@@ -1135,6 +1135,15 @@ export async function POST(req: NextRequest) {
   )
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
+  const modelFallbacks = Array.from(
+    new Set(
+      [
+        String(process.env.OPENAI_FOOD_MODEL_FALLBACK || '').trim(),
+        model === 'gpt-5.2' ? 'gpt-4.1-mini' : 'gpt-4o-mini',
+        'gpt-4.1-mini',
+      ].filter(Boolean),
+    ),
+  )
   let record: RecommendedMealRecord | null = null
   const maxAttempts = 3
 
@@ -1197,30 +1206,57 @@ export async function POST(req: NextRequest) {
     }
 
     let content = ''
-    try {
-      const completion = await runChatCompletionWithLogging(
-        openai,
-        {
-          model,
-          temperature: 0.5,
-          ...(model.toLowerCase().includes('gpt-5') ? { max_completion_tokens: maxOutputTokens } : { max_tokens: maxOutputTokens }),
-          messages: [
-            { role: 'system', content: system },
-            { role: 'user', content: userPrompt },
-          ],
-        } as any,
-        {
-          feature: 'food:ai-meal-recommendation',
-          userId: user.id,
-          userLabel: user.email,
-          endpoint: '/api/ai-meal-recommendation',
-        },
-      )
-      const raw = (completion as any)?.choices?.[0]?.message?.content
-      content = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.map((p: any) => p?.text || '').join('') : ''
-    } catch (err: any) {
-      console.error('[ai-meal-recommendation] LLM call failed', err)
-      return NextResponse.json({ error: 'AI failed' }, { status: 500 })
+    let modelUsed = ''
+    let llmError: any = null
+    const attemptModels = Array.from(new Set([model, ...modelFallbacks].filter(Boolean)))
+    for (const attemptModel of attemptModels) {
+      try {
+        const completion = await runChatCompletionWithLogging(
+          openai,
+          {
+            model: attemptModel,
+            temperature: 0.5,
+            ...(attemptModel.toLowerCase().includes('gpt-5')
+              ? { max_completion_tokens: maxOutputTokens }
+              : { max_tokens: maxOutputTokens }),
+            messages: [
+              { role: 'system', content: system },
+              { role: 'user', content: userPrompt },
+            ],
+          } as any,
+          {
+            feature: 'food:ai-meal-recommendation',
+            userId: user.id,
+            userLabel: user.email,
+            endpoint: '/api/ai-meal-recommendation',
+            callDetail: `generate:${attemptModel}`,
+          },
+        )
+        const raw = (completion as any)?.choices?.[0]?.message?.content
+        content = typeof raw === 'string' ? raw : Array.isArray(raw) ? raw.map((p: any) => p?.text || '').join('') : ''
+        if (content.trim()) {
+          modelUsed = attemptModel
+          break
+        }
+      } catch (err: any) {
+        llmError = err
+        console.warn('[ai-meal-recommendation] model failed, trying fallback', {
+          model: attemptModel,
+          message: String(err?.message || err || ''),
+        })
+      }
+    }
+    if (!content.trim()) {
+      console.error('[ai-meal-recommendation] all model attempts failed', {
+        baseModel: model,
+        fallbackModels: modelFallbacks,
+        message: String(llmError?.message || llmError || ''),
+      })
+      if (attempt + 1 < maxAttempts) continue
+      return NextResponse.json({ error: 'AI is temporarily busy. Please try again in a moment.' }, { status: 503 })
+    }
+    if (modelUsed && modelUsed !== model) {
+      console.warn('[ai-meal-recommendation] used fallback model', { modelUsed, baseModel: model })
     }
 
     const parsed = parseJsonRelaxed(content)
