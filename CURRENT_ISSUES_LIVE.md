@@ -63,6 +63,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 20:16 AEDT
+- What changed: News UX polish. Replaced confusing `8 min read` wording with clearer text like `Reading time: About 8 minutes`. Also added images to the recommended article cards at the bottom of each news article page.
+- Where to see it (page/link): `/news` and any article page such as `/news/complete-food-tracking-workflow`
+- What to quickly test: Open an article and confirm the top metadata line now shows `Reading time: About X minutes`; scroll to “More from Helfi News” and confirm each card shows an image thumbnail.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 16:03 AEDT
 - What changed: SEO pass on News pages. Added article index schema (JSON-LD) on `/news`, added related internal links on each article page, and added clear published + updated metadata on every news article (also reflected in article schema/OpenGraph modified time).
 - Where to see it (page/link): `/news`, `/news/mobile-apps-coming-soon`, `/news/complete-food-tracking-workflow`, `/news/weekly-health-insights-you-can-use`, `/news/meal-water-sleep-consistency`
