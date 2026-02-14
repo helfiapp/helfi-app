@@ -1648,6 +1648,7 @@ export default function MealBuilderClient() {
   const editFavoriteSourceItemsRef = useRef<any[] | null>(null)
   const editFavoriteIsCustomRef = useRef(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [ingredientsListExpanded, setIngredientsListExpanded] = useState(true)
   const [lastRemoved, setLastRemoved] = useState<{ item: BuilderItem; index: number } | null>(null)
   const undoRemoveTimeoutRef = useRef<any>(null)
   const [portionAmountInput, setPortionAmountInput] = useState('')
@@ -1702,6 +1703,7 @@ export default function MealBuilderClient() {
   const recipeImportAppliedRef = useRef(false)
   const recipeImportPortionPrefilledRef = useRef(false)
   const editCollapseAppliedScopeRef = useRef<string | null>(null)
+  const editListCollapseAppliedScopeRef = useRef<string | null>(null)
 
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
   const [favoritesSearch, setFavoritesSearch] = useState('')
@@ -2150,6 +2152,21 @@ export default function MealBuilderClient() {
     if (editCollapseAppliedScopeRef.current === editScopeKey) return
     setExpandedId(null)
     editCollapseAppliedScopeRef.current = editScopeKey
+  }, [editScopeKey, editFavoriteId, sourceLogId, loadedFavoriteId])
+
+  useEffect(() => {
+    // UX rule: when reopening an already-saved meal, the whole "Your ingredients" section starts collapsed.
+    if (!editScopeKey) {
+      editListCollapseAppliedScopeRef.current = null
+      setIngredientsListExpanded(true)
+      return
+    }
+    const expectedLoadedId = editFavoriteId ? editFavoriteId : `log:${sourceLogId}`
+    if (!expectedLoadedId) return
+    if (loadedFavoriteId !== expectedLoadedId) return
+    if (editListCollapseAppliedScopeRef.current === editScopeKey) return
+    setIngredientsListExpanded(false)
+    editListCollapseAppliedScopeRef.current = editScopeKey
   }, [editScopeKey, editFavoriteId, sourceLogId, loadedFavoriteId])
 
   useEffect(() => {
@@ -5724,12 +5741,32 @@ export default function MealBuilderClient() {
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <div className="text-sm font-semibold text-gray-900">Your ingredients</div>
+            <button
+              type="button"
+              onClick={() => {
+                if (items.length === 0) return
+                setIngredientsListExpanded((prev) => !prev)
+              }}
+              className={`flex items-center gap-2 text-sm font-semibold ${
+                items.length === 0 ? 'text-gray-900 cursor-default' : 'text-gray-900 hover:text-gray-700'
+              }`}
+            >
+              <span>Your ingredients</span>
+              {items.length > 0 ? <span className="text-gray-400">{ingredientsListExpanded ? '▾' : '▸'}</span> : null}
+            </button>
             <div className="text-xs text-gray-500">{items.length} item{items.length === 1 ? '' : 's'}</div>
           </div>
 
           {items.length === 0 ? (
             <div className="text-sm text-gray-500">Add ingredients using the search above.</div>
+          ) : !ingredientsListExpanded ? (
+            <button
+              type="button"
+              onClick={() => setIngredientsListExpanded(true)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-xs text-gray-600 hover:bg-gray-100"
+            >
+              Ingredients are hidden. Tap to expand.
+            </button>
           ) : (
             <div className="space-y-2">
               {items.map((it) => {
