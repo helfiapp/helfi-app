@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 18:45 AEDT
+- What changed: Added one single top-level expander for `Your ingredients` in Build a meal edit mode. When reopening a saved recipe, the whole ingredient list now starts retracted in one section (instead of showing all ingredient rows).
+- Where to see it (page/link): `/food/build-meal?sourceLogId=<saved_entry_id>` and `/food/build-meal?editFavoriteId=<favorite_id>`
+- What to quickly test: Reopen a saved recipe entry and confirm `Your ingredients` is collapsed as one section by default. Tap the header to open all ingredient rows.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 17:53 AEDT
 - What changed: Reopened saved recipe edits now use a truly compact collapsed ingredient list. When reopening a saved meal, each ingredient stays title-only until tapped open, so you can reach Save/Update faster without long scrolling.
 - Where to see it (page/link): `/food/build-meal?sourceLogId=<saved_entry_id>` and `/food/build-meal?editFavoriteId=<favorite_id>`
