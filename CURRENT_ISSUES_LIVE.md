@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 00:11 AEDT
+- What changed: Improved Build-a-meal clarity and speed for AI recommended imports. Portion text now reads "This portion is X% of the full amount." and is shown directly under the portion field. Also sped up small imports by using AI-provided ingredient nutrition directly first (when available) and using faster lookup mode for short ingredient lists.
+- Where to see it (page/link): /food/build-meal (after opening from /food/recommended with Build this meal)
+- What to quickly test: Generate an AI meal, click Build this meal, confirm ingredients populate faster; confirm the portion helper appears under the portion field with the new wording.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 23:47 AEDT
 - What changed: Added a visible date-range helper under Check-in History time period controls so users can immediately see the actual data window being shown (example: “Showing data from Feb 4 to Feb 13”). Added on web and native parity screen.
 - Where to see it (page/link): `/check-in/history` and native Daily Check-In -> Rating History
