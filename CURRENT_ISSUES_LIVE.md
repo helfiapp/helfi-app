@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 17:10 AEDT
+- What changed: Recipe import photo flow now shows thumbnail previews of selected photos while importing, then clears those photos automatically after a successful import. Build-a-meal edit mode now starts with ingredient cards collapsed by default when reopening an already-saved meal (without changing first-time pre-save recipe import behavior).
+- Where to see it (page/link): `/food/import-recipe` (Import by photo), `/food/build-meal?sourceLogId=<saved_entry_id>` or `/food/build-meal?editFavoriteId=<favorite_id>`
+- What to quickly test: On mobile, choose/take recipe photos and confirm thumbnails are visible before import, then gone after success. Open a previously saved meal in edit mode and confirm all ingredient cards start collapsed.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 16:46 AEDT
 - What changed: Fixed imported recipe rename not showing in Food Diary after pressing Update. Build-a-meal now treats diary save failures as real failures (no silent success), sends the updated name in return override data, and Food Diary now applies that name override with short retries while entries load.
 - Where to see it (page/link): `/food` and `/food/build-meal`
