@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 20:11 AEDT
+- What changed: Fixed History-tab-only scroll lock on Check-in by removing the extra overscroll lock on the History page wrapper. Today’s Check-in and History tabs now use matching page scroll behavior.
+- Where to see it (page/link): `https://helfi.ai/check-in/history`
+- What to quickly test: Open `/check-in`, switch to `Rating History`, then scroll up/down with mouse wheel or trackpad. Confirm scrolling continues to work after tab switch.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 19:43 AEDT
 - What changed: Fixed the check-in history page scroll lock on desktop by tightening sidebar wheel handling in the shared layout. Wheel handling now only runs when scrolling starts inside the left sidebar, so `/check-in/history` scrolls normally again.
 - Where to see it (page/link): `https://helfi.ai/check-in/history`
