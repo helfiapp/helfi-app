@@ -2559,22 +2559,24 @@ export default function MealBuilderClient() {
     return items
   }
 
-  const resolveItemWithMacros = async (lookup: string) => {
-    const cacheKey = normalizeRecipeLookupValue(lookup)
-    if (!cacheKey) return null
+  const resolveItemWithMacros = async (lookup: string, options?: { fastImportMode?: boolean }) => {
+    const lookupKey = normalizeRecipeLookupValue(lookup)
+    if (!lookupKey) return null
+    const fastImportMode = Boolean(options?.fastImportMode)
+    const cacheKey = `${fastImportMode ? 'fast' : 'full'}:${lookupKey}`
     if (importResolveCacheRef.current.has(cacheKey)) {
       return importResolveCacheRef.current.get(cacheKey) || null
     }
 
     const candidates = buildRecipeLookupCandidates(lookup)
     const localAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
-      { kind: 'single', source: 'usda', localOnly: true, timeoutMs: 1800 },
-      { kind: 'single', source: 'auto', localOnly: true, timeoutMs: 1800 },
-      { kind: 'packaged', source: 'auto', localOnly: true, timeoutMs: 1800 },
+      { kind: 'single', source: 'usda', localOnly: true, timeoutMs: fastImportMode ? 900 : 1800 },
+      { kind: 'single', source: 'auto', localOnly: true, timeoutMs: fastImportMode ? 900 : 1800 },
+      { kind: 'packaged', source: 'auto', localOnly: true, timeoutMs: fastImportMode ? 900 : 1800 },
     ]
     const remoteAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
-      { kind: 'single', source: 'auto', timeoutMs: 2600 },
-      { kind: 'packaged', source: 'auto', timeoutMs: 2600 },
+      { kind: 'single', source: 'auto', timeoutMs: fastImportMode ? 1400 : 2600 },
+      { kind: 'packaged', source: 'auto', timeoutMs: fastImportMode ? 1400 : 2600 },
     ]
 
     const findBestAcrossAttempts = async (
@@ -2613,6 +2615,11 @@ export default function MealBuilderClient() {
       }
     }
 
+    if (fastImportMode) {
+      importResolveCacheRef.current.set(cacheKey, null)
+      return null
+    }
+
     // Last-chance retry for obvious single foods on slow/unstable connections.
     const resilientAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
       { kind: 'single', source: 'usda', localOnly: true, timeoutMs: 4500 },
@@ -2620,7 +2627,7 @@ export default function MealBuilderClient() {
       { kind: 'single', source: 'auto', timeoutMs: 5500 },
     ]
     const resilientCandidates = Array.from(
-      new Set([cacheKey, ...getRecipeCoreTokens(cacheKey).map((token) => singularizeToken(token)).filter(Boolean)]),
+      new Set([lookupKey, ...getRecipeCoreTokens(lookupKey).map((token) => singularizeToken(token)).filter(Boolean)]),
     ).slice(0, 4)
     for (const candidate of resilientCandidates) {
       if (!candidate || candidate.length < 2) continue
@@ -2945,6 +2952,8 @@ export default function MealBuilderClient() {
     const run = async () => {
       const lines = ingredients.map((l) => String(l || '').trim()).filter(Boolean).slice(0, 60)
       if (lines.length === 0) return
+      const fastImportMode = lines.length <= 6
+      const prefillItems = Array.isArray((draft as any).prefillItems) ? ((draft as any).prefillItems as any[]) : []
       const seenImportKeys = new Set<string>()
       const seenImportNames = new Set<string>()
       for (const existing of items) {
@@ -2987,7 +2996,8 @@ export default function MealBuilderClient() {
         })
       }
       try {
-        for (const line of lines) {
+        for (let lineIndex = 0; lineIndex < lines.length; lineIndex += 1) {
+          const line = lines[lineIndex]
           const parsed = parseLine(line)
           const lookup = String(parsed.lookup || '').trim()
           const currentLine = lookup || line
@@ -3015,7 +3025,44 @@ export default function MealBuilderClient() {
             publishProgress(currentLine)
             continue
           }
-          const resolved = await resolveItemWithMacros(lookup)
+          const prefill = prefillItems[lineIndex]
+          const prefillLine = String(prefill?.importLine || '').trim()
+          const prefillName = String(prefill?.name || '').trim()
+          const prefillLineKey = toImportNameKey(prefillLine)
+          const prefillNameKey = toImportNameKey(prefillName)
+          const prefillMatchesLine =
+            (!prefillLineKey && !prefillNameKey) || prefillLineKey === lineNameKey || prefillNameKey === lineNameKey
+
+          if (prefillMatchesLine) {
+            const prefillCandidate = {
+              source: 'ai-recommended',
+              id: String(prefill?.id || `prefill-${lineIndex}`),
+              name: prefillName || lookup || line,
+              brand: null,
+              serving_size: prefill?.serving_size ? String(prefill.serving_size) : null,
+              calories: Number.isFinite(Number(prefill?.calories)) ? Number(prefill.calories) : null,
+              protein_g: Number.isFinite(Number(prefill?.protein_g)) ? Number(prefill.protein_g) : null,
+              carbs_g: Number.isFinite(Number(prefill?.carbs_g)) ? Number(prefill.carbs_g) : null,
+              fat_g: Number.isFinite(Number(prefill?.fat_g)) ? Number(prefill.fat_g) : null,
+              fiber_g: Number.isFinite(Number(prefill?.fiber_g)) ? Number(prefill.fiber_g) : null,
+              sugar_g: Number.isFinite(Number(prefill?.sugar_g)) ? Number(prefill.sugar_g) : null,
+            } as NormalizedFoodItem
+            if (hasMacroData(prefillCandidate)) {
+              addItemDirectWithOverrides(
+                prefillCandidate,
+                { amount: parsed.amount, unit: parsed.unit },
+                { displayName: lookup, matchedName: prefillCandidate.name, importKey: lineKey },
+              )
+              if (lineKey) seenImportKeys.add(lineKey)
+              if (lineNameKey) seenImportNames.add(lineNameKey)
+              processedCount += 1
+              matchedCount += 1
+              publishProgress(currentLine)
+              continue
+            }
+          }
+
+          const resolved = await resolveItemWithMacros(lookup, { fastImportMode })
           if (!resolved) {
             setRecipeImportProgress((prev) => ({
               ...prev,
@@ -5621,6 +5668,11 @@ export default function MealBuilderClient() {
                 <option value="oz">oz</option>
               </select>
             </div>
+            {totalRecipeWeightG > 0 && Number.isFinite(portionScale) && portionScale > 0 ? (
+              <div className="mt-2 text-[11px] text-emerald-700">
+                This portion is {Math.round(portionScale * 100)}% of the full amount.
+              </div>
+            ) : null}
             <div className="mt-2 flex flex-wrap gap-2">
               <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
                 <span className="font-semibold text-gray-900">{formatEnergyValue(mealTotals.calories, energyUnit)}</span> {energyUnit}
@@ -5674,11 +5726,6 @@ export default function MealBuilderClient() {
                 </button>
               </div>
             ) : null}
-            {portionScale < 1 && (
-              <div className="mt-1 text-[11px] text-emerald-700">
-                Saving about {Math.round(portionScale * 100)}% of the recipe.
-              </div>
-            )}
             {showPortionSaveCta && (
               <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
                 <div className="text-[11px] text-gray-600">Ready to save this portion.</div>

@@ -59,6 +59,18 @@ type RecipeImportDraft = {
   prepMinutes: number | null
   cookMinutes: number | null
   ingredients: string[]
+  prefillItems?: Array<{
+    importLine: string
+    id?: string
+    name: string
+    serving_size?: string | null
+    calories?: number | null
+    protein_g?: number | null
+    carbs_g?: number | null
+    fat_g?: number | null
+    fiber_g?: number | null
+    sugar_g?: number | null
+  }>
   steps: string[]
   sourceUrl: string | null
   saveRecipe: boolean
@@ -236,10 +248,27 @@ const buildRecipeImportDraftFromRecommendation = (
   items: RecommendedItem[],
   categoryLabel: string,
 ): RecipeImportDraft => {
-  const ingredients = (Array.isArray(items) ? items : [])
-    .map((it) => buildImportLineFromRecommendedItem(it))
-    .filter(Boolean)
+  const pairs = (Array.isArray(items) ? items : [])
     .slice(0, 60)
+    .map((it) => {
+      const importLine = buildImportLineFromRecommendedItem(it)
+      return { importLine, item: it }
+    })
+    .filter((pair) => Boolean(pair.importLine))
+
+  const ingredients = pairs.map((pair) => pair.importLine)
+  const prefillItems = pairs.map((pair) => ({
+    importLine: pair.importLine,
+    id: pair.item?.id ? String(pair.item.id) : undefined,
+    name: String(pair.item?.name || '').trim() || 'Food',
+    serving_size: pair.item?.serving_size || null,
+    calories: Number.isFinite(Number(pair.item?.calories)) ? Number(pair.item?.calories) : null,
+    protein_g: Number.isFinite(Number(pair.item?.protein_g)) ? Number(pair.item?.protein_g) : null,
+    carbs_g: Number.isFinite(Number(pair.item?.carbs_g)) ? Number(pair.item?.carbs_g) : null,
+    fat_g: Number.isFinite(Number(pair.item?.fat_g)) ? Number(pair.item?.fat_g) : null,
+    fiber_g: Number.isFinite(Number(pair.item?.fiber_g)) ? Number(pair.item?.fiber_g) : null,
+    sugar_g: Number.isFinite(Number(pair.item?.sugar_g)) ? Number(pair.item?.sugar_g) : null,
+  }))
 
   const recipe = rec?.recipe || null
   const steps = Array.isArray(recipe?.steps)
@@ -259,6 +288,7 @@ const buildRecipeImportDraftFromRecommendation = (
     prepMinutes,
     cookMinutes,
     ingredients,
+    prefillItems,
     steps,
     sourceUrl: null,
     saveRecipe: false,
