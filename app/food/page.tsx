@@ -11657,7 +11657,9 @@ Please add nutritional information manually if needed.`);
       return String(item?.name || item?.label || '').trim()
     })()
     const fallbackTitle = extractBaseMealDescription(editingEntry?.description || aiDescription || '') || ''
-    const resolvedTitle = (titleInput || singleItemName || fallbackTitle || generatedSummary || '').trim()
+    // Keep the existing visible title unless the user explicitly changes it.
+    // Do not let single-item database names silently overwrite a custom/favorite label.
+    const resolvedTitle = (titleInput || fallbackTitle || singleItemName || generatedSummary || '').trim()
     const finalDescription = noteInput ? `${resolvedTitle}\n${noteInput}` : resolvedTitle
     const previousLabel = normalizeMealLabel(baseTitle) || baseTitle
     const nextLabel = normalizeMealLabel(resolvedTitle) || resolvedTitle
@@ -13536,6 +13538,11 @@ Please add nutritional information manually if needed.`);
     const byFavoriteId = new Map<string, string>()
     const bySourceId = new Map<string, string>()
     const byBarcode = new Map<string, string>()
+    const favoriteById = new Map<string, any>()
+    ;(Array.isArray(favorites) ? favorites : []).forEach((fav: any) => {
+      const id = typeof fav?.id === 'string' ? String(fav.id).trim() : ''
+      if (id) favoriteById.set(id, fav)
+    })
     const list = Array.isArray(foodNameOverrides) ? foodNameOverrides : []
     for (const row of list) {
       const fromRaw = typeof (row as any)?.from === 'string' ? String((row as any).from) : ''
@@ -13547,6 +13554,46 @@ Please add nutritional information manually if needed.`);
       const from = normalizeMealLabel(fromRaw || '')
       const to = normalizeMealLabel(toRaw || '').trim()
       if (!from || !to) continue
+      // Guard rail: ignore reverse overrides that try to expand a user's favorite label
+      // back to the single-item database ingredient name.
+      if (favIdRaw && favoriteById.has(favIdRaw)) {
+        const favorite = favoriteById.get(favIdRaw)
+        const favoriteLabel = normalizeMealLabel(
+          favoriteDisplayLabel(favorite) || favorite?.label || favorite?.description || '',
+        ).trim()
+        const favoriteItems = (() => {
+          const candidate = favorite?.items
+          if (Array.isArray(candidate)) return candidate
+          if (typeof candidate === 'string') {
+            try {
+              const parsed = JSON.parse(candidate)
+              return Array.isArray(parsed) ? parsed : null
+            } catch {
+              return null
+            }
+          }
+          return null
+        })()
+        const singleItemName =
+          Array.isArray(favoriteItems) && favoriteItems.length === 1
+            ? normalizeMealLabel(String(favoriteItems[0]?.name || favoriteItems[0]?.label || '')).trim()
+            : ''
+        const fromKey = normalizeFoodName(from)
+        const toKey = normalizeFoodName(to)
+        const favoriteKey = normalizeFoodName(favoriteLabel)
+        const singleItemKey = normalizeFoodName(singleItemName)
+        if (
+          favoriteKey &&
+          singleItemKey &&
+          fromKey &&
+          toKey &&
+          fromKey === favoriteKey &&
+          toKey === singleItemKey &&
+          fromKey !== toKey
+        ) {
+          continue
+        }
+      }
       if (itemIdRaw) byItemId.set(itemIdRaw, to)
       if (favIdRaw) byFavoriteId.set(favIdRaw, to)
       if (srcIdRaw) bySourceId.set(srcIdRaw, to)
@@ -13565,7 +13612,7 @@ Please add nutritional information manually if needed.`);
     ;(map as any).__bySourceId = bySourceId
     ;(map as any).__byBarcode = byBarcode
     return map
-  }, [foodNameOverrides])
+  }, [foodNameOverrides, favorites])
 
   const applyFoodNameOverride = (raw: any, entry?: any) => {
     try {
@@ -15922,6 +15969,33 @@ Please add nutritional information manually if needed.`);
         (entry?.total && (entry.total as any).__sourceId) ||
         ''
     } catch {}
+    try {
+      const resolved = resolveFavoriteForEntry(entry, from)
+      const linkedFavorite = resolved?.favorite || null
+      const linkedFavoriteLabel = normalizeMealLabel(
+        favoriteDisplayLabel(linkedFavorite) || linkedFavorite?.label || linkedFavorite?.description || '',
+      ).trim()
+      const parsedItems = parseEntryItemsForMatching(entry)
+      const singleItemRaw =
+        Array.isArray(parsedItems) && parsedItems.length === 1
+          ? String(parsedItems[0]?.name || parsedItems[0]?.label || '').trim()
+          : ''
+      const singleItemLabel = normalizeMealLabel(singleItemRaw).trim()
+      const linkedKey = normalizeFoodName(linkedFavoriteLabel)
+      const toKey = normalizeFoodName(to)
+      const singleItemKey = normalizeFoodName(singleItemLabel)
+      if (
+        favoriteId &&
+        linkedKey &&
+        toKey &&
+        singleItemKey &&
+        linkedKey === normalizeFoodName(from) &&
+        toKey === singleItemKey &&
+        linkedKey !== toKey
+      ) {
+        return
+      }
+    } catch {}
     setFoodNameOverrides((prev) => {
       const base = Array.isArray(prev) ? prev : []
       const next = base.filter((row: any) => {
@@ -16635,7 +16709,9 @@ Please add nutritional information manually if needed.`);
       favorite.items && Array.isArray(favorite.items) && favorite.items.length > 0
         ? JSON.parse(JSON.stringify(favorite.items))
         : null
+    const explicitFavoriteLabel = normalizeMealLabel(favorite.label || favorite.description || '').trim()
     const baseDescription =
+      explicitFavoriteLabel ||
       applyFoodNameOverride(favorite.label || favorite.description || 'Favorite meal', favorite) ||
       favorite.label ||
       favorite.description ||
@@ -16916,7 +16992,7 @@ Please add nutritional information manually if needed.`);
     if (!favId) return
     const existing = (Array.isArray(favorites) ? favorites : []).find((f: any) => String(f?.id || '') === favId) || null
     if (!existing) return
-    const current = applyFoodNameOverride(favoriteDisplayLabel(existing) || 'Favorite', existing) || 'Favorite'
+    const current = favoriteDisplayLabel(existing) || 'Favorite'
     openRenameModal(current, (nextName) => {
       const cleaned = normalizeMealLabel(nextName) || nextName
       try {
@@ -25666,18 +25742,12 @@ Please add nutritional information manually if needed.`);
                         ? ''
                         : applyFoodNameOverride(baseEntryLabel, food) || String(baseEntryLabel || '').trim()
                       const baseShort = isWaterEntry ? '' : extractBaseMealDescription(String(appliedBaseLabel || ''))
-                      const looksLikeRawSourceLabel =
-                        !isWaterEntry &&
-                        baseShort &&
-                        (baseShort.length >= 45 ||
-                          /,\s*(broiler|fryers|skinless|boneless|meat only|cooked|braised)\b/i.test(baseShort))
                       const shouldPreferFavoriteShortLabel =
                         !isWaterEntry &&
                         !overrideOnly &&
                         !favoriteManualEdit &&
                         Boolean(favoriteLabel) &&
                         Boolean(baseShort) &&
-                        looksLikeRawSourceLabel &&
                         normalizeFoodName(baseShort) !== normalizeFoodName(favoriteLabel)
                       const preferBaseTitleOverItem =
                         !isWaterEntry &&

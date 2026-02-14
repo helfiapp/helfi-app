@@ -650,6 +650,8 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 - Add-from-favorites must use one shared tap guard (single action key) before routing to insert paths, so one tap cannot create a duplicate entry through mixed insert flows.
 - Missing-linked-favorite recovery lock: if recent diary rows still contain `__favoriteId` but the favorites list is missing those IDs, rebuild those favorites from the linked diary rows (label/items/nutrition) and persist them so saved meals do not disappear.
 - Favorites stale-write lock: when saving favorites, do not allow a partial/stale payload to drop favorite IDs that are still linked from recent diary rows.
+- Rename stickiness lock: if a user renames a favorite/entry (example `Peach`), keep that title as the entry title unless the user explicitly types a different title. Do not silently fall back to the single-item database ingredient name on save.
+- Favorite-label lock: if an entry is linked to a favorite and was not manually renamed, show the saved favorite label in diary rows whenever it differs from the raw source label (not only long USDA names).
 - Water entries must appear under the **category they were logged in**, not default to Other.
 - Editing/renaming a drink entry must **preserve** `__drinkType` and `__waterLogId` so the linked water log stays hidden in Food Diary.
 
