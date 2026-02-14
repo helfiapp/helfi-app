@@ -2329,6 +2329,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 **Must keep:**
 - Drink metadata can live in either `nutrition` or `total`; read from both with fallback.
 - Do not drop `__drinkType`, `__drinkAmount`, `__drinkUnit`, `__drinkAmountMl`, `__waterLogId` during edit/save/update flows.
+- In Food Diary row rendering (`app/food/page.tsx` -> `renderEntryCard`), explicit drink metadata must always win over favorite-name heuristics.
 - Drink entries linked to water logging must never be loosely remapped to favorites by label/alias/token matching.
 - In favorites picker add flow, when drink context is active (`drinkAmount`/`drinkType` flow), prefer the selected row entry payload over a loosely linked favorite template.
 - Drink scaling lock (all drink types): only scale by `drinkAmount` when the source entry has a reliable base serving volume. Never scale from tiny/invalid bases (like `1 ml`) or raw ml multiplication can explode calories.
@@ -2347,6 +2348,39 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 7. In `app/api/food-log/route.ts`, keep the sugar-free hot chocolate save guard (sweetener-only totals).
 8. In `app/food/page.tsx`, keep the sugar-free hot chocolate load guard so stale rows are corrected on display.
 9. In `applyDrinkOverrideToItems(...)`, keep the reliable-base-volume checks and tiny-base block (`baseMl < 20`).
+
+### 7.6.1 Delayed Drink->Food Flip Lock (HEL-156, Feb 2026 - STRICT LOCK)
+
+**Owner-reported symptom (LIVE):**
+- On `/food` refresh, a row like `Coke Zero` first shows correctly as a drink (`Soft Drink` icon + `150 ml`), then about 5 seconds later flips to food style icon/text with no drink amount.
+
+**Root cause pattern:**
+- Initial render used real drink metadata correctly.
+- Delayed refresh/remap path re-applied favorite-label heuristics and overrode drink rendering.
+
+**Non-negotiable rule:**
+- If `drinkMeta?.type` exists on a non-water entry, that row must stay a drink row.
+- Favorite label logic is fallback only and must never override explicit drink metadata.
+
+**Code lock (must preserve):**
+- File: `app/food/page.tsx`
+- In `renderEntryCard`, keep this precedence:
+  1. `hasExplicitDrinkMeta = !isWaterEntry && Boolean(drinkMeta?.type)`
+  2. `forceFoodIconForFavorite` can only apply when `!hasExplicitDrinkMeta`
+  3. `isDrinkEntry` must be true when `hasExplicitDrinkMeta` is true
+
+**If this breaks again, restore this first:**
+1. Re-open `app/food/page.tsx` and restore the explicit-meta-first logic above.
+2. Confirm favorite-name checks do not run as an override when explicit drink metadata exists.
+3. Run Playwright on LIVE (`https://helfi.ai/food`):
+   - Use a date containing a linked drink entry (example: `2026-02-14`, Breakfast -> `Coke Zero`).
+   - Hard refresh 3 times.
+   - Watch the row for at least 10 seconds after each refresh.
+   - Expected: stays as drink icon + `150 ml`, no delayed flip to food icon.
+
+**Last stable deployment for this lock:**
+- Commit: `52e8d130`
+- Date: `2026-02-14`
 
 ## 7.7 Smart Health Coach Anti-Spam Guard (Feb 2026 – Locked)
 

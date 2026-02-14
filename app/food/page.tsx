@@ -25871,9 +25871,14 @@ Please add nutritional information manually if needed.`);
                         !hasExplicitDrinkMeta &&
                         Boolean(favoriteLabel) &&
                         !favoriteLooksLikeDrink
-                      // DO NOT TOUCH (owner lock):
-                      // If drink metadata exists, trust it directly for drink rendering.
-                      // Heuristic-only checks are fallback; they must not hide drink icons when meta is present.
+                      // DO NOT TOUCH - DRINK RENDER LOCK (owner lock, HEL-156):
+                      // Regression that already happened: after refresh, a drink row could show correctly first,
+                      // then flip to food style when delayed favorite-label heuristics ran.
+                      // Rule: if explicit drink metadata exists, keep drink rendering no matter what favorite label says.
+                      // If broken, restore this precedence:
+                      // 1) `hasExplicitDrinkMeta` first
+                      // 2) `forceFoodIconForFavorite` only when NO explicit drink metadata
+                      // 3) `isDrinkEntry` true whenever explicit drink metadata exists
                       const isDrinkEntry =
                         !isWaterEntry &&
                         (hasExplicitDrinkMeta || (!forceFoodIconForFavorite && Boolean(drinkLiquidHint)))

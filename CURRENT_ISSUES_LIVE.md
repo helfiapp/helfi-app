@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 01:02 AEDT
+- What changed: Added strict lock-down guard rails and in-code warning for the Food Diary drink-row flip regression (HEL-156). Future agents now have explicit "do not override explicit drink metadata" rules plus a clear Playwright recovery checklist if the issue ever returns.
+- Where to see it (page/link): `GUARD_RAILS.md` section `7.6.1 Delayed Drink->Food Flip Lock (HEL-156)` and `app/food/page.tsx` (`renderEntryCard` drink icon logic comment).
+- What to quickly test: Open `/food`, use a date with `Coke Zero` drink entry (example `2026-02-14`), hard refresh 3 times, confirm row stays drink icon + `150 ml` for 10+ seconds.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 00:44 AEDT
 - What changed: Replaced the old No/Yes save control (after Build a meal imports) with a clear toggle switch. Wording is now: "Would you like to save this as a custom meal?" Toggle is OFF by default and turns green when ON.
 - Where to see it (page/link): /food/build-meal (after opening from AI Recommended -> Build this meal, or any recipe import flow)
