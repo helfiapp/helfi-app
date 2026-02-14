@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 12:38 AEDT
+- What changed: Added the new `IOS AND AND ANDROID BANNER.png` to the hero section of the article page `/news/mobile-apps-coming-soon`, replacing the generic placeholder block.
+- Where to see it (page/link): `/news/mobile-apps-coming-soon`
+- What to quickly test: Open the article page and confirm the new iOS/Android banner is visible in the hero area under the title.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 11:57 AEDT
 - What changed: Added the supplied News images from your BLOG IMAGES folder. `BLOG BANNER.png` now appears under the header on `/news`, and `WHAT IS NEXT FOR HELFI.png` now replaces the featured-story green placeholder image panel.
 - Where to see it (page/link): `/news`
