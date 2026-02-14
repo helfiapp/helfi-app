@@ -3546,6 +3546,7 @@ export default function FoodDiary() {
     const params = new URLSearchParams(window.location.search)
     const open = params.get('open')
     if (!open) {
+      openMenuKeyRef.current = null
       clearPendingDrinkContext()
       return
     }
@@ -3554,7 +3555,9 @@ export default function FoodDiary() {
     const drinkOverride = parseDrinkOverrideFromParams(params)
     const drinkType = parseDrinkTypeFromParams(params)
     const waterLogId = parseDrinkWaterLogIdFromParams(params)
-    const key = `${open}|${routeDate}|${routeCategory}`
+    const drinkAmountKey = drinkOverride ? String(drinkOverride.amount) : ''
+    const drinkUnitKey = drinkOverride ? String(drinkOverride.unit) : ''
+    const key = `${open}|${routeDate}|${routeCategory}|${drinkAmountKey}|${drinkUnitKey}|${drinkType || ''}|${waterLogId || ''}`
     if (openMenuKeyRef.current === key) return
     openMenuKeyRef.current = key
 
