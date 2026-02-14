@@ -5734,6 +5734,7 @@ export default function MealBuilderClient() {
             <div className="space-y-2">
               {items.map((it) => {
                 const expanded = expandedId === it.id
+                const compactCollapsedHeader = Boolean((editFavoriteId || sourceLogId) && !expanded)
                 const baseUnits = allowedUnitsForItem(it)
                 const hasCustomUnits = Boolean(getFoodUnitGrams(it.name))
                 const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
@@ -5769,31 +5770,35 @@ export default function MealBuilderClient() {
                           {displayName}
                           {it.brand ? ` – ${it.brand}` : ''}
                         </div>
-                        {isImportedRecipeView ? (
-                          <div className="text-[11px] text-gray-500 truncate">
-                            {it.__baseUnit && amountUnit && fullAmount !== null
-                              ? `Full recipe amount: ${fullAmount} ${amountUnit}`
-                              : `Full recipe servings: ${it.servings}`}
-                          </div>
-                        ) : (
-                          <div className="text-[11px] text-gray-500 truncate">
-                            {it.serving_size ? `Serving: ${it.serving_size}` : 'Serving: (unknown)'} •{' '}
-                            {it.__baseUnit && amountUnit && fullAmount !== null
-                              ? `Amount (full recipe): ${fullAmount} ${amountUnit}`
-                              : `Servings: ${it.servings}`}
-                          </div>
+                        {!compactCollapsedHeader && (
+                          <>
+                            {isImportedRecipeView ? (
+                              <div className="text-[11px] text-gray-500 truncate">
+                                {it.__baseUnit && amountUnit && fullAmount !== null
+                                  ? `Full recipe amount: ${fullAmount} ${amountUnit}`
+                                  : `Full recipe servings: ${it.servings}`}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-gray-500 truncate">
+                                {it.serving_size ? `Serving: ${it.serving_size}` : 'Serving: (unknown)'} •{' '}
+                                {it.__baseUnit && amountUnit && fullAmount !== null
+                                  ? `Amount (full recipe): ${fullAmount} ${amountUnit}`
+                                  : `Servings: ${it.servings}`}
+                              </div>
+                            )}
+                            {showPortionAmount && amountUnit && portionAmount !== null ? (
+                              <div className="text-[11px] text-gray-500 truncate">
+                                Portion amount: {portionAmount} {amountUnit}
+                              </div>
+                            ) : null}
+                            {it.__matchedName &&
+                            normalizeSearchToken(it.__matchedName) !== normalizeSearchToken(it.name) ? (
+                              <div className="text-[11px] text-gray-400 truncate">
+                                Matched nutrition: {it.__matchedName}
+                              </div>
+                            ) : null}
+                          </>
                         )}
-                        {showPortionAmount && amountUnit && portionAmount !== null ? (
-                          <div className="text-[11px] text-gray-500 truncate">
-                            Portion amount: {portionAmount} {amountUnit}
-                          </div>
-                        ) : null}
-                        {it.__matchedName &&
-                        normalizeSearchToken(it.__matchedName) !== normalizeSearchToken(it.name) ? (
-                          <div className="text-[11px] text-gray-400 truncate">
-                            Matched nutrition: {it.__matchedName}
-                          </div>
-                        ) : null}
                       </div>
                       <div className="flex items-center gap-2">
                         <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
