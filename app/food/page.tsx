@@ -628,6 +628,9 @@ const removeInvalidDrinkMetaFromEntry = (entry: any): { entry: any; changed: boo
   if (Boolean((entry as any)?.__water)) return { entry, changed: false }
   const drinkMeta = getDrinkMetaFromEntry(entry)
   if (!drinkMeta?.type) return { entry, changed: false }
+  // If this entry is explicitly linked to a water log row, keep the drink metadata.
+  // The water-row dedupe depends on this link and should not rely on name heuristics.
+  if (drinkMeta.waterLogId) return { entry, changed: false }
   const likelyDrink = isEntryLikelyDrinkFromContent(entry)
   if (likelyDrink) return { entry, changed: false }
   const nextNutrition = stripDrinkMetaFromTotals(entry?.nutrition || null)
