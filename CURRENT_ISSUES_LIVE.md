@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 14:28 AEDT
+- What changed: Expanded all 4 News articles to long-form human-style content (roughly 900-1,100 words each). Added new hero banners for `/news/weekly-health-insights-you-can-use` and `/news/meal-water-sleep-consistency` using supplied images from BLOG IMAGES.
+- Where to see it (page/link): `/news/mobile-apps-coming-soon`, `/news/complete-food-tracking-workflow`, `/news/weekly-health-insights-you-can-use`, `/news/meal-water-sleep-consistency`
+- What to quickly test: Open each article and confirm longer content loads, and confirm Weekly Insights + Meals/Water/Sleep pages now show the new hero banners instead of placeholders.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 14:08 AEDT
 - What changed: Daily Check-In rating buttons now support tap-to-clear. If you tap a selected rating again, it unselects (clears) that rating instead of staying locked.
 - Where to see it (page/link): `/check-in`
