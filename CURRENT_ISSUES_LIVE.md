@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 02:02 AEDT
+- What changed: Added strict lock so `Change portion` from Add-from-favorites is one-off only. Adjusting portion/ingredients in that flow now cannot update favorite/custom default meal templates. Default template changes are only allowed through Favorites/Custom pencil edit flow.
+- Where to see it (page/link): `/food/build-meal?...&fromFavoriteAdjust=1`, plus guard rail lock in `GUARD_RAILS.md` section `7.6.2`.
+- What to quickly test: Open Add from favorites -> choose meal -> `Change portion`, modify portion, tap `Add`, then reopen same meal in favorites and confirm original default serving/ingredients stay unchanged.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 01:49 AEDT
 - What changed: Updated Favorites add flow to support full portion editing. The first popup now includes `Change portion` (goes straight to full editor). In Preview, `Change amount` is renamed to `Change portion` and also opens full editor. The full editor route now uses Add mode for this flow, so users can still add the meal/item to diary after editing portion and ingredients.
 - Where to see it (page/link): `/food` -> `Add from favorites` (All/Favorites/Custom) -> select meal -> action popup/Preview -> `Change portion`

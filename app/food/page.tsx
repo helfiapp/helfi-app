@@ -16543,6 +16543,9 @@ Please add nutritional information manually if needed.`);
     const label =
       String(state?.label || item?.label || source?.description || source?.label || 'Meal').trim() || 'Meal'
     const category = normalizeCategory(selectedAddCategory)
+    // Owner lock (HEL-160):
+    // This seed launches a one-off "add to diary with adjusted portion" flow.
+    // It must not change saved favorite/custom defaults.
     const seedPayload = {
       v: 1,
       createdAt: Date.now(),

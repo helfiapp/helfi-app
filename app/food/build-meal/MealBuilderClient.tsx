@@ -4540,8 +4540,13 @@ export default function MealBuilderClient() {
     const existingWithSameTitle =
       favorites.find((f: any) => isCustomMealFavorite(f) && String(f?.label || f?.description || '').trim() === title.trim()) || null
 
+    // DO NOT TOUCH (owner lock, HEL-160):
+    // fromFavoriteAdjust is a one-off diary add flow only.
+    // It must never update favorite/custom defaults.
+    // Default favorite/custom edits are allowed only via Favorites/Custom pencil edit flow.
+    const oneOffDiaryAddOnly = isFavoriteAdjustBuild
     const shouldAutoSaveFavorite = (() => {
-      if (isFavoriteAdjustBuild) return false
+      if (oneOffDiaryAddOnly) return false
       if (editFavoriteId) return true
       if (recipeImportDraft) return saveImportedRecipeToFavorites
       return true
@@ -4554,6 +4559,7 @@ export default function MealBuilderClient() {
       if (existingWithSameTitle?.id) return String(existingWithSameTitle.id)
       return `fav-${Date.now()}`
     })()
+    const safeFavoriteLinkId = oneOffDiaryAddOnly ? '' : favoriteLinkId
 
     const itemsForSave = itemsRef.current?.length ? itemsRef.current : items
     const totalsForSave = itemsForSave.reduce(
@@ -4673,7 +4679,7 @@ export default function MealBuilderClient() {
         fiber: round3(scaledTotals.fiber),
         sugar: round3(scaledTotals.sugar),
         __origin: 'meal-builder',
-        ...(favoriteLinkId ? { __favoriteId: favoriteLinkId } : {}),
+        ...(safeFavoriteLinkId ? { __favoriteId: safeFavoriteLinkId } : {}),
         ...(portionMeta ? portionMeta : {}),
         ...(importedRecipeMeta ? { __importRecipe: importedRecipeMeta } : {}),
       },
@@ -4690,7 +4696,7 @@ export default function MealBuilderClient() {
       // Editing a diary entry directly (no favorites template involved).
         if (!editFavoriteId && sourceLogId) {
           const diaryNutrition =
-            favoriteLinkId && payload.nutrition
+            safeFavoriteLinkId && payload.nutrition
               ? { ...(payload.nutrition as any), __favoriteManualEdit: true }
               : payload.nutrition
           const updateRes = await fetch('/api/food-log', {
@@ -4726,8 +4732,8 @@ export default function MealBuilderClient() {
 
         // Keep the linked saved meal in sync (if one exists, or create one for future use).
         try {
-          if (favoriteLinkId) {
-            const existingIndex = favorites.findIndex((f: any) => String(f?.id || '') === favoriteLinkId)
+          if (safeFavoriteLinkId) {
+            const existingIndex = favorites.findIndex((f: any) => String(f?.id || '') === safeFavoriteLinkId)
             const existing = existingIndex >= 0 ? favorites[existingIndex] : null
             const existingLabel = String(existing?.label || existing?.description || '').trim()
             const aliases = Array.isArray((existing as any)?.aliases) ? ([...(existing as any).aliases] as string[]) : []
@@ -4736,7 +4742,7 @@ export default function MealBuilderClient() {
               aliases.push(normalizedExisting)
             }
             const favoritePayload = {
-              id: favoriteLinkId,
+              id: safeFavoriteLinkId,
               sourceId: sourceLogId,
               label: title,
               description,
@@ -4989,11 +4995,11 @@ export default function MealBuilderClient() {
 
       // Auto-save newly created meals into Favorites so they appear under Favorites → Custom.
       // For recipe-import builds, only do this if the user enabled "Save to favorites".
-      if (shouldAutoSaveFavorite && favoriteLinkId) {
+      if (shouldAutoSaveFavorite && safeFavoriteLinkId) {
         try {
           const createdId = typeof data?.id === 'string' ? data.id : null
           const favoritePayload: any = {
-            id: favoriteLinkId,
+            id: safeFavoriteLinkId,
             sourceId: createdId,
             label: title,
             description,

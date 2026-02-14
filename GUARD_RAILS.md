@@ -2382,6 +2382,30 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 - Commit: `52e8d130`
 - Date: `2026-02-14`
 
+### 7.6.2 Favorites "Change portion" Must Be One-Off Entry Only (HEL-160, Feb 2026 - STRICT LOCK)
+
+**Goal (non-negotiable):**
+- If user goes through Food Diary -> Add from favorites -> `Change portion`, that edit must apply only to the one new diary entry being added.
+- It must **not** change default portions/ingredients of saved favorites or custom meals.
+
+**Only allowed default-edit path:**
+- Favorites tab -> pencil icon (edit favorite/custom template)
+- Custom tab -> pencil icon (edit custom template)
+
+**Must keep in code:**
+- In `app/food/build-meal/MealBuilderClient.tsx`, `fromFavoriteAdjust=1` (`isFavoriteAdjustBuild`) must force one-off mode:
+  - do not auto-save/overwrite favorite defaults
+  - do not attach `__favoriteId` link for that add flow
+  - primary action should remain `Add` (not `Update`)
+
+**If this breaks again, restore this first:**
+1. In `createMeal`, keep one-off lock for `isFavoriteAdjustBuild` so favorite persistence is disabled.
+2. Ensure payload nutrition does not include `__favoriteId` in this flow.
+3. Re-test on LIVE with Playwright:
+   - Open Add from favorites -> select meal -> `Change portion`.
+   - Change amount/ingredients and tap `Add`.
+   - Reopen that same favorite in list and confirm its default serving/ingredients are unchanged.
+
 ## 7.7 Smart Health Coach Anti-Spam Guard (Feb 2026 – Locked)
 
 **Goal (non-negotiable):**
