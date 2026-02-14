@@ -663,14 +663,22 @@ export default function CheckinHistoryPage() {
               </p>
 
               <div className="relative h-56 md:h-72">
-                <Line ref={chartRef} data={chartData} options={chartOptions} onClick={handleChartClick} />
+                <Line
+                  ref={chartRef}
+                  data={chartData}
+                  options={chartOptions}
+                  onClick={handleChartClick}
+                  onMouseLeave={handleTooltipDismiss}
+                />
                 {tooltipActive && (
                   <button
                     type="button"
                     onClick={handleTooltipDismiss}
-                    className="absolute inset-0 z-10 cursor-pointer"
+                    className="absolute right-2 top-2 z-10 rounded-md border border-slate-200 bg-white/95 px-2 py-1 text-xs font-medium text-slate-600 shadow-sm hover:bg-white"
                     aria-label="Hide chart tooltip"
-                  />
+                  >
+                    Hide tip
+                  </button>
                 )}
               </div>
               <div className="flex flex-wrap gap-4 mt-4 justify-center">
