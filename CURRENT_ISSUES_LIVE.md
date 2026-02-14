@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 22:21 AEDT
+- What changed: Added `Build this meal` to AI Recommended Meals and wired it into the same Build-a-meal import flow used by Recipe Import. Selecting it now passes an import draft and opens Build a meal with ingredient-by-ingredient matching/progress UI while ingredients are found and added.
+- Where to see it (page/link): `/food/recommended` -> `Build this meal` -> `/food/build-meal?recipeImport=1`
+- What to quickly test: Generate an AI meal, click `Build this meal`, confirm Build a meal shows live import progress and ingredients appear progressively as they are matched; then save as favorite/custom meal.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 20:00 AEDT
 - What changed: Fixed Smart Health Coach duplicate alert spam and anti-nag behavior. Added a hard one-run lock so duplicate scheduler hits cannot send/charge multiple alerts, plus extra cooldowns to block repeated same-category/same-message alerts in short periods. Improved Tip History navigation with direct one-tap buttons back to Smart Coach and Main menu.
 - Where to see it (page/link): `/notifications/ai-insights`, `/health-tips`, `/health-tips/history`
