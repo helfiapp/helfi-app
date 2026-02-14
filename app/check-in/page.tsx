@@ -127,7 +127,9 @@ export default function CheckInPage() {
 
   const setRating = (issueId: string, value: number) => {
     setRatings((r) => {
-      const updated = { ...r, [issueId]: value }
+      const current = r[issueId]
+      const nextValue = current === value ? null : value
+      const updated = { ...r, [issueId]: nextValue }
       return updated
     })
     setNa((n) => {
