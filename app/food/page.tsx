@@ -3429,6 +3429,22 @@ export default function FoodDiary() {
   const midnightTimerRef = useRef<number | null>(null)
   const todayIsoRef = useRef<string>(buildTodayIso())
   const openMenuKeyRef = useRef<string | null>(null)
+  const clearDrinkFlowParamsFromUrl = () => {
+    if (typeof window === 'undefined') return
+    try {
+      const url = new URL(window.location.href)
+      const drinkParamKeys = ['drinkAmount', 'drinkUnit', 'drinkType', 'waterLogId'] as const
+      const hasDrinkParams = drinkParamKeys.some((key) => url.searchParams.has(key))
+      if (!hasDrinkParams) return
+      drinkParamKeys.forEach((key) => {
+        url.searchParams.delete(key)
+      })
+      if (url.searchParams.get('open') === 'favorites') {
+        url.searchParams.delete('open')
+      }
+      window.history.replaceState({}, '', `${url.pathname}${url.search}${url.hash}`)
+    } catch {}
+  }
   const clearPendingDrinkContext = () => {
     pendingDrinkOverrideRef.current = null
     pendingDrinkTypeRef.current = null
@@ -3464,16 +3480,20 @@ export default function FoodDiary() {
     )
   }
   const consumePendingDrinkMeta = (override: DrinkAmountOverride | null) => {
-    const drinkType = pendingDrinkTypeRef.current
-    if (!drinkType) return null
-    if (!override) {
-      pendingDrinkTypeRef.current = null
-      pendingDrinkWaterLogIdRef.current = null
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+    const effectiveOverride = override || (params ? parseDrinkOverrideFromParams(params) : null)
+    const drinkType = pendingDrinkTypeRef.current || (params ? parseDrinkTypeFromParams(params) : null)
+    const waterLogId = pendingDrinkWaterLogIdRef.current || (params ? parseDrinkWaterLogIdFromParams(params) : null)
+    if (!drinkType || !effectiveOverride) {
+      clearPendingDrinkContext()
       return null
     }
-    const meta = buildDrinkEntryMeta(override, drinkType, pendingDrinkWaterLogIdRef.current)
+    const meta = buildDrinkEntryMeta(effectiveOverride, drinkType, waterLogId)
     pendingDrinkTypeRef.current = null
     pendingDrinkWaterLogIdRef.current = null
+    if (meta) {
+      clearDrinkFlowParamsFromUrl()
+    }
     return meta
   }
   useEffect(() => {
