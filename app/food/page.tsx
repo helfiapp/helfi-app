@@ -25862,16 +25862,21 @@ Please add nutritional information manually if needed.`);
                             )
                           : isLikelyLiquidFood(String(baseEntryLabel || drinkMeta?.type || ''), '')
                         : false
+                      const hasExplicitDrinkMeta = !isWaterEntry && Boolean(drinkMeta?.type)
                       const favoriteLooksLikeDrink = favoriteLabel
                         ? isLikelyLiquidFood(String(favoriteLabel), '')
                         : false
                       const forceFoodIconForFavorite =
-                        !isWaterEntry && Boolean(favoriteLabel) && !favoriteLooksLikeDrink
+                        !isWaterEntry &&
+                        !hasExplicitDrinkMeta &&
+                        Boolean(favoriteLabel) &&
+                        !favoriteLooksLikeDrink
                       // DO NOT TOUCH (owner lock):
                       // If drink metadata exists, trust it directly for drink rendering.
                       // Heuristic-only checks are fallback; they must not hide drink icons when meta is present.
                       const isDrinkEntry =
-                        !isWaterEntry && !forceFoodIconForFavorite && (Boolean(drinkMeta?.type) || Boolean(drinkLiquidHint))
+                        !isWaterEntry &&
+                        (hasExplicitDrinkMeta || (!forceFoodIconForFavorite && Boolean(drinkLiquidHint)))
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
                       const entryCaloriesValue =
                         !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Number(entryTotals?.calories) : null
