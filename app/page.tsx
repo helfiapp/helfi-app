@@ -216,12 +216,12 @@ export default function SplashPage() {
           {/* Text Content */}
           <div className="text-center">
             <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
-              Your Personal <span className="text-helfi-green">Health Intelligence Platform</span>
+              Your AI <span className="text-helfi-green">Health Tracking App</span>
             </h1>
             <p className="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed max-w-4xl mx-auto">
-              Track your health metrics, supplements, and medications. Get AI-powered insights 
-              and personalized recommendations to optimize your wellbeing. Analyze food photos, 
-              lab reports, and medical images—all in one intelligent platform.
+              Track meals, supplements, symptoms, and daily health metrics in one place. Get weekly AI
+              health insights, monitor trends, and turn your data into practical next steps. Analyze food
+              photos, lab reports, and medical images with clear guidance you can actually use.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link

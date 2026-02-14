@@ -113,10 +113,10 @@ const healthTrackingPhoto = (src: string, alt: string): FeaturePageImage => ({
 export const featurePages: FeaturePageContent[] = [
   {
     slug: 'health-tracking',
-    title: 'Health Tracking and Wearables',
-    subtitle: 'Daily health signals and device data, all in one view.',
+    title: 'Health Tracking App and Wearable Sync',
+    subtitle: 'Track daily health data, check-ins, and connected device trends in one dashboard.',
     intro:
-      'Helfi combines daily check-ins, manual logs, and wearable data so you can track progress without juggling tools.',
+      'Helfi combines daily check-ins, manual logs, and wearable syncing so you can track activity, sleep, and progress without switching apps.',
     overview: [
       'You can capture the basics each day and see them alongside activity and wellness metrics pulled from supported devices, including sleep when a wearable is connected.',
       'Fitbit and Garmin Connect are supported today, and you can share interest in other integrations as the device roster expands.',
@@ -315,10 +315,10 @@ export const featurePages: FeaturePageContent[] = [
   },
   {
     slug: 'ai-insights',
-    title: 'AI Insights and Weekly Reports',
-    subtitle: 'A weekly view of what is helping and what needs attention.',
+    title: 'AI Health Insights and Weekly Reports',
+    subtitle: 'Understand what changed this week and what to do next.',
     intro:
-      'Helfi uses your last 7 days of data to generate weekly reports and issue-specific insights.',
+      'Helfi reviews your last 7 days of data and creates weekly health reports with clear actions for food, sleep, supplements, and lifestyle.',
     overview: [
       'Weekly reporting keeps the focus on consistent patterns rather than noisy daily fluctuations.',
       'Insights are designed to help you ask better questions and stay aligned with your health goals.',
@@ -468,10 +468,10 @@ export const featurePages: FeaturePageContent[] = [
   },
   {
     slug: 'nutrition-food',
-    title: 'Food Analysis and Nutrition Logging',
-    subtitle: 'Log meals faster and keep nutrition trends clear.',
+    title: 'Food Tracking App and Nutrition Logging',
+    subtitle: 'Log meals quickly and keep nutrition trends easy to follow.',
     intro:
-      'Capture meals with photos or manual entries and keep a structured nutrition diary that supports your goals.',
+      'Capture meals by photo, barcode, recipe, or manual entry and build a nutrition diary that supports weight, energy, and health goals.',
     overview: [
       'Helfi is built to reduce the friction of meal logging while keeping the data accurate enough to review each week.',
       'Photo-assisted analysis gives you a starting point, and manual edits keep the final entry under your control.',

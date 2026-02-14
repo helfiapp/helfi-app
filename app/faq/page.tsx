@@ -151,8 +151,8 @@ export default function FAQPage() {
       {/* Page Title */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
         <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Frequently Asked Questions</h1>
-          <p className="text-sm text-gray-500 hidden sm:block">Find answers to common questions about Helfi</p>
+          <h1 className="text-lg md:text-xl font-semibold text-gray-900">Helfi FAQ and Help Center</h1>
+          <p className="text-sm text-gray-500 hidden sm:block">Find clear answers about pricing, food tracking, AI insights, privacy, and support</p>
         </div>
       </div>
 
@@ -160,9 +160,9 @@ export default function FAQPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="bg-white rounded-lg shadow-sm p-6">
           <div className="text-center mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-2">How can we help you?</h2>
+            <h2 className="text-2xl font-bold text-gray-900 mb-2">How can we help you today?</h2>
             <p className="text-gray-600">
-              Can't find what you're looking for? <Link href="/support" className="text-helfi-green hover:text-helfi-green/80 font-medium">Contact our support team</Link>
+              Browse the most common Helfi questions below. Need account help? <Link href="/support" className="text-helfi-green hover:text-helfi-green/80 font-medium">Contact our support team</Link>
             </p>
           </div>
 
