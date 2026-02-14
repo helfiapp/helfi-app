@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 14:59 AEDT
+- What changed: Fixed Check-in History scroll lock bug on web. The chart tooltip interaction no longer places a full-page-style click layer over the chart area, so page scrolling continues to work normally.
+- Where to see it (page/link): `/check-in/history`
+- What to quickly test: Open Check-in History, click any chart point, then scroll down past the chart and confirm the page scrolls normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 14:28 AEDT
 - What changed: Expanded all 4 News articles to long-form human-style content (roughly 900-1,100 words each). Added new hero banners for `/news/weekly-health-insights-you-can-use` and `/news/meal-water-sleep-consistency` using supplied images from BLOG IMAGES.
 - Where to see it (page/link): `/news/mobile-apps-coming-soon`, `/news/complete-food-tracking-workflow`, `/news/weekly-health-insights-you-can-use`, `/news/meal-water-sleep-consistency`
