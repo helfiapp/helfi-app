@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 16:46 AEDT
+- What changed: Fixed imported recipe rename not showing in Food Diary after pressing Update. Build-a-meal now treats diary save failures as real failures (no silent success), sends the updated name in return override data, and Food Diary now applies that name override with short retries while entries load.
+- Where to see it (page/link): `/food` and `/food/build-meal`
+- What to quickly test: Import a recipe, save it, open that entry with Edit Entry, change meal name, tap Update, and confirm the row name updates immediately and stays after refresh.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 16:21 AEDT
 - What changed: Import Recipe photo flow now has clear mobile actions: `Take photo` (camera) and `Choose from library` (phone photos), with multi-photo support and a clear/reset option.
 - Where to see it (page/link): `/food/import-recipe` (Import by photo tab)
