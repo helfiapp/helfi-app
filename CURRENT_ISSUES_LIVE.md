@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 17:53 AEDT
+- What changed: Reopened saved recipe edits now use a truly compact collapsed ingredient list. When reopening a saved meal, each ingredient stays title-only until tapped open, so you can reach Save/Update faster without long scrolling.
+- Where to see it (page/link): `/food/build-meal?sourceLogId=<saved_entry_id>` and `/food/build-meal?editFavoriteId=<favorite_id>`
+- What to quickly test: Open any previously saved recipe entry in Build a meal edit mode and confirm all ingredient rows are compact (name-only) by default. Tap one row to expand and edit.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 17:10 AEDT
 - What changed: Recipe import photo flow now shows thumbnail previews of selected photos while importing, then clears those photos automatically after a successful import. Build-a-meal edit mode now starts with ingredient cards collapsed by default when reopening an already-saved meal (without changing first-time pre-save recipe import behavior).
 - Where to see it (page/link): `/food/import-recipe` (Import by photo), `/food/build-meal?sourceLogId=<saved_entry_id>` or `/food/build-meal?editFavoriteId=<favorite_id>`
