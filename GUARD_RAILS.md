@@ -1497,6 +1497,43 @@ Last stable deployment: `27f72314` (2026-01-30)
 
 ---
 
+### 3.15 Recipe Import + Build Meal Reopen UX (Feb 2026 – STRICT LOCK)
+
+**Protected files (strict):**
+- `app/food/import-recipe/ImportRecipeClient.tsx`
+- `app/api/recipe-import/route.ts`
+- `app/food/build-meal/MealBuilderClient.tsx`
+
+**Owner lock request (must remain exactly as shipped):**
+- In **Import by photo**, selected/taken photos must show as preview thumbnails before import.
+- After successful photo import, selected photos must be cleared automatically.
+- Recipe import API must keep ingredient-line dedupe protections.
+- Recipe import API must keep abbreviated/partial recipe rejection protections.
+- When reopening a saved recipe in Build a meal edit mode, **Your ingredients** must be one top-level expander section.
+- On reopen/edit, that top-level section must default to collapsed (retracted).
+- This collapse behavior must apply only to reopen/edit mode, not first-time pre-save recipe building.
+
+**What agents must NOT change without explicit written owner approval:**
+1. Remove photo previews in Import by photo mode.
+2. Keep imported photos after successful import.
+3. Remove or weaken import dedupe logic.
+4. Remove or weaken abbreviated-recipe rejection logic.
+5. Split the top-level ingredient expander into always-open list behavior when reopening saved recipes.
+6. Change default reopened state from collapsed to expanded.
+
+**Restore steps if broken:**
+1. In `ImportRecipeClient`, restore `photoPreviews` rendering from selected files.
+2. In `ImportRecipeClient`, restore `setFiles([])` after successful photo import.
+3. In `route.ts`, restore `dedupeIngredientLines(...)` usage for imported ingredient arrays.
+4. In `route.ts`, restore abbreviated recipe checks (`isAbbreviatedRecipeText` / `isRecipeAbbreviated`) in fallback guard logic.
+5. In `MealBuilderClient`, restore `ingredientsListExpanded` state + top-level `Your ingredients` toggle.
+6. In `MealBuilderClient`, restore reopen/edit auto-collapse logic tied to `sourceLogId` / `editFavoriteId` load completion.
+
+Fix commits: `87c947e2`, `86fb626f`, `fb57a433` (2026-02-14)  
+Last stable deployment: `fb57a433` (2026-02-14)
+
+---
+
 ## 4. Macros Progress Bars & Remaining Calories Ring (Locked)
 
 The macros progress bars and remaining calories ring in the Food Diary are now working perfectly and must **not be changed** unless the user explicitly requests modifications.

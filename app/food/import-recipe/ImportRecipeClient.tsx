@@ -50,6 +50,8 @@ export default function ImportRecipeClient() {
 
   const ingredientsText = useMemo(() => (recipe ? recipe.ingredients.join('\n') : ''), [recipe])
   const stepsText = useMemo(() => (recipe ? recipe.steps.join('\n') : ''), [recipe])
+  // RECIPE LOCK (owner request): keep photo previews visible before import so users can confirm selected images.
+  // Do not remove/change without explicit written owner approval.
   const photoPreviews = useMemo(
     () =>
       files.map((file) => ({
@@ -161,6 +163,8 @@ export default function ImportRecipeClient() {
         return
       }
       setRecipe(data.recipe as ImportedRecipe)
+      // RECIPE LOCK (owner request): clear photo list immediately after successful import.
+      // Do not remove/change without explicit written owner approval.
       setFiles([])
     } catch {
       setError('Import failed. Please try again.')

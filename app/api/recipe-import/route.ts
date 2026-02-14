@@ -60,6 +60,9 @@ const toIngredientDedupeKey = (value: string) => {
     .trim()
 }
 
+// RECIPE LOCK (owner request): keep ingredient dedupe in the import API.
+// This protects recipe imports from repeated lines and repeated add behavior.
+// Do not remove/change without explicit written owner approval.
 const dedupeIngredientLines = (lines: string[]) => {
   const out: string[] = []
   const seen = new Set<string>()
@@ -179,6 +182,8 @@ const normalizeInstructions = (raw: any): string[] => {
   return out
 }
 
+// RECIPE LOCK (owner request): reject abbreviated/partial recipe instruction outputs.
+// Do not remove/change without explicit written owner approval.
 const isAbbreviatedRecipeText = (value: string) => {
   const text = normalizeInstructionText(value).toLowerCase()
   if (!text) return false

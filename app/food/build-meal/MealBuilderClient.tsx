@@ -1648,6 +1648,9 @@ export default function MealBuilderClient() {
   const editFavoriteSourceItemsRef = useRef<any[] | null>(null)
   const editFavoriteIsCustomRef = useRef(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  // RECIPE LOCK (owner request): reopened saved recipes must support one top-level ingredients expander.
+  // Default collapsed in edit/reopen mode; keep enabled in first-time build flow.
+  // Do not remove/change without explicit written owner approval.
   const [ingredientsListExpanded, setIngredientsListExpanded] = useState(true)
   const [lastRemoved, setLastRemoved] = useState<{ item: BuilderItem; index: number } | null>(null)
   const undoRemoveTimeoutRef = useRef<any>(null)
@@ -2156,6 +2159,7 @@ export default function MealBuilderClient() {
 
   useEffect(() => {
     // UX rule: when reopening an already-saved meal, the whole "Your ingredients" section starts collapsed.
+    // RECIPE LOCK (owner request): do not alter this default without explicit written approval.
     if (!editScopeKey) {
       editListCollapseAppliedScopeRef.current = null
       setIngredientsListExpanded(true)
@@ -5741,6 +5745,8 @@ export default function MealBuilderClient() {
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
           <div className="flex items-center justify-between">
+            {/* RECIPE LOCK (owner request): this is the single top-level ingredients expander.
+                Keep as one section toggle on reopen/edit flows unless owner approves change. */}
             <button
               type="button"
               onClick={() => {
