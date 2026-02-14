@@ -14,6 +14,8 @@ export type NewsPost = {
   author: string
   seoTitle: string
   seoDescription: string
+  heroImage?: string
+  heroImageAlt?: string
   sections: NewsPostSection[]
 }
 
@@ -30,6 +32,8 @@ export const newsPosts: NewsPost[] = [
     seoTitle: 'Helfi iOS and Android Apps Coming Soon | Apple Health, Google Health, Sleep Coach',
     seoDescription:
       'Helfi is launching iOS and Android apps with Apple Health support, Google Health data support, and a new sleep coach experience.',
+    heroImage: '/news-images/ios-android-apps-coming-soon-banner.png',
+    heroImageAlt: 'Helfi iOS and Android apps coming soon banner',
     sections: [
       {
         heading: 'Why we are building mobile apps now',

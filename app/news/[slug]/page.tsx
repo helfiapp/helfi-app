@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
@@ -99,9 +100,22 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
               {formatDate(post.publishedAt)} • {post.readingTime} • By {post.author}
             </p>
 
-            <div className="mt-8 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-500 via-emerald-400 to-sky-400 min-h-[210px] md:min-h-[260px] px-7 py-8 flex items-end">
-              <p className="text-white text-sm font-semibold uppercase tracking-[0.16em]">Hero image placeholder</p>
-            </div>
+            {post.heroImage ? (
+              <div className="mt-8 rounded-3xl overflow-hidden border border-emerald-100 shadow-sm">
+                <Image
+                  src={post.heroImage}
+                  alt={post.heroImageAlt || post.title}
+                  width={1584}
+                  height={672}
+                  className="w-full h-auto object-cover"
+                  priority
+                />
+              </div>
+            ) : (
+              <div className="mt-8 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-500 via-emerald-400 to-sky-400 min-h-[210px] md:min-h-[260px] px-7 py-8 flex items-end">
+                <p className="text-white text-sm font-semibold uppercase tracking-[0.16em]">Hero image placeholder</p>
+              </div>
+            )}
 
             <div className="mt-8 space-y-9">
               {post.sections.map((section) => (
