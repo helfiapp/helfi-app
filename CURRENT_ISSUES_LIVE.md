@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 11:20 AEDT
+- What changed: News pages now include the same top Medical Disclaimer banner and a full site footer, so layout matches homepage styling. Also confirmed the featured story image area ratio target for design is about 1.45:1 (closest preset 3:2).
+- Where to see it (page/link): `/news` and `/news/mobile-apps-coming-soon`
+- What to quickly test: Open `/news` and an article page, confirm top disclaimer bar is visible and expandable, menu/header is present, and footer appears at bottom.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 04:27 AEDT
 - What changed: Fixed the News menu bug so `/news` and `/news/*` stay public (no forced sign-in redirect). Rebuilt News into a professional article hub and added 4 full SEO-focused articles, including the requested iOS + Android apps coming soon post with Apple Health, Google health data support, and Sleep Coach details. Added article pages with metadata + schema and added News URLs to sitemap.
 - Where to see it (page/link): `/news` and `/news/mobile-apps-coming-soon`
