@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 12:46 AEDT
+- What changed: Fixed favorite-name stickiness regression (example `Peach`). Diary save now keeps the current visible title unless the user explicitly types a new one, favorites add now always uses the explicit favorite label, reverse override rules that expand a favorite label back to a raw single-item database name are ignored, and diary rows linked to favorites now prefer the saved favorite label when names differ.
+- Where to see it (page/link): Food Diary (`/food`) add from favorites + diary entry edit + favorites rename flows
+- What to quickly test: In Favorites, keep item as `Peach`, add it to diary, and confirm row shows `Peach` (not `Peaches, yellow, raw`). Edit/reopen/refresh and confirm it stays `Peach`.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 12:38 AEDT
 - What changed: Added the new `IOS AND AND ANDROID BANNER.png` to the hero section of the article page `/news/mobile-apps-coming-soon`, replacing the generic placeholder block.
 - Where to see it (page/link): `/news/mobile-apps-coming-soon`
