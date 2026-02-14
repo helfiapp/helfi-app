@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
@@ -57,6 +57,32 @@ export default function CheckinHistoryPage() {
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState<string>('')
   const [loading, setLoading] = useState(false)
+
+  const handleChartWheelCapture = useCallback((event: React.WheelEvent<HTMLDivElement>) => {
+    if (typeof document === 'undefined') return
+    if (Math.abs(event.deltaY) <= Math.abs(event.deltaX)) return
+
+    const contentZone =
+      document.querySelector('[data-scroll-zone="content"]') instanceof HTMLElement
+        ? (document.querySelector('[data-scroll-zone="content"]') as HTMLElement)
+        : null
+
+    const scrollContainer =
+      contentZone && contentZone.scrollHeight > contentZone.clientHeight + 1
+        ? contentZone
+        : ((document.scrollingElement as HTMLElement | null) ?? null)
+
+    if (!scrollContainer) return
+
+    const maxScroll = Math.max(0, scrollContainer.scrollHeight - scrollContainer.clientHeight)
+    if (maxScroll <= 0) return
+
+    const nextTop = Math.max(0, Math.min(maxScroll, scrollContainer.scrollTop + event.deltaY))
+    if (nextTop === scrollContainer.scrollTop) return
+
+    scrollContainer.scrollTop = nextTop
+    event.preventDefault()
+  }, [])
 
   const LABELS = ['Really bad', 'Bad', 'Below average', 'Average', 'Above average', 'Good', 'Excellent'] as const
   const COLOR_PALETTE = [
@@ -662,7 +688,7 @@ export default function CheckinHistoryPage() {
                 Ratings are scored 0 (Really bad) to 6 (Excellent). Hover the chart to see exact values.
               </p>
 
-              <div className="relative h-56 md:h-72">
+              <div className="relative h-56 md:h-72" onWheelCapture={handleChartWheelCapture}>
                 <Line
                   ref={chartRef}
                   data={chartData}
