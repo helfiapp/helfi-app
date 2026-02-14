@@ -11502,17 +11502,24 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const syncDrinkWaterLog = async (meta: DrinkEntryMeta, localDate: string, category?: string | null) => {
+  const syncDrinkWaterLog = async (
+    meta: DrinkEntryMeta,
+    localDate: string,
+    category?: string | null,
+    linkedAt?: string | number | null,
+  ) => {
+    const normalizedCategory = normalizeCategory(category) || 'uncategorized'
     const payload = {
       amount: meta.amount,
       unit: meta.unit,
       label: meta.type,
       localDate,
-      category: normalizeCategory(category) || 'uncategorized',
+      category: normalizedCategory,
     }
-
-    if (meta.waterLogId) {
-      const res = await fetch(`/api/water-log/${encodeURIComponent(meta.waterLogId)}`, {
+    const updateExistingWaterLog = async (waterLogId: string) => {
+      const waterId = String(waterLogId || '').trim()
+      if (!waterId) return null
+      const res = await fetch(`/api/water-log/${encodeURIComponent(waterId)}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -11520,11 +11527,86 @@ Please add nutritional information manually if needed.`);
       })
       if (res.ok) {
         const data = await res.json()
-        return { id: meta.waterLogId, entry: data?.entry as WaterLogEntry | null }
+        return { id: waterId, entry: data?.entry as WaterLogEntry | null }
       }
-      if (res.status !== 404) {
-        throw new Error('water log update failed')
+      if (res.status === 404) return null
+      throw new Error('water log update failed')
+    }
+    const findRecentMatchingWaterLogId = (entries: any[] | null | undefined) => {
+      if (!Array.isArray(entries) || entries.length === 0) return null
+      const labelKey = normalizeWaterLabel(meta.type)
+      if (!labelKey) return null
+      const expectedAmountMl = Number.isFinite(Number(meta.amountMl))
+        ? Number(meta.amountMl)
+        : meta.unit === 'l'
+        ? Number(meta.amount) * 1000
+        : meta.unit === 'oz'
+        ? Number(meta.amount) * 29.5735
+        : Number(meta.amount)
+      const nowMs = Date.now()
+      const linkedAtMs =
+        linkedAt === null || linkedAt === undefined
+          ? NaN
+          : typeof linkedAt === 'number'
+          ? linkedAt
+          : new Date(linkedAt).getTime()
+      const referenceMs = Number.isFinite(linkedAtMs) ? linkedAtMs : nowMs
+      const maxAgeMs = 45 * 60 * 1000
+      let bestId = ''
+      let bestScore = -Infinity
+      entries.forEach((entry) => {
+        if (!entry) return
+        if (String(entry?.localDate || '') !== String(localDate || '')) return
+        const entryLabelKey = normalizeWaterLabel(entry?.label || '')
+        if (!entryLabelKey || entryLabelKey !== labelKey) return
+        const entryCategory = normalizeCategory(entry?.category) || 'uncategorized'
+        if (entryCategory !== normalizedCategory) return
+        const entryAmountMl = Number(entry?.amountMl)
+        if (Number.isFinite(expectedAmountMl) && Number.isFinite(entryAmountMl) && Math.abs(entryAmountMl - expectedAmountMl) > 2)
+          return
+        const createdAtMs = entry?.createdAt ? new Date(entry.createdAt).getTime() : NaN
+        if (!Number.isFinite(createdAtMs)) return
+        if (Math.abs(nowMs - createdAtMs) > maxAgeMs) return
+        const distance = Math.abs(referenceMs - createdAtMs)
+        const score = 1000000 - distance
+        if (score > bestScore) {
+          const candidateId = entry?.id ? String(entry.id).trim() : ''
+          if (!candidateId) return
+          bestScore = score
+          bestId = candidateId
+        }
+      })
+      return bestId || null
+    }
+
+    if (meta.waterLogId) {
+      const updated = await updateExistingWaterLog(meta.waterLogId)
+      if (updated) return updated
+    }
+
+    const localMatchId = findRecentMatchingWaterLogId(waterEntries)
+    if (localMatchId) {
+      const updated = await updateExistingWaterLog(localMatchId)
+      if (updated) return updated
+    }
+
+    try {
+      const lookupRes = await fetch(`/api/water-log?localDate=${encodeURIComponent(localDate)}`, {
+        cache: 'no-store' as any,
+        credentials: 'include',
+      })
+      if (lookupRes.ok) {
+        const lookupData = await lookupRes.json().catch(() => ({}))
+        const remoteMatchId = findRecentMatchingWaterLogId(
+          Array.isArray(lookupData?.entries) ? lookupData.entries : [],
+        )
+        if (remoteMatchId) {
+          const updated = await updateExistingWaterLog(remoteMatchId)
+          if (updated) return updated
+        }
       }
+    } catch {
+      // Non-blocking: if lookup fails, create a new water row below.
     }
 
     const res = await fetch('/api/water-log', {
@@ -11737,7 +11819,7 @@ Please add nutritional information manually if needed.`);
     let drinkMeta = resolvedDrinkMeta
     if (drinkMeta?.type) {
       try {
-        const waterResult = await syncDrinkWaterLog(drinkMeta, entryLocalDate, entryCategory)
+        const waterResult = await syncDrinkWaterLog(drinkMeta, entryLocalDate, entryCategory, newCreatedAt)
         if (waterResult?.id) {
           drinkMeta = { ...drinkMeta, waterLogId: waterResult.id }
           editingDrinkMetaRef.current = drinkMeta
@@ -16235,6 +16317,7 @@ Please add nutritional information manually if needed.`);
           drinkMetaForEntry,
           pendingEntry.localDate || selectedDate,
           pendingEntry.category || pendingEntry.meal,
+          pendingEntry.createdAt,
         )
         if (waterResult?.id) {
           const updatedMeta = { ...drinkMetaForEntry, waterLogId: waterResult.id }
@@ -16934,6 +17017,7 @@ Please add nutritional information manually if needed.`);
           drinkMetaForEntry,
           pendingEntry.localDate || selectedDate,
           pendingEntry.category || pendingEntry.meal,
+          pendingEntry.createdAt,
         )
         if (waterResult?.id) {
           const updatedMeta = { ...drinkMetaForEntry, waterLogId: waterResult.id }
