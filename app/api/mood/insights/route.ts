@@ -14,6 +14,13 @@ type Insight = {
   sampleSize: number
 }
 
+type MoodEntryRow = {
+  localDate: string
+  timestamp: string
+  mood: number
+  context: any
+}
+
 function pearson(x: number[], y: number[]): number | null {
   const n = Math.min(x.length, y.length)
   if (n < 3) return null
@@ -52,6 +59,28 @@ function strengthLabel(r: number | null): string {
   return 'a very small tendency'
 }
 
+function toFiniteNumber(value: unknown): number | null {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function correlationForEntryContext(entries: MoodEntryRow[], key: string) {
+  const x: number[] = []
+  const y: number[] = []
+  for (const entry of entries) {
+    const raw = (entry as any)?.context?.[key]
+    const value = toFiniteNumber(raw)
+    const mood = toFiniteNumber(entry.mood)
+    if (value == null || mood == null) continue
+    x.push(value)
+    y.push(mood)
+  }
+  return {
+    r: pearson(x, y),
+    sampleSize: Math.min(x.length, y.length),
+  }
+}
+
 export async function GET(req: NextRequest) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -72,7 +101,7 @@ export async function GET(req: NextRequest) {
 
   try {
     await ensureMoodTables()
-    const entries: Array<{ localDate: string; timestamp: string; mood: number; context: any }> =
+    const entries: MoodEntryRow[] =
       (await prisma.$queryRawUnsafe(
         `SELECT localDate, timestamp, mood, context
          FROM MoodEntries
@@ -175,9 +204,12 @@ export async function GET(req: NextRequest) {
 
     const sampleSize = moodDailyAvg.length
     const conf = confidenceFromSample(sampleSize)
+    const medicationsTracked = await prisma.medication.count({
+      where: { userId: user.id },
+    }).catch(() => 0)
 
-    const insights: { sleep: Insight[]; nutrition: Insight[]; supplements: Insight[]; activity: Insight[]; stress: Insight[] } =
-      { sleep: [], nutrition: [], supplements: [], activity: [], stress: [] }
+    const insights: { sleep: Insight[]; nutrition: Insight[]; supplements: Insight[]; activity: Insight[]; stress: Insight[]; medication: Insight[] } =
+      { sleep: [], nutrition: [], supplements: [], activity: [], stress: [], medication: [] }
 
     if (bestBucket && bestBucket.n >= 3) {
       insights.stress.push({
@@ -197,6 +229,17 @@ export async function GET(req: NextRequest) {
       sampleSize,
     })
 
+    const sleepQuality = correlationForEntryContext(entries, 'sleepQuality')
+    if (sleepQuality.sampleSize >= 4) {
+      insights.sleep.push({
+        id: 'sleep-quality-vs-mood',
+        title: 'Better sleep quality may support better mood',
+        detail: `From ${sleepQuality.sampleSize} check-ins, self-rated sleep quality and mood show ${strengthLabel(sleepQuality.r)}.`,
+        confidence: confidenceFromSample(sleepQuality.sampleSize),
+        sampleSize: sleepQuality.sampleSize,
+      })
+    }
+
     insights.activity.push({
       id: 'steps-vs-mood',
       title: 'Activity and mood may move together',
@@ -204,6 +247,17 @@ export async function GET(req: NextRequest) {
       confidence: conf,
       sampleSize,
     })
+
+    const activityQuality = correlationForEntryContext(entries, 'physicalActivity')
+    if (activityQuality.sampleSize >= 4) {
+      insights.activity.push({
+        id: 'activity-rating-vs-mood',
+        title: 'Your activity rating has a mood pattern',
+        detail: `From ${activityQuality.sampleSize} check-ins, your activity score and mood show ${strengthLabel(activityQuality.r)}.`,
+        confidence: confidenceFromSample(activityQuality.sampleSize),
+        sampleSize: activityQuality.sampleSize,
+      })
+    }
 
     insights.nutrition.push({
       id: 'meals-vs-mood',
@@ -213,8 +267,62 @@ export async function GET(req: NextRequest) {
       sampleSize,
     })
 
-    // Supplements aren't reliably trackable per-day yet for correlation, so keep this empty for now.
-    insights.supplements = []
+    const nutritionQuality = correlationForEntryContext(entries, 'nutrition')
+    if (nutritionQuality.sampleSize >= 4) {
+      insights.nutrition.push({
+        id: 'nutrition-rating-vs-mood',
+        title: 'Nutrition quality and mood may align',
+        detail: `From ${nutritionQuality.sampleSize} check-ins, your nutrition score and mood show ${strengthLabel(nutritionQuality.r)}.`,
+        confidence: confidenceFromSample(nutritionQuality.sampleSize),
+        sampleSize: nutritionQuality.sampleSize,
+      })
+    }
+
+    const supplementsImpact = correlationForEntryContext(entries, 'supplements')
+    if (supplementsImpact.sampleSize >= 4) {
+      insights.supplements.push({
+        id: 'supplements-vs-mood',
+        title: 'Supplement impact may connect with mood',
+        detail: `From ${supplementsImpact.sampleSize} check-ins, supplement impact rating and mood show ${strengthLabel(supplementsImpact.r)}.`,
+        confidence: confidenceFromSample(supplementsImpact.sampleSize),
+        sampleSize: supplementsImpact.sampleSize,
+      })
+    } else {
+      insights.supplements.push({
+        id: 'supplements-more-data',
+        title: 'Log supplement impact to unlock a clearer pattern',
+        detail: `You currently have limited supplement-impact check-ins. Add this score for a few more days to get a stronger trend.`,
+        confidence: 'low',
+        sampleSize: supplementsImpact.sampleSize,
+      })
+    }
+
+    const medicationImpact = correlationForEntryContext(entries, 'medicationEffect')
+    if (medicationImpact.sampleSize >= 4) {
+      insights.medication.push({
+        id: 'medication-vs-mood',
+        title: 'Medication impact and mood may be connected',
+        detail: `From ${medicationImpact.sampleSize} check-ins, your medication-impact score and mood show ${strengthLabel(medicationImpact.r)}.`,
+        confidence: confidenceFromSample(medicationImpact.sampleSize),
+        sampleSize: medicationImpact.sampleSize,
+      })
+    } else if (medicationsTracked > 0) {
+      insights.medication.push({
+        id: 'medication-track-more',
+        title: 'You can unlock medication vs mood trends',
+        detail: `You have ${medicationsTracked} medication${medicationsTracked === 1 ? '' : 's'} tracked. Add medication-impact ratings in check-ins to see clearer patterns.`,
+        confidence: 'low',
+        sampleSize: medicationImpact.sampleSize,
+      })
+    } else {
+      insights.medication.push({
+        id: 'medication-not-tracked',
+        title: 'No medication data linked yet',
+        detail: 'If you track medications and rate their daily impact, mood pattern analysis becomes much more useful.',
+        confidence: 'low',
+        sampleSize: 0,
+      })
+    }
 
     return NextResponse.json({
       range: { start, end },

@@ -33,11 +33,13 @@ export default function MoodTrendGraph({
   showTimeAxis = false,
   fillArea = true,
   spanGaps = false,
+  showLegend = true,
 }: {
   points: MoodPoint[]
   showTimeAxis?: boolean
   fillArea?: boolean
   spanGaps?: boolean
+  showLegend?: boolean
 }) {
   const chartPoints = useMemo(() => {
     if (points.length !== 1) {
@@ -118,8 +120,8 @@ export default function MoodTrendGraph({
         {
           label: 'Mood',
           data: chartPoints,
-          borderColor: 'rgb(34, 197, 94)',
-          backgroundColor: 'rgba(34, 197, 94, 0.12)',
+          borderColor: 'rgb(22, 163, 74)',
+          backgroundColor: 'rgba(22, 163, 74, 0.14)',
           tension: 0.35,
           fill: fillArea,
           spanGaps,
@@ -130,7 +132,7 @@ export default function MoodTrendGraph({
         },
       ],
     }
-  }, [chartPoints])
+  }, [chartPoints, fillArea, spanGaps])
 
   const options: ChartOptions<'line'> = useMemo(() => ({
     responsive: true,
@@ -242,16 +244,30 @@ export default function MoodTrendGraph({
         max: 7,
         ticks: {
           stepSize: 1,
-          callback: (v) => String(v),
+          callback: (v) => {
+            if (v === 1) return 'Low'
+            if (v === 4) return 'Mid'
+            if (v === 7) return 'High'
+            return ''
+          },
         },
         grid: { color: 'rgba(148, 163, 184, 0.18)' },
       },
     },
-  }), [])
+  }), [points, showTimeAxis])
 
   return (
-    <div className="h-48 w-full">
-      <Line data={data as any} options={options as any} plugins={[emojiPlugin]} />
+    <div className="h-full w-full flex flex-col">
+      <div className="h-48 w-full">
+        <Line data={data as any} options={options as any} plugins={[emojiPlugin]} />
+      </div>
+      {showLegend && (
+        <div className="mt-2 flex items-center justify-between text-[11px] text-gray-500 dark:text-gray-300 px-1">
+          <span>Low mood</span>
+          <span className="text-helfi-green font-semibold">Mood trend</span>
+          <span>High mood</span>
+        </div>
+      )}
     </div>
   )
 }

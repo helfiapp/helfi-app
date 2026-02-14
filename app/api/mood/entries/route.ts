@@ -52,6 +52,7 @@ function pickContextFields(value: any) {
   const sleepQuality = clampInt(value?.sleepQuality, 1, 5)
   const nutrition = clampInt(value?.nutrition, 1, 5)
   const supplements = clampInt(value?.supplements, 1, 5)
+  const medicationEffect = clampInt(value?.medicationEffect, 1, 5)
   const physicalActivity = clampInt(value?.physicalActivity, 1, 5)
   const localHour = clampInt(value?.localHour, 0, 23)
   const intensityPercent = clampInt(value?.intensityPercent, 0, 100)
@@ -61,6 +62,7 @@ function pickContextFields(value: any) {
     ...(sleepQuality == null ? {} : { sleepQuality }),
     ...(nutrition == null ? {} : { nutrition }),
     ...(supplements == null ? {} : { supplements }),
+    ...(medicationEffect == null ? {} : { medicationEffect }),
     ...(physicalActivity == null ? {} : { physicalActivity }),
     ...(localHour == null ? {} : { localHour }),
     ...(intensityPercent == null ? {} : { intensityPercent }),
@@ -80,6 +82,10 @@ async function getPassiveContext(userId: string, localDate: string) {
   }).catch(() => null)
 
   const supplementsCount = await prisma.supplement.count({
+    where: { userId },
+  }).catch(() => 0)
+
+  const medicationsCount = await prisma.medication.count({
     where: { userId },
   }).catch(() => 0)
 
@@ -128,6 +134,7 @@ async function getPassiveContext(userId: string, localDate: string) {
       ? { id: lastMeal.id, name: lastMeal.name, meal: lastMeal.meal, at: lastMeal.createdAt }
       : null,
     supplementsCount,
+    medicationsCount,
     stepsToday: stepsCount,
     exerciseMinutesToday: clampInt(exerciseToday._sum.durationMinutes, 0, 24 * 60),
     exerciseCaloriesToday: clampInt(exerciseToday._sum.calories, 0, 50_000),

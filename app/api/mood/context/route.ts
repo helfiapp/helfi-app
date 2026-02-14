@@ -51,6 +51,10 @@ export async function GET(req: NextRequest) {
       where: { userId: user.id },
     }).catch(() => 0)
 
+    const medicationsCount = await prisma.medication.count({
+      where: { userId: user.id },
+    }).catch(() => 0)
+
     const exerciseToday = await prisma.exerciseEntry.aggregate({
       where: { userId: user.id, localDate },
       _sum: { durationMinutes: true, calories: true },
@@ -104,6 +108,7 @@ export async function GET(req: NextRequest) {
           : null,
       },
       supplements: { count: supplementsCount },
+      medications: { count: medicationsCount },
       activity: {
         stepsToday: stepsCount,
         exerciseMinutesToday: clampInt(exerciseToday._sum.durationMinutes, 0, 24 * 60),
@@ -119,4 +124,3 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to load context' }, { status: 500 })
   }
 }
-

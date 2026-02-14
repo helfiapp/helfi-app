@@ -17,8 +17,15 @@ type ContextResponse = {
   localDate: string
   meals: { todayCount: number; last: { name: string; meal: string | null; at: string } | null }
   supplements: { count: number }
+  medications: { count: number }
   activity: { stepsToday: number | null; exerciseMinutesToday: number | null; exerciseCaloriesToday: number | null }
   sleep: { minutes: number | null; date: string | null }
+}
+
+type SuggestedAction = {
+  kind: 'breath' | 'walk' | 'hydrate' | 'journal'
+  title: string
+  detail: string
 }
 
 function localDateToday() {
@@ -33,6 +40,52 @@ function minutesToHours(minutes: number | null) {
   if (!minutes) return null
   const hrs = minutes / 60
   return `${hrs.toFixed(1)} h`
+}
+
+function chooseSuggestedAction(params: {
+  mood: number | null
+  intensityPercent: number
+  tags: string[]
+  feelings: string[]
+}): SuggestedAction {
+  const mood = params.mood ?? 4
+  const all = [...params.tags, ...params.feelings].map((item) => String(item || '').toLowerCase())
+  const hasStress = all.some((item) =>
+    ['anxious', 'stress', 'stressed', 'overwhelmed', 'restless', 'irritable'].some((word) => item.includes(word))
+  )
+  const hasLowEnergy = all.some((item) =>
+    ['tired', 'flat', 'low', 'meh'].some((word) => item.includes(word))
+  )
+
+  if (mood <= 3 || hasStress || params.intensityPercent >= 70) {
+    return {
+      kind: 'breath',
+      title: 'Try a 60-second reset',
+      detail: 'Take six slow breaths. In for 4 seconds, out for 6 seconds.',
+    }
+  }
+
+  if (hasLowEnergy || mood <= 4) {
+    return {
+      kind: 'walk',
+      title: 'Do a 5-minute walk',
+      detail: 'A short walk can quickly lift energy and mood.',
+    }
+  }
+
+  if (mood >= 6) {
+    return {
+      kind: 'journal',
+      title: 'Capture what worked today',
+      detail: 'Write 2 lines so you can repeat this good day.',
+    }
+  }
+
+  return {
+    kind: 'hydrate',
+    title: 'Drink a glass of water now',
+    detail: 'Hydration helps keep mood and focus steadier.',
+  }
 }
 
 export default function MoodCheckInPage() {
@@ -55,6 +108,7 @@ export default function MoodCheckInPage() {
   const [sleepQuality, setSleepQuality] = useState<number | null>(null)
   const [nutrition, setNutrition] = useState<number | null>(null)
   const [supplements, setSupplements] = useState<number | null>(null)
+  const [medicationEffect, setMedicationEffect] = useState<number | null>(null)
   const [physicalActivity, setPhysicalActivity] = useState<number | null>(null)
 
   const localDate = useMemo(() => localDateToday(), [])
@@ -124,6 +178,7 @@ export default function MoodCheckInPage() {
             ...(sleepQuality == null ? {} : { sleepQuality }),
             ...(nutrition == null ? {} : { nutrition }),
             ...(supplements == null ? {} : { supplements }),
+            ...(medicationEffect == null ? {} : { medicationEffect }),
             ...(physicalActivity == null ? {} : { physicalActivity }),
           },
         }),
@@ -145,8 +200,11 @@ export default function MoodCheckInPage() {
       setSleepQuality(null)
       setNutrition(null)
       setSupplements(null)
+      setMedicationEffect(null)
       setPhysicalActivity(null)
-      setTimeout(() => { window.location.assign('/mood/history?saved=1') }, 400)
+      const action = chooseSuggestedAction({ mood, intensityPercent, tags, feelings })
+      const nextUrl = `/mood/history?saved=1&action=${encodeURIComponent(action.kind)}`
+      setTimeout(() => { window.location.assign(nextUrl) }, 300)
     } catch {
       setBanner({ type: 'error', message: 'Could not save. Please try again.' })
     } finally {
@@ -162,6 +220,11 @@ export default function MoodCheckInPage() {
   const nutritionValue =
     context ? `${context.meals.todayCount} meal${context.meals.todayCount === 1 ? '' : 's'} logged` : null
   const supplementsValue = context ? (context.supplements.count > 0 ? 'Saved in Helfi' : 'None saved') : null
+  const medicationsValue = context ? (context.medications?.count > 0 ? `${context.medications.count} tracked` : 'None tracked') : null
+  const suggestedAction = useMemo(
+    () => chooseSuggestedAction({ mood, intensityPercent, tags, feelings }),
+    [mood, intensityPercent, tags, feelings]
+  )
 
   const firstName = (() => {
     const raw = String(session?.user?.name || '').trim()
@@ -259,6 +322,17 @@ export default function MoodCheckInPage() {
                 </ExpandableContextRow>
 
                 <ExpandableContextRow
+                  label="Medication"
+                  value={medicationEffect ? `Level ${medicationEffect}/5` : (medicationsValue || 'Optional')}
+                  icon={<span className="material-symbols-outlined text-[20px]" aria-hidden="true">medication</span>}
+                >
+                  <div className="mb-3 text-xs text-gray-500 dark:text-gray-400">
+                    {medicationsValue ? `Current: ${medicationsValue}.` : 'Add medication details in Health Setup to improve this signal.'}
+                  </div>
+                  <FivePointScale label="Medication impact" value={medicationEffect} onChange={setMedicationEffect} />
+                </ExpandableContextRow>
+
+                <ExpandableContextRow
                   label="Activity"
                   value={physicalActivity ? `Level ${physicalActivity}/5` : (activityValue || 'Optional')}
                   icon={<ArrowTrendingUpIcon className="w-5 h-5" aria-hidden="true" />}
@@ -288,6 +362,12 @@ export default function MoodCheckInPage() {
 
             <div className="mt-4 text-xs text-slate-500 dark:text-gray-400 px-1">
               Mood is required. Everything else is optional.
+            </div>
+
+            <div className="mt-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Next best step</div>
+              <div className="mt-1 text-sm font-bold text-emerald-900">{suggestedAction.title}</div>
+              <div className="mt-1 text-xs text-emerald-800">{suggestedAction.detail}</div>
             </div>
 
             <div className="hidden md:block mt-6">

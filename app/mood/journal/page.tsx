@@ -647,7 +647,7 @@ export default function MoodJournalPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 space-y-4">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <div className="flex items-start justify-between gap-3">
             <div>
               <h2 className="text-lg font-bold text-gray-900 dark:text-white">Journal</h2>
@@ -941,7 +941,7 @@ export default function MoodJournalPage() {
               const createdAt = entry.createdAt ? new Date(entry.createdAt) : null
               const time = createdAt ? createdAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
               return (
-                <div key={entry.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+                <div key={entry.id} className="bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
                   <div className="flex items-center justify-between text-xs text-gray-500 dark:text-gray-400">
                     <span className="font-semibold text-gray-700 dark:text-gray-200">{formatDateLabel(entry.localDate)}</span>
                     <span>{time}</span>

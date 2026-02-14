@@ -203,8 +203,19 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
   }
 
   return (
-    <div className="relative h-48 w-full">
-      <Pie data={data} options={options} plugins={[emojiPlugin]} />
+    <div className="relative h-full w-full flex flex-col">
+      <div className="h-48 w-full">
+        <Pie data={data} options={options} plugins={[emojiPlugin]} />
+      </div>
+      <div className="mt-2 flex flex-wrap gap-x-3 gap-y-1 px-1">
+        {slices.map((slice) => (
+          <div key={slice.value} className="inline-flex items-center gap-1.5 text-[11px] text-gray-600 dark:text-gray-300">
+            <span className="w-2 h-2 rounded-full" style={{ backgroundColor: moodColorForValue(slice.value) }} />
+            <span>{slice.label}</span>
+            <span className="font-semibold">{slice.count}</span>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

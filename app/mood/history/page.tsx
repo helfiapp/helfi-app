@@ -26,6 +26,7 @@ type EntriesResponse = {
 }
 
 type InsightsResponse = { insights: any }
+type SuggestedActionKind = 'breath' | 'walk' | 'hydrate' | 'journal'
 
 function safeTags(tags: any): string[] {
   if (Array.isArray(tags)) return tags.map((t) => String(t)).filter(Boolean)
@@ -128,19 +129,60 @@ function entryDayKey(entry: MoodEntry) {
   return ''
 }
 
+function csvEscape(value: unknown) {
+  const text = String(value ?? '')
+  if (text.includes(',') || text.includes('"') || text.includes('\n')) {
+    return `"${text.replace(/"/g, '""')}"`
+  }
+  return text
+}
+
+function monthLabelFromDate(localDate: string) {
+  const d = parseLocalDate(localDate)
+  return d.toLocaleDateString(undefined, { month: 'short' })
+}
+
+function actionDetails(kind: SuggestedActionKind) {
+  if (kind === 'breath') {
+    return {
+      title: 'Next best step: 60-second reset',
+      detail: 'Take six slow breaths. In 4 seconds, out 6 seconds.',
+    }
+  }
+  if (kind === 'walk') {
+    return {
+      title: 'Next best step: 5-minute walk',
+      detail: 'A short walk can quickly improve energy and mood.',
+    }
+  }
+  if (kind === 'journal') {
+    return {
+      title: 'Next best step: write 2 lines',
+      detail: 'Capture what worked so you can repeat it tomorrow.',
+    }
+  }
+  return {
+    title: 'Next best step: hydrate now',
+    detail: 'Drink a glass of water to help stabilize focus and mood.',
+  }
+}
+
 export default function MoodHistoryPage() {
   const [timeframe, setTimeframe] = useState<'day' | 'week' | 'month' | 'year'>('week')
-  const [chartMode, setChartMode] = useState<'pie' | 'wave'>('pie')
+  const [chartMode, setChartMode] = useState<'pie' | 'wave'>('wave')
   const [selectedDay, setSelectedDay] = useState<string | null>(null)
   const [entries, setEntries] = useState<MoodEntry[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [trendPct, setTrendPct] = useState<number | null>(null)
-  const [monthMap, setMonthMap] = useState(() => new Map())
+  const [yearAverageMap, setYearAverageMap] = useState<Map<string, number>>(new Map())
   const [insights, setInsights] = useState<InsightsResponse | null>(null)
   const [streakDays, setStreakDays] = useState<number>(0)
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
   const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([])
+  const [savedAction, setSavedAction] = useState<SuggestedActionKind | null>(null)
+  const [breathingActive, setBreathingActive] = useState(false)
+  const [breathingSecondsLeft, setBreathingSecondsLeft] = useState(60)
   const weekScrollRef = useRef<HTMLDivElement | null>(null)
 
   const [banner, setBanner] = useState<string | null>(null)
@@ -150,10 +192,24 @@ export default function MoodHistoryPage() {
       if (params.get('saved') === '1') {
         setBanner('Saved mood check‑in.')
         const t = setTimeout(() => setBanner(null), 2500)
+        const action = params.get('action')
+        if (action === 'breath' || action === 'walk' || action === 'hydrate' || action === 'journal') {
+          setSavedAction(action)
+        }
         return () => clearTimeout(t)
       }
     } catch {}
   }, [])
+
+  useEffect(() => {
+    if (!breathingActive) return
+    if (breathingSecondsLeft <= 0) {
+      setBreathingActive(false)
+      return
+    }
+    const timer = window.setTimeout(() => setBreathingSecondsLeft((value) => value - 1), 1000)
+    return () => window.clearTimeout(timer)
+  }, [breathingActive, breathingSecondsLeft])
 
   useEffect(() => {
     try {
@@ -291,45 +347,6 @@ export default function MoodHistoryPage() {
   useEffect(() => {
     let ignore = false
     const today = asDateString(new Date())
-    const start = firstDayOfMonth(today)
-    const end = lastDayOfMonth(today)
-    const loadMonth = async () => {
-      try {
-        const res = await fetch(`/api/mood/entries?start=${start}&end=${end}`, { cache: 'no-store' as any })
-        if (!res.ok) return
-        const j = (await res.json()) as EntriesResponse
-        if (ignore) return
-        const m = new Map()
-        for (const e of j.entries || []) {
-          const d = String(e.localDate || '').slice(0, 10)
-          const v = Number(e.mood)
-          if (!d || !Number.isFinite(v)) continue
-          if (!m.has(d)) m.set(d, 0)
-          // store sum in temp map and count separately
-        }
-        // build averages
-        const sums = new Map()
-        for (const e of j.entries || []) {
-          const d = String(e.localDate || '').slice(0, 10)
-          const v = Number(e.mood)
-          if (!d || !Number.isFinite(v)) continue
-          const cur = sums.get(d) || { sum: 0, n: 0 }
-          cur.sum += v
-          cur.n += 1
-          sums.set(d, cur)
-        }
-        const avgs = new Map()
-        sums.forEach((v, d) => avgs.set(d, v.sum / v.n))
-        setMonthMap(avgs)
-      } catch {}
-    }
-    loadMonth()
-    return () => { ignore = true }
-  }, [])
-
-  useEffect(() => {
-    let ignore = false
-    const today = asDateString(new Date())
     const start = shiftDays(today, -364)
     const end = today
     const loadStreak = async () => {
@@ -350,7 +367,23 @@ export default function MoodHistoryPage() {
           cursor = shiftDays(cursor, -1)
           if (streak > 365) break
         }
+
+        const sums = new Map<string, { sum: number; n: number }>()
+        for (const entry of j.entries || []) {
+          const day = String(entry.localDate || '').slice(0, 10)
+          const mood = Number(entry.mood)
+          if (!day || !Number.isFinite(mood)) continue
+          const current = sums.get(day) || { sum: 0, n: 0 }
+          current.sum += mood
+          current.n += 1
+          sums.set(day, current)
+        }
+        const averages = new Map<string, number>()
+        sums.forEach((value, day) => {
+          averages.set(day, value.sum / Math.max(1, value.n))
+        })
         setStreakDays(streak)
+        setYearAverageMap(averages)
       } catch {}
     }
     loadStreak()
@@ -532,10 +565,35 @@ export default function MoodHistoryPage() {
     for (let i = 0; i < pad; i++) cells.push({ type: 'pad' })
     for (let day = 1; day <= daysInMonth; day++) {
       const d = start.slice(0, 8) + String(day).padStart(2, '0')
-      cells.push({ type: 'day', date: d, day, avg: monthMap.get(d) ?? null })
+      cells.push({ type: 'day', date: d, day, avg: yearAverageMap.get(d) ?? null })
     }
     return { cells, today }
-  }, [monthMap])
+  }, [yearAverageMap])
+
+  const yearPixels = useMemo(() => {
+    const months: Array<{ key: string; label: string; cells: any[] }> = []
+    const now = new Date()
+    for (let i = 11; i >= 0; i--) {
+      const monthDate = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() - i, 1))
+      const monthStart = asDateString(monthDate)
+      const monthEndDate = new Date(Date.UTC(monthDate.getUTCFullYear(), monthDate.getUTCMonth() + 1, 0))
+      const monthEnd = asDateString(monthEndDate)
+      const daysInMonth = Number(monthEnd.slice(8, 10))
+      const pad = mondayIndexFromUtcDate(monthStart)
+      const cells: any[] = []
+      for (let j = 0; j < pad; j++) cells.push({ type: 'pad' })
+      for (let day = 1; day <= daysInMonth; day++) {
+        const date = monthStart.slice(0, 8) + String(day).padStart(2, '0')
+        cells.push({ type: 'day', date, avg: yearAverageMap.get(date) ?? null })
+      }
+      months.push({
+        key: monthStart,
+        label: monthLabelFromDate(monthStart),
+        cells,
+      })
+    }
+    return months
+  }, [yearAverageMap])
 
   const insightCards = useMemo(() => {
     const list: any[] = []
@@ -548,9 +606,87 @@ export default function MoodHistoryPage() {
     pushFirst('sleep', 'bedtime', 'bg-purple-100 text-purple-600')
     pushFirst('nutrition', 'restaurant', 'bg-green-100 text-green-600')
     pushFirst('activity', 'directions_walk', 'bg-emerald-100 text-emerald-700')
+    pushFirst('supplements', 'vaccines', 'bg-lime-100 text-lime-700')
+    pushFirst('medication', 'medication', 'bg-cyan-100 text-cyan-700')
     pushFirst('stress', 'schedule', 'bg-blue-100 text-blue-600')
     return list.slice(0, 6)
   }, [insights])
+
+  const handleExportCsv = () => {
+    const ordered = entries
+      .slice()
+      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
+
+    const rows = ordered.map((entry) => {
+      const ctx = safeContext(entry.context)
+      const tags = safeTags(entry.tags).join(' | ')
+      return [
+        entry.localDate,
+        new Date(entry.timestamp).toISOString(),
+        entry.mood,
+        tags,
+        entry.note || '',
+        ctx.intensityPercent ?? '',
+        ctx.sleepMinutes ?? '',
+        ctx.stepsToday ?? '',
+        ctx.mealsTodayCount ?? '',
+        ctx.supplements ?? '',
+        ctx.medicationEffect ?? '',
+        ctx.physicalActivity ?? '',
+      ].map(csvEscape).join(',')
+    })
+
+    const header = [
+      'Local Date',
+      'Timestamp',
+      'Mood (1-7)',
+      'Tags',
+      'Note',
+      'Intensity (%)',
+      'Sleep Minutes',
+      'Steps',
+      'Meals Logged',
+      'Supplement Impact (1-5)',
+      'Medication Impact (1-5)',
+      'Activity Rating (1-5)',
+    ].join(',')
+
+    const csv = [header, ...rows].join('\n')
+    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
+    const url = URL.createObjectURL(blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = `helfi-mood-history-${asDateString(new Date())}.csv`
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    URL.revokeObjectURL(url)
+  }
+
+  const handleShareSummary = async () => {
+    const summary = [
+      `Helfi mood summary (${timeframe})`,
+      overallAverage == null ? 'Average mood: no data yet' : `Average mood: ${overallAverage.toFixed(1)} / 7`,
+      topMoodValue == null ? 'Top mood: no data yet' : `Top mood: ${emojiForMoodValue(topMoodValue)} (${topMoodCount || 0} times)`,
+      `Current streak: ${streakDays} day${streakDays === 1 ? '' : 's'}`,
+    ].join('\n')
+
+    try {
+      if (navigator.share) {
+        await navigator.share({
+          title: 'Helfi mood summary',
+          text: summary,
+        })
+        return
+      }
+    } catch {}
+
+    try {
+      await navigator.clipboard.writeText(summary)
+      setBanner('Mood summary copied.')
+      setTimeout(() => setBanner(null), 2000)
+    } catch {}
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
@@ -564,7 +700,41 @@ export default function MoodHistoryPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+        {savedAction && (
+          <div className="mb-4 rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3">
+            <div className="text-[11px] font-bold uppercase tracking-wider text-emerald-700">Right after check-in</div>
+            <div className="mt-1 text-sm font-bold text-emerald-900">{actionDetails(savedAction).title}</div>
+            <div className="mt-1 text-xs text-emerald-800">{actionDetails(savedAction).detail}</div>
+            {savedAction === 'breath' && (
+              <div className="mt-3 flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setBreathingSecondsLeft(60)
+                    setBreathingActive(true)
+                  }}
+                  className="rounded-xl bg-emerald-600 text-white text-xs font-semibold px-3 py-2"
+                >
+                  {breathingActive ? `Reset running: ${breathingSecondsLeft}s` : 'Start 60s breathing'}
+                </button>
+                {breathingActive && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setBreathingActive(false)
+                      setBreathingSecondsLeft(60)
+                    }}
+                    className="rounded-xl border border-emerald-300 text-emerald-700 text-xs font-semibold px-3 py-2"
+                  >
+                    Stop
+                  </button>
+                )}
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
           <div className="flex h-12 w-full items-center justify-between rounded-full bg-white dark:bg-gray-800 p-1.5 shadow-sm border border-gray-100 dark:border-gray-700">
             {(['day', 'week', 'month', 'year'] as const).map((t) => {
               const active = timeframe === t
@@ -586,6 +756,23 @@ export default function MoodHistoryPage() {
                 </button>
               )
             })}
+          </div>
+
+          <div className="mt-4 flex items-center justify-end gap-2">
+            <button
+              type="button"
+              onClick={handleShareSummary}
+              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200"
+            >
+              Share summary
+            </button>
+            <button
+              type="button"
+              onClick={handleExportCsv}
+              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200"
+            >
+              Export CSV
+            </button>
           </div>
 
           <div className="mt-6">
@@ -799,7 +986,7 @@ export default function MoodHistoryPage() {
             <h3 className="text-gray-900 dark:text-white text-xl font-bold">Insights</h3>
           </div>
           <div className="px-1 mb-3 text-sm text-gray-600 dark:text-gray-300">
-            A quick look at possible patterns between your mood and things like sleep, meals, and activity.
+            A quick look at possible patterns between mood, sleep, meals, activity, supplements, and medication impact.
           </div>
           <div className="flex overflow-x-auto no-scrollbar gap-4 px-1 pb-2">
             {insightCards.length === 0 ? (
@@ -877,6 +1064,36 @@ export default function MoodHistoryPage() {
           </div>
         </div>
 
+        <div className="px-1 mt-8">
+          <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-2">Year in Pixels</h3>
+          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Your last 12 months of mood at a glance.</p>
+          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
+              {yearPixels.map((month) => (
+                <div key={month.key} className="rounded-xl border border-gray-100 dark:border-gray-700 p-2 bg-gray-50/70 dark:bg-gray-900/40">
+                  <div className="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1">
+                    {month.label}
+                  </div>
+                  <div className="grid grid-cols-7 gap-[2px]">
+                    {month.cells.map((cell, index) => {
+                      if (cell.type === 'pad') {
+                        return <div key={`${month.key}-pad-${index}`} className="aspect-square rounded-[3px] bg-transparent" />
+                      }
+                      return (
+                        <div
+                          key={cell.date}
+                          className={`aspect-square rounded-[3px] ${dotColorForAvg(cell.avg)}`}
+                          title={`${cell.date}${cell.avg == null ? '' : ` • avg ${cell.avg.toFixed(1)}`}`}
+                        />
+                      )
+                    })}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        </div>
+
         <div className="mt-8">
           <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-3 px-1">Recent entries</h3>
           <div className="space-y-3">
@@ -889,6 +1106,7 @@ export default function MoodHistoryPage() {
                 ctx.intensityPercent != null ? `Intensity ${ctx.intensityPercent}%` : null,
                 ctx.sleepMinutes ? `Sleep ${Math.round(ctx.sleepMinutes / 6) / 10}h` : null,
                 ctx.stepsToday != null ? `${Number(ctx.stepsToday).toLocaleString()} steps` : null,
+                ctx.medicationEffect != null ? `Medication ${ctx.medicationEffect}/5` : null,
               ].filter(Boolean) as string[]
               return (
                 <details key={e.id} className="group bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -937,6 +1155,7 @@ export default function MoodHistoryPage() {
                       {ctx.mealsTodayCount != null && <div>Meals logged: {ctx.mealsTodayCount}</div>}
                       {ctx.exerciseMinutesToday != null && <div>Exercise: {ctx.exerciseMinutesToday} min</div>}
                       {ctx.intensityPercent != null && <div>Intensity: {ctx.intensityPercent}%</div>}
+                      {ctx.medicationEffect != null && <div>Medication impact: {ctx.medicationEffect}/5</div>}
                     </div>
                   </div>
                 </details>
