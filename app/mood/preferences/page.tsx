@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import MoodTabs from '@/components/mood/MoodTabs'
 import { useSaveOnLeave } from '@/lib/use-save-on-leave'
+import { publishMoodReminderSync, subscribeMoodReminderSync } from '@/lib/mood-reminder-sync'
 
 function urlBase64ToUint8Array(base64String: string) {
   const padding = '='.repeat((4 - (base64String.length % 4)) % 4)
@@ -235,6 +236,10 @@ export default function MoodPreferencesPage() {
       settingsSnapshotRef.current = snapshot
       dirtyRef.current = false
       setHasUnsavedChanges(false)
+      publishMoodReminderSync({
+        ...payload,
+        maxFrequency,
+      })
       const failed = Array.isArray(data?.scheduleResults)
         ? data.scheduleResults.filter((result: any) => result && result.scheduled === false)
         : []
@@ -252,7 +257,7 @@ export default function MoodPreferencesPage() {
     } finally {
       if (!options?.silent) setSaving(false)
     }
-  }, [enabled, frequency, time1, time2, time3, time4, timezone])
+  }, [enabled, frequency, time1, time2, time3, time4, timezone, maxFrequency])
 
   const toggleEnabled = async () => {
     const next = !enabled
@@ -264,8 +269,46 @@ export default function MoodPreferencesPage() {
       }
     }
     setEnabled(next)
-    setBanner({ type: 'success', message: 'Changes will save when you leave this page.' })
+    const nextPayload = {
+      enabled: next,
+      frequency,
+      time1,
+      time2,
+      time3,
+      time4,
+      timezone,
+    }
+    await save({ silent: true, payload: nextPayload })
+    setBanner({ type: 'success', message: 'Saved.' })
   }
+
+  useEffect(() => {
+    return subscribeMoodReminderSync((incoming) => {
+      const nextMaxFrequency = Number(incoming.maxFrequency) || maxFrequency || 1
+      const nextFrequency = Math.min(Math.max(1, Number(incoming.frequency) || 1), nextMaxFrequency)
+      const nextSettings = {
+        enabled: !!incoming.enabled,
+        frequency: nextFrequency,
+        time1: normalizeTime(incoming.time1 || '', '20:00'),
+        time2: normalizeTime(incoming.time2 || '', '12:00'),
+        time3: normalizeTime(incoming.time3 || '', '18:00'),
+        time4: normalizeTime(incoming.time4 || '', '09:00'),
+        timezone: (incoming.timezone && String(incoming.timezone).trim()) || deviceTimezone || 'UTC',
+      }
+      settingsSnapshotRef.current = JSON.stringify(nextSettings)
+      dirtyRef.current = false
+      setHasUnsavedChanges(false)
+      setEnabled(nextSettings.enabled)
+      setFrequency(nextSettings.frequency)
+      setTime1(nextSettings.time1)
+      setTime2(nextSettings.time2)
+      setTime3(nextSettings.time3)
+      setTime4(nextSettings.time4)
+      setTimezone(nextSettings.timezone)
+      setTimezoneQuery(nextSettings.timezone)
+      setMaxFrequency(nextMaxFrequency)
+    })
+  }, [deviceTimezone, maxFrequency])
 
   useEffect(() => {
     if (loading) return

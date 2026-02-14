@@ -9,7 +9,6 @@ export default function MoodTabs() {
   const isCheckIn = pathname === '/mood'
   const isHistory = pathname === '/mood/history'
   const isJournal = pathname === '/mood/journal'
-  const isInsights = pathname === '/mood/insights'
   const isPrefs = pathname === '/mood/preferences'
 
   return (
@@ -59,16 +58,6 @@ export default function MoodTabs() {
               }`}
             >
               Journal
-            </Link>
-            <Link
-              href="/mood/insights"
-              className={`flex-shrink-0 px-4 py-3 text-center font-medium whitespace-nowrap transition-colors ${
-                isInsights
-                  ? 'text-helfi-green border-b-2 border-helfi-green'
-                  : 'text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-200'
-              }`}
-            >
-              Insights
             </Link>
           </div>
         </div>

@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import PageHeader from '@/components/PageHeader'
 import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
 import { useSaveOnLeave } from '@/lib/use-save-on-leave'
+import { publishMoodReminderSync, subscribeMoodReminderSync } from '@/lib/mood-reminder-sync'
 
 const baseTimezones = [
   'UTC','Europe/London','Europe/Paris','Europe/Berlin','Europe/Madrid','Europe/Rome','Europe/Amsterdam','Europe/Zurich','Europe/Stockholm','Europe/Athens',
@@ -308,6 +309,10 @@ export default function ReminderSettingsPage() {
         if (moodCacheKey) {
           writeClientCache(moodCacheKey, payload)
         }
+        publishMoodReminderSync({
+          ...payload,
+          maxFrequency: moodMaxFrequency,
+        })
         if (!options?.silent) alert('Mood reminders saved.')
       } else {
         const data = await res.json().catch(() => ({}))
@@ -318,7 +323,7 @@ export default function ReminderSettingsPage() {
     } finally {
       if (!options?.silent) setMoodSaving(false)
     }
-  }, [moodCacheKey, moodSaving, moodEnabled, moodFrequency, moodTime1, moodTime2, moodTime3, moodTime4, moodTimezone])
+  }, [moodCacheKey, moodSaving, moodEnabled, moodFrequency, moodTime1, moodTime2, moodTime3, moodTime4, moodTimezone, moodMaxFrequency])
 
   useEffect(() => {
     const applyCheckins = (data: any, options?: { setSnapshot?: boolean }) => {
@@ -443,6 +448,47 @@ export default function ReminderSettingsPage() {
       setMoodLoading(false)
     })()
   }, [deviceTimezone, moodCacheKey])
+
+  useEffect(() => {
+    return subscribeMoodReminderSync((incoming) => {
+      const nextMaxFrequency = Number(incoming.maxFrequency) || moodMaxFrequency || 1
+      const nextFrequency = Math.min(Math.max(1, Number(incoming.frequency) || 1), nextMaxFrequency)
+      const nextSettings = {
+        enabled: !!incoming.enabled,
+        frequency: nextFrequency,
+        time1: normalizeTime(incoming.time1 || '', '20:00'),
+        time2: normalizeTime(incoming.time2 || '', '12:00'),
+        time3: normalizeTime(incoming.time3 || '', '18:00'),
+        time4: normalizeTime(incoming.time4 || '', '09:00'),
+        timezone: (incoming.timezone && String(incoming.timezone).trim()) || deviceTimezone || 'UTC',
+      }
+      moodSnapshotRef.current = JSON.stringify(nextSettings)
+      moodDirtyRef.current = false
+      setMoodUnsaved(false)
+      setMoodEnabled(nextSettings.enabled)
+      setMoodFrequency(nextSettings.frequency)
+      setMoodTime1(nextSettings.time1)
+      setMoodTime2(nextSettings.time2)
+      setMoodTime3(nextSettings.time3)
+      setMoodTime4(nextSettings.time4)
+      setMoodTimezone(nextSettings.timezone)
+      setMoodMaxFrequency(nextMaxFrequency)
+    })
+  }, [deviceTimezone, moodMaxFrequency])
+
+  const handleMoodEnabledChange = async (enabled: boolean) => {
+    setMoodEnabled(enabled)
+    const payload = {
+      enabled,
+      frequency: moodFrequency,
+      time1: moodTime1,
+      time2: moodTime2,
+      time3: moodTime3,
+      time4: moodTime4,
+      timezone: moodTimezone,
+    }
+    await saveMood({ silent: true, payload })
+  }
 
   useEffect(() => {
     if (checkinsLoading) return
@@ -737,7 +783,9 @@ export default function ReminderSettingsPage() {
                 className="sr-only peer"
                 checked={moodEnabled}
                 disabled={moodLoading || moodSaving}
-                onChange={(e) => setMoodEnabled(e.target.checked)}
+                onChange={(e) => {
+                  void handleMoodEnabledChange(e.target.checked)
+                }}
               />
               <div className="w-11 h-6 bg-gray-200 peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-helfi-green"></div>
             </label>

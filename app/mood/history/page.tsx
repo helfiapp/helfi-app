@@ -797,9 +797,6 @@ export default function MoodHistoryPage() {
         <div className="mt-8">
           <div className="flex items-center justify-between px-1 mb-3">
             <h3 className="text-gray-900 dark:text-white text-xl font-bold">Insights</h3>
-            <a className="text-helfi-green text-xs font-bold uppercase tracking-wide hover:underline" href="/mood/insights">
-              View All
-            </a>
           </div>
           <div className="px-1 mb-3 text-sm text-gray-600 dark:text-gray-300">
             A quick look at possible patterns between your mood and things like sleep, meals, and activity.
