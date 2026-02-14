@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 14:08 AEDT
+- What changed: Daily Check-In rating buttons now support tap-to-clear. If you tap a selected rating again, it unselects (clears) that rating instead of staying locked.
+- Where to see it (page/link): `/check-in`
+- What to quickly test: Open Today’s Check-In, tap any score once (select), then tap the same score again and confirm it clears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 13:24 AEDT
 - What changed: Updated the food tracking news article title from `A Better Food Tracking Workflow From Photo to Final Log` to `A Better Food Tracking Workflow for Everyday Life`. Added the supplied hero banner image `A BETTER FOOD TRACKING WORKFLOW.png` to `/news/complete-food-tracking-workflow`.
 - Where to see it (page/link): `/news/complete-food-tracking-workflow`
