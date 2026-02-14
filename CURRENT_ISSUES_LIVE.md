@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 20:00 AEDT
+- What changed: Fixed Smart Health Coach duplicate alert spam and anti-nag behavior. Added a hard one-run lock so duplicate scheduler hits cannot send/charge multiple alerts, plus extra cooldowns to block repeated same-category/same-message alerts in short periods. Improved Tip History navigation with direct one-tap buttons back to Smart Coach and Main menu.
+- Where to see it (page/link): `/notifications/ai-insights`, `/health-tips`, `/health-tips/history`
+- What to quickly test: Trigger a hydration condition and confirm you do not receive repeated identical alerts in a burst. Open Tip History and confirm you can go back using `Back to Smart Coach` or `Main menu` in one tap.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 19:43 AEDT
 - What changed: Fixed the check-in history page scroll lock on desktop by tightening sidebar wheel handling in the shared layout. Wheel handling now only runs when scrolling starts inside the left sidebar, so `/check-in/history` scrolls normally again.
 - Where to see it (page/link): `https://helfi.ai/check-in/history`

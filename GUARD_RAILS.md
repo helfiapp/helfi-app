@@ -2369,7 +2369,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 3. Confirm duplicate scheduler hits on the same minute result in only one sent alert.
 4. Keep direct links on history page for `Back to Smart Coach` and `Main menu`.
 
-Last stable deployment: `TBD` (set commit/date right after deploy)
+Last stable deployment: `c1c5f2aa` (2026-02-14)
 
 ## 8. Rules for Future Modifications
 
