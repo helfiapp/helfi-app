@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 11:57 AEDT
+- What changed: Added the supplied News images from your BLOG IMAGES folder. `BLOG BANNER.png` now appears under the header on `/news`, and `WHAT IS NEXT FOR HELFI.png` now replaces the featured-story green placeholder image panel.
+- Where to see it (page/link): `/news`
+- What to quickly test: Open `/news`, confirm the top banner is visible under the menu, and confirm the featured story right panel shows your image with text overlay.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 11:20 AEDT
 - What changed: News pages now include the same top Medical Disclaimer banner and a full site footer, so layout matches homepage styling. Also confirmed the featured story image area ratio target for design is about 1.45:1 (closest preset 3:2).
 - Where to see it (page/link): `/news` and `/news/mobile-apps-coming-soon`
