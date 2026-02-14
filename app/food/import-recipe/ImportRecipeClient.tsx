@@ -54,6 +54,21 @@ export default function ImportRecipeClient() {
   const servingsRef = useRef<HTMLInputElement | null>(null)
   const ingredientsRef = useRef<HTMLTextAreaElement | null>(null)
   const stepsRef = useRef<HTMLTextAreaElement | null>(null)
+  const cameraInputRef = useRef<HTMLInputElement | null>(null)
+  const libraryInputRef = useRef<HTMLInputElement | null>(null)
+
+  const addSelectedFiles = (incoming: File[]) => {
+    if (!incoming.length) return
+    setFiles((prev) => {
+      const out = [...prev]
+      for (const file of incoming) {
+        const key = `${file.name}:${file.size}:${file.lastModified}`
+        const exists = out.some((existing) => `${existing.name}:${existing.size}:${existing.lastModified}` === key)
+        if (!exists) out.push(file)
+      }
+      return out.slice(0, 6)
+    })
+  }
 
   const tryBrowserMirrorFallback = async (url: string): Promise<ImportedRecipe | null> => {
     try {
@@ -242,20 +257,58 @@ export default function ImportRecipeClient() {
               <>
                 <div className="text-sm font-semibold text-gray-900">Recipe photos</div>
                 <div className="mt-2 text-xs text-gray-500">You can add multiple photos (useful if the recipe is on 2 pages).</div>
-                <div className="mt-3">
-                  <input
-                    type="file"
-                    accept="image/*"
-                    multiple
-                    capture="environment"
-                    className="w-full text-base sm:text-sm"
-                    onChange={(e) => {
-                      const list = Array.from(e.target.files || [])
-                      setFiles(list)
-                    }}
-                  />
+                <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
+                  <button
+                    type="button"
+                    onClick={() => cameraInputRef.current?.click()}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Take photo
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => libraryInputRef.current?.click()}
+                    className="w-full rounded-xl border border-gray-300 bg-white px-4 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50"
+                  >
+                    Choose from library
+                  </button>
                 </div>
-                {files.length > 0 && <div className="mt-2 text-xs text-gray-600">{files.length} photo(s) selected</div>}
+                <input
+                  ref={cameraInputRef}
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  className="hidden"
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files || [])
+                    addSelectedFiles(list)
+                    e.currentTarget.value = ''
+                  }}
+                />
+                <input
+                  ref={libraryInputRef}
+                  type="file"
+                  accept="image/*"
+                  multiple
+                  className="hidden"
+                  onChange={(e) => {
+                    const list = Array.from(e.target.files || [])
+                    addSelectedFiles(list)
+                    e.currentTarget.value = ''
+                  }}
+                />
+                {files.length > 0 && (
+                  <div className="mt-2 flex items-center justify-between gap-2">
+                    <div className="text-xs text-gray-600">{files.length} photo(s) selected</div>
+                    <button
+                      type="button"
+                      onClick={() => setFiles([])}
+                      className="text-xs font-semibold text-gray-600 underline"
+                    >
+                      Clear
+                    </button>
+                  </div>
+                )}
                 <button
                   type="button"
                   onClick={doImportFromPhoto}
