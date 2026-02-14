@@ -10,12 +10,17 @@ export type NewsPost = {
   excerpt: string
   category: string
   publishedAt: string
+  updatedAt: string
   readingTime: string
   author: string
   seoTitle: string
   seoDescription: string
   heroImage?: string
   heroImageAlt?: string
+  internalLinks?: {
+    label: string
+    href: string
+  }[]
   sections: NewsPostSection[]
 }
 
@@ -27,6 +32,7 @@ export const newsPosts: NewsPost[] = [
       'We are building dedicated iPhone and Android apps so daily tracking is faster, simpler, and always with you.',
     category: 'Product Update',
     publishedAt: '2026-02-14',
+    updatedAt: '2026-02-14',
     readingTime: '8 min read',
     author: 'Helfi Team',
     seoTitle: 'Helfi iOS and Android Apps Coming Soon | Apple Health, Google Health, Sleep Coach',
@@ -34,6 +40,20 @@ export const newsPosts: NewsPost[] = [
       'Helfi is launching iOS and Android apps with Apple Health support, Google health data support, and a new sleep coach experience.',
     heroImage: '/news-images/ios-android-apps-coming-soon-banner.png',
     heroImageAlt: 'Helfi iOS and Android apps coming soon banner',
+    internalLinks: [
+      {
+        label: 'Explore Food Analysis and Nutrition Logging',
+        href: '/features/nutrition-food',
+      },
+      {
+        label: 'See AI insights features',
+        href: '/features/ai-insights',
+      },
+      {
+        label: 'Read pricing options',
+        href: '/pricing',
+      },
+    ],
     sections: [
       {
         heading: 'Why we are building mobile apps now',
@@ -98,6 +118,7 @@ export const newsPosts: NewsPost[] = [
       'Helfi combines photo logging, barcode scanning, ingredient search, and fast edits so food tracking stays accurate without slowing you down.',
     category: 'Food Tracking',
     publishedAt: '2026-02-13',
+    updatedAt: '2026-02-14',
     readingTime: '8 min read',
     author: 'Helfi Team',
     seoTitle: 'A Better Food Tracking Workflow for Everyday Life | Photo, Barcode, Ingredients',
@@ -105,6 +126,20 @@ export const newsPosts: NewsPost[] = [
       'Learn how Helfi food tracking works with photo logging, barcode scan, ingredient search, meal builder, and reusable meal tools for faster daily logging.',
     heroImage: '/news-images/a-better-food-tracking-workflow-banner.png',
     heroImageAlt: 'A better food tracking workflow banner',
+    internalLinks: [
+      {
+        label: 'Open the full food tracking feature page',
+        href: '/features/nutrition-food',
+      },
+      {
+        label: 'Learn about weekly AI insights',
+        href: '/features/ai-insights',
+      },
+      {
+        label: 'Read how meals, water, and sleep connect',
+        href: '/news/meal-water-sleep-consistency',
+      },
+    ],
     sections: [
       {
         heading: 'Food tracking should work on your busiest day',
@@ -182,6 +217,7 @@ export const newsPosts: NewsPost[] = [
       'Good health insights should be practical. Here is how Helfi turns daily data into weekly actions you can follow without overwhelm.',
     category: 'AI Insights',
     publishedAt: '2026-02-12',
+    updatedAt: '2026-02-14',
     readingTime: '8 min read',
     author: 'Helfi Team',
     seoTitle: 'Weekly Health Insights App: Turn Daily Health Data Into Practical Actions',
@@ -189,6 +225,20 @@ export const newsPosts: NewsPost[] = [
       'See how Helfi weekly health insights connect food, activity, and routine data into practical actions you can use each week.',
     heroImage: '/news-images/weekly-health-insights-you-can-actually-use-banner.png',
     heroImageAlt: 'Weekly health insights you can actually use banner',
+    internalLinks: [
+      {
+        label: 'View AI insights feature details',
+        href: '/features/ai-insights',
+      },
+      {
+        label: 'Read health tracking overview',
+        href: '/features/health-tracking',
+      },
+      {
+        label: 'Find answers in the FAQ',
+        href: '/faq',
+      },
+    ],
     sections: [
       {
         heading: 'Why most health dashboards feel overwhelming',
@@ -272,6 +322,7 @@ export const newsPosts: NewsPost[] = [
       'Big health changes usually come from small repeated habits. Here is a simple way to improve consistency with food, hydration, and sleep routines.',
     category: 'Healthy Habits',
     publishedAt: '2026-02-11',
+    updatedAt: '2026-02-14',
     readingTime: '8 min read',
     author: 'Helfi Team',
     seoTitle: 'Healthy Habit Tracking: Meal Consistency, Hydration, and Sleep Trends',
@@ -279,6 +330,20 @@ export const newsPosts: NewsPost[] = [
       'Learn how tracking meals, water intake, and sleep trends together can improve daily energy and weekly health consistency.',
     heroImage: '/news-images/meals-water-and-sleep-banner.png',
     heroImageAlt: 'Meals water and sleep article banner',
+    internalLinks: [
+      {
+        label: 'See food logging features',
+        href: '/features/nutrition-food',
+      },
+      {
+        label: 'See health tracking features',
+        href: '/features/health-tracking',
+      },
+      {
+        label: 'Read weekly insights article',
+        href: '/news/weekly-health-insights-you-can-use',
+      },
+    ],
     sections: [
       {
         heading: 'Why these three habits matter together',

@@ -40,6 +40,7 @@ export function generateMetadata({ params }: NewsArticlePageProps): Metadata {
       url: absoluteUrl(`/news/${post.slug}`),
       type: 'article',
       publishedTime: new Date(post.publishedAt).toISOString(),
+      modifiedTime: new Date(post.updatedAt).toISOString(),
       authors: [post.author],
     },
   }
@@ -68,7 +69,8 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
     headline: post.title,
     description: post.seoDescription,
     datePublished: new Date(post.publishedAt).toISOString(),
-    dateModified: new Date(post.publishedAt).toISOString(),
+    dateModified: new Date(post.updatedAt).toISOString(),
+    url: absoluteUrl(`/news/${post.slug}`),
     author: {
       '@type': 'Organization',
       name: post.author,
@@ -97,7 +99,7 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
             <h1 className="mt-3 text-4xl md:text-5xl font-bold text-gray-900 leading-tight">{post.title}</h1>
 
             <p className="mt-4 text-sm text-gray-500">
-              {formatDate(post.publishedAt)} • {post.readingTime} • By {post.author}
+              Published {formatDate(post.publishedAt)} • Updated {formatDate(post.updatedAt)} • {post.readingTime} • By {post.author}
             </p>
 
             {post.heroImage ? (
@@ -141,6 +143,21 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
                 </section>
               ))}
             </div>
+
+            {post.internalLinks && post.internalLinks.length > 0 ? (
+              <section className="mt-10 rounded-2xl border border-emerald-100 bg-emerald-50/40 p-6 md:p-7">
+                <h2 className="text-xl font-bold text-gray-900">Related Helfi links</h2>
+                <ul className="mt-4 space-y-3">
+                  {post.internalLinks.map((link) => (
+                    <li key={link.href}>
+                      <Link href={link.href} className="text-base font-semibold text-emerald-700 hover:text-emerald-800">
+                        {link.label} →
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+            ) : null}
           </article>
 
           <section className="mt-14 rounded-2xl border border-gray-100 bg-white p-6 md:p-8 shadow-sm">

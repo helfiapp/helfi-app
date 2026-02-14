@@ -40,6 +40,38 @@ function formatDate(value: string) {
 }
 
 export default function NewsPage() {
+  const newsListingSchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Blog',
+        name: 'Helfi News',
+        description: 'Latest product updates and health tracking guides from Helfi.',
+        url: absoluteUrl('/news'),
+        publisher: {
+          '@type': 'Organization',
+          name: 'Helfi',
+          url: absoluteUrl('/'),
+        },
+      },
+      {
+        '@type': 'ItemList',
+        itemListElement: sortedPosts.map((post, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          url: absoluteUrl(`/news/${post.slug}`),
+          item: {
+            '@type': 'BlogPosting',
+            headline: post.title,
+            description: post.excerpt,
+            datePublished: new Date(post.publishedAt).toISOString(),
+            dateModified: new Date(post.updatedAt).toISOString(),
+          },
+        })),
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50/60 via-white to-sky-50/40">
       <MedicalDisclaimerBanner />
@@ -134,6 +166,13 @@ export default function NewsPage() {
       </main>
 
       <PublicFooter />
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(newsListingSchema),
+        }}
+      />
     </div>
   )
 }
