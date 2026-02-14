@@ -1229,7 +1229,6 @@ export async function POST(req: NextRequest) {
             userId: user.id,
             userLabel: user.email,
             endpoint: '/api/ai-meal-recommendation',
-            callDetail: `generate:${attemptModel}`,
           },
         )
         const raw = (completion as any)?.choices?.[0]?.message?.content

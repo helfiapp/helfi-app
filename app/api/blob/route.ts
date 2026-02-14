@@ -59,7 +59,7 @@ export async function GET(request: NextRequest) {
     }
     headers.set('Cache-Control', 'private, max-age=300')
 
-    return new NextResponse(blobResponse.body, { status: 200, headers })
+    return new Response(blobResponse.body, { status: 200, headers })
   } catch (error) {
     console.error('Secure blob fetch failed:', error)
     return NextResponse.json({ error: 'Failed to load file' }, { status: 500 })

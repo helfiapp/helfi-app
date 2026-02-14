@@ -125,7 +125,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
           setUploadStatus('error');
           return;
         }
-        uploadFile = new File([mergedBytes], `lab-report-${Date.now()}.pdf`, {
+        uploadFile = new File([mergedBytes as any], `lab-report-${Date.now()}.pdf`, {
           type: 'application/pdf',
         });
       } else if (files.length === 1) {
@@ -159,7 +159,7 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
             setUploadStatus('error');
             return;
           }
-          uploadFile = new File([mergedBytes], `lab-report-${Date.now()}.pdf`, {
+          uploadFile = new File([mergedBytes as any], `lab-report-${Date.now()}.pdf`, {
             type: 'application/pdf',
           });
         }

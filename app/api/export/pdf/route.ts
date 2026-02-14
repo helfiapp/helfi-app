@@ -224,9 +224,10 @@ export async function GET(request: NextRequest) {
       ex.forEach((e:any)=> drawText(`${fmt(e.createdAt)} — ${e.type || 'Activity'}${Number.isFinite(e.duration)?` — ${e.duration} min`:''}${e.intensity?` — ${e.intensity}`:''}`))
     }
 
-    const pdfBuffer = await doc.save()
+    const pdfBytes = await doc.save()
+    const pdfBuffer = Buffer.from(pdfBytes)
 
-    return new NextResponse(pdfBuffer, {
+    return new Response(pdfBuffer as any, {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',

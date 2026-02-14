@@ -95,7 +95,7 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    return new NextResponse(buffer, {
+    return new Response(buffer as any, {
       headers: {
         'Content-Type': fileRecord.mimeType || 'application/octet-stream',
         'Cache-Control': `private, max-age=${CACHE_TTL_SECONDS}`,
