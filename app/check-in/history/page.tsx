@@ -524,7 +524,7 @@ export default function CheckinHistoryPage() {
   const pagedGroups = groupedRows.slice((page - 1) * pageSize, page * pageSize)
 
   return (
-    <div className="min-h-screen min-h-[100svh] bg-gray-50 dark:bg-gray-900 pb-24 overscroll-y-none overflow-x-hidden">
+    <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24 overflow-x-hidden">
       <PageHeader title="Today's Check-In" backHref="/more" />
       
       {/* Tabs */}
