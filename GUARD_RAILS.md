@@ -683,6 +683,8 @@ Implementation notes (do not remove):
   - `renameEntriesWithLabel(...)` does the same for label-based renames
 - `renameEntriesWithFavoriteId(...)` must match linked entries not only by `__favoriteId`, but also by source id/barcode/item id/known aliases so older logs still rename globally.
 - In `updateFoodEntry`, db-id resolution fallback must include source id/barcode matching before PUT so renamed entries persist after refresh.
+- Build-a-meal diary edit (`app/food/build-meal/MealBuilderClient.tsx`) must treat `/api/food-log` PUT failures as real failures (no silent success/redirect).
+- Build-a-meal return override (`foodDiary:entryOverride`) must carry the edited `description` and Food Diary must apply it (with short retries) so renamed titles show immediately after return.
 - Helper functions that must stay wired:
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
   - `saveFoodNameOverride` (keeps aliases for older labels)

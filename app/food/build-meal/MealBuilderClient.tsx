@@ -4330,7 +4330,7 @@ export default function MealBuilderClient() {
         lastDiaryAutosaveSignatureRef.current = built.signature || ''
         setAutosaveHint('Auto-saving…')
         try {
-          await fetch('/api/food-log', {
+          const res = await fetch('/api/food-log', {
             method: 'PUT',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
@@ -4342,6 +4342,7 @@ export default function MealBuilderClient() {
               category,
             }),
           })
+          if (!res.ok) throw new Error('autosave failed')
           try {
             sessionStorage.setItem(
               'foodDiary:entryOverride',
@@ -4349,6 +4350,7 @@ export default function MealBuilderClient() {
                 dbId: sourceLogId,
                 localDate: selectedDate,
                 category,
+                description: built.description,
                 nutrition: built.diaryNutrition,
                 total: built.diaryNutrition,
                 items: built.cleanedItems,
@@ -4537,20 +4539,22 @@ export default function MealBuilderClient() {
             favoriteLinkId && payload.nutrition
               ? { ...(payload.nutrition as any), __favoriteManualEdit: true }
               : payload.nutrition
-          try {
-            await fetch('/api/food-log', {
-              method: 'PUT',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                id: sourceLogId,
-                description,
-                nutrition: diaryNutrition,
-                items: cleanedItems,
-                meal: category,
-                category,
-              }),
-            })
-          } catch {}
+          const updateRes = await fetch('/api/food-log', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: sourceLogId,
+              description,
+              nutrition: diaryNutrition,
+              items: cleanedItems,
+              meal: category,
+              category,
+            }),
+          })
+          if (!updateRes.ok) {
+            setError('Could not update this meal. Please try again.')
+            return
+          }
           try {
             sessionStorage.setItem(
               'foodDiary:entryOverride',
@@ -4558,6 +4562,7 @@ export default function MealBuilderClient() {
                 dbId: sourceLogId,
                 localDate: selectedDate,
                 category,
+                description,
                 nutrition: diaryNutrition,
                 total: diaryNutrition,
                 items: cleanedItems,
@@ -4819,6 +4824,7 @@ export default function MealBuilderClient() {
               dbId: createdId,
               localDate: selectedDate,
               category,
+              description,
               nutrition: payload.nutrition,
               total: payload.nutrition,
               items: cleanedItems,

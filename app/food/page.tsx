@@ -13289,31 +13289,74 @@ Please add nutritional information manually if needed.`);
   }, [])
 
   useEffect(() => {
-    // Apply an immediate totals override after returning from Build a meal.
-    try {
-      const raw = sessionStorage.getItem('foodDiary:entryOverride')
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      if (!parsed || typeof parsed !== 'object') return
-      const targetId = String(parsed.dbId || '')
-      if (!targetId) return
-      const applyOverride = (list: any[]) =>
-        Array.isArray(list)
-          ? list.map((entry) =>
-              String(entry?.dbId || '') === targetId
-                ? {
-                    ...entry,
-                    nutrition: parsed.nutrition ?? entry.nutrition,
-                    total: parsed.total ?? entry.total,
-                    items: Array.isArray(parsed.items) ? parsed.items : entry.items,
-                  }
-                : entry,
-            )
-          : list
-      setTodaysFoods((prev) => applyOverride(prev as any[]))
-      setHistoryFoods((prev) => applyOverride(prev as any[]))
-      sessionStorage.removeItem('foodDiary:entryOverride')
-    } catch {}
+    // Apply a quick diary override after returning from Build a meal.
+    // Retry briefly because the diary list may still be loading when we land here.
+    let cancelled = false
+    let attempts = 0
+    const maxAttempts = 12
+
+    const applyEntryOverride = () => {
+      if (cancelled) return
+      attempts += 1
+      try {
+        const raw = sessionStorage.getItem('foodDiary:entryOverride')
+        if (!raw) return
+        const parsed = JSON.parse(raw)
+        if (!parsed || typeof parsed !== 'object') return
+        const targetId = String(parsed.dbId || '').trim()
+        if (!targetId) return
+
+        const applyOverrideToList = (list: any[]) => {
+          if (!Array.isArray(list) || list.length === 0) return { next: list, matched: false }
+          let matched = false
+          const next = list.map((entry) => {
+            const entryId = String(entry?.dbId || entry?.id || '').trim()
+            if (!entryId || entryId !== targetId) return entry
+            matched = true
+            return {
+              ...entry,
+              description:
+                typeof parsed.description === 'string' && parsed.description.trim().length > 0
+                  ? parsed.description
+                  : entry.description,
+              label:
+                typeof parsed.description === 'string' && parsed.description.trim().length > 0
+                  ? parsed.description
+                  : entry.label,
+              nutrition: parsed.nutrition ?? entry.nutrition,
+              total: parsed.total ?? entry.total,
+              items: Array.isArray(parsed.items) ? parsed.items : entry.items,
+            }
+          })
+          return { next: matched ? next : list, matched }
+        }
+
+        const todaysResult = applyOverrideToList(
+          Array.isArray(latestTodaysFoodsRef.current) ? latestTodaysFoodsRef.current : [],
+        )
+        const historyResult = applyOverrideToList(
+          Array.isArray(latestHistoryFoodsRef.current) ? (latestHistoryFoodsRef.current as any[]) : [],
+        )
+        const matched = todaysResult.matched || historyResult.matched
+
+        if (todaysResult.matched) setTodaysFoods(todaysResult.next)
+        if (historyResult.matched) setHistoryFoods(historyResult.next)
+
+        if (matched) {
+          sessionStorage.removeItem('foodDiary:entryOverride')
+          return
+        }
+
+        if (attempts < maxAttempts) {
+          window.setTimeout(applyEntryOverride, 250)
+        }
+      } catch {}
+    }
+
+    applyEntryOverride()
+    return () => {
+      cancelled = true
+    }
   }, [])
 
   useEffect(() => {
