@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 15:19 AEDT
+- What changed: Applied a deeper scroll fix in shared layout so main page scrolling uses native browser behavior (prevents wheel/trackpad lock on content pages like Check-in History).
+- Where to see it (page/link): `/check-in/history`
+- What to quickly test: Open Check-in History and scroll down using wheel/trackpad from anywhere in content area (including over the chart). It should move down normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 14:59 AEDT
 - What changed: Fixed Check-in History scroll lock bug on web. The chart tooltip interaction no longer places a full-page-style click layer over the chart area, so page scrolling continues to work normally.
 - Where to see it (page/link): `/check-in/history`
