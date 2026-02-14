@@ -244,6 +244,31 @@ export default function CheckinHistoryPage() {
     return groups
   }, [filteredRows])
 
+  const visibleHistoryRangeLabel = useMemo(() => {
+    if (filteredRows.length === 0) return 'No data available for the selected time period.'
+
+    const timestamps = filteredRows
+      .map((row) => {
+        const parsed = row.timestamp ? new Date(row.timestamp) : new Date(`${row.date}T12:00:00`)
+        return Number.isNaN(parsed.getTime()) ? null : parsed
+      })
+      .filter((value): value is Date => value !== null)
+      .sort((a, b) => a.getTime() - b.getTime())
+
+    if (timestamps.length === 0) return 'No data available for the selected time period.'
+
+    const first = timestamps[0]
+    const last = timestamps[timestamps.length - 1]
+    const firstLabel = format(first, 'MMM d')
+    const lastLabel = format(last, 'MMM d')
+
+    if (firstLabel === lastLabel) {
+      return `Showing data for ${firstLabel}`
+    }
+
+    return `Showing data from ${firstLabel} to ${lastLabel}`
+  }, [filteredRows])
+
   useEffect(() => {
     setPage(1)
   }, [groupedRows.length])
@@ -686,6 +711,9 @@ export default function CheckinHistoryPage() {
               </div>
               <p className="text-sm text-slate-500 dark:text-slate-400 mb-4">
                 Ratings are scored 0 (Really bad) to 6 (Excellent). Hover the chart to see exact values.
+              </p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 -mt-2 mb-4">
+                {visibleHistoryRangeLabel}
               </p>
 
               <div className="relative h-56 md:h-72" onWheelCapture={handleChartWheelCapture}>
