@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-14 19:38 AEDT
+- What changed: Locked down the recipe section to prevent regressions. Added a strict recipe lock section to `GUARD_RAILS.md` and added in-code `RECIPE LOCK (owner request)` comments in recipe import and build meal files so agents must not change this area without explicit written owner approval.
+- Where to see it (page/link): `GUARD_RAILS.md`, `/app/food/import-recipe/ImportRecipeClient.tsx`, `/app/api/recipe-import/route.ts`, `/app/food/build-meal/MealBuilderClient.tsx`
+- What to quickly test: Open the listed files and confirm the new strict lock rules/comments are present.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-14 18:45 AEDT
 - What changed: Added one single top-level expander for `Your ingredients` in Build a meal edit mode. When reopening a saved recipe, the whole ingredient list now starts retracted in one section (instead of showing all ingredient rows).
 - Where to see it (page/link): `/food/build-meal?sourceLogId=<saved_entry_id>` and `/food/build-meal?editFavoriteId=<favorite_id>`
