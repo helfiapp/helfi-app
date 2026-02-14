@@ -1,4 +1,5 @@
 import type { Metadata } from 'next'
+import Image from 'next/image'
 import Link from 'next/link'
 
 import MedicalDisclaimerBanner from '@/components/marketing/MedicalDisclaimerBanner'
@@ -46,6 +47,19 @@ export default function NewsPage() {
 
       <main className="px-4 sm:px-6 lg:px-8 pb-16">
         <div className="max-w-[1160px] mx-auto pt-10 md:pt-14">
+          <section className="mb-9">
+            <div className="relative w-full overflow-hidden rounded-3xl border border-emerald-100 shadow-sm">
+              <Image
+                src="/news-images/blog-banner.png"
+                alt="Helfi News banner"
+                width={1584}
+                height={672}
+                className="w-full h-auto object-cover"
+                priority
+              />
+            </div>
+          </section>
+
           <p className="text-xs uppercase tracking-[0.22em] text-emerald-700 font-semibold">News</p>
           <h1 className="mt-3 text-4xl md:text-5xl font-bold text-gray-900 leading-tight">
             Latest product updates and health tracking guides
@@ -77,8 +91,15 @@ export default function NewsPage() {
                     Read article →
                   </span>
                 </div>
-                <div className="relative min-h-[240px] bg-gradient-to-br from-emerald-500 via-emerald-400 to-sky-400 p-7 md:p-8 flex flex-col justify-end">
-                  <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_left,rgba(255,255,255,0.35),transparent_45%),radial-gradient(circle_at_bottom_right,rgba(255,255,255,0.24),transparent_40%)]" />
+                <div className="relative min-h-[240px] md:min-h-[320px] p-7 md:p-8 flex flex-col justify-end overflow-hidden">
+                  <Image
+                    src="/news-images/what-is-next-for-helfi.png"
+                    alt="What is next for Helfi"
+                    fill
+                    className="object-cover"
+                    sizes="(min-width: 768px) 35vw, 100vw"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-black/15 to-transparent" />
                   <p className="relative text-white/95 text-sm uppercase tracking-[0.18em] font-semibold">
                     Featured story
                   </p>
