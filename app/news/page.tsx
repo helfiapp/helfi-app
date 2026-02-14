@@ -13,7 +13,7 @@ export const metadata: Metadata = {
   description:
     'Read the latest Helfi updates, food tracking guides, and health insights articles.',
   alternates: {
-    canonical: '/news',
+    canonical: absoluteUrl('/news'),
   },
   openGraph: {
     title: 'Helfi News',
@@ -21,6 +21,13 @@ export const metadata: Metadata = {
       'Product updates, feature news, and practical health tracking articles from the Helfi team.',
     url: absoluteUrl('/news'),
     type: 'website',
+  },
+  twitter: {
+    card: 'summary_large_image',
+    title: 'Helfi News | Product Updates and Health Tracking Guides',
+    description:
+      'Read the latest Helfi updates, food tracking guides, and health insights articles.',
+    images: [absoluteUrl('/news-images/blog-banner.png')],
   },
 }
 

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 04:20 AEDT
+- What changed: Continued SEO improvements across public pages. Added structured data (Home, FAQ, Features, News articles), improved metadata/canonical links for FAQ/Features/News, and added stronger internal linking blocks between Home, Features, FAQ, and News.
+- Where to see it (page/link): `/`, `/faq`, `/features`, `/features/nutrition-food`, `/features/ai-insights`, `/news`, `/news/mobile-apps-coming-soon`, `/news/complete-food-tracking-workflow`, `/news/weekly-health-insights-you-can-use`, `/news/meal-water-sleep-consistency`
+- What to quickly test: Open Home and confirm the new `Latest health tracking guides and product updates` section appears and links to articles. Open `/faq` and confirm the popular links cards appear near the top. Open `/features` and confirm the `Also in news` links section appears. Share a `/news/...` article and check social preview metadata populates.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 02:02 AEDT
 - What changed: Added strict lock so `Change portion` from Add-from-favorites is one-off only. Adjusting portion/ingredients in that flow now cannot update favorite/custom default meal templates. Default template changes are only allowed through Favorites/Custom pencil edit flow.
 - Where to see it (page/link): `/food/build-meal?...&fromFavoriteAdjust=1`, plus guard rail lock in `GUARD_RAILS.md` section `7.6.2`.

@@ -5,6 +5,7 @@ import type { FeaturePageContent } from '@/data/feature-pages'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import MockupCarousel from '@/components/marketing/MockupCarousel'
 import MockupGallery from '@/components/marketing/MockupGallery'
+import { absoluteUrl } from '@/lib/site-url'
 
 type FeaturePageProps = {
   page: FeaturePageContent
@@ -12,6 +13,7 @@ type FeaturePageProps = {
 }
 
 export default function FeaturePage({ page, related }: FeaturePageProps) {
+  const featureUrl = absoluteUrl(`/features/${page.slug}`)
   const sectionLinks = [
     { id: 'overview', label: 'Overview' },
     { id: 'capabilities', label: 'Capabilities' },
@@ -35,6 +37,40 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
   const ctaPlacement = page.ctaPlacement ?? 'text'
   const overviewPaddingClass = page.overviewSpacing === 'spacious' ? 'pt-16 md:pt-20' : 'pt-10'
   const ctaButtonsClass = ctaPlacement === 'image' ? 'mt-6 flex flex-wrap gap-3' : 'flex flex-wrap gap-3 mt-8'
+  const featureStructuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        name: page.title,
+        url: featureUrl,
+        description: page.seo.description,
+      },
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: absoluteUrl('/'),
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'Features',
+            item: absoluteUrl('/features'),
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: page.title,
+            item: featureUrl,
+          },
+        ],
+      },
+    ],
+  }
 
   const ctaButtons = (
     <div className={ctaButtonsClass}>
@@ -529,6 +565,13 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
           </section>
         )}
       </main>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(featureStructuredData),
+        }}
+      />
 
       <footer className="px-6 pb-10">
         <div className="max-w-6xl mx-auto text-sm text-gray-500 flex flex-col md:flex-row items-start md:items-center justify-between gap-4">

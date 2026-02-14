@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import PublicHeader from '@/components/marketing/PublicHeader'
+import { absoluteUrl } from '@/lib/site-url'
 // Back to Top Button Component
 function BackToTopButton() {
   const [isVisible, setIsVisible] = useState(false)
@@ -136,6 +137,43 @@ export default function SplashPage() {
   }
 
   const signupHref = '/auth/signin?mode=signup'
+  const homepageSchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'Organization',
+        '@id': absoluteUrl('/#organization'),
+        name: 'Helfi',
+        url: absoluteUrl('/'),
+        logo: absoluteUrl('/icons/app-512.png'),
+        description:
+          'Helfi helps people track food, symptoms, and daily habits with practical AI health insights.',
+      },
+      {
+        '@type': 'WebSite',
+        '@id': absoluteUrl('/#website'),
+        name: 'Helfi',
+        url: absoluteUrl('/'),
+        publisher: {
+          '@id': absoluteUrl('/#organization'),
+        },
+        description:
+          'AI health tracking app for food logging, weekly insights, hydration, and daily habit tracking.',
+      },
+      {
+        '@type': 'WebPage',
+        '@id': absoluteUrl('/#webpage'),
+        url: absoluteUrl('/'),
+        name: 'Helfi | AI Health Tracking App',
+        isPartOf: {
+          '@id': absoluteUrl('/#website'),
+        },
+        about: {
+          '@id': absoluteUrl('/#organization'),
+        },
+      },
+    ],
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
       {/* Medical Disclaimer Banner */}
@@ -666,6 +704,64 @@ export default function SplashPage() {
         </div>
       </section>
 
+      {/* Latest News Section */}
+      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 bg-gradient-to-br from-emerald-50/40 via-white to-sky-50/40">
+        <div className="max-w-6xl mx-auto">
+          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
+            <div>
+              <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 font-semibold mb-3">News</p>
+              <h2 className="text-3xl md:text-4xl font-bold text-helfi-black">
+                Latest health tracking guides and product updates
+              </h2>
+              <p className="text-gray-600 mt-3 max-w-2xl">
+                Read practical articles about food tracking, weekly health insights, and what we are building next.
+              </p>
+            </div>
+            <Link
+              href="/news"
+              className="inline-flex items-center px-5 py-3 rounded-full border border-emerald-200 text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors"
+            >
+              View all news
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
+            <Link
+              href="/news/mobile-apps-coming-soon"
+              className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">Product update</p>
+              <h3 className="text-xl font-semibold text-gray-900 mt-3">Helfi iOS and Android apps are coming soon</h3>
+              <p className="text-sm text-gray-600 mt-3">
+                Learn what is coming in the mobile apps, including Apple Health, Google health data, and sleep coaching.
+              </p>
+            </Link>
+
+            <Link
+              href="/news/complete-food-tracking-workflow"
+              className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">Food tracking</p>
+              <h3 className="text-xl font-semibold text-gray-900 mt-3">A better food tracking workflow for everyday life</h3>
+              <p className="text-sm text-gray-600 mt-3">
+                See how photo logging, barcode scan, ingredient search, and reusable tools work together.
+              </p>
+            </Link>
+
+            <Link
+              href="/news/weekly-health-insights-you-can-use"
+              className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
+            >
+              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">AI insights</p>
+              <h3 className="text-xl font-semibold text-gray-900 mt-3">Weekly health insights you can actually use</h3>
+              <p className="text-sm text-gray-600 mt-3">
+                Understand how Helfi turns daily logs into clear weekly actions that feel realistic.
+              </p>
+            </Link>
+          </div>
+        </div>
+      </section>
+
       {/* Why Health Tracking Matters Section */}
       <section id="why-helfi" className="px-6 py-20 bg-gradient-to-br from-green-50 to-blue-50">
         <div className="max-w-6xl mx-auto">
@@ -1186,6 +1282,15 @@ export default function SplashPage() {
               </p>
             </div>
           </div>
+
+          <div className="mt-8 text-center">
+            <Link
+              href="/faq"
+              className="inline-flex items-center px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+            >
+              See full FAQ and Help Center
+            </Link>
+          </div>
         </div>
       </section>
 
@@ -1415,6 +1520,13 @@ export default function SplashPage() {
           </div>
         </div>
       )}
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(homepageSchema),
+        }}
+      />
 
     </div>
   )

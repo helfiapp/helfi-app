@@ -6,25 +6,57 @@ import { absoluteUrl } from '@/lib/site-url'
 import { featurePages } from '@/data/feature-pages'
 
 export const metadata: Metadata = {
-  title: 'Features | Helfi',
-  description: 'Explore the Helfi health platform and dive into each core feature.',
+  title: 'Helfi Features | Food Tracking, AI Insights, and Health Tracking',
+  description:
+    'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
+  keywords: [
+    'health tracking app features',
+    'food tracking features',
+    'AI health insights',
+    'hydration tracking app',
+    'Helfi features',
+  ],
   alternates: {
     canonical: absoluteUrl('/features'),
   },
   openGraph: {
-    title: 'Features | Helfi',
-    description: 'Explore the Helfi health platform and dive into each core feature.',
+    title: 'Helfi Features | Food Tracking, AI Insights, and Health Tracking',
+    description:
+      'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
     url: absoluteUrl('/features'),
     type: 'website',
   },
   twitter: {
-    card: 'summary',
-    title: 'Features | Helfi',
-    description: 'Explore the Helfi health platform and dive into each core feature.',
+    card: 'summary_large_image',
+    title: 'Helfi Features | Food Tracking, AI Insights, and Health Tracking',
+    description:
+      'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
   },
 }
 
 export default function FeaturesIndexPage() {
+  const featuresSchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'CollectionPage',
+        name: 'Helfi Features',
+        url: absoluteUrl('/features'),
+        description:
+          'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
+      },
+      {
+        '@type': 'ItemList',
+        itemListElement: featurePages.map((page, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: page.title,
+          url: absoluteUrl(`/features/${page.slug}`),
+        })),
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-slate-50">
       <PublicHeader />
@@ -63,6 +95,25 @@ export default function FeaturesIndexPage() {
             ))}
           </div>
 
+          <div className="mt-12 rounded-3xl border border-gray-100 bg-white p-8 md:p-10 shadow-sm">
+            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-3">Also in news</p>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Guides to help you get more value from each feature</h2>
+            <p className="text-gray-600 mb-6">
+              These short reads explain how to use food tracking, weekly insights, and daily routine planning in real life.
+            </p>
+            <div className="grid gap-3 md:grid-cols-3">
+              <Link href="/news/complete-food-tracking-workflow" className="text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+                A better food tracking workflow for everyday life →
+              </Link>
+              <Link href="/news/weekly-health-insights-you-can-use" className="text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+                Weekly health insights you can actually use →
+              </Link>
+              <Link href="/news/meal-water-sleep-consistency" className="text-sm font-semibold text-emerald-700 hover:text-emerald-800">
+                Meals, water, and sleep: build better weeks →
+              </Link>
+            </div>
+          </div>
+
           <div className="mt-16 bg-white rounded-3xl border border-gray-100 shadow-sm p-8 md:p-10 flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
             <div>
               <h3 className="text-2xl font-bold text-gray-900 mb-2">
@@ -81,6 +132,13 @@ export default function FeaturesIndexPage() {
           </div>
         </div>
       </main>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(featuresSchema),
+        }}
+      />
     </div>
   )
 }

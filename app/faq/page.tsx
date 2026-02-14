@@ -108,6 +108,21 @@ export default function FAQPage() {
     }
   ]
 
+  const faqSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'FAQPage',
+    mainEntity: faqs.flatMap((category) =>
+      category.questions.map((question) => ({
+        '@type': 'Question',
+        name: question.q,
+        acceptedAnswer: {
+          '@type': 'Answer',
+          text: question.a,
+        },
+      })),
+    ),
+  }
+
   return (
     <div className="min-h-screen bg-gray-50">
       {/* Navigation Header */}
@@ -166,6 +181,21 @@ export default function FAQPage() {
             </p>
           </div>
 
+          <div className="mb-10 grid gap-4 md:grid-cols-3">
+            <Link href="/features/nutrition-food" className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 hover:bg-emerald-50 transition-colors">
+              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">Popular feature</p>
+              <p className="text-sm font-semibold text-gray-900 mt-2">Food tracking feature guide</p>
+            </Link>
+            <Link href="/features/ai-insights" className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 hover:bg-emerald-50 transition-colors">
+              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">Popular feature</p>
+              <p className="text-sm font-semibold text-gray-900 mt-2">AI insights feature guide</p>
+            </Link>
+            <Link href="/news" className="rounded-xl border border-emerald-100 bg-emerald-50/40 p-4 hover:bg-emerald-50 transition-colors">
+              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">Latest updates</p>
+              <p className="text-sm font-semibold text-gray-900 mt-2">Read Helfi News and product updates</p>
+            </Link>
+          </div>
+
           <div className="space-y-8">
             {faqs.map((category, categoryIndex) => (
               <div key={categoryIndex}>
@@ -197,6 +227,13 @@ export default function FAQPage() {
           </div>
         </div>
       </div>
+
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(faqSchema),
+        }}
+      />
     </div>
   )
 } 

@@ -28,11 +28,13 @@ export function generateMetadata({ params }: NewsArticlePageProps): Metadata {
     }
   }
 
+  const socialImage = post.heroImage ? absoluteUrl(post.heroImage) : absoluteUrl('/icons/app-1024.png')
+
   return {
     title: post.seoTitle,
     description: post.seoDescription,
     alternates: {
-      canonical: `/news/${post.slug}`,
+      canonical: absoluteUrl(`/news/${post.slug}`),
     },
     openGraph: {
       title: post.seoTitle,
@@ -42,6 +44,18 @@ export function generateMetadata({ params }: NewsArticlePageProps): Metadata {
       publishedTime: new Date(post.publishedAt).toISOString(),
       modifiedTime: new Date(post.updatedAt).toISOString(),
       authors: [post.author],
+      images: [
+        {
+          url: socialImage,
+          alt: post.heroImageAlt || post.title,
+        },
+      ],
+    },
+    twitter: {
+      card: 'summary_large_image',
+      title: post.seoTitle,
+      description: post.seoDescription,
+      images: [socialImage],
     },
   }
 }
@@ -87,6 +101,36 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
       url: absoluteUrl('/'),
     },
     mainEntityOfPage: absoluteUrl(`/news/${post.slug}`),
+  }
+
+  const articleStructuredData = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      articleSchema,
+      {
+        '@type': 'BreadcrumbList',
+        itemListElement: [
+          {
+            '@type': 'ListItem',
+            position: 1,
+            name: 'Home',
+            item: absoluteUrl('/'),
+          },
+          {
+            '@type': 'ListItem',
+            position: 2,
+            name: 'News',
+            item: absoluteUrl('/news'),
+          },
+          {
+            '@type': 'ListItem',
+            position: 3,
+            name: post.title,
+            item: absoluteUrl(`/news/${post.slug}`),
+          },
+        ],
+      },
+    ],
   }
 
   return (
@@ -202,7 +246,7 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{
-          __html: JSON.stringify(articleSchema),
+          __html: JSON.stringify(articleStructuredData),
         }}
       />
 
