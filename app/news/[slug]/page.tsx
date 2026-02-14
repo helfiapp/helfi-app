@@ -2,6 +2,8 @@ import type { Metadata } from 'next'
 import Link from 'next/link'
 import { notFound } from 'next/navigation'
 
+import MedicalDisclaimerBanner from '@/components/marketing/MedicalDisclaimerBanner'
+import PublicFooter from '@/components/marketing/PublicFooter'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import { newsPostBySlug, newsPosts } from '@/data/news-posts'
 import { absoluteUrl } from '@/lib/site-url'
@@ -80,6 +82,7 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-emerald-50/50 via-white to-white">
+      <MedicalDisclaimerBanner />
       <PublicHeader mobileVariant="back" />
 
       <main className="px-4 sm:px-6 lg:px-8 pb-16">
@@ -150,6 +153,8 @@ export default function NewsArticlePage({ params }: NewsArticlePageProps) {
           __html: JSON.stringify(articleSchema),
         }}
       />
+
+      <PublicFooter />
     </div>
   )
 }
