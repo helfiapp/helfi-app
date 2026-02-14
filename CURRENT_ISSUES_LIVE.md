@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 00:44 AEDT
+- What changed: Replaced the old No/Yes save control (after Build a meal imports) with a clear toggle switch. Wording is now: "Would you like to save this as a custom meal?" Toggle is OFF by default and turns green when ON.
+- Where to see it (page/link): /food/build-meal (after opening from AI Recommended -> Build this meal, or any recipe import flow)
+- What to quickly test: Open Build a meal import, confirm the new custom meal toggle appears, default is off, click once and confirm it turns green and shows it will save to Custom meals.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 00:11 AEDT
 - What changed: Improved Build-a-meal clarity and speed for AI recommended imports. Portion text now reads "This portion is X% of the full amount." and is shown directly under the portion field. Also sped up small imports by using AI-provided ingredient nutrition directly first (when available) and using faster lookup mode for short ingredient lists.
 - Where to see it (page/link): /food/build-meal (after opening from /food/recommended with Build this meal)
