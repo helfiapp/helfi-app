@@ -3035,7 +3035,7 @@ export default function MealBuilderClient() {
 
           if (prefillMatchesLine) {
             const prefillCandidate = {
-              source: 'ai-recommended',
+              source: 'custom',
               id: String(prefill?.id || `prefill-${lineIndex}`),
               name: prefillName || lookup || line,
               brand: null,
