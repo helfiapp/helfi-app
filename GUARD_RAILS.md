@@ -2335,6 +2335,8 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 - Drink scaling lock (all drink types): only scale by `drinkAmount` when the source entry has a reliable base serving volume. Never scale from tiny/invalid bases (like `1 ml`) or raw ml multiplication can explode calories.
 - API lock: when saving/updating a **sugar-free hot chocolate** drink entry, force nutrition to sweetener-only values (no stale favorite kcal allowed).
 - UI lock: when loading history/diary, apply the same sugar-free hot chocolate guard so old bad rows cannot reappear with high kcal.
+- Water -> Food handoff lock: when opening Food add flows from Water drink modal, carry sweetener context in URL (`drinkSweetener` + `drinkSweetenerAmount` + `drinkSweetenerUnit` + `drinkSweetenerGrams`) so sweetener intent is never lost.
+- Pending-context lock: in `app/food/page.tsx`, consume sweetener context and apply `applyPendingDrinkSweetenerGuard(...)` before creating entry payload so Water flow drinks never get kcal multiplied by ml.
 - Favorite rename sync must match by `favoriteId`, and also by stable identifiers (`sourceId` / `barcode`) so older diary rows still update.
 - Food name override save must support entries where `items` can be JSON strings (not only arrays).
 
@@ -2348,6 +2350,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 7. In `app/api/food-log/route.ts`, keep the sugar-free hot chocolate save guard (sweetener-only totals).
 8. In `app/food/page.tsx`, keep the sugar-free hot chocolate load guard so stale rows are corrected on display.
 9. In `applyDrinkOverrideToItems(...)`, keep the reliable-base-volume checks and tiny-base block (`baseMl < 20`).
+10. Keep `drinkSweetener` URL + pending ref handoff and the `applyPendingDrinkSweetenerGuard(...)` call in add flows.
 
 ### 7.6.1 Delayed Drink->Food Flip Lock (HEL-156, Feb 2026 - STRICT LOCK)
 
@@ -2405,6 +2408,31 @@ entry for the **same day** only **if that diary entry was not manually edited**.
    - Open Add from favorites -> select meal -> `Change portion`.
    - Change amount/ingredients and tap `Add`.
    - Reopen that same favorite in list and confirm its default serving/ingredients are unchanged.
+
+### 7.6.3 Water Favorites Drink Sweetener Carry-Through (HEL-162, Feb 2026 - STRICT LOCK)
+
+**Owner-reported symptom (LIVE):**
+- Drink added from Water -> Add from favorites could show wrong drink kcal (including ml multiplication or stale favorite totals).
+
+**Root cause pattern:**
+- Sweetener intent from Water modal was not always carried into Food add flow.
+- Flow could scale calories by ml or reuse stale favorite nutrition instead of sweetener-only nutrition.
+
+**Non-negotiable rule:**
+- If Water flow includes sweetener context:
+  - `free` must save as zero nutrition.
+  - `sugar`/`honey` must save only sweetener-based calories/macros (never multiplied by drink ml).
+
+**Code lock (must preserve):**
+- `app/food/water/page.tsx` must pass `drinkSweetener`, `drinkSweetenerAmount`, `drinkSweetenerUnit`, and `drinkSweetenerGrams` in `navigateDrinkNutrition(...)`.
+- `app/food/page.tsx` must:
+  - parse/track pending sweetener context
+  - skip ml scaling when sweetener context is active
+  - apply `applyPendingDrinkSweetenerGuard(...)` before creating entry payload in add flows
+
+**Last stable deployment for this lock:**
+- Commit: `pending`
+- Date: `2026-02-15`
 
 ## 7.7 Smart Health Coach Anti-Spam Guard (Feb 2026 – Locked)
 

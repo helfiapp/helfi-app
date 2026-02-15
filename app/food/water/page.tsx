@@ -579,6 +579,26 @@ export default function WaterIntakePage() {
       const unitParam = String(drinkDetail.unit || '')
       const drinkTypeParam = activeDrink
       const waterLogIdParam = waterEntry?.id ? String(waterEntry.id) : ''
+      const drinkSweetenerParam = drinkSugarChoice === 'free' || drinkSugarChoice === 'sugar' || drinkSugarChoice === 'honey'
+        ? drinkSugarChoice
+        : ''
+      let drinkSweetenerAmountParam = ''
+      let drinkSweetenerUnitParam = ''
+      let drinkSweetenerGramsParam = ''
+      if (drinkSugarChoice === 'sugar' || drinkSugarChoice === 'honey') {
+        const rawAmount = Number(drinkSugarAmount)
+        if (Number.isFinite(rawAmount) && rawAmount > 0) {
+          const grams =
+            drinkSugarChoice === 'honey'
+              ? honeyToGrams(rawAmount, drinkSugarUnit)
+              : sugarToGrams(rawAmount, drinkSugarUnit)
+          if (Number.isFinite(grams) && grams > 0) {
+            drinkSweetenerAmountParam = String(rawAmount)
+            drinkSweetenerUnitParam = drinkSugarUnit
+            drinkSweetenerGramsParam = String(Math.round(grams * 1000) / 1000)
+          }
+        }
+      }
       if (mode === 'photo') {
         const qs = new URLSearchParams({
           date: selectedDate,
@@ -586,6 +606,10 @@ export default function WaterIntakePage() {
           drinkAmount: amountParam,
           drinkUnit: unitParam,
           drinkType: drinkTypeParam,
+          ...(drinkSweetenerParam ? { drinkSweetener: drinkSweetenerParam } : {}),
+          ...(drinkSweetenerAmountParam ? { drinkSweetenerAmount: drinkSweetenerAmountParam } : {}),
+          ...(drinkSweetenerUnitParam ? { drinkSweetenerUnit: drinkSweetenerUnitParam } : {}),
+          ...(drinkSweetenerGramsParam ? { drinkSweetenerGrams: drinkSweetenerGramsParam } : {}),
           ...(waterLogIdParam ? { waterLogId: waterLogIdParam } : {}),
         })
         router.push(`/food/analysis?${qs.toString()}`)
@@ -599,6 +623,10 @@ export default function WaterIntakePage() {
           drinkAmount: amountParam,
           drinkUnit: unitParam,
           drinkType: drinkTypeParam,
+          ...(drinkSweetenerParam ? { drinkSweetener: drinkSweetenerParam } : {}),
+          ...(drinkSweetenerAmountParam ? { drinkSweetenerAmount: drinkSweetenerAmountParam } : {}),
+          ...(drinkSweetenerUnitParam ? { drinkSweetenerUnit: drinkSweetenerUnitParam } : {}),
+          ...(drinkSweetenerGramsParam ? { drinkSweetenerGrams: drinkSweetenerGramsParam } : {}),
           ...(waterLogIdParam ? { waterLogId: waterLogIdParam } : {}),
         })
         router.push(`/food/add-ingredient?${qs.toString()}`)
@@ -611,6 +639,10 @@ export default function WaterIntakePage() {
         drinkAmount: amountParam,
         drinkUnit: unitParam,
         drinkType: drinkTypeParam,
+        ...(drinkSweetenerParam ? { drinkSweetener: drinkSweetenerParam } : {}),
+        ...(drinkSweetenerAmountParam ? { drinkSweetenerAmount: drinkSweetenerAmountParam } : {}),
+        ...(drinkSweetenerUnitParam ? { drinkSweetenerUnit: drinkSweetenerUnitParam } : {}),
+        ...(drinkSweetenerGramsParam ? { drinkSweetenerGrams: drinkSweetenerGramsParam } : {}),
         ...(waterLogIdParam ? { waterLogId: waterLogIdParam } : {}),
       })
       router.push(`/food?${qs.toString()}`)

@@ -331,6 +331,13 @@ type DrinkAmountOverride = {
   unit: 'ml' | 'l' | 'oz'
   amountMl: number
 }
+type DrinkSweetenerChoice = 'free' | 'sugar' | 'honey'
+
+const normalizeDrinkSweetenerChoice = (value: string | null | undefined): DrinkSweetenerChoice | null => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'free' || raw === 'sugar' || raw === 'honey') return raw as DrinkSweetenerChoice
+  return null
+}
 
 const normalizeDrinkUnit = (value: string | null | undefined): DrinkAmountOverride['unit'] | null => {
   const raw = String(value || '').trim().toLowerCase()
@@ -365,6 +372,9 @@ const parseDrinkWaterLogIdFromParams = (params: URLSearchParams): string | null 
   const trimmed = raw.trim()
   return trimmed ? trimmed : null
 }
+
+const parseDrinkSweetenerFromParams = (params: URLSearchParams): DrinkSweetenerChoice | null =>
+  normalizeDrinkSweetenerChoice(params.get('drinkSweetener'))
 
 const formatDrinkOverrideLabel = (override: DrinkAmountOverride) => {
   const unitLabel = override.unit === 'l' ? 'L' : override.unit
@@ -431,6 +441,12 @@ type SweetenerMeta = {
   carbs: number
   sugar: number
 }
+type PendingDrinkSweetenerContext = {
+  choice: DrinkSweetenerChoice
+  grams: number | null
+  amount: number | null
+  unit: SweetenerUnit | null
+}
 
 const HONEY_TBSP_GRAMS = 21
 const HONEY_TSP_GRAMS = 7
@@ -460,6 +476,38 @@ const sweetenerToMacros = (type: SweetenerType, grams: number) => {
   const carbs = Math.round(grams * 10) / 10
   const sugar = carbs
   return { calories, carbs, sugar }
+}
+
+const normalizeSweetenerUnit = (value: string | null | undefined): SweetenerUnit | null => {
+  const raw = String(value || '').trim().toLowerCase()
+  if (raw === 'g' || raw === 'tsp' || raw === 'tbsp') return raw as SweetenerUnit
+  return null
+}
+
+const parseDrinkSweetenerContextFromParams = (
+  params: URLSearchParams,
+): PendingDrinkSweetenerContext | null => {
+  const choice = parseDrinkSweetenerFromParams(params)
+  if (!choice) return null
+
+  const gramsRaw = Number(params.get('drinkSweetenerGrams'))
+  const amountRaw = Number(params.get('drinkSweetenerAmount'))
+  const unit = normalizeSweetenerUnit(params.get('drinkSweetenerUnit'))
+  const amount = Number.isFinite(amountRaw) && amountRaw > 0 ? amountRaw : null
+  const parsedGrams =
+    Number.isFinite(gramsRaw) && gramsRaw > 0
+      ? gramsRaw
+      : choice !== 'free' && amount && unit
+      ? sweetenerToGrams(choice, amount, unit)
+      : null
+  const normalizedGrams = Number(parsedGrams)
+
+  return {
+    choice,
+    grams: Number.isFinite(normalizedGrams) && normalizedGrams > 0 ? normalizedGrams : null,
+    amount,
+    unit,
+  }
 }
 
 const getSweetenerMetaFromEntry = (entry: any): SweetenerMeta | null => {
@@ -3361,6 +3409,7 @@ export default function FoodDiary() {
   const pendingDrinkOverrideRef = useRef<DrinkAmountOverride | null>(null)
   const pendingDrinkTypeRef = useRef<string | null>(null)
   const pendingDrinkWaterLogIdRef = useRef<string | null>(null)
+  const pendingDrinkSweetenerRef = useRef<PendingDrinkSweetenerContext | null>(null)
   const editingDrinkMetaRef = useRef<DrinkEntryMeta | null>(null)
   const [favoriteSwipeOffsets, setFavoriteSwipeOffsets] = useState<Record<string, number>>({})
   const swipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
@@ -3436,7 +3485,16 @@ export default function FoodDiary() {
     if (typeof window === 'undefined') return
     try {
       const url = new URL(window.location.href)
-      const drinkParamKeys = ['drinkAmount', 'drinkUnit', 'drinkType', 'waterLogId'] as const
+      const drinkParamKeys = [
+        'drinkAmount',
+        'drinkUnit',
+        'drinkType',
+        'waterLogId',
+        'drinkSweetener',
+        'drinkSweetenerAmount',
+        'drinkSweetenerUnit',
+        'drinkSweetenerGrams',
+      ] as const
       const hasDrinkParams = drinkParamKeys.some((key) => url.searchParams.has(key))
       if (!hasDrinkParams) return
       drinkParamKeys.forEach((key) => {
@@ -3452,10 +3510,14 @@ export default function FoodDiary() {
     pendingDrinkOverrideRef.current = null
     pendingDrinkTypeRef.current = null
     pendingDrinkWaterLogIdRef.current = null
+    pendingDrinkSweetenerRef.current = null
   }
   const hasPendingDrinkContext = () =>
     Boolean(
-      pendingDrinkOverrideRef.current || pendingDrinkTypeRef.current || pendingDrinkWaterLogIdRef.current,
+      pendingDrinkOverrideRef.current ||
+        pendingDrinkTypeRef.current ||
+        pendingDrinkWaterLogIdRef.current ||
+        pendingDrinkSweetenerRef.current,
     )
   const isDrinkCandidateForPendingContext = (value: any) => {
     if (!value || typeof value !== 'object') return false
@@ -3499,6 +3561,13 @@ export default function FoodDiary() {
     }
     return meta
   }
+  const consumePendingDrinkSweetener = (): PendingDrinkSweetenerContext | null => {
+    const params = typeof window !== 'undefined' ? new URLSearchParams(window.location.search) : null
+    const sweetener =
+      pendingDrinkSweetenerRef.current || (params ? parseDrinkSweetenerContextFromParams(params) : null)
+    pendingDrinkSweetenerRef.current = null
+    return sweetener
+  }
   useEffect(() => {
     if (!isAnalysisRoute) return
     if (typeof window !== 'undefined') {
@@ -3508,6 +3577,7 @@ export default function FoodDiary() {
       const drinkOverride = parseDrinkOverrideFromParams(params)
       const drinkType = parseDrinkTypeFromParams(params)
       const waterLogId = parseDrinkWaterLogIdFromParams(params)
+      const drinkSweetener = parseDrinkSweetenerContextFromParams(params)
       if (routeDate && /^\d{4}-\d{2}-\d{2}$/.test(routeDate)) {
         setSelectedDate(routeDate)
       }
@@ -3519,6 +3589,7 @@ export default function FoodDiary() {
       }
       pendingDrinkTypeRef.current = drinkType
       pendingDrinkWaterLogIdRef.current = waterLogId
+      pendingDrinkSweetenerRef.current = drinkSweetener
     }
     setShowAddFood(true)
     setShowCategoryPicker(false)
@@ -3558,9 +3629,15 @@ export default function FoodDiary() {
     const drinkOverride = parseDrinkOverrideFromParams(params)
     const drinkType = parseDrinkTypeFromParams(params)
     const waterLogId = parseDrinkWaterLogIdFromParams(params)
+    const drinkSweetener = parseDrinkSweetenerContextFromParams(params)
     const drinkAmountKey = drinkOverride ? String(drinkOverride.amount) : ''
     const drinkUnitKey = drinkOverride ? String(drinkOverride.unit) : ''
-    const key = `${open}|${routeDate}|${routeCategory}|${drinkAmountKey}|${drinkUnitKey}|${drinkType || ''}|${waterLogId || ''}`
+    const drinkSweetenerKey = drinkSweetener?.choice || ''
+    const drinkSweetenerGramsKey =
+      Number.isFinite(Number(drinkSweetener?.grams)) && Number(drinkSweetener?.grams) > 0
+        ? String(drinkSweetener?.grams)
+        : ''
+    const key = `${open}|${routeDate}|${routeCategory}|${drinkAmountKey}|${drinkUnitKey}|${drinkType || ''}|${waterLogId || ''}|${drinkSweetenerKey}|${drinkSweetenerGramsKey}`
     if (openMenuKeyRef.current === key) return
     openMenuKeyRef.current = key
 
@@ -3575,6 +3652,7 @@ export default function FoodDiary() {
     }
     pendingDrinkTypeRef.current = drinkType
     pendingDrinkWaterLogIdRef.current = waterLogId
+    pendingDrinkSweetenerRef.current = drinkSweetener
 
     setShowCategoryPicker(false)
     setShowPhotoOptions(false)
@@ -10846,6 +10924,80 @@ const convertTotalsForStorage = (totals: NutritionTotals | null | undefined) => 
   }
 }
 
+const applyPendingDrinkSweetenerGuard = ({
+  totals,
+  items,
+  drinkMeta,
+  drinkSweetener,
+}: {
+  totals: any
+  items: any[] | null | undefined
+  drinkMeta: DrinkEntryMeta | null
+  drinkSweetener: PendingDrinkSweetenerContext | null
+}) => {
+  if (!drinkSweetener?.choice) return { totals, items }
+  if (!drinkMeta?.type) return { totals, items }
+
+  const setSingleItemMacros = (targetItems: any[] | null | undefined, macros: NutritionTotals) => {
+    if (!Array.isArray(targetItems) || targetItems.length !== 1 || !targetItems[0] || typeof targetItems[0] !== 'object') {
+      return targetItems
+    }
+    const single = { ...(targetItems[0] as any) }
+    single.calories = Math.max(0, Math.round(Number(macros.calories || 0)))
+    single.protein_g = Math.max(0, Number(macros.protein || 0))
+    single.carbs_g = Math.max(0, Number(macros.carbs || 0))
+    single.fat_g = Math.max(0, Number(macros.fat || 0))
+    single.fiber_g = Math.max(0, Number(macros.fiber || 0))
+    single.sugar_g = Math.max(0, Number(macros.sugar || 0))
+    return [single]
+  }
+
+  if (drinkSweetener.choice === 'free') {
+    const lockedTotals: NutritionTotals = {
+      calories: 0,
+      protein: 0,
+      carbs: 0,
+      fat: 0,
+      fiber: 0,
+      sugar: 0,
+    }
+    return {
+      totals: lockedTotals,
+      items: setSingleItemMacros(items, lockedTotals),
+    }
+  }
+
+  const grams = Number(drinkSweetener.grams)
+  if (!Number.isFinite(grams) || grams <= 0) return { totals, items }
+
+  const sweetenerType: SweetenerType = drinkSweetener.choice
+  const sweetenerMacros = sweetenerToMacros(sweetenerType, grams)
+  const lockedTotalsBase: NutritionTotals = {
+    calories: Math.round(Math.max(0, sweetenerMacros.calories)),
+    protein: 0,
+    carbs: Math.max(0, Math.round(sweetenerMacros.carbs * 10) / 10),
+    fat: 0,
+    fiber: 0,
+    sugar: Math.max(0, Math.round(sweetenerMacros.sugar * 10) / 10),
+  }
+  const sweetenerMeta: SweetenerMeta = {
+    type: sweetenerType,
+    amount:
+      Number.isFinite(Number(drinkSweetener.amount)) && Number(drinkSweetener.amount) > 0
+        ? Number(drinkSweetener.amount)
+        : Math.round(grams * 1000) / 1000,
+    unit: drinkSweetener.unit || 'g',
+    grams,
+    calories: sweetenerMacros.calories,
+    carbs: sweetenerMacros.carbs,
+    sugar: sweetenerMacros.sugar,
+  }
+  const lockedTotals = applySweetenerMetaToTotals(lockedTotalsBase, sweetenerMeta)
+  return {
+    totals: lockedTotals,
+    items: setSingleItemMacros(items, lockedTotalsBase),
+  }
+}
 function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
   if (!raw || typeof raw !== 'object') return null
   const toNumber = (value: any) => {
@@ -11348,7 +11500,11 @@ Please add nutritional information manually if needed.`);
 	    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
 	    const drinkOverride = pendingDrinkOverrideRef.current
 	    const hadPendingDrinkContext = hasPendingDrinkContext()
-	    const adjusted = applyDrinkOverrideToItems(analyzedItems, drinkOverride)
+	    const drinkSweetener = consumePendingDrinkSweetener()
+	    const adjusted = applyDrinkOverrideToItems(
+	      analyzedItems,
+	      drinkSweetener?.choice ? null : drinkOverride,
+	    )
 	    let finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
 	    const overrideTotals = adjusted.used ? adjusted.totals || null : null
 	    // If this is a single-item entry and the user gave it a title, use that as the item name too.
@@ -11358,10 +11514,21 @@ Please add nutritional information manually if needed.`);
 	      }
 	    } catch {}
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+	    const guardedDrink = applyPendingDrinkSweetenerGuard({
+	      totals: overrideTotals || nutrition || analyzedNutrition,
+	      items: finalItems,
+	      drinkMeta,
+	      drinkSweetener,
+	    })
+	    finalItems = guardedDrink.items || finalItems
 	    // Always clear pending drink context after this add flow has used/checked it.
 	    if (hadPendingDrinkContext) clearPendingDrinkContext()
-	    const finalNutritionBase = overrideTotals || nutrition || analyzedNutrition
-	    const finalTotalBase = overrideTotals ? convertTotalsForStorage(overrideTotals) : analyzedTotal || null
+	    const finalNutritionBase = guardedDrink.totals || overrideTotals || nutrition || analyzedNutrition
+	    const finalTotalBase = guardedDrink.totals
+	      ? convertTotalsForStorage(guardedDrink.totals)
+	      : overrideTotals
+	      ? convertTotalsForStorage(overrideTotals)
+	      : analyzedTotal || null
 	    const finalNutrition = applyDrinkMetaToTotals(finalNutritionBase, drinkMeta)
 	    const finalTotal = applyDrinkMetaToTotals(finalTotalBase, drinkMeta)
 	    const newEntry = ensureEntryLoggedAt(
@@ -14968,31 +15135,40 @@ Please add nutritional information manually if needed.`);
     const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
     const item = buildBarcodeIngredientItem(food, code)
     const normalizedItems = normalizeDiscreteServingsWithLabel([item])
-    const items = normalizedItems.length > 0 ? normalizedItems : [item]
+	    const items = normalizedItems.length > 0 ? normalizedItems : [item]
 	    const drinkOverride = pendingDrinkOverrideRef.current
 	    const hadPendingDrinkContext = hasPendingDrinkContext()
+	    const drinkSweetener = consumePendingDrinkSweetener()
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-	    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
+	    const adjusted = applyDrinkOverrideToItems(items, drinkSweetener?.choice ? null : drinkOverride)
 	    const finalItems = adjusted.items || items
 	    // Always clear pending drink context after this add flow has used/checked it.
 	    if (hadPendingDrinkContext) clearPendingDrinkContext()
 	    const recalculatedTotals = recalculateNutritionFromItems(finalItems)
-    const totals =
-      recalculatedTotals ||
-      sanitizeNutritionTotals({
-        calories: food?.calories,
+	    const totalsBase =
+	      recalculatedTotals ||
+	      sanitizeNutritionTotals({
+	        calories: food?.calories,
         protein: food?.protein_g,
         carbs: food?.carbs_g,
-        fat: food?.fat_g,
-        fiber: food?.fiber_g,
-        sugar: food?.sugar_g,
-      })
-    const totalsWithMeta = applyDrinkMetaToTotals(totals, drinkMeta)
-    const totalsForStorage = applyDrinkMetaToTotals(convertTotalsForStorage(totalsWithMeta || totals), drinkMeta)
-    const description =
-      buildMealSummaryFromItems(finalItems) ||
-      [food?.name, food?.brand].filter(Boolean).join(' – ') ||
-      'Scanned food'
+	        fat: food?.fat_g,
+	        fiber: food?.fiber_g,
+	        sugar: food?.sugar_g,
+	      })
+	    const guardedDrink = applyPendingDrinkSweetenerGuard({
+	      totals: totalsBase,
+	      items: finalItems,
+	      drinkMeta,
+	      drinkSweetener,
+	    })
+	    const totals = guardedDrink.totals || totalsBase
+	    const finalItemsWithGuard = guardedDrink.items || finalItems
+	    const totalsWithMeta = applyDrinkMetaToTotals(totals, drinkMeta)
+	    const totalsForStorage = applyDrinkMetaToTotals(convertTotalsForStorage(totalsWithMeta || totals), drinkMeta)
+	    const description =
+	      buildMealSummaryFromItems(finalItemsWithGuard) ||
+	      [food?.name, food?.brand].filter(Boolean).join(' – ') ||
+	      'Scanned food'
     const entry = ensureEntryLoggedAt(
       applyEntryClientId(
         {
@@ -15003,11 +15179,11 @@ Please add nutritional information manually if needed.`);
           localDate: selectedDate,
           description,
           time: displayTime,
-          method: 'text',
-          photo: null,
-          nutrition: totalsWithMeta,
-          total: totalsForStorage,
-          items: finalItems,
+	          method: 'text',
+	          photo: null,
+	          nutrition: totalsWithMeta,
+	          total: totalsForStorage,
+	          items: finalItemsWithGuard,
           meal: category,
           category,
           persistedCategory: category,
@@ -16304,13 +16480,22 @@ Please add nutritional information manually if needed.`);
     })()
 	    const drinkOverride = pendingDrinkOverrideRef.current
 	    const hadPendingDrinkContext = hasPendingDrinkContext()
-	    const adjusted = applyDrinkOverrideToItems(items, drinkOverride)
+	    const drinkSweetener = consumePendingDrinkSweetener()
+	    const adjusted = applyDrinkOverrideToItems(items, drinkSweetener?.choice ? null : drinkOverride)
 	    const finalItems = adjusted.items || items
 	    const finalTotals = adjusted.used ? adjusted.totals || totals : totals
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+	    const guardedDrink = applyPendingDrinkSweetenerGuard({
+	      totals: finalTotals,
+	      items: finalItems,
+	      drinkMeta,
+	      drinkSweetener,
+	    })
+	    const finalItemsWithGuard = guardedDrink.items || finalItems
+	    const finalTotalsWithGuard = guardedDrink.totals || finalTotals
 	    // Always clear pending drink context after this add flow has used/checked it.
 	    if (hadPendingDrinkContext) clearPendingDrinkContext()
-	    const totalsWithMeta = applyDrinkMetaToTotals(stripWaterLogIdFromTotals(finalTotals), drinkMeta)
+	    const totalsWithMeta = applyDrinkMetaToTotals(stripWaterLogIdFromTotals(finalTotalsWithGuard), drinkMeta)
 	    const newEntry = ensureEntryLoggedAt(
 	      applyEntryClientId(
         {
@@ -16322,10 +16507,10 @@ Please add nutritional information manually if needed.`);
           description,
           time: displayTime,
           method: source?.method || 'text',
-          photo: source?.photo || source?.entry?.photo || null,
-          nutrition: totalsWithMeta,
-          total: totalsWithMeta,
-          items: finalItems,
+	          photo: source?.photo || source?.entry?.photo || null,
+	          nutrition: totalsWithMeta,
+	          total: totalsWithMeta,
+	          items: finalItemsWithGuard,
           meal: category,
           category,
           persistedCategory: category,
@@ -16938,7 +17123,11 @@ Please add nutritional information manually if needed.`);
       return next
     }
     const drinkOverride = pendingDrinkOverrideRef.current
-    const adjusted = applyDrinkOverrideToItems(clonedItems, drinkOverride)
+    const drinkSweetener = consumePendingDrinkSweetener()
+    const adjusted = applyDrinkOverrideToItems(
+      clonedItems,
+      drinkSweetener?.choice ? null : drinkOverride,
+    )
     const finalItems = adjusted.items || clonedItems
 
     // Fix for Favorites -> Diary mismatch on discrete items (especially eggs).
@@ -17013,12 +17202,21 @@ Please add nutritional information manually if needed.`);
 	    const adjustedTotals = adjusted.used ? adjusted.totals || null : null
 	    const hadPendingDrinkContext = hasPendingDrinkContext()
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
+	    const favoriteTotalsBase = adjustedTotals || favorite.nutrition || favorite.total || null
+	    const guardedDrink = applyPendingDrinkSweetenerGuard({
+	      totals: favoriteTotalsBase,
+	      items: repairedFinalItems,
+	      drinkMeta,
+	      drinkSweetener,
+	    })
+	    const finalFavoriteItems = guardedDrink.items || repairedFinalItems
+	    const finalFavoriteTotals = guardedDrink.totals || favoriteTotalsBase
 	    // Always clear pending drink context after this add flow has used/checked it.
 	    if (hadPendingDrinkContext) clearPendingDrinkContext()
-	    const baseTotals = stripWaterLogIdFromTotals(attachMeta(adjustedTotals || favorite.nutrition || favorite.total || null, false))
+	    const baseTotals = stripWaterLogIdFromTotals(attachMeta(finalFavoriteTotals, false))
 	    const totalsWithMeta = attachMeta(applyDrinkMetaToTotals(baseTotals, drinkMeta), false)
 	    const totalWithMeta = applyDrinkMetaToTotals(
-	      stripWaterLogIdFromTotals(adjustedTotals || favorite.total || favorite.nutrition || null),
+	      stripWaterLogIdFromTotals(finalFavoriteTotals),
       drinkMeta,
     )
     const totalWithMetaFixed = attachMeta(totalWithMeta, false)
