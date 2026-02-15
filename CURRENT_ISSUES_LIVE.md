@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 19:45 AEDT
+- What changed: Added a safe global mobile scroll blocker so the PWA feels more like an app while keeping normal scrolling working. Also added a locked guard rail section with restore steps to stop future regressions.
+- Where to see it (page/link): Global app behavior via `app/globals.css`; lock notes in `GUARD_RAILS.md` section `7.8`
+- What to quickly test: Open Helfi on iPhone PWA, scroll long pages up/down, and confirm the page feels less bouncy while buttons/lists/forms still work normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 18:03 AEDT
 - What changed: Reduced Food Diary reload flicker safely by removing extra same-date summary remounts, using cache-first loading for history/water/exercise, reducing repeat same-date verify fetches, removing search warmup, and loading food library from server only when Favorites opens.
 - Where to see it (page/link): `/food`
