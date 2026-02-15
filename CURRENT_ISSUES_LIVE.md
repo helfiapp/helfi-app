@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-16 01:14 AEDT
+- What changed: Added hard build-time locks for calorie safety rules. Deploy now fails automatically if anyone changes (1) remaining calorie math, (2) daily allowance display format, or (3) stale/missing health-setup stamp blocker, unless they use explicit override flags.
+- Where to see it (page/link): `/food`, `/api/user-data`, `scripts/protect-regions.js`, `GUARD_RAILS.md` section `3.4.1`
+- What to quickly test: Try changing any protected block locally and run `node scripts/protect-regions.js`; it should fail unless the matching `ALLOW_*` override is set.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 21:16 AEDT
 - What changed: Food Diary now shows your base daily allowance number (for example 2284) and shows exercise as a separate “+exercise added” note, while remaining calories still uses base + exercise - consumed.
 - Where to see it (page/link): `/food`
