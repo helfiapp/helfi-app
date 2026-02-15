@@ -183,6 +183,30 @@ function main() {
     allowEnvVar: 'ALLOW_ADD_INGREDIENT_MODAL_SEARCH_EDIT',
     description: 'Add Ingredient modal search UI',
   });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: ENERGY_SUMMARY_CALC START',
+    endMarker: 'PROTECTED: ENERGY_SUMMARY_CALC END',
+    expectedHash: 'e003846101a2fcaea648e4e39df08aa1970836625816c2121a0ce67195217a1c',
+    allowEnvVar: 'ALLOW_ENERGY_SUMMARY_CALC_EDIT',
+    description: 'Food Diary energy summary calorie math',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: ENERGY_ALLOWANCE_TEXT START',
+    endMarker: 'PROTECTED: ENERGY_ALLOWANCE_TEXT END',
+    expectedHash: 'f889a0734f6c1a971d0321a86224b5cb77328fe3f47dde1965f14e94faed6a06',
+    allowEnvVar: 'ALLOW_ENERGY_ALLOWANCE_TEXT_EDIT',
+    description: 'Food Diary allowance display text',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'user-data', 'route.ts'),
+    startMarker: 'PROTECTED: HEALTH_SETUP_STAMP_GUARD START',
+    endMarker: 'PROTECTED: HEALTH_SETUP_STAMP_GUARD END',
+    expectedHash: '8c453ba819c3d1a05a8c24aff1c239a62b23b60776afecdd0c4c87b0986a8d4e',
+    allowEnvVar: 'ALLOW_HEALTH_SETUP_STAMP_GUARD_EDIT',
+    description: 'Health setup stamp guard (stale/missing write blocker)',
+  });
   console.log('✅ Guard Rails: Protected regions verified.');
 }
 

@@ -25400,6 +25400,7 @@ Please add nutritional information manually if needed.`);
                   (totals.carbs || 0) * 4 +
                   (totals.fat || 0) * 9
 
+                // PROTECTED: ENERGY_SUMMARY_CALC START
                 const consumedKcal =
                   (macroCalories && Number.isFinite(macroCalories) ? macroCalories : 0) ||
                   totals.calories ||
@@ -25418,6 +25419,7 @@ Please add nutritional information manually if needed.`);
                   allowanceInUnit !== null && consumedInUnit !== null
                     ? Math.max(0, allowanceInUnit - consumedInUnit)
                     : null
+                // PROTECTED: ENERGY_SUMMARY_CALC END
 
                 const sugarGrams = totals.sugar || 0
                 const carbGrams = totals.carbs || 0
@@ -25728,6 +25730,7 @@ Please add nutritional information manually if needed.`);
                                   isMobile={isMobile}
                                 />
                               </div>
+                              {/* PROTECTED: ENERGY_ALLOWANCE_TEXT START */}
                               {baseAllowanceInUnit !== null && (
                                 <div className="mt-2 text-xs text-gray-500 text-center col-span-2">
                                   Daily allowance:{' '}
@@ -25741,6 +25744,7 @@ Please add nutritional information manually if needed.`);
                                   )}
                                 </div>
                               )}
+                              {/* PROTECTED: ENERGY_ALLOWANCE_TEXT END */}
                             </div>
                           )
                           slides.push(energyPanel)

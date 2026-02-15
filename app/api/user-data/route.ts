@@ -1275,6 +1275,7 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // PROTECTED: HEALTH_SETUP_STAMP_GUARD START
     // Guard rail: profile target writes must carry a fresh health-setup version stamp.
     if (touchesProtectedProfileFields && !manualSync && !hasIncomingHealthSetupStamp) {
       await appendProfileTargetAuditEntry({
@@ -1293,7 +1294,6 @@ export async function POST(request: NextRequest) {
         serverHealthSetupUpdatedAt: storedHealthSetupUpdatedAt || null,
       })
     }
-
     // Guard rail: block stale health-setup payloads from older tabs/caches.
     if (
       touchesHealthSetup &&
@@ -1318,6 +1318,7 @@ export async function POST(request: NextRequest) {
         serverHealthSetupUpdatedAt: storedHealthSetupUpdatedAt,
       })
     }
+    // PROTECTED: HEALTH_SETUP_STAMP_GUARD END
 
     // Load existing profile info record for merging purposes (date of birth, etc.)
     let existingProfileInfoData: Record<string, any> | null = null

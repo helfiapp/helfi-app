@@ -673,6 +673,14 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 - If an exercise row is visible, its calories must be reflected in the summary numbers.
 - The “Daily allowance” line in the energy summary must show the **base target** (for example 2284),
   and show exercise as a separate **+exercise added** note.
+- Build-time lock is active in `scripts/protect-regions.js` for:
+  - `PROTECTED: ENERGY_SUMMARY_CALC` in `app/food/page.tsx`
+  - `PROTECTED: ENERGY_ALLOWANCE_TEXT` in `app/food/page.tsx`
+  - `PROTECTED: HEALTH_SETUP_STAMP_GUARD` in `app/api/user-data/route.ts`
+- If anyone changes these blocks, deploy fails unless they intentionally set:
+  - `ALLOW_ENERGY_SUMMARY_CALC_EDIT=true`
+  - `ALLOW_ENERGY_ALLOWANCE_TEXT_EDIT=true`
+  - `ALLOW_HEALTH_SETUP_STAMP_GUARD_EDIT=true`
 
 **Why this lock exists:**
 - This regressed again and made Food Diary remaining calories look wrong after manual exercise logs.
