@@ -6056,20 +6056,45 @@ export default function FoodDiary() {
 
   const shouldLockSugarFreeHotChocolateDrink = (entry: any) => {
     const meta = getDrinkMetaFromEntry(entry)
-    if (!meta?.type) return false
-    if (normalizeWaterLabel(meta.type) !== 'hot chocolate') return false
     const texts: string[] = []
     texts.push(String(entry?.description || ''))
     texts.push(String(entry?.label || ''))
     texts.push(String(entry?.name || ''))
     texts.push(String(entry?.nutrition?.__drinkType || ''))
     texts.push(String(entry?.total?.__drinkType || ''))
+    texts.push(String(entry?.nutrition?.__drinkUnit || ''))
+    texts.push(String(entry?.total?.__drinkUnit || ''))
+    texts.push(String(entry?.nutrition?.__drinkAmount || ''))
+    texts.push(String(entry?.total?.__drinkAmount || ''))
+    texts.push(String(entry?.nutrition?.__waterLogId || ''))
+    texts.push(String(entry?.total?.__waterLogId || ''))
     if (Array.isArray(entry?.items)) {
       entry.items.forEach((item: any) => {
         texts.push(String(item?.name || item?.label || ''))
+        texts.push(String(item?.serving_size || ''))
       })
     }
-    return texts.some((text) => isSugarFreeDrinkText(text))
+    const hasSugarFreeMarker = texts.some((text) => isSugarFreeDrinkText(text))
+    if (!hasSugarFreeMarker) return false
+
+    const explicitDrinkType = normalizeWaterLabel(meta?.type || '')
+    if (explicitDrinkType === 'hot chocolate') return true
+
+    const hasHotChocolateMarker = texts.some((text) =>
+      normalizeWaterLabel(text || '').includes('hot chocolate'),
+    )
+    if (!hasHotChocolateMarker) return false
+
+    const hasWaterLogLink = Boolean(
+      String(entry?.nutrition?.__waterLogId || entry?.total?.__waterLogId || '').trim(),
+    )
+    const hasMlServing =
+      /\b\d+(?:\.\d+)?\s*ml\b/i.test(String(entry?.description || '')) ||
+      /\b\d+(?:\.\d+)?\s*ml\b/i.test(String(entry?.label || '')) ||
+      (Array.isArray(entry?.items) &&
+        entry.items.some((item: any) => /\b\d+(?:\.\d+)?\s*ml\b/i.test(String(item?.serving_size || ''))))
+
+    return hasWaterLogLink || hasMlServing
   }
 
   const buildSugarFreeHotChocolateLockedTotals = (entry: any): NutritionTotals => {
