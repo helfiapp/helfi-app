@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 14:16 AEDT
+- What changed: Relaxed sugar-free hot chocolate lock so base drink calories are preserved (for example 8 kcal per serve) while still blocking inflated legacy values (like 319 kcal from bad scaling).
+- Where to see it (page/link): `/food` and Water -> favorites drink add flow
+- What to quickly test: Refresh `/food` on affected date and confirm sugar-free hot chocolate shows base calories (not zero, not 319). Then add a new sugar-free hot chocolate and confirm it keeps base calories without ml multiplication.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 13:58 AEDT
 - What changed: Rebuilt `/features/ai-insights` to match the same layout style as `/features/nutrition-food`. Added the new full-width beach-couple banner at the top, removed scrolling mobile mockups in that banner area, and set AI insights section images to placeholders for now.
 - Where to see it (page/link): `/features/ai-insights`
