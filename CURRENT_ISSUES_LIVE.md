@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 16:44 AEDT
+- What changed: Fixed reminder tap routing so mood/check-in taps stay on the correct reminder page, and successful saves now clear leftover reminder inbox items for that reminder type (so completed reminders do not keep reappearing).
+- Where to see it (page/link): `/mood/quick`, `/check-in`, `/notifications/inbox`
+- What to quickly test: Trigger a mood reminder and a check-in reminder, tap each from the phone pop-up, confirm each opens the correct page, save, then open `/notifications/inbox` and confirm those reminder items are gone.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 16:05 AEDT
 - What changed: Added the supplied `AI DOCTOR.jpg` into the AI insights feature page overview, in the right-side image position next to the first section text.
 - Where to see it (page/link): `/features/ai-insights`
