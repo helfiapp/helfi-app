@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 12:43 AEDT
+- What changed: Public website layout rule completed. Added the full public top menu and public footer across the required pages: FAQ, Privacy, Terms, Features, Practitioners, List your practice, and List your practice start. Help page now uses public header/footer for signed-out visitors while keeping the signed-in layout unchanged.
+- Where to see it (page/link): `/faq`, `/privacy`, `/terms`, `/help`, `/features`, `/practitioners`, `/list-your-practice`, `/list-your-practice/start`
+- What to quickly test: Open each page while signed out and confirm full top menu + footer show. For `/help`, also sign in and confirm the existing signed-in help layout still appears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 12:36 AEDT
 - What changed: Mood History facelift. Removed Insights section and removed Export CSV. Made the page more compact and cleaner (tighter cards, collapsible extra trend views, shorter recent entries list with show more/less). Also fixed chart popup behavior so tapping the same emoji/data point again now closes the info.
 - Where to see it (page/link): `/mood/history`
