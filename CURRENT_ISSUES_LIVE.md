@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 12:36 AEDT
+- What changed: Mood History facelift. Removed Insights section and removed Export CSV. Made the page more compact and cleaner (tighter cards, collapsible extra trend views, shorter recent entries list with show more/less). Also fixed chart popup behavior so tapping the same emoji/data point again now closes the info.
+- Where to see it (page/link): `/mood/history`
+- What to quickly test: Open `/mood/history`; confirm no Insights section and no Export CSV button. Tap any chart emoji/data point to open info, tap the same point again to close it. Confirm Recent entries starts compact and expands with Show more.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 12:26 AEDT
 - What changed: Fixed Water -> Favorites drink calorie carry-through for sweetener drinks. Drinks now keep drink icon + ml amount, and calories use sweetener amount only (no ml multiplication).
 - Where to see it (page/link): `/food/water` -> add drink from favorites flow into `/food`
