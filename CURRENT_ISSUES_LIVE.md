@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 16:28 AEDT
+- What changed: Added a new “Food Diary Lock List (Quick View)” near the top of guard rails so agents can instantly see the protected Food Diary sections before editing.
+- Where to see it (page/link): `GUARD_RAILS.md` (top section)
+- What to quickly test: Open `GUARD_RAILS.md` and confirm the new Food Diary quick list appears before section `0`.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 15:29 AEDT
 - What changed: Fixed a race where adding a drink from Water -> Favorites could hide an earlier meal in the same category/date. Add flow now always merges from the latest live diary list before saving, so new drink adds no longer replace prior meals.
 - Where to see it (page/link): `/food` (Favorites add flow + Water -> Favorites add flow), lock notes in `GUARD_RAILS.md` section `7.6.4`
