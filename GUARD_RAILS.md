@@ -2046,14 +2046,22 @@ Anything marked ✅ in the audit is **locked**. Do not change, loosen, or bypass
 
 **This area is fragile and business‑critical. Do not change it without the owner’s written approval.**
 
-**Last verified working deployment:** 2026‑01‑14 12:30 UTC (commit `427f65b8`)
+**Last verified working deployment:** 2026‑02‑15 16:44 AEDT (fix commit `f42edabd`, deploy-note commit `8ef7d612`)
 
 **Protected files:**
 - `lib/notification-inbox.ts`
 - `app/notifications/inbox/page.tsx`
 - `app/api/notifications/inbox/route.ts`
 - `app/api/notifications/pending-open/route.ts`
+- `app/api/notifications/notification-open/route.ts`
 - `app/pwa-entry/page.tsx`
+- `components/LayoutWrapper.tsx`
+- `public/sw.js`
+- `app/check-in/page.tsx`
+- `app/mood/page.tsx`
+- `app/mood/quick/page.tsx`
+- `app/api/checkins/today/route.ts`
+- `app/api/mood/entries/route.ts`
 - `app/api/push/dispatch/route.ts`
 - `app/api/push/scheduler/route.ts`
 - `app/api/mood/dispatch/route.ts`
@@ -2062,7 +2070,26 @@ Anything marked ✅ in the audit is **locked**. Do not change, loosen, or bypass
 **Required behavior (must not change):**
 1) Tapping a reminder must open the reminder page (check‑in or mood) even if the app was last left on another page.  
 2) Reminders must always appear in the Notification inbox.  
-3) Normal app opens must still go to the last page the user visited.
+3) After a successful save, completed reminders must be removed from the Notification inbox.  
+4) Normal app opens must still go to the last page the user visited.
+
+### 14.0.1 Hard lock (Feb 2026 regression prevention)
+
+If you touch this flow without owner approval, you are likely to break reminder taps again.
+
+**Do not remove these protections:**
+1) In `components/LayoutWrapper.tsx`, keep the `urlPrefix` filter when `notificationOpen=1` so mood taps cannot be redirected to check‑in (and vice versa).
+2) In `lib/notification-inbox.ts`, keep `consumePendingNotificationOpen(...)` filtered to `status = 'unread'`.
+3) In save endpoints, keep cleanup after successful save:
+   - `app/api/checkins/today/route.ts` clears `checkin_reminder`.
+   - `app/api/mood/entries/route.ts` clears `mood_reminder`.
+4) Do not move reminder cleanup before save success.
+5) Do not remove the notification-open marker flow (`public/sw.js` -> `/api/notifications/notification-open` -> `components/LayoutWrapper.tsx`).
+
+**Quick pass/fail check (must pass before shipping):**
+1) Tap a mood reminder from iPhone pop-up -> it must open mood page.
+2) Tap a check-in reminder from iPhone pop-up -> it must open check-in page.
+3) Save both -> both reminder cards must disappear from `/notifications/inbox`.
 
 **If changes are requested:**
 1) Explain the change in plain language first.  
@@ -2102,7 +2129,7 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
 
 4) Re‑test on iPhone PWA:
    - Tap a fresh reminder, complete it, then open inbox.
-   - The alert must be gone. If not, step 2 is broken.
+   - The alert must be gone. If not, step 3 is broken.
 
 5) If the inbox shows the same time for every alert:
    - The list view is falling back to “now” because it cannot read the saved
