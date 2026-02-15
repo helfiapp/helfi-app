@@ -671,7 +671,8 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 - The exercise calories used for the summary must come from the **exercise entries list** first,
   with API/snapshot calories only as fallback.
 - If an exercise row is visible, its calories must be reflected in the summary numbers.
-- The “Daily allowance” line in the energy summary must show the **exercise-adjusted allowance** (not base-only target).
+- The “Daily allowance” line in the energy summary must show the **base target** (for example 2284),
+  and show exercise as a separate **+exercise added** note.
 
 **Why this lock exists:**
 - This regressed again and made Food Diary remaining calories look wrong after manual exercise logs.
@@ -679,9 +680,10 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 **Restore steps if it breaks again:**
 1. File: `app/food/page.tsx`.
 2. Ensure `resolveExerciseCaloriesKcal(...)` is used for exercise summary values (not raw cached value alone).
-3. Ensure energy summary uses `daily target + exercise calories` before subtracting consumed food.
-4. Ensure save/sync paths normalize exercise calories with entry fallback before writing session snapshot.
-5. Verify by adding one manual exercise entry and confirming remaining calories increase immediately.
+3. Ensure energy summary remaining uses `daily target + exercise calories` before subtracting consumed food.
+4. Ensure the “Daily allowance” text shows base target only, with exercise shown separately as `+exercise added`.
+5. Ensure save/sync paths normalize exercise calories with entry fallback before writing session snapshot.
+6. Verify by adding one manual exercise entry and confirming remaining calories increase immediately while base allowance text stays unchanged.
 
 ### 3.5 Favorite label must stay consistent in edit view (Food diary)
 - When a user logs a **favorite** item (e.g., “Hot chocolate”), the **edit view must show the favorite label**,
