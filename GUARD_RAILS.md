@@ -11,6 +11,32 @@ protected areas listed below.
 
 ---
 
+## Food Diary Lock List (Quick View)
+
+Use this as the fast “no-touch without approval” checklist for Food Diary.
+
+- `3.5.1` Favorites + Diary Rename Sync (Locked)
+- `3.5.2` Water Entry Edit from Food Diary (Locked)
+- `3.5.3` Favorites Recency Order (Locked)
+- `3.6` Food Search Consistency (Locked)
+- `3.7` Food Diary Manual Refresh Only (Locked)
+- `3.7` Food Diary Deletes & Snapshot Sync (Locked)
+- `3.7.2` Food Diary Restore & Favorites Recovery (Locked)
+- `3.10` Discrete Produce Counts & Weight Seeding (Locked)
+- `3.13` Build a Meal Portion Scaling (Locked)
+- `3.14` Food Diary Edit Calorie Consistency & Macro Validation (Locked)
+- `3.15` Recipe Import + Build Meal Reopen UX (Strict Lock)
+- `7` Food Diary Favorites “All” Ordering (Locked)
+- `7.5` Favorites -> Diary Sync (Locked)
+- `7.6.1` Delayed Drink -> Food Flip Lock (Strict Lock)
+- `7.6.2` Favorites “Change Portion” One-Off Lock (Strict Lock)
+- `7.6.3` Water Favorites Drink Sweetener Carry-Through (Strict Lock)
+- `7.6.4` Water/Favorites Add Must Not Wipe Existing Meal Rows (Strict Lock)
+
+If any of the above is touched, agent must read that full section first.
+
+---
+
 ## 0. Update Insights / Add More flow (Jan 2026 – Locked)
 - Health Setup must let users make multiple edits across pages, then ask **once** to “Update Insights” when they try to leave Health Setup (including Dashboard or another page). Do NOT reintroduce “prompt on every Next/Back”.
 - The navigation guard must still protect leaving Health Setup when changes exist. Do NOT remove or loosen this guard.
