@@ -65,6 +65,24 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
   const sweetenerCalories = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCalories') || 0)
   const sweetenerCarbs = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCarbs') || 0)
   const sweetenerSugar = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerSugar') || 0)
+  const baseDrinkCaloriesRaw =
+    readFiniteNumber(baseNutrition, 'calories') ??
+    readFiniteNumber(baseNutrition, 'kcal') ??
+    0
+  const baseDrinkCarbsRaw =
+    readFiniteNumber(baseNutrition, 'carbs') ??
+    readFiniteNumber(baseNutrition, 'carbs_g') ??
+    0
+  const baseDrinkSugarRaw =
+    readFiniteNumber(baseNutrition, 'sugar') ??
+    readFiniteNumber(baseNutrition, 'sugar_g') ??
+    0
+  const safeBaseDrinkCalories =
+    Number.isFinite(Number(baseDrinkCaloriesRaw)) &&
+    Number(baseDrinkCaloriesRaw) > 0 &&
+    Number(baseDrinkCaloriesRaw) <= 80
+      ? Number(baseDrinkCaloriesRaw)
+      : 8
   const sweetenerChoice = String(
     (baseNutrition as any).__sweetenerChoice ||
       (baseNutrition as any).__sweetenerType ||
@@ -85,10 +103,18 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
   const round1 = (value: number) => Math.round(value * 10) / 10
 
   if (hasSweetenerContext) {
-    const useZero = sweetenerChoice === 'free'
-    const lockedCalories = useZero ? 0 : sweetenerCalories
-    const lockedCarbs = useZero ? 0 : sweetenerCarbs
-    const lockedSugar = useZero ? 0 : sweetenerSugar
+    const isSugarHoney = sweetenerChoice === 'sugar' || sweetenerChoice === 'honey'
+    const lockedCalories = isSugarHoney ? sweetenerCalories : safeBaseDrinkCalories
+    const lockedCarbs = isSugarHoney
+      ? sweetenerCarbs
+      : Number.isFinite(Number(baseDrinkCarbsRaw)) && Number(baseDrinkCarbsRaw) >= 0 && Number(baseDrinkCarbsRaw) <= 20
+      ? Number(baseDrinkCarbsRaw)
+      : 0
+    const lockedSugar = isSugarHoney
+      ? sweetenerSugar
+      : Number.isFinite(Number(baseDrinkSugarRaw)) && Number(baseDrinkSugarRaw) >= 0 && Number(baseDrinkSugarRaw) <= 20
+      ? Number(baseDrinkSugarRaw)
+      : 0
 
     const normalizedNutrition = {
       ...baseNutrition,
@@ -103,10 +129,10 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
       fat_g: 0,
       fiber_g: 0,
       sugar_g: round1(lockedSugar),
-      __sweetenerChoice: useZero ? 'free' : sweetenerChoice || null,
-      __sweetenerCalories: lockedCalories,
-      __sweetenerCarbs: round1(lockedCarbs),
-      __sweetenerSugar: round1(lockedSugar),
+      __sweetenerChoice: isSugarHoney ? sweetenerChoice : 'free',
+      __sweetenerCalories: isSugarHoney ? lockedCalories : 0,
+      __sweetenerCarbs: isSugarHoney ? round1(lockedCarbs) : 0,
+      __sweetenerSugar: isSugarHoney ? round1(lockedSugar) : 0,
     }
 
     let normalizedItems = input.items
@@ -137,34 +163,48 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
   }
 
   // Backward guard for older sugar-free hot chocolate rows without new sweetener context.
+  const legacyCalories =
+    Number.isFinite(Number(baseDrinkCaloriesRaw)) &&
+    Number(baseDrinkCaloriesRaw) > 0 &&
+    Number(baseDrinkCaloriesRaw) <= 80
+      ? Number(baseDrinkCaloriesRaw)
+      : 8
+  const legacyCarbs =
+    Number.isFinite(Number(baseDrinkCarbsRaw)) && Number(baseDrinkCarbsRaw) >= 0 && Number(baseDrinkCarbsRaw) <= 20
+      ? Number(baseDrinkCarbsRaw)
+      : 0
+  const legacySugar =
+    Number.isFinite(Number(baseDrinkSugarRaw)) && Number(baseDrinkSugarRaw) >= 0 && Number(baseDrinkSugarRaw) <= 20
+      ? Number(baseDrinkSugarRaw)
+      : 0
   const normalizedNutrition = {
     ...baseNutrition,
-    calories: Math.round(sweetenerCalories),
+    calories: Math.round(legacyCalories),
     protein: 0,
-    carbs: round1(sweetenerCarbs),
+    carbs: round1(legacyCarbs),
     fat: 0,
     fiber: 0,
-    sugar: round1(sweetenerSugar),
+    sugar: round1(legacySugar),
     protein_g: 0,
-    carbs_g: round1(sweetenerCarbs),
+    carbs_g: round1(legacyCarbs),
     fat_g: 0,
     fiber_g: 0,
-    sugar_g: round1(sweetenerSugar),
+    sugar_g: round1(legacySugar),
     __sweetenerChoice: 'free',
-    __sweetenerCalories: Math.round(sweetenerCalories),
-    __sweetenerCarbs: round1(sweetenerCarbs),
-    __sweetenerSugar: round1(sweetenerSugar),
+    __sweetenerCalories: 0,
+    __sweetenerCarbs: 0,
+    __sweetenerSugar: 0,
   }
 
   let normalizedItems = input.items
   if (itemList.length === 1 && itemList[0] && typeof itemList[0] === 'object') {
     const single = { ...(itemList[0] as any) }
-    single.calories = Math.round(sweetenerCalories)
+    single.calories = Math.round(legacyCalories)
     single.protein_g = 0
-    single.carbs_g = round1(sweetenerCarbs)
+    single.carbs_g = round1(legacyCarbs)
     single.fat_g = 0
     single.fiber_g = 0
-    single.sugar_g = round1(sweetenerSugar)
+    single.sugar_g = round1(legacySugar)
     normalizedItems = [single]
   }
 

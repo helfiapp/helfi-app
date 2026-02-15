@@ -6128,19 +6128,45 @@ export default function FoodDiary() {
 
     // Legacy self-heal rule:
     // If this row says sugar-free and there is no explicit sugar/honey choice with a real amount,
-    // force nutrition to zero. Old rows can carry stale __sweetenerCalories values (e.g., 319).
+    // keep a small base drink calorie value and block stale inflated values (e.g., 319).
     if (
       choice === 'free' ||
       (hasSugarFreeMarker && (effectiveType !== 'sugar' && effectiveType !== 'honey')) ||
       (hasSugarFreeMarker && !hasPositiveGrams)
     ) {
+      const round1 = (value: number) => Math.round(value * 10) / 10
+      const rawCalories = Number(entry?.nutrition?.calories ?? entry?.total?.calories ?? NaN)
+      const safeBaseCalories =
+        Number.isFinite(rawCalories) && rawCalories > 0 && rawCalories <= 80
+          ? Math.round(rawCalories)
+          : 8
+      const rawCarbs = Number(
+        entry?.nutrition?.carbs ??
+          entry?.nutrition?.carbs_g ??
+          entry?.total?.carbs ??
+          entry?.total?.carbs_g ??
+          0,
+      )
+      const rawSugar = Number(
+        entry?.nutrition?.sugar ??
+          entry?.nutrition?.sugar_g ??
+          entry?.total?.sugar ??
+          entry?.total?.sugar_g ??
+          0,
+      )
       return {
-        calories: 0,
+        calories: safeBaseCalories,
         protein: 0,
-        carbs: 0,
+        carbs:
+          Number.isFinite(rawCarbs) && rawCarbs >= 0 && rawCarbs <= 20
+            ? round1(rawCarbs)
+            : 0,
         fat: 0,
         fiber: 0,
-        sugar: 0,
+        sugar:
+          Number.isFinite(rawSugar) && rawSugar >= 0 && rawSugar <= 20
+            ? round1(rawSugar)
+            : 0,
       }
     }
 
@@ -11052,13 +11078,36 @@ const applyPendingDrinkSweetenerGuard = ({
   }
 
   if (drinkSweetener.choice === 'free') {
+    const baseTotals =
+      totals && typeof totals === 'object'
+        ? { ...(totals as any) }
+        : {
+            calories: 0,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            fiber: 0,
+            sugar: 0,
+          }
     const lockedTotals: NutritionTotals & Record<string, any> = {
-      calories: 0,
-      protein: 0,
-      carbs: 0,
-      fat: 0,
-      fiber: 0,
-      sugar: 0,
+      calories: Number.isFinite(Number((baseTotals as any).calories))
+        ? Math.round(Number((baseTotals as any).calories))
+        : 0,
+      protein: Number.isFinite(Number((baseTotals as any).protein))
+        ? Number((baseTotals as any).protein)
+        : 0,
+      carbs: Number.isFinite(Number((baseTotals as any).carbs))
+        ? Number((baseTotals as any).carbs)
+        : 0,
+      fat: Number.isFinite(Number((baseTotals as any).fat))
+        ? Number((baseTotals as any).fat)
+        : 0,
+      fiber: Number.isFinite(Number((baseTotals as any).fiber))
+        ? Number((baseTotals as any).fiber)
+        : 0,
+      sugar: Number.isFinite(Number((baseTotals as any).sugar))
+        ? Number((baseTotals as any).sugar)
+        : 0,
       __sweetenerChoice: 'free',
       __sweetenerCalories: 0,
       __sweetenerCarbs: 0,
@@ -11066,7 +11115,7 @@ const applyPendingDrinkSweetenerGuard = ({
     }
     return {
       totals: lockedTotals,
-      items: setSingleItemMacros(items, lockedTotals),
+      items,
     }
   }
 

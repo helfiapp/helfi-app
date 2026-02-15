@@ -2420,7 +2420,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 
 **Non-negotiable rule:**
 - If Water flow includes sweetener context:
-  - `free` must save as zero nutrition.
+  - `free` must keep the base drink nutrition only (for example 8 kcal), never multiplied by ml.
   - `sugar`/`honey` must save only sweetener-based calories/macros (never multiplied by drink ml).
 
 **Code lock (must preserve):**
@@ -2430,7 +2430,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
   - skip ml scaling when sweetener context is active
   - apply `applyPendingDrinkSweetenerGuard(...)` before creating entry payload in add flows
 - `app/api/food-log/route.ts` must enforce sweetener guard at save time for Water-flow drinks:
-  - if sweetener choice is `free`, save zero nutrition
+  - if sweetener choice is `free`, keep base drink nutrition (never multiplied by ml)
   - if sweetener choice is `sugar`/`honey`, save sweetener-only nutrition (never multiplied by drink ml)
 
 **Last stable deployment for this lock:**
