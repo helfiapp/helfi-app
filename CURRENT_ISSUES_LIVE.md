@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 12:36 AEDT
+- What changed: Second lock patch for Water -> Favorites drink calories. Added server-side save guard plus stronger client guard, so drink calories now always come from sweetener context (free/sugar/honey) and never from ml multiplication or stale favorite totals.
+- Where to see it (page/link): `/food/water` and `/food` (Water drink -> favorites add flow)
+- What to quickly test: Add hot chocolate/tea/coffee from Water flow via favorites, set sweetener, and confirm calories match sweetener only (no 319 kcal spike from 500 ml scaling).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 12:26 AEDT
 - What changed: Fixed Water -> Favorites drink calorie carry-through for sweetener drinks. Drinks now keep drink icon + ml amount, and calories use sweetener amount only (no ml multiplication).
 - Where to see it (page/link): `/food/water` -> add drink from favorites flow into `/food`
