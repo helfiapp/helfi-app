@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 11:20 AEDT
+- What changed: Full Mood Tracker upgrade focused on retention and usability. Removed Mood Insights tab from mood navigation, added instant sync for mood reminder settings between Mood Preferences and Notification Reminders, expanded emotion selection with grouped feeling chips, added medication impact tracking in check-ins, upgraded mood pattern cards (sleep/nutrition/activity/supplements/medication), added post-check-in “next best step” guidance, added Share Summary and Export CSV tools, and added a 12-month “Year in Pixels” mood view with chart polish.
+- Where to see it (page/link): `/mood`, `/mood/history`, `/mood/journal`, `/mood/preferences`, `/notifications/reminders`
+- What to quickly test: In `/mood/preferences` toggle reminders and confirm `/notifications/reminders` updates immediately (and vice versa). In `/mood` complete a check-in and confirm “Next best step” appears after save. In `/mood/history` verify Share Summary, Export CSV, and Year in Pixels render correctly.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 04:20 AEDT
 - What changed: Continued SEO improvements across public pages. Added structured data (Home, FAQ, Features, News articles), improved metadata/canonical links for FAQ/Features/News, and added stronger internal linking blocks between Home, Features, FAQ, and News.
 - Where to see it (page/link): `/`, `/faq`, `/features`, `/features/nutrition-food`, `/features/ai-insights`, `/news`, `/news/mobile-apps-coming-soon`, `/news/complete-food-tracking-workflow`, `/news/weekly-health-insights-you-can-use`, `/news/meal-water-sleep-consistency`
