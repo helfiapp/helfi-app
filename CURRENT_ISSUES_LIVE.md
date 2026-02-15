@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 21:00 AEDT
+- What changed: Locked health-setup profile target saves so stale/unstamped payloads cannot silently overwrite daily calorie target inputs (weight/height/goal settings), and added a server-side profile target audit trail (`__PROFILE_TARGET_AUDIT__`) for traceable change history.
+- Where to see it (page/link): `/onboarding?step=2`, `/food`, and guard rail notes in `GUARD_RAILS.md` section `2.7.3`
+- What to quickly test: Open Health Setup on two devices/tabs, make a goal/intensity change on one side, then try to save older values from the other side; confirm stale save is ignored and Food Diary daily allowance stays on the latest saved profile values.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 20:05 AEDT
 - What changed: Fixed Food Diary energy summary text so existing exercise calories are clearly included in “Daily allowance” (for example your existing +344 exercise entry now shows in that allowance line), and locked this rule in guard rails.
 - Where to see it (page/link): `/food`
