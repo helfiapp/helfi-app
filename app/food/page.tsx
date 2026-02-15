@@ -28603,6 +28603,10 @@ Please add nutritional information manually if needed.`);
               >
                 Preview
               </button>
+              {/* DO NOT REMOVE - OWNER LOCK (HEL-159 / HEL-160):
+                  `Change portion` must appear in this first popup.
+                  This is the only direct path from favorites popup -> full portion editor
+                  before adding to diary. */}
               <button
                 type="button"
                 onClick={() => openFavoritePortionEditor(favoriteActionModal)}

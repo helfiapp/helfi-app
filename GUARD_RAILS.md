@@ -2396,6 +2396,11 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 - Custom tab -> pencil icon (edit custom template)
 
 **Must keep in code:**
+- In `app/food/page.tsx`, the first favorites action popup (`favoriteActionModal.mode === 'choose'`) must always show:
+  - `Add to diary`
+  - `Preview`
+  - `Change portion`
+  - `Cancel`
 - In `app/food/build-meal/MealBuilderClient.tsx`, `fromFavoriteAdjust=1` (`isFavoriteAdjustBuild`) must force one-off mode:
   - do not auto-save/overwrite favorite defaults
   - do not attach `__favoriteId` link for that add flow
@@ -2404,7 +2409,8 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 **If this breaks again, restore this first:**
 1. In `createMeal`, keep one-off lock for `isFavoriteAdjustBuild` so favorite persistence is disabled.
 2. Ensure payload nutrition does not include `__favoriteId` in this flow.
-3. Re-test on LIVE with Playwright:
+3. In `app/food/page.tsx`, confirm the choose popup still renders `Change portion` button (not hidden/removed by merge).
+4. Re-test on LIVE with Playwright:
    - Open Add from favorites -> select meal -> `Change portion`.
    - Change amount/ingredients and tap `Add`.
    - Reopen that same favorite in list and confirm its default serving/ingredients are unchanged.
