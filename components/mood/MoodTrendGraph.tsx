@@ -219,10 +219,36 @@ export default function MoodTrendGraph({
       },
     },
     interaction: { mode: 'nearest', intersect: false },
-    onClick: (event, elements, chart) => {
-      if (!elements?.length) return
+    onClick: (_event, elements, chart) => {
+      const chartRef = chart as any
+      const active = chartRef.$activeMoodPoint as { datasetIndex: number; index: number } | undefined
+      if (!elements?.length) {
+        if (active) {
+          chart.setActiveElements([])
+          chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+          chartRef.$activeMoodPoint = undefined
+          chart.update()
+        }
+        return
+      }
+
       const first = elements[0] as any
-      chart.setActiveElements([{ datasetIndex: first.datasetIndex, index: first.index }])
+      const next = { datasetIndex: first.datasetIndex, index: first.index }
+      const isSame = !!active && active.datasetIndex === next.datasetIndex && active.index === next.index
+      if (isSame) {
+        chart.setActiveElements([])
+        chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+        chartRef.$activeMoodPoint = undefined
+        chart.update()
+        return
+      }
+
+      chart.setActiveElements([next])
+      chart.tooltip?.setActiveElements([next], {
+        x: first.element?.x ?? 0,
+        y: first.element?.y ?? 0,
+      })
+      chartRef.$activeMoodPoint = next
       chart.update()
     },
     scales: {

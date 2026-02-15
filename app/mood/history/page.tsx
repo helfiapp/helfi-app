@@ -24,8 +24,6 @@ type EntriesResponse = {
   range: { start: string; end: string }
   entries: MoodEntry[]
 }
-
-type InsightsResponse = { insights: any }
 type SuggestedActionKind = 'breath' | 'walk' | 'hydrate' | 'journal'
 
 function safeTags(tags: any): string[] {
@@ -129,14 +127,6 @@ function entryDayKey(entry: MoodEntry) {
   return ''
 }
 
-function csvEscape(value: unknown) {
-  const text = String(value ?? '')
-  if (text.includes(',') || text.includes('"') || text.includes('\n')) {
-    return `"${text.replace(/"/g, '""')}"`
-  }
-  return text
-}
-
 function monthLabelFromDate(localDate: string) {
   const d = parseLocalDate(localDate)
   return d.toLocaleDateString(undefined, { month: 'short' })
@@ -176,10 +166,10 @@ export default function MoodHistoryPage() {
   const [error, setError] = useState<string | null>(null)
   const [trendPct, setTrendPct] = useState<number | null>(null)
   const [yearAverageMap, setYearAverageMap] = useState<Map<string, number>>(new Map())
-  const [insights, setInsights] = useState<InsightsResponse | null>(null)
   const [streakDays, setStreakDays] = useState<number>(0)
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
   const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([])
+  const [showAllEntries, setShowAllEntries] = useState(false)
   const [savedAction, setSavedAction] = useState<SuggestedActionKind | null>(null)
   const [breathingActive, setBreathingActive] = useState(false)
   const [breathingSecondsLeft, setBreathingSecondsLeft] = useState(60)
@@ -307,16 +297,6 @@ export default function MoodHistoryPage() {
           }
         })()
 
-        void (async () => {
-          try {
-            const insightPeriod = timeframe === 'week' || timeframe === 'day' ? 'week' : 'month'
-            const insRes = await fetch(`/api/mood/insights?period=${insightPeriod}`, { cache: 'no-store' as any }).catch(() => null)
-            if (insRes && insRes.ok) {
-              const ins = (await insRes.json()) as InsightsResponse
-              if (!ignore) setInsights(ins)
-            }
-          } catch {}
-        })()
       } catch (e: any) {
         if (!ignore) setError(e?.message || 'Failed to load history')
       } finally {
@@ -554,6 +534,8 @@ export default function MoodHistoryPage() {
 
   const topMoodValue = (topMood as any)?.mood as number | null
   const topMoodCount = (topMood as any)?.n as number | null
+  const entriesToRender = showAllEntries ? entries.slice(0, 12) : entries.slice(0, 5)
+  const hasMoreEntries = entries.length > 5
 
   const monthGrid = useMemo(() => {
     const today = asDateString(new Date())
@@ -594,74 +576,6 @@ export default function MoodHistoryPage() {
     }
     return months
   }, [yearAverageMap])
-
-  const insightCards = useMemo(() => {
-    const list: any[] = []
-    const by = insights?.insights || {}
-    const pushFirst = (key: string, icon: string, color: string) => {
-      const arr = (by as any)?.[key]
-      if (!Array.isArray(arr) || arr.length === 0) return
-      list.push({ title: arr[0].title, detail: arr[0].detail, icon, color })
-    }
-    pushFirst('sleep', 'bedtime', 'bg-purple-100 text-purple-600')
-    pushFirst('nutrition', 'restaurant', 'bg-green-100 text-green-600')
-    pushFirst('activity', 'directions_walk', 'bg-emerald-100 text-emerald-700')
-    pushFirst('supplements', 'vaccines', 'bg-lime-100 text-lime-700')
-    pushFirst('medication', 'medication', 'bg-cyan-100 text-cyan-700')
-    pushFirst('stress', 'schedule', 'bg-blue-100 text-blue-600')
-    return list.slice(0, 6)
-  }, [insights])
-
-  const handleExportCsv = () => {
-    const ordered = entries
-      .slice()
-      .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime())
-
-    const rows = ordered.map((entry) => {
-      const ctx = safeContext(entry.context)
-      const tags = safeTags(entry.tags).join(' | ')
-      return [
-        entry.localDate,
-        new Date(entry.timestamp).toISOString(),
-        entry.mood,
-        tags,
-        entry.note || '',
-        ctx.intensityPercent ?? '',
-        ctx.sleepMinutes ?? '',
-        ctx.stepsToday ?? '',
-        ctx.mealsTodayCount ?? '',
-        ctx.supplements ?? '',
-        ctx.medicationEffect ?? '',
-        ctx.physicalActivity ?? '',
-      ].map(csvEscape).join(',')
-    })
-
-    const header = [
-      'Local Date',
-      'Timestamp',
-      'Mood (1-7)',
-      'Tags',
-      'Note',
-      'Intensity (%)',
-      'Sleep Minutes',
-      'Steps',
-      'Meals Logged',
-      'Supplement Impact (1-5)',
-      'Medication Impact (1-5)',
-      'Activity Rating (1-5)',
-    ].join(',')
-
-    const csv = [header, ...rows].join('\n')
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' })
-    const url = URL.createObjectURL(blob)
-    const link = document.createElement('a')
-    link.href = url
-    link.download = `helfi-mood-history-${asDateString(new Date())}.csv`
-    document.body.appendChild(link)
-    link.click()
-    link.remove()
-    URL.revokeObjectURL(url)
-  }
 
   const handleShareSummary = async () => {
     const summary = [
@@ -734,7 +648,7 @@ export default function MoodHistoryPage() {
           </div>
         )}
 
-        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
+        <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-4">
           <div className="flex h-12 w-full items-center justify-between rounded-full bg-white dark:bg-gray-800 p-1.5 shadow-sm border border-gray-100 dark:border-gray-700">
             {(['day', 'week', 'month', 'year'] as const).map((t) => {
               const active = timeframe === t
@@ -758,7 +672,7 @@ export default function MoodHistoryPage() {
             })}
           </div>
 
-          <div className="mt-4 flex items-center justify-end gap-2">
+          <div className="mt-3 flex items-center justify-end gap-2">
             <button
               type="button"
               onClick={handleShareSummary}
@@ -766,16 +680,9 @@ export default function MoodHistoryPage() {
             >
               Share summary
             </button>
-            <button
-              type="button"
-              onClick={handleExportCsv}
-              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1.5 text-xs font-semibold text-gray-700 dark:text-gray-200"
-            >
-              Export CSV
-            </button>
           </div>
 
-          <div className="mt-6">
+          <div className="mt-4">
             <div className="flex items-center justify-between mb-4">
               <div className="flex flex-col gap-1">
                 <h3 className="text-gray-500 dark:text-gray-300 text-sm font-bold uppercase tracking-wider">
@@ -944,160 +851,109 @@ export default function MoodHistoryPage() {
 	          </div>
 	        </div>
 
-        <div className="px-1 mt-6">
-          <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-4">Highlights</h3>
-          <div className="grid grid-cols-2 gap-4">
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 flex flex-col justify-between aspect-[4/3] relative overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="absolute top-0 right-0 p-4 opacity-10">
-                <span className="text-6xl grayscale opacity-50">{topMoodValue ? emojiForMoodValue(topMoodValue) : '🙂'}</span>
-              </div>
-              <div>
-                <p className="text-gray-500 dark:text-gray-300 text-xs font-bold uppercase tracking-wider mb-1">Top Mood</p>
-                <p className="text-gray-900 dark:text-white text-lg font-bold leading-tight">
-                  {topMoodValue ? `“${emojiForMoodValue(topMoodValue)}”` : '—'}
-                </p>
-              </div>
-              <div className="flex items-end justify-between relative z-10">
-                <span className="text-4xl">{topMoodValue ? emojiForMoodValue(topMoodValue) : '🙂'}</span>
-                <span className="text-xs font-medium text-helfi-green bg-helfi-green/10 px-2 py-1 rounded-lg">
+        <div className="px-1 mt-5">
+          <h3 className="text-gray-900 dark:text-white text-lg font-bold mb-3">Highlights</h3>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+              <p className="text-gray-500 dark:text-gray-300 text-[11px] font-bold uppercase tracking-wider">Top Mood</p>
+              <div className="mt-2 flex items-center justify-between">
+                <div className="text-3xl leading-none">{topMoodValue ? emojiForMoodValue(topMoodValue) : '🙂'}</div>
+                <span className="text-xs font-semibold text-helfi-green bg-helfi-green/10 px-2 py-1 rounded-md">
                   {topMoodCount ? `${topMoodCount}x` : '0x'}
                 </span>
               </div>
             </div>
-
-            <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 flex flex-col justify-between aspect-[4/3] relative overflow-hidden shadow-sm border border-gray-100 dark:border-gray-700">
-              <div className="absolute -right-4 -bottom-4 bg-helfi-green/10 w-24 h-24 rounded-full blur-2xl"></div>
-              <div>
-                <p className="text-gray-500 dark:text-gray-300 text-xs font-bold uppercase tracking-wider mb-1">Streak</p>
-                <p className="text-gray-900 dark:text-white text-lg font-bold leading-tight">On fire</p>
-              </div>
-              <div className="flex items-end gap-2 relative z-10">
-                <span className="text-4xl">🔥</span>
-                <span className="text-2xl font-bold text-helfi-green">
-                  {streakDays} <span className="text-sm text-gray-500 dark:text-gray-300 font-normal">days</span>
-                </span>
+            <div className="bg-white dark:bg-gray-800 rounded-xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+              <p className="text-gray-500 dark:text-gray-300 text-[11px] font-bold uppercase tracking-wider">Streak</p>
+              <div className="mt-2 flex items-center gap-2">
+                <span className="text-2xl">🔥</span>
+                <span className="text-xl font-bold text-helfi-green">{streakDays}</span>
+                <span className="text-xs text-gray-500 dark:text-gray-300">days</span>
               </div>
             </div>
           </div>
         </div>
 
-        <div className="mt-8">
-          <div className="flex items-center justify-between px-1 mb-3">
-            <h3 className="text-gray-900 dark:text-white text-xl font-bold">Insights</h3>
-          </div>
-          <div className="px-1 mb-3 text-sm text-gray-600 dark:text-gray-300">
-            A quick look at possible patterns between mood, sleep, meals, activity, supplements, and medication impact.
-          </div>
-          <div className="flex overflow-x-auto no-scrollbar gap-4 px-1 pb-2">
-            {insightCards.length === 0 ? (
-              <div className="min-w-[260px] bg-white dark:bg-gray-800 rounded-2xl p-5 border border-gray-100 dark:border-gray-700 shadow-sm text-sm text-gray-600 dark:text-gray-300">
-                Add a few mood check‑ins to unlock insights.
+        <details className="mt-5 rounded-2xl border border-gray-100 dark:border-gray-700 bg-white dark:bg-gray-800 p-4 shadow-sm group">
+          <summary className="list-none cursor-pointer select-none flex items-center justify-between">
+            <span className="text-sm font-bold text-gray-900 dark:text-white">More trend views</span>
+            <span className="material-symbols-outlined text-gray-400 transition-transform group-open:rotate-180">expand_more</span>
+          </summary>
+          <div className="mt-4 space-y-5">
+            <div>
+              <h3 className="text-gray-900 dark:text-white text-base font-bold mb-3">This Month</h3>
+              <div className="rounded-2xl p-4 border border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/40">
+                <div className="grid grid-cols-7 gap-y-3 gap-x-2 text-center mb-2">
+                  {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => (
+                    <span key={d} className="text-[10px] font-bold text-gray-500 dark:text-gray-300 uppercase">{d}</span>
+                  ))}
+                  {monthGrid.cells.map((cell, idx) => {
+                    if (cell.type === 'pad') {
+                      return <div key={`pad-${idx}`} className="aspect-square rounded-full flex items-center justify-center text-xs text-gray-300" />
+                    }
+                    const isToday = cell.date === monthGrid.today
+                    const avg = cell.avg
+                    return (
+                      <button
+                        key={cell.date}
+                        type="button"
+                        onClick={() => {
+                          setTimeframe('day')
+                          setSelectedDay(cell.date)
+                        }}
+                        className={[
+                          'aspect-square rounded-full flex items-center justify-center border transition-colors cursor-pointer',
+                          isToday ? 'bg-white dark:bg-gray-800 border-helfi-green ring-2 ring-helfi-green/20' : 'bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-700 hover:border-helfi-green',
+                        ].join(' ')}
+                        aria-label={`Select ${cell.date}`}
+                      >
+                        {avg == null ? (
+                          <span className="text-xs text-gray-400 dark:text-gray-500">{cell.day}</span>
+                        ) : (
+                          <div className={`w-2 h-2 rounded-full ${dotColorForAvg(avg)}`} />
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
               </div>
-            ) : (
-              insightCards.map((c, idx) => (
-                <div key={idx} className="min-w-[260px] bg-white dark:bg-gray-800 rounded-2xl p-5 flex flex-col gap-3 border border-gray-100 dark:border-gray-700 shadow-sm">
-                  <div className="flex items-center gap-2">
-                    <div className={`w-8 h-8 rounded-full flex items-center justify-center ${c.color}`}>
-                      <span className="material-symbols-outlined text-lg">{c.icon}</span>
+            </div>
+
+            <div>
+              <h3 className="text-gray-900 dark:text-white text-base font-bold mb-2">Year in Pixels</h3>
+              <div className="rounded-2xl p-3 border border-gray-100 dark:border-gray-700 bg-gray-50/70 dark:bg-gray-900/40">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
+                  {yearPixels.map((month) => (
+                    <div key={month.key} className="rounded-lg border border-gray-100 dark:border-gray-700 p-2 bg-white/70 dark:bg-gray-900/50">
+                      <div className="text-[10px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1">
+                        {month.label}
+                      </div>
+                      <div className="grid grid-cols-7 gap-[2px]">
+                        {month.cells.map((cell, index) => {
+                          if (cell.type === 'pad') {
+                            return <div key={`${month.key}-pad-${index}`} className="aspect-square rounded-[3px] bg-transparent" />
+                          }
+                          return (
+                            <div
+                              key={cell.date}
+                              className={`aspect-square rounded-[3px] ${dotColorForAvg(cell.avg)}`}
+                              title={`${cell.date}${cell.avg == null ? '' : ` • avg ${cell.avg.toFixed(1)}`}`}
+                            />
+                          )
+                        })}
+                      </div>
                     </div>
-                    <span className="text-gray-900 dark:text-white font-bold text-sm">Pattern</span>
-                  </div>
-                  <p className="text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
-                    {c.detail}
-                  </p>
+                  ))}
                 </div>
-              ))
-            )}
-          </div>
-        </div>
-
-        <div className="px-1 mt-8">
-          <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-4">This Month</h3>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="grid grid-cols-7 gap-y-4 gap-x-2 text-center mb-2">
-              {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((d) => (
-                <span key={d} className="text-[10px] font-bold text-gray-500 dark:text-gray-300 uppercase">{d}</span>
-              ))}
-              {monthGrid.cells.map((cell, idx) => {
-                if (cell.type === 'pad') {
-                  return <div key={`pad-${idx}`} className="aspect-square rounded-full flex items-center justify-center text-xs text-gray-300" />
-                }
-                const isToday = cell.date === monthGrid.today
-                const avg = cell.avg
-                return (
-                  <button
-                    key={cell.date}
-                    type="button"
-                    onClick={() => {
-                      setTimeframe('day')
-                      setSelectedDay(cell.date)
-                    }}
-                    className={[
-                      'aspect-square rounded-full flex items-center justify-center border transition-colors cursor-pointer',
-                      isToday ? 'bg-white dark:bg-gray-800 border-helfi-green ring-2 ring-helfi-green/20' : 'bg-gray-50 dark:bg-gray-900/40 border-gray-100 dark:border-gray-700 hover:border-helfi-green',
-                    ].join(' ')}
-                    aria-label={`Select ${cell.date}`}
-                  >
-                    {avg == null ? (
-                      <span className="text-xs text-gray-400 dark:text-gray-500">{cell.day}</span>
-                    ) : (
-                      <div className={`w-2 h-2 rounded-full ${dotColorForAvg(avg)}`} />
-                    )}
-                  </button>
-                )
-              })}
-            </div>
-            <div className="flex items-center justify-center gap-4 mt-4">
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-green-400" />
-                <span className="text-[10px] text-gray-500 dark:text-gray-300">Good</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-yellow-400" />
-                <span className="text-[10px] text-gray-500 dark:text-gray-300">Okay</span>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <div className="w-2 h-2 rounded-full bg-red-400" />
-                <span className="text-[10px] text-gray-500 dark:text-gray-300">Bad</span>
               </div>
             </div>
           </div>
-        </div>
+        </details>
 
-        <div className="px-1 mt-8">
-          <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-2">Year in Pixels</h3>
-          <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">Your last 12 months of mood at a glance.</p>
-          <div className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
-            <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-              {yearPixels.map((month) => (
-                <div key={month.key} className="rounded-xl border border-gray-100 dark:border-gray-700 p-2 bg-gray-50/70 dark:bg-gray-900/40">
-                  <div className="text-[11px] font-bold uppercase tracking-wider text-gray-600 dark:text-gray-300 mb-1">
-                    {month.label}
-                  </div>
-                  <div className="grid grid-cols-7 gap-[2px]">
-                    {month.cells.map((cell, index) => {
-                      if (cell.type === 'pad') {
-                        return <div key={`${month.key}-pad-${index}`} className="aspect-square rounded-[3px] bg-transparent" />
-                      }
-                      return (
-                        <div
-                          key={cell.date}
-                          className={`aspect-square rounded-[3px] ${dotColorForAvg(cell.avg)}`}
-                          title={`${cell.date}${cell.avg == null ? '' : ` • avg ${cell.avg.toFixed(1)}`}`}
-                        />
-                      )
-                    })}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        </div>
-
-        <div className="mt-8">
-          <h3 className="text-gray-900 dark:text-white text-xl font-bold mb-3 px-1">Recent entries</h3>
+        <div className="mt-6">
+          <h3 className="text-gray-900 dark:text-white text-lg font-bold mb-3 px-1">Recent entries</h3>
           <div className="space-y-3">
-            {entries.slice(0, 12).map((e) => {
+            {entriesToRender.map((e) => {
               const tags = safeTags(e.tags)
               const ctx = safeContext(e.context)
               const when = new Date(e.timestamp)
@@ -1109,11 +965,11 @@ export default function MoodHistoryPage() {
                 ctx.medicationEffect != null ? `Medication ${ctx.medicationEffect}/5` : null,
               ].filter(Boolean) as string[]
               return (
-                <details key={e.id} className="group bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+                <details key={e.id} className="group bg-white dark:bg-gray-800 rounded-xl p-3 shadow-sm border border-gray-100 dark:border-gray-700">
                   <summary className="list-none cursor-pointer select-none">
                     <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-helfi-green/10 flex items-center justify-center">
-                        <span className="text-2xl">{emojiForMoodValue(Number(e.mood))}</span>
+                      <div className="w-10 h-10 rounded-full bg-helfi-green/10 flex items-center justify-center">
+                        <span className="text-xl">{emojiForMoodValue(Number(e.mood))}</span>
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="flex items-center justify-between gap-2">
@@ -1162,6 +1018,17 @@ export default function MoodHistoryPage() {
               )
             })}
           </div>
+          {hasMoreEntries && (
+            <div className="mt-3 px-1">
+              <button
+                type="button"
+                onClick={() => setShowAllEntries((prev) => !prev)}
+                className="text-sm font-semibold text-helfi-green hover:underline"
+              >
+                {showAllEntries ? 'Show less' : `Show more (${Math.min(12, entries.length) - 5} more)`}
+              </button>
+            </div>
+          )}
         </div>
       </main>
 

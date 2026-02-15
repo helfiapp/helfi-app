@@ -192,6 +192,39 @@ export default function MoodPieChart({ entries }: { entries: MoodEntry[] }) {
         },
       },
     },
+    interaction: { mode: 'nearest', intersect: true },
+    onClick: (_event, elements, chart) => {
+      const chartRef = chart as any
+      const active = chartRef.$activeMoodSlice as { datasetIndex: number; index: number } | undefined
+      if (!elements?.length) {
+        if (active) {
+          chart.setActiveElements([])
+          chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+          chartRef.$activeMoodSlice = undefined
+          chart.update()
+        }
+        return
+      }
+
+      const first = elements[0] as any
+      const next = { datasetIndex: first.datasetIndex, index: first.index }
+      const isSame = !!active && active.datasetIndex === next.datasetIndex && active.index === next.index
+      if (isSame) {
+        chart.setActiveElements([])
+        chart.tooltip?.setActiveElements([], { x: 0, y: 0 })
+        chartRef.$activeMoodSlice = undefined
+        chart.update()
+        return
+      }
+
+      chart.setActiveElements([next])
+      chart.tooltip?.setActiveElements([next], {
+        x: first.element?.x ?? 0,
+        y: first.element?.y ?? 0,
+      })
+      chartRef.$activeMoodSlice = next
+      chart.update()
+    },
   }), [slices, timeMap])
 
   if (!slices.length) {
