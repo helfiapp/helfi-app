@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 15:29 AEDT
+- What changed: Fixed a race where adding a drink from Water -> Favorites could hide an earlier meal in the same category/date. Add flow now always merges from the latest live diary list before saving, so new drink adds no longer replace prior meals.
+- Where to see it (page/link): `/food` (Favorites add flow + Water -> Favorites add flow), lock notes in `GUARD_RAILS.md` section `7.6.4`
+- What to quickly test: Add a breakfast meal from Favorites, then add tea/hot chocolate from Water -> Favorites into Breakfast. Confirm both rows stay visible.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 15:05 AEDT
 - What changed: Added a hard regression lock for the favorites popup so `Change portion` must remain visible in the first action popup (`Add to diary`, `Preview`, `Change portion`, `Cancel`). Added matching guard-rail recovery steps so future agents can quickly restore this if a merge removes it.
 - Where to see it (page/link): `/food` favorites add popup, `app/food/page.tsx`, `GUARD_RAILS.md` section `7.6.2`
