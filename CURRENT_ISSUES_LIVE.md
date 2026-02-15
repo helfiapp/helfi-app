@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 12:26 AEDT
+- What changed: Fixed Water -> Favorites drink calorie carry-through for sweetener drinks. Drinks now keep drink icon + ml amount, and calories use sweetener amount only (no ml multiplication).
+- Where to see it (page/link): `/food/water` -> add drink from favorites flow into `/food`
+- What to quickly test: Add hot chocolate/tea/coffee from Water flow using sugar or honey and confirm Food Diary calories match sweetener amount only while showing correct drink icon and ml.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 12:15 AEDT
 - What changed: FAQ page modernized to accordion style. All answers are now collapsed by default and expand only when tapped, giving a cleaner and more modern help-center layout.
 - Where to see it (page/link): `/faq`
