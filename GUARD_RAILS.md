@@ -632,6 +632,26 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
   to avoid stale session storage (`loadExerciseEntriesForDate(..., { force: true })`).
 - Deleting must update the list even if the server responds with “Not found” for stale entries.
 
+### 3.4.1 Exercise calories must increase remaining calories (Feb 2026 - Locked)
+**Goal (non-negotiable):** Burned exercise calories must always add back to daily calorie room.
+
+**Must keep (source of truth):**
+- Remaining calories must use this formula:  
+  `remaining = max(0, daily_target + exercise_burned - food_consumed)`
+- The exercise calories used for the summary must come from the **exercise entries list** first,
+  with API/snapshot calories only as fallback.
+- If an exercise row is visible, its calories must be reflected in the summary numbers.
+
+**Why this lock exists:**
+- This regressed again and made Food Diary remaining calories look wrong after manual exercise logs.
+
+**Restore steps if it breaks again:**
+1. File: `app/food/page.tsx`.
+2. Ensure `resolveExerciseCaloriesKcal(...)` is used for exercise summary values (not raw cached value alone).
+3. Ensure energy summary uses `daily target + exercise calories` before subtracting consumed food.
+4. Ensure save/sync paths normalize exercise calories with entry fallback before writing session snapshot.
+5. Verify by adding one manual exercise entry and confirming remaining calories increase immediately.
+
 ### 3.5 Favorite label must stay consistent in edit view (Food diary)
 - When a user logs a **favorite** item (e.g., “Hot chocolate”), the **edit view must show the favorite label**,
   not a raw ingredient name (e.g., “Drinking Chocolate”).

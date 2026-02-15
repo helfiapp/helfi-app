@@ -968,6 +968,22 @@ const SHOW_LOCAL_RESTORE_PROMPT = false
 // Owner request: disable the "Fix favorites & credits" banner on load.
 const SHOW_FAVORITES_RESCUE_PROMPT = false
 
+const sumExerciseCaloriesFromEntries = (entries: any[]): number => {
+  if (!Array.isArray(entries) || entries.length === 0) return 0
+  return entries.reduce((sum, entry) => {
+    const calories = Number(entry?.calories)
+    if (!Number.isFinite(calories) || calories <= 0) return sum
+    return sum + calories
+  }, 0)
+}
+
+const resolveExerciseCaloriesKcal = (entries: any[], apiOrSnapshotCalories: unknown): number => {
+  const fromEntries = sumExerciseCaloriesFromEntries(entries)
+  if (fromEntries > 0) return fromEntries
+  const parsed = Number(apiOrSnapshotCalories)
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 0
+}
+
 const readPersistentDiarySnapshot = (): DiarySnapshot | null => {
   if (typeof window === 'undefined') return null
   try {
@@ -990,7 +1006,10 @@ const readExerciseSnapshot = (dateKey: string): ExerciseSnapshot | null => {
     const parsed = JSON.parse(raw) as ExerciseSnapshotStore
     const entry = parsed?.[dateKey]
     if (!entry || !Array.isArray(entry.entries)) return null
-    return entry
+    return {
+      ...entry,
+      caloriesKcal: resolveExerciseCaloriesKcal(entry.entries, entry.caloriesKcal),
+    }
   } catch {
     return null
   }
@@ -1002,9 +1021,10 @@ const writeExerciseSnapshot = (dateKey: string, entries: any[], caloriesKcal: nu
   try {
     const raw = sessionStorage.getItem('foodDiary:exerciseSnapshot')
     const parsed = raw ? (JSON.parse(raw) as ExerciseSnapshotStore) : {}
+    const safeEntries = Array.isArray(entries) ? entries : []
     parsed[dateKey] = {
-      entries: Array.isArray(entries) ? entries : [],
-      caloriesKcal: Number(caloriesKcal) || 0,
+      entries: safeEntries,
+      caloriesKcal: resolveExerciseCaloriesKcal(safeEntries, caloriesKcal),
       savedAt: Date.now(),
     }
     sessionStorage.setItem('foodDiary:exerciseSnapshot', JSON.stringify(parsed))
@@ -3940,6 +3960,10 @@ export default function FoodDiary() {
   } | null>(null)
   const exerciseModalInitRef = useRef(false)
   const autoExerciseSyncRef = useRef<Record<string, boolean>>({})
+  const effectiveExerciseCaloriesKcal = useMemo(
+    () => resolveExerciseCaloriesKcal(exerciseEntries, exerciseCaloriesKcal),
+    [exerciseEntries, exerciseCaloriesKcal],
+  )
   const [macroPopup, setMacroPopup] = useState<{
     title: string
     energyLabel?: string
@@ -4182,7 +4206,7 @@ export default function FoodDiary() {
         throw new Error(data?.error || 'Failed to load exercise')
       }
       const entries = Array.isArray(data?.entries) ? data.entries : []
-      const calories = Number(data?.exerciseCalories) || 0
+      const calories = resolveExerciseCaloriesKcal(entries, data?.exerciseCalories)
       setExerciseEntries(entries)
       setExerciseCaloriesKcal(calories)
       writeExerciseSnapshot(dateKey, entries, calories)
@@ -4258,7 +4282,7 @@ export default function FoodDiary() {
         throw new Error(data?.error || 'Failed to sync exercise')
       }
       const entries = Array.isArray(data?.entries) ? data.entries : []
-      const calories = Number(data?.exerciseCalories) || 0
+      const calories = resolveExerciseCaloriesKcal(entries, data?.exerciseCalories)
       setExerciseEntries(entries)
       setExerciseCaloriesKcal(calories)
       writeExerciseSnapshot(selectedDate, entries, calories)
@@ -17175,10 +17199,7 @@ Please add nutritional information manually if needed.`);
       sugar_g: (dailyTargets as any)?.sugarMax ?? null,
     }
 
-    const exerciseKcal =
-      Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
-        ? Number(exerciseCaloriesKcal)
-        : 0
+    const exerciseKcal = effectiveExerciseCaloriesKcal
 
     const targetsWithExercise = (() => {
       const next: any = { ...baseTargets }
@@ -25384,10 +25405,7 @@ Please add nutritional information manually if needed.`);
                   totals.calories ||
                   0
                 const baseTargetCalories = dailyTargets.calories
-                const exerciseKcal =
-                  Number.isFinite(Number(exerciseCaloriesKcal)) && Number(exerciseCaloriesKcal) > 0
-                    ? Number(exerciseCaloriesKcal)
-                    : 0
+                const exerciseKcal = effectiveExerciseCaloriesKcal
                 const allowanceCalories = baseTargetCalories && baseTargetCalories > 0 ? baseTargetCalories : null
                 const allowanceWithExercise =
                   allowanceCalories !== null ? allowanceCalories + exerciseKcal : null
@@ -26149,7 +26167,7 @@ Please add nutritional information manually if needed.`);
 		                      <div className="text-xs text-gray-500 mt-0.5">
 		                        Burned:{' '}
 		                        <span className="font-semibold text-emerald-600">
-		                          +{Math.round(convertKcalToUnit(exerciseCaloriesKcal, energyUnit) || 0)} {energyUnit}
+		                          +{Math.round(convertKcalToUnit(effectiveExerciseCaloriesKcal, energyUnit) || 0)} {energyUnit}
 		                        </span>
 		                      </div>
 		                    </div>
