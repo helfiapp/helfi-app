@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 20:05 AEDT
+- What changed: Fixed Food Diary energy summary text so existing exercise calories are clearly included in “Daily allowance” (for example your existing +344 exercise entry now shows in that allowance line), and locked this rule in guard rails.
+- Where to see it (page/link): `/food`
+- What to quickly test: Open Food Diary with existing exercise logged, confirm “Daily allowance” includes exercise and shows the green “includes +exercise” text, and remaining/used numbers stay consistent.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 19:59 AEDT
 - What changed: Refreshed Mood Journal editor button styling so `Add photo` and `Record voice note` look modern on mobile and desktop, with clear visual states while uploading/recording.
 - Where to see it (page/link): `/mood/journal`
