@@ -2465,6 +2465,37 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 - Commit: `3f34d239`
 - Date: `2026-02-15`
 
+### 7.6.4 Favorites + Water Add Must Not Wipe Existing Meal Rows (HEL-169, Feb 2026 - STRICT LOCK)
+
+**Owner-reported symptom (LIVE):**
+- Add a meal from Favorites (example: breakfast), then add a drink from Water -> Favorites.
+- The earlier meal row disappears and only the newest drink row remains.
+
+**Root cause pattern:**
+- Add flow merged using a potentially stale `todaysFoods` snapshot instead of the latest live diary cache.
+- Under timing/race conditions, that stale base list dropped earlier same-date entries.
+
+**Non-negotiable rule:**
+- In add-to-diary flows, merge from the latest live diary list ref, not stale state snapshots.
+
+**Code lock (must preserve):**
+- File: `app/food/page.tsx`
+- In both add paths:
+  - `insertMealIntoDiary(...)`
+  - `insertFavoriteIntoDiary(...)`
+- Keep base list building as:
+  - `filterEntriesForDate(latestTodaysFoodsRef.current, selectedDate)`
+  - then `dedupeEntries([pendingEntry, ...baseForDate], ...)`
+- Do not switch this back to `filterEntriesForDate(todaysFoods, selectedDate)` in these two flows.
+
+**If this breaks again, restore this first:**
+1. Re-open `app/food/page.tsx` and confirm both add paths use `latestTodaysFoodsRef.current` for `baseForDate`.
+2. Confirm both paths still call `syncSnapshotOnly(updatedFoods, selectedDate)` after optimistic add.
+3. Re-test on LIVE:
+   - Add breakfast meal from Favorites.
+   - Add tea/hot chocolate from Water -> Favorites into the same meal category.
+   - Confirm earlier meal row stays visible (new drink adds without replacing prior row).
+
 ## 7.7 Smart Health Coach Anti-Spam Guard (Feb 2026 – Locked)
 
 **Goal (non-negotiable):**

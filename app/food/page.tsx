@@ -16700,8 +16700,11 @@ Please add nutritional information manually if needed.`);
     // we keep a tombstone to prevent server "resurrections". But if the user is *intentionally*
     // re-adding it now, we must clear that tombstone so it can appear again.
     removeDeletedTombstonesForEntries([pendingEntry])
+    // DO NOT TOUCH - OWNER LOCK (HEL-169):
+    // Always merge from the latest live diary cache ref, not a stale state snapshot.
+    // This prevents a Water/Favorites add from wiping an earlier same-date meal entry.
     const baseForDate = dedupeEntries(
-      filterEntriesForDate(todaysFoods, selectedDate),
+      filterEntriesForDate(latestTodaysFoodsRef.current, selectedDate),
       { fallbackDate: selectedDate },
     )
     let updated = dedupeEntries([pendingEntry, ...baseForDate], { fallbackDate: selectedDate })
@@ -17438,8 +17441,11 @@ Please add nutritional information manually if needed.`);
       ...prev,
       [category]: true,
     }))
+    // DO NOT TOUCH - OWNER LOCK (HEL-169):
+    // Always merge from the latest live diary cache ref, not a stale state snapshot.
+    // This prevents a Water/Favorites add from wiping an earlier same-date meal entry.
     const baseForDate = dedupeEntries(
-      filterEntriesForDate(todaysFoods, selectedDate),
+      filterEntriesForDate(latestTodaysFoodsRef.current, selectedDate),
       { fallbackDate: selectedDate },
     )
     let updatedFoods = dedupeEntries([pendingEntry, ...baseForDate], { fallbackDate: selectedDate })
