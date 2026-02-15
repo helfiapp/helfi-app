@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 13:58 AEDT
+- What changed: Rebuilt `/features/ai-insights` to match the same layout style as `/features/nutrition-food`. Added the new full-width beach-couple banner at the top, removed scrolling mobile mockups in that banner area, and set AI insights section images to placeholders for now.
+- Where to see it (page/link): `/features/ai-insights`
+- What to quickly test: Open `/features/ai-insights` and confirm top section matches nutrition-food layout style, banner is full-width, no scrolling phone strip appears in the banner, and section image blocks show placeholders.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 13:00 AEDT
 - What changed: Added legacy self-correction for old sugar-free hot chocolate rows that were saved with bad calories and missing drink metadata. These old rows now auto-correct in Food Diary instead of keeping stale 319 kcal values.
 - Where to see it (page/link): `/food`
