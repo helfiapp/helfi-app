@@ -68,6 +68,135 @@ const buildWriteGuardPayload = (raw: any) => {
   return clone
 }
 
+const PROFILE_TARGET_AUDIT_RECORD_NAME = '__PROFILE_TARGET_AUDIT__'
+const MAX_PROFILE_TARGET_AUDIT_ENTRIES = 120
+const PROTECTED_PROFILE_TARGET_KEYS = new Set([
+  'gender',
+  'weight',
+  'height',
+  'birthdate',
+  'bodyType',
+  'exerciseFrequency',
+  'exerciseTypes',
+  'goalChoice',
+  'goalIntensity',
+  'goalTargetWeightKg',
+  'goalTargetWeightUnit',
+  'goalPaceKgPerWeek',
+  'goalCalorieTarget',
+  'goalMacroSplit',
+  'goalMacroMode',
+  'goalFiberTarget',
+  'goalSugarMax',
+  'dietTypes',
+  'dietType',
+  'allergies',
+  'diabetesType',
+  'healthSituations',
+  'healthCheckSettings',
+])
+
+const normalizeAuditString = (value: any) => {
+  if (value === null || value === undefined) return ''
+  return String(value).trim()
+}
+
+const normalizeAuditNumber = (value: any) => {
+  const n = Number(value)
+  return Number.isFinite(n) ? Number(n) : null
+}
+
+const stableAuditValue = (value: any) => {
+  if (value === null || value === undefined) return null
+  if (typeof value === 'number') {
+    return Number.isFinite(value) ? Number(value) : null
+  }
+  if (typeof value === 'string') return value
+  if (typeof value === 'boolean') return value
+  try {
+    return JSON.parse(JSON.stringify(value))
+  } catch {
+    return String(value)
+  }
+}
+
+const buildProfileTargetChanges = (before: Record<string, any>, after: Record<string, any>) => {
+  const fields = ['weight', 'height', 'exerciseFrequency', 'bodyType', 'birthdate', 'goalChoice', 'goalIntensity']
+  const changes: Record<string, { from: any; to: any }> = {}
+  fields.forEach((field) => {
+    const fromValue = stableAuditValue(before[field])
+    const toValue = stableAuditValue(after[field])
+    if (JSON.stringify(fromValue) !== JSON.stringify(toValue)) {
+      changes[field] = { from: fromValue, to: toValue }
+    }
+  })
+  return changes
+}
+
+const appendProfileTargetAuditEntry = async (params: {
+  userId: string
+  eventType: 'changed' | 'blocked_missing_stamp' | 'blocked_stale_stamp'
+  source: string
+  incomingHealthSetupUpdatedAt: number | null
+  serverHealthSetupUpdatedAt: number
+  requestKeys: string[]
+  changes?: Record<string, { from: any; to: any }>
+  note?: string
+}) => {
+  try {
+    const existingAudit = await prisma.healthGoal.findFirst({
+      where: { userId: params.userId, name: PROFILE_TARGET_AUDIT_RECORD_NAME },
+      orderBy: { updatedAt: 'desc' },
+    })
+
+    let existingEntries: any[] = []
+    if (existingAudit?.category) {
+      try {
+        const parsed = JSON.parse(existingAudit.category)
+        if (Array.isArray(parsed?.entries)) existingEntries = parsed.entries
+      } catch {
+        existingEntries = []
+      }
+    }
+
+    const entry = {
+      changedAt: new Date().toISOString(),
+      eventType: params.eventType,
+      source: params.source,
+      incomingHealthSetupUpdatedAt: params.incomingHealthSetupUpdatedAt,
+      serverHealthSetupUpdatedAt: params.serverHealthSetupUpdatedAt,
+      requestKeys: params.requestKeys.slice(0, 40),
+      changes: params.changes || {},
+      note: params.note || '',
+    }
+
+    const nextEntries = [...existingEntries, entry].slice(-MAX_PROFILE_TARGET_AUDIT_ENTRIES)
+    const auditPayload = {
+      userId: params.userId,
+      name: PROFILE_TARGET_AUDIT_RECORD_NAME,
+      category: JSON.stringify({ entries: nextEntries }),
+      currentRating: 0,
+    }
+
+    const auditRecord = existingAudit
+      ? await prisma.healthGoal.update({
+          where: { id: existingAudit.id },
+          data: auditPayload,
+        })
+      : await prisma.healthGoal.create({ data: auditPayload })
+
+    await prisma.healthGoal.deleteMany({
+      where: {
+        userId: params.userId,
+        name: PROFILE_TARGET_AUDIT_RECORD_NAME,
+        id: { not: auditRecord.id },
+      },
+    })
+  } catch (error) {
+    console.warn('Failed to append profile target audit entry', error)
+  }
+}
+
 const splitSupplementName = (rawName: string) => {
   const cleaned = String(rawName || '').trim()
   if (!cleaned) return { brand: null as string | null, product: null as string | null }
@@ -964,6 +1093,12 @@ export async function POST(request: NextRequest) {
     const data = await request.json()
     console.timeEnd('⏱️ Parse Request Data')
     const manualSync = (data as any)?.manualSync === true || (data as any)?.syncOverride === true
+    const incomingHealthSetupUpdatedAtRaw = Number((data as any)?.healthSetupUpdatedAt)
+    const incomingHealthSetupUpdatedAt =
+      Number.isFinite(incomingHealthSetupUpdatedAtRaw) && incomingHealthSetupUpdatedAtRaw > 0
+        ? Math.round(incomingHealthSetupUpdatedAtRaw)
+        : 0
+    const hasIncomingHealthSetupStamp = incomingHealthSetupUpdatedAt > 0
     const healthSetupKeys = new Set([
       'gender',
       'termsAccepted',
@@ -997,6 +1132,9 @@ export async function POST(request: NextRequest) {
     ])
     const touchesHealthSetup =
       data && typeof data === 'object' && Object.keys(data as any).some((key) => healthSetupKeys.has(key))
+    const requestKeys = data && typeof data === 'object' ? Object.keys(data as any) : []
+    const touchesProtectedProfileFields =
+      data && typeof data === 'object' && Object.keys(data as any).some((key) => PROTECTED_PROFILE_TARGET_KEYS.has(key))
     let storedHealthSetupUpdatedAt = 0
 
     // #region agent log
@@ -1137,6 +1275,50 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Guard rail: profile target writes must carry a fresh health-setup version stamp.
+    if (touchesProtectedProfileFields && !manualSync && !hasIncomingHealthSetupStamp) {
+      await appendProfileTargetAuditEntry({
+        userId: user.id,
+        eventType: 'blocked_missing_stamp',
+        source: 'user-data-post',
+        incomingHealthSetupUpdatedAt: null,
+        serverHealthSetupUpdatedAt: storedHealthSetupUpdatedAt,
+        requestKeys,
+        note: 'Blocked profile target write because payload did not include healthSetupUpdatedAt.',
+      })
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: 'missing_health_setup_version',
+        serverHealthSetupUpdatedAt: storedHealthSetupUpdatedAt || null,
+      })
+    }
+
+    // Guard rail: block stale health-setup payloads from older tabs/caches.
+    if (
+      touchesHealthSetup &&
+      !manualSync &&
+      hasIncomingHealthSetupStamp &&
+      storedHealthSetupUpdatedAt > 0 &&
+      incomingHealthSetupUpdatedAt < storedHealthSetupUpdatedAt
+    ) {
+      await appendProfileTargetAuditEntry({
+        userId: user.id,
+        eventType: 'blocked_stale_stamp',
+        source: 'user-data-post',
+        incomingHealthSetupUpdatedAt,
+        serverHealthSetupUpdatedAt: storedHealthSetupUpdatedAt,
+        requestKeys,
+        note: 'Blocked stale health setup payload to prevent silent profile overwrite.',
+      })
+      return NextResponse.json({
+        success: true,
+        skipped: true,
+        reason: 'stale_health_setup_payload',
+        serverHealthSetupUpdatedAt: storedHealthSetupUpdatedAt,
+      })
+    }
+
     // Load existing profile info record for merging purposes (date of birth, etc.)
     let existingProfileInfoData: Record<string, any> | null = null
     try {
@@ -1212,6 +1394,15 @@ export async function POST(request: NextRequest) {
       normalizedBirthdate &&
         normalizedBirthdate !== (existingProfileInfoData?.dateOfBirth || '')
     )
+    const beforeProfileTargetSnapshot = {
+      weight: normalizeAuditNumber((user as any)?.weight),
+      height: normalizeAuditNumber((user as any)?.height),
+      exerciseFrequency: normalizeAuditString((user as any)?.exerciseFrequency),
+      bodyType: normalizeAuditString((user as any)?.bodyType).toLowerCase(),
+      birthdate: normalizeAuditString(existingProfileInfoData?.dateOfBirth),
+      goalChoice: normalizeAuditString(existingPrimaryGoalData?.goalChoice),
+      goalIntensity: normalizeAuditString(existingPrimaryGoalData?.goalIntensity || 'standard').toLowerCase(),
+    }
 
     // SIMPLIFIED APPROACH: Update each piece of data individually with proper error handling
     // This avoids complex transactions that were causing constraint violations
@@ -2563,7 +2754,11 @@ export async function POST(request: NextRequest) {
     })
     
     const shouldStoreHealthSetupMeta = touchesHealthSetup
-    const metaUpdatedAt = Date.now()
+    const metaUpdatedAt = Math.max(
+      Date.now(),
+      hasIncomingHealthSetupStamp ? incomingHealthSetupUpdatedAt : 0,
+      storedHealthSetupUpdatedAt || 0,
+    )
     if (shouldStoreHealthSetupMeta) {
       try {
         const existingMeta = await prisma.healthGoal.findFirst({
@@ -2587,6 +2782,71 @@ export async function POST(request: NextRequest) {
         })
       } catch (metaError) {
         console.warn('Failed to store __HEALTH_SETUP_META__', metaError)
+      }
+    }
+
+    if (touchesHealthSetup) {
+      try {
+        const refreshedUser = await prisma.user.findUnique({
+          where: { id: user.id },
+          select: {
+            weight: true,
+            height: true,
+            exerciseFrequency: true,
+            bodyType: true,
+            healthGoals: {
+              where: { name: { in: ['__PRIMARY_GOAL__', '__PROFILE_INFO_DATA__'] } },
+              orderBy: { updatedAt: 'desc' },
+              select: { name: true, category: true },
+            },
+          },
+        })
+        if (refreshedUser) {
+          let refreshedPrimaryGoal: Record<string, any> = {}
+          let refreshedProfileInfo: Record<string, any> = {}
+          try {
+            const storedPrimaryGoal = refreshedUser.healthGoals.find((goal: any) => goal.name === '__PRIMARY_GOAL__')
+            refreshedPrimaryGoal =
+              storedPrimaryGoal?.category && typeof storedPrimaryGoal.category === 'string'
+                ? JSON.parse(storedPrimaryGoal.category)
+                : {}
+          } catch {
+            refreshedPrimaryGoal = {}
+          }
+          try {
+            const storedProfileInfo = refreshedUser.healthGoals.find((goal: any) => goal.name === '__PROFILE_INFO_DATA__')
+            refreshedProfileInfo =
+              storedProfileInfo?.category && typeof storedProfileInfo.category === 'string'
+                ? JSON.parse(storedProfileInfo.category)
+                : {}
+          } catch {
+            refreshedProfileInfo = {}
+          }
+
+          const afterProfileTargetSnapshot = {
+            weight: normalizeAuditNumber((refreshedUser as any)?.weight),
+            height: normalizeAuditNumber((refreshedUser as any)?.height),
+            exerciseFrequency: normalizeAuditString((refreshedUser as any)?.exerciseFrequency),
+            bodyType: normalizeAuditString((refreshedUser as any)?.bodyType).toLowerCase(),
+            birthdate: normalizeAuditString((refreshedProfileInfo as any)?.dateOfBirth),
+            goalChoice: normalizeAuditString((refreshedPrimaryGoal as any)?.goalChoice),
+            goalIntensity: normalizeAuditString((refreshedPrimaryGoal as any)?.goalIntensity || 'standard').toLowerCase(),
+          }
+          const targetChanges = buildProfileTargetChanges(beforeProfileTargetSnapshot, afterProfileTargetSnapshot)
+          if (Object.keys(targetChanges).length > 0) {
+            await appendProfileTargetAuditEntry({
+              userId: user.id,
+              eventType: 'changed',
+              source: manualSync ? 'manual-sync' : 'user-data-post',
+              incomingHealthSetupUpdatedAt: hasIncomingHealthSetupStamp ? incomingHealthSetupUpdatedAt : null,
+              serverHealthSetupUpdatedAt: metaUpdatedAt,
+              requestKeys,
+              changes: targetChanges,
+            })
+          }
+        }
+      } catch (auditError) {
+        console.warn('Failed to capture profile target audit snapshot', auditError)
       }
     }
 

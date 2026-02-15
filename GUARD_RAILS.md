@@ -451,6 +451,36 @@ If this breaks again, restore these rules exactly.
 1) Restore `lib/prisma-write-guard.ts` and the `attachWriteGuard(prisma)` call in `lib/prisma.ts`.  
 2) Restore `lib/write-guard.ts` (table + hashing + guard logic).  
 
+### 2.7.3 Profile Target Stamp Lock + Audit Trail (Feb 2026 – Locked)
+
+**Purpose:** Stop silent changes to daily calorie target inputs (weight/height/goal intensity/exercise profile).
+
+**Protected file:** `app/api/user-data/route.ts`
+
+**Must keep (non-negotiable):**
+- Any save touching profile target fields must include a valid `healthSetupUpdatedAt` stamp.
+- If profile target fields are sent **without** a stamp, the server must skip the write and return:
+  - `skipped: true`
+  - `reason: missing_health_setup_version`
+- If a stamped payload is older than server `__HEALTH_SETUP_META__.updatedAt`, the server must skip the write and return:
+  - `skipped: true`
+  - `reason: stale_health_setup_payload`
+- Every blocked or successful profile-target change must be recorded in hidden audit record:
+  - `HealthGoal.name = "__PROFILE_TARGET_AUDIT__"`
+  - Keep a rolling history (latest entries only).
+
+**Why this is locked:**
+- Prevents older tabs/cached forms from silently overwriting calorie-target inputs.
+- Gives a timestamped trail of what changed and when, so regressions can be traced quickly.
+
+**Restore checklist if broken:**
+1) Re-add stamp checks in `POST /api/user-data` before profile writes.
+2) Re-add stale-version guard comparing payload stamp vs `__HEALTH_SETUP_META__`.
+3) Re-add `__PROFILE_TARGET_AUDIT__` append logic.
+4) Verify: sending old or unstamped profile payload does **not** change user weight/height/goal.
+
+Last stable deployment: `TO_BE_FILLED_AFTER_DEPLOY` (2026-02-15)
+
 ### 2.8 Supplement + Medication Photo Retention (Jan 2026 – Locked)
 
 - Photos uploaded for supplements and medications are **temporary**.
