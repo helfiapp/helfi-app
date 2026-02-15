@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 16:05 AEDT
+- What changed: Added the supplied `AI DOCTOR.jpg` into the AI insights feature page overview, in the right-side image position next to the first section text.
+- Where to see it (page/link): `/features/ai-insights`
+- What to quickly test: Open `/features/ai-insights` and confirm the right-side image next to the first paragraph block now shows the AI doctor photo.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 15:29 AEDT
 - What changed: Fixed a race where adding a drink from Water -> Favorites could hide an earlier meal in the same category/date. Add flow now always merges from the latest live diary list before saving, so new drink adds no longer replace prior meals.
 - Where to see it (page/link): `/food` (Favorites add flow + Water -> Favorites add flow), lock notes in `GUARD_RAILS.md` section `7.6.4`
