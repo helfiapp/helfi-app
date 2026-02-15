@@ -7,6 +7,8 @@ import Link from 'next/link'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import PublicHeader from '@/components/marketing/PublicHeader'
+import PublicFooter from '@/components/marketing/PublicFooter'
 
 export default function Help() {
   const { data: session } = useSession()
@@ -35,7 +37,7 @@ export default function Help() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header - First Row */}
+      {session ? (
       <nav className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-3">
         <div className="max-w-7xl mx-auto flex justify-between items-center">
           {/* Logo on the left */}
@@ -112,17 +114,20 @@ export default function Help() {
           </div>
         </div>
       </nav>
+      ) : (
+        <PublicHeader />
+      )}
 
       {/* Second Row - Page Title Centered */}
-      <div className="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 px-4 py-4">
+      <div className={`bg-white border-b border-gray-200 px-4 py-4 ${session ? 'dark:bg-gray-800 dark:border-gray-700' : ''}`}>
         <div className="max-w-7xl mx-auto text-center">
-          <h1 className="text-lg md:text-xl font-semibold text-gray-900 dark:text-white">Help & Support</h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 hidden sm:block">Get help with your health journey</p>
+          <h1 className={`text-lg md:text-xl font-semibold text-gray-900 ${session ? 'dark:text-white' : ''}`}>Help & Support</h1>
+          <p className={`text-sm text-gray-500 hidden sm:block ${session ? 'dark:text-gray-400' : ''}`}>Get help with your health journey</p>
         </div>
       </div>
 
       {/* Main Content */}
-      <div className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
+      <div className={`max-w-3xl mx-auto px-4 py-8 ${session ? 'pb-24 md:pb-8' : 'pb-8'}`}>
         <div className="bg-white rounded-lg shadow-sm p-6">
           <h2 className="text-2xl font-bold text-gray-900 mb-6">How can we help you?</h2>
           
@@ -149,7 +154,9 @@ export default function Help() {
         </div>
       </div>
 
-      {/* Mobile Bottom Navigation */}
+      {!session && <PublicFooter />}
+
+      {session && (
       <nav className="md:hidden fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 px-4 py-2 z-40">
         <div className="flex items-center justify-around">
           
@@ -195,6 +202,7 @@ export default function Help() {
 
         </div>
       </nav>
+      )}
     </div>
   )
 } 

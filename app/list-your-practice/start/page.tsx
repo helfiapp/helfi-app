@@ -2,6 +2,7 @@
 
 import Link from 'next/link'
 import PublicHeader from '@/components/marketing/PublicHeader'
+import PublicFooter from '@/components/marketing/PublicFooter'
 
 export default function ListYourPracticeStartPage() {
   return (
@@ -63,6 +64,7 @@ export default function ListYourPracticeStartPage() {
           </section>
         </div>
       </main>
+      <PublicFooter />
     </div>
   )
 }

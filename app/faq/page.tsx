@@ -1,12 +1,11 @@
 'use client'
 
 import React from 'react'
-import Image from 'next/image'
 import Link from 'next/link'
-import { useSession } from 'next-auth/react'
+import PublicHeader from '@/components/marketing/PublicHeader'
+import PublicFooter from '@/components/marketing/PublicFooter'
 
 export default function FAQPage() {
-  const { data: session } = useSession()
   const [openFaqId, setOpenFaqId] = React.useState<string | null>(null)
 
   const faqs = [
@@ -126,43 +125,7 @@ export default function FAQPage() {
 
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Logo on the left */}
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="/mobile-assets/LOGOS/helfi-01-01.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          
-          {/* Navigation Links */}
-          <div className="flex items-center space-x-4">
-            {session ? (
-              <Link 
-                href="/dashboard" 
-                className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-              >
-                Back to Dashboard
-              </Link>
-            ) : (
-              <Link 
-                href="/" 
-                className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-              >
-                Back to Home
-              </Link>
-            )}
-          </div>
-        </div>
-      </nav>
+      <PublicHeader />
 
       {/* Page Title */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
@@ -264,6 +227,7 @@ export default function FAQPage() {
           __html: JSON.stringify(faqSchema),
         }}
       />
+      <PublicFooter />
     </div>
   )
 } 

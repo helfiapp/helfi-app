@@ -2,6 +2,7 @@ import Link from 'next/link'
 import type { Metadata } from 'next'
 
 import PublicHeader from '@/components/marketing/PublicHeader'
+import PublicFooter from '@/components/marketing/PublicFooter'
 import { absoluteUrl } from '@/lib/site-url'
 import { featurePages } from '@/data/feature-pages'
 
@@ -139,6 +140,7 @@ export default function FeaturesIndexPage() {
           __html: JSON.stringify(featuresSchema),
         }}
       />
+      <PublicFooter />
     </div>
   )
 }

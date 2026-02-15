@@ -1,51 +1,13 @@
 'use client'
 
 import React from 'react';
-import Image from 'next/image';
-import Link from 'next/link';
-import { useRouter } from 'next/navigation';
+import PublicHeader from '@/components/marketing/PublicHeader';
+import PublicFooter from '@/components/marketing/PublicFooter';
 
 export default function PrivacyPage() {
-  const router = useRouter();
-  const handleBack = () => {
-    if (typeof window !== 'undefined' && window.history.length > 1) {
-      router.back();
-    } else {
-      router.push('/');
-    }
-  };
-
   return (
     <div className="min-h-screen bg-gray-50">
-      {/* Navigation Header */}
-      <nav className="bg-white border-b border-gray-200 px-4 py-3">
-        <div className="max-w-7xl mx-auto flex justify-between items-center">
-          {/* Logo on the left */}
-          <div className="flex items-center">
-            <Link href="/" className="w-16 h-16 md:w-20 md:h-20 cursor-pointer hover:opacity-80 transition-opacity">
-              <Image
-                src="/mobile-assets/LOGOS/helfi-01-01.png"
-                alt="Helfi Logo"
-                width={80}
-                height={80}
-                className="w-full h-full object-contain"
-                priority
-              />
-            </Link>
-          </div>
-          
-          {/* Back to Home button on the right */}
-          <div>
-            <button
-              type="button"
-              onClick={handleBack}
-              className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
-            >
-              Back
-            </button>
-          </div>
-        </div>
-      </nav>
+      <PublicHeader />
 
       {/* Page Title */}
       <div className="bg-white border-b border-gray-200 px-4 py-4">
@@ -294,6 +256,7 @@ export default function PrivacyPage() {
           </div>
         </div>
       </div>
+      <PublicFooter />
     </div>
   );
 } 
