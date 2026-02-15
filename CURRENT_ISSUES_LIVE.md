@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 13:58 AEDT
+- What changed: Strengthened legacy self-correction for old sugar-free hot chocolate entries. If no explicit sugar/honey sweetener amount is present, the entry now forces zero calories/macros instead of reusing stale stored values like 319 kcal.
+- Where to see it (page/link): `/food`
+- What to quickly test: Open `/food` on the affected date and confirm old `Hot chocolate sugar free` row no longer shows `319 kcal` after refresh.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 13:00 AEDT
 - What changed: Added legacy self-correction for old sugar-free hot chocolate rows that were saved with bad calories and missing drink metadata. These old rows now auto-correct in Food Diary instead of keeping stale 319 kcal values.
 - Where to see it (page/link): `/food`
