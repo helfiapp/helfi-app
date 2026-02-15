@@ -7,6 +7,7 @@ import { useSession } from 'next-auth/react'
 
 export default function FAQPage() {
   const { data: session } = useSession()
+  const [openFaqId, setOpenFaqId] = React.useState<string | null>(null)
 
   const faqs = [
     {
@@ -203,12 +204,41 @@ export default function FAQPage() {
                   {category.category}
                 </h3>
                 <div className="space-y-4">
-                  {category.questions.map((faq, faqIndex) => (
-                    <div key={faqIndex} className="border border-gray-200 rounded-lg p-4 hover:border-helfi-green/50 transition-colors">
-                      <h4 className="font-medium text-gray-900 mb-2">{faq.q}</h4>
-                      <p className="text-gray-600 text-sm leading-relaxed">{faq.a}</p>
-                    </div>
-                  ))}
+                  {category.questions.map((faq, faqIndex) => {
+                    const faqId = `${categoryIndex}-${faqIndex}`
+                    const isOpen = openFaqId === faqId
+
+                    return (
+                      <div
+                        key={faqIndex}
+                        className="border border-gray-200 rounded-xl bg-white hover:border-helfi-green/50 transition-colors"
+                      >
+                        <button
+                          type="button"
+                          onClick={() => setOpenFaqId(isOpen ? null : faqId)}
+                          className="w-full text-left p-4 md:p-5 flex items-center justify-between gap-4"
+                          aria-expanded={isOpen}
+                          aria-controls={`faq-answer-${faqId}`}
+                        >
+                          <h4 className="font-semibold text-gray-900 pr-2">{faq.q}</h4>
+                          <span
+                            className={`flex-shrink-0 w-7 h-7 rounded-full border border-gray-300 flex items-center justify-center text-gray-600 transition-transform ${
+                              isOpen ? 'rotate-45 border-helfi-green text-helfi-green' : ''
+                            }`}
+                          >
+                            +
+                          </span>
+                        </button>
+
+                        {isOpen && (
+                          <div id={`faq-answer-${faqId}`} className="px-4 md:px-5 pb-4 md:pb-5">
+                            <div className="h-px w-full bg-gray-100 mb-4" />
+                            <p className="text-gray-600 text-sm leading-relaxed">{faq.a}</p>
+                          </div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             ))}

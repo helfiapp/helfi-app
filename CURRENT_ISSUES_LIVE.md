@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 12:15 AEDT
+- What changed: FAQ page modernized to accordion style. All answers are now collapsed by default and expand only when tapped, giving a cleaner and more modern help-center layout.
+- Where to see it (page/link): `/faq`
+- What to quickly test: Open `/faq`, confirm all answers start closed. Tap a question to open it, tap again to close it, and confirm only one answer is open at a time.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 11:20 AEDT
 - What changed: Full Mood Tracker upgrade focused on retention and usability. Removed Mood Insights tab from mood navigation, added instant sync for mood reminder settings between Mood Preferences and Notification Reminders, expanded emotion selection with grouped feeling chips, added medication impact tracking in check-ins, upgraded mood pattern cards (sleep/nutrition/activity/supplements/medication), added post-check-in “next best step” guidance, added Share Summary and Export CSV tools, and added a 12-month “Year in Pixels” mood view with chart polish.
 - Where to see it (page/link): `/mood`, `/mood/history`, `/mood/journal`, `/mood/preferences`, `/notifications/reminders`
