@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 21:16 AEDT
+- What changed: Food Diary now shows your base daily allowance number (for example 2284) and shows exercise as a separate “+exercise added” note, while remaining calories still uses base + exercise - consumed.
+- Where to see it (page/link): `/food`
+- What to quickly test: With your existing +344 exercise and ~408 consumed, confirm Daily allowance shows base target and Remaining stays around 2220.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 21:00 AEDT
 - What changed: Locked health-setup profile target saves so stale/unstamped payloads cannot silently overwrite daily calorie target inputs (weight/height/goal settings), and added a server-side profile target audit trail (`__PROFILE_TARGET_AUDIT__`) for traceable change history.
 - Where to see it (page/link): `/onboarding?step=2`, `/food`, and guard rail notes in `GUARD_RAILS.md` section `2.7.3`
