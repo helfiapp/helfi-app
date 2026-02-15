@@ -110,6 +110,14 @@ const healthTrackingPhoto = (src: string, alt: string): FeaturePageImage => ({
   kind: 'photo',
 })
 
+const aiInsightsPhoto = (src: string, alt: string): FeaturePageImage => ({
+  src,
+  alt,
+  width: 1200,
+  height: 896,
+  kind: 'photo',
+})
+
 export const featurePages: FeaturePageContent[] = [
   {
     slug: 'health-tracking',
@@ -326,10 +334,18 @@ export const featurePages: FeaturePageContent[] = [
       'This AI health insights layer turns daily tracking into a weekly health report you can act on.',
     ],
     summary: 'Weekly reports and focused insights built from your last 7 days.',
-    heroImage: {
-      src: '/screenshots/hero/INSIGHTS.png',
-      alt: 'AI insights on a phone',
-    },
+    heroImage: aiInsightsPhoto(
+      '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+      'AI insights placeholder image'
+    ),
+    bannerImage: aiInsightsPhoto(
+      '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS BANNER.png',
+      'Couple walking on the beach at sunset'
+    ),
+    bannerSpacerHeight: 320,
+    showHeroImage: true,
+    showSegmentImages: true,
+    overviewLayout: 'expanded',
     primaryCta,
     secondaryCta,
     capabilities: [
@@ -391,10 +407,20 @@ export const featurePages: FeaturePageContent[] = [
           'Easy to review and revisit',
           'Aligned with your ongoing tracking',
         ],
-        image: {
-          src: '/screenshots/hero/INSIGHTS.png',
-          alt: 'Weekly report view',
-        },
+        image: aiInsightsPhoto(
+          '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+          'AI insights placeholder image'
+        ),
+        images: [
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+        ],
       },
       {
         title: 'Issue-specific insights',
@@ -412,10 +438,20 @@ export const featurePages: FeaturePageContent[] = [
           'Organized for quick review',
           'Aligned with your health goals',
         ],
-        image: {
-          src: '/screenshots/hero/HEALTH ISSUES.png',
-          alt: 'Issue-based insights on a phone',
-        },
+        image: aiInsightsPhoto(
+          '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+          'AI insights placeholder image'
+        ),
+        images: [
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+        ],
       },
       {
         title: 'Supplement safety and interactions',
@@ -433,10 +469,20 @@ export const featurePages: FeaturePageContent[] = [
           'Built for safe decision making',
           'Supports weekly reviews',
         ],
-        image: {
-          src: '/screenshots/hero/SUPPLEMENT INTERACTIONS.png',
-          alt: 'Supplement interaction summary',
-        },
+        image: aiInsightsPhoto(
+          '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+          'AI insights placeholder image'
+        ),
+        images: [
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+        ],
       },
       {
         title: 'Actionable next steps',
@@ -454,10 +500,20 @@ export const featurePages: FeaturePageContent[] = [
           'Keeps improvements measurable',
           'Designed for steady momentum',
         ],
-        image: {
-          src: '/screenshots/hero/INSIGHTS ENERGY.png',
-          alt: 'Weekly action summary',
-        },
+        image: aiInsightsPhoto(
+          '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+          'AI insights placeholder image'
+        ),
+        images: [
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+          aiInsightsPhoto(
+            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
+            'AI insights placeholder image'
+          ),
+        ],
       },
     ],
     seo: {
