@@ -807,15 +807,50 @@ export default function MoodJournalPage() {
             <button
               type="button"
               onClick={handleImagePick}
-              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-helfi-green"
+              className={`group inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all ${
+                uploading
+                  ? 'cursor-wait border-emerald-300 bg-emerald-50 text-emerald-700 dark:border-emerald-500/60 dark:bg-emerald-900/30 dark:text-emerald-200'
+                  : 'border-emerald-200 bg-gradient-to-b from-emerald-50 to-white text-emerald-700 shadow-sm hover:border-emerald-300 hover:shadow-md active:scale-[0.98] dark:border-emerald-500/40 dark:from-emerald-900/35 dark:to-gray-900 dark:text-emerald-200'
+              }`}
             >
+              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
+                uploading
+                  ? 'border-emerald-300 bg-emerald-100 dark:border-emerald-500/50 dark:bg-emerald-800/40'
+                  : 'border-emerald-200 bg-white dark:border-emerald-500/40 dark:bg-gray-900'
+              }`}>
+                <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-none stroke-current stroke-[2]">
+                  <path d="M4 8a2 2 0 0 1 2-2h2.2a1.5 1.5 0 0 0 1.2-.6l.7-.8A1.5 1.5 0 0 1 11.2 4h1.6a1.5 1.5 0 0 1 1.1.6l.7.8a1.5 1.5 0 0 0 1.2.6H18a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2Z" />
+                  <circle cx="12" cy="12" r="3.5" />
+                </svg>
+              </span>
               {uploading ? 'Uploading...' : 'Add photo'}
             </button>
             <button
               type="button"
               onClick={recording ? stopRecording : startRecording}
-              className="rounded-full border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-1 text-xs font-semibold text-gray-600 dark:text-gray-200"
+              className={`group inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-xs sm:text-sm font-semibold transition-all ${
+                recording
+                  ? 'border-rose-300 bg-rose-50 text-rose-700 shadow-sm hover:border-rose-400 hover:shadow-md active:scale-[0.98] dark:border-rose-500/50 dark:bg-rose-900/30 dark:text-rose-200'
+                  : 'border-gray-200 bg-gradient-to-b from-white to-gray-50 text-gray-700 shadow-sm hover:border-gray-300 hover:shadow-md active:scale-[0.98] dark:border-gray-600 dark:from-gray-800 dark:to-gray-900 dark:text-gray-100'
+              }`}
             >
+              <span className={`inline-flex h-5 w-5 items-center justify-center rounded-full border ${
+                recording
+                  ? 'border-rose-300 bg-rose-100 dark:border-rose-500/50 dark:bg-rose-800/40'
+                  : 'border-gray-200 bg-white dark:border-gray-600 dark:bg-gray-800'
+              }`}>
+                {recording ? (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-current">
+                    <rect x="7" y="7" width="10" height="10" rx="1.5" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" aria-hidden="true" className="h-3.5 w-3.5 fill-none stroke-current stroke-[2]">
+                    <path d="M12 4a3 3 0 0 1 3 3v4a3 3 0 1 1-6 0V7a3 3 0 0 1 3-3Z" />
+                    <path d="M5 11a7 7 0 0 0 14 0" />
+                    <path d="M12 18v3" />
+                  </svg>
+                )}
+              </span>
               {recording ? `Stop ${formatSeconds(recordSeconds)}` : 'Record voice note'}
             </button>
             {uploadingAudio && (
