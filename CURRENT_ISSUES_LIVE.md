@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 13:00 AEDT
+- What changed: Added legacy self-correction for old sugar-free hot chocolate rows that were saved with bad calories and missing drink metadata. These old rows now auto-correct in Food Diary instead of keeping stale 319 kcal values.
+- Where to see it (page/link): `/food`
+- What to quickly test: Refresh `/food` on a date with an old sugar-free hot chocolate row that previously showed 319 kcal and confirm it now self-corrects instead of showing inflated calories.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 12:43 AEDT
 - What changed: Public website layout rule completed. Added the full public top menu and public footer across the required pages: FAQ, Privacy, Terms, Features, Practitioners, List your practice, and List your practice start. Help page now uses public header/footer for signed-out visitors while keeping the signed-in layout unchanged.
 - Where to see it (page/link): `/faq`, `/privacy`, `/terms`, `/help`, `/features`, `/practitioners`, `/list-your-practice`, `/list-your-practice/start`
