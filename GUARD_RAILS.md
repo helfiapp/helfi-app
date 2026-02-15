@@ -641,6 +641,7 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 - The exercise calories used for the summary must come from the **exercise entries list** first,
   with API/snapshot calories only as fallback.
 - If an exercise row is visible, its calories must be reflected in the summary numbers.
+- The “Daily allowance” line in the energy summary must show the **exercise-adjusted allowance** (not base-only target).
 
 **Why this lock exists:**
 - This regressed again and made Food Diary remaining calories look wrong after manual exercise logs.
