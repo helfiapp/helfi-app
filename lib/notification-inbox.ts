@@ -125,12 +125,13 @@ export async function createInboxNotification(params: {
 
 export async function consumePendingNotificationOpen(
   userId: string,
-  options?: { withinMinutes?: number; types?: string[]; sources?: string[] }
+  options?: { withinMinutes?: number; types?: string[]; sources?: string[]; urlPrefix?: string | null }
 ): Promise<{ id: string; url: string } | null> {
   await ensureNotificationInboxTable()
   const withinMinutes = Math.min(Math.max(Number(options?.withinMinutes ?? 10), 1), 180)
   const types = Array.isArray(options?.types) && options.types.length > 0 ? options.types : null
   const sources = Array.isArray(options?.sources) && options.sources.length > 0 ? options.sources : null
+  const urlPrefix = typeof options?.urlPrefix === 'string' && options.urlPrefix.trim() ? options.urlPrefix.trim() : null
 
   try {
     const rows: Array<{ id: string; url: string | null }> = await prisma.$queryRawUnsafe(
@@ -138,15 +139,18 @@ export async function consumePendingNotificationOpen(
        FROM NotificationInbox
        WHERE userId = $1
          AND url IS NOT NULL
+         AND status = 'unread'
          AND ($2::text[] IS NULL OR type = ANY($2))
          AND ($3::text[] IS NULL OR source = ANY($3))
+         AND ($4::text IS NULL OR url LIKE ($4 || '%'))
          AND (metadata->>'launchConsumedAt' IS NULL OR metadata->>'launchConsumedAt' = '')
-         AND createdAt >= NOW() - ($4 * INTERVAL '1 minute')
+         AND createdAt >= NOW() - ($5 * INTERVAL '1 minute')
        ORDER BY createdAt DESC
        LIMIT 1`,
       userId,
       types,
       sources,
+      urlPrefix,
       withinMinutes
     )
 
@@ -226,6 +230,23 @@ export async function deleteNotifications(userId: string, ids: string[]): Promis
     return rows.length
   } catch (error) {
     console.warn('[notifications] Failed to delete inbox items', error)
+    return 0
+  }
+}
+
+export async function deleteNotificationsByType(userId: string, types: string[]): Promise<number> {
+  await ensureNotificationInboxTable()
+  const list = Array.isArray(types) ? types.filter(Boolean) : []
+  if (!list.length) return 0
+  try {
+    const rows: Array<{ id: string }> = await prisma.$queryRawUnsafe(
+      `DELETE FROM NotificationInbox WHERE userId = $1 AND type = ANY($2::text[]) RETURNING id`,
+      userId,
+      list
+    )
+    return rows.length
+  } catch (error) {
+    console.warn('[notifications] Failed to delete inbox items by type', error)
     return 0
   }
 }

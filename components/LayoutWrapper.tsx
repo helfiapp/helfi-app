@@ -670,6 +670,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       const params = new URLSearchParams(window.location.search)
       const pendingId = params.get('notificationId')
       const notificationOpen = params.get('notificationOpen') === '1'
+      const preferredUrlPrefix = notificationOpen ? window.location.pathname : ''
       let shouldCheckPending = notificationOpen
 
       try {
@@ -684,8 +685,10 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         storePendingNotificationId(pendingId)
       }
 
-      const runPendingOpen = () => {
-        fetch('/api/notifications/pending-open', { cache: 'no-store' as any })
+      const runPendingOpen = (urlPrefix?: string | null) => {
+        const endpoint = new URL('/api/notifications/pending-open', window.location.origin)
+        if (urlPrefix) endpoint.searchParams.set('urlPrefix', urlPrefix)
+        fetch(endpoint.toString(), { cache: 'no-store' as any })
           .then((res) => (res.ok ? res.json() : null))
           .then((data) => {
             if (!data) return
@@ -693,9 +696,14 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
             const pending = typeof data?.id === 'string' ? data.id : ''
             if (pending) storePendingNotificationId(pending)
             if (!url) return
-            const target = new URL(url, window.location.origin).href
-            if (window.location.href === target) return
-            window.location.href = target
+            const targetUrl = new URL(url, window.location.origin)
+            const currentUrl = new URL(window.location.href)
+            if (urlPrefix && targetUrl.pathname !== urlPrefix) {
+              return
+            }
+            if (targetUrl.pathname === currentUrl.pathname) return
+            if (window.location.href === targetUrl.href) return
+            window.location.href = targetUrl.href
           })
           .catch(() => {})
       }
@@ -786,7 +794,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         })
 
       const finalizePendingCheck = () => {
-        runPendingOpen()
+        runPendingOpen(preferredUrlPrefix || null)
         try {
           sessionStorage.removeItem('helfi:notification-open')
         } catch {

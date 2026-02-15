@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
-import { deleteNotifications } from '@/lib/notification-inbox'
+import { deleteNotificationsByType } from '@/lib/notification-inbox'
 
 let checkinTablesEnsured = false
 
@@ -199,7 +199,6 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const ratings = Array.isArray(body?.ratings) ? body.ratings : []
-  const notificationId = typeof body?.notificationId === 'string' ? body.notificationId.trim() : ''
   const today = new Date().toISOString().slice(0,10)
 
   try {
@@ -237,9 +236,7 @@ export async function POST(req: NextRequest) {
         id, user.id, r.issueId, today, clamped, String(r.note || ''), !!r.isNa
       )
     }
-    if (notificationId) {
-      await deleteNotifications(user.id, [notificationId]).catch(() => {})
-    }
+    await deleteNotificationsByType(user.id, ['checkin_reminder']).catch(() => {})
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('checkins save error', e)

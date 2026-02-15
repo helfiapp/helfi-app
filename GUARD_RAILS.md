@@ -2078,6 +2078,9 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
 1) Reminder tap routing must return a URL that includes a `notificationId`.
    - The pending‑open flow already returns `{ url, id }` and appends
      `?notificationId=<id>` when it redirects (see `app/pwa-entry/page.tsx`).
+   - When the app is already on a reminder page after a tap (`notificationOpen=1`),
+     pending‑open must filter by that page URL prefix (check-in vs mood) so it does
+     not redirect to a different reminder type.
    - The tap must also set a “notification open” marker before navigation so the
      app knows a reminder was tapped (see `public/sw.js`).
    - The app must check that marker on resume and call the pending‑open API
@@ -2092,9 +2095,10 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
    - Do NOT use `useSearchParams()` here; it causes build failures. Use
      `new URLSearchParams(window.location.search)` inside the client component.
 
-3) The save endpoints must delete the inbox item using that `notificationId`.
-   - `/api/checkins/today` and `/api/mood/entries` already delete by ID.
-   - Do not remove that deletion, and only clear the inbox after a successful save.
+3) The save endpoints must clear reminder inbox items only after a successful save.
+   - `/api/checkins/today` must clear `checkin_reminder` items.
+   - `/api/mood/entries` must clear `mood_reminder` items.
+   - Do not move this cleanup before save success.
 
 4) Re‑test on iPhone PWA:
    - Tap a fresh reminder, complete it, then open inbox.

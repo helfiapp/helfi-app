@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { ensureMoodTables } from '@/app/api/mood/_db'
-import { deleteNotifications } from '@/lib/notification-inbox'
+import { deleteNotificationsByType } from '@/lib/notification-inbox'
 
 export const dynamic = 'force-dynamic'
 
@@ -209,7 +209,6 @@ export async function POST(req: NextRequest) {
   const localDate = asLocalDate(body?.localDate) ?? new Date().toISOString().slice(0, 10)
   const tags = normalizeTags(body?.tags)
   const note = normalizeNote(body?.note)
-  const notificationId = typeof body?.notificationId === 'string' ? body.notificationId.trim() : ''
 
   const id = crypto.randomUUID()
 
@@ -234,9 +233,7 @@ export async function POST(req: NextRequest) {
       JSON.stringify(context),
     )
 
-    if (notificationId) {
-      await deleteNotifications(user.id, [notificationId]).catch(() => {})
-    }
+    await deleteNotificationsByType(user.id, ['mood_reminder']).catch(() => {})
 
     return NextResponse.json({ success: true, id })
   } catch (e) {
