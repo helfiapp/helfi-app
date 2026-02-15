@@ -2607,7 +2607,7 @@ Last stable deployment: `c1c5f2aa` (2026-02-14)
    - Confirm no page bounce feel.
    - Confirm lists/forms/buttons still work.
 
-Last stable deployment: `PENDING_DEPLOY_COMMIT` (2026-02-15)
+Last stable deployment: `a0544590` (2026-02-15)
 
 ## 8. Rules for Future Modifications
 
