@@ -12,10 +12,13 @@
 
   html,
   body {
+    height: 100%;
     width: 100%;
     max-width: 100%;
     overflow-x: hidden;
+    overscroll-behavior: none;
     overscroll-behavior-x: none;
+    overscroll-behavior-y: none;
   }
 
   /* ⚠️ GUARD RAIL: Keep scrollbars hidden everywhere (desktop + mobile). */
@@ -34,6 +37,8 @@
   body {
     @apply bg-white text-helfi-black antialiased;
     position: relative;
+    min-height: 100dvh;
+    -webkit-overflow-scrolling: touch;
   }
 
   img,

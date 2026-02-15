@@ -2578,6 +2578,37 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 
 Last stable deployment: `c1c5f2aa` (2026-02-14)
 
+## 7.8 Global Mobile Scroll Blocker (HEL-176, Feb 2026 - LOCKED)
+
+**Goal:**
+- On iPhone/Android PWA, scrolling should feel app-like (no rubber-band page bounce).
+- Normal vertical page scrolling must still work.
+
+**Must keep in `app/globals.css`:**
+- `html, body` keep:
+  - `height: 100%`
+  - `overflow-x: hidden`
+  - `overscroll-behavior: none`
+  - `overscroll-behavior-y: none`
+- `body` keep:
+  - `min-height: 100dvh`
+  - `-webkit-overflow-scrolling: touch`
+
+**Do not do without owner approval:**
+- Do not remove these rules.
+- Do not replace this with JavaScript scroll blocking.
+- Do not add global `overflow: hidden` on `body` (it breaks normal page scroll).
+
+**If this breaks again, restore in this order:**
+1. Re-add the exact `html, body` overscroll block rules in `app/globals.css`.
+2. Re-add `min-height: 100dvh` and `-webkit-overflow-scrolling: touch` on `body`.
+3. Re-test on iPhone PWA:
+   - Scroll long pages up/down.
+   - Confirm no page bounce feel.
+   - Confirm lists/forms/buttons still work.
+
+Last stable deployment: `PENDING_DEPLOY_COMMIT` (2026-02-15)
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
