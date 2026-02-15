@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 15:05 AEDT
+- What changed: Added a hard regression lock for the favorites popup so `Change portion` must remain visible in the first action popup (`Add to diary`, `Preview`, `Change portion`, `Cancel`). Added matching guard-rail recovery steps so future agents can quickly restore this if a merge removes it.
+- Where to see it (page/link): `/food` favorites add popup, `app/food/page.tsx`, `GUARD_RAILS.md` section `7.6.2`
+- What to quickly test: Open `/food` -> Add from favorites -> tap any favorite/custom item and confirm popup shows `Change portion` between `Preview` and `Cancel`.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 14:50 AEDT
 - What changed: Locked down HEL-162 permanently. Added strict non-tamper guard rails plus inline code lock comments and recovery steps in both Food Diary and API drink-calorie guard functions, so future agents can’t accidentally break hot chocolate/tea drink calorie behavior.
 - Where to see it (page/link): `GUARD_RAILS.md`, `/food` flow code in `app/food/page.tsx`, and save guard in `app/api/food-log/route.ts`
