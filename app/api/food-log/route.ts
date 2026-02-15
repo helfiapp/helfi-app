@@ -59,12 +59,75 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
     return { nutrition: input.nutrition, items: input.items, changed: false }
   }
 
+  const itemList = Array.isArray(input.items) ? input.items : []
   const drinkType = normalizeDrinkTypeLabel((baseNutrition as any).__drinkType)
+
+  const sweetenerCalories = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCalories') || 0)
+  const sweetenerCarbs = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCarbs') || 0)
+  const sweetenerSugar = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerSugar') || 0)
+  const sweetenerChoice = String(
+    (baseNutrition as any).__sweetenerChoice ||
+      (baseNutrition as any).__sweetenerType ||
+      '',
+  )
+    .trim()
+    .toLowerCase()
+  const hasSweetenerMetaValues =
+    readFiniteNumber(baseNutrition, '__sweetenerCalories') !== null ||
+    readFiniteNumber(baseNutrition, '__sweetenerCarbs') !== null ||
+    readFiniteNumber(baseNutrition, '__sweetenerSugar') !== null
+  const hasSweetenerContext =
+    Boolean(drinkType) &&
+    (sweetenerChoice === 'free' ||
+      sweetenerChoice === 'sugar' ||
+      sweetenerChoice === 'honey' ||
+      hasSweetenerMetaValues)
+  const round1 = (value: number) => Math.round(value * 10) / 10
+
+  if (hasSweetenerContext) {
+    const useZero = sweetenerChoice === 'free'
+    const lockedCalories = useZero ? 0 : sweetenerCalories
+    const lockedCarbs = useZero ? 0 : sweetenerCarbs
+    const lockedSugar = useZero ? 0 : sweetenerSugar
+
+    const normalizedNutrition = {
+      ...baseNutrition,
+      calories: Math.round(lockedCalories),
+      protein: 0,
+      carbs: round1(lockedCarbs),
+      fat: 0,
+      fiber: 0,
+      sugar: round1(lockedSugar),
+      protein_g: 0,
+      carbs_g: round1(lockedCarbs),
+      fat_g: 0,
+      fiber_g: 0,
+      sugar_g: round1(lockedSugar),
+      __sweetenerChoice: useZero ? 'free' : sweetenerChoice || null,
+      __sweetenerCalories: lockedCalories,
+      __sweetenerCarbs: round1(lockedCarbs),
+      __sweetenerSugar: round1(lockedSugar),
+    }
+
+    let normalizedItems = input.items
+    if (itemList.length === 1 && itemList[0] && typeof itemList[0] === 'object') {
+      const single = { ...(itemList[0] as any) }
+      single.calories = Math.round(lockedCalories)
+      single.protein_g = 0
+      single.carbs_g = round1(lockedCarbs)
+      single.fat_g = 0
+      single.fiber_g = 0
+      single.sugar_g = round1(lockedSugar)
+      normalizedItems = [single]
+    }
+
+    return { nutrition: normalizedNutrition, items: normalizedItems, changed: true }
+  }
+
   if (drinkType !== HOT_CHOCOLATE_KEY) {
     return { nutrition: input.nutrition, items: input.items, changed: false }
   }
 
-  const itemList = Array.isArray(input.items) ? input.items : []
   const looksSugarFree =
     isSugarFreeLabel((baseNutrition as any).__drinkType) ||
     isSugarFreeLabel(input.description) ||
@@ -73,14 +136,7 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
     return { nutrition: input.nutrition, items: input.items, changed: false }
   }
 
-  const sweetenerCalories = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCalories') || 0)
-  const sweetenerCarbs = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerCarbs') || 0)
-  const sweetenerSugar = Math.max(0, readFiniteNumber(baseNutrition, '__sweetenerSugar') || 0)
-  const round1 = (value: number) => Math.round(value * 10) / 10
-
-  // DO NOT TOUCH (owner lock):
-  // Sugar-free hot chocolate logged via water flow must never persist stale favorite calories.
-  // Only sweetener metadata can contribute kcal/carbs/sugar for this specific drink path.
+  // Backward guard for older sugar-free hot chocolate rows without new sweetener context.
   const normalizedNutrition = {
     ...baseNutrition,
     calories: Math.round(sweetenerCalories),
@@ -94,6 +150,10 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
     fat_g: 0,
     fiber_g: 0,
     sugar_g: round1(sweetenerSugar),
+    __sweetenerChoice: 'free',
+    __sweetenerCalories: Math.round(sweetenerCalories),
+    __sweetenerCarbs: round1(sweetenerCarbs),
+    __sweetenerSugar: round1(sweetenerSugar),
   }
 
   let normalizedItems = input.items

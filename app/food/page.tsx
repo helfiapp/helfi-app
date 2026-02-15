@@ -546,6 +546,7 @@ const getSweetenerMetaFromEntry = (entry: any): SweetenerMeta | null => {
 const stripSweetenerMetaFromTotals = (totals: any) => {
   if (!totals || typeof totals !== 'object') return totals
   const next: any = { ...(totals as any) }
+  delete next.__sweetenerChoice
   delete next.__sweetenerType
   delete next.__sweetenerAmount
   delete next.__sweetenerUnit
@@ -579,6 +580,7 @@ const applySweetenerMetaToTotals = (totals: any, meta: SweetenerMeta | null) => 
     calories: Math.round(calories * 10) / 10,
     carbs: Math.round(carbs * 10) / 10,
     sugar: Math.round(sugar * 10) / 10,
+    __sweetenerChoice: meta.type,
     __sweetenerType: meta.type,
     __sweetenerAmount: meta.amount,
     __sweetenerUnit: meta.unit,
@@ -10936,7 +10938,20 @@ const applyPendingDrinkSweetenerGuard = ({
   drinkSweetener: PendingDrinkSweetenerContext | null
 }) => {
   if (!drinkSweetener?.choice) return { totals, items }
-  if (!drinkMeta?.type) return { totals, items }
+  const liquidSingleItem = (() => {
+    if (!Array.isArray(items) || items.length !== 1 || !items[0]) return false
+    const single = items[0] as any
+    return isLikelyLiquidFood(
+      String(single?.name || single?.label || ''),
+      String(single?.serving_size || ''),
+    )
+  })()
+  const totalsDrinkType =
+    totals && typeof totals === 'object' && typeof (totals as any).__drinkType === 'string'
+      ? String((totals as any).__drinkType).trim()
+      : ''
+  const shouldApplyGuard = Boolean(drinkMeta?.type || totalsDrinkType || liquidSingleItem)
+  if (!shouldApplyGuard) return { totals, items }
 
   const setSingleItemMacros = (targetItems: any[] | null | undefined, macros: NutritionTotals) => {
     if (!Array.isArray(targetItems) || targetItems.length !== 1 || !targetItems[0] || typeof targetItems[0] !== 'object') {
@@ -10953,13 +10968,17 @@ const applyPendingDrinkSweetenerGuard = ({
   }
 
   if (drinkSweetener.choice === 'free') {
-    const lockedTotals: NutritionTotals = {
+    const lockedTotals: NutritionTotals & Record<string, any> = {
       calories: 0,
       protein: 0,
       carbs: 0,
       fat: 0,
       fiber: 0,
       sugar: 0,
+      __sweetenerChoice: 'free',
+      __sweetenerCalories: 0,
+      __sweetenerCarbs: 0,
+      __sweetenerSugar: 0,
     }
     return {
       totals: lockedTotals,
@@ -17234,8 +17253,8 @@ Please add nutritional information manually if needed.`);
           method: favorite.method || 'text',
           photo: favorite.photo || null,
           nutrition: totalsWithMeta,
-          items: Array.isArray(repairedFinalItems)
-            ? repairedFinalItems
+          items: Array.isArray(finalFavoriteItems)
+            ? finalFavoriteItems
             : typeof (favorite as any)?.items === 'string'
             ? (() => {
                 try {

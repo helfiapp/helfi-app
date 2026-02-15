@@ -2429,6 +2429,9 @@ entry for the **same day** only **if that diary entry was not manually edited**.
   - parse/track pending sweetener context
   - skip ml scaling when sweetener context is active
   - apply `applyPendingDrinkSweetenerGuard(...)` before creating entry payload in add flows
+- `app/api/food-log/route.ts` must enforce sweetener guard at save time for Water-flow drinks:
+  - if sweetener choice is `free`, save zero nutrition
+  - if sweetener choice is `sugar`/`honey`, save sweetener-only nutrition (never multiplied by drink ml)
 
 **Last stable deployment for this lock:**
 - Commit: `pending`
