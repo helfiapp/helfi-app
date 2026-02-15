@@ -6098,6 +6098,16 @@ export default function FoodDiary() {
   }
 
   const buildSugarFreeHotChocolateLockedTotals = (entry: any): NutritionTotals => {
+    // DO NOT TOUCH - OWNER LOCK (HEL-162 legacy correction):
+    // Purpose: auto-fix old bad sugar-free hot chocolate rows on load.
+    // Keep these rules:
+    // - Sugar-free with no real sugar/honey grams => keep safe base drink calories
+    //   (example: 8 kcal), and block stale inflated values like 319.
+    // - Sugar/honey with valid grams => compute from grams only.
+    // Recovery if broken:
+    // 1) Keep safe base calorie clamp + fallback.
+    // 2) Keep sugar/honey grams path using `sweetenerToMacros(...)`.
+    // 3) Keep sugar-free path that ignores stale high sweetener meta values.
     const entryTexts: string[] = [
       String(entry?.description || ''),
       String(entry?.label || ''),
@@ -11047,6 +11057,16 @@ const applyPendingDrinkSweetenerGuard = ({
   drinkMeta: DrinkEntryMeta | null
   drinkSweetener: PendingDrinkSweetenerContext | null
 }) => {
+  // DO NOT TOUCH - OWNER LOCK (HEL-162):
+  // Protects Water -> Food drink adds from wrong calorie math.
+  // Keep these rules:
+  // - `free` keeps base drink nutrition (example: 8 kcal), not zero.
+  // - `sugar`/`honey` uses sweetener-only macros, never multiplied by ml.
+  // - If sweetener context exists, it must override favorite/stale totals.
+  // Recovery if broken:
+  // 1) Keep detection: drinkMeta OR totals __drinkType OR one liquid item.
+  // 2) Keep `free` branch preserving base totals + zeroed sweetener meta fields.
+  // 3) Keep non-free branch based on `sweetenerToMacros(...)`.
   if (!drinkSweetener?.choice) return { totals, items }
   const liquidSingleItem = (() => {
     if (!Array.isArray(items) || items.length !== 1 || !items[0]) return false

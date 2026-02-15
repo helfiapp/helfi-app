@@ -53,6 +53,16 @@ const normalizeSugarFreeHotChocolatePayload = (input: {
   nutrition: any
   items: any
 }) => {
+  // DO NOT TOUCH - OWNER LOCK (HEL-162):
+  // Final server safety net for Water -> Food drink calories.
+  // Keep these rules:
+  // - `free` keeps base drink nutrition (small base kcal), never ml-scaled.
+  // - `sugar`/`honey` uses sweetener-only calories/macros from sweetener metadata.
+  // - Legacy sugar-free rows without full metadata must still self-heal safely.
+  // Recovery if broken:
+  // 1) Keep `hasSweetenerContext` branch as the first guard.
+  // 2) Keep `isSugarHoney` split behavior (`free` base drink, sugar/honey sweetener-only).
+  // 3) Keep legacy fallback that blocks inflated values and writes safe fields to nutrition/items.
   const baseNutrition =
     input.nutrition && typeof input.nutrition === 'object' ? { ...(input.nutrition as any) } : null
   if (!baseNutrition) {

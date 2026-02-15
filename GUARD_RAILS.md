@@ -2423,6 +2423,12 @@ entry for the **same day** only **if that diary entry was not manually edited**.
   - `free` must keep the base drink nutrition only (for example 8 kcal), never multiplied by ml.
   - `sugar`/`honey` must save only sweetener-based calories/macros (never multiplied by drink ml).
 
+**Hard lock (do not tamper):**
+- Do not simplify this to “always zero for sugar-free”. Sugar-free drinks can have base calories.
+- Do not remove save-time guard in API even if UI looks correct.
+- Do not remove load-time legacy correction in Food Diary; old rows still depend on it.
+- Do not let favorite totals override explicit sweetener context from Water flow.
+
 **Code lock (must preserve):**
 - `app/food/water/page.tsx` must pass `drinkSweetener`, `drinkSweetenerAmount`, `drinkSweetenerUnit`, and `drinkSweetenerGrams` in `navigateDrinkNutrition(...)`.
 - `app/food/page.tsx` must:
@@ -2433,8 +2439,24 @@ entry for the **same day** only **if that diary entry was not manually edited**.
   - if sweetener choice is `free`, keep base drink nutrition (never multiplied by ml)
   - if sweetener choice is `sugar`/`honey`, save sweetener-only nutrition (never multiplied by drink ml)
 
+**If this breaks again (fix checklist):**
+1. In `app/food/water/page.tsx`, confirm URL params include all 4 values:
+   - `drinkSweetener`, `drinkSweetenerAmount`, `drinkSweetenerUnit`, `drinkSweetenerGrams`
+2. In `app/food/page.tsx`, confirm `applyPendingDrinkSweetenerGuard(...)`:
+   - `free` path keeps base drink totals and only clears sweetener contribution
+   - sugar/honey path uses `sweetenerToMacros(...)` only
+3. In `app/food/page.tsx`, confirm `buildSugarFreeHotChocolateLockedTotals(...)`:
+   - sugar-free legacy rows keep safe base calories (example 8), not 0, not 319
+4. In `app/api/food-log/route.ts`, confirm `normalizeSugarFreeHotChocolatePayload(...)`:
+   - `free` keeps base drink values
+   - sugar/honey uses sweetener-only values
+5. Re-test on LIVE:
+   - old sugar-free hot chocolate row does not show inflated kcal
+   - new sugar-free add keeps base kcal
+   - new tea/honey add shows sweetener-based kcal only
+
 **Last stable deployment for this lock:**
-- Commit: `pending`
+- Commit: `3f34d239`
 - Date: `2026-02-15`
 
 ## 7.7 Smart Health Coach Anti-Spam Guard (Feb 2026 – Locked)
