@@ -479,7 +479,7 @@ If this breaks again, restore these rules exactly.
 3) Re-add `__PROFILE_TARGET_AUDIT__` append logic.
 4) Verify: sending old or unstamped profile payload does **not** change user weight/height/goal.
 
-Last stable deployment: `TO_BE_FILLED_AFTER_DEPLOY` (2026-02-15)
+Last stable deployment: `0c205475` (2026-02-15)
 
 ### 2.8 Supplement + Medication Photo Retention (Jan 2026 – Locked)
 
