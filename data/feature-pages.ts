@@ -342,7 +342,9 @@ export const featurePages: FeaturePageContent[] = [
       '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS BANNER.png',
       'Couple walking on the beach at sunset'
     ),
-    bannerSpacerHeight: 320,
+    bannerImagePosition: 'center 38%',
+    bannerImagePositionMobile: '66% 38%',
+    bannerSpacerHeight: 430,
     showHeroImage: true,
     showSegmentImages: true,
     overviewLayout: 'expanded',
