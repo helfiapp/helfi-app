@@ -335,8 +335,8 @@ export const featurePages: FeaturePageContent[] = [
     ],
     summary: 'Weekly reports and focused insights built from your last 7 days.',
     heroImage: aiInsightsPhoto(
-      '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
-      'AI insights placeholder image'
+      '/WEBSITE IMAGES/AI INSIGHTS/AI DOCTOR.jpg',
+      'AI doctor discussing health insights with a patient'
     ),
     bannerImage: aiInsightsPhoto(
       '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS BANNER.png',
