@@ -6098,6 +6098,65 @@ export default function FoodDiary() {
   }
 
   const buildSugarFreeHotChocolateLockedTotals = (entry: any): NutritionTotals => {
+    const entryTexts: string[] = [
+      String(entry?.description || ''),
+      String(entry?.label || ''),
+      String(entry?.name || ''),
+      String(entry?.nutrition?.__drinkType || ''),
+      String(entry?.total?.__drinkType || ''),
+    ]
+    const hasSugarFreeMarker = entryTexts.some((text) => isSugarFreeDrinkText(text))
+    const rawChoice = String(
+      entry?.nutrition?.__sweetenerChoice ||
+        entry?.nutrition?.__sweetenerType ||
+        entry?.total?.__sweetenerChoice ||
+        entry?.total?.__sweetenerType ||
+        '',
+    )
+      .trim()
+      .toLowerCase()
+    const choice =
+      rawChoice === 'free' || rawChoice === 'sugar' || rawChoice === 'honey' ? rawChoice : ''
+    const meta = getSweetenerMetaFromEntry(entry)
+    const metaType = meta?.type || null
+    const effectiveType =
+      choice === 'sugar' || choice === 'honey'
+        ? (choice as SweetenerType)
+        : metaType
+    const grams = Number(meta?.grams)
+    const hasPositiveGrams = Number.isFinite(grams) && grams > 0
+
+    // Legacy self-heal rule:
+    // If this row says sugar-free and there is no explicit sugar/honey choice with a real amount,
+    // force nutrition to zero. Old rows can carry stale __sweetenerCalories values (e.g., 319).
+    if (
+      choice === 'free' ||
+      (hasSugarFreeMarker && (effectiveType !== 'sugar' && effectiveType !== 'honey')) ||
+      (hasSugarFreeMarker && !hasPositiveGrams)
+    ) {
+      return {
+        calories: 0,
+        protein: 0,
+        carbs: 0,
+        fat: 0,
+        fiber: 0,
+        sugar: 0,
+      }
+    }
+
+    if ((effectiveType === 'sugar' || effectiveType === 'honey') && hasPositiveGrams) {
+      const strictMacros = sweetenerToMacros(effectiveType, grams)
+      const round1 = (value: number) => Math.round(value * 10) / 10
+      return {
+        calories: Math.round(Math.max(0, strictMacros.calories)),
+        protein: 0,
+        carbs: round1(Math.max(0, strictMacros.carbs)),
+        fat: 0,
+        fiber: 0,
+        sugar: round1(Math.max(0, strictMacros.sugar)),
+      }
+    }
+
     const sweetenerCalories = Math.max(0, readDrinkMetaNumber(entry, '__sweetenerCalories') || 0)
     const sweetenerCarbs = Math.max(0, readDrinkMetaNumber(entry, '__sweetenerCarbs') || 0)
     const sweetenerSugar = Math.max(0, readDrinkMetaNumber(entry, '__sweetenerSugar') || 0)
