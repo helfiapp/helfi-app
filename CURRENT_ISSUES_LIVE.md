@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 17:34 AEDT
+- What changed: Hardened reminder guard rails with a strict lock section, expanded protected files list, explicit no-touch rules, and clearer restore steps for reminder page opening + inbox cleanup after save.
+- Where to see it (page/link): `GUARD_RAILS.md` section `14` and `14.0.1`
+- What to quickly test: Open `GUARD_RAILS.md` and confirm section `14.0.1 Hard lock (Feb 2026 regression prevention)` exists with the pass/fail checklist and restore steps.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 16:44 AEDT
 - What changed: Fixed reminder tap routing so mood/check-in taps stay on the correct reminder page, and successful saves now clear leftover reminder inbox items for that reminder type (so completed reminders do not keep reappearing).
 - Where to see it (page/link): `/mood/quick`, `/check-in`, `/notifications/inbox`
