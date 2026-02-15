@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 18:03 AEDT
+- What changed: Reduced Food Diary reload flicker safely by removing extra same-date summary remounts, using cache-first loading for history/water/exercise, reducing repeat same-date verify fetches, removing search warmup, and loading food library from server only when Favorites opens.
+- Where to see it (page/link): `/food`
+- What to quickly test: Hard refresh `/food`; energy summary should feel steadier, existing rows should stay visible while data verifies, and water/exercise sections should show less loading flicker when cached.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 17:34 AEDT
 - What changed: Hardened reminder guard rails with a strict lock section, expanded protected files list, explicit no-touch rules, and clearer restore steps for reminder page opening + inbox cleanup after save.
 - Where to see it (page/link): `GUARD_RAILS.md` section `14` and `14.0.1`
