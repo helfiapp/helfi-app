@@ -926,6 +926,11 @@ type ExerciseSnapshot = {
 }
 
 type ExerciseSnapshotStore = Record<string, ExerciseSnapshot>
+type WaterSnapshot = {
+  entries: WaterLogEntry[]
+  savedAt: number
+}
+type WaterSnapshotStore = Record<string, WaterSnapshot>
 
 type DeviceStatusSnapshot = {
   fitbitConnected: boolean
@@ -937,6 +942,9 @@ type DeviceStatusSnapshotStore = Record<string, DeviceStatusSnapshot>
 
 const DEVICE_STATUS_TTL_MS = 5 * 60 * 1000
 const DEVICE_STATUS_SNAPSHOT_KEY = 'foodDiary:deviceStatus'
+const EXERCISE_SNAPSHOT_FRESH_MS = 90 * 1000
+const WATER_SNAPSHOT_FRESH_MS = 90 * 1000
+const WATER_SNAPSHOT_KEY = 'foodDiary:waterSnapshot'
 
 type FavoritesAllSnapshot = {
   entries: any[]
@@ -1000,6 +1008,35 @@ const writeExerciseSnapshot = (dateKey: string, entries: any[], caloriesKcal: nu
       savedAt: Date.now(),
     }
     sessionStorage.setItem('foodDiary:exerciseSnapshot', JSON.stringify(parsed))
+  } catch {}
+}
+
+const readWaterSnapshot = (dateKey: string): WaterSnapshot | null => {
+  if (typeof window === 'undefined') return null
+  if (!dateKey) return null
+  try {
+    const raw = sessionStorage.getItem(WATER_SNAPSHOT_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw) as WaterSnapshotStore
+    const entry = parsed?.[dateKey]
+    if (!entry || !Array.isArray(entry.entries)) return null
+    return entry
+  } catch {
+    return null
+  }
+}
+
+const writeWaterSnapshot = (dateKey: string, entries: WaterLogEntry[]) => {
+  if (typeof window === 'undefined') return
+  if (!dateKey) return
+  try {
+    const raw = sessionStorage.getItem(WATER_SNAPSHOT_KEY)
+    const parsed = raw ? (JSON.parse(raw) as WaterSnapshotStore) : {}
+    parsed[dateKey] = {
+      entries: Array.isArray(entries) ? entries : [],
+      savedAt: Date.now(),
+    }
+    sessionStorage.setItem(WATER_SNAPSHOT_KEY, JSON.stringify(parsed))
   } catch {}
 }
 
@@ -3271,7 +3308,6 @@ export default function FoodDiary() {
   const [manualMealBuildMode, setManualMealBuildMode] = useState(false)
   const [isMobile, setIsMobile] = useState(false)
   const [summarySlideIndex, setSummarySlideIndex] = useState(0)
-  const [summaryRenderNonce, setSummaryRenderNonce] = useState(0)
   const [summaryMinHeight, setSummaryMinHeight] = useState<number | null>(null)
   const [resumeTick, setResumeTick] = useState(0)
 
@@ -3310,16 +3346,6 @@ export default function FoodDiary() {
     if (cached.length > 0) setOfficialResults(mergeBrandSuggestions(cached, immediateBrands))
   }, [officialSearchQuery, officialSource])
 
-  useEffect(() => {
-    try {
-      if (typeof window === 'undefined') return
-      const key = 'helfi:food-search-warm'
-      if (sessionStorage.getItem(key) === '1') return
-      sessionStorage.setItem(key, '1')
-      fetch('/api/food-data?source=usda&kind=single&q=apple&limit=5&localOnly=1').catch(() => {})
-    } catch {}
-  }, [])
-  
   // Manual food entry states
   const [manualFoodName, setManualFoodName] = useState('')
   const [manualFoodType, setManualFoodType] = useState('single')
@@ -3762,6 +3788,8 @@ export default function FoodDiary() {
   const PENDING_SAVE_STALE_MS = 5 * 60 * 1000
   const DUPLICATE_CLEANUP_WINDOW_MS = 2 * 60 * 1000
   const VERIFY_MERGE_HOLD_MS = 4000
+  const VERIFY_FETCH_FRESH_MS = 30 * 1000
+  const lastVerifyFetchAtRef = useRef<Record<string, number>>({})
   const holdVerifyMergeForDate = (date: string, durationMs: number = VERIFY_MERGE_HOLD_MS) => {
     if (!date) return
     verifyMergeHoldRef.current[date] = Date.now() + Math.max(0, durationMs)
@@ -4069,7 +4097,6 @@ export default function FoodDiary() {
 
   useEffect(() => {
     setSummarySlideIndex(0)
-    setSummaryRenderNonce((prev) => prev + 1)
   }, [selectedDate, isMobile])
 
   useEffect(() => {
@@ -4077,7 +4104,7 @@ export default function FoodDiary() {
       setSummaryMinHeight(null)
       return
     }
-  }, [selectedDate, isMobile, summaryRenderNonce])
+  }, [selectedDate, isMobile])
 
   useEffect(() => {
     if (!isMobile) return
@@ -4094,7 +4121,7 @@ export default function FoodDiary() {
     } else {
       updateHeight()
     }
-  }, [isMobile, summarySlideIndex, fatDetailState, summaryRenderNonce])
+  }, [isMobile, summarySlideIndex, fatDetailState])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -4127,6 +4154,10 @@ export default function FoodDiary() {
     if (!dateKey) return
     const cached = readExerciseSnapshot(dateKey)
     const shouldRefresh = options?.force ? true : shouldRefreshOnResume('exercise')
+    const cachedFresh =
+      Boolean(cached) &&
+      Number.isFinite(Number(cached?.savedAt)) &&
+      Date.now() - Number(cached?.savedAt || 0) < EXERCISE_SNAPSHOT_FRESH_MS
     if (cached && Array.isArray(cached.entries)) {
       setExerciseEntries(cached.entries)
       setExerciseCaloriesKcal(Number(cached.caloriesKcal) || 0)
@@ -4139,9 +4170,9 @@ export default function FoodDiary() {
       }
       setExerciseError(null)
     }
-    // Root-cause fix:
-    // Always fetch latest exercise rows from server (even when cache exists),
-    // so desktop and mobile/PWA stay in sync.
+    if (cachedFresh && !options?.force && !shouldRefresh) {
+      return
+    }
     try {
       const res = await fetch(`/api/exercise-entries?date=${encodeURIComponent(dateKey)}`, {
         method: 'GET',
@@ -4170,11 +4201,21 @@ export default function FoodDiary() {
 
   const refreshDeviceStatus = async () => {
     const shouldRefresh = shouldRefreshOnResume('deviceStatus')
-    if (!shouldRefresh && initialDeviceStatus) {
-      setFitbitConnected(Boolean(initialDeviceStatus.fitbitConnected))
-      setGarminConnected(Boolean(initialDeviceStatus.garminConnected))
-      deviceStatusHydratedRef.current = true
-      return
+    if (!shouldRefresh) {
+      const snapshot = readDeviceStatusSnapshot(userCacheKey)
+      if (snapshot) {
+        setFitbitConnected(Boolean(snapshot.fitbitConnected))
+        setGarminConnected(Boolean(snapshot.garminConnected))
+        deviceStatusHydratedRef.current = true
+        return
+      }
+      if (deviceStatusHydratedRef.current) return
+      if (initialDeviceStatus) {
+        setFitbitConnected(Boolean(initialDeviceStatus.fitbitConnected))
+        setGarminConnected(Boolean(initialDeviceStatus.garminConnected))
+        deviceStatusHydratedRef.current = true
+        return
+      }
     }
     try {
       const [fitbitRes, garminRes] = await Promise.all([
@@ -4291,9 +4332,12 @@ export default function FoodDiary() {
 
   useEffect(() => {
     loadExerciseEntriesForDate(selectedDate)
-    // Keep device pills updated when switching dates (low-cost, cached by browser).
-    refreshDeviceStatus()
   }, [selectedDate, resumeTick])
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+    refreshDeviceStatus()
+  }, [resumeTick, session?.user?.id])
 
   useEffect(() => {
     const today = buildTodayIso()
@@ -9308,7 +9352,7 @@ const applyStructuredItems = (
           setHistoryFoodsDate(selectedDate)
           setFoodDiaryLoaded(true)
         }
-        setIsLoadingHistory(true);
+        setIsLoadingHistory(!hasCachedHistory);
         setFoodDiaryLoaded(hasCachedHistory); // Show cached state instantly when available
         const attemptLocalDateRepair = async () => {
           if (typeof window === 'undefined') return false
@@ -9441,7 +9485,18 @@ const applyStructuredItems = (
     }
     let cancelled = false
     const loadWater = async () => {
-      setWaterLoading(true)
+      const cached = readWaterSnapshot(selectedDate)
+      const cachedEntries = Array.isArray(cached?.entries) ? cached.entries : []
+      const cachedFresh =
+        Boolean(cached) &&
+        Number.isFinite(Number(cached?.savedAt)) &&
+        Date.now() - Number(cached?.savedAt || 0) < WATER_SNAPSHOT_FRESH_MS
+
+      if (cachedEntries.length > 0) {
+        setWaterEntries(cachedEntries)
+      }
+      setWaterLoading(cachedEntries.length === 0)
+      if (cachedFresh) return
       try {
         const res = await fetch(`/api/water-log?localDate=${encodeURIComponent(selectedDate)}`, {
           cache: 'no-store' as any,
@@ -9450,10 +9505,14 @@ const applyStructuredItems = (
         if (!res.ok) throw new Error('water load failed')
         const data = await res.json()
         if (!cancelled) {
-          setWaterEntries(Array.isArray(data?.entries) ? data.entries : [])
+          const nextEntries = Array.isArray(data?.entries) ? data.entries : []
+          setWaterEntries(nextEntries)
+          writeWaterSnapshot(selectedDate, nextEntries)
         }
       } catch {
-        if (!cancelled) setWaterEntries([])
+        if (!cancelled && cachedEntries.length === 0) {
+          setWaterEntries([])
+        }
       } finally {
         if (!cancelled) setWaterLoading(false)
       }
@@ -9700,6 +9759,20 @@ const applyStructuredItems = (
   const refreshEntriesFromServer = async (options?: { mode?: 'verify' | 'manual' }) => {
     const targetDate = selectedDate
     if (!targetDate) return
+    const mode = options?.mode || 'verify'
+    if (mode === 'verify') {
+      const lastVerifyAt = Number(lastVerifyFetchAtRef.current[targetDate] || 0)
+      const hasPendingForDate = Array.from(pendingFoodLogSaveRef.current.values()).some(
+        (item) => item?.targetDate === targetDate,
+      )
+      if (
+        lastVerifyAt > 0 &&
+        Date.now() - lastVerifyAt < VERIFY_FETCH_FRESH_MS &&
+        !hasPendingForDate
+      ) {
+        return
+      }
+    }
     if (diaryMergeInFlightRef.current[targetDate]) return
     diaryMergeInFlightRef.current[targetDate] = true
     try {
@@ -9764,6 +9837,7 @@ const applyStructuredItems = (
       }
       const merged = mergeServerEntries(cleanedServerEntries, localList, targetDate, options)
       markDiaryVerified(targetDate)
+      lastVerifyFetchAtRef.current[targetDate] = Date.now()
       setFoodDiaryLoaded(true)
       if (hasSameEntryMembers(localList, merged)) {
         return
@@ -12029,6 +12103,7 @@ Please add nutritional information manually if needed.`);
           const idx = next.findIndex((item) => String(item.id) === String(entry.id))
           if (idx >= 0) next[idx] = entry
           else next.unshift(entry)
+          writeWaterSnapshot(selectedDate, next)
           return next
         })
       }
@@ -12175,6 +12250,7 @@ Please add nutritional information manually if needed.`);
               const idx = next.findIndex((item) => item.id === waterEntry.id)
               if (idx >= 0) next[idx] = waterEntry
               else next.unshift(waterEntry)
+              writeWaterSnapshot(selectedDate, next)
               return next
             })
           }
@@ -13941,15 +14017,6 @@ Please add nutritional information manually if needed.`);
   },
   [mapLogsToEntries, mergeFoodLibraryEntries, selectedDate, foodLibrary],
   )
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (!diaryHydrated) return
-    const handle = window.setTimeout(() => {
-      refreshFoodLibraryFromServer()
-    }, 900)
-    return () => window.clearTimeout(handle)
-  }, [diaryHydrated, refreshFoodLibraryFromServer, resumeTick])
 
   useEffect(() => {
     if (!showFavoritesPicker) return
@@ -16740,6 +16807,7 @@ Please add nutritional information manually if needed.`);
               const idx = next.findIndex((item) => item.id === waterEntry.id)
               if (idx >= 0) next[idx] = waterEntry
               else next.unshift(waterEntry)
+              writeWaterSnapshot(selectedDate, next)
               return next
             })
           }
@@ -17510,6 +17578,7 @@ Please add nutritional information manually if needed.`);
               const idx = next.findIndex((item) => item.id === waterEntry.id)
               if (idx >= 0) next[idx] = waterEntry
               else next.unshift(waterEntry)
+              writeWaterSnapshot(selectedDate, next)
               return next
             })
           }
@@ -18514,7 +18583,11 @@ Please add nutritional information manually if needed.`);
         credentials: 'include',
       })
       if (!res.ok) throw new Error('delete failed')
-      setWaterEntries((prev) => prev.filter((item) => item.id !== waterId))
+      setWaterEntries((prev) => {
+        const next = prev.filter((item) => item.id !== waterId)
+        writeWaterSnapshot(selectedDate, next)
+        return next
+      })
       showQuickToast('Water entry removed.')
     } catch {
       showQuickToast('Could not remove water entry.')
@@ -25608,7 +25681,7 @@ Please add nutritional information manually if needed.`);
                             <div className="flex flex-col items-center order-1 md:order-2 w-full">
                               <div className="grid grid-cols-2 gap-4 sm:gap-6 w-full items-stretch">
                                 <TargetRing
-                                  key={`remaining-${selectedDate}-${summaryRenderNonce}`}
+                                  key={`remaining-${selectedDate}`}
                                   label="Remaining"
                                   valueLabel={
                                     remainingInUnit !== null
@@ -25622,7 +25695,7 @@ Please add nutritional information manually if needed.`);
                                   isMobile={isMobile}
                                 />
                                 <TargetRing
-                                  key={`used-${selectedDate}-${summaryRenderNonce}`}
+                                  key={`used-${selectedDate}`}
                                   label="Used"
                                   valueLabel={
                                     consumedInUnit !== null

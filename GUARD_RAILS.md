@@ -930,6 +930,7 @@ On January 19th, 2025, food diary entries disappeared because entries were being
 ### 3.4 Food Diary UX Safeguards (Jan 2026 – Locked)
 - Energy summary rings must render full, un-clipped numbers after any date switch (especially Today → previous day).
   - The summary should remount on date change to avoid iOS rendering glitches.
+  - Do not force extra remount cycles on the same date (for example, nonce-based remounts) because this causes visible flicker.
   - Past-day energy summaries should use the cached per‑date snapshot immediately while the server load runs.
 - Opening the **last** category (Other / `uncategorized`) should auto‑scroll to the **last** entry in that category so it’s visible without manual scrolling.
 - Do not remove or bypass these UI safeguards without explicit owner approval.
