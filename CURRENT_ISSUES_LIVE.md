@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 14:50 AEDT
+- What changed: Locked down HEL-162 permanently. Added strict non-tamper guard rails plus inline code lock comments and recovery steps in both Food Diary and API drink-calorie guard functions, so future agents can’t accidentally break hot chocolate/tea drink calorie behavior.
+- Where to see it (page/link): `GUARD_RAILS.md`, `/food` flow code in `app/food/page.tsx`, and save guard in `app/api/food-log/route.ts`
+- What to quickly test: Open guard rails section `7.6.3` and confirm lock + recovery checklist exists. In code, confirm `DO NOT TOUCH - OWNER LOCK (HEL-162)` comments exist above drink guard functions.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 14:45 AEDT
 - What changed: Follow-up visual fix for `/features/ai-insights` hero banner. Increased banner height and adjusted image framing so the couple’s heads and the phone mockups on the right are no longer cut off.
 - Where to see it (page/link): `/features/ai-insights`
