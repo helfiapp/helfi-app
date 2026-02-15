@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-15 14:45 AEDT
+- What changed: Follow-up visual fix for `/features/ai-insights` hero banner. Increased banner height and adjusted image framing so the couple’s heads and the phone mockups on the right are no longer cut off.
+- Where to see it (page/link): `/features/ai-insights`
+- What to quickly test: Open `/features/ai-insights` on desktop and mobile, confirm the top banner is taller and both heads + right-side phone mockups are fully visible.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-15 14:16 AEDT
 - What changed: Relaxed sugar-free hot chocolate lock so base drink calories are preserved (for example 8 kcal per serve) while still blocking inflated legacy values (like 319 kcal from bad scaling).
 - Where to see it (page/link): `/food` and Water -> favorites drink add flow
