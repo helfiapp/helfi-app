@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 00:29 AEDT
+- What changed: Replaced the old browser popup with a modern in-app dialog after Favorite update. Dialog now uses two buttons: 'Not now' (white button, green text) and 'Add Meal' (green button, white text).
+- Where to see it (page/link): /food -> Favorites/Custom -> Edit meal (Build a meal flow)
+- What to quickly test: Update a favorite meal, confirm modern dialog appears with 'Not now' and 'Add Meal', and confirm 'Not now' returns to Food Diary while 'Add Meal' adds it to diary.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 00:12 AEDT
 - What changed: When you edit/update a Favorite meal in Build a meal, the app now asks if you want to add the updated meal to your Food Diary right away. If yes, it creates a new diary entry immediately.
 - Where to see it (page/link): /food -> Favorites/Custom -> Edit meal (Build a meal flow)
