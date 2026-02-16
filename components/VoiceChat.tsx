@@ -43,9 +43,14 @@ type ParsedFoodOption = {
   ingredients: string[]
   steps: string[]
   category: MealCategory
+  servings: number | null
+  prepMinutes: number | null
+  cookMinutes: number | null
 }
 
 const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim())
+const MEAL_OPTIONS_JSON_START = '[[MEAL_OPTIONS_JSON]]'
+const MEAL_OPTIONS_JSON_END = '[[/MEAL_OPTIONS_JSON]]'
 
 const buildTodayIso = () => {
   const now = new Date()
@@ -74,6 +79,22 @@ const inferCategoryFromMealTitle = (title: string): MealCategory => {
   return 'uncategorized'
 }
 
+const normalizeMealCategory = (raw: any): MealCategory => {
+  const v = String(raw || '').toLowerCase().trim()
+  if (!v) return 'uncategorized'
+  if (v.includes('breakfast')) return 'breakfast'
+  if (v.includes('lunch')) return 'lunch'
+  if (v.includes('dinner')) return 'dinner'
+  if (v.includes('snack')) return 'snacks'
+  if (v.includes('uncat') || v.includes('other')) return 'uncategorized'
+  return 'uncategorized'
+}
+
+const toPositiveNumberOrNull = (raw: any) => {
+  const n = Number(raw)
+  return Number.isFinite(n) && n > 0 ? n : null
+}
+
 const normalizeIngredientToken = (raw: string) => {
   const value = String(raw || '')
     .replace(/^[\s•*\-–—]+/, '')
@@ -100,8 +121,63 @@ const splitTitleIntoIngredients = (title: string) => {
   return unique.filter(Boolean).slice(0, 12)
 }
 
-const parseFoodOptionsFromAssistantMessage = (content: string): ParsedFoodOption[] => {
-  const lines = String(content || '')
+const parseStructuredFoodOptions = (raw: any): ParsedFoodOption[] => {
+  const source = Array.isArray(raw) ? raw : Array.isArray(raw?.options) ? raw.options : []
+  return source
+    .map((entry: any, idx: number) => {
+      const title = String(entry?.title || entry?.mealName || '').trim()
+      if (!title) return null
+      const indexRaw = Number(entry?.optionNumber ?? entry?.index ?? idx + 1)
+      const index = Number.isFinite(indexRaw) && indexRaw > 0 ? Math.round(indexRaw) : idx + 1
+      const ingredients = Array.isArray(entry?.ingredients)
+        ? entry.ingredients.map((line: any) => normalizeIngredientToken(String(line || ''))).filter(Boolean).slice(0, 60)
+        : []
+      const steps = Array.isArray(entry?.steps)
+        ? entry.steps.map((line: any) => normalizeIngredientToken(String(line || ''))).filter(Boolean).slice(0, 30)
+        : []
+      return {
+        key: `option-${index}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        index,
+        title,
+        ingredients: ingredients.length > 0 ? ingredients : splitTitleIntoIngredients(title),
+        steps: steps.length > 0 ? steps : [`Assemble ${title}.`],
+        category: normalizeMealCategory(entry?.category || inferCategoryFromMealTitle(title)),
+        servings: toPositiveNumberOrNull(entry?.servings),
+        prepMinutes: toPositiveNumberOrNull(entry?.prepMinutes),
+        cookMinutes: toPositiveNumberOrNull(entry?.cookMinutes),
+      } as ParsedFoodOption
+    })
+    .filter((entry: ParsedFoodOption | null): entry is ParsedFoodOption => Boolean(entry))
+}
+
+const parseFoodAssistantResponse = (
+  content: string,
+): { displayContent: string; options: ParsedFoodOption[] } => {
+  const raw = String(content || '')
+  const start = raw.indexOf(MEAL_OPTIONS_JSON_START)
+  const end = raw.indexOf(MEAL_OPTIONS_JSON_END)
+  let displayContent = raw
+  let structuredOptions: ParsedFoodOption[] = []
+
+  if (start >= 0 && end > start) {
+    const before = raw.slice(0, start).trimEnd()
+    const after = raw.slice(end + MEAL_OPTIONS_JSON_END.length).trimStart()
+    displayContent = `${before}${before && after ? '\n\n' : ''}${after}`.trim()
+    const jsonRaw = raw.slice(start + MEAL_OPTIONS_JSON_START.length, end).trim()
+    if (jsonRaw) {
+      try {
+        structuredOptions = parseStructuredFoodOptions(JSON.parse(jsonRaw))
+      } catch {
+        structuredOptions = []
+      }
+    }
+  }
+
+  if (structuredOptions.length > 0) {
+    return { displayContent, options: structuredOptions }
+  }
+
+  const lines = displayContent
     .split('\n')
     .map((line) => stripOuterBold(line).trim())
     .filter(Boolean)
@@ -124,7 +200,7 @@ const parseFoodOptionsFromAssistantMessage = (content: string): ParsedFoodOption
   }
   if (current) options.push(current)
 
-  return options
+  const fallbackOptions = options
     .map((opt) => {
       const nonMacroLines = opt.detailLines.filter((line) => !/^(Macros|After eating)\s*:/i.test(line))
       const bulletIngredients = nonMacroLines
@@ -148,9 +224,14 @@ const parseFoodOptionsFromAssistantMessage = (content: string): ParsedFoodOption
         ingredients,
         steps: steps.length > 0 ? steps : [`Assemble ${opt.title}.`],
         category: inferCategoryFromMealTitle(opt.title),
+        servings: 1,
+        prepMinutes: null,
+        cookMinutes: null,
       }
     })
     .filter((opt) => opt.title.length > 0)
+
+  return { displayContent, options: fallbackOptions }
 }
 
 export default function VoiceChat({
@@ -1607,9 +1688,9 @@ export default function VoiceChat({
 
     const draft = {
       title,
-      servings: 1,
-      prepMinutes: null,
-      cookMinutes: null,
+      servings: option.servings ?? 1,
+      prepMinutes: option.prepMinutes ?? null,
+      cookMinutes: option.cookMinutes ?? null,
       ingredients,
       prefillItems: [],
       steps,
@@ -2002,8 +2083,10 @@ export default function VoiceChat({
               {messages.map((m, idx) => {
                 const isLast = idx === messages.length - 1
                 const assistantRef = m.role === 'assistant' && isLast ? latestAssistantRef : undefined
-                const parsedFoodOptions =
-                  m.role === 'assistant' && isFoodEntry ? parseFoodOptionsFromAssistantMessage(m.content) : []
+                const parsedFoodPayload =
+                  m.role === 'assistant' && isFoodEntry ? parseFoodAssistantResponse(m.content) : null
+                const parsedFoodOptions = parsedFoodPayload?.options || []
+                const messageContentForDisplay = parsedFoodPayload?.displayContent || m.content
                 return (
                 <div ref={assistantRef} key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <div className={`hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
@@ -2020,7 +2103,7 @@ export default function VoiceChat({
                       <div className="w-full space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
                         <div className="text-[12px] md:text-[11px] font-bold uppercase tracking-wide text-gray-400">Health Assistant</div>
                         <div className="text-[18px] md:text-[16px] leading-7 text-gray-800">
-                          {renderFormattedContent(m.content, true)}
+                          {renderFormattedContent(messageContentForDisplay, true)}
                         </div>
                         {parsedFoodOptions.length > 0 && (
                           <div className="mt-3 space-y-2">
@@ -2044,7 +2127,7 @@ export default function VoiceChat({
                       </div>
                     ) : (
                       <div className="text-[18px] md:text-[16px] leading-7 text-gray-900 font-medium">
-                        {renderFormattedContent(m.content, false)}
+                        {renderFormattedContent(messageContentForDisplay, false)}
                       </div>
                     )}
                   </div>

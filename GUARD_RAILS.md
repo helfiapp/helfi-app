@@ -1984,12 +1984,16 @@ If changes are requested, explain them to the user first, get explicit approval,
 - Buttons must appear per recommendation option (not only one generic button).
 - Button click must write `food:recipeImportDraft` and open `/food/build-meal` with `recipeImport=1`.
 - This path must stay compatible with saving the built meal to favorites from Build a Meal.
+- Food chat responses must carry the structured meal payload wrapper:
+  - `[[MEAL_OPTIONS_JSON]] ... [[/MEAL_OPTIONS_JSON]]`
+  - payload must include each option title, ingredients, and steps.
 
 **If it breaks:**
 1. Confirm food chat assistant message contains `Option 1:` / `Option 2:` lines.
-2. Confirm `parseFoodOptionsFromAssistantMessage(...)` still returns options.
-3. Confirm clicking button writes `sessionStorage['food:recipeImportDraft']`.
-4. Confirm route push includes `/food/build-meal?...&recipeImport=1`.
+2. Confirm response includes `[[MEAL_OPTIONS_JSON]]` wrapper with valid JSON.
+3. Confirm `parseFoodAssistantResponse(...)` returns structured options (fallback parsing only if JSON missing).
+4. Confirm clicking button writes `sessionStorage['food:recipeImportDraft']`.
+5. Confirm route push includes `/food/build-meal?...&recipeImport=1`.
 
 ---
 
