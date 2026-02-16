@@ -2,7 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { formatChatContent } from '@/lib/chatFormatting'
+import ChatRichText from '@/components/chat/ChatRichText'
 
 interface SymptomChatProps {
   analysisResult: {
@@ -812,92 +812,16 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
                     {m.role === 'assistant' ? (
                       <div className="space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
                         <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Symptom analysis</div>
-                        <div className="text-[16px] md:text-[15px] leading-7 text-gray-800">
-                          {formatChatContent(m.content).split('\n').map((line, lineIdx) => {
-                            const trimmed = line.trim()
-                            if (!trimmed) {
-                              return <div key={lineIdx} className="h-3" />
-                            }
-
-                            if (trimmed.startsWith('**') && trimmed.endsWith('**') && trimmed.length > 4) {
-                              return (
-                                <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
-                                  {trimmed.slice(2, -2)}
-                                </div>
-                              )
-                            }
-
-                            const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
-                            if (numberedMatch) {
-                              return (
-                                <div key={lineIdx} className="ml-4 mb-1.5">
-                                  <span className="font-medium">{numberedMatch[1]}.</span> {numberedMatch[2]}
-                                </div>
-                              )
-                            }
-
-                            const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
-                            if (bulletMatch) {
-                              return (
-                                <div key={lineIdx} className="ml-4 mb-1.5">
-                                  <span className="mr-2">•</span> {bulletMatch[1]}
-                                </div>
-                              )
-                            }
-
-                            const parts = trimmed.split(/(\*\*.*?\*\*)/g)
-                            return (
-                              <div key={lineIdx} className="mb-2">
-                                {parts.map((part, j) => {
-                                  if (part.startsWith('**') && part.endsWith('**')) {
-                                    return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                  }
-                                  return <span key={j}>{part}</span>
-                                })}
-                              </div>
-                            )
-                          })}
-                        </div>
+                        <ChatRichText
+                          content={m.content}
+                          className="text-[19px] md:text-[17px] leading-[1.7] text-gray-800"
+                        />
                       </div>
                     ) : (
-                      <div className="text-[16px] md:text-[15px] leading-7 text-gray-900 font-medium">
-                        {formatChatContent(m.content).split('\n').map((line, lineIdx) => {
-                          const trimmed = line.trim()
-                          if (!trimmed) {
-                            return <div key={lineIdx} className="h-3" />
-                          }
-
-                          const numberedMatch = trimmed.match(/^(\d+)\.\s+(.+)$/)
-                          if (numberedMatch) {
-                            return (
-                              <div key={lineIdx} className="ml-4 mb-1.5">
-                                <span className="font-medium">{numberedMatch[1]}.</span> {numberedMatch[2]}
-                              </div>
-                            )
-                          }
-
-                          const bulletMatch = trimmed.match(/^[-•*]\s+(.+)$/)
-                          if (bulletMatch) {
-                            return (
-                              <div key={lineIdx} className="ml-4 mb-1.5">
-                                <span className="mr-2">•</span> {bulletMatch[1]}
-                              </div>
-                            )
-                          }
-
-                          const parts = trimmed.split(/(\*\*.*?\*\*)/g)
-                          return (
-                            <div key={lineIdx} className="mb-2">
-                              {parts.map((part, j) => {
-                                if (part.startsWith('**') && part.endsWith('**')) {
-                                  return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                }
-                                return <span key={j}>{part}</span>
-                              })}
-                            </div>
-                          )
-                        })}
-                      </div>
+                      <ChatRichText
+                        content={m.content}
+                        className="text-[19px] md:text-[17px] leading-[1.7] text-gray-900 font-medium"
+                      />
                     )}
                   </div>
                 </div>

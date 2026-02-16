@@ -2,7 +2,7 @@
 
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback, type PointerEvent } from 'react'
 import { createPortal } from 'react-dom'
-import { formatChatContent } from '@/lib/chatFormatting'
+import ChatRichText from '@/components/chat/ChatRichText'
 
 interface SectionChatProps {
   issueSlug: string
@@ -806,142 +806,16 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                     {m.role === 'assistant' ? (
                       <div className="space-y-2 rounded-2xl border border-gray-100 bg-[#fcfcfc] px-6 py-5 shadow-sm">
                         <div className="text-[11px] font-bold uppercase tracking-wide text-gray-400">Insights</div>
-                        <div className="text-[16px] md:text-[15px] leading-7 text-gray-800">
-                          {(() => {
-                            const formatted = formatChatContent(m.content)
-                            const paragraphs = formatted.split(/\n\n+/)
-                            return paragraphs.map((para, paraIdx) => {
-                              const trimmed = para.trim()
-                              if (!trimmed) return null
-                              const lines = trimmed.split('\n')
-                              return (
-                                <div key={paraIdx} className={paraIdx > 0 ? 'mt-4' : ''}>
-                                  {lines.map((line, lineIdx) => {
-                                    const lineTrimmed = line.trim()
-                                    if (!lineTrimmed) return <div key={lineIdx} className="h-2" />
-
-                                    if (lineTrimmed.startsWith('**') && lineTrimmed.endsWith('**') && lineTrimmed.length > 4) {
-                                      return (
-                                        <div key={lineIdx} className="font-bold text-gray-900 mb-2 mt-3 first:mt-0">
-                                          {lineTrimmed.slice(2, -2)}
-                                        </div>
-                                      )
-                                    }
-
-                                    const numberedMatch = lineTrimmed.match(/^(\d+)\.\s+(.+)$/)
-                                    if (numberedMatch) {
-                                      const parts = numberedMatch[2].split(/(\*\*.*?\*\*)/g)
-                                      return (
-                                        <div key={lineIdx} className="ml-4 mb-1.5">
-                                          <span className="font-medium">{numberedMatch[1]}.</span>{' '}
-                                          {parts.map((part, j) => {
-                                            if (part.startsWith('**') && part.endsWith('**')) {
-                                              return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                            }
-                                            return <span key={j}>{part}</span>
-                                          })}
-                                        </div>
-                                      )
-                                    }
-
-                                    const bulletMatch = lineTrimmed.match(/^[-•*]\s+(.+)$/)
-                                    if (bulletMatch) {
-                                      const parts = bulletMatch[1].split(/(\*\*.*?\*\*)/g)
-                                      return (
-                                        <div key={lineIdx} className="ml-4 mb-1.5">
-                                          <span className="mr-2">•</span>
-                                          {parts.map((part, j) => {
-                                            if (part.startsWith('**') && part.endsWith('**')) {
-                                              return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                            }
-                                            return <span key={j}>{part}</span>
-                                          })}
-                                        </div>
-                                      )
-                                    }
-
-                                    const parts = lineTrimmed.split(/(\*\*.*?\*\*)/g)
-                                    return (
-                                      <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
-                                        {parts.map((part, j) => {
-                                          if (part.startsWith('**') && part.endsWith('**')) {
-                                            return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                          }
-                                          return <span key={j}>{part}</span>
-                                        })}
-                                      </div>
-                                    )
-                                  })}
-                                </div>
-                              )
-                            })
-                          })()}
-                        </div>
+                        <ChatRichText
+                          content={m.content}
+                          className="text-[19px] md:text-[17px] leading-[1.7] text-gray-800"
+                        />
                       </div>
                     ) : (
-                      <div className="text-[16px] md:text-[15px] leading-7 text-gray-900 font-medium">
-                        {(() => {
-                          const formatted = formatChatContent(m.content)
-                          const paragraphs = formatted.split(/\n\n+/)
-                          return paragraphs.map((para, paraIdx) => {
-                            const trimmed = para.trim()
-                            if (!trimmed) return null
-                            const lines = trimmed.split('\n')
-                            return (
-                              <div key={paraIdx} className={paraIdx > 0 ? 'mt-4' : ''}>
-                                {lines.map((line, lineIdx) => {
-                                  const lineTrimmed = line.trim()
-                                  if (!lineTrimmed) return <div key={lineIdx} className="h-2" />
-
-                                  const numberedMatch = lineTrimmed.match(/^(\d+)\.\s+(.+)$/)
-                                  if (numberedMatch) {
-                                    const parts = numberedMatch[2].split(/(\*\*.*?\*\*)/g)
-                                    return (
-                                      <div key={lineIdx} className="ml-4 mb-1.5">
-                                        <span className="font-medium">{numberedMatch[1]}.</span>{' '}
-                                        {parts.map((part, j) => {
-                                          if (part.startsWith('**') && part.endsWith('**')) {
-                                            return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                          }
-                                          return <span key={j}>{part}</span>
-                                        })}
-                                      </div>
-                                    )
-                                  }
-
-                                  const bulletMatch = lineTrimmed.match(/^[-•*]\s+(.+)$/)
-                                  if (bulletMatch) {
-                                    const parts = bulletMatch[1].split(/(\*\*.*?\*\*)/g)
-                                    return (
-                                      <div key={lineIdx} className="ml-4 mb-1.5">
-                                        <span className="mr-2">•</span>
-                                        {parts.map((part, j) => {
-                                          if (part.startsWith('**') && part.endsWith('**')) {
-                                            return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                          }
-                                          return <span key={j}>{part}</span>
-                                        })}
-                                      </div>
-                                    )
-                                  }
-
-                                  const parts = lineTrimmed.split(/(\*\*.*?\*\*)/g)
-                                  return (
-                                    <div key={lineIdx} className={lineIdx > 0 ? 'mt-2' : ''}>
-                                      {parts.map((part, j) => {
-                                        if (part.startsWith('**') && part.endsWith('**')) {
-                                          return <strong key={j} className="font-semibold">{part.slice(2, -2)}</strong>
-                                        }
-                                        return <span key={j}>{part}</span>
-                                      })}
-                                    </div>
-                                  )
-                                })}
-                              </div>
-                            )
-                          })
-                        })()}
-                      </div>
+                      <ChatRichText
+                        content={m.content}
+                        className="text-[19px] md:text-[17px] leading-[1.7] text-gray-900 font-medium"
+                      />
                     )}
                   </div>
                 </div>
