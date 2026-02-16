@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 01:37 AEDT
+- What changed: Added a backend repair for old favorites missing `lastUsedAt` so ordering is corrected from diary history. Also applied a one-time data repair for owner account favorites to restore missing last-used timestamps.
+- Where to see it (page/link): /food -> Add from favorites (All/Favorites/Custom)
+- What to quickly test: Open Add from favorites and confirm older meals with missing recency now move based on actual recent diary use.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 01:20 AEDT
 - What changed: Fixed Favorites/All ordering so meals added through Favorites -> Change portion are treated as recently used and moved to the top. Also improved fallback matching so older entries (including Monday Taco entries) are recognized for recency ordering.
 - Where to see it (page/link): /food -> Add from favorites (All/Favorites/Custom tabs) and /food/build-meal from Favorites change-portion flow
