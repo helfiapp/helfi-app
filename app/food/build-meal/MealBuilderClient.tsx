@@ -2310,9 +2310,11 @@ export default function MealBuilderClient() {
   // Do NOT recalculate from portion input - the front page uses saved scale, so we must match it
   // See GUARD_RAILS.md section 3.14 for details
   const [savedPortionScale, setSavedPortionScale] = useState<number | null>(null)
+  const [portionScaleOverriddenByUser, setPortionScaleOverriddenByUser] = useState(false)
   
   useEffect(() => {
     if (sourceLogId && !editFavoriteId) {
+      setPortionScaleOverriddenByUser(false)
       // When editing a diary entry, fetch and store the saved portion scale
       const fetchSavedScale = async () => {
         try {
@@ -2335,6 +2337,7 @@ export default function MealBuilderClient() {
       }
       fetchSavedScale()
     } else if (editFavoriteId) {
+      setPortionScaleOverriddenByUser(false)
       // When editing a favorite, get saved portion scale from favorite data
       const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
       const fav = favorites.find((f: any) => String(f?.id || '') === editFavoriteId) || null
@@ -2350,6 +2353,7 @@ export default function MealBuilderClient() {
         setSavedPortionScale(null)
       }
     } else {
+      setPortionScaleOverriddenByUser(false)
       setSavedPortionScale(null)
     }
   }, [sourceLogId, editFavoriteId, userData])
@@ -2360,11 +2364,11 @@ export default function MealBuilderClient() {
   // See GUARD_RAILS.md section 3.14 for details
   const portionScale = useMemo(() => {
     // If we have a saved scale and we're editing an existing entry, use saved scale to match front page
-    if (savedPortionScale !== null && (sourceLogId || editFavoriteId)) {
+    if (savedPortionScale !== null && (sourceLogId || editFavoriteId) && !portionScaleOverriddenByUser) {
       return savedPortionScale
     }
     return computedPortionScale
-  }, [savedPortionScale, computedPortionScale, sourceLogId, editFavoriteId])
+  }, [savedPortionScale, computedPortionScale, sourceLogId, editFavoriteId, portionScaleOverriddenByUser])
 
   const mealTotals = useMemo(
     () => applyPortionScaleToTotals(baseMealTotals, portionScale),
@@ -2381,6 +2385,7 @@ export default function MealBuilderClient() {
   const adjustServingPortion = (delta: number) => {
     const current = parseNumericInput(portionAmountInput) ?? 1
     const next = round3(Math.max(0.1, current + delta))
+    setPortionScaleOverriddenByUser(true)
     setPortionAmountInput(String(next))
   }
 
@@ -5702,7 +5707,10 @@ export default function MealBuilderClient() {
                 <div className="flex-1 flex items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => adjustServingPortion(-1)}
+                    onClick={() => {
+                      setPortionScaleOverriddenByUser(true)
+                      adjustServingPortion(-1)
+                    }}
                     className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
                     aria-label="Decrease servings"
                   >
@@ -5713,7 +5721,10 @@ export default function MealBuilderClient() {
                   </div>
                   <button
                     type="button"
-                    onClick={() => adjustServingPortion(1)}
+                    onClick={() => {
+                      setPortionScaleOverriddenByUser(true)
+                      adjustServingPortion(1)
+                    }}
                     className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
                     aria-label="Increase servings"
                   >
@@ -5728,14 +5739,20 @@ export default function MealBuilderClient() {
                   min={0}
                   value={portionAmountInput}
                   onFocus={() => setPortionAmountInput('')}
-                  onChange={(e) => setPortionAmountInput(e.target.value)}
+                  onChange={(e) => {
+                    setPortionScaleOverriddenByUser(true)
+                    setPortionAmountInput(e.target.value)
+                  }}
                   placeholder={portionUnit === 'oz' ? 'e.g., 10' : 'e.g., 300'}
                   className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                 />
               )}
               <select
                 value={portionUnit}
-                onChange={(e) => setPortionUnit(e.target.value as PortionUnit)}
+                onChange={(e) => {
+                  setPortionScaleOverriddenByUser(true)
+                  setPortionUnit(e.target.value as PortionUnit)
+                }}
                 className="w-28 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               >
                 <option value="serving">serving</option>
