@@ -102,6 +102,7 @@ const CATEGORY_LABELS: Record<MealCategory, string> = {
   snacks: 'Snacks',
   uncategorized: 'Other',
 }
+const BARCODE_REGION_ID = 'meal-builder-barcode-reader'
 
 const FAVORITE_PORTION_SEED_KEY = 'foodDiary:favoritePortionSeed'
 
@@ -1680,13 +1681,18 @@ export default function MealBuilderClient() {
   const searchPressRef = useRef(0)
 
   const [showBarcodeScanner, setShowBarcodeScanner] = useState(false)
+  const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
   const [barcodeError, setBarcodeError] = useState<string | null>(null)
-  const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('Ready')
+  const [barcodeStatus, setBarcodeStatus] = useState<'idle' | 'scanning' | 'loading'>('idle')
+  const [barcodeStatusHint, setBarcodeStatusHint] = useState<string>('')
   const [manualBarcode, setManualBarcode] = useState('')
-  const manualBarcodeBackupRef = useRef<string>('')
-  const manualBarcodeEditedRef = useRef(false)
-  const manualBarcodeWasClearedOnFocusRef = useRef(false)
   const barcodeScannerRef = useRef<any>(null)
+  const barcodeLookupInFlightRef = useRef(false)
+  const barcodeDetectLockRef = useRef(false)
+  const manualBarcodeInputRef = useRef<HTMLInputElement | null>(null)
+  const [torchEnabled, setTorchEnabled] = useState(false)
+  const [torchAvailable, setTorchAvailable] = useState(false)
+  const barcodeTorchTrackRef = useRef<MediaStreamTrack | null>(null)
   const initialItemsSignatureRef = useRef<string>('')
   const initialPortionTotalWeightRef = useRef<number | null>(null)
 
@@ -4174,47 +4180,142 @@ export default function MealBuilderClient() {
     }
   }
 
+  const resetTorchState = () => {
+    barcodeTorchTrackRef.current = null
+    setTorchEnabled(false)
+    setTorchAvailable(false)
+  }
+
+  const disableTorch = () => {
+    const track = barcodeTorchTrackRef.current
+    if (track && typeof track.applyConstraints === 'function') {
+      try {
+        const constraints: MediaTrackConstraints & { advanced?: Array<{ torch?: boolean }> } = {
+          advanced: [{ torch: false }],
+        }
+        ;(track as any).applyConstraints(constraints).catch(() => {})
+      } catch {}
+    }
+    resetTorchState()
+  }
+
+  const attachTorchTrack = (stream: MediaStream | null) => {
+    if (!stream) {
+      resetTorchState()
+      return
+    }
+    const track = stream.getVideoTracks?.()[0]
+    barcodeTorchTrackRef.current = track || null
+    const capabilities = (track?.getCapabilities?.() as any) || {}
+    const canTorch = !!capabilities.torch
+    setTorchAvailable(canTorch)
+    if (!canTorch) setTorchEnabled(false)
+  }
+
+  const attachTorchTrackFromDom = (retry = true) => {
+    const region = document.getElementById(BARCODE_REGION_ID)
+    const videoEl = region?.querySelector('video') as HTMLVideoElement | null
+    const stream = (videoEl?.srcObject as MediaStream) || null
+    if (!stream && retry) {
+      setTimeout(() => attachTorchTrackFromDom(false), 250)
+      return
+    }
+    attachTorchTrack(stream)
+  }
+
   const stopBarcodeScanner = () => {
+    setBarcodeStatusHint('')
+    disableTorch()
     try {
       const current = barcodeScannerRef.current
       if (current?.controls?.stop) current.controls.stop()
       if (current?.reader?.reset) current.reader.reset()
+      if (current?.videoEl) {
+        try {
+          current.videoEl.pause()
+        } catch {}
+        try {
+          current.videoEl.srcObject = null
+        } catch {}
+        try {
+          current.videoEl.remove()
+        } catch {}
+      }
+      if (current?.stream) {
+        try {
+          ;(current.stream as MediaStream).getTracks().forEach((t) => t.stop())
+        } catch {}
+      }
     } catch {}
     barcodeScannerRef.current = null
+    const region = document.getElementById(BARCODE_REGION_ID)
+    if (region) region.innerHTML = ''
   }
 
-  const lookupBarcode = async (codeRaw: string) => {
+  const resetBarcodeState = () => {
+    setBarcodeStatus('idle')
+    setBarcodeError(null)
+    setManualBarcode('')
+    setShowManualBarcodeInput(false)
+    barcodeLookupInFlightRef.current = false
+    resetTorchState()
+  }
+
+  const lookupBarcodeAndAdd = async (codeRaw: string) => {
     const code = String(codeRaw || '').trim().replace(/[^0-9A-Za-z]/g, '')
     if (!code) {
-      setBarcodeError('Please enter a barcode.')
+      setBarcodeError('Enter a valid barcode to search.')
+      setBarcodeStatus('scanning')
+      setBarcodeStatusHint('Scanning…')
       return
     }
-    setBarcodeError(null)
+    if (barcodeLookupInFlightRef.current) return
+
+    const resumeScannerAfterLookup = () => {
+      if (!showBarcodeScanner) return
+      if ((barcodeScannerRef.current as any)?.videoEl) {
+        setBarcodeStatus('scanning')
+        setBarcodeStatusHint('Scanning…')
+        return
+      }
+      startBarcodeScanner()
+    }
+
+    barcodeLookupInFlightRef.current = true
     setBarcodeLoading(true)
+    setBarcodeStatus('loading')
     setBarcodeStatusHint('Looking up barcode…')
+    setBarcodeError(null)
+
     try {
       const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(code)}`, { method: 'GET' })
       const data = await res.json().catch(() => ({}))
+      if (res.status === 404 || res.status === 422) {
+        setBarcodeStatus('idle')
+        setBarcodeError('No food found for this barcode. Try again or use photo.')
+        resumeScannerAfterLookup()
+        return
+      }
+      if (res.status === 402) {
+        setBarcodeStatus('idle')
+        setBarcodeError(data?.message || data?.error || 'Not enough credits to scan. Each barcode scan costs 3 credits.')
+        return
+      }
+      if (res.status === 401) {
+        setBarcodeStatus('idle')
+        setBarcodeError('Please sign in to scan barcodes.')
+        return
+      }
       if (!res.ok) {
-        if (res.status === 402) {
-          setBarcodeError('Not enough credits for barcode scanning.')
-        } else if (res.status === 422) {
-          setBarcodeError(
-            data?.message ||
-              data?.error ||
-              'Nutrition data is missing for this barcode. Please scan the nutrition label instead.',
-          )
-        } else if (res.status === 404) {
-          setBarcodeError('No product found for that barcode. Try photo or search.')
-        } else if (res.status === 401) {
-          setBarcodeError('Please sign in again, then retry.')
-        } else {
-          setBarcodeError('Barcode lookup failed. Please try again.')
-        }
+        setBarcodeStatus('idle')
+        setBarcodeError('Could not find a match. Please rescan or type the code.')
+        resumeScannerAfterLookup()
         return
       }
       if (!data?.found || !data?.food) {
-        setBarcodeError('No product found for that barcode. Try photo or search.')
+        setBarcodeStatus('idle')
+        setBarcodeError('No food found for this barcode. Try again or use photo.')
+        resumeScannerAfterLookup()
         return
       }
       const food = data.food
@@ -4231,25 +4332,82 @@ export default function MealBuilderClient() {
         fiber_g: toNumber(food.fiber_g),
         sugar_g: toNumber(food.sugar_g),
       }
-      addItemDirect(normalized)
-      setBarcodeStatusHint('Added')
       setShowBarcodeScanner(false)
+      setBarcodeStatus('idle')
+      setBarcodeStatusHint('')
+      addItemDirect(normalized)
+      setManualBarcode('')
+      setShowManualBarcodeInput(false)
     } catch {
-      setBarcodeError('Barcode lookup failed. Please try again.')
+      setBarcodeStatus('idle')
+      setBarcodeError('Could not find a match. Please rescan or type the code.')
+      resumeScannerAfterLookup()
     } finally {
       setBarcodeLoading(false)
+      barcodeLookupInFlightRef.current = false
+    }
+  }
+
+  const handleBarcodeDetected = (rawCode: string) => {
+    if (!rawCode || barcodeLookupInFlightRef.current || barcodeDetectLockRef.current) return
+    const cleaned = rawCode.replace(/[^0-9A-Za-z]/g, '')
+    if (!cleaned) return
+    barcodeDetectLockRef.current = true
+    void lookupBarcodeAndAdd(cleaned).finally(() => {
+      barcodeDetectLockRef.current = false
+    })
+  }
+
+  const toggleTorch = async () => {
+    const track = barcodeTorchTrackRef.current
+    if (!track) {
+      setTorchAvailable(false)
+      setTorchEnabled(false)
+      setBarcodeError('Flash is not available for this camera.')
+      return
+    }
+    const capabilities = typeof track.getCapabilities === 'function' ? (track.getCapabilities() as any) : null
+    if (!capabilities?.torch) {
+      setTorchAvailable(false)
+      setTorchEnabled(false)
+      setBarcodeError('Flash is not available for this camera.')
+      return
+    }
+    try {
+      const next = !torchEnabled
+      const constraints: MediaTrackConstraints & { advanced?: Array<{ torch?: boolean }> } = {
+        advanced: [{ torch: next }],
+      }
+      await (track as any).applyConstraints(constraints)
+      setTorchEnabled(next)
+      setBarcodeError(null)
+    } catch {
+      setBarcodeError('Could not control the flash on this device.')
+      resetTorchState()
     }
   }
 
   const startBarcodeScanner = async () => {
-    setBarcodeError(null)
+    if (!showBarcodeScanner) return
+    resetTorchState()
+    setShowManualBarcodeInput(false)
+    setBarcodeStatus('loading')
     setBarcodeStatusHint('Starting camera…')
+    setBarcodeError(null)
     try {
+      barcodeLookupInFlightRef.current = false
       stopBarcodeScanner()
-      const region = document.getElementById('meal-builder-barcode-region')
+      if (typeof navigator === 'undefined' || !navigator.mediaDevices?.getUserMedia) {
+        setBarcodeError('Camera is only available in the browser.')
+        setBarcodeStatusHint('Camera unavailable in this browser')
+        setBarcodeStatus('idle')
+        return
+      }
+      const region = document.getElementById(BARCODE_REGION_ID)
       if (!region) {
         setBarcodeError('Camera area missing. Close and reopen the scanner.')
-        setBarcodeStatusHint('Camera error')
+        setBarcodeStatusHint('Camera area missing')
+        setBarcodeStatus('idle')
         return
       }
       region.innerHTML = ''
@@ -4292,32 +4450,40 @@ export default function MealBuilderClient() {
 
       const controls = await reader.decodeFromConstraints(constraints, videoEl, (result: any) => {
         const text = result?.getText ? result.getText() : result?.text
-        if (!text) return
-        // Stop quickly so we don't double-trigger.
-        stopBarcodeScanner()
-        lookupBarcode(text)
+        if (text) handleBarcodeDetected(text)
       })
 
-      barcodeScannerRef.current = { reader, controls, videoEl }
+      const stream = (videoEl.srcObject as MediaStream) || null
+      barcodeScannerRef.current = { reader, controls, videoEl, stream }
+      setBarcodeStatus('scanning')
       setBarcodeStatusHint('Scanning…')
+      setTimeout(() => attachTorchTrackFromDom(), 150)
     } catch {
-      setBarcodeError('Could not start the camera. Please allow camera access and retry.')
-      setBarcodeStatusHint('Camera error')
+      setBarcodeError('Could not start the camera. Please allow camera access, then tap Restart.')
+      setBarcodeStatusHint('Camera start failed')
+      setBarcodeStatus('idle')
       stopBarcodeScanner()
     }
   }
 
   useEffect(() => {
-    if (!showBarcodeScanner) {
+    if (showBarcodeScanner) {
+      startBarcodeScanner()
+    } else {
       stopBarcodeScanner()
-      setBarcodeError(null)
-      setBarcodeStatusHint('Ready')
-      return
+      resetBarcodeState()
     }
-    startBarcodeScanner()
-    return () => stopBarcodeScanner()
+    return () => {
+      stopBarcodeScanner()
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [showBarcodeScanner])
+
+  useEffect(() => {
+    if (showManualBarcodeInput && manualBarcodeInputRef.current) {
+      manualBarcodeInputRef.current.focus()
+    }
+  }, [showManualBarcodeInput])
 
   const removeItem = (id: string) => {
     const current = itemsRef.current
@@ -5500,89 +5666,135 @@ export default function MealBuilderClient() {
           )}
 
           {showBarcodeScanner && (
-            <div className="fixed inset-0 md:left-64 z-50 bg-black">
-              <div className="absolute inset-0 flex flex-col">
-                <div className="flex items-center justify-between px-4 py-3 bg-black/70 text-white">
-                  <div className="text-sm font-semibold">Scan barcode</div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setShowBarcodeScanner(false)
-                      stopBarcodeScanner()
-                    }}
-                    className="px-3 py-1.5 rounded-lg bg-white/10"
+            <div className="fixed inset-0 z-50 bg-black flex flex-col">
+              <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
+                <button
+                  type="button"
+                  onClick={() => setShowBarcodeScanner(false)}
+                  className="w-10 h-10 flex items-center justify-center"
+                  aria-label="Close scanner"
+                >
+                  <svg className="w-6 h-6 text-gray-800" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  </svg>
+                </button>
+                <div className="text-lg font-semibold text-gray-900">Scan Barcode</div>
+                <div className="w-10" />
+              </div>
+
+              <div className="flex-1 relative bg-black overflow-hidden">
+                <div id={BARCODE_REGION_ID} className="absolute inset-0" />
+
+                <div className="absolute inset-0 pointer-events-none flex flex-col items-center justify-center px-6">
+                  <div className="text-center mb-6">
+                    <div className="text-white text-xl font-semibold drop-shadow-lg">Scan Barcode</div>
+                    <div className="text-white/80 text-sm mt-1 drop-shadow">Place barcode in the frame to scan</div>
+                  </div>
+
+                  <div className="w-72 h-[220px] rounded-[22px] border-[4px] border-white/95 shadow-[0_0_30px_rgba(0,0,0,0.35)]" />
+
+                  {barcodeStatusHint && (
+                    <div className="absolute bottom-6 left-0 right-0 text-center">
+                      <div className="inline-flex items-center px-3 py-1 rounded-full bg-black/55 text-white text-xs font-semibold shadow-lg">
+                        {barcodeStatusHint}
+                      </div>
+                    </div>
+                  )}
+                </div>
+
+                {showManualBarcodeInput && (
+                  <div
+                    className="pointer-events-auto absolute left-4 right-4 bg-white/95 rounded-2xl shadow-2xl border border-gray-200 p-4 space-y-3"
+                    style={{ bottom: '110px' }}
                   >
-                    Close
-                  </button>
-                </div>
-
-                <div className="flex-1 relative">
-                  <div id="meal-builder-barcode-region" className="absolute inset-0" />
-                  <div className="absolute inset-0 pointer-events-none flex items-center justify-center">
-                    <div className="w-64 h-40 border-2 border-white/70 rounded-xl" />
-                  </div>
-                </div>
-
-                <div className="bg-black/85 text-white px-4 py-3 space-y-2">
-                  <div className="text-xs text-white/80">{barcodeStatusHint}</div>
-                  {barcodeError && <div className="text-xs text-red-300">{barcodeError}</div>}
-
-                  <div className="flex gap-2">
-                    <input
-                      value={manualBarcode}
-                      onFocus={() => {
-                        manualBarcodeBackupRef.current = manualBarcode
-                        manualBarcodeEditedRef.current = false
-                        manualBarcodeWasClearedOnFocusRef.current = manualBarcode.trim().length > 0
-                        if (manualBarcodeWasClearedOnFocusRef.current) setManualBarcode('')
-                      }}
-                      onChange={(e) => {
-                        manualBarcodeEditedRef.current = true
-                        setManualBarcode(e.target.value)
-                      }}
-                      onBlur={() => {
-                        if (manualBarcodeWasClearedOnFocusRef.current && !manualBarcodeEditedRef.current) {
-                          setManualBarcode(manualBarcodeBackupRef.current)
-                        }
-                        manualBarcodeWasClearedOnFocusRef.current = false
-                        manualBarcodeEditedRef.current = false
-                      }}
-                      placeholder="Enter barcode"
-                      className="flex-1 px-3 py-2 rounded-lg bg-white text-gray-900 text-sm"
-                    />
-                    <button
-                      type="button"
-                      onClick={() => lookupBarcode(manualBarcode)}
-                      disabled={barcodeLoading}
-                      className="px-4 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
-                    >
-                      Lookup
-                    </button>
-                  </div>
-
-                  <div className="flex gap-2">
-                    <button
-                      type="button"
-                      onClick={() => startBarcodeScanner()}
-                      className="flex-1 px-3 py-2 rounded-lg bg-white/10 text-white text-sm font-semibold"
-                    >
-                      Restart camera
-                    </button>
+                    <div className="text-sm font-semibold text-gray-900">Type the barcode</div>
+                    <div className="flex items-center gap-2">
+                      <input
+                        ref={manualBarcodeInputRef}
+                        value={manualBarcode}
+                        onChange={(e) => setManualBarcode(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            lookupBarcodeAndAdd(manualBarcode)
+                          }
+                        }}
+                        placeholder="Enter barcode number"
+                        className="flex-1 px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-1 focus:ring-emerald-500 focus:border-emerald-500"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => lookupBarcodeAndAdd(manualBarcode)}
+                        className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-emerald-700"
+                      >
+                        Search
+                      </button>
+                    </div>
                     <button
                       type="button"
                       onClick={() => {
-                        setShowBarcodeScanner(false)
-                        stopBarcodeScanner()
+                        setShowManualBarcodeInput(false)
+                        setManualBarcode('')
                       }}
-                      className="flex-1 px-3 py-2 rounded-lg bg-white/10 text-white text-sm font-semibold"
+                      className="text-xs text-gray-500 underline font-medium"
                     >
                       Cancel
                     </button>
                   </div>
+                )}
+
+                {barcodeStatus === 'loading' && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+                    <div className="flex flex-col items-center gap-3">
+                      <svg className="animate-spin h-10 w-10 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+                      </svg>
+                      <span className="text-white text-sm font-medium">Starting camera...</span>
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {barcodeError && (
+                <div className="flex-shrink-0 px-4 py-3 bg-red-500 text-white text-center text-sm">
+                  {barcodeError}
+                </div>
+              )}
+
+              <div className="flex-shrink-0 bg-stone-100 border-t border-gray-200" style={{ paddingBottom: 'env(safe-area-inset-bottom, 0px)' }}>
+                <div className="flex items-center justify-evenly px-6 py-4 gap-6">
+                  <button
+                    type="button"
+                    onClick={toggleTorch}
+                    disabled={!torchAvailable}
+                    className={`flex items-center gap-2 font-semibold ${torchAvailable ? 'text-gray-800' : 'text-gray-400'}`}
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
+                    </svg>
+                    <span className="text-sm uppercase tracking-wide">{torchEnabled ? 'Flash On' : 'Flash'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowManualBarcodeInput((prev) => !prev)
+                      setBarcodeError(null)
+                      setTimeout(() => {
+                        manualBarcodeInputRef.current?.focus()
+                      }, 50)
+                    }}
+                    className="flex items-center gap-2 text-gray-800 font-semibold"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
+                    </svg>
+                    <span className="text-sm uppercase tracking-wide">{showManualBarcodeInput ? 'Hide Input' : 'Type Barcode'}</span>
+                  </button>
                 </div>
               </div>
             </div>
-	          )}
+          )}
 
 	          {(recipeImportLoading || recipeImportMissing.length > 0 || (recipeImportDraft && Array.isArray((recipeImportDraft as any).steps) && (recipeImportDraft as any).steps.length > 0)) && (
 	            <div className="space-y-3">
