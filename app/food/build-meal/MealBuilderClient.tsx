@@ -1735,6 +1735,13 @@ export default function MealBuilderClient() {
   const diaryAutosaveTimeoutRef = useRef<number | null>(null)
   const lastDiaryAutosaveSignatureRef = useRef<string>('')
   const [autosaveHint, setAutosaveHint] = useState<string>('')
+  const [favoriteUpdatePrompt, setFavoriteUpdatePrompt] = useState<{
+    description: string
+    nutrition: any
+    items: any[]
+    category: string
+  } | null>(null)
+  const [favoriteUpdatePromptSaving, setFavoriteUpdatePromptSaving] = useState(false)
 
   const applySavedPortion = (source: any) => {
     if (!source || typeof source !== 'object') return
@@ -4983,60 +4990,19 @@ export default function MealBuilderClient() {
 
         // Owner request: after updating a favorite from Favorites flow,
         // ask whether to add this updated meal to diary immediately.
-        if (!targetLogId && typeof window !== 'undefined') {
-          const addNow = window.confirm('Favorite updated. Would you like to add this updated meal to your diary now?')
-          if (addNow) {
-            try {
-              const addCategory = normalizeCategory(existing?.meal || category)
-              const addPayload = {
-                description,
-                nutrition: {
-                  ...(normalizedNutrition || payload.nutrition || {}),
-                  __favoriteId: editFavoriteId,
-                },
-                imageUrl: null,
-                items: cleanedItems,
-                localDate: selectedDate,
-                meal: addCategory,
-                category: addCategory,
-                createdAt: alignTimestampToLocalDate(new Date().toISOString(), selectedDate),
-                allowDuplicate: true,
-              }
-              const addRes = await fetch('/api/food-log', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(addPayload),
-              })
-              if (addRes.ok) {
-                const addData = await addRes.json().catch(() => ({} as any))
-                const createdId = typeof addData?.id === 'string' ? addData.id : ''
-                if (createdId) {
-                  try {
-                    sessionStorage.setItem(
-                      'foodDiary:entryOverride',
-                      JSON.stringify({
-                        dbId: createdId,
-                        localDate: selectedDate,
-                        category: addCategory,
-                        description,
-                        nutrition: addPayload.nutrition,
-                        total: addPayload.nutrition,
-                        items: cleanedItems,
-                      }),
-                    )
-                    sessionStorage.setItem(
-                      'foodDiary:scrollToEntry',
-                      JSON.stringify({ dbId: createdId, localDate: selectedDate, category: addCategory }),
-                    )
-                  } catch {}
-                }
-              } else {
-                window.alert('Favorite was updated, but we could not add it to diary right now. Please try Add to diary again.')
-              }
-            } catch {
-              window.alert('Favorite was updated, but we could not add it to diary right now. Please try Add to diary again.')
-            }
-          }
+        if (!targetLogId) {
+          const addCategory = normalizeCategory(existing?.meal || category)
+          setFavoriteUpdatePrompt({
+            description,
+            nutrition: {
+              ...(normalizedNutrition || payload.nutrition || {}),
+              __favoriteId: editFavoriteId,
+            },
+            items: cleanedItems,
+            category: addCategory,
+          })
+          clearDraft()
+          return
         }
 
         clearDraft()
@@ -5137,8 +5103,96 @@ export default function MealBuilderClient() {
     }
   }
 
+  const handleFavoriteUpdatePromptCancel = () => {
+    setFavoriteUpdatePrompt(null)
+    clearDraft()
+    router.push('/food')
+  }
+
+  const handleFavoriteUpdatePromptAdd = async () => {
+    if (!favoriteUpdatePrompt || favoriteUpdatePromptSaving) return
+    setFavoriteUpdatePromptSaving(true)
+    try {
+      const addPayload = {
+        description: favoriteUpdatePrompt.description,
+        nutrition: favoriteUpdatePrompt.nutrition,
+        imageUrl: null,
+        items: favoriteUpdatePrompt.items,
+        localDate: selectedDate,
+        meal: favoriteUpdatePrompt.category,
+        category: favoriteUpdatePrompt.category,
+        createdAt: alignTimestampToLocalDate(new Date().toISOString(), selectedDate),
+        allowDuplicate: true,
+      }
+      const addRes = await fetch('/api/food-log', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(addPayload),
+      })
+      if (!addRes.ok) {
+        setError('Favorite was updated, but we could not add it to diary right now.')
+        return
+      }
+      const addData = await addRes.json().catch(() => ({} as any))
+      const createdId = typeof addData?.id === 'string' ? addData.id : ''
+      if (createdId) {
+        try {
+          sessionStorage.setItem(
+            'foodDiary:entryOverride',
+            JSON.stringify({
+              dbId: createdId,
+              localDate: selectedDate,
+              category: favoriteUpdatePrompt.category,
+              description: favoriteUpdatePrompt.description,
+              nutrition: favoriteUpdatePrompt.nutrition,
+              total: favoriteUpdatePrompt.nutrition,
+              items: favoriteUpdatePrompt.items,
+            }),
+          )
+          sessionStorage.setItem(
+            'foodDiary:scrollToEntry',
+            JSON.stringify({ dbId: createdId, localDate: selectedDate, category: favoriteUpdatePrompt.category }),
+          )
+        } catch {}
+      }
+      setFavoriteUpdatePrompt(null)
+      clearDraft()
+      router.push('/food')
+    } catch {
+      setError('Favorite was updated, but we could not add it to diary right now.')
+    } finally {
+      setFavoriteUpdatePromptSaving(false)
+    }
+  }
+
   return (
     <div className="min-h-screen bg-white">
+      {favoriteUpdatePrompt && (
+        <div className="fixed inset-0 z-[70] bg-black/40 flex items-center justify-center px-4">
+          <div className="w-full max-w-md rounded-2xl bg-white border border-gray-200 shadow-xl p-5">
+            <div className="text-base font-semibold text-gray-900">Favorite updated</div>
+            <div className="mt-2 text-sm text-gray-600">Would you like to add this updated meal to your diary now?</div>
+            <div className="mt-4 flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handleFavoriteUpdatePromptCancel}
+                disabled={favoriteUpdatePromptSaving}
+                className="flex-1 py-2.5 px-4 rounded-xl border border-emerald-600 bg-white text-emerald-600 font-semibold hover:bg-emerald-50 disabled:opacity-60"
+              >
+                Not now
+              </button>
+              <button
+                type="button"
+                onClick={handleFavoriteUpdatePromptAdd}
+                disabled={favoriteUpdatePromptSaving}
+                className="flex-1 py-2.5 px-4 rounded-xl bg-emerald-600 text-white font-semibold hover:bg-emerald-700 disabled:opacity-60"
+              >
+                {favoriteUpdatePromptSaving ? 'Adding…' : 'Add Meal'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="flex flex-col gap-3 px-4 py-3 md:flex-row md:items-center md:gap-4">
           <div className="flex items-start gap-3 md:items-center">
