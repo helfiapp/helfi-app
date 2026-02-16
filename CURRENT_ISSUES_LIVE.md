@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-16 21:29 AEDT
+- What changed: Food chat Build this meal now guarantees recipe-import style structure. If the AI response is missing proper structured options, the server auto-builds structured options (separate ingredient lines + steps + servings + prep/cook) before the button opens Build a Meal.
+- Where to see it (page/link): `/chat?context=food` -> `/food/build-meal`
+- What to quickly test: Ask for 2 meal options in food chat, click Build this meal, and confirm multiple separate ingredient cards appear with per-ingredient macros/totals (not one combined meal card).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-16 21:11 AEDT
 - What changed: Food chat Build this meal now uses structured recipe-import style data (ingredients, steps, servings, prep/cook time) from each AI option, then opens Build a Meal with that full draft.
 - Where to see it (page/link): `/chat?context=food` -> `/food/build-meal`
