@@ -2869,6 +2869,16 @@ export default function FoodDiary() {
     const ms = parseInt(base36, 36)
     return Number.isFinite(ms) ? ms : NaN
   }
+  const parseCuidTimestampMs = (value: any) => {
+    const raw = typeof value === 'string' ? value.trim().toLowerCase() : ''
+    if (!raw || raw.length < 9 || raw[0] !== 'c') return NaN
+    const encoded = raw.slice(1, 9)
+    if (!/^[0-9a-z]{8}$/.test(encoded)) return NaN
+    const ts = parseInt(encoded, 36)
+    if (!Number.isFinite(ts)) return NaN
+    if (ts < 946684800000 || ts > Date.now() + 7 * 24 * 60 * 60 * 1000) return NaN
+    return ts
+  }
   const getEntryClientIdTimestampMs = (entry: any) => {
     const clientId = getEntryClientId(entry)
     return clientId ? parseClientIdTimestampMs(clientId) : NaN
@@ -9590,6 +9600,7 @@ const applyStructuredItems = (
       const addedOrderFromNutrients = Number.isFinite(Number(addedOrderRaw)) ? Number(addedOrderRaw) : NaN
       const loggedOrder = loggedAtIso ? new Date(loggedAtIso).getTime() : NaN
       const clientOrder = storedClientId ? parseClientIdTimestampMs(storedClientId) : NaN
+      const dbOrder = parseCuidTimestampMs((l as any)?.id)
       const addedOrder =
         Number.isFinite(addedOrderFromNutrients)
           ? addedOrderFromNutrients
@@ -9597,6 +9608,8 @@ const applyStructuredItems = (
           ? loggedOrder
           : Number.isFinite(clientOrder)
           ? clientOrder
+          : Number.isFinite(dbOrder)
+          ? dbOrder
           : NaN
       const method =
         storedOrigin === 'meal-builder'
@@ -14681,6 +14694,10 @@ Please add nutritional information manually if needed.`);
       if (Number.isFinite(loggedTs)) return loggedTs
       const clientTs = getEntryClientIdTimestampMs(entry)
       if (Number.isFinite(clientTs)) return clientTs
+      const dbIdTs = parseCuidTimestampMs(entry?.dbId)
+      if (Number.isFinite(dbIdTs)) return dbIdTs
+      const entryIdTs = parseCuidTimestampMs(entry?.id)
+      if (Number.isFinite(entryIdTs)) return entryIdTs
       const entryTs = extractEntryTimestampMs(entry)
       if (Number.isFinite(entryTs)) return entryTs
       const timeBased = parseEntryTimeToMs(entry)
@@ -14717,6 +14734,8 @@ Please add nutritional information manually if needed.`);
           const ts = Number(match[1])
           if (Number.isFinite(ts) && ts > 946684800000) return ts
         }
+        const cuidTs = parseCuidTimestampMs(idStr)
+        if (Number.isFinite(cuidTs)) return cuidTs
       }
       return 0
     }

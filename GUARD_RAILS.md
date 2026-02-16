@@ -2316,14 +2316,16 @@ days after midnight).
    into `ensureEntryLoggedAt(...)`.
 2) Confirm `mapLogsToEntries(...)` reads `nutrients.__addedOrder` (if present)
    and assigns `entry.__addedOrder`.
-3) Confirm `resolveEntryCreatedAtMs(...)` uses `__addedOrder` first.
-4) Confirm `ensureEntryLoggedAt(...)` writes `__addedOrder` onto the entry and
+3) For older logs missing `__addedOrder`, keep fallback to parse timestamp from
+   `FoodLog.id` (cuid) so midnight previous-day adds still sort correctly.
+4) Confirm `resolveEntryCreatedAtMs(...)` uses `__addedOrder` first.
+5) Confirm `ensureEntryLoggedAt(...)` writes `__addedOrder` onto the entry and
    into `nutrition`/`total`.
-5) Ensure Favorites -> All collapses duplicates by normalized label:
+6) Ensure Favorites -> All collapses duplicates by normalized label:
    - Keep `dedupeAllMealsByLabel(...)` in `buildFavoritesDatasets`.
    - It must merge items with the same normalized label and keep the newest one.
    - It must preserve any favorite link (so edit/delete still works).
-6) If duplicates reappear:
+7) If duplicates reappear:
    - Restore the `dedupeAllMealsByLabel(...)` block (and helpers) near
      `buildFavoritesDatasets` in `app/food/page.tsx`.
    - Make sure `allMealsRaw` flows through that dedupe before `allMealsWithFavorites`.
