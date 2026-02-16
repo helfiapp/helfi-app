@@ -4981,6 +4981,64 @@ export default function MealBuilderClient() {
           } catch {}
         }
 
+        // Owner request: after updating a favorite from Favorites flow,
+        // ask whether to add this updated meal to diary immediately.
+        if (!targetLogId && typeof window !== 'undefined') {
+          const addNow = window.confirm('Favorite updated. Would you like to add this updated meal to your diary now?')
+          if (addNow) {
+            try {
+              const addCategory = normalizeCategory(existing?.meal || category)
+              const addPayload = {
+                description,
+                nutrition: {
+                  ...(normalizedNutrition || payload.nutrition || {}),
+                  __favoriteId: editFavoriteId,
+                },
+                imageUrl: null,
+                items: cleanedItems,
+                localDate: selectedDate,
+                meal: addCategory,
+                category: addCategory,
+                createdAt: alignTimestampToLocalDate(new Date().toISOString(), selectedDate),
+                allowDuplicate: true,
+              }
+              const addRes = await fetch('/api/food-log', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(addPayload),
+              })
+              if (addRes.ok) {
+                const addData = await addRes.json().catch(() => ({} as any))
+                const createdId = typeof addData?.id === 'string' ? addData.id : ''
+                if (createdId) {
+                  try {
+                    sessionStorage.setItem(
+                      'foodDiary:entryOverride',
+                      JSON.stringify({
+                        dbId: createdId,
+                        localDate: selectedDate,
+                        category: addCategory,
+                        description,
+                        nutrition: addPayload.nutrition,
+                        total: addPayload.nutrition,
+                        items: cleanedItems,
+                      }),
+                    )
+                    sessionStorage.setItem(
+                      'foodDiary:scrollToEntry',
+                      JSON.stringify({ dbId: createdId, localDate: selectedDate, category: addCategory }),
+                    )
+                  } catch {}
+                }
+              } else {
+                window.alert('Favorite was updated, but we could not add it to diary right now. Please try Add to diary again.')
+              }
+            } catch {
+              window.alert('Favorite was updated, but we could not add it to diary right now. Please try Add to diary again.')
+            }
+          }
+        }
+
         clearDraft()
         router.push('/food')
         return
