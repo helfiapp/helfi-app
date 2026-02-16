@@ -389,32 +389,34 @@ export async function GET(request: NextRequest) {
           if (prefixLonger && isOneEditAway(queryToken, prefixLonger)) return true
         }
 
+        // Predictive fallback: allow matching on later words for short typed queries
+        // (e.g. "blu" should match "Cheese, blue").
+        if (queryToken.length >= 2) {
+          const queryTokenSingular = singularizeToken(queryToken)
+          const otherWords = filteredNameTokens.slice(1)
+          const laterWordMatches = otherWords.some((word) => {
+            if (!word) return false
+            if (word.startsWith(queryToken)) return true
+            const singularWord = singularizeToken(word)
+            if (singularWord !== word && singularWord.startsWith(queryToken)) return true
+            if (queryTokenSingular !== queryToken && word.startsWith(queryTokenSingular)) return true
+            if (
+              queryTokenSingular !== queryToken &&
+              singularWord !== word &&
+              singularWord.startsWith(queryTokenSingular)
+            ) {
+              return true
+            }
+            return false
+          })
+          if (laterWordMatches) return true
+        }
+
         return false
       }
 
-      // Multi-word queries: first query token must match first name word, then all tokens must match
-      const firstQueryToken = queryTokens[0]
-      const firstNameWord = filteredNameTokens[0]
-      if (!firstNameWord) return false
-
-      // First word must match first token
-      const firstWordMatches = (() => {
-        if (firstNameWord === firstQueryToken) return true
-        const firstNameSingular = singularizeToken(firstNameWord)
-        const firstQuerySingular = singularizeToken(firstQueryToken)
-        if (firstNameSingular === firstQuerySingular) return true
-        if (firstNameWord.startsWith(firstQueryToken)) return true
-        if (firstNameSingular !== firstNameWord && firstNameSingular.startsWith(firstQueryToken)) return true
-        if (firstQuerySingular !== firstQueryToken && firstNameWord.startsWith(firstQuerySingular)) return true
-        return false
-      })()
-
-      if (!firstWordMatches) return false
-
-      // All remaining query tokens must match somewhere in the name
-      const remainingQueryTokens = queryTokens.slice(1)
-      if (remainingQueryTokens.length === 0) return true
-
+      // Multi-word queries: token matching is order-independent.
+      // This allows searches like "blue cheese" to match names like "Cheese, blue".
       const tokenMatches = (token: string, word: string) => {
         if (!token || !word) return false
         if (word.startsWith(token)) return true
@@ -426,7 +428,14 @@ export async function GET(request: NextRequest) {
         return false
       }
 
-      return remainingQueryTokens.every((token) => filteredNameTokens.some((word) => tokenMatches(token, word)))
+      const allTokensMatchAnywhere = queryTokens.every((token) =>
+        filteredNameTokens.some((word) => tokenMatches(token, word)),
+      )
+
+      if (!allTokensMatchAnywhere) return false
+
+      // Ranking still prefers first-word matches elsewhere.
+      return true
     }
 
     const filterItemsByQuery = (
@@ -633,12 +642,13 @@ export async function GET(request: NextRequest) {
 
     const buildSingleFoodResults = async (value: string) => {
       const customPrefix = await toCustomFoodItems(value, { allowTypo: false })
+      const localSearchWindow = Math.max(limit, 60)
 
       // For single foods: only use foundation and legacy (simple foods), NOT branded (product foods)
       // Branded/product foods should only appear for packaged searches
       const [foundation, legacy] = await Promise.all([
-        searchLocalFoods(value, { pageSize: limit, sources: ['usda_foundation'] }),
-        searchLocalFoods(value, { pageSize: limit, sources: ['usda_sr_legacy'] }),
+        searchLocalFoods(value, { pageSize: localSearchWindow, sources: ['usda_foundation'] }),
+        searchLocalFoods(value, { pageSize: localSearchWindow, sources: ['usda_sr_legacy'] }),
       ])
 
       const combinedMain = [...foundation, ...legacy]
@@ -686,7 +696,7 @@ export async function GET(request: NextRequest) {
       // If we still don't have enough results, use FatSecret as a fallback.
       // (We still return the Helfi database results first.)
       if (!localOnly && combined.length < limit) {
-        const fat = await searchFatSecretFoods(value, { pageSize: limit })
+        const fat = await searchFatSecretFoods(value, { pageSize: localSearchWindow })
         const filteredFat = filterItemsByQuery(fat, value, (item) => item?.name || '').filter((it) => hasMacroData(it))
         const sortedFat = sortByAlphabeticalHierarchyAsc(filteredFat, value)
         const seen = new Set(combined.map((it) => `${normalizeForMatch(it?.name)}|${normalizeForMatch(it?.brand)}`))
