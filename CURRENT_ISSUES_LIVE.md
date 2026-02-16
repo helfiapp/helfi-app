@@ -1,16 +1,16 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
-- Date/time: 2026-02-16 21:29 AEDT
-- What changed: Food chat Build this meal now guarantees recipe-import style structure. If the AI response is missing proper structured options, the server auto-builds structured options (separate ingredient lines + steps + servings + prep/cook) before the button opens Build a Meal.
-- Where to see it (page/link): `/chat?context=food` -> `/food/build-meal`
-- What to quickly test: Ask for 2 meal options in food chat, click Build this meal, and confirm multiple separate ingredient cards appear with per-ingredient macros/totals (not one combined meal card).
+- Date/time: 2026-02-16 22:08 AEDT
+- What changed: Added a new Portion control toggle in Build a meal. Toggle OFF is now the default and shows full-meal totals (100% of recipe). Toggle ON shows portion fields (serving/g/oz), keeps serving defaults for imported recipes, and saves/scales totals using the selected portion.
+- Where to see it (page/link): /food/build-meal (including Recipe Import, Ask AI Build this meal, and edit flows that open Build a meal)
+- What to quickly test: Open Build a meal and confirm toggle starts OFF with 100% message. Turn it ON and change serving/grams/oz; confirm totals and save use the selected portion.
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
-- Date/time: 2026-02-16 21:11 AEDT
-- What changed: Food chat Build this meal now uses structured recipe-import style data (ingredients, steps, servings, prep/cook time) from each AI option, then opens Build a Meal with that full draft.
-- Where to see it (page/link): `/chat?context=food` -> `/food/build-meal`
-- What to quickly test: Ask food chat for options, click Build this meal under an option, confirm Build a Meal opens with imported ingredients and recipe steps (not just a guessed title).
+- Date/time: 2026-02-16 17:55 AEDT
+- What changed: Fixed meal builder portion override bug so manual portion edits (including 0) now update ingredient and total calories immediately.
+- Where to see it (page/link): /food/build-meal (and meal edit flow opened from Food Diary)
+- What to quickly test: Open an existing meal entry with saved portion, change portion to 0 or another value, confirm calories/macros update instantly.
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
