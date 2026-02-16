@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 10:55 AEDT
+- What changed: Added a locked guard-rail section to protect the approved chat formatting and chat interface style across web chat pages, so future agents cannot change it without owner approval.
+- Where to see it (page/link): `GUARD_RAILS.md` section `7.9 Chat Formatting + Interface Style Lock`
+- What to quickly test: Open `GUARD_RAILS.md` and confirm section `7.9` exists with protected files, no-change rules, restore checklist, and last stable deployment reference.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 02:45 AEDT
 - What changed: Fixed Add from favorites ordering for midnight edge cases so older entries without __addedOrder use real add-time fallback from record ID; Taco-style entries now sort in correct recency position.
 - Where to see it (page/link): https://helfi.ai/food (Add from favorites modal, All/Favorites tabs)
