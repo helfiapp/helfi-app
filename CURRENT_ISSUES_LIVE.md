@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 02:24 AEDT
+- What changed: Updated Build a Meal barcode scanner so it now matches the main Food Diary scanner behavior (same camera flow, one-scan behavior, flash button, and manual barcode input toggle).
+- Where to see it (page/link): /food/build-meal (tap “Scan barcode”)
+- What to quickly test: Open main Food Diary scanner and Build a Meal scanner; confirm both look and behave the same, and one successful scan adds the item without reopening scanner.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 01:37 AEDT
 - What changed: Added a backend repair for old favorites missing `lastUsedAt` so ordering is corrected from diary history. Also applied a one-time data repair for owner account favorites to restore missing last-used timestamps.
 - Where to see it (page/link): /food -> Add from favorites (All/Favorites/Custom)
