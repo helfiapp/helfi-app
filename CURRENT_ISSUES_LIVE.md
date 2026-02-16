@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 00:46 AEDT
+- What changed: Fixed meal ordering when adding from Favorites/Build a meal flows so newly added meals are stamped as newest and move to the top of Favorites and All lists. Also kept the updated-favorite "Add Meal" path aligned with this rule.
+- Where to see it (page/link): /food -> Add from favorites / Build a meal
+- What to quickly test: Open a favorite meal, change it, add it to diary, then open Favorites and All lists and confirm that meal appears at the top as the latest entry.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 00:29 AEDT
 - What changed: Replaced the old browser popup with a modern in-app dialog after Favorite update. Dialog now uses two buttons: 'Not now' (white button, green text) and 'Add Meal' (green button, white text).
 - Where to see it (page/link): /food -> Favorites/Custom -> Edit meal (Build a meal flow)
