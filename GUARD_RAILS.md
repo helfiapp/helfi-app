@@ -1972,6 +1972,25 @@ Agents must not:
 
 If changes are requested, explain them to the user first, get explicit approval, and ensure all chat experiences remain consistent and readable.
 
+### 7.1 Food Chat "Build this meal" handoff (Feb 2026 - Locked)
+
+**Goal:** In food chat (`/chat?context=food`), each `Option N:` recommendation must show a `Build this meal` button and open the same Build a Meal import flow.
+
+**Protected files:**
+- `components/VoiceChat.tsx` (option parsing + build button UI + builder handoff)
+- `app/food/build-meal/MealBuilderClient.tsx` (recipe import draft handling)
+
+**Must keep:**
+- Buttons must appear per recommendation option (not only one generic button).
+- Button click must write `food:recipeImportDraft` and open `/food/build-meal` with `recipeImport=1`.
+- This path must stay compatible with saving the built meal to favorites from Build a Meal.
+
+**If it breaks:**
+1. Confirm food chat assistant message contains `Option 1:` / `Option 2:` lines.
+2. Confirm `parseFoodOptionsFromAssistantMessage(...)` still returns options.
+3. Confirm clicking button writes `sessionStorage['food:recipeImportDraft']`.
+4. Confirm route push includes `/food/build-meal?...&recipeImport=1`.
+
 ---
 
 ## 9.2 Device Interest Tracking (Dashboard + Admin) — Locked

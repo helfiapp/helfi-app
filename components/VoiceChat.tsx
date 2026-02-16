@@ -34,6 +34,124 @@ interface VoiceChatProps {
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
 type ChatThread = { id: string; title: string | null; chargedOnce: boolean; createdAt: string; updatedAt: string }
 type PhotoMode = 'inventory' | 'menu' | 'meal' | 'label'
+type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
+
+type ParsedFoodOption = {
+  key: string
+  index: number
+  title: string
+  ingredients: string[]
+  steps: string[]
+  category: MealCategory
+}
+
+const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim())
+
+const buildTodayIso = () => {
+  const now = new Date()
+  const year = now.getFullYear()
+  const month = String(now.getMonth() + 1).padStart(2, '0')
+  const day = String(now.getDate()).padStart(2, '0')
+  return `${year}-${month}-${day}`
+}
+
+const stripOuterBold = (value: string) => {
+  const v = String(value || '').trim()
+  if (v.startsWith('**') && v.endsWith('**') && v.length > 4) return v.slice(2, -2).trim()
+  return v
+}
+
+const inferCategoryFromMealTitle = (title: string): MealCategory => {
+  const t = String(title || '').toLowerCase()
+  if (
+    /(breakfast|oat|porridge|omelette|omelet|toast|pancake|waffle|yogurt bowl|smoothie bowl|granola)/i.test(t)
+  ) {
+    return 'breakfast'
+  }
+  if (/(snack|protein bar|trail mix|popcorn|nuts|apple slices|fruit cup)/i.test(t)) return 'snacks'
+  if (/(lunch|salad|sandwich|wrap|bowl)/i.test(t)) return 'lunch'
+  if (/(dinner|steak|curry|stir fry|chili|pasta|roast|salmon|chicken breast)/i.test(t)) return 'dinner'
+  return 'uncategorized'
+}
+
+const normalizeIngredientToken = (raw: string) => {
+  const value = String(raw || '')
+    .replace(/^[\s•*\-–—]+/, '')
+    .replace(/^\d+\.\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!value) return ''
+  return value
+}
+
+const splitTitleIntoIngredients = (title: string) => {
+  const cleaned = String(title || '')
+    .replace(/\((.*?)\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return []
+  const chunks = cleaned
+    .split(/\s+\+\s+|\s+&\s+|,\s+(?=[a-z0-9])/i)
+    .map((part) => normalizeIngredientToken(part))
+    .filter(Boolean)
+  const unique = Array.from(new Set(chunks.map((item) => item.toLowerCase()))).map((key) =>
+    chunks.find((item) => item.toLowerCase() === key) || '',
+  )
+  return unique.filter(Boolean).slice(0, 12)
+}
+
+const parseFoodOptionsFromAssistantMessage = (content: string): ParsedFoodOption[] => {
+  const lines = String(content || '')
+    .split('\n')
+    .map((line) => stripOuterBold(line).trim())
+    .filter(Boolean)
+
+  const options: Array<{ index: number; title: string; detailLines: string[] }> = []
+  let current: { index: number; title: string; detailLines: string[] } | null = null
+
+  for (const line of lines) {
+    const optionMatch = line.match(/^Option\s+(\d+):\s*(.+)$/i)
+    if (optionMatch) {
+      if (current) options.push(current)
+      current = {
+        index: Number(optionMatch[1]),
+        title: String(optionMatch[2] || '').trim(),
+        detailLines: [],
+      }
+      continue
+    }
+    if (current) current.detailLines.push(line)
+  }
+  if (current) options.push(current)
+
+  return options
+    .map((opt) => {
+      const nonMacroLines = opt.detailLines.filter((line) => !/^(Macros|After eating)\s*:/i.test(line))
+      const bulletIngredients = nonMacroLines
+        .map((line) => {
+          const bullet = line.match(/^[-•*]\s+(.+)$/)
+          return bullet ? normalizeIngredientToken(bullet[1]) : ''
+        })
+        .filter(Boolean)
+      const titleIngredients = splitTitleIntoIngredients(opt.title)
+      const ingredients = bulletIngredients.length > 0 ? bulletIngredients.slice(0, 20) : titleIngredients
+      const steps = nonMacroLines
+        .map((line) => {
+          const numbered = line.match(/^\d+\.\s+(.+)$/)
+          return numbered ? normalizeIngredientToken(numbered[1]) : ''
+        })
+        .filter(Boolean)
+      return {
+        key: `option-${opt.index}-${String(opt.title || '').toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+        index: opt.index,
+        title: opt.title,
+        ingredients,
+        steps: steps.length > 0 ? steps : [`Assemble ${opt.title}.`],
+        category: inferCategoryFromMealTitle(opt.title),
+      }
+    })
+    .filter((opt) => opt.title.length > 0)
+}
 
 export default function VoiceChat({
   context,
@@ -86,6 +204,7 @@ export default function VoiceChat({
   const [selectionMode, setSelectionMode] = useState(false)
   const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([])
   const [bulkActionPending, setBulkActionPending] = useState(false)
+  const [openingFoodOptionKey, setOpeningFoodOptionKey] = useState<string | null>(null)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const barcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const barcodeScannerRef = useRef<{ reader: any; controls: any } | null>(null)
@@ -1473,6 +1592,49 @@ export default function VoiceChat({
     sendChatMessageRef.current = sendChatMessage
   }, [sendChatMessage])
 
+  const openFoodOptionInMealBuilder = (option: ParsedFoodOption) => {
+    const title = String(option?.title || '').trim()
+    const ingredients = Array.isArray(option?.ingredients)
+      ? option.ingredients.map((line) => String(line || '').trim()).filter(Boolean).slice(0, 60)
+      : []
+    const steps = Array.isArray(option?.steps)
+      ? option.steps.map((line) => String(line || '').trim()).filter(Boolean).slice(0, 30)
+      : []
+    if (!title || (ingredients.length === 0 && steps.length === 0)) {
+      setError('This recommendation does not have enough detail to build yet.')
+      return
+    }
+
+    const draft = {
+      title,
+      servings: 1,
+      prepMinutes: null,
+      cookMinutes: null,
+      ingredients,
+      prefillItems: [],
+      steps,
+      sourceUrl: null,
+      saveRecipe: false,
+      createdAt: Date.now(),
+    }
+
+    try {
+      sessionStorage.setItem('food:recipeImportDraft', JSON.stringify(draft))
+    } catch {
+      setError('Could not open Build a meal right now. Please try again.')
+      return
+    }
+
+    setError(null)
+    setOpeningFoodOptionKey(option.key)
+    const qs = new URLSearchParams()
+    qs.set('date', isIsoDate(selectedDate || '') ? String(selectedDate) : buildTodayIso())
+    qs.set('category', option.category || 'uncategorized')
+    qs.set('recipeImport', '1')
+    qs.set('t', String(Date.now()))
+    router.push(`/food/build-meal?${qs.toString()}`)
+  }
+
   const renderFormattedContent = (content: string, enableMacroColors = false) => (
     <ChatRichText content={content} useMacroColors={enableMacroColors} />
   )
@@ -1840,6 +2002,8 @@ export default function VoiceChat({
               {messages.map((m, idx) => {
                 const isLast = idx === messages.length - 1
                 const assistantRef = m.role === 'assistant' && isLast ? latestAssistantRef : undefined
+                const parsedFoodOptions =
+                  m.role === 'assistant' && isFoodEntry ? parseFoodOptionsFromAssistantMessage(m.content) : []
                 return (
                 <div ref={assistantRef} key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <div className={`hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
@@ -1858,6 +2022,25 @@ export default function VoiceChat({
                         <div className="text-[18px] md:text-[16px] leading-7 text-gray-800">
                           {renderFormattedContent(m.content, true)}
                         </div>
+                        {parsedFoodOptions.length > 0 && (
+                          <div className="mt-3 space-y-2">
+                            {parsedFoodOptions.map((option) => (
+                              <div key={option.key} className="rounded-xl border border-emerald-100 bg-emerald-50 px-3 py-3">
+                                <div className="text-sm font-semibold text-emerald-900">
+                                  Option {option.index}: {option.title}
+                                </div>
+                                <button
+                                  type="button"
+                                  onClick={() => openFoodOptionInMealBuilder(option)}
+                                  disabled={openingFoodOptionKey === option.key || loading}
+                                  className="mt-2 w-full sm:w-auto px-3 py-2 rounded-xl bg-emerald-600 text-white text-sm font-semibold disabled:opacity-60"
+                                >
+                                  {openingFoodOptionKey === option.key ? 'Opening builder…' : 'Build this meal'}
+                                </button>
+                              </div>
+                            ))}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="text-[18px] md:text-[16px] leading-7 text-gray-900 font-medium">
