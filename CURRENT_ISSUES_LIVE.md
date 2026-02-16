@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 01:20 AEDT
+- What changed: Fixed Favorites/All ordering so meals added through Favorites -> Change portion are treated as recently used and moved to the top. Also improved fallback matching so older entries (including Monday Taco entries) are recognized for recency ordering.
+- Where to see it (page/link): /food -> Add from favorites (All/Favorites/Custom tabs) and /food/build-meal from Favorites change-portion flow
+- What to quickly test: Open a favorite (for example Taco), use Change portion and Add. Reopen Add from favorites and confirm Taco appears at the top of Favorites and All.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 01:08 AEDT
 - What changed: Improved food search prediction so typing short text like 'blu' can now return cheese matches such as 'Cheese, blue', and word-order searches like 'Blue cheese' now work correctly.
 - Where to see it (page/link): /food -> Add Ingredient search (also Build a meal ingredient search)
