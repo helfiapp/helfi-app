@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-16 14:23 AEDT
+- What changed: Applied the new ChatGPT-style chat formatting/interface across all web chat sections (Talk to Helfi, Food Ask AI, Symptom chat, Medical image chat, and Insights section chat) using one shared renderer. Section behavior stayed context-specific (full-health for Talk to Helfi, food-specific for Food chat, symptom-specific for Symptom chat).
+- Where to see it (page/link): `/chat`, `/food`, `/symptoms`, `/medical-images`, `/insights/issues/*`
+- What to quickly test: Open each chat section, send a message, and confirm consistent spacing/font/list formatting across all of them while each section still answers in its own topic context.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-16 01:14 AEDT
 - What changed: Added hard build-time locks for calorie safety rules. Deploy now fails automatically if anyone changes (1) remaining calorie math, (2) daily allowance display format, or (3) stale/missing health-setup stamp blocker, unless they use explicit override flags.
 - Where to see it (page/link): `/food`, `/api/user-data`, `scripts/protect-regions.js`, `GUARD_RAILS.md` section `3.4.1`
