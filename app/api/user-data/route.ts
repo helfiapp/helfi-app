@@ -295,6 +295,16 @@ const extractFavoriteIdFromNutrition = (nutrients: any) => {
   return typeof raw === 'string' ? raw.trim() : ''
 }
 
+const extractFavoriteUsageTimestampMs = (log: any) => {
+  if (!log || typeof log !== 'object') return 0
+  const nutrients = log?.nutrients && typeof log.nutrients === 'object' ? (log.nutrients as any) : null
+  const addedOrder = Number(nutrients?.__addedOrder)
+  if (Number.isFinite(addedOrder) && addedOrder > 0) return addedOrder
+  const createdAt = log?.createdAt ? new Date(log.createdAt).getTime() : NaN
+  if (Number.isFinite(createdAt) && createdAt > 0) return createdAt
+  return 0
+}
+
 const extractFavoriteLabelFromLog = (description: any, fallback?: any) => {
   const raw = String(description || fallback || '').trim()
   if (!raw) return 'Favorite meal'
@@ -630,6 +640,88 @@ export async function GET(request: NextRequest) {
         }
       } catch (e) {
         console.log('No favorites data found in storage')
+      }
+
+      // Backfill missing favorite recency for older records.
+      // Some historical favorites were saved without lastUsedAt, which causes wrong ordering.
+      // We repair this once by deriving usage from linked diary logs.
+      try {
+        const needsLastUsedBackfill = (Array.isArray(favorites) ? favorites : []).some(
+          (fav: any) => Number(fav?.lastUsedAt) <= 0,
+        )
+        if (needsLastUsedBackfill) {
+          const cutoff = new Date(Date.now() - 120 * 24 * 60 * 60 * 1000)
+          const recentUsageLogs = await prisma.foodLog.findMany({
+            where: { userId: user.id, createdAt: { gte: cutoff } },
+            orderBy: { createdAt: 'desc' },
+            take: 2000,
+            select: {
+              id: true,
+              createdAt: true,
+              nutrients: true,
+            },
+          })
+
+          const lastUsedByFavoriteId = new Map<string, number>()
+          recentUsageLogs.forEach((log: any) => {
+            const favoriteId = extractFavoriteIdFromNutrition(log?.nutrients)
+            if (!favoriteId) return
+            const usageTs = extractFavoriteUsageTimestampMs(log)
+            if (!Number.isFinite(usageTs) || usageTs <= 0) return
+            const prev = Number(lastUsedByFavoriteId.get(favoriteId) || 0)
+            if (usageTs > prev) lastUsedByFavoriteId.set(favoriteId, usageTs)
+          })
+
+          if (lastUsedByFavoriteId.size > 0) {
+            let changed = false
+            const repaired = (Array.isArray(favorites) ? favorites : []).map((fav: any) => {
+              const currentLastUsed = Number(fav?.lastUsedAt)
+              if (Number.isFinite(currentLastUsed) && currentLastUsed > 0) return fav
+              const favId = typeof fav?.id === 'string' ? String(fav.id).trim() : ''
+              if (!favId) return fav
+              const recoveredLastUsed = Number(lastUsedByFavoriteId.get(favId) || 0)
+              if (!Number.isFinite(recoveredLastUsed) || recoveredLastUsed <= 0) return fav
+              changed = true
+              return { ...fav, lastUsedAt: recoveredLastUsed }
+            })
+
+            if (changed) {
+              favorites = repaired
+              const existingGoals = await prisma.healthGoal.findMany({
+                where: { userId: user.id, name: '__FOOD_FAVORITES__' },
+                orderBy: { createdAt: 'desc' },
+                select: { id: true },
+              })
+              const primary = existingGoals[0] || null
+              if (primary?.id) {
+                await prisma.healthGoal.update({
+                  where: { id: primary.id },
+                  data: {
+                    category: JSON.stringify({ favorites }),
+                    currentRating: 0,
+                  },
+                })
+                if (existingGoals.length > 1) {
+                  await prisma.healthGoal.deleteMany({
+                    where: { id: { in: existingGoals.slice(1).map((g) => g.id) } },
+                  })
+                }
+              } else {
+                await prisma.healthGoal.create({
+                  data: {
+                    userId: user.id,
+                    name: '__FOOD_FAVORITES__',
+                    category: JSON.stringify({ favorites }),
+                    currentRating: 0,
+                  },
+                })
+              }
+              console.log('Backfilled missing favorites lastUsedAt from diary history')
+            }
+          }
+        }
+      } catch (backfillError) {
+        console.warn('Favorite recency backfill failed (non-blocking)', backfillError)
       }
 
       // Recovery guard:
