@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 02:45 AEDT
+- What changed: Fixed Add from favorites ordering for midnight edge cases so older entries without __addedOrder use real add-time fallback from record ID; Taco-style entries now sort in correct recency position.
+- Where to see it (page/link): https://helfi.ai/food (Add from favorites modal, All/Favorites tabs)
+- What to quickly test: Open Add from favorites and confirm Taco Meal appears above older Monday items based on its newer timestamp.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 02:24 AEDT
 - What changed: Updated Build a Meal barcode scanner so it now matches the main Food Diary scanner behavior (same camera flow, one-scan behavior, flash button, and manual barcode input toggle).
 - Where to see it (page/link): /food/build-meal (tap “Scan barcode”)
