@@ -1742,6 +1742,11 @@ export default function MealBuilderClient() {
     category: string
   } | null>(null)
   const [favoriteUpdatePromptSaving, setFavoriteUpdatePromptSaving] = useState(false)
+  const [favoriteAdjustRecencySeed, setFavoriteAdjustRecencySeed] = useState<{
+    favoriteId: string
+    sourceId: string
+    label: string
+  } | null>(null)
 
   const applySavedPortion = (source: any) => {
     if (!source || typeof source !== 'object') return
@@ -1980,8 +1985,12 @@ export default function MealBuilderClient() {
 
   useEffect(() => {
     // Seeded from Food Diary "Change portion" flow: open full editor with source meal as a NEW add flow.
-    if (!isFavoriteAdjustBuild) return
+    if (!isFavoriteAdjustBuild) {
+      setFavoriteAdjustRecencySeed(null)
+      return
+    }
 
+    setFavoriteAdjustRecencySeed(null)
     let seeded = false
     try {
       const raw = sessionStorage.getItem(FAVORITE_PORTION_SEED_KEY)
@@ -1993,6 +2002,18 @@ export default function MealBuilderClient() {
       const label = sanitizeMealTitle(String(parsed?.label || source?.description || source?.label || 'Meal'))
       if (label) setMealName(label)
       setLinkedFavoriteId('')
+      const sourceFavoriteId = typeof source?.id === 'string' ? source.id.trim() : ''
+      const sourceSourceId = typeof source?.sourceId === 'string' ? source.sourceId.trim() : ''
+      const sourceLabel = sanitizeMealTitle(String(source?.label || source?.description || label || ''))
+      if (sourceFavoriteId || sourceSourceId || sourceLabel) {
+        setFavoriteAdjustRecencySeed({
+          favoriteId: sourceFavoriteId,
+          sourceId: sourceSourceId,
+          label: sourceLabel,
+        })
+      } else {
+        setFavoriteAdjustRecencySeed(null)
+      }
 
       const totals = (source as any)?.nutrition || (source as any)?.total || null
       applySavedPortion(totals)
@@ -5030,6 +5051,33 @@ export default function MealBuilderClient() {
       if (!res.ok) {
         setError('Saving failed. Please try again.')
         return
+      }
+      if (isFavoriteAdjustBuild && favoriteAdjustRecencySeed) {
+        try {
+          const targetFavoriteId = String(favoriteAdjustRecencySeed.favoriteId || '').trim()
+          const targetSourceId = String(favoriteAdjustRecencySeed.sourceId || '').trim()
+          const targetLabelKey = normalizeFoodNameKey(
+            normalizeMealLabel(String(favoriteAdjustRecencySeed.label || '')).trim(),
+          )
+          const usedAtMs = addedOrderStamp
+          let changed = false
+          const nextFavorites = favorites.map((fav: any) => {
+            const favId = String(fav?.id || '').trim()
+            const favSourceId = String(fav?.sourceId || '').trim()
+            const favLabelKey = normalizeFoodNameKey(
+              normalizeMealLabel(favoriteDisplayLabel(fav) || fav?.label || fav?.description || '').trim(),
+            )
+            const idMatch = targetFavoriteId && favId && favId === targetFavoriteId
+            const sourceMatch = targetSourceId && favSourceId && favSourceId === targetSourceId
+            const labelMatch = targetLabelKey && favLabelKey && favLabelKey === targetLabelKey
+            if (!idMatch && !sourceMatch && !labelMatch) return fav
+            changed = true
+            return { ...fav, lastUsedAt: usedAtMs }
+          })
+          if (changed) persistFavorites(nextFavorites)
+        } catch {
+          // Non-blocking: diary add already succeeded.
+        }
       }
       try {
         const createdId = typeof data?.id === 'string' ? data.id : null

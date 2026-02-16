@@ -14755,8 +14755,16 @@ Please add nutritional information manually if needed.`);
     // Use the same normalization we use for food names so things like "Bürgen" and "Burgen"
     // (and various punctuation/spacing differences) still match reliably.
     const normalizeKey = (raw: any, entry?: any) => normalizeFoodName(applyFoodNameOverride(raw || '', entry))
+    const normalizeRawKey = (raw: any) => normalizeFoodName(normalizeMealLabel(String(raw || '')).trim())
     const simplifyKey = (raw: any) => {
       const s = applyFoodNameOverride(raw || '').trim()
+      if (!s) return ''
+      const withoutQty = s.replace(/^\s*\d+(?:\.\d+)?\s*(?:×|x)?\s*/i, '').trim()
+      const head = (withoutQty.split(',')[0] || withoutQty).split('(')[0] || withoutQty
+      return normalizeFoodName(normalizeMealLabel(head))
+    }
+    const simplifyRawKey = (raw: any) => {
+      const s = normalizeMealLabel(String(raw || '')).trim()
       if (!s) return ''
       const withoutQty = s.replace(/^\s*\d+(?:\.\d+)?\s*(?:×|x)?\s*/i, '').trim()
       const head = (withoutQty.split(',')[0] || withoutQty).split('(')[0] || withoutQty
@@ -14770,14 +14778,22 @@ Please add nutritional information manually if needed.`);
       if (!favId) return
       const labelKey = normalizeKey(fav?.label || fav?.description || '')
       if (labelKey) favoriteIdByAlias.set(labelKey, favId)
+      const labelRawKey = normalizeRawKey(fav?.label || fav?.description || '')
+      if (labelRawKey) favoriteIdByAlias.set(labelRawKey, favId)
       const labelSimple = simplifyKey(fav?.label || fav?.description || '')
       if (labelSimple) favoriteIdByAlias.set(labelSimple, favId)
+      const labelRawSimple = simplifyRawKey(fav?.label || fav?.description || '')
+      if (labelRawSimple) favoriteIdByAlias.set(labelRawSimple, favId)
       const aliases = Array.isArray((fav as any)?.aliases) ? (fav as any).aliases : []
       for (const a of Array.isArray(aliases) ? aliases : []) {
         const k = normalizeKey(a)
         if (k) favoriteIdByAlias.set(k, favId)
+        const rawK = normalizeRawKey(a)
+        if (rawK) favoriteIdByAlias.set(rawK, favId)
         const ks = simplifyKey(a)
         if (ks) favoriteIdByAlias.set(ks, favId)
+        const rawKs = simplifyRawKey(a)
+        if (rawKs) favoriteIdByAlias.set(rawKs, favId)
       }
 
       // Also treat ingredient item names as aliases. This helps keep renamed Favorites consistent
@@ -14789,8 +14805,12 @@ Please add nutritional information manually if needed.`);
           if (!n) continue
           const k = normalizeKey(n)
           if (k) favoriteIdByAlias.set(k, favId)
+          const rawK = normalizeRawKey(n)
+          if (rawK) favoriteIdByAlias.set(rawK, favId)
           const ks = simplifyKey(n)
           if (ks) favoriteIdByAlias.set(ks, favId)
+          const rawKs = simplifyRawKey(n)
+          if (rawKs) favoriteIdByAlias.set(rawKs, favId)
         }
       } catch {}
     })
@@ -14805,8 +14825,12 @@ Please add nutritional information manually if needed.`);
     ;(favorites || []).forEach((fav: any) => {
       const favId = fav?.id ? String(fav.id).trim() : ''
       const key = normalizeKey(fav?.label || fav?.description || favoriteDisplayLabel(fav) || '', fav)
-      if (!key) return
-      favoritesByKey.set(key, fav)
+      if (key) favoritesByKey.set(key, fav)
+      const rawKey = normalizeRawKey(fav?.label || fav?.description || favoriteDisplayLabel(fav) || '')
+      if (rawKey && !favoritesByKey.has(rawKey)) favoritesByKey.set(rawKey, fav)
+      const rawSimple = simplifyRawKey(fav?.label || fav?.description || favoriteDisplayLabel(fav) || '')
+      if (rawSimple && !favoritesByKey.has(rawSimple)) favoritesByKey.set(rawSimple, fav)
+      if (!key && !rawKey && !rawSimple) return
       if (favId) favoritesById.set(favId, fav)
       const favSourceId = getSourceIdForEntry(fav)
       if (favId && favSourceId && !favoriteIdBySourceId.has(favSourceId)) {
@@ -14855,11 +14879,18 @@ Please add nutritional information manually if needed.`);
         return ''
       }
       const labelKey = normalizeKey(entry?.description || entry?.label || '', entry)
+      const labelRawKey = normalizeRawKey(entry?.description || entry?.label || '')
       const aliasId =
         (labelKey ? favoriteIdByAlias.get(labelKey) : '') ||
+        (labelRawKey ? favoriteIdByAlias.get(labelRawKey) : '') ||
         (() => {
           const s = simplifyKey(entry?.description || entry?.label || '')
-          return s ? favoriteIdByAlias.get(s) : ''
+          if (s) {
+            const hit = favoriteIdByAlias.get(s)
+            if (hit) return hit
+          }
+          const sr = simplifyRawKey(entry?.description || entry?.label || '')
+          return sr ? favoriteIdByAlias.get(sr) : ''
         })()
       if (aliasId) return String(aliasId || '')
       const tokenId = resolveFavoriteIdByTokenOverlap(entry)

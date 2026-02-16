@@ -2547,12 +2547,14 @@ entry for the **same day** only **if that diary entry was not manually edited**.
   - do not auto-save/overwrite favorite defaults
   - do not attach `__favoriteId` link for that add flow
   - primary action should remain `Add` (not `Update`)
+  - when this one-off add succeeds, update the source favorite `lastUsedAt` so Favorites/All recency order stays correct.
 
 **If this breaks again, restore this first:**
 1. In `createMeal`, keep one-off lock for `isFavoriteAdjustBuild` so favorite persistence is disabled.
 2. Ensure payload nutrition does not include `__favoriteId` in this flow.
-3. In `app/food/page.tsx`, confirm the choose popup still renders `Change portion` button (not hidden/removed by merge).
-4. Re-test on LIVE with Playwright:
+3. Ensure one-off add success path stamps the source favorite `lastUsedAt` (id/sourceId/label match) before returning to Food Diary.
+4. In `app/food/page.tsx`, confirm the choose popup still renders `Change portion` button (not hidden/removed by merge).
+5. Re-test on LIVE with Playwright:
    - Open Add from favorites -> select meal -> `Change portion`.
    - Change amount/ingredients and tap `Add`.
    - Reopen that same favorite in list and confirm its default serving/ingredients are unchanged.
