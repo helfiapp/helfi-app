@@ -2697,6 +2697,47 @@ Last stable deployment: `c1c5f2aa` (2026-02-14)
 
 Last stable deployment: `a0544590` (2026-02-15)
 
+## 7.9 Chat Formatting + Interface Style Lock (Feb 2026 – Locked)
+
+**Goal (non-negotiable):** Keep the approved chat look and text formatting exactly as released across all web chat sections.
+
+**Protected files:**
+- `components/chat/ChatRichText.tsx`
+- `components/VoiceChat.tsx`
+- `app/insights/issues/[issueSlug]/SectionChat.tsx`
+- `app/symptoms/SymptomChat.tsx`
+- `app/medical-images/MedicalImageChat.tsx`
+
+**Must keep (source of truth):**
+- `ChatRichText.tsx` is the shared text renderer for chat replies and user messages.
+- All protected chat screens above must use the shared renderer (not separate custom formatting logic per screen).
+- Keep the approved readable text size/spacing style (ChatGPT-like clean headings, bullet points, numbered lists, and paragraph spacing).
+- Keep chat context behavior separated by section:
+  - Talk to Helfi = full health context
+  - Food chat = food-specific context
+  - Symptom chat = symptom-specific context
+  - Medical image chat = image-analysis-specific context
+  - Insights section chat = issue/section-specific context
+
+**Do not:**
+- Reintroduce per-screen custom markdown/line parsers in the protected chat files.
+- Shrink text back to the old compact style or remove the current list/heading spacing.
+- Mix section contexts together (for example, making food chat behave like full-health chat).
+
+**If this breaks again, restore checklist:**
+1. Ensure each protected chat file imports and uses `ChatRichText`.
+2. Remove any duplicate inline text parsing blocks from those files.
+3. Keep medical image chat heading support passed through `headings={SECTION_HEADINGS}`.
+4. Verify quickly on web:
+   - `/chat` (Talk to Helfi)
+   - `/food` (Ask AI)
+   - `/symptoms`
+   - `/medical-images`
+   - `/insights/issues/*`
+   and confirm formatting is consistent and section context remains specific.
+
+Last stable deployment: `d1b55505` (2026-02-16)
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
