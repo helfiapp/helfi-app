@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-16 21:11 AEDT
+- What changed: Food chat Build this meal now uses structured recipe-import style data (ingredients, steps, servings, prep/cook time) from each AI option, then opens Build a Meal with that full draft.
+- Where to see it (page/link): `/chat?context=food` -> `/food/build-meal`
+- What to quickly test: Ask food chat for options, click Build this meal under an option, confirm Build a Meal opens with imported ingredients and recipe steps (not just a guessed title).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-16 17:48 AEDT
 - What changed: In food chat (`/chat?context=food`), each AI `Option` now has its own `Build this meal` button. Clicking it opens the existing Build a Meal import flow with a prefilled draft so users can continue building and then save as favorite.
 - Where to see it (page/link): `/chat?context=food` -> `/food/build-meal`
