@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-16 17:48 AEDT
+- What changed: In food chat (`/chat?context=food`), each AI `Option` now has its own `Build this meal` button. Clicking it opens the existing Build a Meal import flow with a prefilled draft so users can continue building and then save as favorite.
+- Where to see it (page/link): `/chat?context=food` -> `/food/build-meal`
+- What to quickly test: Ask for meal options in food chat, click `Build this meal` under Option 1 or Option 2, confirm Build a Meal opens with imported ingredients and can be saved to favorites.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-16 14:23 AEDT
 - What changed: Applied the new ChatGPT-style chat formatting/interface across all web chat sections (Talk to Helfi, Food Ask AI, Symptom chat, Medical image chat, and Insights section chat) using one shared renderer. Section behavior stayed context-specific (full-health for Talk to Helfi, food-specific for Food chat, symptom-specific for Symptom chat).
 - Where to see it (page/link): `/chat`, `/food`, `/symptoms`, `/medical-images`, `/insights/issues/*`
