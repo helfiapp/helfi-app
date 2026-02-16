@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 01:08 AEDT
+- What changed: Improved food search prediction so typing short text like 'blu' can now return cheese matches such as 'Cheese, blue', and word-order searches like 'Blue cheese' now work correctly.
+- Where to see it (page/link): /food -> Add Ingredient search (also Build a meal ingredient search)
+- What to quickly test: Type 'blu' and confirm 'Cheese, blue' appears in the dropdown; then type 'Blue cheese' and confirm it appears as a result.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 00:46 AEDT
 - What changed: Fixed meal ordering when adding from Favorites/Build a meal flows so newly added meals are stamped as newest and move to the top of Favorites and All lists. Also kept the updated-favorite "Add Meal" path aligned with this rule.
 - Where to see it (page/link): /food -> Add from favorites / Build a meal
