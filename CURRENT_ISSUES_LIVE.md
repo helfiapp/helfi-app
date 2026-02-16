@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 00:12 AEDT
+- What changed: When you edit/update a Favorite meal in Build a meal, the app now asks if you want to add the updated meal to your Food Diary right away. If yes, it creates a new diary entry immediately.
+- Where to see it (page/link): /food -> Favorites/Custom -> Edit meal (Build a meal flow)
+- What to quickly test: Edit a favorite meal, click Update, confirm prompt appears, choose Yes, and confirm the updated meal is added to diary.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-16 22:08 AEDT
 - What changed: Added a new Portion control toggle in Build a meal. Toggle OFF is now the default and shows full-meal totals (100% of recipe). Toggle ON shows portion fields (serving/g/oz), keeps serving defaults for imported recipes, and saves/scales totals using the selected portion.
 - Where to see it (page/link): /food/build-meal (including Recipe Import, Ask AI Build this meal, and edit flows that open Build a meal)
