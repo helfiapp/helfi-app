@@ -1657,6 +1657,7 @@ export default function MealBuilderClient() {
   const [ingredientsListExpanded, setIngredientsListExpanded] = useState(true)
   const [lastRemoved, setLastRemoved] = useState<{ item: BuilderItem; index: number } | null>(null)
   const undoRemoveTimeoutRef = useRef<any>(null)
+  const [portionControlEnabled, setPortionControlEnabled] = useState(false)
   const [portionAmountInput, setPortionAmountInput] = useState('')
   const [portionUnit, setPortionUnit] = useState<PortionUnit>('g')
   const [recipeServingsForPortion, setRecipeServingsForPortion] = useState<number | null>(null)
@@ -1717,7 +1718,7 @@ export default function MealBuilderClient() {
   const [favoritesToast, setFavoritesToast] = useState<string | null>(null)
 
   const busy = searchLoading || savingMeal || photoLoading || barcodeLoading || recipeImportLoading
-  const showPortionSaveCta = (parseNumericInput(portionAmountInput) || 0) > 0
+  const showPortionSaveCta = portionControlEnabled && (parseNumericInput(portionAmountInput) || 0) > 0
   const isDiaryEdit = Boolean(sourceLogId) && !editFavoriteId
   const isFavoriteAdjustBuild = fromFavoriteAdjust && !editFavoriteId && !sourceLogId
   const editScopeKey = editFavoriteId ? `fav:${editFavoriteId}` : sourceLogId ? `log:${sourceLogId}` : ''
@@ -1737,6 +1738,13 @@ export default function MealBuilderClient() {
 
   const applySavedPortion = (source: any) => {
     if (!source || typeof source !== 'object') return
+    const explicitToggle = (source as any).__portionControlEnabled
+    if (typeof explicitToggle === 'boolean') {
+      setPortionControlEnabled(explicitToggle)
+    } else {
+      const legacyScale = Number((source as any).__portionScale)
+      setPortionControlEnabled(Number.isFinite(legacyScale) && Math.abs(legacyScale - 1) > 0.0001)
+    }
     const amountRaw = (source as any).__portionAmount
     const unitRaw = (source as any).__portionUnit
     const weightRaw = (source as any).__portionWeightG
@@ -1809,6 +1817,9 @@ export default function MealBuilderClient() {
       if (typeof parsed.portionUnit === 'string' && (parsed.portionUnit === 'serving' || parsed.portionUnit === 'g' || parsed.portionUnit === 'oz')) {
         setPortionUnit(parsed.portionUnit)
       }
+      if (typeof parsed.portionControlEnabled === 'boolean') {
+        setPortionControlEnabled(parsed.portionControlEnabled)
+      }
       if (typeof parsed.saveImportedRecipeToFavorites === 'boolean') {
         setSaveImportedRecipeToFavorites(parsed.saveImportedRecipeToFavorites)
       }
@@ -1834,6 +1845,7 @@ export default function MealBuilderClient() {
           updatedAt: Date.now(),
           mealName,
           energyUnit,
+          portionControlEnabled,
           portionAmountInput,
           portionUnit,
           saveImportedRecipeToFavorites,
@@ -1850,7 +1862,7 @@ export default function MealBuilderClient() {
         if (draftWriteTimeoutRef.current) window.clearTimeout(draftWriteTimeoutRef.current)
       } catch {}
     }
-  }, [draftKey, items, mealName, energyUnit, portionAmountInput, portionUnit, saveImportedRecipeToFavorites, recipeServingsForPortion])
+  }, [draftKey, items, mealName, energyUnit, portionControlEnabled, portionAmountInput, portionUnit, saveImportedRecipeToFavorites, recipeServingsForPortion])
 
   useEffect(() => {
     itemsRef.current = items
@@ -2370,9 +2382,14 @@ export default function MealBuilderClient() {
     return computedPortionScale
   }, [savedPortionScale, computedPortionScale, sourceLogId, editFavoriteId, portionScaleOverriddenByUser])
 
+  const effectivePortionScale = useMemo(() => {
+    if (!portionControlEnabled) return 1
+    return portionScale
+  }, [portionControlEnabled, portionScale])
+
   const mealTotals = useMemo(
-    () => applyPortionScaleToTotals(baseMealTotals, portionScale),
-    [baseMealTotals, portionScale],
+    () => applyPortionScaleToTotals(baseMealTotals, effectivePortionScale),
+    [baseMealTotals, effectivePortionScale],
   )
 
   useEffect(() => {
@@ -4391,31 +4408,29 @@ export default function MealBuilderClient() {
 
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
-    const portionScaleForSave = computePortionScale(
-      portionAmountForSave,
-      portionUnit,
-      totalRecipeWeightForSave,
-      recipeServingsForPortion,
-    )
+    const portionScaleRaw = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave, recipeServingsForPortion)
+    const portionScaleForSave = portionControlEnabled ? portionScaleRaw : 1
+    const portionAmountNumeric = parseNumericInput(portionAmountForSave)
 
-    const portionWeightForSave = computePortionWeightG(
-      portionAmountForSave,
-      portionUnit,
-      totalRecipeWeightForSave,
-      recipeServingsForPortion,
-    )
+    const portionWeightForSave = portionControlEnabled
+      ? computePortionWeightG(portionAmountForSave, portionUnit, totalRecipeWeightForSave, recipeServingsForPortion)
+      : null
     const portionMeta =
-      portionWeightForSave
+      portionControlEnabled && portionAmountNumeric && portionAmountNumeric > 0
         ? {
             __portionScale: round3(portionScaleForSave),
-            __portionWeightG: Math.round(portionWeightForSave),
             __portionUnit: portionUnit,
-            __portionAmount: parseNumericInput(portionAmountForSave),
-            __portionTotalWeightG: Math.round(totalRecipeWeightForSave || 0),
+            __portionAmount: portionAmountNumeric,
+            __portionTotalWeightG:
+              Number.isFinite(Number(totalRecipeWeightForSave)) && Number(totalRecipeWeightForSave) > 0
+                ? Math.round(Number(totalRecipeWeightForSave))
+                : null,
             __portionRecipeServings:
               Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0
                 ? Number(recipeServingsForPortion)
                 : null,
+            __portionControlEnabled: true,
+            ...(portionWeightForSave ? { __portionWeightG: Math.round(portionWeightForSave) } : {}),
           }
         : null
 
@@ -4455,6 +4470,7 @@ export default function MealBuilderClient() {
       fiber: round3(scaledTotals.fiber),
       sugar: round3(scaledTotals.sugar),
       __origin: 'meal-builder',
+      __portionControlEnabled: portionControlEnabled,
       ...(favoriteId ? { __favoriteId: favoriteId } : {}),
       ...(portionMeta ? portionMeta : {}),
     }
@@ -4462,6 +4478,7 @@ export default function MealBuilderClient() {
 
     const signature = [
       title,
+      String(portionControlEnabled ? '1' : '0'),
       portionUnit,
       String(parseNumericInput(portionAmountForSave) || ''),
       String(Number(recipeServingsForPortion) || ''),
@@ -4470,7 +4487,7 @@ export default function MealBuilderClient() {
     ].join('|')
 
     return { title, description, cleanedItems, diaryNutrition, signature }
-  }, [isDiaryEdit, sourceLogId, items, mealName, portionAmountInput, portionUnit, recipeServingsForPortion, linkedFavoriteId])
+  }, [isDiaryEdit, sourceLogId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, recipeServingsForPortion, linkedFavoriteId])
 
   useEffect(() => {
     if (!isDiaryEdit) return
@@ -4529,7 +4546,7 @@ export default function MealBuilderClient() {
         if (diaryAutosaveTimeoutRef.current) window.clearTimeout(diaryAutosaveTimeoutRef.current)
       } catch {}
     }
-  }, [isDiaryEdit, sourceLogId, items, mealName, portionAmountInput, portionUnit, linkedFavoriteId, savingMeal, buildDiaryAutosaveBundle, category, selectedDate])
+  }, [isDiaryEdit, sourceLogId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, linkedFavoriteId, savingMeal, buildDiaryAutosaveBundle, category, selectedDate])
 
   const createMeal = async () => {
     if (items.length === 0) {
@@ -4582,12 +4599,9 @@ export default function MealBuilderClient() {
     )
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
-    const portionScaleForSave = computePortionScale(
-      portionAmountForSave,
-      portionUnit,
-      totalRecipeWeightForSave,
-      recipeServingsForPortion,
-    )
+    const portionScaleRaw = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave, recipeServingsForPortion)
+    const portionScaleForSave = portionControlEnabled ? portionScaleRaw : 1
+    const portionAmountNumeric = parseNumericInput(portionAmountForSave)
 
     const shouldStripBuilderIds = Boolean(editFavoriteId) && !editFavoriteIsCustomRef.current
     const sourceItemsForMerge = shouldStripBuilderIds ? editFavoriteSourceItemsRef.current : null
@@ -4633,24 +4647,25 @@ export default function MealBuilderClient() {
           sugar: totalsForSave.sugar * portionScaleForSave,
         }
       : totalsForSave
-    const portionWeightForSave = computePortionWeightG(
-      portionAmountForSave,
-      portionUnit,
-      totalRecipeWeightForSave,
-      recipeServingsForPortion,
-    )
+    const portionWeightForSave = portionControlEnabled
+      ? computePortionWeightG(portionAmountForSave, portionUnit, totalRecipeWeightForSave, recipeServingsForPortion)
+      : null
     const portionMeta =
-      portionWeightForSave
+      portionControlEnabled && portionAmountNumeric && portionAmountNumeric > 0
         ? {
             __portionScale: round3(portionScaleForSave),
-            __portionWeightG: Math.round(portionWeightForSave),
             __portionUnit: portionUnit,
-            __portionAmount: parseNumericInput(portionAmountForSave),
-            __portionTotalWeightG: Math.round(totalRecipeWeightForSave || 0),
+            __portionAmount: portionAmountNumeric,
+            __portionTotalWeightG:
+              Number.isFinite(Number(totalRecipeWeightForSave)) && Number(totalRecipeWeightForSave) > 0
+                ? Math.round(Number(totalRecipeWeightForSave))
+                : null,
             __portionRecipeServings:
               Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0
                 ? Number(recipeServingsForPortion)
                 : null,
+            __portionControlEnabled: true,
+            ...(portionWeightForSave ? { __portionWeightG: Math.round(portionWeightForSave) } : {}),
           }
         : null
 
@@ -4684,6 +4699,7 @@ export default function MealBuilderClient() {
         fiber: round3(scaledTotals.fiber),
         sugar: round3(scaledTotals.sugar),
         __origin: 'meal-builder',
+        __portionControlEnabled: portionControlEnabled,
         ...(safeFavoriteLinkId ? { __favoriteId: safeFavoriteLinkId } : {}),
         ...(portionMeta ? portionMeta : {}),
         ...(importedRecipeMeta ? { __importRecipe: importedRecipeMeta } : {}),
@@ -5701,70 +5717,101 @@ export default function MealBuilderClient() {
           <UsageMeter inline className="mt-1" feature="foodAnalysis" />
 
           <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3">
-            <div className="text-xs font-semibold text-gray-700">Portion size</div>
-            <div className="mt-2 flex items-center gap-2">
-              {portionUnit === 'serving' ? (
-                <div className="flex-1 flex items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPortionScaleOverriddenByUser(true)
-                      adjustServingPortion(-1)
-                    }}
-                    className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
-                    aria-label="Decrease servings"
-                  >
-                    −
-                  </button>
-                  <div className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-900">
-                    {servingLabel}
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPortionScaleOverriddenByUser(true)
-                      adjustServingPortion(1)
-                    }}
-                    className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
-                    aria-label="Increase servings"
-                  >
-                    +
-                  </button>
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div className="text-xs font-semibold text-gray-700">Portion control</div>
+                <div className="text-[11px] text-gray-600">
+                  {portionControlEnabled
+                    ? 'Toggle is on: you are editing a portion amount.'
+                    : 'Toggle is off: this meal uses 100% of ingredients.'}
                 </div>
-              ) : (
-                <input
-                  ref={portionInputRef}
-                  type="number"
-                  inputMode="decimal"
-                  min={0}
-                  value={portionAmountInput}
-                  onFocus={() => setPortionAmountInput('')}
-                  onChange={(e) => {
-                    setPortionScaleOverriddenByUser(true)
-                    setPortionAmountInput(e.target.value)
-                  }}
-                  placeholder={portionUnit === 'oz' ? 'e.g., 10' : 'e.g., 300'}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                />
-              )}
-              <select
-                value={portionUnit}
-                onChange={(e) => {
-                  setPortionScaleOverriddenByUser(true)
-                  setPortionUnit(e.target.value as PortionUnit)
-                }}
-                className="w-28 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              >
-                <option value="serving">serving</option>
-                <option value="g">g</option>
-                <option value="oz">oz</option>
-              </select>
-            </div>
-            {totalRecipeWeightG > 0 && Number.isFinite(portionScale) && portionScale > 0 ? (
-              <div className="mt-2 text-[11px] text-emerald-700">
-                This portion is {Math.round(portionScale * 100)}% of the full amount.
               </div>
-            ) : null}
+              <button
+                type="button"
+                role="switch"
+                aria-checked={portionControlEnabled}
+                aria-label="Portion control"
+                onClick={() => setPortionControlEnabled((prev) => !prev)}
+                className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
+                  portionControlEnabled ? 'bg-emerald-600' : 'bg-gray-300'
+                }`}
+              >
+                <span
+                  className={`inline-block h-5 w-5 transform rounded-full bg-white transition-transform ${
+                    portionControlEnabled ? 'translate-x-5' : 'translate-x-1'
+                  }`}
+                />
+              </button>
+            </div>
+            {portionControlEnabled ? (
+              <>
+                <div className="mt-2 flex items-center gap-2">
+                  {portionUnit === 'serving' ? (
+                    <div className="flex-1 flex items-center gap-2">
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPortionScaleOverriddenByUser(true)
+                          adjustServingPortion(-1)
+                        }}
+                        className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
+                        aria-label="Decrease servings"
+                      >
+                        −
+                      </button>
+                      <div className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white text-sm text-gray-900">
+                        {servingLabel}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setPortionScaleOverriddenByUser(true)
+                          adjustServingPortion(1)
+                        }}
+                        className="h-10 w-10 rounded-lg border border-gray-300 bg-white text-lg font-semibold text-gray-700 hover:bg-gray-50"
+                        aria-label="Increase servings"
+                      >
+                        +
+                      </button>
+                    </div>
+                  ) : (
+                    <input
+                      ref={portionInputRef}
+                      type="number"
+                      inputMode="decimal"
+                      min={0}
+                      value={portionAmountInput}
+                      onFocus={() => setPortionAmountInput('')}
+                      onChange={(e) => {
+                        setPortionScaleOverriddenByUser(true)
+                        setPortionAmountInput(e.target.value)
+                      }}
+                      placeholder={portionUnit === 'oz' ? 'e.g., 10' : 'e.g., 300'}
+                      className="flex-1 px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                    />
+                  )}
+                  <select
+                    value={portionUnit}
+                    onChange={(e) => {
+                      setPortionScaleOverriddenByUser(true)
+                      setPortionUnit(e.target.value as PortionUnit)
+                    }}
+                    className="w-28 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                  >
+                    <option value="serving">serving</option>
+                    <option value="g">g</option>
+                    <option value="oz">oz</option>
+                  </select>
+                </div>
+                {totalRecipeWeightG > 0 && Number.isFinite(effectivePortionScale) && effectivePortionScale > 0 ? (
+                  <div className="mt-2 text-[11px] text-emerald-700">
+                    This portion is {Math.round(effectivePortionScale * 100)}% of the full amount.
+                  </div>
+                ) : null}
+              </>
+            ) : (
+              <div className="mt-2 text-[11px] text-emerald-700">This meal is 100% of the full amount.</div>
+            )}
             <div className="mt-2 flex flex-wrap gap-2">
               <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
                 <span className="font-semibold text-gray-900">{formatEnergyValue(mealTotals.calories, energyUnit)}</span> {energyUnit}
@@ -5785,8 +5832,15 @@ export default function MealBuilderClient() {
                 <span className="font-semibold text-gray-900">{round3(mealTotals.sugar)}</span> g sugar
               </div>
             </div>
-            <div className="mt-1 text-[11px] text-gray-600">These update live when you change portion size.</div>
-            {portionUnit === 'serving' && Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0 ? (
+            <div className="mt-1 text-[11px] text-gray-600">
+              {portionControlEnabled
+                ? 'These update live when you change portion size.'
+                : 'Portion control is off. Totals show the full meal.'}
+            </div>
+            {portionControlEnabled &&
+            portionUnit === 'serving' &&
+            Number.isFinite(Number(recipeServingsForPortion)) &&
+            Number(recipeServingsForPortion) > 0 ? (
               <div className="mt-2 text-[11px] text-gray-600">
                 Recipe has about {Math.round(Number(recipeServingsForPortion))} servings.
               </div>
@@ -5934,19 +5988,20 @@ export default function MealBuilderClient() {
                 const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
                 const isImportedRecipeView = Boolean(recipeImportDraft || recipeImportFlag)
                 const totals = computeItemTotals(it)
-                const displayTotals = applyPortionScaleToTotals(totals, portionScale)
+                const displayTotals = applyPortionScaleToTotals(totals, effectivePortionScale)
                 const macroTotals = isImportedRecipeView ? totals : displayTotals
                 const amountUnit = it.__unit || it.__baseUnit
                 const fullAmount = Number.isFinite(Number(it.__amount)) ? round3(Number(it.__amount)) : null
-                const hasPortionScale = Number.isFinite(Number(portionScale)) && Number(portionScale) > 0
+                const hasPortionScale = Number.isFinite(Number(effectivePortionScale)) && Number(effectivePortionScale) > 0
                 const showPortionAmount = Boolean(
+                  portionControlEnabled &&
                   amountUnit &&
                     fullAmount !== null &&
                     hasPortionScale &&
-                    Math.abs(Number(portionScale) - 1) > 0.0001,
+                    Math.abs(Number(effectivePortionScale) - 1) > 0.0001,
                 )
                 const portionAmount = showPortionAmount
-                  ? round3(Math.max(0, Number(fullAmount) * Number(portionScale)))
+                  ? round3(Math.max(0, Number(fullAmount) * Number(effectivePortionScale)))
                   : null
                 return (
                   <div
@@ -6126,7 +6181,7 @@ export default function MealBuilderClient() {
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
           <div className="flex items-center justify-between mb-2">
             <div className="text-sm font-semibold text-gray-900">
-              {portionScale !== 1 ? 'Your portion totals' : 'Meal totals'}
+              {portionControlEnabled && effectivePortionScale !== 1 ? 'Your portion totals' : 'Meal totals'}
             </div>
             <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
               <button
@@ -6149,13 +6204,16 @@ export default function MealBuilderClient() {
               </button>
             </div>
           </div>
-          {portionScale !== 1 && (
+          {portionControlEnabled && effectivePortionScale !== 1 && (
             <div className="mb-2 text-[11px] text-gray-600">
-              Your portion is about {Math.round(portionScale * 100)}% of the recipe.
+              Your portion is about {Math.round(effectivePortionScale * 100)}% of the recipe.
               <span className="mx-1">•</span>
               Whole recipe: {formatEnergyValue(baseMealTotals.calories, energyUnit)} {energyUnit} • {round3(baseMealTotals.carbs)} g
               carbs • {round3(baseMealTotals.sugar)} g sugar
             </div>
+          )}
+          {!portionControlEnabled && (
+            <div className="mb-2 text-[11px] text-gray-600">This meal is 100% of the full amount.</div>
           )}
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
             {MEAL_TOTAL_CARDS.map((card) => {
