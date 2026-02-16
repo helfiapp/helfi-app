@@ -112,7 +112,7 @@ const splitTitleIntoIngredients = (title: string) => {
     .trim()
   if (!cleaned) return []
   const chunks = cleaned
-    .split(/\s+\+\s+|\s+&\s+|,\s+(?=[a-z0-9])/i)
+    .split(/\s+\+\s+|\s+&\s+|\s+with\s+|,\s+(?=[a-z0-9])/i)
     .map((part) => normalizeIngredientToken(part))
     .filter(Boolean)
   const unique = Array.from(new Set(chunks.map((item) => item.toLowerCase()))).map((key) =>

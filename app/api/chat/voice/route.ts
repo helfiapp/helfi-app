@@ -536,6 +536,260 @@ const extractAssistantContent = (message: any) => {
   return ''
 }
 
+const MEAL_OPTIONS_JSON_START = '[[MEAL_OPTIONS_JSON]]'
+const MEAL_OPTIONS_JSON_END = '[[/MEAL_OPTIONS_JSON]]'
+
+type StructuredMealOption = {
+  optionNumber: number
+  title: string
+  category: 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
+  servings: number
+  prepMinutes: number | null
+  cookMinutes: number | null
+  ingredients: string[]
+  steps: string[]
+}
+
+const splitTitleToIngredients = (title: string) => {
+  const cleaned = String(title || '')
+    .replace(/\((.*?)\)/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  if (!cleaned) return []
+  return cleaned
+    .split(/\s+\+\s+|\s+&\s+|\s+with\s+|,\s+(?=[a-z0-9])/i)
+    .map((part) => String(part || '').trim())
+    .filter(Boolean)
+    .slice(0, 16)
+}
+
+const inferMealCategory = (title: string): StructuredMealOption['category'] => {
+  const t = String(title || '').toLowerCase()
+  if (/(breakfast|oat|porridge|omelette|omelet|toast|pancake|waffle|yogurt bowl|smoothie bowl|granola)/i.test(t)) return 'breakfast'
+  if (/(snack|protein bar|trail mix|popcorn|nuts|fruit cup)/i.test(t)) return 'snacks'
+  if (/(lunch|salad|sandwich|wrap|bowl)/i.test(t)) return 'lunch'
+  if (/(dinner|steak|curry|stir fry|chili|pasta|roast|salmon|chicken breast)/i.test(t)) return 'dinner'
+  return 'uncategorized'
+}
+
+const normalizeMealCategory = (raw: any, fallbackTitle: string): StructuredMealOption['category'] => {
+  const value = String(raw || '').toLowerCase().trim()
+  if (!value) return inferMealCategory(fallbackTitle)
+  if (value.includes('breakfast')) return 'breakfast'
+  if (value.includes('lunch')) return 'lunch'
+  if (value.includes('dinner')) return 'dinner'
+  if (value.includes('snack')) return 'snacks'
+  if (value.includes('uncat') || value.includes('other')) return 'uncategorized'
+  return inferMealCategory(fallbackTitle)
+}
+
+const sanitizeLine = (value: any) =>
+  String(value || '')
+    .replace(/^[\s•*\-–—]+/, '')
+    .replace(/^\d+\.\s+/, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const parseOptionTitlesFromVisibleText = (text: string) => {
+  const lines = String(text || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
+  const out: Array<{ optionNumber: number; title: string }> = []
+  for (const line of lines) {
+    const m = line.match(/^Option\s+(\d+):\s*(.+)$/i)
+    if (!m) continue
+    const optionNumber = Number(m[1])
+    const title = String(m[2] || '').trim()
+    if (!Number.isFinite(optionNumber) || optionNumber <= 0 || !title) continue
+    out.push({ optionNumber: Math.round(optionNumber), title })
+  }
+  return out
+}
+
+const stripMealOptionsJsonBlock = (message: string) => {
+  const raw = String(message || '')
+  const start = raw.indexOf(MEAL_OPTIONS_JSON_START)
+  const end = raw.indexOf(MEAL_OPTIONS_JSON_END)
+  if (start === -1 || end <= start) return { visibleMessage: raw.trim(), jsonRaw: null as string | null }
+  const before = raw.slice(0, start).trimEnd()
+  const after = raw.slice(end + MEAL_OPTIONS_JSON_END.length).trimStart()
+  return {
+    visibleMessage: `${before}${before && after ? '\n\n' : ''}${after}`.trim(),
+    jsonRaw: raw.slice(start + MEAL_OPTIONS_JSON_START.length, end).trim(),
+  }
+}
+
+const safeParseObject = (raw: string) => {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    const cleaned = String(raw || '')
+      .replace(/```json/gi, '')
+      .replace(/```/g, '')
+      .trim()
+    try {
+      return JSON.parse(cleaned)
+    } catch {
+      return null
+    }
+  }
+}
+
+const normalizeStructuredMealOptions = (
+  raw: any,
+  fallbackTitles: Array<{ optionNumber: number; title: string }>,
+): StructuredMealOption[] => {
+  const input = Array.isArray(raw?.options) ? raw.options : Array.isArray(raw) ? raw : []
+  const byIndex = new Map<number, { optionNumber: number; title: string }>()
+  fallbackTitles.forEach((entry, index) => {
+    byIndex.set(index + 1, entry)
+    byIndex.set(entry.optionNumber, entry)
+  })
+  const normalized = input
+    .map((entry: any, index: number) => {
+      const fallback = byIndex.get(index + 1) || byIndex.get(Number(entry?.optionNumber)) || null
+      const optionNumberRaw = Number(entry?.optionNumber ?? fallback?.optionNumber ?? index + 1)
+      const optionNumber = Number.isFinite(optionNumberRaw) && optionNumberRaw > 0 ? Math.round(optionNumberRaw) : index + 1
+      const title = sanitizeLine(entry?.title || fallback?.title || '')
+      if (!title) return null
+
+      const ingredientListRaw = Array.isArray(entry?.ingredients) ? entry.ingredients : []
+      let ingredients = ingredientListRaw.map((line: any) => sanitizeLine(line)).filter(Boolean).slice(0, 60)
+      if (ingredients.length < 2) {
+        ingredients = splitTitleToIngredients(title)
+      }
+      if (ingredients.length < 2) return null
+
+      const stepsRaw = Array.isArray(entry?.steps) ? entry.steps : []
+      const steps = stepsRaw.map((line: any) => sanitizeLine(line)).filter(Boolean).slice(0, 30)
+      const safeSteps =
+        steps.length >= 2
+          ? steps
+          : [`Prepare ingredients for ${title}.`, `Cook and assemble ${title}.`, `Serve and enjoy.`]
+
+      const servingsRaw = Number(entry?.servings)
+      const servings = Number.isFinite(servingsRaw) && servingsRaw > 0 ? Math.round(servingsRaw) : 1
+      const prepRaw = Number(entry?.prepMinutes)
+      const prepMinutes = Number.isFinite(prepRaw) && prepRaw >= 0 ? Math.round(prepRaw) : null
+      const cookRaw = Number(entry?.cookMinutes)
+      const cookMinutes = Number.isFinite(cookRaw) && cookRaw >= 0 ? Math.round(cookRaw) : null
+
+      return {
+        optionNumber,
+        title,
+        category: normalizeMealCategory(entry?.category, title),
+        servings,
+        prepMinutes,
+        cookMinutes,
+        ingredients,
+        steps: safeSteps,
+      } as StructuredMealOption
+    })
+    .filter((entry: StructuredMealOption | null): entry is StructuredMealOption => Boolean(entry))
+    .slice(0, 3)
+
+  return normalized
+}
+
+const appendMealOptionsJsonBlock = (visibleMessage: string, options: StructuredMealOption[]) => {
+  const body = String(visibleMessage || '').trim()
+  const payload = JSON.stringify({ options })
+  return `${body}\n\n${MEAL_OPTIONS_JSON_START}\n${payload}\n${MEAL_OPTIONS_JSON_END}`
+}
+
+const buildStructuredFoodOptions = async (params: {
+  openai: OpenAI
+  visibleMessage: string
+  optionTitles: Array<{ optionNumber: number; title: string }>
+  model: string
+  fallbackModel: string
+}) => {
+  const run = async (modelName: string) => {
+    const completion = await chatCompletionWithCost(params.openai, {
+      model: modelName,
+      temperature: 0.1,
+      max_tokens: 700,
+      response_format: { type: 'json_object' } as any,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'Convert meal options into structured recipe data.\n' +
+            'Return valid JSON object only: {"options":[...]}\n' +
+            'Each option requires: optionNumber, title, category, servings, prepMinutes, cookMinutes, ingredients, steps.\n' +
+            'ingredients must be separate lines with amount + unit (for example "150 g chicken breast").\n' +
+            'steps must be concise cooking steps in order.\n' +
+            'Keep only options that exist in the visible text.',
+        },
+        {
+          role: 'user',
+          content:
+            `Visible meal options text:\n${params.visibleMessage}\n\n` +
+            `Known options:\n${JSON.stringify(params.optionTitles)}`,
+        },
+      ],
+    } as any)
+    const raw = extractAssistantContent(completion.completion.choices?.[0]?.message)
+    return { completion, raw }
+  }
+
+  let first = await run(params.model)
+  let parsed = safeParseObject(first.raw)
+  let normalized = normalizeStructuredMealOptions(parsed, params.optionTitles)
+  let totalCostCents = first.completion.costCents
+
+  if (normalized.length > 0) {
+    return { options: normalized, costCents: totalCostCents }
+  }
+
+  if (params.fallbackModel && params.fallbackModel !== params.model) {
+    const second = await run(params.fallbackModel)
+    totalCostCents += second.completion.costCents
+    parsed = safeParseObject(second.raw)
+    normalized = normalizeStructuredMealOptions(parsed, params.optionTitles)
+  }
+
+  return { options: normalized, costCents: totalCostCents }
+}
+
+const ensureFoodMealOptionsPayload = async (params: {
+  openai: OpenAI
+  assistantMessage: string
+  model: string
+  fallbackModel: string
+}) => {
+  const stripped = stripMealOptionsJsonBlock(params.assistantMessage)
+  const visibleMessage = stripped.visibleMessage
+  const optionTitles = parseOptionTitlesFromVisibleText(visibleMessage)
+  if (optionTitles.length === 0) return { assistantMessage: params.assistantMessage, extraCostCents: 0 }
+
+  if (stripped.jsonRaw) {
+    const parsed = safeParseObject(stripped.jsonRaw)
+    const normalized = normalizeStructuredMealOptions(parsed, optionTitles)
+    if (normalized.length > 0) {
+      return { assistantMessage: appendMealOptionsJsonBlock(visibleMessage, normalized), extraCostCents: 0 }
+    }
+  }
+
+  const structured = await buildStructuredFoodOptions({
+    openai: params.openai,
+    visibleMessage,
+    optionTitles,
+    model: params.model,
+    fallbackModel: params.fallbackModel,
+  })
+
+  if (structured.options.length === 0) {
+    return { assistantMessage: visibleMessage, extraCostCents: structured.costCents }
+  }
+
+  return {
+    assistantMessage: appendMealOptionsJsonBlock(visibleMessage, structured.options),
+    extraCostCents: structured.costCents,
+  }
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -778,8 +1032,7 @@ export async function POST(req: NextRequest) {
       if (!assistantMessage) {
         assistantMessage = 'I apologize, but I could not generate a response.'
       }
-
-      const apiCostCents = wrapped.costCents * 2
+      let structuredExtraCostCents = 0
       const chargedCents = shouldCharge ? (allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS) : 0
       if (shouldCharge) {
         if (!allowViaFreeUse) {
@@ -799,6 +1052,23 @@ export async function POST(req: NextRequest) {
         }
         await markThreadCharged(threadId)
       }
+
+      if (isFoodChat && assistantMessage) {
+        try {
+          const ensured = await ensureFoodMealOptionsPayload({
+            openai,
+            assistantMessage,
+            model,
+            fallbackModel,
+          })
+          assistantMessage = ensured.assistantMessage
+          structuredExtraCostCents = ensured.extraCostCents
+        } catch (foodOptionError) {
+          console.warn('[voice-chat] food option payload enrichment failed', foodOptionError)
+        }
+      }
+
+      const apiCostCents = (wrapped.costCents + structuredExtraCostCents) * 2
 
       // Save assistant message
       await appendMessage(threadId, 'assistant', assistantMessage)
@@ -887,6 +1157,21 @@ export async function POST(req: NextRequest) {
       if (!assistantMessage) {
         assistantMessage = 'I apologize, but I could not generate a response.'
       }
+      let structuredExtraCostCents = 0
+      if (isFoodChat && assistantMessage) {
+        try {
+          const ensured = await ensureFoodMealOptionsPayload({
+            openai,
+            assistantMessage,
+            model,
+            fallbackModel,
+          })
+          assistantMessage = ensured.assistantMessage
+          structuredExtraCostCents = ensured.extraCostCents
+        } catch (foodOptionError) {
+          console.warn('[voice-chat] food option payload enrichment failed', foodOptionError)
+        }
+      }
 
       // Log AI usage for cost tracking (voice chat, non-streaming)
       try {
@@ -895,7 +1180,7 @@ export async function POST(req: NextRequest) {
           model: usedModel,
           promptTokens: wrapped.promptTokens,
           completionTokens: wrapped.completionTokens,
-          costCents: wrapped.costCents * 2,
+          costCents: (wrapped.costCents + structuredExtraCostCents) * 2,
         })
       } catch {
         // Ignore logging failures
