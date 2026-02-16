@@ -5010,10 +5010,21 @@ export default function MealBuilderClient() {
         return
       }
 
+      const addedOrderStamp = Date.now()
+      const createNutrition = {
+        ...(payload.nutrition as any),
+        __addedOrder: addedOrderStamp,
+      }
+      const createPayload: any = {
+        ...payload,
+        nutrition: createNutrition,
+      }
+      if (isFavoriteAdjustBuild) createPayload.allowDuplicate = true
+
       const res = await fetch('/api/food-log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
+        body: JSON.stringify(createPayload),
       })
       const data = await res.json().catch(() => ({} as any))
       if (!res.ok) {
@@ -5030,8 +5041,8 @@ export default function MealBuilderClient() {
               localDate: selectedDate,
               category,
               description,
-              nutrition: payload.nutrition,
-              total: payload.nutrition,
+              nutrition: createNutrition,
+              total: createNutrition,
               items: cleanedItems,
             }),
           )
@@ -5113,9 +5124,13 @@ export default function MealBuilderClient() {
     if (!favoriteUpdatePrompt || favoriteUpdatePromptSaving) return
     setFavoriteUpdatePromptSaving(true)
     try {
+      const addedOrderStamp = Date.now()
       const addPayload = {
         description: favoriteUpdatePrompt.description,
-        nutrition: favoriteUpdatePrompt.nutrition,
+        nutrition: {
+          ...(favoriteUpdatePrompt.nutrition || {}),
+          __addedOrder: addedOrderStamp,
+        },
         imageUrl: null,
         items: favoriteUpdatePrompt.items,
         localDate: selectedDate,
@@ -5144,8 +5159,8 @@ export default function MealBuilderClient() {
               localDate: selectedDate,
               category: favoriteUpdatePrompt.category,
               description: favoriteUpdatePrompt.description,
-              nutrition: favoriteUpdatePrompt.nutrition,
-              total: favoriteUpdatePrompt.nutrition,
+              nutrition: addPayload.nutrition,
+              total: addPayload.nutrition,
               items: favoriteUpdatePrompt.items,
             }),
           )
