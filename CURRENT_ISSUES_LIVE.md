@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 21:24 AEDT
+- What changed: Global media retention lock is now live. Mood image and voice uploads are processed for analysis, only extracted text is kept for reporting, and raw media files are not kept long-term on the server. Blood result upload consent now states that originals are deleted after extraction. Weekly report data collection now includes mood journal text entries.
+- Where to see it (page/link): https://helfi.ai/mood/journal, https://helfi.ai/privacy, https://helfi.ai/terms
+- What to quickly test: In Mood Journal, upload an image or voice note and confirm the entry saves with analyzed text. Confirm the page shows that media is stored on the user device and may disappear if browser/app storage is cleared. Check Privacy/Terms pages for the updated retention wording.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 18:54 AEDT
 - What changed: Fixed notification inbox cleanup for completed check-in actions. Mood save now clears related Smart Health Coach mood alerts, water save clears Smart Health Coach hydration alerts, and food save clears Smart Health Coach meal/macro alerts. Existing daily check-in and mood reminder cleanup stays in place.
 - Where to see it (page/link): https://helfi.ai/notifications/inbox (also related pages: /mood, /food/water, /food)
