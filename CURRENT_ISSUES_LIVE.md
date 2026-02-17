@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 15:02 AEDT
+- What changed: Updated web Talk to Helfi/Food Ask AI composer to match native style with a `+` button on the left, center input, and mic/send on the right. The + button now opens the existing photo/barcode actions. Added guard-rail lock note so this layout is protected.
+- Where to see it (page/link): `/chat`, `/chat?context=food`, and `GUARD_RAILS.md` section `7.6`
+- What to quickly test: Open Food Diary -> Ask AI, confirm left `+` button is visible and opens photo/barcode menu; send message and confirm mic/send stay on right.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 10:55 AEDT
 - What changed: Added a locked guard-rail section to protect the approved chat formatting and chat interface style across web chat pages, so future agents cannot change it without owner approval.
 - Where to see it (page/link): `GUARD_RAILS.md` section `7.9 Chat Formatting + Interface Style Lock`
