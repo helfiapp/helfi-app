@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 17:09 AEDT
+- What changed: Added automated deploy-time guard `scripts/assert-food-log-date-guard.js` and wired it into `prebuild` so deploy fails if Food Diary localDate source-of-truth date logic is removed.
+- Where to see it (page/link): Build pipeline (`prebuild`) + guard docs in `GUARD_RAILS.md` section `3.4.1`
+- What to quickly test: Run `npm run check:food-log-date-guard`; it should pass. Remove key localDate branch in `app/api/food-log/route.ts` and confirm the check fails.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 15:40 AEDT
 - What changed: Hotfix for Food Diary date leak. GET /api/food-log now treats localDate as source of truth and only uses createdAt fallback when localDate is missing. Also repaired owner rows that were moved to 17 Feb so they are back on 16 Feb.
 - Where to see it (page/link): https://helfi.ai/food
