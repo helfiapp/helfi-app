@@ -126,6 +126,12 @@ export default function HealthJournalPage() {
   const desktopDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
   const mediaProcessing = images.some((item) => item.processing) || audioClips.some((item) => item.processing)
   const entryHasMedia = images.length > 0 || audioClips.length > 0
+  const extractedMediaNotes = [
+    ...images.filter((item) => !item.processing && !item.failed).map((item) => item.summary),
+    ...audioClips.filter((item) => !item.processing && !item.failed).map((item) => item.summary),
+  ]
+    .map((item) => trimSummary(item, ''))
+    .filter(Boolean)
 
   const shiftSelectedDateByDays = (deltaDays: number) => {
     try {
@@ -982,6 +988,29 @@ export default function HealthJournalPage() {
                         </div>
                       </div>
                     ))}
+                  </div>
+                )}
+
+                {mediaProcessing ? (
+                  <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
+                    Media analysis is in progress. Please wait before submitting.
+                  </div>
+                ) : extractedMediaNotes.length > 0 ? (
+                  <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
+                    <div className="text-xs font-semibold text-emerald-800">
+                      Extracted media notes (will be saved):
+                    </div>
+                    <ul className="mt-2 space-y-1">
+                      {extractedMediaNotes.map((item, index) => (
+                        <li key={`${index}-${item.slice(0, 24)}`} className="text-xs text-emerald-900">
+                          {index + 1}. {item}
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-xs text-gray-600">
+                    Media added, but no extracted note yet.
                   </div>
                 )}
               </div>
