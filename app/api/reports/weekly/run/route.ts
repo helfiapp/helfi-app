@@ -2444,13 +2444,6 @@ export async function POST(request: NextRequest) {
     .filter((entry) => entry.content)
     .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
 
-  await updateRunningProgress({
-    userId,
-    reportId: report.id,
-    stage: 'collecting',
-    percent: 30,
-    detail: 'Preparing your nutrition, mood, and activity data.',
-  })
   const selectedIssues = readGoalSnapshot(healthGoals, '__SELECTED_ISSUES__')
   const healthSituations = readGoalSnapshot(healthGoals, '__HEALTH_SITUATIONS_DATA__')
   const allergySnapshot = readGoalSnapshot(healthGoals, '__ALLERGIES_DATA__')
