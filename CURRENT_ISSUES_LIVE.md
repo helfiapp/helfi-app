@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-18 00:36 AEDT
+- What changed: Health Journal page-only voice note fix is live. Added Audio settings on the page so users can choose microphone input and playback output, improved recording capture handling, and added a silent-recording warning to prevent saving unusable voice clips.
+- Where to see it (page/link): https://helfi.ai/health-journal
+- What to quickly test: In Health Journal, choose input/output in Audio settings, record a 3-5 second voice note, play it back and confirm sound is audible, then submit and confirm note/history still save normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 23:58 AEDT
 - What changed: Web Health Journal now has Add photo and Record voice note in New entry. Each upload is analyzed immediately and the extracted notes are merged into the saved journal text. Raw media is not stored long-term on the server. If media analysis is temporarily unavailable, safe fallback summary text is still added so saving can continue.
 - Where to see it (page/link): https://helfi.ai/health-journal
