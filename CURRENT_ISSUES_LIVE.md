@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 15:40 AEDT
+- What changed: Hotfix for Food Diary date leak. GET /api/food-log now treats localDate as source of truth and only uses createdAt fallback when localDate is missing. Also repaired owner rows that were moved to 17 Feb so they are back on 16 Feb.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: On 17 Feb view, yesterday’s late snacks should not appear unless they were actually logged to 17 Feb; on 16 Feb view, those snacks should be present.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 15:02 AEDT
 - What changed: Updated web Talk to Helfi/Food Ask AI composer to match native style with a `+` button on the left, center input, and mic/send on the right. The + button now opens the existing photo/barcode actions. Added guard-rail lock note so this layout is protected.
 - Where to see it (page/link): `/chat`, `/chat?context=food`, and `GUARD_RAILS.md` section `7.6`
