@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useMemo, useState } from 'react'
+import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 
 export const dynamic = 'force-dynamic'
@@ -11,6 +11,59 @@ type JournalEntry = {
   localDate: string
   createdAt: string
   updatedAt: string
+}
+
+type JournalImageItem = {
+  id: string
+  localUrl: string
+  fileName: string
+  summary: string
+  processing: boolean
+  failed: boolean
+}
+
+type JournalAudioClip = {
+  id: string
+  localUrl: string
+  fileName: string
+  summary: string
+  processing: boolean
+  failed: boolean
+}
+
+const MAX_IMAGE_BYTES = 6 * 1024 * 1024
+const MAX_AUDIO_BYTES = 12 * 1024 * 1024
+const MAX_MEDIA_ITEMS = 6
+
+function trimSummary(value: string, fallback: string) {
+  const clean = String(value || '').replace(/\s+/g, ' ').trim()
+  if (!clean) return fallback
+  return clean.slice(0, 320)
+}
+
+function buildMediaId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`
+}
+
+function mergeContentWithMediaNotes(content: string, summaries: string[]) {
+  const base = String(content || '').trim()
+  const cleaned = summaries.map((item) => trimSummary(item, '')).filter(Boolean)
+  if (!cleaned.length) return base
+  const list = cleaned.map((item, index) => `${index + 1}. ${item}`).join('\n')
+  const block = `Media notes (auto-analyzed):\n${list}`
+  return [base, block].filter(Boolean).join('\n\n').trim()
+}
+
+function audioMimeFromName(name: string) {
+  const lower = String(name || '').toLowerCase()
+  if (lower.endsWith('.mp3')) return 'audio/mpeg'
+  if (lower.endsWith('.wav')) return 'audio/wav'
+  if (lower.endsWith('.m4a')) return 'audio/mp4'
+  if (lower.endsWith('.aac')) return 'audio/aac'
+  return 'audio/webm'
 }
 
 function buildTodayIso() {
@@ -42,8 +95,12 @@ export default function HealthJournalPage() {
   const [activeTab, setActiveTab] = useState<'entry' | 'history'>('entry')
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
+  const [mediaBusy, setMediaBusy] = useState(false)
+  const [recording, setRecording] = useState(false)
   const [notice, setNotice] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [images, setImages] = useState<JournalImageItem[]>([])
+  const [audioClips, setAudioClips] = useState<JournalAudioClip[]>([])
 
   const [selectedDate, setSelectedDate] = useState<string>(todayIso)
   const [showDateSheet, setShowDateSheet] = useState(false)
@@ -57,9 +114,18 @@ export default function HealthJournalPage() {
   const [editingText, setEditingText] = useState('')
   const [editingSaving, setEditingSaving] = useState(false)
 
+  const imageInputRef = useRef<HTMLInputElement | null>(null)
+  const mediaRecorderRef = useRef<MediaRecorder | null>(null)
+  const recorderChunksRef = useRef<Blob[]>([])
+  const recorderStreamRef = useRef<MediaStream | null>(null)
+  const imagesRef = useRef<JournalImageItem[]>([])
+  const audioClipsRef = useRef<JournalAudioClip[]>([])
+
   const isViewingToday = selectedDate === todayIso
   const mobileDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
   const desktopDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
+  const mediaProcessing = images.some((item) => item.processing) || audioClips.some((item) => item.processing)
+  const entryHasMedia = images.length > 0 || audioClips.length > 0
 
   const shiftSelectedDateByDays = (deltaDays: number) => {
     try {
@@ -80,6 +146,40 @@ export default function HealthJournalPage() {
       setDateSheetMonth((selectedDate || todayIso).slice(0, 7))
     }
   }, [showDateSheet, selectedDate, todayIso])
+
+  useEffect(() => {
+    imagesRef.current = images
+  }, [images])
+
+  useEffect(() => {
+    audioClipsRef.current = audioClips
+  }, [audioClips])
+
+  useEffect(() => {
+    return () => {
+      imagesRef.current.forEach((item) => {
+        try {
+          URL.revokeObjectURL(item.localUrl)
+        } catch {
+          // ignore
+        }
+      })
+      audioClipsRef.current.forEach((item) => {
+        try {
+          URL.revokeObjectURL(item.localUrl)
+        } catch {
+          // ignore
+        }
+      })
+
+      const recorder = mediaRecorderRef.current
+      if (recorder && recorder.state !== 'inactive') {
+        recorder.stop()
+      }
+      recorderStreamRef.current?.getTracks().forEach((track) => track.stop())
+      recorderStreamRef.current = null
+    }
+  }, [])
 
   const monthMeta = useMemo(() => {
     const [yy, mm] = (dateSheetMonth || '').split('-').map((v) => parseInt(v, 10))
@@ -158,11 +258,314 @@ export default function HealthJournalPage() {
     loadMonthDates(dateSheetMonth)
   }, [activeTab, dateSheetMonth])
 
-  const handleSubmit = async () => {
-    if (!note.trim()) {
-      setError('Please write a short note first.')
+  const clearComposerMedia = () => {
+    images.forEach((item) => {
+      try {
+        URL.revokeObjectURL(item.localUrl)
+      } catch {
+        // ignore
+      }
+    })
+    audioClips.forEach((item) => {
+      try {
+        URL.revokeObjectURL(item.localUrl)
+      } catch {
+        // ignore
+      }
+    })
+    setImages([])
+    setAudioClips([])
+  }
+
+  const extractMediaFromFile = async (params: { kind: 'image' | 'audio'; file: File }) => {
+    const fallback =
+      params.kind === 'image'
+        ? 'Image analyzed for health journal context.'
+        : 'Voice note analyzed for health journal context.'
+
+    const formData = new FormData()
+    formData.append('kind', params.kind)
+    formData.append('file', params.file)
+
+    try {
+      const res = await fetch('/api/health-journal/extract-media', {
+        method: 'POST',
+        body: formData,
+      })
+      const data = await res.json().catch(() => ({}))
+
+      if (res.ok && data?.summary) {
+        return trimSummary(String(data.summary || ''), fallback)
+      }
+
+      if (res.status === 401) {
+        throw new Error('Please log in again.')
+      }
+
+      return fallback
+    } catch (error: any) {
+      if (String(error?.message || '').toLowerCase().includes('log in again')) {
+        throw error
+      }
+      return fallback
+    }
+  }
+
+  const addImageFile = async (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      setError('Please choose an image file.')
       return
     }
+    if (file.size > MAX_IMAGE_BYTES) {
+      setError('Image must be less than 6MB.')
+      return
+    }
+    if (images.length >= MAX_MEDIA_ITEMS) {
+      setError('You can add up to 6 photos.')
+      return
+    }
+
+    const imageId = buildMediaId()
+    const imageUrl = URL.createObjectURL(file)
+
+    setImages((prev) => [
+      ...prev,
+      {
+        id: imageId,
+        localUrl: imageUrl,
+        fileName: file.name || `health-journal-image-${Date.now()}.jpg`,
+        summary: '',
+        processing: true,
+        failed: false,
+      },
+    ])
+    setError(null)
+
+    try {
+      const summary = await extractMediaFromFile({ kind: 'image', file })
+      setImages((prev) =>
+        prev.map((item) =>
+          item.id === imageId
+            ? { ...item, summary, processing: false, failed: false }
+            : item,
+        ),
+      )
+    } catch (err: any) {
+      setImages((prev) =>
+        prev.map((item) =>
+          item.id === imageId
+            ? { ...item, processing: false, failed: true }
+            : item,
+        ),
+      )
+      setError(err?.message || 'Image analysis failed. You can still continue.')
+    }
+  }
+
+  const onImageFileSelected = async (event: ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0]
+    event.target.value = ''
+    if (!file) return
+    await addImageFile(file)
+  }
+
+  const removeImage = (imageId: string) => {
+    setImages((prev) => {
+      const target = prev.find((item) => item.id === imageId)
+      if (target) {
+        try {
+          URL.revokeObjectURL(target.localUrl)
+        } catch {
+          // ignore
+        }
+      }
+      return prev.filter((item) => item.id !== imageId)
+    })
+  }
+
+  const removeAudioClip = (audioId: string) => {
+    setAudioClips((prev) => {
+      const target = prev.find((item) => item.id === audioId)
+      if (target) {
+        try {
+          URL.revokeObjectURL(target.localUrl)
+        } catch {
+          // ignore
+        }
+      }
+      return prev.filter((item) => item.id !== audioId)
+    })
+  }
+
+  const startVoiceRecording = async () => {
+    if (recording || mediaBusy) return
+    if (audioClips.length >= MAX_MEDIA_ITEMS) {
+      setError('You can add up to 6 voice notes.')
+      return
+    }
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return
+    if (!navigator.mediaDevices?.getUserMedia || typeof MediaRecorder === 'undefined') {
+      setError('Voice recording is not supported on this browser.')
+      return
+    }
+
+    setError(null)
+    setMediaBusy(true)
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      recorderStreamRef.current = stream
+
+      const mimeOptions = [
+        'audio/webm;codecs=opus',
+        'audio/webm',
+        'audio/mp4',
+      ]
+      const chosenMime = mimeOptions.find((type) =>
+        typeof MediaRecorder.isTypeSupported === 'function' ? MediaRecorder.isTypeSupported(type) : false,
+      )
+
+      const recorder = chosenMime
+        ? new MediaRecorder(stream, { mimeType: chosenMime })
+        : new MediaRecorder(stream)
+
+      recorderChunksRef.current = []
+
+      recorder.ondataavailable = (event) => {
+        if (event.data && event.data.size > 0) {
+          recorderChunksRef.current.push(event.data)
+        }
+      }
+
+      recorder.onerror = () => {
+        setError('Recording failed. Please try again.')
+        setRecording(false)
+        setMediaBusy(false)
+        recorderStreamRef.current?.getTracks().forEach((track) => track.stop())
+        recorderStreamRef.current = null
+      }
+
+      recorder.onstop = async () => {
+        let createdClipId: string | null = null
+        try {
+          const chunks = recorderChunksRef.current
+          recorderChunksRef.current = []
+          const mimeType = recorder.mimeType || 'audio/webm'
+          const blob = new Blob(chunks, { type: mimeType })
+
+          if (!blob.size) return
+          if (blob.size > MAX_AUDIO_BYTES) {
+            setError('Voice note must be less than 12MB.')
+            return
+          }
+
+          const extension = mimeType.includes('mp4')
+            ? 'm4a'
+            : mimeType.includes('wav')
+            ? 'wav'
+            : mimeType.includes('mpeg')
+            ? 'mp3'
+            : 'webm'
+
+          const fileName = `health-journal-audio-${Date.now()}.${extension}`
+          const file = new File([blob], fileName, {
+            type: mimeType || audioMimeFromName(fileName),
+          })
+          const clipId = buildMediaId()
+          createdClipId = clipId
+          const clipUrl = URL.createObjectURL(blob)
+
+          setAudioClips((prev) => [
+            ...prev,
+            {
+              id: clipId,
+              localUrl: clipUrl,
+              fileName,
+              summary: '',
+              processing: true,
+              failed: false,
+            },
+          ])
+
+          const summary = await extractMediaFromFile({ kind: 'audio', file })
+          setAudioClips((prev) =>
+            prev.map((item) =>
+              item.id === clipId
+                ? { ...item, summary, processing: false, failed: false }
+                : item,
+            ),
+          )
+        } catch (err: any) {
+          if (createdClipId) {
+            setAudioClips((prev) =>
+              prev.map((item) =>
+                item.id === createdClipId
+                  ? { ...item, processing: false, failed: true }
+                  : item,
+              ),
+            )
+          }
+          setError(err?.message || 'Voice note analysis failed. You can still continue.')
+        } finally {
+          mediaRecorderRef.current = null
+          recorderStreamRef.current?.getTracks().forEach((track) => track.stop())
+          recorderStreamRef.current = null
+          setRecording(false)
+          setMediaBusy(false)
+        }
+      }
+
+      mediaRecorderRef.current = recorder
+      recorder.start()
+      setRecording(true)
+    } catch (err: any) {
+      setError(err?.message || 'Could not start recording.')
+      recorderStreamRef.current?.getTracks().forEach((track) => track.stop())
+      recorderStreamRef.current = null
+    } finally {
+      setMediaBusy(false)
+    }
+  }
+
+  const stopVoiceRecording = () => {
+    const recorder = mediaRecorderRef.current
+    if (!recorder || recorder.state === 'inactive') {
+      setRecording(false)
+      return
+    }
+    setMediaBusy(true)
+    try {
+      recorder.stop()
+    } catch {
+      setMediaBusy(false)
+      setRecording(false)
+    }
+  }
+
+  const handleSubmit = async () => {
+    if (recording) {
+      setError('Please stop recording first.')
+      return
+    }
+
+    if (images.some((item) => item.processing) || audioClips.some((item) => item.processing)) {
+      setError('Please wait for photo and voice analysis to finish.')
+      return
+    }
+
+    const mediaSummaries = [
+      ...images.filter((item) => !item.failed).map((item) => item.summary),
+      ...audioClips.filter((item) => !item.failed).map((item) => item.summary),
+    ]
+      .map((item) => trimSummary(item, ''))
+      .filter(Boolean)
+
+    if (!note.trim() && mediaSummaries.length === 0) {
+      setError('Please add a note, photo, or voice note first.')
+      return
+    }
+
+    const finalContent = mergeContentWithMediaNotes(note, mediaSummaries)
+
     setSaving(true)
     setError(null)
     setNotice(null)
@@ -170,14 +573,15 @@ export default function HealthJournalPage() {
       const res = await fetch('/api/health-journal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: note, localDate: buildTodayIso() }),
+        body: JSON.stringify({ content: finalContent, localDate: buildTodayIso() }),
       })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
         throw new Error(data?.error || 'Could not save note')
       }
       setNote('')
-      setNotice('Saved. This will be used in your next health report.')
+      clearComposerMedia()
+      setNotice('Saved. Media was analyzed and only summary text was kept.')
       if (activeTab === 'history' && selectedDate === todayIso) {
         loadHistory(selectedDate)
         loadMonthDates(dateSheetMonth)
@@ -486,6 +890,41 @@ export default function HealthJournalPage() {
             <p className="text-sm text-gray-600 mt-1">
               Write a quick note about pain, symptoms, supplements, food, or anything health-related.
             </p>
+            <p className="mt-2 text-xs text-gray-500">
+              Photos and voice notes are analyzed straight away. Raw files are not kept on our server.
+            </p>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={onImageFileSelected}
+            />
+            <div className="mt-4 flex flex-wrap items-center gap-2">
+              <button
+                type="button"
+                onClick={() => imageInputRef.current?.click()}
+                disabled={mediaBusy || saving || images.length >= MAX_MEDIA_ITEMS}
+                className="inline-flex items-center gap-2 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100 disabled:opacity-60"
+              >
+                Add photo
+              </button>
+              <button
+                type="button"
+                onClick={recording ? stopVoiceRecording : startVoiceRecording}
+                disabled={mediaBusy || saving || audioClips.length >= MAX_MEDIA_ITEMS}
+                className={`inline-flex items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold disabled:opacity-60 ${
+                  recording
+                    ? 'border border-red-200 bg-red-50 text-red-700'
+                    : 'border border-blue-200 bg-blue-50 text-blue-700 hover:bg-blue-100'
+                }`}
+              >
+                {recording ? 'Stop recording' : 'Record voice note'}
+              </button>
+              {recording && (
+                <span className="text-xs font-medium text-red-600">Recording...</span>
+              )}
+            </div>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -493,14 +932,73 @@ export default function HealthJournalPage() {
               className="mt-4 w-full rounded-xl border border-gray-200 px-4 py-3 text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-emerald-200"
               placeholder="Example: 3:30pm - really tired after lunch. Took magnesium an hour ago and feel dizzy."
             />
+
+            {entryHasMedia && (
+              <div className="mt-4 space-y-3">
+                {images.length > 0 && (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    {images.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                        <div className="relative">
+                          <div
+                            role="img"
+                            aria-label="Health journal upload"
+                            className="h-32 w-full rounded-lg border border-gray-200 bg-white bg-cover bg-center"
+                            style={{ backgroundImage: `url(${item.localUrl})` }}
+                          />
+                          <button
+                            type="button"
+                            onClick={() => removeImage(item.id)}
+                            className="absolute top-2 right-2 rounded-full bg-black/60 text-white text-xs px-2 py-1"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <div className="mt-2 text-xs text-gray-600">
+                          {item.processing ? 'Analyzing photo...' : item.failed ? 'Could not analyze photo.' : 'Photo analyzed'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+
+                {audioClips.length > 0 && (
+                  <div className="space-y-2">
+                    {audioClips.map((item) => (
+                      <div key={item.id} className="rounded-xl border border-gray-200 p-3 bg-gray-50">
+                        <div className="flex items-center justify-between gap-3">
+                          <div className="text-xs text-gray-700 truncate">{item.fileName}</div>
+                          <button
+                            type="button"
+                            onClick={() => removeAudioClip(item.id)}
+                            className="rounded-md border border-gray-300 px-2 py-1 text-xs font-medium text-gray-700 hover:bg-gray-100"
+                          >
+                            Remove
+                          </button>
+                        </div>
+                        <audio controls src={item.localUrl} className="mt-2 w-full" />
+                        <div className="mt-2 text-xs text-gray-600">
+                          {item.processing ? 'Analyzing voice note...' : item.failed ? 'Could not analyze voice note.' : 'Voice note analyzed'}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+
             {error && <div className="mt-3 text-sm text-red-600">{error}</div>}
             {notice && <div className="mt-3 text-sm text-emerald-700">{notice}</div>}
             <div className="mt-4 flex items-center justify-between">
-              <span className="text-xs text-gray-400">Saved with today's date and time.</span>
+              <span className="text-xs text-gray-400">
+                {mediaProcessing
+                  ? 'Media is still analyzing...'
+                  : "Saved with today's date and time."}
+              </span>
               <button
                 type="button"
                 onClick={handleSubmit}
-                disabled={saving}
+                disabled={saving || mediaProcessing || recording}
                 className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
               >
                 {saving ? 'Saving...' : 'Submit note'}
