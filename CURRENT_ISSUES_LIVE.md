@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 18:54 AEDT
+- What changed: Fixed notification inbox cleanup for completed check-in actions. Mood save now clears related Smart Health Coach mood alerts, water save clears Smart Health Coach hydration alerts, and food save clears Smart Health Coach meal/macro alerts. Existing daily check-in and mood reminder cleanup stays in place.
+- Where to see it (page/link): https://helfi.ai/notifications/inbox (also related pages: /mood, /food/water, /food)
+- What to quickly test: Open a Smart Health Coach alert from inbox, complete the related action (save mood, add water, or log food), then return to inbox and confirm that alert is no longer listed.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 17:09 AEDT
 - What changed: Added automated deploy-time guard `scripts/assert-food-log-date-guard.js` and wired it into `prebuild` so deploy fails if Food Diary localDate source-of-truth date logic is removed.
 - Where to see it (page/link): Build pipeline (`prebuild`) + guard docs in `GUARD_RAILS.md` section `3.4.1`
