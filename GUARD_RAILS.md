@@ -1013,6 +1013,8 @@ This section was breaking for weeks. Do **not** touch it without explicit owner 
 - While history is loading, **keep showing** the saved per-date snapshot.
 - The server **must not** include entries whose `localDate` exists but does **not** match the requested day.
 - Only use `createdAt` as a fallback **when `localDate` is missing**.
+- Build guard `scripts/assert-food-log-date-guard.js` must stay in `prebuild` so
+  deploy fails if localDate source-of-truth logic is removed.
 
 **Restore steps (exact, no guessing):**
 1) **Server date filter** (`app/api/food-log/route.ts`):
