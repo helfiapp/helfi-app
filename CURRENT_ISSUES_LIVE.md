@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-17 23:58 AEDT
+- What changed: Web Health Journal now has Add photo and Record voice note in New entry. Each upload is analyzed immediately and the extracted notes are merged into the saved journal text. Raw media is not stored long-term on the server. If media analysis is temporarily unavailable, safe fallback summary text is still added so saving can continue.
+- Where to see it (page/link): https://helfi.ai/health-journal
+- What to quickly test: 1) Add photo and confirm it shows analyzed. 2) Record voice note and confirm it shows analyzed. 3) Submit and confirm saved note includes a “Media notes (auto-analyzed)” section. 4) Open History and verify save/edit/delete still works.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-17 21:24 AEDT
 - What changed: Global media retention lock is now live. Mood image and voice uploads are processed for analysis, only extracted text is kept for reporting, and raw media files are not kept long-term on the server. Blood result upload consent now states that originals are deleted after extraction. Weekly report data collection now includes mood journal text entries.
 - Where to see it (page/link): https://helfi.ai/mood/journal, https://helfi.ai/privacy, https://helfi.ai/terms
