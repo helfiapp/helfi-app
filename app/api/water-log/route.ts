@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
+import { deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 
 export const dynamic = 'force-dynamic'
 
@@ -181,6 +182,7 @@ export async function POST(req: NextRequest) {
         localDate,
       },
     })
+    await deleteSmartCoachNotificationsByCategories(user.id, ['hydration']).catch(() => {})
     return NextResponse.json({ entry })
   } catch (error) {
     if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') {
@@ -196,6 +198,7 @@ export async function POST(req: NextRequest) {
             localDate,
           },
         })
+        await deleteSmartCoachNotificationsByCategories(user.id, ['hydration']).catch(() => {})
         return NextResponse.json({ entry })
       } catch (retryError) {
         console.error('[water-log] POST failed after ensure', retryError)

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 
 export const dynamic = 'force-dynamic'
 
@@ -119,6 +120,7 @@ export async function PATCH(req: NextRequest, context: { params: { id?: string }
     })
     if (!result.count) return NextResponse.json({ error: 'Not found' }, { status: 404 })
     const entry = await prisma.waterLog.findFirst({ where: { id, userId: user.id } })
+    await deleteSmartCoachNotificationsByCategories(user.id, ['hydration']).catch(() => {})
     return NextResponse.json({ entry })
   } catch (error) {
     console.error('[water-log] PATCH failed', error)

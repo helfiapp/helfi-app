@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { ensureMoodTables } from '@/app/api/mood/_db'
-import { deleteNotificationsByType } from '@/lib/notification-inbox'
+import { deleteNotificationsByType, deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 
 export const dynamic = 'force-dynamic'
 
@@ -234,6 +234,7 @@ export async function POST(req: NextRequest) {
     )
 
     await deleteNotificationsByType(user.id, ['mood_reminder']).catch(() => {})
+    await deleteSmartCoachNotificationsByCategories(user.id, ['mood']).catch(() => {})
 
     return NextResponse.json({ success: true, id })
   } catch (e) {

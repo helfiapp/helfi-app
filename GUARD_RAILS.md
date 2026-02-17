@@ -2211,6 +2211,10 @@ If reminder taps open the wrong page OR the inbox does not clear after a complet
 3) The save endpoints must clear reminder inbox items only after a successful save.
    - `/api/checkins/today` must clear `checkin_reminder` items.
    - `/api/mood/entries` must clear `mood_reminder` items.
+   - Smart Health Coach alerts must clear by category after related saves:
+     - mood save clears `mood`
+     - water save clears `hydration`
+     - food save clears `meal` + `macro`
    - Do not move this cleanup before save success.
 
 4) Re‑test on iPhone PWA:

@@ -9,6 +9,7 @@ import { put } from '@vercel/blob'
 import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 import { createWriteGuard, hashPayload } from '@/lib/write-guard'
+import { deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 
 const FOOD_PHOTO_PREFIX = 'food-photos'
 const FOOD_PHOTO_SCOPE = 'food-photo'
@@ -985,6 +986,8 @@ export async function POST(request: NextRequest) {
       console.warn('⚠️ Failed to trigger nutrition insights regeneration', error)
     })
 
+    await deleteSmartCoachNotificationsByCategories(user.id, ['meal', 'macro']).catch(() => {})
+
     console.log('🔄 Triggered background regeneration for nutrition insights')
 
     return NextResponse.json({ success: true, id: created.id })
@@ -1143,6 +1146,8 @@ export async function PUT(request: NextRequest) {
     }).catch((error) => {
       console.warn('⚠️ Failed to trigger nutrition insights regeneration after update', error)
     })
+
+    await deleteSmartCoachNotificationsByCategories(user.id, ['meal', 'macro']).catch(() => {})
 
     return NextResponse.json({ success: true, id: updated.id })
   } catch (error) {

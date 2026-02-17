@@ -251,6 +251,32 @@ export async function deleteNotificationsByType(userId: string, types: string[])
   }
 }
 
+export async function deleteSmartCoachNotificationsByCategories(
+  userId: string,
+  categories: string[]
+): Promise<number> {
+  await ensureNotificationInboxTable()
+  const list = Array.isArray(categories)
+    ? categories.map((value) => String(value || '').trim()).filter(Boolean)
+    : []
+  if (!list.length) return 0
+  try {
+    const rows: Array<{ id: string }> = await prisma.$queryRawUnsafe(
+      `DELETE FROM NotificationInbox
+       WHERE userId = $1
+         AND type = 'smart_health_coach_alert'
+         AND COALESCE(metadata->>'category', '') = ANY($2::text[])
+       RETURNING id`,
+      userId,
+      list
+    )
+    return rows.length
+  } catch (error) {
+    console.warn('[notifications] Failed to delete smart coach inbox items by category', error)
+    return 0
+  }
+}
+
 export async function deleteAllNotifications(userId: string): Promise<number> {
   await ensureNotificationInboxTable()
   try {
