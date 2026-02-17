@@ -2196,7 +2196,7 @@ export default function VoiceChat({
                 </div>
               )}
               <form
-                className="relative flex w-full flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all focus-within:shadow-lg focus-within:border-gray-300"
+                className="flex w-full flex-col rounded-2xl border border-gray-200 bg-white shadow-[0_2px_12px_rgba(0,0,0,0.04)] transition-all focus-within:shadow-lg focus-within:border-gray-300"
                 onSubmit={handleSubmit}
                 style={{ paddingBottom: 'calc(env(safe-area-inset-bottom, 0px) + 8px)' }}
               >
@@ -2240,48 +2240,52 @@ export default function VoiceChat({
                     </div>
                   </div>
                 )}
-                <textarea
-                  ref={textareaRef}
-                  value={input}
-                  onChange={(event) => setInput(event.target.value)}
-                  onKeyDown={onComposerKeyDown}
-                  placeholder="Message Talk to Helfi..."
-                  rows={1}
-                  className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[18px] md:text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
-                />
-                <div className="absolute bottom-2.5 right-2.5 flex items-center gap-2">
+                <div className="mx-3 mt-3 mb-2 flex items-end gap-2">
                   <button
                     type="button"
                     onClick={openPhotoMenu}
                     disabled={loading || isListening}
-                    className="flex h-8 w-8 items-center justify-center rounded-full text-gray-400 hover:bg-gray-100 hover:text-gray-600 disabled:opacity-50"
+                    className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full border border-gray-200 bg-gray-100 text-gray-600 hover:bg-gray-200 disabled:opacity-50"
                     aria-label="Add photo or scan barcode"
                   >
-                    <span className="material-symbols-outlined" style={{ fontSize: 20 }}>photo_camera</span>
+                    <span className="material-symbols-outlined" style={{ fontSize: 30 }}>add</span>
                   </button>
-                  {hasSpeechRecognition && (
-                    <button
-                      type="button"
-                      onClick={isListening ? stopListening : startListening}
-                      disabled={loading}
-                      className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
-                        isListening
-                          ? 'bg-red-500 text-white'
-                          : 'text-gray-400 hover:bg-gray-100 hover:text-gray-600'
-                      } disabled:opacity-50`}
-                      aria-label={isListening ? 'Stop listening' : 'Start voice input'}
-                    >
-                      <span className="material-symbols-outlined" style={{ fontSize: 20 }}>mic</span>
-                    </button>
-                  )}
-                  <button
-                    type="submit"
-                    disabled={loading || isListening || (!input.trim() && pendingPhotos.length === 0)}
-                    className="flex h-8 w-8 items-center justify-center rounded-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-200 disabled:text-gray-400 transition-all shadow-sm"
-                    aria-label="Send message"
-                  >
-                    <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_upward</span>
-                  </button>
+                  <div className="relative flex-1 rounded-[28px] border border-gray-200 bg-[#f4f4f5]">
+                    <textarea
+                      ref={textareaRef}
+                      value={input}
+                      onChange={(event) => setInput(event.target.value)}
+                      onKeyDown={onComposerKeyDown}
+                      placeholder="Ask anything"
+                      rows={1}
+                      className="max-h-[200px] min-h-[56px] w-full resize-none bg-transparent pl-5 pr-24 py-[14px] text-[18px] md:text-[16px] text-black placeholder-gray-500 focus:outline-none border-none focus:ring-0"
+                    />
+                    <div className="absolute bottom-2 right-2 flex items-center gap-2">
+                      {hasSpeechRecognition && (
+                        <button
+                          type="button"
+                          onClick={isListening ? stopListening : startListening}
+                          disabled={loading}
+                          className={`flex h-8 w-8 items-center justify-center rounded-full transition-colors ${
+                            isListening
+                              ? 'bg-red-500 text-white'
+                              : 'text-gray-500 hover:bg-gray-200 hover:text-gray-700'
+                          } disabled:opacity-50`}
+                          aria-label={isListening ? 'Stop listening' : 'Start voice input'}
+                        >
+                          <span className="material-symbols-outlined" style={{ fontSize: 20 }}>mic</span>
+                        </button>
+                      )}
+                      <button
+                        type="submit"
+                        disabled={loading || isListening || (!input.trim() && pendingPhotos.length === 0)}
+                        className="flex h-10 w-10 items-center justify-center rounded-full bg-black text-white hover:bg-gray-800 disabled:bg-gray-300 disabled:text-gray-500 transition-all shadow-sm"
+                        aria-label="Send message"
+                      >
+                        <span className="material-symbols-outlined" style={{ fontSize: 18 }}>arrow_upward</span>
+                      </button>
+                    </div>
+                  </div>
                 </div>
               </form>
               {error && <div className="mt-2 text-[13px] md:text-xs text-red-600">{error}</div>}

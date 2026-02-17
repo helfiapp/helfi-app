@@ -2712,6 +2712,10 @@ Last stable deployment: `a0544590` (2026-02-15)
 - `ChatRichText.tsx` is the shared text renderer for chat replies and user messages.
 - All protected chat screens above must use the shared renderer (not separate custom formatting logic per screen).
 - Keep the approved readable text size/spacing style (ChatGPT-like clean headings, bullet points, numbered lists, and paragraph spacing).
+- Keep the approved composer layout in web Talk to Helfi/Food Ask AI:
+  - `+` button on the far left (opens photo/barcode actions)
+  - text input in the center
+  - mic + send on the right
 - Keep chat context behavior separated by section:
   - Talk to Helfi = full health context
   - Food chat = food-specific context
@@ -2722,6 +2726,7 @@ Last stable deployment: `a0544590` (2026-02-15)
 **Do not:**
 - Reintroduce per-screen custom markdown/line parsers in the protected chat files.
 - Shrink text back to the old compact style or remove the current list/heading spacing.
+- Remove or move the left `+` button back inside/right side of the input bar.
 - Mix section contexts together (for example, making food chat behave like full-health chat).
 
 **If this breaks again, restore checklist:**
