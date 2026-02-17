@@ -567,41 +567,20 @@ export async function GET(request: NextRequest) {
       ? parseInt(tzOffsetMinRaw || '0', 10)
       : 0
     
-    // CRITICAL FIX: Use a wider window to catch entries that might be on the boundary
-    // Query from start of requested day to end of next day, then filter precisely
-    // This ensures we don't miss entries due to timezone or timing issues
+    // Build the requested local-day UTC window.
     const startUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 0, 0, 0, 0) + tzMin * 60 * 1000
     const endUtcMs = Date.UTC(y, (m || 1) - 1, d || 1, 23, 59, 59, 999) + tzMin * 60 * 1000
     
-    // Also create a wider query window (extend by 12 hours on each side to catch boundary cases)
+    // Keep a wider lookup window only for legacy rows with missing localDate.
     const queryStartMs = startUtcMs - (12 * 60 * 60 * 1000) // 12 hours before
     const queryEndMs = endUtcMs + (12 * 60 * 60 * 1000) // 12 hours after
     
-    const start = new Date(startUtcMs)
-    const end = new Date(endUtcMs)
     const queryStart = new Date(queryStartMs)
     const queryEnd = new Date(queryEndMs)
 
-    // 🛡️ GUARD RAIL: Food Diary Entry Query (CRITICAL - DO NOT MODIFY WITHOUT READING GUARD_RAILS.md)
-    // 
-    // This query prevents entries from disappearing due to date filtering issues.
-    // See GUARD_RAILS.md section 3 for full documentation of the bug and fix.
-    //
-    // DO NOT:
-    // - Remove any of the OR conditions below
-    // - Filter by localDate alone without checking createdAt
-    // - Make the query more restrictive
-    // - Remove the filtering/deduplication steps below
-    //
-    // DO:
-    // - Query broadly to catch entries with missing/incorrect localDate (for repair)
-    // - Filter precisely after querying to ensure correct date
-    // - Always deduplicate results
-    //
-    // Prefer the explicit localDate column when present so entries never drift to the wrong day.
-    // For older rows that predate localDate, fall back to the createdAt time-window.
-    // CRITICAL FIX: Query broadly so we can detect incorrect localDate values.
-    // We will filter mismatches out below and repair localDate separately.
+    // Critical rule:
+    // - If localDate exists, it is the source of truth.
+    // - createdAt fallback is used only for legacy rows where localDate is missing.
     console.log('🔍 GET /api/food-log - Querying database for entries...');
     let logs;
     try {
@@ -611,13 +590,7 @@ export async function GET(request: NextRequest) {
           OR: [
             { localDate: validatedDateStr },
             {
-              localDate: null,
-              createdAt: { gte: queryStart, lte: queryEnd },
-            },
-            // Include entries created within the wider query window to detect localDate mismatches.
-            // We still filter them out below if localDate does not match the requested day.
-            // DO NOT REMOVE THIS CONDITION - it supports localDate repair.
-            {
+              OR: [{ localDate: null }, { localDate: '' }],
               createdAt: { gte: queryStart, lte: queryEnd },
             },
           ],
@@ -633,62 +606,44 @@ export async function GET(request: NextRequest) {
       }, { status: 500 })
     }
     
-    // 🛡️ SEVERE GUARD RAIL: Post-Query Filtering (REQUIRED; owner approval to change)
-    // Filter to ensure we only return entries for the requested date.
-    // Entries with incorrect localDate must be handled carefully.
-    // IMPORTANT: this app writes `createdAt` aligned to the selected diary date (see alignTimestampToLocalDate on the client).
-    // That means if `localDate` is missing/incorrect, we can safely use `createdAt` as the backup for what day it belongs to,
-    // and then auto-heal localDate so it stays consistent going forward.
-    // DO NOT remove this filtering step - it ensures accuracy after broad query.
+    // Final date filter:
+    // - Keep only exact localDate matches when localDate exists.
+    // - Use createdAt day check only when localDate is missing.
     const filteredLogs = logs.filter((log) => {
       try {
-        // If localDate matches exactly, include it
-        if (log.localDate === validatedDateStr) return true;
+        const hasLocalDate = typeof log.localDate === 'string' && log.localDate.trim().length > 0
+        if (hasLocalDate) {
+          return log.localDate === validatedDateStr
+        }
 
-        // Backup: decide which local day this entry belongs to based on createdAt (aligned to diary date on write).
-        // This fixes cases where localDate is missing or incorrect, without hiding the entry.
-
-        // Safety check: createdAt must exist and be a valid date
         if (!log.createdAt) {
           console.warn(`⚠️ Entry ${log.id} has no createdAt, skipping date check`);
           return false;
         }
 
-        // Ensure createdAt is a Date object
         const createdAtDate = log.createdAt instanceof Date ? log.createdAt : new Date(log.createdAt);
         if (isNaN(createdAtDate.getTime())) {
           console.warn(`⚠️ Entry ${log.id} has invalid createdAt: ${log.createdAt}, skipping date check`);
           return false;
         }
 
-        // Convert createdAt to user's local date using their timezone offset
         const logDate = new Date(createdAtDate.getTime() - (tzMin * 60 * 1000));
         const logYear = logDate.getUTCFullYear();
         const logMonth = logDate.getUTCMonth();
         const logDay = logDate.getUTCDate();
 
-        // Compare with requested date
         const [reqYear, reqMonth, reqDay] = validatedDateStr.split('-').map((v) => parseInt(v, 10));
         const matchesDate = logYear === reqYear && logMonth === (reqMonth - 1) && logDay === reqDay;
-
-        // Also check UTC window as fallback (for entries created exactly at boundaries)
-        const logTime = createdAtDate.getTime();
-        const isInWindow = logTime >= start.getTime() && logTime <= end.getTime();
-
-        // Include if either the calendar date matches OR it's within the UTC window
-        const shouldInclude = matchesDate || isInWindow;
-
-        if (!shouldInclude) {
+        if (!matchesDate) {
           const logDateStr = `${logYear}-${String(logMonth + 1).padStart(2, '0')}-${String(logDay).padStart(2, '0')}`;
           console.log(
-            `⚠️ Entry filtered out: localDate=${log.localDate || 'null'}, createdAt date=${logDateStr}, requested=${validatedDateStr}, matchesDate=${matchesDate}, inWindow=${isInWindow}`,
+            `⚠️ Entry filtered out: localDate missing, createdAt date=${logDateStr}, requested=${validatedDateStr}`,
           );
         }
 
-        return shouldInclude;
+        return matchesDate;
       } catch (error) {
         console.error(`❌ Error filtering log entry ${log.id}:`, error);
-        // On error, exclude the entry to prevent breaking the entire response
         return false;
       }
     })
@@ -718,20 +673,20 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Auto-heal: if an entry matches this requested date by createdAt but its stored localDate differs,
-    // correct the localDate so it stops leaking across adjacent days in future queries.
+    // Auto-heal only missing localDate rows that matched this requested day via createdAt fallback.
+    // Never rewrite rows that already have a different localDate, because localDate is the source of truth.
     try {
-      const mismatchIds = uniqueLogs
-        .filter((l) => l.localDate !== validatedDateStr)
+      const missingLocalDateIds = uniqueLogs
+        .filter((l) => !(typeof l.localDate === 'string' && l.localDate.trim().length > 0))
         .map((l) => l.id as string);
-      if (mismatchIds.length > 0) {
+      if (missingLocalDateIds.length > 0) {
         prisma.foodLog
           .updateMany({
-            where: { id: { in: mismatchIds } },
+            where: { id: { in: missingLocalDateIds } },
             data: { localDate: validatedDateStr },
           })
           .catch((err) =>
-            console.warn('⚠️ GET /api/food-log - Failed to auto-heal localDate for ids', mismatchIds, err),
+            console.warn('⚠️ GET /api/food-log - Failed to auto-heal missing localDate for ids', missingLocalDateIds, err),
           );
       }
     } catch (healErr) {

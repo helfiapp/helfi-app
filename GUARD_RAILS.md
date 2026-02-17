@@ -1083,17 +1083,16 @@ This caused the left menu to stop working on desktop whenever Food Diary was ope
 **Backend (`app/api/food-log/route.ts`):**
 
 1. **Query broadly, filter precisely:**
-   - Query MUST include entries created within the date window, even if `localDate` doesn't match
+   - Query MUST include entries created within the date window only for legacy rows where `localDate` is missing
    - Use OR conditions to catch entries with:
      - Correct `localDate` matching requested date
      - Null `localDate` but `createdAt` within date window
-     - Incorrect `localDate` (so it can be detected and repaired)
    - After querying, filter results to ensure only entries for requested date are returned
    - Remove duplicates before returning results
 
 2. **Never filter by `localDate` alone:**
    - Use `createdAt` **only** when `localDate` is missing
-   - If `localDate` exists but is wrong, **exclude** it and repair `localDate`
+   - If `localDate` exists but is wrong, **exclude** it (do not move it to requested day automatically)
    - Do **not** use `createdAt` to override a mismatched `localDate`
 
 3. **Deduplication is required:**
@@ -1105,7 +1104,7 @@ This caused the left menu to stop working on desktop whenever Food Diary was ope
 **DO NOT:**
 - Remove the database verification step in the frontend loading logic
 - Make date filtering stricter or more restrictive
-- Remove the fallback OR conditions in the backend query
+- Remove the fallback OR condition for missing `localDate` rows in the backend query
 - Include entries whose `localDate` exists but does **not** match the requested day
 - Remove deduplication logic
 - Assume cached data is always complete or correct
