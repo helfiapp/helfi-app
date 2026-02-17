@@ -4,11 +4,20 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
+import { del } from '@vercel/blob'
 
 export const dynamic = 'force-dynamic'
 
 const MOOD_MEDIA_SCOPE = 'mood-journal'
 const MOOD_MEDIA_URL_TTL_SECONDS = 60 * 60
+
+const chunk = <T,>(items: T[], size: number) => {
+  const result: T[][] = []
+  for (let i = 0; i < items.length; i += size) {
+    result.push(items.slice(i, i + size))
+  }
+  return result
+}
 
 function coerceMediaList(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -76,6 +85,27 @@ function mapSignedMedia(value: unknown): string[] {
   return result
 }
 
+function mediaBlobPaths(value: unknown): string[] {
+  const set = new Set<string>()
+  for (const raw of coerceMediaList(value)) {
+    const path = extractScopedBlobPath(raw, MOOD_MEDIA_SCOPE)
+    if (path) set.add(path)
+  }
+  return Array.from(set)
+}
+
+async function deleteMoodMedia(paths: string[]) {
+  if (!process.env.BLOB_READ_WRITE_TOKEN) return
+  if (paths.length === 0) return
+  const batches = chunk(Array.from(new Set(paths)), 100)
+  for (const batch of batches) {
+    if (!batch.length) continue
+    await del(batch).catch((error) => {
+      console.warn('mood journal media delete skipped', error)
+    })
+  }
+}
+
 export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -128,6 +158,23 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   try {
     await ensureMoodTables()
+    const existingRows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT images, audio
+       FROM MoodJournalEntries
+       WHERE userId = $1 AND id = $2`,
+      user.id,
+      params.id,
+    )
+    const existing = existingRows[0] || null
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const beforePaths = new Set([
+      ...mediaBlobPaths(existing.images),
+      ...mediaBlobPaths(existing.audio),
+    ])
+    const nextPaths = new Set([...mediaBlobPaths(images), ...mediaBlobPaths(audio)])
+    const removedPaths = Array.from(beforePaths).filter((path) => !nextPaths.has(path))
+
     const updated = await prisma.$executeRawUnsafe(
       `UPDATE MoodJournalEntries
        SET localDate = $1,
@@ -152,6 +199,7 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
       params.id,
     )
     if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    await deleteMoodMedia(removedPaths)
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('mood journal update error', e)
@@ -167,11 +215,27 @@ export async function DELETE(_req: NextRequest, { params }: { params: { id: stri
 
   try {
     await ensureMoodTables()
+    const existingRows: any[] = await prisma.$queryRawUnsafe(
+      `SELECT images, audio
+       FROM MoodJournalEntries
+       WHERE userId = $1 AND id = $2`,
+      user.id,
+      params.id,
+    )
+    const existing = existingRows[0] || null
+    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+
+    const mediaToDelete = [
+      ...mediaBlobPaths(existing.images),
+      ...mediaBlobPaths(existing.audio),
+    ]
+
     await prisma.$executeRawUnsafe(
       `DELETE FROM MoodJournalEntries WHERE userId = $1 AND id = $2`,
       user.id,
       params.id,
     )
+    await deleteMoodMedia(mediaToDelete)
     return NextResponse.json({ success: true })
   } catch (e) {
     console.error('mood journal delete error', e)

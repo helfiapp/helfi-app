@@ -4,6 +4,17 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 import MoodTabs from '@/components/mood/MoodTabs'
 import InsightsBottomNav from '@/app/insights/InsightsBottomNav'
+import {
+  deleteLocalMoodMedia,
+  getAllEntryMediaMap,
+  getEntryMediaIds,
+  getLocalMoodMedia,
+  getLocalMoodMediaMany,
+  removeEntryMediaIds,
+  saveLocalMoodMedia,
+  setEntryMediaIds,
+  type LocalMoodMediaKind,
+} from '@/lib/mood-local-media'
 
 export const dynamic = 'force-dynamic'
 
@@ -18,6 +29,19 @@ type JournalEntry = {
   prompt?: string
   template?: string
   createdAt: string
+}
+
+type LocalMediaPreview = {
+  id: string
+  kind: LocalMoodMediaKind
+  url: string
+  fileName: string
+}
+
+type EntryLocalMedia = {
+  images: LocalMediaPreview[]
+  audio: LocalMediaPreview[]
+  missingCount: number
 }
 
 const PROMPTS = [
@@ -101,6 +125,32 @@ function formatSeconds(total: number) {
   return `${String(mins).padStart(2, '0')}:${String(secs).padStart(2, '0')}`
 }
 
+function createLocalMediaId() {
+  if (typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function') {
+    return crypto.randomUUID()
+  }
+  return `media-${Date.now()}-${Math.random().toString(36).slice(2)}`
+}
+
+function sanitizeDownloadName(name: string) {
+  return String(name || 'media')
+    .replace(/[^a-zA-Z0-9._-]/g, '_')
+    .slice(0, 80)
+}
+
+function withMediaSummary(content: string, summaries: string[]) {
+  const cleanedSummaries = summaries.map((item) => item.trim()).filter(Boolean)
+  if (cleanedSummaries.length === 0) return content
+  const withoutOldBlock = content.replace(
+    /<hr data-media-summary="true"\s*\/?>[\s\S]*$/i,
+    '',
+  )
+  const bullets = cleanedSummaries
+    .map((item) => `<li>${item.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</li>`)
+    .join('')
+  return `${withoutOldBlock}<hr data-media-summary="true" /><p><strong>Media notes (auto-analyzed)</strong></p><ul>${bullets}</ul>`
+}
+
 export default function MoodJournalPage() {
   const [entries, setEntries] = useState<JournalEntry[]>([])
   const [loading, setLoading] = useState(false)
@@ -117,6 +167,14 @@ export default function MoodJournalPage() {
   const [contentHtml, setContentHtml] = useState('')
   const [images, setImages] = useState<string[]>([])
   const [audioClips, setAudioClips] = useState<string[]>([])
+  const [localImageIds, setLocalImageIds] = useState<string[]>([])
+  const [localAudioIds, setLocalAudioIds] = useState<string[]>([])
+  const [localPreviews, setLocalPreviews] = useState<Record<string, LocalMediaPreview>>({})
+  const [localMediaNotes, setLocalMediaNotes] = useState<Record<string, string>>({})
+  const [analyzingMediaIds, setAnalyzingMediaIds] = useState<Set<string>>(new Set())
+  const [entryLocalMedia, setEntryLocalMedia] = useState<Record<string, EntryLocalMedia>>({})
+  const [brokenRemoteMedia, setBrokenRemoteMedia] = useState<Set<string>>(new Set())
+  const [downloadingAll, setDownloadingAll] = useState(false)
   const [tags, setTags] = useState<string[]>([])
   const [tagInput, setTagInput] = useState('')
   const [selectedPrompt, setSelectedPrompt] = useState('')
@@ -130,6 +188,234 @@ export default function MoodJournalPage() {
   const dateInputRef = useRef<HTMLInputElement | null>(null)
   const mediaRecorderRef = useRef<MediaRecorder | null>(null)
   const recordTimerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const localPreviewsRef = useRef<Record<string, LocalMediaPreview>>({})
+  const entryLocalMediaRef = useRef<Record<string, EntryLocalMedia>>({})
+
+  const releaseObjectUrl = (url?: string | null) => {
+    if (!url) return
+    if (!url.startsWith('blob:')) return
+    try {
+      URL.revokeObjectURL(url)
+    } catch {
+      // ignore
+    }
+  }
+
+  const appendAnalyzingId = (id: string) => {
+    setAnalyzingMediaIds((prev) => {
+      const next = new Set(prev)
+      next.add(id)
+      return next
+    })
+  }
+
+  const removeAnalyzingId = (id: string) => {
+    setAnalyzingMediaIds((prev) => {
+      const next = new Set(prev)
+      next.delete(id)
+      return next
+    })
+  }
+
+  const analyzeLocalMedia = async (
+    params: { id: string; file: File; kind: LocalMoodMediaKind },
+  ) => {
+    appendAnalyzingId(params.id)
+    try {
+      const formData = new FormData()
+      formData.append('kind', params.kind)
+      formData.append('file', params.file)
+      const res = await fetch('/api/mood/journal/extract-media', {
+        method: 'POST',
+        body: formData,
+      })
+      if (!res.ok) {
+        const payload = await res.json().catch(() => null)
+        throw new Error(payload?.error || 'Could not analyze media')
+      }
+      const payload = await res.json().catch(() => ({}))
+      const summary = String(payload?.summary || '').trim()
+      if (summary) {
+        setLocalMediaNotes((prev) => ({ ...prev, [params.id]: summary }))
+      }
+    } catch (e: any) {
+      const fallback =
+        params.kind === 'image'
+          ? 'Image uploaded and analyzed for journal context.'
+          : 'Voice note uploaded and analyzed for journal context.'
+      setLocalMediaNotes((prev) => ({ ...prev, [params.id]: fallback }))
+      setError((current) => current || (e?.message || 'Could not analyze media right now.'))
+    } finally {
+      removeAnalyzingId(params.id)
+    }
+  }
+
+  const addLocalMedia = async (params: {
+    blob: Blob
+    fileName: string
+    mimeType: string
+    kind: LocalMoodMediaKind
+  }) => {
+    const id = createLocalMediaId()
+    const fileName = sanitizeDownloadName(params.fileName)
+    await saveLocalMoodMedia({
+      id,
+      kind: params.kind,
+      blob: params.blob,
+      fileName,
+      mimeType: params.mimeType || params.blob.type || 'application/octet-stream',
+      createdAt: Date.now(),
+    })
+
+    const url = URL.createObjectURL(params.blob)
+    setLocalPreviews((prev) => ({ ...prev, [id]: { id, kind: params.kind, url, fileName } }))
+    if (params.kind === 'image') {
+      setLocalImageIds((prev) => [...prev, id])
+    } else {
+      setLocalAudioIds((prev) => [...prev, id])
+    }
+
+    const file = new File([params.blob], fileName, {
+      type: params.mimeType || params.blob.type || 'application/octet-stream',
+    })
+    void analyzeLocalMedia({ id, file, kind: params.kind })
+    return id
+  }
+
+  const removeLocalMedia = async (id: string, kind: LocalMoodMediaKind) => {
+    const preview = localPreviews[id]
+    if (preview) releaseObjectUrl(preview.url)
+    setLocalPreviews((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    setLocalMediaNotes((prev) => {
+      const next = { ...prev }
+      delete next[id]
+      return next
+    })
+    if (kind === 'image') {
+      setLocalImageIds((prev) => prev.filter((item) => item !== id))
+    } else {
+      setLocalAudioIds((prev) => prev.filter((item) => item !== id))
+    }
+    await deleteLocalMoodMedia(id).catch(() => {})
+  }
+
+  const downloadLocalMedia = async (id: string) => {
+    const media = await getLocalMoodMedia(id)
+    if (!media) {
+      setError('That local file is no longer available on this device.')
+      return
+    }
+    const url = URL.createObjectURL(media.blob)
+    const link = document.createElement('a')
+    link.href = url
+    link.download = sanitizeDownloadName(media.fileName || `${media.kind}-${id}`)
+    document.body.appendChild(link)
+    link.click()
+    link.remove()
+    setTimeout(() => releaseObjectUrl(url), 0)
+  }
+
+  const downloadAllLocalMedia = async () => {
+    setDownloadingAll(true)
+    setError(null)
+    try {
+      const allMap = getAllEntryMediaMap()
+      const fromEntries = Object.values(allMap).flat()
+      const ids = Array.from(new Set([...fromEntries, ...localImageIds, ...localAudioIds]))
+      let downloaded = 0
+      for (const id of ids) {
+        const media = await getLocalMoodMedia(id)
+        if (!media) continue
+        const url = URL.createObjectURL(media.blob)
+        const link = document.createElement('a')
+        link.href = url
+        link.download = sanitizeDownloadName(media.fileName || `${media.kind}-${id}`)
+        document.body.appendChild(link)
+        link.click()
+        link.remove()
+        setTimeout(() => releaseObjectUrl(url), 0)
+        downloaded += 1
+        await new Promise((resolve) => setTimeout(resolve, 120))
+      }
+      if (!downloaded) {
+        setError('No local media files were found on this device.')
+      } else {
+        setNotice(`Started download for ${downloaded} local media file${downloaded === 1 ? '' : 's'}.`)
+        setTimeout(() => setNotice(null), 2500)
+      }
+    } finally {
+      setDownloadingAll(false)
+    }
+  }
+
+  const loadEntryLocalMedia = async (rows: JournalEntry[]) => {
+    const next: Record<string, EntryLocalMedia> = {}
+    for (const entry of rows) {
+      const ids = getEntryMediaIds(entry.id)
+      if (ids.length === 0) continue
+      const records = await getLocalMoodMediaMany(ids)
+      const found = new Set(records.map((item) => item.id))
+      const previews = records.map((item) => ({
+        id: item.id,
+        kind: item.kind,
+        fileName: item.fileName,
+        url: URL.createObjectURL(item.blob),
+      }))
+      next[entry.id] = {
+        images: previews.filter((item) => item.kind === 'image'),
+        audio: previews.filter((item) => item.kind === 'audio'),
+        missingCount: ids.filter((id) => !found.has(id)).length,
+      }
+    }
+
+    setEntryLocalMedia((prev) => {
+      Object.values(prev).forEach((state) => {
+        state.images.forEach((item) => releaseObjectUrl(item.url))
+        state.audio.forEach((item) => releaseObjectUrl(item.url))
+      })
+      return next
+    })
+  }
+
+  const loadComposerLocalMediaFromEntry = async (entryId: string | null) => {
+    Object.values(localPreviews).forEach((item) => releaseObjectUrl(item.url))
+    setLocalPreviews({})
+    setLocalMediaNotes({})
+    if (!entryId) {
+      setLocalImageIds([])
+      setLocalAudioIds([])
+      return
+    }
+
+    const ids = getEntryMediaIds(entryId)
+    if (ids.length === 0) {
+      setLocalImageIds([])
+      setLocalAudioIds([])
+      return
+    }
+
+    const records = await getLocalMoodMediaMany(ids)
+    const previews: Record<string, LocalMediaPreview> = {}
+    const imageIds: string[] = []
+    const audioIds: string[] = []
+    records.forEach((item) => {
+      previews[item.id] = {
+        id: item.id,
+        kind: item.kind,
+        url: URL.createObjectURL(item.blob),
+        fileName: item.fileName,
+      }
+      if (item.kind === 'image') imageIds.push(item.id)
+      if (item.kind === 'audio') audioIds.push(item.id)
+    })
+    setLocalPreviews(previews)
+    setLocalImageIds(imageIds)
+    setLocalAudioIds(audioIds)
+  }
 
   const loadEntries = async (query?: string) => {
     setLoading(true)
@@ -142,7 +428,9 @@ export default function MoodJournalPage() {
       const res = await fetch(url, { cache: 'no-store' as any })
       if (!res.ok) throw new Error('Failed to load journal')
       const data = await res.json()
-      setEntries(Array.isArray(data?.entries) ? data.entries : [])
+      const rows = Array.isArray(data?.entries) ? data.entries : []
+      setEntries(rows)
+      await loadEntryLocalMedia(rows)
     } catch (e: any) {
       setError(e?.message || 'Failed to load journal')
     } finally {
@@ -162,11 +450,24 @@ export default function MoodJournalPage() {
   }, [searchTerm])
 
   useEffect(() => {
+    localPreviewsRef.current = localPreviews
+  }, [localPreviews])
+
+  useEffect(() => {
+    entryLocalMediaRef.current = entryLocalMedia
+  }, [entryLocalMedia])
+
+  useEffect(() => {
     return () => {
       if (recordTimerRef.current) clearInterval(recordTimerRef.current)
       if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
         mediaRecorderRef.current.stop()
       }
+      Object.values(localPreviewsRef.current).forEach((item) => releaseObjectUrl(item.url))
+      Object.values(entryLocalMediaRef.current).forEach((state) => {
+        state.images.forEach((item) => releaseObjectUrl(item.url))
+        state.audio.forEach((item) => releaseObjectUrl(item.url))
+      })
     }
   }, [])
 
@@ -431,25 +732,19 @@ export default function MoodJournalPage() {
     setUploading(true)
     setError(null)
     try {
-      const uploads = Array.from(files).slice(0, 6)
+      const uploads = Array.from(files).slice(0, 6 - localImageIds.length)
       for (const file of uploads) {
-        const formData = new FormData()
-        formData.append('image', file)
-        const res = await fetch('/api/mood/journal/upload', {
-          method: 'POST',
-          body: formData,
+        await addLocalMedia({
+          blob: file,
+          fileName: file.name || `mood-image-${Date.now()}.jpg`,
+          mimeType: file.type || 'image/jpeg',
+          kind: 'image',
         })
-        if (!res.ok) {
-          const msg = await res.json().catch(() => null)
-          throw new Error(msg?.error || 'Upload failed')
-        }
-        const data = await res.json()
-        if (data?.url) {
-          setImages((prev) => [...prev, data.url])
-        }
       }
+      setNotice('Photo saved to this device only. Server copies are not stored.')
+      setTimeout(() => setNotice(null), 2500)
     } catch (e: any) {
-      setError(e?.message || 'Failed to upload image')
+      setError(e?.message || 'Failed to add image')
     } finally {
       setUploading(false)
       if (fileInputRef.current) fileInputRef.current.value = ''
@@ -460,23 +755,23 @@ export default function MoodJournalPage() {
     setUploadingAudio(true)
     setError(null)
     try {
-      const file = new File([blob], `voice-note-${Date.now()}.webm`, { type: blob.type || 'audio/webm' })
-      const formData = new FormData()
-      formData.append('audio', file)
-      const res = await fetch('/api/mood/journal/upload-audio', {
-        method: 'POST',
-        body: formData,
+      const ext = blob.type.includes('mp4')
+        ? 'm4a'
+        : blob.type.includes('mpeg')
+          ? 'mp3'
+          : blob.type.includes('wav')
+            ? 'wav'
+            : 'webm'
+      await addLocalMedia({
+        blob,
+        fileName: `voice-note-${Date.now()}.${ext}`,
+        mimeType: blob.type || 'audio/webm',
+        kind: 'audio',
       })
-      if (!res.ok) {
-        const msg = await res.json().catch(() => null)
-        throw new Error(msg?.error || 'Audio upload failed')
-      }
-      const data = await res.json()
-      if (data?.url) {
-        setAudioClips((prev) => [...prev, data.url])
-      }
+      setNotice('Voice note saved to this device only. Server copies are not stored.')
+      setTimeout(() => setNotice(null), 2500)
     } catch (e: any) {
-      setError(e?.message || 'Failed to upload audio')
+      setError(e?.message || 'Failed to add audio')
     } finally {
       setUploadingAudio(false)
     }
@@ -538,16 +833,34 @@ export default function MoodJournalPage() {
 
   const handleSave = async () => {
     const content = editorRef.current?.innerHTML?.trim() || ''
-    if (!title.trim() && !content && images.length === 0 && audioClips.length === 0) {
+    if (
+      !title.trim() &&
+      !content &&
+      images.length === 0 &&
+      audioClips.length === 0 &&
+      localImageIds.length === 0 &&
+      localAudioIds.length === 0
+    ) {
       setError('Add a title, some text, a photo, or a voice note first.')
+      return
+    }
+    if (analyzingMediaIds.size > 0) {
+      setError('Please wait a moment while media analysis finishes.')
       return
     }
     setSaving(true)
     setError(null)
     try {
+      const localIds = [...localImageIds, ...localAudioIds]
+      const localSummaries = localIds
+        .map((id) => localMediaNotes[id] || '')
+        .map((text) => text.trim())
+        .filter(Boolean)
+      const contentWithNotes = withMediaSummary(content, localSummaries)
+
       const payload = {
         title,
-        content,
+        content: contentWithNotes,
         images,
         audio: audioClips,
         tags,
@@ -565,10 +878,27 @@ export default function MoodJournalPage() {
         const msg = await res.json().catch(() => null)
         throw new Error(msg?.error || 'Failed to save entry')
       }
+      const data = await res.json().catch(() => ({}))
+      const savedEntryId =
+        (editingId || String(data?.id || '').trim() || null) as string | null
+      if (savedEntryId) {
+        const uniqueLocalIds = Array.from(new Set(localIds))
+        if (uniqueLocalIds.length > 0) {
+          setEntryMediaIds(savedEntryId, uniqueLocalIds)
+        } else {
+          removeEntryMediaIds(savedEntryId)
+        }
+      }
+
       setTitle('')
       setContentHtml('')
       setImages([])
       setAudioClips([])
+      setLocalImageIds([])
+      setLocalAudioIds([])
+      Object.values(localPreviews).forEach((item) => releaseObjectUrl(item.url))
+      setLocalPreviews({})
+      setLocalMediaNotes({})
       setTags([])
       setSelectedPrompt('')
       setSelectedTemplate('')
@@ -596,6 +926,7 @@ export default function MoodJournalPage() {
     const html = entry.content || ''
     setContentHtml(html)
     if (editorRef.current) editorRef.current.innerHTML = html
+    void loadComposerLocalMediaFromEntry(entry.id)
   }
 
   const handleCancelEdit = () => {
@@ -604,6 +935,11 @@ export default function MoodJournalPage() {
     setContentHtml('')
     setImages([])
     setAudioClips([])
+    setLocalImageIds([])
+    setLocalAudioIds([])
+    Object.values(localPreviews).forEach((item) => releaseObjectUrl(item.url))
+    setLocalPreviews({})
+    setLocalMediaNotes({})
     setTags([])
     setSelectedPrompt('')
     setSelectedTemplate('')
@@ -620,6 +956,11 @@ export default function MoodJournalPage() {
         const msg = await res.json().catch(() => null)
         throw new Error(msg?.error || 'Failed to delete entry')
       }
+      const mediaIds = getEntryMediaIds(entryId)
+      for (const mediaId of mediaIds) {
+        await deleteLocalMoodMedia(mediaId).catch(() => {})
+      }
+      removeEntryMediaIds(entryId)
       if (editingId === entryId) handleCancelEdit()
       loadEntries(searchTerm)
     } catch (e: any) {
@@ -629,6 +970,14 @@ export default function MoodJournalPage() {
 
   const visibleEntries = useMemo(() => entries, [entries])
   const dateLabel = useMemo(() => formatDateLong(localDate), [localDate])
+  const localImagePreviews = useMemo(
+    () => localImageIds.map((id) => localPreviews[id]).filter(Boolean),
+    [localImageIds, localPreviews],
+  )
+  const localAudioPreviews = useMemo(
+    () => localAudioIds.map((id) => localPreviews[id]).filter(Boolean),
+    [localAudioIds, localPreviews],
+  )
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24 overflow-x-hidden">
@@ -646,6 +995,25 @@ export default function MoodJournalPage() {
             {error}
           </div>
         )}
+        <div className="rounded-xl border border-blue-200 bg-blue-50 px-4 py-3 text-xs text-blue-900">
+          <p>
+            For security, photos and voice notes are analyzed and not kept on Helfi servers.
+            Local copies stay on this device only.
+          </p>
+          <p className="mt-1">
+            If browser/app data is cleared, local media may disappear. Use download to keep your own copy.
+          </p>
+          <div className="mt-2">
+            <button
+              type="button"
+              onClick={downloadAllLocalMedia}
+              disabled={downloadingAll}
+              className="rounded-full border border-blue-300 bg-white px-3 py-1 text-xs font-semibold text-blue-800 disabled:opacity-60"
+            >
+              {downloadingAll ? 'Preparing downloads...' : 'Download local media from this device'}
+            </button>
+          </div>
+        </div>
 
         <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5 space-y-4">
           <div className="flex items-start justify-between gap-3">
@@ -823,7 +1191,7 @@ export default function MoodJournalPage() {
                   <circle cx="12" cy="12" r="3.5" />
                 </svg>
               </span>
-              {uploading ? 'Uploading...' : 'Add photo'}
+              {uploading ? 'Saving locally...' : 'Add photo'}
             </button>
             <button
               type="button"
@@ -854,7 +1222,12 @@ export default function MoodJournalPage() {
               {recording ? `Stop ${formatSeconds(recordSeconds)}` : 'Record voice note'}
             </button>
             {uploadingAudio && (
-              <span className="text-xs text-gray-500 dark:text-gray-400 self-center">Uploading audio...</span>
+              <span className="text-xs text-gray-500 dark:text-gray-400 self-center">Saving audio locally...</span>
+            )}
+            {analyzingMediaIds.size > 0 && (
+              <span className="text-xs text-gray-500 dark:text-gray-400 self-center">
+                Analyzing media...
+              </span>
             )}
             <input
               ref={fileInputRef}
@@ -895,7 +1268,24 @@ export default function MoodJournalPage() {
             <div className="flex flex-wrap gap-3">
               {images.map((url) => (
                 <div key={url} className="relative">
-                  <img src={url} alt="Journal" className="h-20 w-20 rounded-xl object-cover" />
+                  {brokenRemoteMedia.has(url) ? (
+                    <div className="h-20 w-20 rounded-xl border border-amber-200 bg-amber-50 px-2 py-1 text-[10px] text-amber-700 flex items-center justify-center text-center">
+                      Media expired
+                    </div>
+                  ) : (
+                    <img
+                      src={url}
+                      alt="Journal"
+                      className="h-20 w-20 rounded-xl object-cover"
+                      onError={() =>
+                        setBrokenRemoteMedia((prev) => {
+                          const next = new Set(prev)
+                          next.add(url)
+                          return next
+                        })
+                      }
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => setImages((prev) => prev.filter((item) => item !== url))}
@@ -909,11 +1299,56 @@ export default function MoodJournalPage() {
             </div>
           )}
 
+          {localImagePreviews.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-gray-600 dark:text-gray-300">Local photos (this device only)</div>
+              <div className="flex flex-wrap gap-3">
+                {localImagePreviews.map((item) => (
+                  <div key={item.id} className="relative">
+                    <img src={item.url} alt="Journal local" className="h-20 w-20 rounded-xl object-cover" />
+                    <button
+                      type="button"
+                      onClick={() => removeLocalMedia(item.id, 'image')}
+                      className="absolute -top-2 -right-2 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-full p-1 text-xs"
+                      aria-label="Remove"
+                    >
+                      x
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => downloadLocalMedia(item.id)}
+                      className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-700"
+                    >
+                      Download
+                    </button>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
           {audioClips.length > 0 && (
             <div className="space-y-2">
               {audioClips.map((url) => (
                 <div key={url} className="flex items-center gap-3 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2">
-                  <audio controls src={url} className="w-full" />
+                  {brokenRemoteMedia.has(url) ? (
+                    <div className="w-full rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700">
+                      Voice note expired
+                    </div>
+                  ) : (
+                    <audio
+                      controls
+                      src={url}
+                      className="w-full"
+                      onError={() =>
+                        setBrokenRemoteMedia((prev) => {
+                          const next = new Set(prev)
+                          next.add(url)
+                          return next
+                        })
+                      }
+                    />
+                  )}
                   <button
                     type="button"
                     onClick={() => setAudioClips((prev) => prev.filter((item) => item !== url))}
@@ -926,11 +1361,44 @@ export default function MoodJournalPage() {
             </div>
           )}
 
+          {localAudioPreviews.length > 0 && (
+            <div className="space-y-2">
+              <div className="text-xs font-semibold text-gray-600 dark:text-gray-300">Local voice notes (this device only)</div>
+              {localAudioPreviews.map((item) => (
+                <div
+                  key={item.id}
+                  className="flex flex-col gap-2 rounded-xl border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-900 px-3 py-2"
+                >
+                  <audio controls src={item.url} className="w-full" />
+                  {localMediaNotes[item.id] && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-300">{localMediaNotes[item.id]}</p>
+                  )}
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={() => downloadLocalMedia(item.id)}
+                      className="text-xs text-gray-500"
+                    >
+                      Download
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => removeLocalMedia(item.id, 'audio')}
+                      className="text-xs text-gray-500"
+                    >
+                      Remove
+                    </button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+
           <div className="flex flex-col gap-3">
             <button
               type="button"
               onClick={handleSave}
-              disabled={saving}
+              disabled={saving || analyzingMediaIds.size > 0}
               className="w-full rounded-xl bg-helfi-green text-white text-sm font-semibold py-3 disabled:opacity-60"
             >
               {saving ? 'Saving...' : editingId ? 'Update entry' : 'Save entry'}
@@ -972,6 +1440,10 @@ export default function MoodJournalPage() {
               const entryImages = normalizeImages(entry.images)
               const entryAudio = normalizeImages(entry.audio)
               const entryTags = normalizeTags(entry.tags)
+              const localMedia = entryLocalMedia[entry.id]
+              const localEntryImages = localMedia?.images || []
+              const localEntryAudio = localMedia?.audio || []
+              const missingLocalCount = localMedia?.missingCount || 0
               const preview = stripHtml(entry.content || '').slice(0, 140)
               const createdAt = entry.createdAt ? new Date(entry.createdAt) : null
               const time = createdAt ? createdAt.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' }) : ''
@@ -1007,15 +1479,94 @@ export default function MoodJournalPage() {
                   {entryImages.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-2">
                       {entryImages.slice(0, 4).map((url: string) => (
-                        <img key={url} src={url} alt="Journal" className="h-16 w-16 rounded-xl object-cover" />
+                        brokenRemoteMedia.has(url) ? (
+                          <div
+                            key={url}
+                            className="h-16 w-16 rounded-xl border border-amber-200 bg-amber-50 px-1 text-[10px] text-amber-700 flex items-center justify-center text-center"
+                          >
+                            Media expired
+                          </div>
+                        ) : (
+                          <img
+                            key={url}
+                            src={url}
+                            alt="Journal"
+                            className="h-16 w-16 rounded-xl object-cover"
+                            onError={() =>
+                              setBrokenRemoteMedia((prev) => {
+                                const next = new Set(prev)
+                                next.add(url)
+                                return next
+                              })
+                            }
+                          />
+                        )
+                      ))}
+                    </div>
+                  )}
+                  {localEntryImages.length > 0 && (
+                    <div className="mt-3 flex flex-wrap gap-2">
+                      {localEntryImages.map((item) => (
+                        <div key={item.id} className="relative">
+                          <img src={item.url} alt="Local journal" className="h-16 w-16 rounded-xl object-cover" />
+                          <button
+                            type="button"
+                            onClick={() => downloadLocalMedia(item.id)}
+                            className="absolute -bottom-2 left-1/2 -translate-x-1/2 rounded-full border border-gray-200 bg-white px-2 py-0.5 text-[10px] text-gray-700"
+                          >
+                            Download
+                          </button>
+                        </div>
                       ))}
                     </div>
                   )}
                   {entryAudio.length > 0 && (
                     <div className="mt-3 space-y-2">
                       {entryAudio.map((url: string) => (
-                        <audio key={url} controls src={url} className="w-full" />
+                        brokenRemoteMedia.has(url) ? (
+                          <div
+                            key={url}
+                            className="rounded-lg border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-700"
+                          >
+                            Voice note expired
+                          </div>
+                        ) : (
+                          <audio
+                            key={url}
+                            controls
+                            src={url}
+                            className="w-full"
+                            onError={() =>
+                              setBrokenRemoteMedia((prev) => {
+                                const next = new Set(prev)
+                                next.add(url)
+                                return next
+                              })
+                            }
+                          />
+                        )
                       ))}
+                    </div>
+                  )}
+                  {localEntryAudio.length > 0 && (
+                    <div className="mt-3 space-y-2">
+                      {localEntryAudio.map((item) => (
+                        <div key={item.id} className="space-y-1">
+                          <audio controls src={item.url} className="w-full" />
+                          <button
+                            type="button"
+                            onClick={() => downloadLocalMedia(item.id)}
+                            className="text-xs text-gray-500"
+                          >
+                            Download voice note
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {missingLocalCount > 0 && (
+                    <div className="mt-2 text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-lg px-2 py-1">
+                      Some local media for this entry is not available on this device (it may have been cleared).
                     </div>
                   )}
                   <div className="mt-3 flex items-center justify-end gap-2">

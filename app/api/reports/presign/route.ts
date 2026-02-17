@@ -41,7 +41,6 @@ export async function POST(request: NextRequest) {
       password,
       decryptionConsent,
       passwordConsent,
-      retentionConsent,
     } = body;
 
     // Validate required fields
@@ -86,7 +85,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create consent record
-    const consentText = `I authorize Helfi to decrypt my uploaded PDF using the password I provide, only once, to extract my laboratory test results for analysis within my account. I understand Helfi will not store my password and will permanently delete the original PDF after extraction unless I choose to retain it.`;
+    const consentText = `I authorize Helfi to decrypt my uploaded PDF using the password I provide, only once, to extract my laboratory test results for analysis within my account. I understand Helfi will not store my password and will permanently delete the original PDF after extraction.`;
 
     const consentRecord = await prisma.consentRecord.create({
       data: {
@@ -95,7 +94,7 @@ export async function POST(request: NextRequest) {
         consentText,
         decryptionConsent: decryptionConsent || false,
         passwordConsent: passwordConsent || false,
-        retentionConsent: retentionConsent || false,
+        retentionConsent: false,
         ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
         userAgent: request.headers.get('user-agent') || undefined,
       },
@@ -123,7 +122,7 @@ export async function POST(request: NextRequest) {
         status: 'PENDING',
         isPasswordProtected: isPasswordProtected || false,
         passwordHash,
-        retainOriginal: retentionConsent || false,
+        retainOriginal: false,
         consentRecordId: consentRecord.id,
       },
     });
@@ -138,7 +137,7 @@ export async function POST(request: NextRequest) {
         fileName,
         fileSize,
         isPasswordProtected,
-        retentionConsent,
+        retentionConsent: false,
       },
       ipAddress: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || undefined,
       userAgent: request.headers.get('user-agent') || undefined,
@@ -153,7 +152,7 @@ export async function POST(request: NextRequest) {
         consentRecordId: consentRecord.id,
         decryptionConsent,
         passwordConsent,
-        retentionConsent,
+        retentionConsent: false,
       },
     });
 

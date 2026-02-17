@@ -17,6 +17,7 @@ import {
   markWeeklyReportOnboardingComplete,
   queueWeeklyReportNotification,
   resolveWeeklyReportTimezone,
+  setWeeklyReportsEnabled,
   summarizeCoverage,
   updateWeeklyReportRecord,
   upsertWeeklyReportState,
@@ -1306,6 +1307,13 @@ function clipText(value: string, max = 220) {
   return `${compact.slice(0, Math.max(0, max - 3)).trim()}...`
 }
 
+function stripHtmlTags(value: string) {
+  return String(value || '')
+    .replace(/<[^>]*>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function buildModelInput(reportSignals: any) {
   const sliceList = (list: any, max: number) => (Array.isArray(list) ? list.slice(0, max) : [])
   const trimTopFoods = (foods: any, max: number) =>
@@ -2196,6 +2204,10 @@ export async function POST(request: NextRequest) {
 
   const now = new Date()
   let state = await getWeeklyReportState(userId)
+  if (!state?.reportsEnabled && isManualTrigger && allowManual) {
+    await setWeeklyReportsEnabled(userId, true, { scheduleFrom: now })
+    state = await getWeeklyReportState(userId)
+  }
   if (!state?.reportsEnabled) {
     return NextResponse.json({ status: 'disabled', reason: 'reports_disabled' }, { status: 400 })
   }
@@ -2293,6 +2305,8 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ status: 'failed', reason: 'user_missing' }, { status: 404 })
   }
 
+  await ensureMoodTables().catch(() => {})
+
   const [
     healthGoals,
     supplements,
@@ -2301,6 +2315,7 @@ export async function POST(request: NextRequest) {
     waterLogs,
     healthLogs,
     healthJournalEntries,
+    moodJournalEntries,
     exerciseLogs,
     exerciseEntries,
   ] = await Promise.all([
@@ -2359,6 +2374,21 @@ export async function POST(request: NextRequest) {
         console.warn('[weekly-report] Failed to load health journal entries', error)
         return []
       }),
+    prisma
+      .$queryRawUnsafe<Array<{ id: string; title: string | null; content: string | null; localDate: string | null; createdAt: Date }>>(
+        `SELECT id, title, content, localDate, createdAt
+         FROM MoodJournalEntries
+         WHERE userId = $1 AND createdAt >= $2 AND createdAt <= $3
+         ORDER BY createdAt DESC
+         LIMIT 120`,
+        userId,
+        periodStart,
+        periodEnd,
+      )
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load mood journal entries', error)
+        return []
+      }),
     prisma.exerciseLog
       .findMany({
         where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
@@ -2394,6 +2424,33 @@ export async function POST(request: NextRequest) {
     exerciseEntries,
   }
 
+  const reportJournalEntries = [
+    ...(healthJournalEntries || []).map((entry: any) => ({
+      content: String(entry?.content || '').trim(),
+      createdAt: entry?.createdAt ? new Date(entry.createdAt) : new Date(),
+      localDate: entry?.localDate || null,
+    })),
+    ...(moodJournalEntries || []).map((entry: any) => {
+      const title = String(entry?.title || '').trim()
+      const body = stripHtmlTags(String(entry?.content || '').trim())
+      const combined = [title, body].filter(Boolean).join(' - ')
+      return {
+        content: combined,
+        createdAt: entry?.createdAt ? new Date(entry.createdAt) : new Date(),
+        localDate: entry?.localDate || null,
+      }
+    }),
+  ]
+    .filter((entry) => entry.content)
+    .sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime())
+
+  await updateRunningProgress({
+    userId,
+    reportId: report.id,
+    stage: 'collecting',
+    percent: 30,
+    detail: 'Preparing your nutrition, mood, and activity data.',
+  })
   const selectedIssues = readGoalSnapshot(healthGoals, '__SELECTED_ISSUES__')
   const healthSituations = readGoalSnapshot(healthGoals, '__HEALTH_SITUATIONS_DATA__')
   const allergySnapshot = readGoalSnapshot(healthGoals, '__ALLERGIES_DATA__')
@@ -2640,7 +2697,7 @@ export async function POST(request: NextRequest) {
     }))
   )
   const journalSummary = buildJournalSummary(
-    (user.healthJournalEntries || []).map((entry: any) => ({
+    reportJournalEntries.map((entry: any) => ({
       content: entry.content || '',
       createdAt: entry.createdAt,
       localDate: entry.localDate || null,
@@ -2649,7 +2706,7 @@ export async function POST(request: NextRequest) {
   )
 
   const journalDigest = buildJournalDigest(
-    (user.healthJournalEntries || []).map((entry: any) => ({
+    reportJournalEntries.map((entry: any) => ({
       content: entry.content || '',
       createdAt: entry.createdAt,
       localDate: entry.localDate || null,
@@ -2671,7 +2728,7 @@ export async function POST(request: NextRequest) {
   user.foodLogs?.forEach((f) => stamp(f.createdAt))
   user.waterLogs?.forEach((w) => stamp(w.createdAt))
   checkinRows?.forEach((r) => stamp(r.timestamp))
-  user.healthJournalEntries?.forEach((entry) => stamp(entry.createdAt))
+  reportJournalEntries.forEach((entry) => stamp(entry.createdAt))
   user.exerciseLogs?.forEach((e) => stamp(e.createdAt))
   user.exerciseEntries?.forEach((e) => stamp(e.createdAt))
   moodRows?.forEach((m) => stamp(m.timestamp))
@@ -2685,7 +2742,7 @@ export async function POST(request: NextRequest) {
       (user.foodLogs?.length || 0) +
       (user.waterLogs?.length || 0) +
       (checkinRows?.length || 0) +
-      (user.healthJournalEntries?.length || 0) +
+      reportJournalEntries.length +
       (user.exerciseLogs?.length || 0) +
       (user.exerciseEntries?.length || 0) +
       (moodRows?.length || 0) +
@@ -2695,7 +2752,7 @@ export async function POST(request: NextRequest) {
     waterCount: user.waterLogs?.length || 0,
     moodCount: moodRows?.length || 0,
     checkinCount: checkinRows?.length || 0,
-    journalCount: user.healthJournalEntries?.length || 0,
+    journalCount: reportJournalEntries.length,
     symptomCount: symptomAnalyses?.length || 0,
     exerciseCount: (user.exerciseLogs?.length || 0) + (user.exerciseEntries?.length || 0),
     labCount: labReports?.length || 0,
@@ -2747,7 +2804,7 @@ export async function POST(request: NextRequest) {
       createdAt: msg.createdAt,
       role: msg.role,
     })),
-    journalEntries: (user.healthJournalEntries || []).map((entry) => ({
+    journalEntries: reportJournalEntries.map((entry) => ({
       createdAt: entry.createdAt,
       localDate: entry.localDate ?? null,
     })),
@@ -2825,7 +2882,7 @@ export async function POST(request: NextRequest) {
     labTrends,
     moodRange,
     dailyStats,
-    journalEntries: user.healthJournalEntries || [],
+    journalEntries: reportJournalEntries || [],
     timezone,
   })
 
@@ -2895,7 +2952,7 @@ export async function POST(request: NextRequest) {
     talkToAi: talkToAiSummary,
     journalSummary,
     journalDigest,
-    journalEntries: (user.healthJournalEntries || []).slice(0, 20).map((entry) => ({
+    journalEntries: reportJournalEntries.slice(0, 20).map((entry) => ({
       content: clipText(entry.content || '', 200),
       createdAt: entry.createdAt,
       localDate: entry.localDate,

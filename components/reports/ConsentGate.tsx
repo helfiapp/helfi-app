@@ -16,7 +16,6 @@ export interface ConsentData {
 export default function ConsentGate({ onConsent, isPasswordProtected }: ConsentGateProps) {
   const [decryptionConsent, setDecryptionConsent] = useState(false);
   const [passwordConsent, setPasswordConsent] = useState(false);
-  const [retentionConsent, setRetentionConsent] = useState(false);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -28,7 +27,7 @@ export default function ConsentGate({ onConsent, isPasswordProtected }: ConsentG
     onConsent({
       decryptionConsent,
       passwordConsent,
-      retentionConsent,
+      retentionConsent: false,
     });
   };
 
@@ -87,27 +86,9 @@ export default function ConsentGate({ onConsent, isPasswordProtected }: ConsentG
             />
             <div className="flex-1">
               <span className="text-gray-900 font-medium">
-                I understand Helfi will not store my password and will permanently delete the original PDF after extraction unless I choose to retain it.
+                I understand Helfi will not store my password and will permanently delete the original PDF after extraction.
               </span>
               <span className="text-red-600 ml-1">*</span>
-            </div>
-          </label>
-
-          {/* Optional Consent */}
-          <label className="flex items-start space-x-3 cursor-pointer">
-            <input
-              type="checkbox"
-              checked={retentionConsent}
-              onChange={(e) => setRetentionConsent(e.target.checked)}
-              className="mt-1 h-5 w-5 text-green-600 focus:ring-green-500 border-gray-300 rounded"
-            />
-            <div className="flex-1">
-              <span className="text-gray-900">
-                Retain an encrypted copy of my original PDF for later download.
-              </span>
-              <span className="text-gray-500 text-sm block mt-1">
-                (Optional - by default, we delete the original after extraction)
-              </span>
             </div>
           </label>
         </div>
@@ -118,7 +99,7 @@ export default function ConsentGate({ onConsent, isPasswordProtected }: ConsentG
         <ul className="text-blue-800 text-sm space-y-1 list-disc list-inside">
           <li>Your password is used only once for decryption and is never stored</li>
           <li>All lab values are encrypted at rest using industry-standard encryption</li>
-          <li>Original PDFs are deleted by default unless you choose to retain them</li>
+          <li>Original PDFs are deleted automatically after extraction</li>
           <li>Full audit trail is maintained for compliance</li>
         </ul>
       </div>
@@ -151,4 +132,3 @@ export default function ConsentGate({ onConsent, isPasswordProtected }: ConsentG
     </div>
   );
 }
-

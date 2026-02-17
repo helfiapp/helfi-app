@@ -85,7 +85,7 @@ export default function PrivacyPage() {
                 </p>
                 <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                   <li>The password is never stored, logged, or reused.</li>
-                  <li>Once extraction is complete, the structured data is securely stored in encrypted form and the original file is deleted unless you choose to retain an encrypted copy for your records.</li>
+                  <li>Once extraction is complete, the structured data is securely stored in encrypted form and the original file is deleted.</li>
                 </ul>
               </div>
             </section>
@@ -155,7 +155,7 @@ export default function PrivacyPage() {
                   <li><strong>TLS in transit:</strong> All data is encrypted during transmission using TLS 1.2 or higher</li>
                   <li><strong>Encryption at rest:</strong> Structured lab data is encrypted using AES-256-GCM with per-record encryption keys</li>
                   <li><strong>Envelope encryption:</strong> Data encryption keys are wrapped using a master encryption key for additional security</li>
-                  <li><strong>Secure cloud storage:</strong> Original PDFs (if retained) are stored in encrypted cloud storage with access controls</li>
+                  <li><strong>Secure cloud storage:</strong> Temporary original PDFs are stored only for processing and then deleted after extraction</li>
                   <li><strong>Restricted access:</strong> Only authorized systems and personnel can decrypt and process PDFs</li>
                   <li><strong>Audit logs:</strong> Full audit trail maintained for all processing activities, including uploads, decryption, extraction, and deletion</li>
                   <li><strong>Password handling:</strong> PDF passwords are used only once for decryption and are never stored, logged, or reused</li>
@@ -193,10 +193,11 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">7. Data Retention and Deletion</h2>
               <p className="text-gray-700 leading-relaxed mb-3">
-                By default, Helfi deletes original uploaded documents (such as PDFs) immediately after extraction. If you opt to retain a copy, it remains encrypted and accessible only through your authenticated account.
+                Helfi deletes original uploaded media and documents (such as photos, voice notes, and PDFs) after extraction. Only structured health data needed for reports is retained.
               </p>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6 mb-3">
                 <li>Structured health data is retained until you delete your account or request deletion.</li>
+                <li>Any local copies kept on your own device may be removed if you clear browser/app storage data.</li>
                 <li>System audit logs are maintained for security and compliance purposes. We retain audit logs as necessary to comply with legal obligations and for security monitoring.</li>
                 <li>You can request data deletion or export at any time via in-app settings or by contacting us at <a href="mailto:support@helfi.ai" className="text-green-600 hover:text-green-800 font-medium">support@helfi.ai</a></li>
               </ul>
@@ -204,7 +205,7 @@ export default function PrivacyPage() {
                 <h3 className="text-gray-900 font-semibold mb-2">Laboratory Report Retention</h3>
                 <ul className="text-gray-700 text-sm space-y-1 list-disc list-inside">
                   <li><strong>Structured data:</strong> Lab values are retained until account deletion or until you request deletion</li>
-                  <li><strong>Original PDFs:</strong> Deleted by default immediately after extraction unless you choose to retain them</li>
+                  <li><strong>Original PDFs:</strong> Deleted immediately after extraction</li>
                   <li><strong>Consent records:</strong> Retained for compliance and audit purposes</li>
                   <li><strong>Audit events:</strong> Retained for security monitoring and compliance with legal requirements</li>
                 </ul>

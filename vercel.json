@@ -9,6 +9,10 @@
       "schedule": "0 4 * * *"
     },
     {
+      "path": "/api/cron/mood-media-cleanup",
+      "schedule": "30 4 * * *"
+    },
+    {
       "path": "/api/cron/weekly-health-report",
       "schedule": "*/15 * * * *"
     },

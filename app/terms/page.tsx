@@ -103,7 +103,7 @@ export default function TermsPage() {
               </p>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>If your PDF is password-protected and you choose to supply the password, you expressly authorize Helfi to use that password once to decrypt and process the file. We do not store your password.</li>
-                <li>You may choose whether Helfi retains an encrypted copy of your original PDF; by default, we delete the original file after extraction.</li>
+                <li>Helfi permanently deletes the original PDF after extraction. Only the extracted structured lab data is retained for your reports.</li>
                 <li>We may refuse processing of unreadable or corrupted files.</li>
                 <li>Structured lab data (analyte names, values, units, reference ranges, collection dates, accession numbers, and laboratory names) is extracted and encrypted at rest using industry-standard encryption.</li>
               </ul>
@@ -112,7 +112,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">5. Security & Encryption</h2>
               <p className="text-gray-700 leading-relaxed mb-3">
-                Helfi uses industry-standard encryption to protect sensitive information in transit and at rest. Structured data is encrypted using per-record keys, and retained originals are encrypted with managed key services. If a breach occurs that may cause harm, Helfi will notify affected users and authorities per applicable law.
+                Helfi uses industry-standard encryption to protect sensitive information in transit and at rest. Structured data is encrypted using per-record keys. Original uploaded media and documents are temporary processing files and are deleted after extraction. If a breach occurs that may cause harm, Helfi will notify affected users and authorities per applicable law.
               </p>
             </section>
 

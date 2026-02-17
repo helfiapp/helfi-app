@@ -1,37 +1,14 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import crypto from 'crypto'
-import { put } from '@vercel/blob'
-import { prisma } from '@/lib/prisma'
-import { buildSignedBlobUrl } from '@/lib/blob-access'
 
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024
-
-const contentTypeToExt = (contentType: string) => {
-  if (contentType === 'audio/webm') return 'webm'
-  if (contentType === 'audio/mpeg') return 'mp3'
-  if (contentType === 'audio/mp4') return 'm4a'
-  if (contentType === 'audio/wav') return 'wav'
-  return 'webm'
-}
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.email) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-    })
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
-      return NextResponse.json({ error: 'Audio storage is not configured' }, { status: 503 })
     }
 
     // NextRequest.formData() returns a standard web FormData, but type
@@ -52,23 +29,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'File size must be less than 12MB' }, { status: 400 })
     }
 
-    const buffer = Buffer.from(await audioFile.arrayBuffer())
-    const ext = contentTypeToExt(audioFile.type || 'audio/webm')
-    const filename = `${Date.now()}-${crypto.randomUUID()}.${ext}`
-    const pathname = `mood-journal/${user.id}/audio/${filename}`
-    const blob = await put(pathname, buffer, {
-      access: 'public',
-      contentType: audioFile.type || 'audio/webm',
-      addRandomSuffix: true,
-    })
-    const signedUrl = buildSignedBlobUrl(blob.pathname, 'mood-journal', 60 * 60)
-    if (!signedUrl) {
-      return NextResponse.json({ error: 'Failed to create secure link' }, { status: 500 })
-    }
-
     return NextResponse.json({
-      url: signedUrl,
-      path: blob.pathname,
+      success: true,
+      localOnly: true,
+      message: 'For security, mood voice notes are kept on this device only and not stored on our servers.',
     })
   } catch (e) {
     console.error('mood journal audio upload error', e)
