@@ -1,6 +1,6 @@
 'use client'
 
-import { ChangeEvent, useEffect, useMemo, useRef, useState } from 'react'
+import { ChangeEvent, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import PageHeader from '@/components/PageHeader'
 
 export const dynamic = 'force-dynamic'
@@ -34,6 +34,8 @@ type JournalAudioClip = {
 const MAX_IMAGE_BYTES = 6 * 1024 * 1024
 const MAX_AUDIO_BYTES = 12 * 1024 * 1024
 const MAX_MEDIA_ITEMS = 6
+const AUDIO_INPUT_STORAGE_KEY = 'helfi-health-journal-audio-input-id'
+const AUDIO_OUTPUT_STORAGE_KEY = 'helfi-health-journal-audio-output-id'
 
 function trimSummary(value: string, fallback: string) {
   const clean = String(value || '').replace(/\s+/g, ' ').trim()
@@ -64,6 +66,37 @@ function audioMimeFromName(name: string) {
   if (lower.endsWith('.m4a')) return 'audio/mp4'
   if (lower.endsWith('.aac')) return 'audio/aac'
   return 'audio/webm'
+}
+
+async function detectSilentAudio(blob: Blob): Promise<boolean> {
+  try {
+    if (typeof window === 'undefined') return false
+    const AudioContextClass = (window as any).AudioContext || (window as any).webkitAudioContext
+    if (!AudioContextClass) return false
+
+    const context = new AudioContextClass()
+    try {
+      const arrayBuffer = await blob.arrayBuffer()
+      const decoded = await context.decodeAudioData(arrayBuffer.slice(0))
+      let energy = 0
+      let sampleCount = 0
+      for (let channel = 0; channel < decoded.numberOfChannels; channel += 1) {
+        const data = decoded.getChannelData(channel)
+        const step = Math.max(1, Math.floor(data.length / 12000))
+        for (let i = 0; i < data.length; i += step) {
+          const value = data[i]
+          energy += value * value
+          sampleCount += 1
+        }
+      }
+      const rms = Math.sqrt(energy / Math.max(sampleCount, 1))
+      return rms < 0.004
+    } finally {
+      await context.close().catch(() => {})
+    }
+  } catch {
+    return false
+  }
 }
 
 function buildTodayIso() {
@@ -101,6 +134,11 @@ export default function HealthJournalPage() {
   const [error, setError] = useState<string | null>(null)
   const [images, setImages] = useState<JournalImageItem[]>([])
   const [audioClips, setAudioClips] = useState<JournalAudioClip[]>([])
+  const [audioInputDevices, setAudioInputDevices] = useState<MediaDeviceInfo[]>([])
+  const [audioOutputDevices, setAudioOutputDevices] = useState<MediaDeviceInfo[]>([])
+  const [selectedAudioInputId, setSelectedAudioInputId] = useState('')
+  const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('')
+  const [audioSettingsBusy, setAudioSettingsBusy] = useState(false)
 
   const [selectedDate, setSelectedDate] = useState<string>(todayIso)
   const [showDateSheet, setShowDateSheet] = useState(false)
@@ -120,12 +158,15 @@ export default function HealthJournalPage() {
   const recorderStreamRef = useRef<MediaStream | null>(null)
   const imagesRef = useRef<JournalImageItem[]>([])
   const audioClipsRef = useRef<JournalAudioClip[]>([])
+  const audioElementRefs = useRef<Record<string, HTMLAudioElement | null>>({})
 
   const isViewingToday = selectedDate === todayIso
   const mobileDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
   const desktopDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
   const mediaProcessing = images.some((item) => item.processing) || audioClips.some((item) => item.processing)
   const entryHasMedia = images.length > 0 || audioClips.length > 0
+  const supportsAudioOutputSelection =
+    typeof window !== 'undefined' && typeof (HTMLMediaElement.prototype as any).setSinkId === 'function'
   const extractedMediaNotes = [
     ...images.filter((item) => !item.processing && !item.failed).map((item) => item.summary),
     ...audioClips.filter((item) => !item.processing && !item.failed).map((item) => item.summary),
@@ -264,6 +305,91 @@ export default function HealthJournalPage() {
     loadMonthDates(dateSheetMonth)
   }, [activeTab, dateSheetMonth])
 
+  const refreshAudioDevices = useCallback(async () => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return
+    if (!navigator.mediaDevices?.enumerateDevices) return
+
+    setAudioSettingsBusy(true)
+    try {
+      const allDevices = await navigator.mediaDevices.enumerateDevices()
+      const inputs = allDevices.filter((item) => item.kind === 'audioinput')
+      const outputs = allDevices.filter((item) => item.kind === 'audiooutput')
+
+      setAudioInputDevices(inputs)
+      setAudioOutputDevices(outputs)
+
+      const storedInput = window.localStorage.getItem(AUDIO_INPUT_STORAGE_KEY) || ''
+      const storedOutput = window.localStorage.getItem(AUDIO_OUTPUT_STORAGE_KEY) || ''
+
+      if (!selectedAudioInputId) {
+        const preferredInput = inputs.find((item) => item.deviceId === storedInput)?.deviceId || inputs[0]?.deviceId || ''
+        setSelectedAudioInputId(preferredInput)
+      } else if (!inputs.some((item) => item.deviceId === selectedAudioInputId)) {
+        setSelectedAudioInputId(inputs[0]?.deviceId || '')
+      }
+
+      if (!selectedAudioOutputId) {
+        const preferredOutput = outputs.find((item) => item.deviceId === storedOutput)?.deviceId || outputs[0]?.deviceId || ''
+        setSelectedAudioOutputId(preferredOutput)
+      } else if (!outputs.some((item) => item.deviceId === selectedAudioOutputId)) {
+        setSelectedAudioOutputId(outputs[0]?.deviceId || '')
+      }
+    } catch {
+      setError((current) => current || 'Could not load audio devices. Please refresh and try again.')
+    } finally {
+      setAudioSettingsBusy(false)
+    }
+  }, [selectedAudioInputId, selectedAudioOutputId])
+
+  const applyAudioOutputToElement = useCallback(async (element: HTMLAudioElement | null) => {
+    if (!element) return
+    if (!supportsAudioOutputSelection) return
+    if (!selectedAudioOutputId) return
+    const mediaElement = element as HTMLAudioElement & {
+      setSinkId?: (sinkId: string) => Promise<void>
+    }
+    if (typeof mediaElement.setSinkId !== 'function') return
+    try {
+      await mediaElement.setSinkId(selectedAudioOutputId)
+    } catch {
+      setError((current) => current || 'Could not switch audio output for playback on this browser.')
+    }
+  }, [selectedAudioOutputId, supportsAudioOutputSelection])
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || typeof navigator === 'undefined') return
+    void refreshAudioDevices()
+    const onDeviceChange = () => {
+      void refreshAudioDevices()
+    }
+    navigator.mediaDevices?.addEventListener?.('devicechange', onDeviceChange)
+    return () => {
+      navigator.mediaDevices?.removeEventListener?.('devicechange', onDeviceChange)
+    }
+  }, [refreshAudioDevices])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedAudioInputId) {
+      window.localStorage.setItem(AUDIO_INPUT_STORAGE_KEY, selectedAudioInputId)
+    }
+  }, [selectedAudioInputId])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (selectedAudioOutputId) {
+      window.localStorage.setItem(AUDIO_OUTPUT_STORAGE_KEY, selectedAudioOutputId)
+    }
+  }, [selectedAudioOutputId])
+
+  useEffect(() => {
+    if (!supportsAudioOutputSelection) return
+    const audioElements = Object.values(audioElementRefs.current).filter(Boolean) as HTMLAudioElement[]
+    audioElements.forEach((element) => {
+      void applyAudioOutputToElement(element)
+    })
+  }, [selectedAudioOutputId, supportsAudioOutputSelection, audioClips.length, applyAudioOutputToElement])
+
   const clearComposerMedia = () => {
     images.forEach((item) => {
       try {
@@ -281,6 +407,7 @@ export default function HealthJournalPage() {
     })
     setImages([])
     setAudioClips([])
+    audioElementRefs.current = {}
   }
 
   const extractMediaFromFile = async (params: { kind: 'image' | 'audio'; file: File }) => {
@@ -399,6 +526,7 @@ export default function HealthJournalPage() {
           // ignore
         }
       }
+      delete audioElementRefs.current[audioId]
       return prev.filter((item) => item.id !== audioId)
     })
   }
@@ -418,13 +546,23 @@ export default function HealthJournalPage() {
     setError(null)
     setMediaBusy(true)
     try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true })
+      const audioConstraints: MediaTrackConstraints = {
+        echoCancellation: true,
+        noiseSuppression: false,
+        autoGainControl: true,
+      }
+      if (selectedAudioInputId) {
+        audioConstraints.deviceId = { exact: selectedAudioInputId }
+      }
+
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: audioConstraints })
       recorderStreamRef.current = stream
 
       const mimeOptions = [
         'audio/webm;codecs=opus',
         'audio/webm',
         'audio/mp4',
+        'audio/mpeg',
       ]
       const chosenMime = mimeOptions.find((type) =>
         typeof MediaRecorder.isTypeSupported === 'function' ? MediaRecorder.isTypeSupported(type) : false,
@@ -461,6 +599,12 @@ export default function HealthJournalPage() {
           if (!blob.size) return
           if (blob.size > MAX_AUDIO_BYTES) {
             setError('Voice note must be less than 12MB.')
+            return
+          }
+
+          const likelySilent = await detectSilentAudio(blob)
+          if (likelySilent) {
+            setError('Recording is too quiet. Please check audio input and try again.')
             return
           }
 
@@ -521,7 +665,7 @@ export default function HealthJournalPage() {
       }
 
       mediaRecorderRef.current = recorder
-      recorder.start()
+      recorder.start(250)
       setRecording(true)
     } catch (err: any) {
       setError(err?.message || 'Could not start recording.')
@@ -540,6 +684,13 @@ export default function HealthJournalPage() {
     }
     setMediaBusy(true)
     try {
+      if (typeof recorder.requestData === 'function') {
+        try {
+          recorder.requestData()
+        } catch {
+          // ignore
+        }
+      }
       recorder.stop()
     } catch {
       setMediaBusy(false)
@@ -931,6 +1082,63 @@ export default function HealthJournalPage() {
                 <span className="text-xs font-medium text-red-600">Recording...</span>
               )}
             </div>
+            <div className="mt-3 rounded-xl border border-gray-200 bg-gray-50 p-3">
+              <div className="flex items-center justify-between gap-2">
+                <div className="text-xs font-semibold text-gray-700">Audio settings</div>
+                <button
+                  type="button"
+                  onClick={() => refreshAudioDevices()}
+                  disabled={audioSettingsBusy}
+                  className="rounded-md border border-gray-300 bg-white px-2 py-1 text-xs text-gray-700 hover:bg-gray-100 disabled:opacity-60"
+                >
+                  {audioSettingsBusy ? 'Refreshing...' : 'Refresh devices'}
+                </button>
+              </div>
+              <div className="mt-2 grid grid-cols-1 md:grid-cols-2 gap-2">
+                <label className="text-xs text-gray-700">
+                  <span className="block mb-1 font-medium">Audio input (microphone)</span>
+                  <select
+                    value={selectedAudioInputId}
+                    onChange={(e) => setSelectedAudioInputId(e.target.value)}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900"
+                  >
+                    {audioInputDevices.length === 0 ? (
+                      <option value="">No microphone found</option>
+                    ) : (
+                      audioInputDevices.map((device, index) => (
+                        <option key={device.deviceId || `input-${index}`} value={device.deviceId}>
+                          {device.label || `Microphone ${index + 1}`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+                <label className="text-xs text-gray-700">
+                  <span className="block mb-1 font-medium">Audio output (playback)</span>
+                  <select
+                    value={selectedAudioOutputId}
+                    onChange={(e) => setSelectedAudioOutputId(e.target.value)}
+                    disabled={!supportsAudioOutputSelection}
+                    className="w-full rounded-lg border border-gray-300 bg-white px-2 py-2 text-xs text-gray-900 disabled:bg-gray-100"
+                  >
+                    {audioOutputDevices.length === 0 ? (
+                      <option value="">No output device found</option>
+                    ) : (
+                      audioOutputDevices.map((device, index) => (
+                        <option key={device.deviceId || `output-${index}`} value={device.deviceId}>
+                          {device.label || `Speaker ${index + 1}`}
+                        </option>
+                      ))
+                    )}
+                  </select>
+                </label>
+              </div>
+              {!supportsAudioOutputSelection && (
+                <p className="mt-2 text-xs text-gray-500">
+                  This browser does not support in-page output switching. Use Chrome or system sound settings.
+                </p>
+              )}
+            </div>
             <textarea
               value={note}
               onChange={(e) => setNote(e.target.value)}
@@ -982,7 +1190,20 @@ export default function HealthJournalPage() {
                             Remove
                           </button>
                         </div>
-                        <audio controls src={item.localUrl} className="mt-2 w-full" />
+                        <audio
+                          ref={(element) => {
+                            audioElementRefs.current[item.id] = element
+                            if (element) {
+                              void applyAudioOutputToElement(element)
+                            }
+                          }}
+                          onLoadedMetadata={(event) => {
+                            void applyAudioOutputToElement(event.currentTarget)
+                          }}
+                          controls
+                          src={item.localUrl}
+                          className="mt-2 w-full"
+                        />
                         <div className="mt-2 text-xs text-gray-600">
                           {item.processing ? 'Analyzing voice note...' : item.failed ? 'Could not analyze voice note.' : 'Voice note analyzed'}
                         </div>
