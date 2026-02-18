@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-18 11:33 AEDT
+- What changed: Renamed Smart Health Coach to Health Coach across key user screens (sidebar/menu, Health Coach pages, notifications/settings text). Added Select + Delete for past Health Coach history on web. Improved Health Coach tip quality rules so alerts avoid repeated hydration nagging and prioritize food swaps tied to user goals.
+- Where to see it (page/link): https://helfi.ai/health-tips, https://helfi.ai/health-tips/history, https://helfi.ai/notifications/ai-insights
+- What to quickly test: Open Health Coach and confirm new title text. Go to Tip History, tap Select, choose multiple items, delete selected, and confirm they disappear. Trigger/generate new tips and confirm variety (fewer repeated hydration-only alerts, more food/goal-linked actions).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-18 00:36 AEDT
 - What changed: Health Journal page-only voice note fix is live. Added Audio settings on the page so users can choose microphone input and playback output, improved recording capture handling, and added a silent-recording warning to prevent saving unusable voice clips.
 - Where to see it (page/link): https://helfi.ai/health-journal
