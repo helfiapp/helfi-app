@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 00:51 AEDT
+- What changed: Locked food search behavior across all food diary search modules (Add Ingredient page, Food Diary Add Ingredient modal, Build a Meal, and packaged search API ranking/filtering). Added strict deploy-time protection so these search-core blocks cannot be changed unless an explicit override is set.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient, https://helfi.ai/food/build-meal, and Food Diary -> Add Ingredient modal
+- What to quickly test: In all three search flows, type “McDonald’s chee” with Packaged/Fast-foods selected. Confirm cheeseburger-style matches appear immediately and stay prioritized. Then confirm deploy guard still passes (no search core edits allowed without override env vars).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 00:26 AEDT
 - What changed: Updated packaged predictive search to follow word-by-word intent. Once you start typing the next word, that current word is now treated as the main match immediately (not just the brand). Multi-word matching now requires the active word to match, and quick lookup keeps brand + current word together from the first typed letter.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient and https://helfi.ai/food/build-meal
