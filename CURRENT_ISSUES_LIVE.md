@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-18 21:51 AEDT
+- What changed: Fixed packaged/fast-food ingredient search reliability. Search now keeps Helfi database results first, uses safer country fallback so valid fast-food items (like McDonald’s cheeseburger) are not hidden when country-specific rows are missing, then fills with OpenFoodFacts and FatSecret while keeping macro-required filtering.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient
+- What to quickly test: In Add ingredient with Packaged/Fast-foods selected, search “McDonald’s cheeseburger” and “McDonald’s cheese burger”; confirm burger items appear (not only brand suggestion). Also type partials like “mcdo” and confirm instant results appear while typing.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-18 12:27 AEDT
 - What changed: Fixed Health Coach history delete for native token-based sessions and web sessions. Also updated Health Coach tip title display so old saved items that started with “Smart Health Coach:” now show as “Health Coach:” in the app UI.
 - Where to see it (page/link): https://helfi.ai/health-tips, https://helfi.ai/health-tips/history
