@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 00:26 AEDT
+- What changed: Updated packaged predictive search to follow word-by-word intent. Once you start typing the next word, that current word is now treated as the main match immediately (not just the brand). Multi-word matching now requires the active word to match, and quick lookup keeps brand + current word together from the first typed letter.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and https://helfi.ai/food/build-meal
+- What to quickly test: Type “McDonald’s che”, “McDonald’s chee”, and “McDonald’s cheese” with Packaged/Fast-foods selected. Confirm cheese-related items appear immediately and non-matching brand-only items are pushed out.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-18 23:31 AEDT
 - What changed: Fixed packaged/fast-food ranking so typing a partial like “McDonald’s cheese” now returns cheeseburger items properly (instead of only random cheese items). Search now also safely tops up from global custom fast-food rows when country-specific rows are too narrow, and quick typing keeps both brand + food token intent for better matches.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient and https://helfi.ai/food/build-meal
