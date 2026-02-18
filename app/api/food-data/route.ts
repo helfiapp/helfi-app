@@ -140,6 +140,7 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    // PROTECTED: FOOD_DATA_PACKAGED_SORT START
     // Alphabetical hierarchy for packaged foods (considers brand + name)
     const sortPackagedByAlphabeticalHierarchyAsc = (list: any[], searchQuery: string) => {
       const queryNorm = normalizeForMatch(searchQuery)
@@ -271,6 +272,8 @@ export async function GET(request: NextRequest) {
         return aMeta.hierarchyKey.localeCompare(bMeta.hierarchyKey) || aMeta.stable.localeCompare(bMeta.stable)
       })
     }
+
+    // PROTECTED: FOOD_DATA_PACKAGED_SORT END
 
     const singularizeToken = (value: string) => {
       const lower = value.toLowerCase()
@@ -452,6 +455,7 @@ export async function GET(request: NextRequest) {
       return true
     }
 
+    // PROTECTED: FOOD_DATA_PACKAGED_FILTER START
     const wordStartsWithToken = (word: string, token: string, options?: { allowTypo?: boolean }) => {
       if (!word || !token) return false
       if (word.startsWith(token)) return true
@@ -533,6 +537,8 @@ export async function GET(request: NextRequest) {
       if (!allowTypoFallback) return []
       return items.filter((item) => nameMatchesSearchQuery(getText(item), searchQuery, { allowTypo: true }))
     }
+
+    // PROTECTED: FOOD_DATA_PACKAGED_FILTER END
 
     type CustomPackagedItem = {
       id: string

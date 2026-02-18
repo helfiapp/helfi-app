@@ -267,6 +267,7 @@ const isOneEditAway = (a: string, b: string) => {
   return true
 }
 
+// PROTECTED: ADD_INGREDIENT_SEARCH_CORE START
 const nameMatchesSearchQuery = (
   name: string,
   searchQuery: string,
@@ -455,6 +456,7 @@ const getQuickPackagedQuery = (searchQuery: string) => {
   }
   return searchQuery
 }
+// PROTECTED: ADD_INGREDIENT_SEARCH_CORE END
 
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
   const normalizedTokens = getBrandMatchTokens(searchQuery).filter(Boolean)

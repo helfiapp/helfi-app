@@ -184,6 +184,46 @@ function main() {
     description: 'Add Ingredient modal search UI',
   });
   checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'add-ingredient', 'AddIngredientClient.tsx'),
+    startMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH_CORE START',
+    endMarker: 'PROTECTED: ADD_INGREDIENT_SEARCH_CORE END',
+    expectedHash: '37f416baf8ccf98ce78ce2e7d28a663b8b4b2e93b240c3716b1537a5f69afad1',
+    allowEnvVar: 'ALLOW_ADD_INGREDIENT_SEARCH_CORE_EDIT',
+    description: 'Add Ingredient standalone search core logic',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH_CORE START',
+    endMarker: 'PROTECTED: ADD_INGREDIENT_MODAL_SEARCH_CORE END',
+    expectedHash: '59e83d9d80738834b2ac6c1502fd8bb2849e595c7d526e1648c718b63846e728',
+    allowEnvVar: 'ALLOW_ADD_INGREDIENT_MODAL_SEARCH_CORE_EDIT',
+    description: 'Add Ingredient modal search core logic',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
+    startMarker: 'PROTECTED: BUILD_MEAL_SEARCH_CORE START',
+    endMarker: 'PROTECTED: BUILD_MEAL_SEARCH_CORE END',
+    expectedHash: '4c38c030432c1bbc9d06c1e7dace0ed96bb1a9e16410e32f107863fd9cc60647',
+    allowEnvVar: 'ALLOW_BUILD_MEAL_SEARCH_CORE_EDIT',
+    description: 'Build a Meal search core logic',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'food-data', 'route.ts'),
+    startMarker: 'PROTECTED: FOOD_DATA_PACKAGED_SORT START',
+    endMarker: 'PROTECTED: FOOD_DATA_PACKAGED_SORT END',
+    expectedHash: '3c38724d5d192f258786ff4765311d33f45a263b33c91b3db559cf49749226b2',
+    allowEnvVar: 'ALLOW_FOOD_DATA_PACKAGED_SORT_EDIT',
+    description: 'Food data packaged search ranking hierarchy',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'food-data', 'route.ts'),
+    startMarker: 'PROTECTED: FOOD_DATA_PACKAGED_FILTER START',
+    endMarker: 'PROTECTED: FOOD_DATA_PACKAGED_FILTER END',
+    expectedHash: '55c381986cfd2086e244e4488dc97e1ba1e3823543033b916d2d645db0ea4bcb',
+    allowEnvVar: 'ALLOW_FOOD_DATA_PACKAGED_FILTER_EDIT',
+    description: 'Food data packaged active-word filter logic',
+  });
+  checkProtectedRegion({
     filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
     startMarker: 'PROTECTED: ENERGY_SUMMARY_CALC START',
     endMarker: 'PROTECTED: ENERGY_SUMMARY_CALC END',

@@ -1071,6 +1071,8 @@ This caused the left menu to stop working on desktop whenever Food Diary was ope
 - Single‑food searches must use USDA; packaged searches use FatSecret + OpenFoodFacts.
 - Plural searches should automatically fall back to the singular form (e.g., “fried eggs” → “fried egg”) to prevent empty/irrelevant results.
 - If the query begins with a brand (e.g., KFC, Starbucks, McDonalds), top results should preserve the brand‑first wording.
+- For multi-word packaged search, once the user starts a new word, that current word must be matched immediately from its first letter (example: `McDonald's chee` must prioritize `cheeseburger` matches before unrelated words).
+- Packaged result order must follow the alphabetical hierarchy ranking for the active typed word, not random order.
 - Search UX must stay consistent across:
   - Add Ingredient
   - Build a Meal
@@ -1274,6 +1276,32 @@ These regions are guarded in `scripts/protect-regions.js` using hashes.
    - `ALLOW_ADD_INGREDIENT_SEARCH_EDIT=true` (standalone)
 2) Update the hash in `scripts/protect-regions.js` to match the new region.
 3) Remove the override env var after the deployment.
+
+#### 3.4.12 Food Search Core Logic Lock (Feb 2026 - Locked)
+
+These search-core regions are now hash-protected in `scripts/protect-regions.js`:
+
+- `app/food/add-ingredient/AddIngredientClient.tsx`
+  - `PROTECTED: ADD_INGREDIENT_SEARCH_CORE`
+- `app/food/page.tsx`
+  - `PROTECTED: ADD_INGREDIENT_MODAL_SEARCH_CORE`
+- `app/food/build-meal/MealBuilderClient.tsx`
+  - `PROTECTED: BUILD_MEAL_SEARCH_CORE`
+- `app/api/food-data/route.ts`
+  - `PROTECTED: FOOD_DATA_PACKAGED_SORT`
+  - `PROTECTED: FOOD_DATA_PACKAGED_FILTER`
+
+Do **not** edit these sections unless the owner explicitly approves.
+
+If an intentional change is approved:
+1) Set only the matching override env var(s):
+   - `ALLOW_ADD_INGREDIENT_SEARCH_CORE_EDIT=true`
+   - `ALLOW_ADD_INGREDIENT_MODAL_SEARCH_CORE_EDIT=true`
+   - `ALLOW_BUILD_MEAL_SEARCH_CORE_EDIT=true`
+   - `ALLOW_FOOD_DATA_PACKAGED_SORT_EDIT=true`
+   - `ALLOW_FOOD_DATA_PACKAGED_FILTER_EDIT=true`
+2) Update the matching expected hash(es) in `scripts/protect-regions.js`.
+3) Remove the override env var(s) after deployment.
 
 ### 3.5 Testing Requirements
 

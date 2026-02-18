@@ -7185,6 +7185,7 @@ export default function FoodDiary() {
     return true
   }
 
+  // PROTECTED: ADD_INGREDIENT_MODAL_SEARCH_CORE START
   const nameMatchesSearchQuery = (
     name: string,
     searchQuery: string,
@@ -7358,6 +7359,7 @@ export default function FoodDiary() {
     }
     return searchQuery
   }
+  // PROTECTED: ADD_INGREDIENT_MODAL_SEARCH_CORE END
 
   const COMMON_PACKAGED_BRAND_SUGGESTIONS = [
     'McDonald\'s',
