@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-18 23:13 AEDT
+- What changed: Made packaged/fast-food search feel faster while typing. The app now starts a fast local lookup immediately on each keystroke, shows matching results sooner, and still runs the full search in the background so complete results still load.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and https://helfi.ai/food/build-meal
+- What to quickly test: Type partial text like “mc”, “mcd”, “mcdonald” with Packaged/Fast-foods selected. Confirm suggestions start appearing quickly as you type, then fuller results keep loading.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-18 21:51 AEDT
 - What changed: Fixed packaged/fast-food ingredient search reliability. Search now keeps Helfi database results first, uses safer country fallback so valid fast-food items (like McDonald’s cheeseburger) are not hidden when country-specific rows are missing, then fills with OpenFoodFacts and FatSecret while keeping macro-required filtering.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient
