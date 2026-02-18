@@ -339,9 +339,10 @@ function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null 
 
 export async function searchOpenFoodFactsByQuery(
   query: string,
-  opts: { pageSize?: number } = {},
+  opts: { pageSize?: number; timeoutMs?: number } = {},
 ): Promise<NormalizedFoodItem[]> {
   const pageSize = opts.pageSize ?? 5
+  const timeoutMs = Number.isFinite(Number(opts.timeoutMs)) ? Math.max(1000, Number(opts.timeoutMs)) : 3000
   if (!query.trim()) return []
 
   const params = new URLSearchParams({
@@ -362,7 +363,7 @@ export async function searchOpenFoodFactsByQuery(
       // keep timeouts modest to avoid blocking the analyzer too long
       cache: 'no-store',
       next: { revalidate: 0 },
-      timeoutMs: 3000,
+      timeoutMs,
     })
 
     if (!res.ok) {
@@ -988,7 +989,7 @@ export async function fetchFatSecretServingOptions(foodId: string): Promise<Serv
 
 export async function searchFatSecretFoods(
   query: string,
-  opts: { pageSize?: number } = {},
+  opts: { pageSize?: number; timeoutMs?: number } = {},
 ): Promise<NormalizedFoodItem[]> {
   if (!FATSECRET_CLIENT_ID || !FATSECRET_CLIENT_SECRET) {
     console.warn('FatSecret credentials not configured; skipping FatSecret lookup')
@@ -996,6 +997,7 @@ export async function searchFatSecretFoods(
   }
 
   const pageSize = opts.pageSize ?? 5
+  const timeoutMs = Number.isFinite(Number(opts.timeoutMs)) ? Math.max(1000, Number(opts.timeoutMs)) : 3500
   if (!query.trim()) return []
 
   const accessToken = await getFatSecretAccessToken()
@@ -1022,7 +1024,7 @@ export async function searchFatSecretFoods(
       },
       cache: 'no-store',
       next: { revalidate: 0 },
-      timeoutMs: 3500,
+      timeoutMs,
     })
 
     if (!res.ok) {

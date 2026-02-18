@@ -308,6 +308,7 @@ Files:
 - Packaged searches: use OpenFoodFacts + FatSecret unless the local USDA branded library already has matches. Single foods remain USDA local only.
 - Packaged searches: if local USDA branded matches are fewer than 5, add OpenFoodFacts + FatSecret results to fill the list. Also normalize "cheese burger" to "cheeseburger" when external sources return nothing.
 - Packaged fast‑food/restaurant searches must skip USDA entirely and only use OpenFoodFacts + FatSecret.
+- Country fallback guard (Feb 2026): packaged custom/fast‑food results must not go empty just because the user country has no exact row. If country-specific custom matches are empty for a query, fall back to all-country custom rows (still keep DB-first ordering).
 - Never add an ingredient without calories, protein, carbs, and fat. If the user picks a specific result that is missing macros, do **not** swap it for a different food; block the add and show a clear message so they can choose another result.
 
 **Restore steps if broken:**

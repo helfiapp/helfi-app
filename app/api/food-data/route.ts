@@ -537,10 +537,17 @@ export async function GET(request: NextRequest) {
         .filter(Boolean) as CustomPackagedItem[]
     }
 
-    const customPackagedItems =
+    const customPackagedItemsPrimary =
       kindMode === 'packaged' ? buildCustomPackagedItems(await getCustomPackagedItems(resolvedCountry)) : []
+    let customPackagedItemsAllCountries: CustomPackagedItem[] | null = null
 
-    const getCustomPackagedMatches = (value: string) => {
+    const loadAllCustomPackagedItems = async () => {
+      if (customPackagedItemsAllCountries) return customPackagedItemsAllCountries
+      customPackagedItemsAllCountries = buildCustomPackagedItems(await getCustomPackagedItems(null))
+      return customPackagedItemsAllCountries
+    }
+
+    const getCustomPackagedMatches = (value: string, sourceItems: CustomPackagedItem[] = customPackagedItemsPrimary) => {
       if (!value) return []
       
       // For packaged foods, be more lenient - check if query tokens appear in name or brand+name
@@ -548,7 +555,7 @@ export async function GET(request: NextRequest) {
       const normalizedQuery = normalizeForMatch(value)
       
       const buildMatches = (allowTypo: boolean) =>
-        customPackagedItems.filter((item) => {
+        sourceItems.filter((item) => {
           const name = item.name || ''
           const brand = item.brand || ''
           const brandName = brand ? `${brand} ${name}` : name
@@ -601,7 +608,14 @@ export async function GET(request: NextRequest) {
     const queryTokens = queryNorm ? queryNorm.split(' ').filter(Boolean) : []
     const queryTokensNormalized = queryTokens.map((token) => singularizeToken(token))
     const queryFirstToken = queryTokens[0] || ''
-    const customPackagedMatches = kindMode === 'packaged' ? getCustomPackagedMatches(query) : []
+    let customPackagedMatches = kindMode === 'packaged' ? getCustomPackagedMatches(query) : []
+    // If the user's country has no matching fast-food item, fall back to all-country custom rows
+    // so valid items are still discoverable instead of returning an empty list.
+    if (kindMode === 'packaged' && customPackagedMatches.length === 0 && resolvedCountry) {
+      const allCountryItems = await loadAllCustomPackagedItems()
+      const crossCountryMatches = getCustomPackagedMatches(query, allCountryItems)
+      if (crossCountryMatches.length > 0) customPackagedMatches = crossCountryMatches
+    }
     let customPackagedApplied = false
 
     // Owner rule: never return items with missing calories/macros.
@@ -1063,7 +1077,7 @@ export async function GET(request: NextRequest) {
           return combined || item?.name || ''
         })
 
-        // Owner rule: our database first (custom + local), then FatSecret fills missing results.
+        // Owner rule: our database first (custom + local), then OpenFoodFacts, then FatSecret.
         // Custom FAST_FOOD should appear first in packaged search.
         const customFastFood = customPackagedMatches.filter((it) => String(it?.kind || '') === 'FAST_FOOD')
         const customOther = customPackagedMatches.filter((it) => String(it?.kind || '') !== 'FAST_FOOD')
@@ -1089,60 +1103,75 @@ export async function GET(request: NextRequest) {
         sortedLocal.forEach(pushUnique)
 
         if (!localOnly && combined.length < limit) {
-          const fetchFatSecret = async (value: string) => {
-            const fat = await searchFatSecretFoods(value, { pageSize: Math.min(25, Math.max(limit, 10)) })
-            const filtered = filterItemsByQuery(fat, value, (item) => {
-              const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-              return combined || item?.name || ''
+          const externalTimeoutMs = combined.length > 0 ? 1200 : 8000
+          const externalPageSize = Math.min(25, Math.max(limit, 10))
+          const fetchPackagedExternalSorted = async (
+            value: string,
+            sourceType: 'openfoodfacts' | 'fatsecret',
+          ) => {
+            if (!value) return []
+            const externalItems =
+              sourceType === 'openfoodfacts'
+                ? await searchOpenFoodFactsByQuery(value, {
+                    pageSize: externalPageSize,
+                    timeoutMs: Math.max(externalTimeoutMs + 1000, 3500),
+                  })
+                : await searchFatSecretFoods(value, {
+                    pageSize: externalPageSize,
+                    timeoutMs: Math.max(externalTimeoutMs + 1000, 3500),
+                  })
+            const filtered = filterItemsByQuery(externalItems, value, (item) => {
+              const label = [item?.brand, item?.name].filter(Boolean).join(' ')
+              return label || item?.name || ''
             })
             return sortPackagedByAlphabeticalHierarchyAsc(filtered, value)
           }
 
-          const fatPrimary = await fetchFatSecret(query)
-          fatPrimary.forEach((it) => {
-            if (combined.length >= limit) return
-            pushUnique(it)
-          })
-
-          if (combined.length < limit) {
-            const compactQuery = buildCompactFoodQuery(query)
-            if (compactQuery) {
-              const fatCompact = await fetchFatSecret(compactQuery)
-              fatCompact.forEach((it) => {
-                if (combined.length >= limit) return
-                pushUnique(it)
+          const fetchPackagedExternalWithTimeout = async (
+            value: string,
+            sourceType: 'openfoodfacts' | 'fatsecret',
+            timeoutMs = 1200,
+          ) => {
+            let timer: ReturnType<typeof setTimeout> | null = null
+            try {
+              const timeoutFallback = new Promise<any[]>((resolve) => {
+                timer = setTimeout(() => resolve([]), timeoutMs)
               })
+              return (await Promise.race([
+                fetchPackagedExternalSorted(value, sourceType),
+                timeoutFallback,
+              ])) as any[]
+            } catch {
+              return []
+            } finally {
+              if (timer) clearTimeout(timer)
             }
           }
 
-          // Last fallback for packaged foods: OpenFoodFacts (helps AU/UK/CA branded products).
-          // Still enforce "no empty calories/macros" and keep it after Helfi + FatSecret results.
-          if (combined.length < limit) {
-            const fetchOpenFoodFacts = async (value: string) => {
-              const off = await searchOpenFoodFactsByQuery(value, { pageSize: Math.min(25, Math.max(limit, 10)) })
-              const filtered = filterItemsByQuery(off, value, (item) => {
-                const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
-                return combined || item?.name || ''
-              })
-              return sortPackagedByAlphabeticalHierarchyAsc(filtered, value)
-            }
-
-            const offPrimary = await fetchOpenFoodFacts(query)
-            offPrimary.forEach((it) => {
-              if (combined.length >= limit) return
+          const pushGroup = (group: any[]) => {
+            for (const it of group) {
+              if (combined.length >= limit) break
               pushUnique(it)
-            })
-
-            if (combined.length < limit) {
-              const compactQuery = buildCompactFoodQuery(query)
-              if (compactQuery) {
-                const offCompact = await fetchOpenFoodFacts(compactQuery)
-                offCompact.forEach((it) => {
-                  if (combined.length >= limit) return
-                  pushUnique(it)
-                })
-              }
             }
+          }
+
+          const compactQuery = buildCompactFoodQuery(query)
+
+          const [offPrimary, fatPrimary] = await Promise.all([
+            fetchPackagedExternalWithTimeout(query, 'openfoodfacts', externalTimeoutMs),
+            fetchPackagedExternalWithTimeout(query, 'fatsecret', externalTimeoutMs),
+          ])
+
+          pushGroup(offPrimary)
+          pushGroup(fatPrimary)
+
+          if (combined.length < limit && compactQuery) {
+            const [offCompact, fatCompact] = await Promise.all([
+              fetchPackagedExternalWithTimeout(compactQuery, 'openfoodfacts', externalTimeoutMs),
+              fetchPackagedExternalWithTimeout(compactQuery, 'fatsecret', externalTimeoutMs),
+            ])
+            pushGroup(offCompact)
+            pushGroup(fatCompact)
           }
         }
 
