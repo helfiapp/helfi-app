@@ -382,6 +382,45 @@ const itemMatchesSearchQuery = (
   if (kind === 'single')
     return nameMatchesSearchQuery(item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
   const combined = [item?.brand, item?.name].filter(Boolean).join(' ')
+  const rawTokens = getSearchTokens(searchQuery).filter(Boolean)
+
+  const tokenStartsWord = (word: string, token: string) => {
+    if (!word || !token) return false
+    if (word.startsWith(token)) return true
+    const singularWord = singularizeToken(word)
+    if (singularWord !== word && singularWord.startsWith(token)) return true
+    const singularToken = singularizeToken(token)
+    if (singularToken !== token && word.startsWith(singularToken)) return true
+    if (singularToken !== token && singularWord !== word && singularWord.startsWith(singularToken)) return true
+    const allowTypo = (options?.allowTypo ?? false) && token.length >= 3 && token[0] === word[0]
+    if (!allowTypo) return false
+    const prefixSame = word.slice(0, token.length)
+    if (prefixSame && isOneEditAway(token, prefixSame)) return true
+    const prefixLonger = word.slice(0, token.length + 1)
+    if (prefixLonger && isOneEditAway(token, prefixLonger)) return true
+    return false
+  }
+
+  // Word-by-word intent: once users start word #2, keep the current word in control.
+  if (rawTokens.length > 1) {
+    const words = getSearchTokens(combined || item?.name || '').filter(Boolean)
+    const activeToken = rawTokens[rawTokens.length - 1] || ''
+    if (!activeToken || words.length === 0) return false
+    const activeMatch = words.some((word) => tokenStartsWord(word, activeToken))
+    if (!activeMatch) return false
+    const compactHaystack = normalizeBrandToken(combined || item?.name || '')
+    const leadingTokens = rawTokens.slice(0, -1).filter((token) => token.length >= 2)
+    const leadingMatch = leadingTokens.every((token) => {
+      const normalized = normalizeBrandToken(token)
+      if (normalized && compactHaystack.includes(normalized)) return true
+      const singular = normalizeBrandToken(singularizeToken(token))
+      if (singular && compactHaystack.includes(singular)) return true
+      return false
+    })
+    if (!leadingMatch) return false
+    return true
+  }
+
   return nameMatchesSearchQuery(combined || item?.name || '', searchQuery, { requireFirstWord: false, allowTypo: options?.allowTypo })
 }
 
@@ -453,13 +492,13 @@ const shouldShowBrandSuggestions = (searchQuery: string) => {
 }
 
 const getQuickPackagedQuery = (searchQuery: string) => {
-  const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
-  if (tokens.length <= 1) return searchQuery
+  const rawTokens = getSearchTokens(searchQuery).filter(Boolean)
+  if (rawTokens.length <= 1) return searchQuery
   const brandTokens = getBrandMatchTokens(searchQuery)
   const firstBrand = brandTokens[0] || ''
-  const tailToken = tokens[tokens.length - 1] || ''
+  const tailToken = rawTokens[rawTokens.length - 1] || ''
   if (firstBrand) {
-    if (tailToken.length >= 3 && normalizeBrandToken(tailToken) !== firstBrand) {
+    if (tailToken.length >= 1 && normalizeBrandToken(tailToken) !== firstBrand) {
       return `${firstBrand} ${tailToken}`.trim()
     }
     return firstBrand

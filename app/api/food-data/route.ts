@@ -143,7 +143,7 @@ export async function GET(request: NextRequest) {
     // Alphabetical hierarchy for packaged foods (considers brand + name)
     const sortPackagedByAlphabeticalHierarchyAsc = (list: any[], searchQuery: string) => {
       const queryNorm = normalizeForMatch(searchQuery)
-      const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+      const queryTokens = getSearchTokens(searchQuery).filter(Boolean)
       const rankingTokenRaw =
         queryTokens.length > 1 ? queryTokens[queryTokens.length - 1] : queryTokens[0] || queryNorm
       const brandTokenRaw = queryTokens.length > 1 ? queryTokens[0] : ''
@@ -452,6 +452,50 @@ export async function GET(request: NextRequest) {
       return true
     }
 
+    const wordStartsWithToken = (word: string, token: string, options?: { allowTypo?: boolean }) => {
+      if (!word || !token) return false
+      if (word.startsWith(token)) return true
+      const singularWord = singularizeToken(word)
+      if (singularWord !== word && singularWord.startsWith(token)) return true
+      const singularToken = singularizeToken(token)
+      if (singularToken !== token && word.startsWith(singularToken)) return true
+      if (singularToken !== token && singularWord !== word && singularWord.startsWith(singularToken)) return true
+      const allowTypo = (options?.allowTypo ?? false) && token.length >= 3 && token[0] === word[0]
+      if (!allowTypo) return false
+      const prefixSame = word.slice(0, token.length)
+      if (prefixSame && isOneEditAway(token, prefixSame)) return true
+      const prefixLonger = word.slice(0, token.length + 1)
+      if (prefixLonger && isOneEditAway(token, prefixLonger)) return true
+      return false
+    }
+
+    const packagedMatchesActiveWordIntent = (
+      text: string,
+      searchQuery: string,
+      options?: { allowTypo?: boolean },
+    ) => {
+      const rawTokens = getSearchTokens(searchQuery).filter(Boolean)
+      const words = getSearchTokens(text).filter(Boolean)
+      if (rawTokens.length === 0 || words.length === 0) return false
+
+      const activeToken = rawTokens[rawTokens.length - 1] || ''
+      if (!activeToken) return false
+      const activeWordMatch = words.some((word) => wordStartsWithToken(word, activeToken, options))
+      if (!activeWordMatch) return false
+
+      const leadingTokens = rawTokens.slice(0, -1).filter((token) => token.length >= 2)
+      if (leadingTokens.length === 0) return true
+
+      const compact = normalizeForCompact(text)
+      return leadingTokens.every((token) => {
+        const normalized = normalizeForCompact(token)
+        if (normalized && compact.includes(normalized)) return true
+        const singular = normalizeForCompact(singularizeToken(token))
+        if (singular && compact.includes(singular)) return true
+        return false
+      })
+    }
+
     const filterItemsByQuery = (
       items: any[],
       searchQuery: string,
@@ -464,14 +508,21 @@ export async function GET(request: NextRequest) {
       const isPackaged = kindMode === 'packaged'
       
       if (isPackaged) {
-        // For packaged foods, check if query tokens appear anywhere in brand+name
-        const queryTokens = getSearchTokens(searchQuery).filter((t) => t.length >= 2)
-        if (queryTokens.length > 0) {
+        const rawTokens = getSearchTokens(searchQuery).filter(Boolean)
+        // Word-by-word intent: once users type multiple words, the current word must match now.
+        if (rawTokens.length > 1) {
+          const strict = items.filter((item) => packagedMatchesActiveWordIntent(getText(item), searchQuery, { allowTypo: false }))
+          if (strict.length > 0) return strict
+          if (!allowTypoFallback) return []
+          const typo = items.filter((item) => packagedMatchesActiveWordIntent(getText(item), searchQuery, { allowTypo: true }))
+          return typo
+        }
+        if (rawTokens.length === 1) {
+          const active = rawTokens[0]
           const matches = items.filter((item) => {
-            const text = getText(item)
-            const normalizedText = normalizeForMatch(text)
-            // Check if all query tokens appear in the text (more lenient for packaged)
-            return queryTokens.every((token) => normalizedText.includes(token))
+            const words = getSearchTokens(getText(item)).filter(Boolean)
+            if (words.length === 0) return false
+            return words.some((word) => wordStartsWithToken(word, active, { allowTypo: false }))
           })
           if (matches.length > 0) return matches
         }
