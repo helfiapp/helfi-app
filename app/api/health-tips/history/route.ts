@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
@@ -8,7 +9,7 @@ type HealthTipUser = {
   email: string
 }
 
-async function getHealthTipUser(): Promise<HealthTipUser | null> {
+async function getHealthTipUser(req: NextRequest): Promise<HealthTipUser | null> {
   const session = await getServerSession(authOptions)
   const sessionEmail = String(session?.user?.email || '')
     .trim()
@@ -20,11 +21,24 @@ async function getHealthTipUser(): Promise<HealthTipUser | null> {
     })
     if (user?.id && user?.email) return user
   }
+
+  const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
+  if (!secret) return null
+  const token = await getToken({ req, secret }).catch(() => null)
+  const tokenEmail = String(token?.email || '')
+    .trim()
+    .toLowerCase()
+  if (!tokenEmail) return null
+  const tokenUser = await prisma.user.findUnique({
+    where: { email: tokenEmail },
+    select: { id: true, email: true },
+  })
+  if (tokenUser?.id && tokenUser?.email) return tokenUser
   return null
 }
 
 export async function GET(req: NextRequest) {
-  const user = await getHealthTipUser()
+  const user = await getHealthTipUser(req)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -154,7 +168,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function DELETE(req: NextRequest) {
-  const user = await getHealthTipUser()
+  const user = await getHealthTipUser(req)
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

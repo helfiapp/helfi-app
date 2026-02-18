@@ -63,6 +63,9 @@ const buildTipBlocks = (body: string): TipBlock[] => {
   return blocks
 }
 
+const normalizeTipTitle = (title: string) =>
+  String(title || '').replace(/^Smart Health Coach:\s*/i, 'Health Coach: ')
+
 export default function HealthTipHistoryPage() {
   const pathname = usePathname()
   const [tips, setTips] = useState<HealthTip[]>([])
@@ -301,7 +304,7 @@ export default function HealthTipHistoryPage() {
                             />
                           )}
                           <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
-                            {tip.title}
+                            {normalizeTipTitle(tip.title)}
                           </h3>
                         </div>
                         <span className="text-xs text-gray-500 dark:text-gray-400 whitespace-nowrap">

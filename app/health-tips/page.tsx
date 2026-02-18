@@ -82,6 +82,9 @@ const buildTipBlocks = (body: string): TipBlock[] => {
   return blocks
 }
 
+const normalizeTipTitle = (title: string) =>
+  String(title || '').replace(/^Smart Health Coach:\s*/i, 'Health Coach: ')
+
 export default function HealthTipsPage() {
   const pathname = usePathname()
   const [tips, setTips] = useState<HealthTip[]>([])
@@ -510,7 +513,7 @@ export default function HealthTipsPage() {
                     className="border border-gray-200 dark:border-gray-700 rounded-xl p-4 bg-white dark:bg-gray-800/70"
                   >
                     <h2 className="text-base font-semibold text-gray-900 dark:text-white mb-2">
-                      {tip.title}
+                      {normalizeTipTitle(tip.title)}
                     </h2>
                     <div className="space-y-2 text-sm text-gray-800 dark:text-gray-100 leading-relaxed">
                       {blocks.length > 0 ? (
