@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 00:56 AEDT
+- What changed: Added “Change time entry” to Build a meal when editing an existing diary meal entry, and wired save/autosave so the edited time is saved as the entry timestamp.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary -> Edit Entry on a Build-a-meal/combined meal that opens Build a meal editor)
+- What to quickly test: Open a saved Build-a-meal entry from Food Diary, change “Change time entry,” tap Update, then confirm the meal shows under the updated time in the diary.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 00:51 AEDT
 - What changed: Locked food search behavior across all food diary search modules (Add Ingredient page, Food Diary Add Ingredient modal, Build a Meal, and packaged search API ranking/filtering). Added strict deploy-time protection so these search-core blocks cannot be changed unless an explicit override is set.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient, https://helfi.ai/food/build-meal, and Food Diary -> Add Ingredient modal
