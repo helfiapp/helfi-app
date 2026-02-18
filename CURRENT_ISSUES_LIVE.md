@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 02:55 AEDT
+- What changed: Added “Change time entry” to the Add from favorites -> Change portion Build a meal flow (`fromFavoriteAdjust=1`) so you can set a custom time there too, and save now uses that selected time.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary -> Add from favorites -> pick item -> Change portion)
+- What to quickly test: Open Change portion from favorites, confirm “Change time entry” appears, set a time, tap Add, and confirm the new diary entry appears with that chosen time.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 00:56 AEDT
 - What changed: Added “Change time entry” to Build a meal when editing an existing diary meal entry, and wired save/autosave so the edited time is saved as the entry timestamp.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary -> Edit Entry on a Build-a-meal/combined meal that opens Build a meal editor)
