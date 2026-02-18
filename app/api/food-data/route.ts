@@ -143,11 +143,14 @@ export async function GET(request: NextRequest) {
     // Alphabetical hierarchy for packaged foods (considers brand + name)
     const sortPackagedByAlphabeticalHierarchyAsc = (list: any[], searchQuery: string) => {
       const queryNorm = normalizeForMatch(searchQuery)
-      const queryTokens = getSearchTokens(searchQuery)
-      const queryFirstRaw = queryTokens[0] || queryNorm
-      const queryFirst = singularizeToken(queryFirstRaw)
-      const queryAlt = singularizeToken(queryFirstRaw)
-      const queryCandidates = Array.from(new Set([queryFirstRaw, queryFirst, queryAlt].filter(Boolean)))
+      const queryTokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
+      const rankingTokenRaw =
+        queryTokens.length > 1 ? queryTokens[queryTokens.length - 1] : queryTokens[0] || queryNorm
+      const brandTokenRaw = queryTokens.length > 1 ? queryTokens[0] : ''
+      const queryFirst = singularizeToken(rankingTokenRaw)
+      const queryAlt = singularizeToken(rankingTokenRaw)
+      const queryCandidates = Array.from(new Set([rankingTokenRaw, queryFirst, queryAlt].filter(Boolean)))
+      const brandToken = singularizeToken(brandTokenRaw)
       const minCandidateLen = queryCandidates.length > 0 ? Math.min(...queryCandidates.map((t) => t.length)) : 0
 
       const getMatchMeta = (item: any) => {
@@ -161,7 +164,7 @@ export async function GET(request: NextRequest) {
         let matchIndex = Number.POSITIVE_INFINITY
         let matchedWord = ''
         let matchedCandidateLen = minCandidateLen || 0
-        let isBrandMatch = false
+        let brandStartsWithQuery = false
 
         // Check brand first, then name
         const brandTokens = brand ? getSearchTokens(brand) : []
@@ -181,18 +184,25 @@ export async function GET(request: NextRequest) {
               matchIndex = i
               matchedWord = word
               matchedCandidateLen = candidate.length
-              isBrandMatch = true
               break
             }
             if (wordSingular && wordSingular !== word && wordSingular.startsWith(candidate)) {
               matchIndex = i
               matchedWord = wordSingular
               matchedCandidateLen = candidate.length
-              isBrandMatch = true
               break
             }
           }
           if (matchIndex !== Number.POSITIVE_INFINITY) break
+        }
+
+        if (brandToken) {
+          brandStartsWithQuery = brandTokens.some((word) => {
+            if (!word) return false
+            if (word.startsWith(brandToken)) return true
+            const wordSingular = singularizeToken(word)
+            return wordSingular !== word && wordSingular.startsWith(brandToken)
+          })
         }
 
         // If no brand match, check name tokens
@@ -226,34 +236,38 @@ export async function GET(request: NextRequest) {
         const wordDelta = matchedWord ? Math.max(0, matchedWord.length - matchedCandidateLen) : 999
         const hierarchyKey = matchedWord ? `${matchedWord} ${normalizedCombined}` : normalizedCombined
 
-        return { matchIndex, isFirstWordMatch, exactWordMatch, wordDelta, hierarchyKey, stable: normalizedCombined, isBrandMatch, simplicityScore }
+        return {
+          matchIndex,
+          isFirstWordMatch,
+          exactWordMatch,
+          wordDelta,
+          hierarchyKey,
+          stable: normalizedCombined,
+          brandStartsWithQuery,
+          simplicityScore,
+        }
       }
 
       return [...list].sort((a, b) => {
         const aMeta = getMatchMeta(a)
         const bMeta = getMatchMeta(b)
 
-        // 1) First-word matches should always win
-        if (aMeta.isFirstWordMatch !== bMeta.isFirstWordMatch) return aMeta.isFirstWordMatch ? -1 : 1
-
-        // 2) Brand matches come before name matches (if both are first word)
-        if (aMeta.isFirstWordMatch && bMeta.isFirstWordMatch) {
-          if (aMeta.isBrandMatch !== bMeta.isBrandMatch) return aMeta.isBrandMatch ? -1 : 1
-        }
-
-        // 3) Earlier word match wins (if both are non-first)
+        // 1) Earlier word match of the main typed token wins (e.g. "cheese" -> "cheeseburger" before "... & cheese").
         if (aMeta.matchIndex !== bMeta.matchIndex) return aMeta.matchIndex - bMeta.matchIndex
 
-        // 4) Exact word match wins
+        // 2) Exact word match wins.
         if (aMeta.exactWordMatch !== bMeta.exactWordMatch) return aMeta.exactWordMatch ? -1 : 1
 
-        // 5) Simpler names win (fewer words in product name)
-        if (aMeta.simplicityScore !== bMeta.simplicityScore) return aMeta.simplicityScore - bMeta.simplicityScore
-
-        // 6) Closer match wins (shorter extension after the typed prefix)
+        // 3) Closer match wins (shorter extension after the typed prefix).
         if (aMeta.wordDelta !== bMeta.wordDelta) return aMeta.wordDelta - bMeta.wordDelta
 
-        // 7) Alphabetical within the hierarchy
+        // 4) If brand was typed too, keep matching brand items ahead.
+        if (aMeta.brandStartsWithQuery !== bMeta.brandStartsWithQuery) return aMeta.brandStartsWithQuery ? -1 : 1
+
+        // 5) Simpler names win (fewer words in product name).
+        if (aMeta.simplicityScore !== bMeta.simplicityScore) return aMeta.simplicityScore - bMeta.simplicityScore
+
+        // 6) Alphabetical within the hierarchy.
         return aMeta.hierarchyKey.localeCompare(bMeta.hierarchyKey) || aMeta.stable.localeCompare(bMeta.stable)
       })
     }
@@ -615,6 +629,30 @@ export async function GET(request: NextRequest) {
       const allCountryItems = await loadAllCustomPackagedItems()
       const crossCountryMatches = getCustomPackagedMatches(query, allCountryItems)
       if (crossCountryMatches.length > 0) customPackagedMatches = crossCountryMatches
+    }
+    // If country-specific matches are too narrow, top up with all-country matches.
+    // Keep country matches first, then append non-duplicates.
+    if (
+      kindMode === 'packaged' &&
+      resolvedCountry &&
+      customPackagedMatches.length > 0 &&
+      customPackagedMatches.length < Math.min(limit, 8)
+    ) {
+      const allCountryItems = await loadAllCustomPackagedItems()
+      const crossCountryMatches = getCustomPackagedMatches(query, allCountryItems)
+      if (crossCountryMatches.length > 0) {
+        const seen = new Set(
+          customPackagedMatches.map((item) => `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`),
+        )
+        const extras = crossCountryMatches.filter((item) => {
+          const key = `${normalizeForMatch(item?.name)}|${normalizeForMatch(item?.brand)}`
+          if (!key || key === '|') return false
+          if (seen.has(key)) return false
+          seen.add(key)
+          return true
+        })
+        if (extras.length > 0) customPackagedMatches = [...customPackagedMatches, ...extras]
+      }
     }
     let customPackagedApplied = false
 

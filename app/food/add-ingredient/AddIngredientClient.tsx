@@ -406,8 +406,15 @@ const getQuickPackagedQuery = (searchQuery: string) => {
   const tokens = getSearchTokens(searchQuery).filter((token) => token.length >= 2)
   if (tokens.length <= 1) return searchQuery
   const brandTokens = getBrandMatchTokens(searchQuery)
-  if (brandTokens.length > 0) return brandTokens[0]
-  return tokens[0]
+  const firstBrand = brandTokens[0] || ''
+  const tailToken = tokens[tokens.length - 1] || ''
+  if (firstBrand) {
+    if (tailToken.length >= 3 && normalizeBrandToken(tailToken) !== firstBrand) {
+      return `${firstBrand} ${tailToken}`.trim()
+    }
+    return firstBrand
+  }
+  return searchQuery
 }
 
 const buildBrandSuggestions = (names: string[], searchQuery: string): NormalizedFoodItem[] => {
