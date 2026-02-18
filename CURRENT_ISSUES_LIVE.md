@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-18 12:27 AEDT
+- What changed: Fixed Health Coach history delete for native token-based sessions and web sessions. Also updated Health Coach tip title display so old saved items that started with “Smart Health Coach:” now show as “Health Coach:” in the app UI.
+- Where to see it (page/link): https://helfi.ai/health-tips, https://helfi.ai/health-tips/history
+- What to quickly test: In Health Coach Tip History, select a few items and delete them; confirm no error popup. Confirm list rows show “Health Coach:” instead of “Smart Health Coach:” for older entries.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-18 11:33 AEDT
 - What changed: Renamed Smart Health Coach to Health Coach across key user screens (sidebar/menu, Health Coach pages, notifications/settings text). Added Select + Delete for past Health Coach history on web. Improved Health Coach tip quality rules so alerts avoid repeated hydration nagging and prioritize food swaps tied to user goals.
 - Where to see it (page/link): https://helfi.ai/health-tips, https://helfi.ai/health-tips/history, https://helfi.ai/notifications/ai-insights
