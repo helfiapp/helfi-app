@@ -3,15 +3,30 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
+type HealthTipUser = {
+  id: string
+  email: string
+}
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+async function getHealthTipUser(): Promise<HealthTipUser | null> {
+  const session = await getServerSession(authOptions)
+  const sessionEmail = String(session?.user?.email || '')
+    .trim()
+    .toLowerCase()
+  if (sessionEmail) {
+    const user = await prisma.user.findUnique({
+      where: { email: sessionEmail },
+      select: { id: true, email: true },
+    })
+    if (user?.id && user?.email) return user
+  }
+  return null
+}
+
+export async function GET(req: NextRequest) {
+  const user = await getHealthTipUser()
   if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const { searchParams } = new URL(req.url)
@@ -138,3 +153,52 @@ export async function GET(req: NextRequest) {
   return NextResponse.json({ tips: tipsWithSuggestions })
 }
 
+export async function DELETE(req: NextRequest) {
+  const user = await getHealthTipUser()
+  if (!user) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  const body = await req.json().catch(() => ({}))
+  const ids = Array.isArray((body as any)?.ids)
+    ? (body as any).ids
+        .filter((value: unknown): value is string => typeof value === 'string')
+        .map((value: string) => value.trim())
+        .filter((value: string) => value.length > 0)
+        .slice(0, 200)
+    : []
+
+  if (!ids.length) {
+    return NextResponse.json({ error: 'No history items selected.' }, { status: 400 })
+  }
+
+  await prisma.$executeRawUnsafe(`
+    CREATE TABLE IF NOT EXISTS HealthTips (
+      id TEXT PRIMARY KEY,
+      userId TEXT NOT NULL,
+      tipDate DATE NOT NULL,
+      sentAt TIMESTAMP NOT NULL DEFAULT NOW(),
+      title TEXT NOT NULL,
+      body TEXT NOT NULL,
+      category TEXT NOT NULL,
+      metadata JSONB,
+      costCents INTEGER,
+      chargeCents INTEGER
+    )
+  `)
+
+  const deleted: Array<{ id: string }> = await prisma.$queryRawUnsafe(
+    `DELETE FROM HealthTips
+     WHERE userId = $1
+       AND id = ANY($2::text[])
+     RETURNING id`,
+    user.id,
+    ids
+  )
+
+  return NextResponse.json({
+    success: true,
+    deletedCount: deleted.length,
+    deletedIds: deleted.map((row) => row.id),
+  })
+}

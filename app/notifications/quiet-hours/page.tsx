@@ -61,7 +61,7 @@ export default function QuietHoursNotificationsPage() {
           <div>
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">Quiet hours</h2>
             <p className="text-sm text-gray-600 dark:text-gray-400">
-              Pause Smart Health Coach alerts during your chosen hours.
+              Pause Health Coach alerts during your chosen hours.
             </p>
           </div>
 

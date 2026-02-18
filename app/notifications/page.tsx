@@ -15,7 +15,7 @@ const notificationSections = [
     href: '/notifications/reminders',
   },
   {
-    title: 'Smart Health Coach',
+    title: 'Health Coach',
     description: 'Paid proactive alerts based on your logs and habits.',
     href: '/notifications/ai-insights',
   },

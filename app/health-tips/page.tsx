@@ -359,12 +359,12 @@ export default function HealthTipsPage() {
       settingsSnapshotRef.current = snapshot
       setHasUnsavedChanges(false)
       if (!options?.silent) {
-        alert('Smart Health Coach settings saved.')
+        alert('Health Coach settings saved.')
       }
       return true
     } catch {
       if (!options?.silent) {
-        alert('Could not save Smart Health Coach settings. Please try again.')
+        alert('Could not save Health Coach settings. Please try again.')
       }
       return false
     } finally {
@@ -440,7 +440,7 @@ export default function HealthTipsPage() {
       acceptPricingTerms: true,
     })
     if (saved) {
-      alert('Smart Health Coach enabled.')
+      alert('Health Coach enabled.')
     } else {
       setEnabled(false)
     }
@@ -448,7 +448,7 @@ export default function HealthTipsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Smart Health Coach" backHref="/notifications/ai-insights" />
+      <PageHeader title="Health Coach" backHref="/notifications/ai-insights" />
 
       {/* Tabs */}
       <div className="max-w-3xl mx-auto px-4 pt-4">
@@ -482,10 +482,10 @@ export default function HealthTipsPage() {
         {/* Today’s Tips */}
         <section className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6 mb-6">
           <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-2">
-            Today&apos;s Smart Health Coach alerts
+            Today&apos;s Health Coach alerts
           </h1>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            When you receive a Smart Health Coach alert and tap it, you&apos;ll land here to see
+            When you receive a Health Coach alert and tap it, you&apos;ll land here to see
             the full message and any others sent today.
           </p>
 
@@ -496,7 +496,7 @@ export default function HealthTipsPage() {
           ) : filteredTips.length === 0 ? (
             <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4 text-sm text-gray-600 dark:text-gray-300">
               {tips.length === 0
-                ? "No Smart Health Coach alerts have been sent yet today. Once enabled, alerts that match your logs will show here."
+                ? "No Health Coach alerts have been sent yet today. Once enabled, alerts that match your logs will show here."
                 : "You cleared today’s tips. They’re still saved in your tip history."}
             </div>
           ) : (
@@ -588,21 +588,21 @@ export default function HealthTipsPage() {
         <section className="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6">
           <div className="mb-4">
             <h2 className="text-xl font-bold text-gray-900 dark:text-white">
-              Smart Health Coach settings
+              Health Coach settings
             </h2>
           </div>
           <p className="text-sm text-gray-600 dark:text-gray-400 mb-4">
-            Smart Health Coach checks your logs and can send proactive alerts.
+            Health Coach checks your logs and can send proactive alerts.
             Charges only apply when an alert is actually sent.
           </p>
           <p className="text-sm text-gray-500 dark:text-gray-400 mb-4">
             Cost: 10 credits per alert. Daily cap: 50 credits (max 5 charged alerts).
           </p>
 
-          {/* Credits usage for Smart Health Coach */}
+          {/* Credits usage for Health Coach */}
           <div className="mb-4">
             <UsageMeter inline={true} feature="healthTips" />
-            <FeatureUsageDisplay featureName="healthTips" featureLabel="Smart Health Coach" />
+            <FeatureUsageDisplay featureName="healthTips" featureLabel="Health Coach" />
           </div>
 
           {loadingSettings ? (
@@ -613,7 +613,7 @@ export default function HealthTipsPage() {
             <div className="space-y-5">
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">Enable Smart Health Coach</h3>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Enable Health Coach</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     Get proactive guidance based on your daily logs and habits.
                   </p>
@@ -688,7 +688,7 @@ export default function HealthTipsPage() {
                 disabled={saving}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium mt-2"
               >
-                {saving ? 'Saving…' : 'Save Smart Health Coach settings'}
+                {saving ? 'Saving…' : 'Save Health Coach settings'}
               </button>
               {hasUnsavedChanges && (
                 <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
@@ -697,7 +697,7 @@ export default function HealthTipsPage() {
               )}
 
               <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
-                Smart Health Coach alerts are educational and do not replace medical advice.
+                Health Coach alerts are educational and do not replace medical advice.
                 Always consider your medications, allergies, and personal circumstances, and talk
                 to your clinician before making big changes or starting new supplements.
               </p>
@@ -710,7 +710,7 @@ export default function HealthTipsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Enable Smart Health Coach?
+              Enable Health Coach?
             </h3>
             <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <p>Get proactive health guidance based on your daily logs and habits.</p>
@@ -729,7 +729,7 @@ export default function HealthTipsPage() {
                 onClick={() => void confirmEnableSmartCoach()}
                 className="px-4 py-2 rounded-lg bg-helfi-green text-white hover:bg-helfi-green/90"
               >
-                Enable Smart Coach
+                Enable Health Coach
               </button>
             </div>
           </div>

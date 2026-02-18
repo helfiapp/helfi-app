@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useState, useMemo } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import PageHeader from '@/components/PageHeader'
@@ -69,6 +69,9 @@ export default function HealthTipHistoryPage() {
   const [loading, setLoading] = useState(false)
   const [expandedTipId, setExpandedTipId] = useState<string | null>(null)
   const [activeChatTip, setActiveChatTip] = useState<HealthTip | null>(null)
+  const [selectMode, setSelectMode] = useState(false)
+  const [selectedTipIds, setSelectedTipIds] = useState<Set<string>>(new Set())
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -119,11 +122,70 @@ export default function HealthTipHistoryPage() {
     })
   }, [tips])
 
+  const selectedCount = selectedTipIds.size
+
+  const handleToggleSelect = useCallback((tipId: string) => {
+    setSelectedTipIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(tipId)) {
+        next.delete(tipId)
+      } else {
+        next.add(tipId)
+      }
+      return next
+    })
+  }, [])
+
+  const handleDeleteSelected = useCallback(async () => {
+    if (!selectedCount || deleting) return
+    const confirmed = window.confirm(`Delete ${selectedCount} selected history item(s)?`)
+    if (!confirmed) return
+
+    setDeleting(true)
+    try {
+      const ids = Array.from(selectedTipIds)
+      const res = await fetch('/api/health-tips/history', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ids }),
+      })
+      const data = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        alert(data?.error || 'Could not delete selected history items.')
+        return
+      }
+
+      const deletedIds = Array.isArray(data?.deletedIds)
+        ? data.deletedIds.filter((value: unknown): value is string => typeof value === 'string')
+        : ids
+
+      setTips((prev) => {
+        const next = prev.filter((tip) => !deletedIds.includes(tip.id))
+        if (typeof window !== 'undefined') {
+          try {
+            sessionStorage.setItem(HISTORY_CACHE_KEY, JSON.stringify(next))
+          } catch {
+            // ignore cache errors
+          }
+        }
+        return next
+      })
+
+      setSelectedTipIds(new Set())
+      setExpandedTipId(null)
+      setSelectMode(false)
+    } catch {
+      alert('Could not delete selected history items.')
+    } finally {
+      setDeleting(false)
+    }
+  }, [deleting, selectedCount, selectedTipIds])
+
   const isHistoryPage = pathname === '/health-tips/history'
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
-      <PageHeader title="Smart Health Coach" backHref="/health-tips" />
+      <PageHeader title="Health Coach" backHref="/more" />
 
       {/* Tabs */}
       <div className="max-w-3xl mx-auto px-4 pt-4">
@@ -155,28 +217,48 @@ export default function HealthTipHistoryPage() {
 
       <main className="max-w-3xl mx-auto px-4 py-6">
         <section className="bg-white dark:bg-gray-800 rounded-b-2xl shadow-sm p-6">
-          <div className="mb-4">
-            <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
-              Past Smart Health Coach alerts
-            </h1>
-            <p className="text-sm text-gray-600 dark:text-gray-400">
-              Scroll back through previous days to revisit useful Smart Health Coach alerts.
-            </p>
-            <div className="mt-3 flex flex-wrap gap-2">
-              <Link
-                href="/health-tips"
-                className="inline-flex items-center rounded-lg border border-helfi-green/40 bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-helfi-green hover:bg-emerald-100"
-              >
-                Back to Smart Coach
-              </Link>
-              <Link
-                href="/more"
-                className="inline-flex items-center rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-semibold text-gray-700 hover:bg-gray-50 dark:border-gray-600 dark:text-gray-200 dark:hover:bg-gray-700"
-              >
-                Main menu
-              </Link>
+          <div className="mb-4 flex items-start justify-between gap-3">
+            <div>
+              <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-1">
+                Past Health Coach alerts
+              </h1>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                Scroll back through previous days to revisit useful Health Coach alerts.
+              </p>
             </div>
+            {sortedTips.length > 0 && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSelectMode((prev) => !prev)
+                  setSelectedTipIds(new Set())
+                }}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                {selectMode ? 'Done' : 'Select'}
+              </button>
+            )}
           </div>
+
+          {selectMode && selectedCount > 0 && (
+            <div className="mb-4 flex gap-2">
+              <button
+                type="button"
+                onClick={() => void handleDeleteSelected()}
+                disabled={deleting}
+                className="px-3 py-1.5 rounded-lg bg-red-600 text-white text-sm hover:bg-red-700 disabled:opacity-60"
+              >
+                {deleting ? 'Deleting…' : `Delete selected (${selectedCount})`}
+              </button>
+              <button
+                type="button"
+                onClick={() => setSelectedTipIds(new Set())}
+                className="px-3 py-1.5 rounded-lg border border-gray-300 text-sm text-gray-700 hover:bg-gray-50"
+              >
+                Clear selection
+              </button>
+            </div>
+          )}
 
           {loading ? (
             <div className="flex items-center justify-center py-8">
@@ -184,7 +266,7 @@ export default function HealthTipHistoryPage() {
             </div>
           ) : sortedTips.length === 0 ? (
             <div className="border border-dashed border-gray-300 dark:border-gray-600 rounded-xl p-4 text-sm text-gray-600 dark:text-gray-300">
-              No Smart Health Coach alerts have been recorded yet. Once alerts are sent, they will
+              No Health Coach alerts have been recorded yet. Once alerts are sent, they will
               appear here.
             </div>
           ) : (
@@ -192,6 +274,7 @@ export default function HealthTipHistoryPage() {
               {sortedTips.map((tip) => {
                 const blocks = buildTipBlocks(tip.body || '')
                 const isExpanded = expandedTipId === tip.id
+                const isSelected = selectedTipIds.has(tip.id)
                 return (
                   <article
                     key={tip.id}
@@ -199,11 +282,24 @@ export default function HealthTipHistoryPage() {
                   >
                     <button
                       type="button"
-                      onClick={() => setExpandedTipId(isExpanded ? null : tip.id)}
+                      onClick={() => {
+                        if (selectMode) {
+                          handleToggleSelect(tip.id)
+                          return
+                        }
+                        setExpandedTipId(isExpanded ? null : tip.id)
+                      }}
                       className="w-full px-4 py-3 text-left"
                     >
                       <div className="flex items-center justify-between gap-3">
-                        <div className="min-w-0 flex-1">
+                        <div className="min-w-0 flex items-center gap-2 flex-1">
+                          {selectMode && (
+                            <span
+                              className={`h-4 w-4 rounded border ${
+                                isSelected ? 'bg-helfi-green border-helfi-green' : 'border-gray-400'
+                              }`}
+                            />
+                          )}
                           <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">
                             {tip.title}
                           </h3>
@@ -213,7 +309,7 @@ export default function HealthTipHistoryPage() {
                         </span>
                       </div>
                     </button>
-                    {isExpanded && (
+                    {isExpanded && !selectMode && (
                       <div className="border-t border-gray-100 dark:border-gray-700 px-4 pb-4 pt-3">
                         <div className="space-y-2 text-sm text-gray-800 dark:text-gray-100 leading-relaxed">
                           {blocks.length > 0 ? (

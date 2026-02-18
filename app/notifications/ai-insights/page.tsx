@@ -228,7 +228,7 @@ export default function AiInsightsNotificationsPage() {
       if (cacheKey) {
         writeClientCache(cacheKey, payload)
       }
-      if (!options?.silent) alert('Smart Health Coach settings saved.')
+      if (!options?.silent) alert('Health Coach settings saved.')
       return true
     } catch {
       if (!options?.silent) alert('Could not save settings. Please try again.')
@@ -290,7 +290,7 @@ export default function AiInsightsNotificationsPage() {
       acceptPricingTerms: true,
     })
     if (saved) {
-      alert('Smart Health Coach enabled.')
+      alert('Health Coach enabled.')
     } else {
       setEnabled(false)
     }
@@ -298,13 +298,13 @@ export default function AiInsightsNotificationsPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
-      <PageHeader title="Smart Health Coach" backHref="/notifications" />
+      <PageHeader title="Health Coach" backHref="/notifications" />
 
       <main className="max-w-3xl mx-auto px-4 py-8 pb-24 md:pb-8">
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-sm p-6 space-y-6">
           <div className="flex items-start justify-between gap-4 flex-wrap">
             <div>
-              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Smart Health Coach settings</h2>
+              <h2 className="text-xl font-bold text-gray-900 dark:text-white">Health Coach settings</h2>
               <p className="text-sm text-gray-600 dark:text-gray-400">
                 Get proactive guidance based on your daily logs and habits.
               </p>
@@ -313,7 +313,7 @@ export default function AiInsightsNotificationsPage() {
               href="/health-tips"
               className="text-sm font-semibold text-helfi-green hover:underline"
             >
-              Open Smart Health Coach
+              Open Health Coach
             </Link>
           </div>
 
@@ -325,7 +325,7 @@ export default function AiInsightsNotificationsPage() {
             <>
               <div className="flex items-center justify-between">
                 <div>
-                  <h3 className="font-medium text-gray-900 dark:text-white">Enable Smart Health Coach</h3>
+                  <h3 className="font-medium text-gray-900 dark:text-white">Enable Health Coach</h3>
                   <p className="text-sm text-gray-600 dark:text-gray-400">
                     10 credits per alert. Up to 50 credits per day. Charges only apply when an alert is sent.
                   </p>
@@ -376,7 +376,7 @@ export default function AiInsightsNotificationsPage() {
                 disabled={saving}
                 className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:opacity-60 disabled:cursor-not-allowed font-medium"
               >
-                {saving ? 'Saving...' : 'Save Smart Health Coach settings'}
+                {saving ? 'Saving...' : 'Save Health Coach settings'}
               </button>
               {hasUnsavedChanges && (
                 <p className="text-xs text-gray-500 dark:text-gray-400">
@@ -392,7 +392,7 @@ export default function AiInsightsNotificationsPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4">
           <div className="w-full max-w-md rounded-xl bg-white dark:bg-gray-800 p-6 shadow-xl space-y-4">
             <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
-              Enable Smart Health Coach?
+              Enable Health Coach?
             </h3>
             <div className="space-y-2 text-sm text-gray-700 dark:text-gray-300">
               <p>Get proactive health guidance based on your daily logs and habits.</p>
@@ -411,7 +411,7 @@ export default function AiInsightsNotificationsPage() {
                 onClick={() => void confirmEnableSmartCoach()}
                 className="px-4 py-2 rounded-lg bg-helfi-green text-white hover:bg-helfi-green/90"
               >
-                Enable Smart Coach
+                Enable Health Coach
               </button>
             </div>
           </div>

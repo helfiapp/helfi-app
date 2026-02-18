@@ -93,8 +93,15 @@ export async function buildUserHealthContext(userId: string) {
     console.error('[HEALTH_TIPS] Failed to ensure WaterLog table', e)
   }
 
-  const [healthSituationsGoal, selectedIssuesGoal, supplements, medications, recentFoodLogs, waterLogs] =
-    await Promise.all([
+  const [
+    healthSituationsGoal,
+    selectedIssuesGoal,
+    supplements,
+    medications,
+    recentFoodLogs,
+    waterLogs,
+    recentTips,
+  ] = await Promise.all([
       prisma.healthGoal.findFirst({
         where: { userId, name: '__HEALTH_SITUATIONS_DATA__' },
       }),
@@ -121,6 +128,27 @@ export async function buildUserHealthContext(userId: string) {
         orderBy: { createdAt: 'desc' },
         take: 40,
       }),
+      prisma
+        .$queryRawUnsafe<
+          Array<{
+            tipDate: string
+            title: string
+            body: string
+            category: string
+          }>
+        >(
+          `SELECT
+             tipDate::text AS "tipDate",
+             title,
+             body,
+             category
+           FROM HealthTips
+           WHERE userId = $1
+           ORDER BY sentAt DESC
+           LIMIT 12`,
+          userId
+        )
+        .catch(() => []),
     ])
 
   let healthData: {
@@ -230,6 +258,24 @@ export async function buildUserHealthContext(userId: string) {
     })
   })()
 
+  const hydrationPattern = /\b(hydration|hydrate|water|dehydrat|drink)\b/i
+  const todayIso = new Date().toISOString().slice(0, 10)
+  const hydrationTipsTodayCount = recentTips.filter((tip) => {
+    const tipDate = String(tip.tipDate || '').slice(0, 10)
+    if (tipDate !== todayIso) return false
+    const text = `${tip.title || ''} ${tip.body || ''} ${tip.category || ''}`
+    return hydrationPattern.test(text)
+  }).length
+
+  const recentTipThemes = recentTips
+    .slice(0, 5)
+    .map((tip) => {
+      const category = String(tip.category || '').trim().toLowerCase() || 'unknown'
+      const title = String(tip.title || '').trim()
+      return `${category}: ${title}`
+    })
+    .filter(Boolean)
+
   return {
     healthData,
     selectedHealthGoals,
@@ -238,6 +284,8 @@ export async function buildUserHealthContext(userId: string) {
     recentFoodLogs,
     recentCheckins: checkinRows,
     hydrationLines,
+    hydrationTipsTodayCount,
+    recentTipThemes,
   }
 }
 
@@ -257,6 +305,8 @@ export function buildTipPrompt(args: {
     recentFoodLogs,
     recentCheckins,
     hydrationLines,
+    hydrationTipsTodayCount,
+    recentTipThemes,
   } = context
 
   const lines: string[] = []
@@ -334,6 +384,11 @@ export function buildTipPrompt(args: {
   } else {
     lines.push('Hydration logs: none in the last 7 days.')
   }
+  if (recentTipThemes.length > 0) {
+    lines.push('Recent Health Coach tip themes (new tips should avoid repeating these):')
+    lines.push(...recentTipThemes.map((theme) => `- ${theme}`))
+  }
+  lines.push(`Hydration-focused tips already sent today: ${hydrationTipsTodayCount}`)
 
   const healthSnapshot =
     lines.length > 0
@@ -380,6 +435,12 @@ CRITICAL RULES:
    - Explicitly reference the main recommendation (for example, the specific food, supplement, or habit you suggested).
    - Be practical and personalised (for example, about safety, interactions, alternatives, or how to tailor the advice to their routine or health issues).
    - Avoid generic wording that could apply to any random health tip.
+10. Hydration anti-nag rule:
+   - If "Hydration-focused tips already sent today" is 1 or more, do NOT send another hydration-focused tip.
+   - Only allow hydration as the primary advice if there is a clear safety-level reason and no stronger food/goal-based action.
+11. Food-first quality rule:
+   - If there are recent food diary entries, prefer a food-category tip and include one specific swap alternative (replace X with Y).
+   - If health goals/concerns exist, mention at least one by name in the "Why:" line so the tip clearly supports that goal.
 
 RESPONSE FORMAT (JSON ONLY, no markdown, no extra text):
 {
