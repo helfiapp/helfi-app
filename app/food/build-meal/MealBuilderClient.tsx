@@ -138,6 +138,37 @@ const alignTimestampToLocalDate = (iso: string, localDate: string) => {
   }
 }
 
+const formatTimeInputValue = (date: Date) => {
+  const h = String(date.getHours()).padStart(2, '0')
+  const m = String(date.getMinutes()).padStart(2, '0')
+  return `${h}:${m}`
+}
+
+const extractTimeFromTimestamp = (raw: any) => {
+  if (!raw) return ''
+  const dt = new Date(raw)
+  if (Number.isNaN(dt.getTime())) return ''
+  return formatTimeInputValue(dt)
+}
+
+const buildCreatedAtFromEntryTime = (localDate: string, entryTime: string, fallbackIso: string) => {
+  const fallback = alignTimestampToLocalDate(fallbackIso, localDate)
+  try {
+    if (!entryTime || !/^\d{2}:\d{2}$/.test(entryTime)) return fallback
+    if (!localDate || !/^\d{4}-\d{2}-\d{2}$/.test(localDate)) return fallback
+    const [h, min] = entryTime.split(':').map((v) => parseInt(v, 10))
+    const [y, mon, d] = localDate.split('-').map((v) => parseInt(v, 10))
+    if (!Number.isFinite(h) || !Number.isFinite(min) || !Number.isFinite(y) || !Number.isFinite(mon) || !Number.isFinite(d)) {
+      return fallback
+    }
+    const dt = new Date(y, mon - 1, d, h, min, 0, 0)
+    if (Number.isNaN(dt.getTime())) return fallback
+    return dt.toISOString()
+  } catch {
+    return fallback
+  }
+}
+
 const toNumber = (v: any): number | null => {
   const n = typeof v === 'number' ? v : Number(v)
   return Number.isFinite(n) ? n : null
@@ -1796,6 +1827,7 @@ export default function MealBuilderClient() {
     items: any[]
     category: string
   } | null>(null)
+  const [entryTime, setEntryTime] = useState<string>('')
   const [favoriteUpdatePromptSaving, setFavoriteUpdatePromptSaving] = useState(false)
   const [favoriteAdjustRecencySeed, setFavoriteAdjustRecencySeed] = useState<{
     favoriteId: string
@@ -1887,6 +1919,9 @@ export default function MealBuilderClient() {
       if (typeof parsed.portionControlEnabled === 'boolean') {
         setPortionControlEnabled(parsed.portionControlEnabled)
       }
+      if (typeof parsed.entryTime === 'string' && /^\d{2}:\d{2}$/.test(parsed.entryTime)) {
+        setEntryTime(parsed.entryTime)
+      }
       if (typeof parsed.saveImportedRecipeToFavorites === 'boolean') {
         setSaveImportedRecipeToFavorites(parsed.saveImportedRecipeToFavorites)
       }
@@ -1915,6 +1950,7 @@ export default function MealBuilderClient() {
           portionControlEnabled,
           portionAmountInput,
           portionUnit,
+          entryTime,
           saveImportedRecipeToFavorites,
           recipeServingsForPortion,
           items: itemsForDraft,
@@ -1929,7 +1965,7 @@ export default function MealBuilderClient() {
         if (draftWriteTimeoutRef.current) window.clearTimeout(draftWriteTimeoutRef.current)
       } catch {}
     }
-  }, [draftKey, items, mealName, energyUnit, portionControlEnabled, portionAmountInput, portionUnit, saveImportedRecipeToFavorites, recipeServingsForPortion])
+  }, [draftKey, items, mealName, energyUnit, portionControlEnabled, portionAmountInput, portionUnit, entryTime, saveImportedRecipeToFavorites, recipeServingsForPortion])
 
   useEffect(() => {
     itemsRef.current = items
@@ -2245,6 +2281,7 @@ export default function MealBuilderClient() {
   useEffect(() => {
     // Editing mode (diary): load a FoodLog row directly when a Build-a-meal diary entry is edited.
     if (!sourceLogId) {
+      setEntryTime('')
       if (!editFavoriteId) {
         initialItemsSignatureRef.current = ''
         initialPortionTotalWeightRef.current = null
@@ -2272,6 +2309,11 @@ export default function MealBuilderClient() {
           return ''
         })()
         if (!cancelled) setLinkedFavoriteId(linked)
+
+        const loadedTime = extractTimeFromTimestamp(log?.createdAt)
+        if (!cancelled && loadedTime) {
+          setEntryTime((prev) => (prev ? prev : loadedTime))
+        }
 
         // If we restored a draft, do not overwrite the user's in-progress changes.
         if (draftAppliedRef.current) {
@@ -2304,6 +2346,12 @@ export default function MealBuilderClient() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [sourceLogId, editFavoriteId, loadedFavoriteId])
+
+  useEffect(() => {
+    if (!sourceLogId) return
+    if (entryTime) return
+    setEntryTime(formatTimeInputValue(new Date()))
+  }, [sourceLogId, entryTime])
 
   useEffect(() => {
     // UX rule: when reopening an already-saved meal, start with all ingredient cards collapsed.
@@ -4739,6 +4787,7 @@ export default function MealBuilderClient() {
       : totalsForSave
 
     const favoriteId = (linkedFavoriteId || '').trim()
+    const createdAtIso = buildCreatedAtFromEntryTime(selectedDate, entryTime, new Date().toISOString())
     const nutritionBase: any = {
       calories: Math.round(scaledTotals.calories),
       protein: round3(scaledTotals.protein),
@@ -4758,13 +4807,14 @@ export default function MealBuilderClient() {
       String(portionControlEnabled ? '1' : '0'),
       portionUnit,
       String(parseNumericInput(portionAmountForSave) || ''),
+      entryTime,
       String(Number(recipeServingsForPortion) || ''),
       buildItemsSignature(itemsForSave),
       favoriteId,
     ].join('|')
 
-    return { title, description, cleanedItems, diaryNutrition, signature }
-  }, [isDiaryEdit, sourceLogId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, recipeServingsForPortion, linkedFavoriteId])
+    return { title, description, cleanedItems, diaryNutrition, createdAtIso, signature }
+  }, [isDiaryEdit, sourceLogId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, entryTime, recipeServingsForPortion, linkedFavoriteId, selectedDate])
 
   useEffect(() => {
     if (!isDiaryEdit) return
@@ -4792,6 +4842,7 @@ export default function MealBuilderClient() {
               items: built.cleanedItems,
               meal: category,
               category,
+              createdAt: built.createdAtIso,
             }),
           })
           if (!res.ok) throw new Error('autosave failed')
@@ -4806,6 +4857,7 @@ export default function MealBuilderClient() {
                 nutrition: built.diaryNutrition,
                 total: built.diaryNutrition,
                 items: built.cleanedItems,
+                createdAt: built.createdAtIso,
               }),
             )
           } catch {}
@@ -4964,7 +5016,7 @@ export default function MealBuilderClient() {
           }
         : null
 
-    const createdAtIso = alignTimestampToLocalDate(new Date().toISOString(), selectedDate)
+    const createdAtIso = buildCreatedAtFromEntryTime(selectedDate, entryTime, new Date().toISOString())
 
     const payload = {
       description,
@@ -5007,6 +5059,7 @@ export default function MealBuilderClient() {
               items: cleanedItems,
               meal: category,
               category,
+              createdAt: createdAtIso,
             }),
           })
           if (!updateRes.ok) {
@@ -5024,6 +5077,7 @@ export default function MealBuilderClient() {
                 nutrition: diaryNutrition,
                 total: diaryNutrition,
                 items: cleanedItems,
+                createdAt: createdAtIso,
               }),
             )
           } catch {}
@@ -5247,6 +5301,7 @@ export default function MealBuilderClient() {
                 items: cleanedItems,
                 meal: existing?.meal || category,
                 category: existing?.meal || category,
+                createdAt: createdAtIso,
               }),
             })
           } catch {}
@@ -6720,6 +6775,18 @@ export default function MealBuilderClient() {
         {(autosaveHint || isDiaryEdit) && (
           <div className="text-xs text-gray-500 px-1">
             {autosaveHint || 'Auto-saving while you edit…'}
+          </div>
+        )}
+
+        {sourceLogId && (
+          <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2">
+            <label className="block text-sm font-medium text-gray-700">Change time entry</label>
+            <input
+              type="time"
+              value={entryTime}
+              onChange={(e) => setEntryTime(e.target.value)}
+              className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
+            />
           </div>
         )}
 
