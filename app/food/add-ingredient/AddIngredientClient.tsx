@@ -791,8 +791,10 @@ export default function AddIngredientClient() {
   const servingCacheRef = useRef<Map<string, ServingOption>>(new Map())
   const servingPendingRef = useRef<Set<string>>(new Set())
   const seqRef = useRef(0)
+  const instantPackagedSeqRef = useRef(0)
   const brandSeqRef = useRef(0)
   const searchDebounceRef = useRef<number | null>(null)
+  const instantPackagedAbortRef = useRef<AbortController | null>(null)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
   const searchPressRef = useRef(0)
@@ -867,6 +869,50 @@ export default function AddIngredientClient() {
     }
   }, [prefillQuery, kind])
 
+  const runInstantPackagedQuickSearch = async (searchQuery: string) => {
+    const q = String(searchQuery || '').trim()
+    if (!q) return
+    const quickQuery = getQuickPackagedQuery(q)
+    if (quickQuery.length < 1) return
+    const userCountry = String(userData?.country || '').trim()
+    const seq = ++instantPackagedSeqRef.current
+    try {
+      instantPackagedAbortRef.current?.abort()
+    } catch {}
+    const controller = new AbortController()
+    instantPackagedAbortRef.current = controller
+
+    try {
+      const params = new URLSearchParams({
+        source: 'auto',
+        q: quickQuery,
+        kind: 'packaged',
+        limit: '20',
+        localOnly: '1',
+      })
+      if (userCountry) params.set('country', userCountry)
+      const res = await fetch(`/api/food-data?${params.toString()}`, { method: 'GET', signal: controller.signal })
+      if (!res.ok || instantPackagedSeqRef.current !== seq) return
+      const data = await res.json().catch(() => ({}))
+      const quickItems = Array.isArray(data?.items) ? data.items : []
+      if (quickItems.length === 0 || instantPackagedSeqRef.current !== seq) return
+      const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
+      const quickFiltered = hasToken
+        ? filterItemsForQuery(quickItems, q, 'packaged', { allowTypoFallback: false })
+        : quickItems
+      if (quickFiltered.length === 0 || instantPackagedSeqRef.current !== seq) return
+      const allowBrandSuggestions = shouldShowBrandSuggestions(q)
+      const quickMerged = allowBrandSuggestions
+        ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
+        : quickFiltered
+      if (quickMerged.length === 0 || instantPackagedSeqRef.current !== seq) return
+      setResults(quickMerged)
+      searchCacheRef.current.set(buildSearchCacheKey('packaged', sourceChoice), { items: quickMerged, at: Date.now() })
+    } catch (e: any) {
+      if (e?.name === 'AbortError') return
+    }
+  }
+
   useEffect(() => {
     const q = String(query || '').trim()
     if (searchDebounceRef.current) {
@@ -877,8 +923,13 @@ export default function AddIngredientClient() {
       try {
         abortRef.current?.abort()
       } catch {}
+      try {
+        instantPackagedAbortRef.current?.abort()
+      } catch {}
+      instantPackagedAbortRef.current = null
       abortRef.current = null
       seqRef.current += 1
+      instantPackagedSeqRef.current += 1
       setResults([])
       setLoading(false)
       setError(null)
@@ -887,6 +938,8 @@ export default function AddIngredientClient() {
     if (kind === 'single') {
       const instant = buildSingleFoodSuggestions(q)
       if (instant.length > 0) setResults(instant)
+    } else {
+      void runInstantPackagedQuickSearch(q)
     }
     const cached = getCachedSearchResults(q, kind, sourceChoice, searchCacheRef.current)
     if (cached.length > 0) {
@@ -896,8 +949,8 @@ export default function AddIngredientClient() {
     }
     setLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
-      runSearch(q, kind, sourceChoice, { preserveResults: true })
-    }, 200)
+      runSearch(q, kind, sourceChoice, { preserveResults: true, skipQuickLocal: true })
+    }, 90)
     return () => {
       if (searchDebounceRef.current) {
         window.clearTimeout(searchDebounceRef.current)
@@ -1129,7 +1182,7 @@ export default function AddIngredientClient() {
     qOverride?: string,
     kindOverride?: SearchKind,
     sourceOverride?: SearchSource,
-    options?: { preserveResults?: boolean },
+    options?: { preserveResults?: boolean; skipQuickLocal?: boolean },
   ) => {
     const q = String(qOverride ?? query).trim()
     const source: SearchSource = 'auto'
@@ -1168,7 +1221,7 @@ export default function AddIngredientClient() {
       }
 
       const allowBrandSuggestions = k === 'packaged' && shouldShowBrandSuggestions(q)
-      if (k === 'packaged') {
+      if (k === 'packaged' && !options?.skipQuickLocal) {
         const quickQuery = getQuickPackagedQuery(q)
         if (quickQuery.length >= 1) {
           const quick = await fetchItems(quickQuery, { localOnly: true })

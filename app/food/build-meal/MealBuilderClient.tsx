@@ -1674,6 +1674,7 @@ export default function MealBuilderClient() {
   const importAutoFillCacheRef = useRef<Map<string, NormalizedFoodItem | null>>(new Map())
 
   const seqRef = useRef(0)
+  const instantPackagedSeqRef = useRef(0)
   const brandSeqRef = useRef(0)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const queryInputRef = useRef<HTMLInputElement | null>(null)
@@ -3261,7 +3262,7 @@ export default function MealBuilderClient() {
     }
   }
 
-  const runSearch = async (searchQuery?: string) => {
+  const runSearch = async (searchQuery?: string, options?: { skipQuickLocal?: boolean }) => {
     const raw = String(searchQuery ?? query)
     const q = raw.trim()
     const cacheKey = buildSearchCacheKey(kind)
@@ -3277,7 +3278,7 @@ export default function MealBuilderClient() {
 
     try {
       const allowBrandSuggestions = kind === 'packaged' && shouldShowBrandSuggestions(q)
-      if (kind === 'packaged') {
+      if (kind === 'packaged' && !options?.skipQuickLocal) {
         const quickQuery = getQuickPackagedQuery(q)
         if (quickQuery.length >= 1) {
           const quickItems = await fetchSearchItems(quickQuery, { kindOverride: 'packaged', sourceOverride: 'usda', localOnly: true })
@@ -3342,6 +3343,37 @@ export default function MealBuilderClient() {
     }
   }
 
+  const runInstantPackagedQuickSearch = async (searchQuery: string) => {
+    const q = String(searchQuery || '').trim()
+    if (!q) return
+    const quickQuery = getQuickPackagedQuery(q)
+    if (quickQuery.length < 1) return
+    const seq = ++instantPackagedSeqRef.current
+    try {
+      const quickItems = await fetchSearchItems(quickQuery, {
+        kindOverride: 'packaged',
+        sourceOverride: 'usda',
+        localOnly: true,
+        timeoutMs: 900,
+      })
+      if (instantPackagedSeqRef.current !== seq || quickItems.length === 0) return
+      const hasToken = getSearchTokens(q).some((token) => token.length >= 1)
+      const quickFiltered = hasToken
+        ? filterItemsForQuery(quickItems, q, 'packaged', { allowTypoFallback: false })
+        : quickItems
+      if (quickFiltered.length === 0 || instantPackagedSeqRef.current !== seq) return
+      const allowBrandSuggestions = shouldShowBrandSuggestions(q)
+      const quickMerged = allowBrandSuggestions
+        ? mergeBrandSuggestions(quickFiltered, brandSuggestionsRef.current)
+        : quickFiltered
+      if (quickMerged.length === 0 || instantPackagedSeqRef.current !== seq) return
+      setResults(quickMerged)
+      searchCacheRef.current.set(buildSearchCacheKey('packaged'), { items: quickMerged, at: Date.now() })
+    } catch {
+      // ignore instant lookup errors
+    }
+  }
+
   useEffect(() => {
     const q = String(query || '').trim()
     if (searchDebounceRef.current) {
@@ -3350,6 +3382,7 @@ export default function MealBuilderClient() {
     }
     if (q.length < 1) {
       seqRef.current += 1
+      instantPackagedSeqRef.current += 1
       setResults([])
       setSearchLoading(false)
       if (q.length === 0) setError(null)
@@ -3358,6 +3391,8 @@ export default function MealBuilderClient() {
     if (kind === 'single') {
       const instant = buildInstantSuggestions(q)
       if (instant.length > 0) setResults(instant)
+    } else {
+      void runInstantPackagedQuickSearch(q)
     }
     const cached = getCachedSearchResults(q, kind, searchCacheRef.current)
     if (cached.length > 0) {
@@ -3371,8 +3406,8 @@ export default function MealBuilderClient() {
     }
     setSearchLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
-      runSearch(q)
-    }, 200)
+      runSearch(q, { skipQuickLocal: true })
+    }, 90)
     return () => {
       if (searchDebounceRef.current) {
         window.clearTimeout(searchDebounceRef.current)
