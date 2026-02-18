@@ -1807,6 +1807,7 @@ export default function MealBuilderClient() {
   const showPortionSaveCta = portionControlEnabled && (parseNumericInput(portionAmountInput) || 0) > 0
   const isDiaryEdit = Boolean(sourceLogId) && !editFavoriteId
   const isFavoriteAdjustBuild = fromFavoriteAdjust && !editFavoriteId && !sourceLogId
+  const showEntryTimeOverride = Boolean(sourceLogId || isFavoriteAdjustBuild)
   const editScopeKey = editFavoriteId ? `fav:${editFavoriteId}` : sourceLogId ? `log:${sourceLogId}` : ''
 
   // Draft protection + auto-save (owner request):
@@ -2281,7 +2282,7 @@ export default function MealBuilderClient() {
   useEffect(() => {
     // Editing mode (diary): load a FoodLog row directly when a Build-a-meal diary entry is edited.
     if (!sourceLogId) {
-      setEntryTime('')
+      if (!isFavoriteAdjustBuild) setEntryTime('')
       if (!editFavoriteId) {
         initialItemsSignatureRef.current = ''
         initialPortionTotalWeightRef.current = null
@@ -2345,13 +2346,13 @@ export default function MealBuilderClient() {
       cancelled = true
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sourceLogId, editFavoriteId, loadedFavoriteId])
+  }, [sourceLogId, editFavoriteId, loadedFavoriteId, isFavoriteAdjustBuild])
 
   useEffect(() => {
-    if (!sourceLogId) return
+    if (!showEntryTimeOverride) return
     if (entryTime) return
     setEntryTime(formatTimeInputValue(new Date()))
-  }, [sourceLogId, entryTime])
+  }, [showEntryTimeOverride, entryTime])
 
   useEffect(() => {
     // UX rule: when reopening an already-saved meal, start with all ingredient cards collapsed.
@@ -6778,7 +6779,7 @@ export default function MealBuilderClient() {
           </div>
         )}
 
-        {sourceLogId && (
+        {showEntryTimeOverride && (
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2">
             <label className="block text-sm font-medium text-gray-700">Change time entry</label>
             <input
