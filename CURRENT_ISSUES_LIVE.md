@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-18 23:31 AEDT
+- What changed: Fixed packaged/fast-food ranking so typing a partial like “McDonald’s cheese” now returns cheeseburger items properly (instead of only random cheese items). Search now also safely tops up from global custom fast-food rows when country-specific rows are too narrow, and quick typing keeps both brand + food token intent for better matches.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and https://helfi.ai/food/build-meal
+- What to quickly test: With Packaged/Fast-foods selected, type “McDonald’s chee” and “McDonald’s cheese”. Confirm cheeseburger options appear near the top and the list is fuller (not stuck on only a few cheese snack entries).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-18 23:13 AEDT
 - What changed: Made packaged/fast-food search feel faster while typing. The app now starts a fast local lookup immediately on each keystroke, shows matching results sooner, and still runs the full search in the background so complete results still load.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient and https://helfi.ai/food/build-meal
