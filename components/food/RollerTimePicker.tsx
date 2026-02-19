@@ -87,14 +87,13 @@ function InfiniteWheelColumn({
     <div className="w-20">
       <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</div>
       <div className="relative h-[180px] rounded-xl border border-gray-200 bg-white">
-        <div className="pointer-events-none absolute inset-x-1 top-1/2 z-20 h-9 -translate-y-1/2 rounded-md border border-emerald-200 bg-emerald-50" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-gradient-to-b from-white to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-white to-transparent" />
 
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="scrollbar-hide h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
+          className="scrollbar-hide relative z-10 h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           {displayValues.map((value, i) => {
@@ -105,7 +104,7 @@ function InfiniteWheelColumn({
                 type="button"
                 onClick={() => scrollToIndex(i % options.length)}
                 className={`flex h-9 w-full snap-center items-center justify-center text-base transition ${
-                  isSelected ? 'font-semibold text-emerald-700' : 'text-gray-500'
+                  isSelected ? 'mx-1 rounded-md bg-emerald-500 font-semibold text-white shadow-sm' : 'text-gray-600'
                 }`}
               >
                 {value}
@@ -152,14 +151,13 @@ function FiniteWheelColumn({
     <div className="w-20">
       <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</div>
       <div className="relative h-[180px] rounded-xl border border-gray-200 bg-white">
-        <div className="pointer-events-none absolute inset-x-1 top-1/2 z-20 h-9 -translate-y-1/2 rounded-md border border-emerald-200 bg-emerald-50" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-gradient-to-b from-white to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-white to-transparent" />
 
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          className="scrollbar-hide h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
+          className="scrollbar-hide relative z-10 h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
           <div style={{ height: CENTER_OFFSET }} />
@@ -171,7 +169,7 @@ function FiniteWheelColumn({
                 type="button"
                 onClick={() => onSelect(i)}
                 className={`flex h-9 w-full snap-center items-center justify-center text-base transition ${
-                  isSelected ? 'font-semibold text-emerald-700' : 'text-gray-500'
+                  isSelected ? 'mx-1 rounded-md bg-emerald-500 font-semibold text-white shadow-sm' : 'text-gray-600'
                 }`}
               >
                 {value}
