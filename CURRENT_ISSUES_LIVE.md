@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 18:48 AEDT
+- What changed: Admin user page now correctly shows admin-granted premium access (instead of always showing Paid), and refund action is hidden when there is no Stripe-paid subscription. Manual admin grants now clear Stripe subscription linkage so status stays correct.
+- Where to see it (page/link): https://helfi.ai/admin-panel (open a user details page in User Management)
+- What to quickly test: Grant premium from admin tools, open that user’s detail page, confirm badge says Admin granted and refunds card shows no refund available; for a Stripe-paid premium user, confirm Paid badge and Refund latest payment button still appear.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 18:06 AEDT
 - What changed: Health setup weight input on page 2 now allows decimal typing on mobile keyboards (for example 58.3 or 78.5) by enabling decimal keypad behavior.
 - Where to see it (page/link): https://helfi.ai/onboarding
