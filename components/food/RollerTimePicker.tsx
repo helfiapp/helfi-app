@@ -1,12 +1,18 @@
 'use client'
 
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 
 type RollerTimePickerProps = {
   value: string
   onChange: (next: string) => void
   className?: string
 }
+
+const ITEM_HEIGHT = 36
+const VISIBLE_ROWS = 5
+const VIEWPORT_HEIGHT = ITEM_HEIGHT * VISIBLE_ROWS
+const CENTER_OFFSET = (VIEWPORT_HEIGHT - ITEM_HEIGHT) / 2
+const INFINITE_REPEAT_BLOCKS = 12
 
 const pad2 = (n: number) => String(n).padStart(2, '0')
 
@@ -28,68 +34,153 @@ const toTime24 = (hour12: number, minute: number, meridiem: 'AM' | 'PM') => {
   return `${pad2(hour24)}:${pad2(Math.min(59, Math.max(0, minute)))}`
 }
 
-const cycleIndex = (index: number, total: number) => {
-  if (total <= 0) return 0
-  return ((index % total) + total) % total
-}
-
-function WheelColumn({
+function InfiniteWheelColumn({
+  label,
   options,
   selectedIndex,
   onSelect,
-  ariaLabel,
+  enabled,
 }: {
+  label: string
   options: string[]
   selectedIndex: number
   onSelect: (index: number) => void
-  ariaLabel: string
+  enabled: boolean
 }) {
-  const offsets = [-2, -1, 0, 1, 2]
-  return (
-    <div className="flex flex-col items-center gap-1">
-      <button
-        type="button"
-        onClick={() => onSelect(cycleIndex(selectedIndex - 1, options.length))}
-        className="h-5 w-14 rounded-md text-gray-500 hover:bg-gray-100"
-        aria-label={`${ariaLabel} up`}
-      >
-        ^
-      </button>
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+  const itemCount = options.length * INFINITE_REPEAT_BLOCKS
+  const displayValues = useMemo(() => Array.from({ length: itemCount }, (_, i) => options[i % options.length]), [itemCount, options])
 
-      <div className="relative h-28 w-14 overflow-hidden rounded-xl border border-gray-200 bg-white">
-        <div className="pointer-events-none absolute inset-x-1 top-1/2 h-7 -translate-y-1/2 rounded-md border border-emerald-200 bg-emerald-50" />
-        <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white to-transparent" />
-        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent" />
-        <div className="relative z-10 flex h-full flex-col justify-center">
-          {offsets.map((offset) => {
-            const index = cycleIndex(selectedIndex + offset, options.length)
-            const selected = offset === 0
-            const faded = Math.abs(offset) === 2
+  const scrollToIndex = useCallback(
+    (targetIndex: number, behavior: ScrollBehavior = 'smooth') => {
+      const el = scrollRef.current
+      if (!el) return
+      const raw = Math.floor(INFINITE_REPEAT_BLOCKS / 2) * options.length + targetIndex
+      el.scrollTo({ top: raw * ITEM_HEIGHT - CENTER_OFFSET, behavior })
+    },
+    [options.length],
+  )
+
+  useEffect(() => {
+    if (!enabled) return
+    scrollToIndex(selectedIndex, 'auto')
+  }, [enabled, selectedIndex, scrollToIndex])
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+
+    const raw = Math.round((el.scrollTop + CENTER_OFFSET) / ITEM_HEIGHT)
+    const normalized = ((raw % options.length) + options.length) % options.length
+
+    if (normalized !== selectedIndex) onSelect(normalized)
+
+    const minRaw = options.length * 2
+    const maxRaw = itemCount - options.length * 2
+    if (raw < minRaw || raw > maxRaw) {
+      const centeredRaw = Math.floor(INFINITE_REPEAT_BLOCKS / 2) * options.length + normalized
+      el.scrollTop = centeredRaw * ITEM_HEIGHT - CENTER_OFFSET
+    }
+  }
+
+  return (
+    <div className="w-20">
+      <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="relative h-[180px] rounded-xl border border-gray-200 bg-white">
+        <div className="pointer-events-none absolute inset-x-1 top-1/2 z-20 h-9 -translate-y-1/2 rounded-md border border-emerald-200 bg-emerald-50" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-gradient-to-b from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-white to-transparent" />
+
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="scrollbar-hide h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          {displayValues.map((value, i) => {
+            const isSelected = options[((i % options.length) + options.length) % options.length] === options[selectedIndex]
             return (
               <button
-                key={`${ariaLabel}-${offset}-${index}`}
+                key={`${label}-${i}-${value}`}
                 type="button"
-                onClick={() => onSelect(index)}
-                className={`h-7 w-full text-sm transition ${
-                  selected ? 'font-semibold text-emerald-700' : faded ? 'text-gray-300' : 'text-gray-600 hover:text-gray-900'
+                onClick={() => scrollToIndex(i % options.length)}
+                className={`flex h-9 w-full snap-center items-center justify-center text-base transition ${
+                  isSelected ? 'font-semibold text-emerald-700' : 'text-gray-500'
                 }`}
-                aria-label={`${ariaLabel} ${options[index]}`}
               >
-                {options[index]}
+                {value}
               </button>
             )
           })}
         </div>
       </div>
+    </div>
+  )
+}
 
-      <button
-        type="button"
-        onClick={() => onSelect(cycleIndex(selectedIndex + 1, options.length))}
-        className="h-5 w-14 rounded-md text-gray-500 hover:bg-gray-100"
-        aria-label={`${ariaLabel} down`}
-      >
-        v
-      </button>
+function FiniteWheelColumn({
+  label,
+  options,
+  selectedIndex,
+  onSelect,
+  enabled,
+}: {
+  label: string
+  options: string[]
+  selectedIndex: number
+  onSelect: (index: number) => void
+  enabled: boolean
+}) {
+  const scrollRef = useRef<HTMLDivElement | null>(null)
+
+  useEffect(() => {
+    if (!enabled) return
+    const el = scrollRef.current
+    if (!el) return
+    el.scrollTo({ top: selectedIndex * ITEM_HEIGHT, behavior: 'auto' })
+  }, [enabled, selectedIndex])
+
+  const handleScroll = () => {
+    const el = scrollRef.current
+    if (!el) return
+    const raw = Math.round(el.scrollTop / ITEM_HEIGHT)
+    const clamped = Math.min(options.length - 1, Math.max(0, raw))
+    if (clamped !== selectedIndex) onSelect(clamped)
+  }
+
+  return (
+    <div className="w-20">
+      <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="relative h-[180px] rounded-xl border border-gray-200 bg-white">
+        <div className="pointer-events-none absolute inset-x-1 top-1/2 z-20 h-9 -translate-y-1/2 rounded-md border border-emerald-200 bg-emerald-50" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 z-10 h-12 bg-gradient-to-b from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 z-10 h-12 bg-gradient-to-t from-white to-transparent" />
+
+        <div
+          ref={scrollRef}
+          onScroll={handleScroll}
+          className="scrollbar-hide h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
+          style={{ WebkitOverflowScrolling: 'touch' }}
+        >
+          <div style={{ height: CENTER_OFFSET }} />
+          {options.map((value, i) => {
+            const isSelected = i === selectedIndex
+            return (
+              <button
+                key={`${label}-${value}`}
+                type="button"
+                onClick={() => onSelect(i)}
+                className={`flex h-9 w-full snap-center items-center justify-center text-base transition ${
+                  isSelected ? 'font-semibold text-emerald-700' : 'text-gray-500'
+                }`}
+              >
+                {value}
+              </button>
+            )
+          })}
+          <div style={{ height: CENTER_OFFSET }} />
+        </div>
+      </div>
     </div>
   )
 }
@@ -109,35 +200,34 @@ export default function RollerTimePicker({ value, onChange, className }: RollerT
 
   const hourIndex = hour12 - 1
   const minuteIndex = minute
+  const meridiemIndex = meridiems.indexOf(meridiem)
 
   const applyHourIndex = (nextIndex: number) => {
-    const nextHour12 = nextIndex + 1
-    onChange(toTime24(nextHour12, minute, meridiem))
+    onChange(toTime24(nextIndex + 1, minute, meridiem))
   }
 
   const applyMinuteIndex = (nextIndex: number) => {
     onChange(toTime24(hour12, nextIndex, meridiem))
   }
 
-  const applyMeridiem = (nextMeridiem: 'AM' | 'PM') => {
-    onChange(toTime24(hour12, minute, nextMeridiem))
+  const applyMeridiemIndex = (nextIndex: number) => {
+    onChange(toTime24(hour12, minute, meridiems[nextIndex] || 'AM'))
   }
 
   const classValue = className ? ` ${className}` : ''
   const display = `${pad2(hour12)}:${pad2(minute)} ${meridiem.toLowerCase()}`
 
+  const updatePlacement = () => {
+    const rect = rootRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const estimatedPopoverHeight = 300
+    const spaceBelow = window.innerHeight - rect.bottom
+    const spaceAbove = rect.top
+    setOpenAbove(spaceBelow < estimatedPopoverHeight && spaceAbove > spaceBelow)
+  }
+
   useEffect(() => {
     if (!open) return
-
-    const updatePlacement = () => {
-      const rect = rootRef.current?.getBoundingClientRect()
-      if (!rect) return
-      const estimatedPopoverHeight = 220
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
-      setOpenAbove(spaceBelow < estimatedPopoverHeight && spaceAbove > spaceBelow)
-    }
-
     updatePlacement()
 
     const handleOutside = (event: MouseEvent | TouchEvent) => {
@@ -170,15 +260,7 @@ export default function RollerTimePicker({ value, onChange, className }: RollerT
       setOpen(false)
       return
     }
-    const rect = rootRef.current?.getBoundingClientRect()
-    if (rect) {
-      const estimatedPopoverHeight = 220
-      const spaceBelow = window.innerHeight - rect.bottom
-      const spaceAbove = rect.top
-      setOpenAbove(spaceBelow < estimatedPopoverHeight && spaceAbove > spaceBelow)
-    } else {
-      setOpenAbove(false)
-    }
+    updatePlacement()
     setOpen(true)
   }
 
@@ -199,7 +281,7 @@ export default function RollerTimePicker({ value, onChange, className }: RollerT
 
       {open && (
         <div
-          className={`absolute left-0 z-50 w-[min(92vw,280px)] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl ${
+          className={`absolute left-0 z-50 w-[min(96vw,340px)] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl ${
             openAbove ? 'bottom-full mb-2' : 'top-full mt-2'
           }`}
         >
@@ -214,32 +296,21 @@ export default function RollerTimePicker({ value, onChange, className }: RollerT
             </button>
           </div>
 
-          <div className="grid grid-cols-3 gap-2">
-            <WheelColumn ariaLabel="Hour" options={hours} selectedIndex={hourIndex} onSelect={applyHourIndex} />
-            <WheelColumn ariaLabel="Minute" options={minutes} selectedIndex={minuteIndex} onSelect={applyMinuteIndex} />
-            <div className="flex flex-col items-center gap-1">
-              <div className="h-5 w-14" />
-              <div className="flex h-28 w-14 flex-col rounded-xl border border-gray-200 bg-white p-1">
-                {meridiems.map((option) => (
-                  <button
-                    key={option}
-                    type="button"
-                    onClick={() => applyMeridiem(option)}
-                    className={`flex-1 rounded-md text-sm transition ${
-                      option === meridiem ? 'bg-emerald-100 font-semibold text-emerald-700' : 'text-gray-600 hover:bg-gray-100'
-                    }`}
-                    aria-label={`Set ${option}`}
-                  >
-                    {option}
-                  </button>
-                ))}
-              </div>
-              <div className="h-5 w-14" />
-            </div>
+          <div className="flex items-start justify-between gap-2">
+            <InfiniteWheelColumn label="Hour" options={hours} selectedIndex={hourIndex} onSelect={applyHourIndex} enabled={open} />
+            <InfiniteWheelColumn label="Minute" options={minutes} selectedIndex={minuteIndex} onSelect={applyMinuteIndex} enabled={open} />
+            <FiniteWheelColumn
+              label="AM/PM"
+              options={[...meridiems]}
+              selectedIndex={meridiemIndex}
+              onSelect={applyMeridiemIndex}
+              enabled={open}
+            />
           </div>
         </div>
       )}
-      {open && !openAbove && <div className="h-14" aria-hidden="true" />}
+
+      {open && !openAbove && <div className="h-16" aria-hidden="true" />}
     </div>
   )
 }
