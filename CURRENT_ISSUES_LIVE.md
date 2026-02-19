@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 18:06 AEDT
+- What changed: Health setup weight input on page 2 now allows decimal typing on mobile keyboards (for example 58.3 or 78.5) by enabling decimal keypad behavior.
+- Where to see it (page/link): https://helfi.ai/onboarding
+- What to quickly test: Open Health Setup page 2 on mobile, tap the weight field, confirm decimal point is available on keyboard, enter a value like 78.5, and continue without input issues.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 17:36 AEDT
 - What changed: Removed the remaining dummy section images on AI Insights for now. Step 01 still shows the two supplied real photos, and the other sections no longer show placeholder images.
 - Where to see it (page/link): https://helfi.ai/features/ai-insights
