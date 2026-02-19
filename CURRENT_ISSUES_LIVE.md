@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 11:32 AEDT
+- What changed: Replaced the large intrusive time picker block with a compact modern time field that opens a small popover roller only when tapped. This applies to both Food Diary edit and Add from favorites -> Change portion edit flow.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary edit + Add from favorites -> pick item -> Change portion)
+- What to quickly test: Open either edit flow, confirm only a clean time field is shown at first, tap it to open a small popup picker, choose a time, save, and confirm the entry appears under that chosen time.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 11:13 AEDT
 - What changed: Replaced the old dropdown/browser-style time input with a proper app-style roller time picker for food diary time editing. This now appears in both edit paths: Food Diary edit and Add from favorites -> Change portion.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary edit + Add from favorites -> pick item -> Change portion)
