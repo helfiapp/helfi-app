@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 21:14 AEDT
+- What changed: Replaced Helfi PWA/iPhone app icon image files with the new white-background icon so iOS home screen no longer renders a black background after update. Updated apple-touch-icon plus 192/512/1024 PWA icon assets.
+- Where to see it (page/link): https://helfi.ai (installed on iPhone home screen)
+- What to quickly test: Remove existing Helfi home screen shortcut, add Helfi to Home Screen again from Safari, and confirm icon now shows white background.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 20:29 AEDT
 - What changed: Hardened barcode first-scan reliability in Food Diary. Removed the extra double-read gate, limited scanner detection to retail food barcode formats (EAN/UPC), added stronger automatic retry for temporary lookup failures, and tightened barcode sanity checks to reduce false first reads.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode)
