@@ -2090,7 +2090,10 @@ If this ever breaks, restore by:
 - The barcode scanner is now stable on iOS PWA using **ZXing** with `decodeFromConstraints`, rear camera, continuous autofocus hint, “try harder” hint, and no photo/fallback flows.
 - The overlay is intentionally minimal (clear view + frame + flash + small status chip).
 - Do **not** swap the decoder (no html5-qrcode, no native `BarcodeDetector`), change constraints, add photo upload, or alter the overlay without explicit written approval from the user.
-- Barcode results must be saved as a single **ingredient card** item (same shape as photo/AI `analyzedItems`) using `buildBarcodeIngredientItem` → `insertBarcodeFoodIntoDiary`; keep barcode metadata (`barcode`, `barcodeSource`, `detectionMethod: 'barcode'`) and rely on ingredient cards for totals.
+- Barcode results must be saved as a single **ingredient card** item (same shape as photo/AI `analyzedItems`) using `buildBarcodeIngredientItem`; keep barcode metadata (`barcode`, `barcodeSource`, `detectionMethod: 'barcode'`) and rely on ingredient cards for totals.
+- Post-scan UX lock (HEL-220, Feb 19, 2026): for diary scans, show the action chooser first (`Add to diary`, `Preview`, `Change portion`, `Cancel`) and do not auto-add immediately after lookup success.
+- Save path lock (HEL-220, Feb 19, 2026): barcode diary adds must use the same meal insert path as other diary adds (`insertMealIntoDiary`) so new rows appear immediately without a manual page refresh.
+- UPC-E lock (HEL-220, Feb 19, 2026): do not reject valid UPC-E scans in client sanity checks, and keep UPC-E -> UPC-A candidate expansion in `app/api/barcode/lookup/route.ts` to avoid “scan twice” behavior.
 - Editing barcode entries must open the ingredient-card editor (triggered by `isBarcodeEntry` in `editFood`); do not strip the barcode markers or fall back to the manual text editor.
 - If you must touch this area, first explain the exact change in plain language and get approval; then re-test live scanning on iOS PWA.
 

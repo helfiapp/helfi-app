@@ -15482,106 +15482,41 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const buildBarcodeEntrySource = (food: any, code?: string) => {
+    const item = buildBarcodeIngredientItem(food, code)
+    const normalizedItems = normalizeDiscreteServingsWithLabel([item])
+    const items = normalizedItems.length > 0 ? normalizedItems : [item]
+    const totals =
+      recalculateNutritionFromItems(items) ||
+      sanitizeNutritionTotals({
+        calories: food?.calories,
+        protein: food?.protein_g,
+        carbs: food?.carbs_g,
+        fat: food?.fat_g,
+        fiber: food?.fiber_g,
+        sugar: food?.sugar_g,
+      }) ||
+      null
+    const description =
+      buildMealSummaryFromItems(items) ||
+      [food?.name, food?.brand].filter(Boolean).join(' – ') ||
+      'Scanned food'
+    return {
+      description,
+      label: description,
+      method: 'text',
+      photo: null,
+      nutrition: totals,
+      total: totals ? convertTotalsForStorage(totals) : null,
+      items,
+    }
+  }
+
   const isBarcodeEntry = (entry: any) =>
     Array.isArray(entry?.items) &&
     entry.items.some(
       (it: any) => it?.barcode || it?.detectionMethod === 'barcode' || it?.barcodeSource,
     )
-
-  const insertBarcodeFoodIntoDiary = async (food: any, code?: string) => {
-    const category = normalizeCategory(selectedAddCategory)
-    const opStamp = Date.now()
-    const loggedAtIso = new Date().toISOString()
-    const addedOrder = Date.now()
-    const createdAtIso = alignTimestampToLocalDate(loggedAtIso, selectedDate)
-    const displayTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-    const item = buildBarcodeIngredientItem(food, code)
-    const normalizedItems = normalizeDiscreteServingsWithLabel([item])
-	    const items = normalizedItems.length > 0 ? normalizedItems : [item]
-	    const drinkOverride = pendingDrinkOverrideRef.current
-	    const hadPendingDrinkContext = hasPendingDrinkContext()
-	    const drinkSweetener = consumePendingDrinkSweetener()
-	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-	    const adjusted = applyDrinkOverrideToItems(items, drinkSweetener?.choice ? null : drinkOverride)
-	    const finalItems = adjusted.items || items
-	    // Always clear pending drink context after this add flow has used/checked it.
-	    if (hadPendingDrinkContext) clearPendingDrinkContext()
-	    const recalculatedTotals = recalculateNutritionFromItems(finalItems)
-	    const totalsBase =
-	      recalculatedTotals ||
-	      sanitizeNutritionTotals({
-	        calories: food?.calories,
-        protein: food?.protein_g,
-        carbs: food?.carbs_g,
-	        fat: food?.fat_g,
-	        fiber: food?.fiber_g,
-	        sugar: food?.sugar_g,
-	      })
-	    const guardedDrink = applyPendingDrinkSweetenerGuard({
-	      totals: totalsBase,
-	      items: finalItems,
-	      drinkMeta,
-	      drinkSweetener,
-	    })
-	    const totals = guardedDrink.totals || totalsBase
-	    const finalItemsWithGuard = guardedDrink.items || finalItems
-	    const totalsWithMeta = applyDrinkMetaToTotals(totals, drinkMeta)
-	    const totalsForStorage = applyDrinkMetaToTotals(convertTotalsForStorage(totalsWithMeta || totals), drinkMeta)
-	    const description =
-	      buildMealSummaryFromItems(finalItemsWithGuard) ||
-	      [food?.name, food?.brand].filter(Boolean).join(' – ') ||
-	      'Scanned food'
-    const entry = ensureEntryLoggedAt(
-      applyEntryClientId(
-        {
-          id: makeUniqueLocalEntryId(
-            new Date(createdAtIso).getTime(),
-            `barcode:${opStamp}|${selectedDate}|${category}|${normalizedDescription(description)}`,
-          ),
-          localDate: selectedDate,
-          description,
-          time: displayTime,
-	          method: 'text',
-	          photo: null,
-	          nutrition: totalsWithMeta,
-	          total: totalsForStorage,
-	          items: finalItemsWithGuard,
-          meal: category,
-          category,
-          persistedCategory: category,
-          createdAt: createdAtIso,
-        },
-        `barcode:${opStamp}|${selectedDate}|${category}|${normalizedDescription(description)}`,
-      ),
-      loggedAtIso,
-      addedOrder,
-    )
-    const updated = dedupeEntries([entry, ...todaysFoods], { fallbackDate: selectedDate })
-    setTodaysFoods(updated)
-    if (!isViewingToday) {
-      setHistoryFoods((prev: any[] | null) => {
-        const base = Array.isArray(prev) ? prev : []
-        return dedupeEntries([entry, ...base], { fallbackDate: selectedDate })
-      })
-    }
-    setExpandedCategories((prev) => ({
-      ...prev,
-      [category]: true,
-    }))
-    triggerHaptic(10)
-    queueScrollToDiaryEntry({ entryKey: entry.id, category })
-    try {
-      await saveFoodEntries(updated)
-      await refreshEntriesFromServer()
-      showQuickToast(`Added to ${categoryLabel(category)}`)
-    } catch (err) {
-      console.warn('Barcode add sync failed', err)
-    } finally {
-      setPhotoOptionsAnchor(null)
-      setShowAddFood(false)
-      setShowPhotoOptions(false)
-    }
-  }
 
   const saveBarcodeLabelIfNeeded = async (
     items: any[] | null | undefined,
@@ -15881,6 +15816,24 @@ Please add nutritional information manually if needed.`);
     }
     const replaceIndex = barcodeReplaceTargetRef.current
     const actionMode = barcodeActionRef.current
+    const openBarcodeActionPrompt = (food: any, resolvedCode: string) => {
+      const source = buildBarcodeEntrySource(food, resolvedCode)
+      const item = {
+        id: `barcode-${resolvedCode || Date.now()}`,
+        label: source?.description || food?.name || 'Scanned food',
+        serving:
+          (Array.isArray(source?.items) && source.items[0]?.serving_size) ||
+          food?.serving_size ||
+          '1 serving',
+        entry: source,
+        sourceTag: 'Scanned',
+      }
+      const preview = buildFavoritePreview(item)
+      setFavoriteActionModal({
+        ...preview,
+        mode: 'choose',
+      })
+    }
     const openBarcodeLabelPrompt = (code: string, data?: any) => {
       setShowBarcodeScanner(false)
       setBarcodeStatus('idle')
@@ -15950,12 +15903,7 @@ Please add nutritional information manually if needed.`);
       } else if (actionMode === 'analysis') {
         addBarcodeIngredientToAnalysis(data.food, resolvedBarcode || normalized)
       } else {
-        try {
-          await insertBarcodeFoodIntoDiary(data.food, resolvedBarcode || normalized)
-        } catch (insertErr) {
-          console.error('Barcode insert failed', insertErr)
-          showQuickToast('Found item, but could not save it. Please try again.')
-        }
+        openBarcodeActionPrompt(data.food, resolvedBarcode || normalized)
       }
       setBarcodeValue('')
       setShowManualBarcodeInput(false)
@@ -15991,6 +15939,40 @@ Please add nutritional information manually if needed.`);
     return check === expected
   }
 
+  const expandUpcEToUpcA = (digits: string): string | null => {
+    if (!/^[01]\d{7}$/.test(digits)) return null
+    const numberSystem = digits[0]
+    const e1 = digits[1]
+    const e2 = digits[2]
+    const e3 = digits[3]
+    const e4 = digits[4]
+    const e5 = digits[5]
+    const e6 = digits[6]
+    const check = digits[7]
+    let manufacturer = ''
+    let product = ''
+    if (e6 === '0' || e6 === '1' || e6 === '2') {
+      manufacturer = `${e1}${e2}${e6}00`
+      product = `00${e3}${e4}${e5}`
+    } else if (e6 === '3') {
+      manufacturer = `${e1}${e2}${e3}00`
+      product = `000${e4}${e5}`
+    } else if (e6 === '4') {
+      manufacturer = `${e1}${e2}${e3}${e4}0`
+      product = `0000${e5}`
+    } else {
+      manufacturer = `${e1}${e2}${e3}${e4}${e5}`
+      product = `0000${e6}`
+    }
+    return `${numberSystem}${manufacturer}${product}${check}`
+  }
+
+  const isValidUpcE = (digits: string) => {
+    const expanded = expandUpcEToUpcA(digits)
+    if (!expanded) return false
+    return isValidUpcA(expanded)
+  }
+
   const isValidEan13 = (digits: string) => {
     if (!/^\d{13}$/.test(digits)) return false
     const nums = digits.split('').map((d) => Number(d))
@@ -16004,7 +15986,7 @@ Please add nutritional information manually if needed.`);
 
   const passesBarcodeSanityCheck = (value: string) => {
     if (!/^\d+$/.test(value)) return true
-    if (value.length === 8) return isValidEan8(value)
+    if (value.length === 8) return isValidEan8(value) || isValidUpcE(value)
     if (value.length === 12) return isValidUpcA(value)
     if (value.length === 13) return isValidEan13(value)
     return true

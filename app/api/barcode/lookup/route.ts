@@ -96,6 +96,34 @@ const parseServingWeight = (servingSize?: string | null): number | null => {
   return null
 }
 
+const expandUpcEToUpcA = (value: string): string | null => {
+  if (!/^[01]\d{7}$/.test(value)) return null
+  const numberSystem = value[0]
+  const e1 = value[1]
+  const e2 = value[2]
+  const e3 = value[3]
+  const e4 = value[4]
+  const e5 = value[5]
+  const e6 = value[6]
+  const check = value[7]
+  let manufacturer = ''
+  let product = ''
+  if (e6 === '0' || e6 === '1' || e6 === '2') {
+    manufacturer = `${e1}${e2}${e6}00`
+    product = `00${e3}${e4}${e5}`
+  } else if (e6 === '3') {
+    manufacturer = `${e1}${e2}${e3}00`
+    product = `000${e4}${e5}`
+  } else if (e6 === '4') {
+    manufacturer = `${e1}${e2}${e3}${e4}0`
+    product = `0000${e5}`
+  } else {
+    manufacturer = `${e1}${e2}${e3}${e4}${e5}`
+    product = `0000${e6}`
+  }
+  return `${numberSystem}${manufacturer}${product}${check}`
+}
+
 const isLikelyOilProduct = (nameRaw: string | null | undefined): boolean => {
   const name = String(nameRaw || '').toLowerCase()
   if (!name) return false
@@ -587,10 +615,17 @@ export async function GET(req: NextRequest) {
   const buildBarcodeCandidates = (value: string) => {
     const normalized = value.replace(/[^0-9A-Za-z]/g, '')
     const candidates = new Set<string>()
-    if (normalized) candidates.add(normalized)
-    if (/^\d+$/.test(normalized)) {
-      if (normalized.length === 12) candidates.add(`0${normalized}`)
-      if (normalized.length === 13 && normalized.startsWith('0')) candidates.add(normalized.slice(1))
+    const addWithNumericVariants = (candidate: string) => {
+      if (!candidate) return
+      candidates.add(candidate)
+      if (!/^\d+$/.test(candidate)) return
+      if (candidate.length === 12) candidates.add(`0${candidate}`)
+      if (candidate.length === 13 && candidate.startsWith('0')) candidates.add(candidate.slice(1))
+    }
+    addWithNumericVariants(normalized)
+    if (/^[01]\d{7}$/.test(normalized)) {
+      const expanded = expandUpcEToUpcA(normalized)
+      if (expanded) addWithNumericVariants(expanded)
     }
     return Array.from(candidates)
   }
