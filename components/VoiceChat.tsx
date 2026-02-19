@@ -1323,7 +1323,10 @@ export default function VoiceChat({
         if (fullResponse) {
           setMessages((prev) => [...prev, { role: 'assistant', content: fullResponse }])
         } else {
-          await recoverAssistantMessage()
+          const recovered = await recoverAssistantMessage()
+          if (!recovered) {
+            setError('No response received. Please try again.')
+          }
         }
 
         if (sawEnd) {

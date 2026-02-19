@@ -19,6 +19,9 @@ import {
   updateThreadCost,
 } from '@/lib/symptom-chat-store'
 
+const EMPTY_RESPONSE_FALLBACK =
+  'I had a temporary issue answering that. Please try sending your question again.'
+
 function getOpenAIClient(): OpenAI | null {
   if (!process.env.OPENAI_API_KEY) return null
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
@@ -245,7 +248,8 @@ export async function POST(req: NextRequest) {
         // Ignore logging failures
       }
 
-      const text = wrapped.completion.choices?.[0]?.message?.content || ''
+      const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
+      const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
       await appendMessage(threadId, 'assistant', text)
       await updateThreadCost(session.user.id, threadId, wrapped.costCents, allowViaFreeUse)
       const enc = new TextEncoder()
@@ -312,7 +316,8 @@ export async function POST(req: NextRequest) {
         // Ignore logging failures
       }
 
-      const text = wrapped.completion.choices?.[0]?.message?.content || ''
+      const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
+      const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
       await appendMessage(threadId, 'assistant', text)
       await updateThreadCost(session.user.id, threadId, wrapped.costCents, allowViaFreeUse)
       return NextResponse.json({ assistant: text, costCents: wrapped.costCents, covered: allowViaFreeUse, threadId })

@@ -106,6 +106,55 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
     () => threads.filter((thread) => thread.archivedAt),
     [threads]
   )
+
+  const getApiErrorMessage = useCallback((data: any) => {
+    const message =
+      (typeof data?.message === 'string' && data.message.trim()) ||
+      (typeof data?.error === 'string' && data.error.trim()) ||
+      'Sorry, something went wrong. Please try again.'
+    if (message === 'server_error') return 'Sorry, something went wrong. Please try again.'
+    return message
+  }, [])
+
+  const recoverAssistantMessage = useCallback(async (preferredThreadId?: string | null) => {
+    try {
+      let targetThreadId = preferredThreadId || threadId
+      if (!targetThreadId) {
+        const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
+        if (threadsRes.ok) {
+          const threadsData = await threadsRes.json()
+          const nextThreads = Array.isArray(threadsData?.threads) ? threadsData.threads : []
+          if (nextThreads.length) {
+            setThreads(nextThreads)
+            const nextThread = nextThreads.find((item: ChatThread) => !item.archivedAt) || nextThreads[0]
+            targetThreadId = nextThread?.id || null
+            if (targetThreadId) setThreadId(targetThreadId)
+          }
+        }
+      }
+      if (!targetThreadId) return false
+      const messagesRes = await fetch(
+        `/api/insights/issues/${issueSlug}/sections/${section}/chat?threadId=${targetThreadId}`,
+        { cache: 'no-store' }
+      )
+      if (!messagesRes.ok) return false
+      const messagesData = await messagesRes.json().catch(() => null)
+      const messageList = Array.isArray(messagesData?.messages) ? messagesData.messages : []
+      const lastAssistant = [...messageList]
+        .reverse()
+        .find((msg) => msg?.role === 'assistant' && typeof msg?.content === 'string' && msg.content.trim())
+      if (!lastAssistant?.content) return false
+      setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant' && last.content === lastAssistant.content) return prev
+        return [...prev, { role: 'assistant', content: lastAssistant.content }]
+      })
+      return true
+    } catch {
+      return false
+    }
+  }, [issueSlug, section, threadId])
+
   // Smooth single-frame resize to prevent jitter when text grows/shrinks quickly
   const resizeTextarea = useCallback(() => {
     if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
@@ -463,6 +512,7 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
       const nextMessages: ChatMessage[] = [...messages, { role: 'user', content: text }]
       setMessages(nextMessages)
       setInput('')
+      let activeThreadId = threadId
 
       // Attempt streaming via SSE to new chat endpoint
       const url = `/api/insights/issues/${issueSlug}/sections/${section}/chat`
@@ -475,11 +525,75 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           newThread: false, // Never create a new thread automatically - user must click "+ New"
         }),
       })
-      if (res.ok && (res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
+
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setError(getApiErrorMessage(data))
+        return
+      }
+
+      if ((res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
         let hasAssistant = false
+        const applyChunk = (chunk: string) => {
+          if (chunk.startsWith('event: end')) {
+            return
+          }
+          if (!chunk.startsWith('data:')) return
+          const raw = chunk.replace(/^data:\s?/, '')
+          const trimmed = raw.trim()
+          if (trimmed.startsWith(COST_PREFIX)) {
+            try {
+              const payload = JSON.parse(trimmed.slice(COST_PREFIX.length))
+              if (payload && typeof payload.costCents === 'number') {
+                const targetId = activeThreadId || threadId
+                if (targetId) {
+                  const costNow = new Date().toISOString()
+                  setThreads((prev) =>
+                    prev.map((thread) =>
+                      thread.id === targetId
+                        ? {
+                            ...thread,
+                            lastChargedCost: payload.costCents,
+                            lastChargedAt: costNow,
+                            lastChargeCovered: Boolean(payload.covered),
+                          }
+                        : thread
+                    )
+                  )
+                }
+              }
+            } catch {}
+            return
+          }
+          let token = ''
+          try {
+            const parsed = JSON.parse(trimmed)
+            if (typeof parsed === 'string') {
+              token = parsed
+            } else if (parsed && typeof parsed.token === 'string') {
+              token = parsed.token
+            } else {
+              token = raw
+            }
+          } catch {
+            token = raw
+          }
+          if (!token) return
+          if (!hasAssistant) {
+            setMessages((prev) => [...prev, { role: 'assistant', content: token }])
+            hasAssistant = true
+          } else {
+            setMessages((prev) => {
+              const copy = prev.slice()
+              copy[copy.length - 1] = { role: 'assistant', content: (copy[copy.length - 1] as any).content + token }
+              return copy
+            })
+          }
+        }
+
         while (true) {
           const { value, done } = await reader.read()
           if (done) break
@@ -487,57 +601,8 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
           const parts = buffer.split('\n\n')
           buffer = parts.pop() || ''
           for (const chunk of parts) {
-            if (chunk.startsWith('data: ')) {
-              const raw = chunk.slice(6)
-              const trimmed = raw.trim()
-              if (trimmed.startsWith(COST_PREFIX)) {
-                try {
-                  const payload = JSON.parse(trimmed.slice(COST_PREFIX.length))
-                  if (payload && typeof payload.costCents === 'number') {
-                    if (threadId) {
-                      const costNow = new Date().toISOString()
-                      setThreads((prev) =>
-                        prev.map((thread) =>
-                          thread.id === threadId
-                            ? {
-                                ...thread,
-                                lastChargedCost: payload.costCents,
-                                lastChargedAt: costNow,
-                                lastChargeCovered: Boolean(payload.covered),
-                              }
-                            : thread
-                        )
-                      )
-                    }
-                  }
-                } catch {}
-                continue
-              }
-              let token = ''
-              // Prefer JSON payloads to preserve newlines; fall back to raw
-              try {
-                const parsed = JSON.parse(trimmed)
-                if (typeof parsed === 'string') {
-                  token = parsed
-                } else if (parsed && typeof parsed.token === 'string') {
-                  token = parsed.token
-                } else {
-                  token = trimmed
-                }
-              } catch {
-                token = trimmed
-              }
-              if (!hasAssistant) {
-                setMessages((prev) => [...prev, { role: 'assistant', content: token }])
-                hasAssistant = true
-              } else {
-                setMessages((prev) => {
-                  const copy = prev.slice()
-                  copy[copy.length - 1] = { role: 'assistant', content: (copy[copy.length - 1] as any).content + token }
-                  return copy
-                })
-              }
-            } else if (chunk.startsWith('event: end')) {
+            applyChunk(chunk)
+            if (chunk.startsWith('event: end')) {
               // Response complete - reload threads to get updated title
               const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
               if (threadsRes.ok) {
@@ -545,13 +610,25 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
                 if (threadsData.threads) {
                   setThreads(threadsData.threads)
                   // Update threadId if we created a new thread
-                  if (!threadId && threadsData.threads.length > 0) {
+                  if (!activeThreadId && threadsData.threads.length > 0) {
                     const nextThread = threadsData.threads.find((thread: ChatThread) => !thread.archivedAt) || threadsData.threads[0]
                     setThreadId(nextThread.id)
+                    activeThreadId = nextThread.id
                   }
                 }
               }
             }
+          }
+        }
+
+        if (buffer.trim()) {
+          applyChunk(buffer.trim())
+        }
+
+        if (!hasAssistant) {
+          const recovered = await recoverAssistantMessage(activeThreadId)
+          if (!recovered) {
+            setError('No response received. Please try again.')
           }
         }
       } else {
@@ -560,10 +637,16 @@ export default function SectionChat({ issueSlug, section, issueName }: SectionCh
         const textOut = data?.assistant as string | undefined
         if (textOut) {
           setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
+        } else {
+          const recovered = await recoverAssistantMessage(data?.threadId || activeThreadId)
+          if (!recovered) {
+            setError(getApiErrorMessage(data))
+          }
         }
         // Update threadId if returned
         if (data?.threadId) {
           setThreadId(data.threadId)
+          activeThreadId = data.threadId
           // Reload threads to get updated titles
           const threadsRes = await fetch(`/api/insights/issues/${issueSlug}/sections/${section}/threads`, { cache: 'no-store' })
           if (threadsRes.ok) {

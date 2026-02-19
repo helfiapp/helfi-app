@@ -132,6 +132,36 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
     return trimmed.length > 50 ? `${trimmed.slice(0, 47)}...` : trimmed
   }, [])
 
+  const getApiErrorMessage = useCallback((data: any) => {
+    const message =
+      (typeof data?.message === 'string' && data.message.trim()) ||
+      (typeof data?.error === 'string' && data.error.trim()) ||
+      'Sorry, something went wrong. Please try again.'
+    if (message === 'server_error') return 'Sorry, something went wrong. Please try again.'
+    return message
+  }, [])
+
+  const recoverAssistantMessage = useCallback(async (threadId: string) => {
+    try {
+      const res = await fetch(`/api/medical-images/chat?threadId=${threadId}`)
+      if (!res.ok) return false
+      const data = await res.json().catch(() => null)
+      const messageList = Array.isArray(data?.messages) ? data.messages : []
+      const lastAssistant = [...messageList]
+        .reverse()
+        .find((msg) => msg?.role === 'assistant' && typeof msg?.content === 'string' && msg.content.trim())
+      if (!lastAssistant?.content) return false
+      setMessages((prev) => {
+        const last = prev[prev.length - 1]
+        if (last?.role === 'assistant' && last.content === lastAssistant.content) return prev
+        return [...prev, { role: 'assistant', content: lastAssistant.content }]
+      })
+      return true
+    } catch {
+      return false
+    }
+  }, [])
+
   // Smooth, single-frame resize to keep composer steady during rapid updates (typing/voice)
   const resizeTextarea = useCallback(() => {
     if (resizeRafRef.current) cancelAnimationFrame(resizeRafRef.current)
@@ -450,11 +480,60 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         }),
       })
 
-      if (res.ok && (res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
+      if (!res.ok) {
+        const data = await res.json().catch(() => null)
+        setError(getApiErrorMessage(data))
+        return
+      }
+
+      if ((res.headers.get('content-type') || '').includes('text/event-stream') && res.body) {
         const reader = res.body.getReader()
         const decoder = new TextDecoder()
         let buffer = ''
         let hasAssistant = false
+        const applyChunk = (chunk: string) => {
+          if (!chunk.startsWith('data:')) return
+          const token = chunk.replace(/^data:\s?/, '')
+          if (token.startsWith(COST_PREFIX)) {
+            try {
+              const payload = JSON.parse(token.slice(COST_PREFIX.length))
+              if (payload && typeof payload.costCents === 'number') {
+                const costNow = new Date().toISOString()
+                setThreads((prev) =>
+                  prev.map((thread) =>
+                    thread.id === activeThreadId
+                      ? {
+                          ...thread,
+                          lastChargedCost: payload.costCents,
+                          lastChargedAt: costNow,
+                          lastChargeCovered: Boolean(payload.covered),
+                        }
+                      : thread
+                  )
+                )
+              }
+            } catch {}
+            return
+          }
+          if (!token) return
+          if (!hasAssistant) {
+            setMessages((prev) => [...prev, { role: 'assistant', content: token }])
+            hasAssistant = true
+          } else {
+            setMessages((prev) => {
+              const copy = prev.slice()
+              const last = copy[copy.length - 1]
+              if (last && last.role === 'assistant') {
+                copy[copy.length - 1] = {
+                  role: 'assistant',
+                  content: last.content + token,
+                }
+              }
+              return copy
+            })
+          }
+        }
+
         while (true) {
           const { value, done } = await reader.read()
           if (done) break
@@ -462,46 +541,18 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
           const parts = buffer.split('\n\n')
           buffer = parts.pop() || ''
           for (const chunk of parts) {
-            if (chunk.startsWith('data: ')) {
-              const token = chunk.slice(6)
-              if (token.startsWith(COST_PREFIX)) {
-                try {
-                  const payload = JSON.parse(token.slice(COST_PREFIX.length))
-                  if (payload && typeof payload.costCents === 'number') {
-                    const costNow = new Date().toISOString()
-                    setThreads((prev) =>
-                      prev.map((thread) =>
-                        thread.id === activeThreadId
-                          ? {
-                              ...thread,
-                              lastChargedCost: payload.costCents,
-                              lastChargedAt: costNow,
-                              lastChargeCovered: Boolean(payload.covered),
-                            }
-                          : thread
-                      )
-                    )
-                  }
-                } catch {}
-                continue
-              }
-              if (!hasAssistant) {
-                setMessages((prev) => [...prev, { role: 'assistant', content: token }])
-                hasAssistant = true
-              } else {
-                setMessages((prev) => {
-                  const copy = prev.slice()
-                  const last = copy[copy.length - 1]
-                  if (last && last.role === 'assistant') {
-                    copy[copy.length - 1] = {
-                      role: 'assistant',
-                      content: last.content + token,
-                    }
-                  }
-                  return copy
-                })
-              }
-            }
+            applyChunk(chunk)
+          }
+        }
+
+        if (buffer.trim()) {
+          applyChunk(buffer.trim())
+        }
+
+        if (!hasAssistant) {
+          const recovered = await recoverAssistantMessage(activeThreadId)
+          if (!recovered) {
+            setError('No response received. Please try again.')
           }
         }
       } else {
@@ -509,6 +560,11 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         const textOut = data?.assistant as string | undefined
         if (textOut) {
           setMessages((prev) => [...prev, { role: 'assistant', content: textOut }])
+        } else {
+          const recovered = await recoverAssistantMessage(activeThreadId)
+          if (!recovered) {
+            setError(getApiErrorMessage(data))
+          }
         }
         if (typeof data?.costCents === 'number') {
           setThreads((prev) =>

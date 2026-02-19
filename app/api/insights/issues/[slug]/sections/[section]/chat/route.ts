@@ -24,6 +24,8 @@ import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 const rateMap = new Map<string, number>()
 const MIN_INTERVAL_MS = 1500
+const EMPTY_RESPONSE_FALLBACK =
+  'I had a temporary issue answering that. Please try sending your question again.'
 
 export async function GET(
   _request: Request,
@@ -226,7 +228,8 @@ export async function POST(
         // Ignore logging failures
       }
 
-      const text = wrapped.completion.choices?.[0]?.message?.content || ''
+      const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
+      const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
       await appendMessage(thread.id, 'assistant', text)
       await updateThreadCost(session.user.id, thread.id, wrapped.costCents, allowViaFreeUse)
 
@@ -293,7 +296,8 @@ export async function POST(
       // Ignore logging failures
     }
 
-    const text = wrapped.completion.choices?.[0]?.message?.content || ''
+    const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
+    const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
     await appendMessage(thread.id, 'assistant', text)
     await updateThreadCost(session.user.id, thread.id, wrapped.costCents, allowViaFreeUse)
     return NextResponse.json({
