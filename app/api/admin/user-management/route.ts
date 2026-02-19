@@ -78,7 +78,7 @@ export async function GET(request: NextRequest) {
         monthlyInsightsGenerationUsed: true,
         monthlyMedicalImageAnalysisUsed: true,
         monthlySymptomAnalysisUsed: true,
-        subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true } },
+        subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true, stripeSubscriptionId: true } },
         creditTopUps: {
           where: {
             expiresAt: { gt: new Date() }
@@ -249,12 +249,14 @@ export async function POST(request: NextRequest) {
           where: { userId },
           update: { 
             plan: 'PREMIUM',
-            monthlyPriceCents: 2000 // Default to $20 tier
+            monthlyPriceCents: 2000, // Default to $20 tier
+            stripeSubscriptionId: null,
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
-            monthlyPriceCents: 2000
+            monthlyPriceCents: 2000,
+            stripeSubscriptionId: null,
           }
         })
         // Update daily credits for premium
@@ -318,13 +320,15 @@ export async function POST(request: NextRequest) {
             plan: 'PREMIUM',
             monthlyPriceCents: priceCents,
             // Reset startDate if tier changed or if subscription didn't exist
-            startDate: newStartDate
+            startDate: newStartDate,
+            stripeSubscriptionId: null,
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
             monthlyPriceCents: priceCents,
-            startDate: newStartDate
+            startDate: newStartDate,
+            stripeSubscriptionId: null,
           }
         })
         
@@ -371,13 +375,15 @@ export async function POST(request: NextRequest) {
           update: { 
             plan: 'PREMIUM',
             endDate: endDate,
-            monthlyPriceCents: 2000 // Default to $20 tier
+            monthlyPriceCents: 2000, // Default to $20 tier
+            stripeSubscriptionId: null,
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
             endDate: endDate,
-            monthlyPriceCents: 2000
+            monthlyPriceCents: 2000,
+            stripeSubscriptionId: null,
           }
         })
         break
@@ -397,13 +403,15 @@ export async function POST(request: NextRequest) {
           update: { 
             plan: 'PREMIUM',
             endDate: trialEndDate,
-            monthlyPriceCents: monthlyPriceCents
+            monthlyPriceCents: monthlyPriceCents,
+            stripeSubscriptionId: null,
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
             endDate: trialEndDate,
-            monthlyPriceCents: monthlyPriceCents
+            monthlyPriceCents: monthlyPriceCents,
+            stripeSubscriptionId: null,
           }
         })
         break

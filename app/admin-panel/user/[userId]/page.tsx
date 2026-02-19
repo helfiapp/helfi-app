@@ -25,6 +25,7 @@ type AdminUser = {
     monthlyPriceCents?: number | null
     startDate?: string | null
     endDate?: string | null
+    stripeSubscriptionId?: string | null
   } | null
 }
 
@@ -145,8 +146,24 @@ export default function AdminUserPage() {
     return `$${Math.round(price / 100)}/month`
   }, [user])
 
+  const isPremium = user?.subscription?.plan === 'PREMIUM'
+  const isPermanentAccess =
+    !!user?.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050
+  const hasStripeSubscription = !!user?.subscription?.stripeSubscriptionId
+  const isPaidPremium = isPremium && hasStripeSubscription
+  const isAdminGrantedPremium = isPremium && !hasStripeSubscription
+
   const accessLabel = useMemo(() => {
     if (!user?.subscription) return 'No Subscription'
+    if (user.subscription.plan === 'PREMIUM' && !user.subscription.stripeSubscriptionId) {
+      if (user.subscription.endDate) {
+        const endDate = new Date(user.subscription.endDate)
+        return endDate.getFullYear() > 2050
+          ? 'Admin granted permanent access'
+          : `Admin granted access until ${endDate.toLocaleDateString()}`
+      }
+      return 'Admin granted premium access'
+    }
     if (user.subscription.endDate) {
       const endDate = new Date(user.subscription.endDate)
       return endDate.getFullYear() > 2050
@@ -228,18 +245,23 @@ export default function AdminUserPage() {
                 </div>
                 <div className="flex flex-wrap gap-2">
                   <span className={`px-3 py-1 rounded-full text-xs font-semibold ${
-                    user.subscription?.plan === 'PREMIUM' ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
+                    isPremium ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-600'
                   }`}>
-                    {user.subscription?.plan === 'PREMIUM' ? 'Premium' : 'Free'}
+                    {isPremium ? 'Premium' : 'Free'}
                   </span>
-                  {user.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050 && (
+                  {isPermanentAccess && (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-amber-100 text-amber-700">
                       Permanent
                     </span>
                   )}
-                  {user.subscription?.plan === 'PREMIUM' && !user.subscription?.endDate && (
+                  {isPaidPremium && (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
                       Paid
+                    </span>
+                  )}
+                  {isAdminGrantedPremium && (
+                    <span className="px-3 py-1 rounded-full text-xs font-semibold bg-violet-100 text-violet-700">
+                      Admin granted
                     </span>
                   )}
                 </div>
@@ -489,32 +511,40 @@ export default function AdminUserPage() {
 
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-slate-900 mb-3">Refunds</h2>
-                  <p className="text-sm text-slate-600 mb-4">
-                    Refund the most recent payment. Access and credits are removed automatically.
-                  </p>
-                  <button
-                    onClick={() => {
-                      const raw = prompt('Refund amount in dollars (leave blank for full refund):')
-                      if (raw === null) return
-                      const trimmed = raw.trim()
-                      let amountCents: number | null = null
-                      if (trimmed) {
-                        const parsed = Number(trimmed)
-                        if (!Number.isFinite(parsed) || parsed <= 0) {
-                          alert('Please enter a valid amount.')
-                          return
-                        }
-                        amountCents = Math.round(parsed * 100)
-                      }
-                      const amountLabel = amountCents ? `$${(amountCents / 100).toFixed(2)}` : 'the full amount'
-                      if (confirm(`Refund ${amountLabel} from the most recent payment for ${user.email}?`)) {
-                        handleUserAction('refund_latest_payment', { amountCents })
-                      }
-                    }}
-                    className="w-full bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors"
-                  >
-                    Refund latest payment
-                  </button>
+                  {isPaidPremium ? (
+                    <>
+                      <p className="text-sm text-slate-600 mb-4">
+                        Refund the most recent payment. Access and credits are removed automatically.
+                      </p>
+                      <button
+                        onClick={() => {
+                          const raw = prompt('Refund amount in dollars (leave blank for full refund):')
+                          if (raw === null) return
+                          const trimmed = raw.trim()
+                          let amountCents: number | null = null
+                          if (trimmed) {
+                            const parsed = Number(trimmed)
+                            if (!Number.isFinite(parsed) || parsed <= 0) {
+                              alert('Please enter a valid amount.')
+                              return
+                            }
+                            amountCents = Math.round(parsed * 100)
+                          }
+                          const amountLabel = amountCents ? `$${(amountCents / 100).toFixed(2)}` : 'the full amount'
+                          if (confirm(`Refund ${amountLabel} from the most recent payment for ${user.email}?`)) {
+                            handleUserAction('refund_latest_payment', { amountCents })
+                          }
+                        }}
+                        className="w-full bg-amber-500 text-white px-4 py-2 rounded-lg text-sm hover:bg-amber-600 transition-colors"
+                      >
+                        Refund latest payment
+                      </button>
+                    </>
+                  ) : (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      No refund available. This account has admin-granted access and no paid Stripe charge.
+                    </div>
+                  )}
                 </div>
 
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
