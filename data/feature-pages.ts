@@ -346,7 +346,7 @@ export const featurePages: FeaturePageContent[] = [
     bannerImagePositionMobile: '66% 38%',
     bannerSpacerHeight: 430,
     showHeroImage: true,
-    showSegmentImages: true,
+    showSegmentImages: false,
     overviewLayout: 'expanded',
     primaryCta,
     secondaryCta,
@@ -423,6 +423,7 @@ export const featurePages: FeaturePageContent[] = [
             'Woman reviewing health insights near a fireplace'
           ),
         ],
+        showImage: true,
       },
       {
         title: 'Issue-specific insights',
