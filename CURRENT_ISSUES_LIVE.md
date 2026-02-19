@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 17:17 AEDT
+- What changed: Replaced the two duplicate dummy images in AI insights Step 01 with the supplied real photos (gym scene + woman in front of fireplace).
+- Where to see it (page/link): https://helfi.ai/features/ai-insights
+- What to quickly test: Open Step 01 on AI insights and confirm the two side-by-side images are now different: left is gym photo, right is fireplace photo.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 16:15 AEDT
 - What changed: Fixed barcode product naming so preview no longer shows accidental reversed name order (for example “Blue smooth”). The scanner now keeps barcode rename matching barcode-specific only, and when a source looks reversed it cross-checks OpenFoodFacts name order and uses it only when it is the same words in the correct order.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode -> Preview)
