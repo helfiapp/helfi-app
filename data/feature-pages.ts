@@ -410,17 +410,17 @@ export const featurePages: FeaturePageContent[] = [
           'Aligned with your ongoing tracking',
         ],
         image: aiInsightsPhoto(
-          '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
-          'AI insights placeholder image'
+          '/WEBSITE IMAGES/AI INSIGHTS/GUY IN GYM.jpg',
+          'Man in gym reviewing health insights'
         ),
         images: [
           aiInsightsPhoto(
-            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
-            'AI insights placeholder image'
+            '/WEBSITE IMAGES/AI INSIGHTS/GUY IN GYM.jpg',
+            'Man in gym reviewing health insights'
           ),
           aiInsightsPhoto(
-            '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS PLACEHOLDER.png',
-            'AI insights placeholder image'
+            '/WEBSITE IMAGES/AI INSIGHTS/WOMAN IN FRONT OF FIREPLACE.jpg',
+            'Woman reviewing health insights near a fireplace'
           ),
         ],
       },
