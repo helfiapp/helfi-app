@@ -66,6 +66,12 @@ function InfiniteWheelColumn({
     scrollToIndex(selectedIndex, 'auto')
   }, [enabled, selectedIndex, scrollToIndex])
 
+  const step = (delta: number) => {
+    const next = (selectedIndex + delta + options.length) % options.length
+    onSelect(next)
+    scrollToIndex(next)
+  }
+
   const handleScroll = () => {
     const el = scrollRef.current
     if (!el) return
@@ -86,6 +92,16 @@ function InfiniteWheelColumn({
   return (
     <div className="w-20">
       <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="mb-1 hidden justify-center md:flex">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          aria-label={`${label} up`}
+        >
+          ^
+        </button>
+      </div>
       <div className="relative h-[180px] rounded-xl border border-gray-200 bg-white">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-white to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-white to-transparent" />
@@ -93,6 +109,20 @@ function InfiniteWheelColumn({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
+          onWheel={(event) => {
+            event.preventDefault()
+            step(event.deltaY > 0 ? 1 : -1)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              step(-1)
+            } else if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              step(1)
+            }
+          }}
+          tabIndex={0}
           className="scrollbar-hide relative z-10 h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
@@ -112,6 +142,16 @@ function InfiniteWheelColumn({
             )
           })}
         </div>
+      </div>
+      <div className="mt-1 hidden justify-center md:flex">
+        <button
+          type="button"
+          onClick={() => step(1)}
+          className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          aria-label={`${label} down`}
+        >
+          v
+        </button>
       </div>
     </div>
   )
@@ -147,9 +187,28 @@ function FiniteWheelColumn({
     if (clamped !== selectedIndex) onSelect(clamped)
   }
 
+  const step = (delta: number) => {
+    const next = Math.min(options.length - 1, Math.max(0, selectedIndex + delta))
+    if (next !== selectedIndex) onSelect(next)
+    const el = scrollRef.current
+    if (el) {
+      el.scrollTo({ top: next * ITEM_HEIGHT, behavior: 'smooth' })
+    }
+  }
+
   return (
     <div className="w-20">
       <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</div>
+      <div className="mb-1 hidden justify-center md:flex">
+        <button
+          type="button"
+          onClick={() => step(-1)}
+          className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          aria-label={`${label} up`}
+        >
+          ^
+        </button>
+      </div>
       <div className="relative h-[180px] rounded-xl border border-gray-200 bg-white">
         <div className="pointer-events-none absolute inset-x-0 top-0 z-20 h-12 bg-gradient-to-b from-white to-transparent" />
         <div className="pointer-events-none absolute inset-x-0 bottom-0 z-20 h-12 bg-gradient-to-t from-white to-transparent" />
@@ -157,6 +216,20 @@ function FiniteWheelColumn({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
+          onWheel={(event) => {
+            event.preventDefault()
+            step(event.deltaY > 0 ? 1 : -1)
+          }}
+          onKeyDown={(event) => {
+            if (event.key === 'ArrowUp') {
+              event.preventDefault()
+              step(-1)
+            } else if (event.key === 'ArrowDown') {
+              event.preventDefault()
+              step(1)
+            }
+          }}
+          tabIndex={0}
           className="scrollbar-hide relative z-10 h-full overflow-y-auto overscroll-contain snap-y snap-mandatory touch-pan-y"
           style={{ WebkitOverflowScrolling: 'touch' }}
         >
@@ -178,6 +251,16 @@ function FiniteWheelColumn({
           })}
           <div style={{ height: CENTER_OFFSET }} />
         </div>
+      </div>
+      <div className="mt-1 hidden justify-center md:flex">
+        <button
+          type="button"
+          onClick={() => step(1)}
+          className="rounded-md border border-gray-200 bg-white px-2 py-0.5 text-xs font-semibold text-gray-600 hover:bg-gray-50"
+          aria-label={`${label} down`}
+        >
+          v
+        </button>
       </div>
     </div>
   )

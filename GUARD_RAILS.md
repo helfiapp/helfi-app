@@ -777,6 +777,7 @@ Implementation notes (do not remove):
 - Food edit time UI should use the app-style roller picker (`components/food/RollerTimePicker.tsx`) in both `app/food/page.tsx` and `app/food/build-meal/MealBuilderClient.tsx`; do not revert to dated browser-only time inputs.
 - Food edit time picker must stay **compact**: show a normal time field first, then open a small popover roller only when tapped. Do not render a large always-open wheel block in the main form layout.
 - Food edit time picker wheel must use true touch scroll + snap behavior (birthday-style rolling) for hour/minute on mobile; do not replace it with click-only fake wheel lists.
+- On desktop, the wheel must also have clear non-touch controls (visible up/down buttons and mouse wheel/keyboard step support) so values can be changed without drag gestures.
 - Build-a-meal return override (`foodDiary:entryOverride`) must carry the edited `description` and Food Diary must apply it (with short retries) so renamed titles show immediately after return.
 - Helper functions that must stay wired:
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
