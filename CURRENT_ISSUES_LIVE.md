@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 01:03 AEDT
+- What changed: Unified AI chat bubble styling in web chat sections (Talk to Helfi including Food Diary Ask AI context, Symptom Chat, Medical Image Chat, Insights Section Chat). User messages now use Helfi green with white text; AI messages use light grey with dark text.
+- Where to see it (page/link): /chat?context=food, /chat, /symptoms, /medical-images, /insights/issues/[issue]
+- What to quickly test: Send 1 message in each chat and confirm user bubble is green/white and AI bubble is light grey/dark.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 00:36 AEDT
 - What changed: Fixed Insights weekly report action row stability and manual report create behavior. Restored top action buttons to approved alignment (no forced tall buttons), enabled manual report run for approved manual user when weekly reports were off, improved manual error messages, and added guard-rail protection for this action row so it does not regress.
 - Where to see it (page/link): https://helfi.ai/insights and https://helfi.ai/insights/weekly-report
