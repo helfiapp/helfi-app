@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 01:33 AEDT
+- What changed: Added two new Food Diary entry menu actions. "Move entry" now lets users move an item to another meal section (shows only the other sections, not the current one). "Copy for 7 days" now copies that entry forward for the next 7 days so daily repeat meals can be logged faster.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary entry 3-dot menu)
+- What to quickly test: Open any Food Diary entry menu and confirm "Move entry" + "Copy for 7 days" are shown; move a breakfast item to lunch and confirm it moves; use "Copy for 7 days" and check upcoming days for the copied entry.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 01:18 AEDT
 - What changed: Completed a full web chat reliability pass and fixed silent no-reply behavior across AI chat sections. Symptom Chat, Medical Image Chat, Insights Section Chat, and Talk to Helfi now show clear errors when requests fail, recover the saved assistant reply if a stream drops, and avoid blank assistant outputs from the server.
 - Where to see it (page/link): /chat, /chat?context=food, /symptoms, /medical-images, /insights/issues/[issue]
