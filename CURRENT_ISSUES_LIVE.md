@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 13:06 AEDT
+- What changed: Replaced the food edit time picker with a true touch wheel roller (birthday-style scroll + snap). Hour and minute now roll naturally on mobile; AM/PM is clean and simple; picker remains compact and still saves the chosen time correctly.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary edit and Add from favorites -> Change portion)
+- What to quickly test: Open time entry edit, swipe hour/minute wheels up/down on mobile, choose AM/PM, tap Done, save, and confirm the diary entry appears under the selected time.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 12:41 AEDT
 - What changed: Fixed the compact time picker so it no longer gets stuck at the page bottom. It now opens upward when space is tight, keeps extra bottom space when opening downward, and AM/PM now shows only one AM and one PM (no duplicates).
 - Where to see it (page/link): https://helfi.ai/food (Build a meal / Food Diary edit time entry, including Add from favorites -> Change portion)
