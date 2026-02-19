@@ -3448,7 +3448,8 @@ export default function FoodDiary() {
   const [duplicateModalContext, setDuplicateModalContext] = useState<{
     entry: any
     targetDate: string
-    mode: 'duplicate' | 'copyToToday'
+    mode: 'duplicate' | 'copyToToday' | 'move'
+    allowedCategories?: (typeof MEAL_CATEGORY_ORDER[number])[]
   } | null>(null)
   const duplicateInFlightRef = useRef(false)
   const duplicateActionDebounceRef = useRef<Record<string, number>>({})
@@ -17880,6 +17881,137 @@ Please add nutritional information manually if needed.`);
     const sourceBucket = Number.isFinite(sourceTs) ? Math.floor(sourceTs / 60000) : null
     const nowBucket = Math.floor(nowTs / 60000)
     const baseTs = sourceBucket !== null && sourceBucket === nowBucket ? nowTs + 60000 : nowTs
+    if (mode === 'move') {
+      const sourceDate =
+        (typeof source?.localDate === 'string' && source.localDate.length >= 8
+          ? source.localDate
+          : targetDate || selectedDate) || selectedDate
+      const sourceCategory = normalizeCategory(source?.meal || source?.category)
+      if (!category || category === sourceCategory) {
+        setDuplicateModalContext(null)
+        duplicateInFlightRef.current = false
+        endDiaryMutation()
+        return
+      }
+
+      const sourceIdentity = entryIdentityKey(source)
+      const sourceClientId = getEntryClientId(source)
+      const sourceDbId = String((source as any)?.dbId || '').trim()
+      const sourceDescKey = normalizedDescription(source?.description || source?.label || '')
+      const sourceTimestamp = extractEntryTimestampMs(source)
+      const sourcePendingKey =
+        (source as any)?.__pendingKey || buildPendingSaveKey(source, sourceDate)
+
+      const movedBaseEntry = normalizeDiaryEntry(
+        {
+          ...source,
+          meal: category,
+          category,
+          persistedCategory: category,
+          localDate: sourceDate,
+        },
+        sourceDate,
+      )
+      const movedPendingKey = buildPendingSaveKey(movedBaseEntry, sourceDate)
+      const movedEntry = sourceDbId
+        ? movedBaseEntry
+        : markEntryPendingSave(movedBaseEntry, movedPendingKey)
+      removeDeletedTombstonesForEntries([movedEntry])
+
+      const matchesSourceEntry = (candidate: any) => {
+        if (!candidate) return false
+        if (candidate === source) return true
+        if (sourceIdentity && entryIdentityKey(candidate) === sourceIdentity) return true
+        if (sourceClientId && getEntryClientId(candidate) === sourceClientId) return true
+        const candidateDbId = String((candidate as any)?.dbId || '').trim()
+        if (sourceDbId && candidateDbId && sourceDbId === candidateDbId) return true
+        const candidateDescKey = normalizedDescription(candidate?.description || candidate?.label || '')
+        const candidateTimestamp = extractEntryTimestampMs(candidate)
+        const candidateCategory = normalizeCategory(candidate?.meal || candidate?.category)
+        if (
+          sourceDescKey &&
+          candidateDescKey === sourceDescKey &&
+          candidateCategory === sourceCategory &&
+          Number.isFinite(sourceTimestamp) &&
+          Number.isFinite(candidateTimestamp) &&
+          Math.abs(Number(candidateTimestamp) - Number(sourceTimestamp)) <= 1000
+        ) {
+          return true
+        }
+        return false
+      }
+
+      const currentVisibleForDate = dedupeEntries(
+        filterEntriesForDate(
+          isViewingToday ? todaysFoods : Array.isArray(historyFoods) ? historyFoods : [],
+          sourceDate,
+        ),
+        { fallbackDate: sourceDate },
+      )
+      const withoutSource = currentVisibleForDate.filter((entry) => !matchesSourceEntry(entry))
+      const updatedForDate = dedupeEntries([movedEntry, ...withoutSource], {
+        fallbackDate: sourceDate,
+      })
+
+      const isTargetToday = sourceDate === todayIso
+      const isTargetSelected = sourceDate === selectedDate
+      if (isTargetToday || (isTargetSelected && isViewingToday)) {
+        updateTodaysFoodsForDate(updatedForDate, sourceDate)
+      } else if (isTargetSelected && !isViewingToday) {
+        setHistoryFoods(updatedForDate)
+      } else {
+        updateTodaysFoodsForDate(updatedForDate, sourceDate)
+      }
+
+      updateUserSnapshotForDate(updatedForDate, sourceDate)
+      updatePersistentDiarySnapshotForDate(updatedForDate, sourceDate)
+      holdVerifyMergeForDate(sourceDate)
+      setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
+      setExpandedCategories((prev) => ({
+        ...prev,
+        [category]: true,
+      }))
+      setDuplicateModalContext(null)
+      triggerHaptic(10)
+      showQuickToast(`Moved to ${categoryLabel(category)}`)
+
+      if (sourcePendingKey && sourcePendingKey !== movedPendingKey) {
+        pendingFoodLogSaveRef.current.delete(sourcePendingKey)
+      }
+
+      try {
+        if (sourceDbId) {
+          const res = await fetch('/api/food-log', {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              id: sourceDbId,
+              description: movedEntry.description,
+              nutrition: movedEntry.nutrition,
+              imageUrl: movedEntry.photo,
+              items: movedEntry.items,
+              localDate: movedEntry.localDate || sourceDate,
+              createdAt: movedEntry.createdAt,
+              meal: movedEntry.meal || movedEntry.category,
+              category: movedEntry.category || movedEntry.meal,
+            }),
+          })
+          if (!res.ok) {
+            console.warn('Move entry server update failed', await res.text())
+          }
+        } else {
+          enqueuePendingFoodLogSave(movedEntry, sourceDate)
+        }
+        await syncSnapshotOnly(updatedForDate, sourceDate)
+      } catch (err) {
+        console.warn('Move entry sync failed', err)
+      } finally {
+        duplicateInFlightRef.current = false
+        endDiaryMutation()
+      }
+      return
+    }
+
     const loggedAtIso = new Date(baseTs).toISOString()
     const addedOrder = baseTs
     const createdAtIso = alignTimestampToLocalDate(loggedAtIso, targetDate)
@@ -17975,6 +18107,156 @@ Please add nutritional information manually if needed.`);
       await syncSnapshotOnly(foodsForSave, dedupeTargetDate)
     } catch (err) {
       console.warn('Duplicate/copy sync failed', err)
+    } finally {
+      duplicateInFlightRef.current = false
+      endDiaryMutation()
+    }
+  }
+
+  const copyEntryForSevenDays = async (source: any) => {
+    if (!source || duplicateInFlightRef.current) return
+    duplicateInFlightRef.current = true
+    beginDiaryMutation()
+    setSwipeMenuEntry(null)
+    setEntrySwipeOffsets({})
+    setShowEntryOptions(null)
+    try {
+      const sourceDate =
+        (typeof source?.localDate === 'string' && source.localDate.length >= 8
+          ? source.localDate
+          : selectedDate) || selectedDate
+      const category = normalizeCategory(source?.meal || source?.category)
+      const baseDescription = source.description || source.label || 'Copied meal'
+      const parsedSourceTs = extractEntryTimestampMs(source)
+      const sourceTime = Number.isFinite(parsedSourceTs) ? new Date(parsedSourceTs) : new Date()
+      const cloneStamp = Date.now()
+      const clonedItems =
+        source.items && Array.isArray(source.items) && source.items.length > 0
+          ? JSON.parse(JSON.stringify(source.items))
+          : null
+
+      const addDaysToIso = (iso: string, delta: number) => {
+        const [y, m, d] = String(iso || '')
+          .split('-')
+          .map((value) => parseInt(value, 10))
+        const base = new Date(
+          Number.isFinite(y) ? y : new Date().getFullYear(),
+          Number.isFinite(m) ? Math.max(0, m - 1) : new Date().getMonth(),
+          Number.isFinite(d) ? d : new Date().getDate(),
+          12,
+          0,
+          0,
+          0,
+        )
+        base.setDate(base.getDate() + delta)
+        const yy = base.getFullYear()
+        const mm = String(base.getMonth() + 1).padStart(2, '0')
+        const dd = String(base.getDate()).padStart(2, '0')
+        return `${yy}-${mm}-${dd}`
+      }
+
+      const targetDates = Array.from({ length: 7 }, (_, index) => addDaysToIso(sourceDate, index + 1))
+      const clonesByDate = new Map<string, any[]>()
+      const allClones: any[] = []
+
+      targetDates.forEach((targetIso, index) => {
+        const [year, month, day] = targetIso.split('-').map((value) => parseInt(value, 10))
+        const localDateTime = new Date(
+          Number.isFinite(year) ? year : sourceTime.getFullYear(),
+          Number.isFinite(month) ? month - 1 : sourceTime.getMonth(),
+          Number.isFinite(day) ? day : sourceTime.getDate(),
+          sourceTime.getHours(),
+          sourceTime.getMinutes(),
+          sourceTime.getSeconds(),
+          sourceTime.getMilliseconds(),
+        )
+        const createdAtIso = alignTimestampToLocalDate(localDateTime.toISOString(), targetIso)
+        const loggedAtIso = new Date(cloneStamp + index * 60000).toISOString()
+        const addedOrder = cloneStamp + index * 60000
+        const entryTime = new Date(createdAtIso).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+        const cloneBase = markEntryAllowDuplicate(
+          ensureEntryLoggedAt(
+            applyEntryClientId(
+              {
+                ...source,
+                clientId: undefined,
+                id: makeUniqueLocalEntryId(
+                  new Date(createdAtIso).getTime(),
+                  `copy7:${cloneStamp}|${targetIso}|${category}|${normalizedDescription(baseDescription)}|${index}`,
+                ),
+                dbId: undefined,
+                localDate: targetIso,
+                time: entryTime,
+                meal: category,
+                category,
+                persistedCategory: category,
+                items: clonedItems ? JSON.parse(JSON.stringify(clonedItems)) : null,
+                description: baseDescription,
+                createdAt: createdAtIso,
+              },
+              `copy7:${cloneStamp}|${targetIso}|${category}|${normalizedDescription(baseDescription)}|${index}`,
+              { forceNew: true },
+            ),
+            loggedAtIso,
+            addedOrder,
+          ),
+        )
+        const pendingKey = buildPendingSaveKey(cloneBase, targetIso)
+        const pendingClone = markEntryPendingSave(cloneBase, pendingKey)
+        const existing = clonesByDate.get(targetIso) || []
+        clonesByDate.set(targetIso, [...existing, pendingClone])
+        allClones.push(pendingClone)
+      })
+
+      if (allClones.length === 0) {
+        showQuickToast('Nothing to copy')
+        return
+      }
+
+      removeDeletedTombstonesForEntries(allClones)
+
+      let mergedTodaysFoods = Array.isArray(latestTodaysFoodsRef.current)
+        ? [...latestTodaysFoodsRef.current]
+        : Array.isArray(todaysFoods)
+        ? [...todaysFoods]
+        : []
+      let mergedUserSnapshot = Array.isArray((userData as any)?.todaysFoods)
+        ? [ ...((userData as any).todaysFoods as any[]) ]
+        : []
+
+      targetDates.forEach((targetIso) => {
+        const additions = clonesByDate.get(targetIso) || []
+        const existingForDate = dedupeEntries(filterEntriesForDate(mergedTodaysFoods, targetIso), {
+          fallbackDate: targetIso,
+        })
+        const mergedForDate = dedupeEntries([...additions, ...existingForDate], {
+          fallbackDate: targetIso,
+        })
+        mergedTodaysFoods = mergeSnapshotForDate(mergedTodaysFoods, mergedForDate, targetIso)
+        mergedUserSnapshot = mergeSnapshotForDate(mergedUserSnapshot, mergedForDate, targetIso)
+        updatePersistentDiarySnapshotForDate(mergedForDate, targetIso)
+        holdVerifyMergeForDate(targetIso)
+        additions.forEach((clone) => enqueuePendingFoodLogSave(clone, targetIso))
+      })
+
+      setTodaysFoods(mergedTodaysFoods)
+      updateUserData({ todaysFoods: mergedUserSnapshot })
+      setSelectedAddCategory(category as typeof MEAL_CATEGORY_ORDER[number])
+      setExpandedCategories((prev) => ({
+        ...prev,
+        [category]: true,
+      }))
+      triggerHaptic(10)
+      showQuickToast(`Copied for 7 days in ${categoryLabel(category)}`)
+
+      for (const targetIso of targetDates) {
+        const entriesForDate = dedupeEntries(filterEntriesForDate(mergedTodaysFoods, targetIso), {
+          fallbackDate: targetIso,
+        })
+        await syncSnapshotOnly(entriesForDate, targetIso)
+      }
+    } catch (err) {
+      console.warn('Copy for 7 days failed', err)
     } finally {
       duplicateInFlightRef.current = false
       endDiaryMutation()
@@ -26684,6 +26966,30 @@ Please add nutritional information manually if needed.`);
                                   mode: 'copyToToday',
                                 }),
                             },
+                            {
+                              label: 'Copy for 7 days',
+                              onClick: () => copyEntryForSevenDays(food),
+                            },
+                            {
+                              label: 'Move entry',
+                              onClick: () => {
+                                const currentCategory = normalizeCategory(food?.meal || food?.category)
+                                const moveTargets = MEAL_CATEGORY_ORDER.filter((key) => key !== currentCategory)
+                                if (moveTargets.length === 0) {
+                                  showQuickToast('No other category to move this entry to')
+                                  return
+                                }
+                                setDuplicateModalContext({
+                                  entry: food,
+                                  targetDate:
+                                    (typeof (food as any)?.localDate === 'string' && (food as any).localDate.length >= 8
+                                      ? (food as any).localDate
+                                      : selectedDate) || selectedDate,
+                                  mode: 'move',
+                                  allowedCategories: moveTargets,
+                                })
+                              },
+                            },
                             { label: 'Edit Entry', onClick: startEditEntry },
                             {
                               label: 'Delete',
@@ -26708,6 +27014,18 @@ Please add nutritional information manually if needed.`);
                           <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-3-3v6" />
                             <rect x="5" y="5" width="14" height="14" rx="2" ry="2" />
+                          </svg>
+                        ),
+                        'Copy for 7 days': (
+                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 2v3m8-3v3M4 9h16" />
+                            <rect x="3" y="4" width="18" height="18" rx="2" ry="2" />
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 12v5m0 0l-2-2m2 2l2-2" />
+                          </svg>
+                        ),
+                        'Move entry': (
+                          <svg className="w-5 h-5 text-emerald-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0l-3-3m3 3l-3 3M11 17H3m0 0l3-3m-3 3l3 3" />
                           </svg>
                         ),
                         'Edit Entry': (
@@ -28778,11 +29096,17 @@ Please add nutritional information manually if needed.`);
             <div className="flex items-start justify-between mb-4">
               <div>
                 <div className="text-lg font-semibold text-gray-900">
-                  {duplicateModalContext.mode === 'copyToToday' ? 'Copy to Today' : 'Duplicate Meal'}
+                  {duplicateModalContext.mode === 'copyToToday'
+                    ? 'Copy to Today'
+                    : duplicateModalContext.mode === 'move'
+                    ? 'Move entry'
+                    : 'Duplicate Meal'}
                 </div>
                 <p className="text-sm text-gray-600 mt-1">
                   {duplicateModalContext.mode === 'copyToToday'
                     ? 'Choose the category to add this copy to today.'
+                    : duplicateModalContext.mode === 'move'
+                    ? 'Choose the category to move this entry into.'
                     : 'Which category would you like to place your duplicated meal?'}
                 </p>
               </div>
@@ -28795,7 +29119,10 @@ Please add nutritional information manually if needed.`);
               </button>
             </div>
             <div className="grid grid-cols-1 gap-2">
-              {MEAL_CATEGORY_ORDER.map((key) => (
+              {(duplicateModalContext.allowedCategories && duplicateModalContext.allowedCategories.length > 0
+                ? duplicateModalContext.allowedCategories
+                : MEAL_CATEGORY_ORDER
+              ).map((key) => (
                 <button
                   key={key}
                   className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-gray-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
