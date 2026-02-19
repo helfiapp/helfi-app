@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 01:18 AEDT
+- What changed: Completed a full web chat reliability pass and fixed silent no-reply behavior across AI chat sections. Symptom Chat, Medical Image Chat, Insights Section Chat, and Talk to Helfi now show clear errors when requests fail, recover the saved assistant reply if a stream drops, and avoid blank assistant outputs from the server.
+- Where to see it (page/link): /chat, /chat?context=food, /symptoms, /medical-images, /insights/issues/[issue]
+- What to quickly test: In each chat, send a first message and confirm you always get either a visible AI reply or a clear error message (no silent “nothing happened” state).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 01:03 AEDT
 - What changed: Unified AI chat bubble styling in web chat sections (Talk to Helfi including Food Diary Ask AI context, Symptom Chat, Medical Image Chat, Insights Section Chat). User messages now use Helfi green with white text; AI messages use light grey with dark text.
 - Where to see it (page/link): /chat?context=food, /chat, /symptoms, /medical-images, /insights/issues/[issue]
