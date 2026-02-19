@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 02:42 AEDT
+- What changed: Added editable drink log time support so users can change timestamp after logging water/tea/hot chocolate. Also ensured meal entry menu supports Move entry and Copy for 7 days in the Food Diary flow.
+- Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
+- What to quickly test: In Food Diary and Water Intake, edit a drink entry and change its time; save and confirm the new time shows. In Food Diary entry menu, confirm Move entry and Copy for 7 days are available and working.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 01:33 AEDT
 - What changed: Added two new Food Diary entry menu actions. "Move entry" now lets users move an item to another meal section (shows only the other sections, not the current one). "Copy for 7 days" now copies that entry forward for the next 7 days so daily repeat meals can be logged faster.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary entry 3-dot menu)
