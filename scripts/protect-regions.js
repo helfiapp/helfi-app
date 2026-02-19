@@ -247,6 +247,14 @@ function main() {
     allowEnvVar: 'ALLOW_HEALTH_SETUP_STAMP_GUARD_EDIT',
     description: 'Health setup stamp guard (stale/missing write blocker)',
   });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'insights', 'InsightLandingClient.tsx'),
+    startMarker: 'PROTECTED: INSIGHTS_REPORT_ACTION_ROW START',
+    endMarker: 'PROTECTED: INSIGHTS_REPORT_ACTION_ROW END',
+    expectedHash: '4a457d1a09d685c2f58b3b7620aeed6db925aacb0717ff38e7249267207b3adb',
+    allowEnvVar: 'ALLOW_INSIGHTS_REPORT_ACTION_ROW_EDIT',
+    description: 'Insights report action row UI',
+  });
   console.log('✅ Guard Rails: Protected regions verified.');
 }
 

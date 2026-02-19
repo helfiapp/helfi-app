@@ -315,7 +315,18 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       success = res.ok
       const data = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data?.error || 'Failed to start report')
+        const raw = String(data?.error || data?.reason || data?.status || '').toLowerCase()
+        const friendly =
+          raw.includes('reports_disabled') || raw.includes('disabled')
+            ? 'Turn on weekly reports first.'
+            : raw.includes('unauthorized') || raw.includes('auth')
+              ? 'Please sign in again and try.'
+              : raw.includes('insufficient_credits')
+                ? 'Weekly reports need a subscription or credits before creating a report.'
+                : 'Could not start the report. Please try again in a moment.'
+        setManualStatus('error')
+        setManualMessage(friendly)
+        return
       }
       if (data?.reportId) {
         navigated = true

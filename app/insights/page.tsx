@@ -72,11 +72,7 @@ export default async function InsightsPage() {
   const latestReport = await getLatestWeeklyReport(session.user.id)
   const reportReady = latestReport?.status === 'READY'
   const reportLocked = latestReport?.status === 'LOCKED'
-  const reportsEnabled =
-    Boolean(weeklyState?.reportsEnabled) ||
-    Boolean(weeklyState?.reportsEnabledAt) ||
-    Boolean(weeklyState?.nextReportDueAt) ||
-    Boolean(latestReport)
+  const reportsEnabled = Boolean(weeklyState?.reportsEnabled)
 
   return (
     <InsightsLandingClient

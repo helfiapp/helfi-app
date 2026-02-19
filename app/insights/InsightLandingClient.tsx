@@ -54,6 +54,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const lastLoaded = generatedAt
   const isReportRunning = weeklyStatus?.status === 'RUNNING'
   const reportsEnabled = weeklyStatus?.reportsEnabled ?? false
+  const canUseReportActions = reportsEnabled || Boolean(weeklyStatus?.reportReady) || Boolean(weeklyStatus?.reportLocked)
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -251,10 +252,17 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
         setCreateReportError(true)
         const raw = String(data?.error || data?.reason || data?.status || '').toLowerCase()
         const friendly =
-          raw.includes('unauthorized') || raw.includes('auth')
+          raw.includes('reports_disabled') || raw.includes('disabled')
+            ? 'Turn on weekly reports first.'
+            : raw.includes('unauthorized') || raw.includes('auth')
             ? 'Please sign in again and try.'
+            : raw.includes('insufficient_credits')
+              ? 'Weekly reports need a subscription or credits before creating a report.'
             : 'Sorry, we could not create the report right now. Please try again in a minute.'
         setCreateReportMessage(friendly)
+        if (raw.includes('reports_disabled') || raw.includes('disabled')) {
+          setWeeklyStatus((prev: any) => ({ ...(prev || {}), reportsEnabled: false }))
+        }
       }
       stopProgress(success)
     } catch (error) {
@@ -485,8 +493,9 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 </div>
               )}
             </div>
-            <div className="flex gap-3">
-              {reportsEnabled ? (
+            {/* PROTECTED: INSIGHTS_REPORT_ACTION_ROW START */}
+            <div className="flex items-start gap-3">
+              {canUseReportActions ? (
                 weeklyStatus?.reportReady ? (
                   <Link
                     href="/insights/weekly-report"
@@ -555,6 +564,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 </div>
               )}
             </div>
+            {/* PROTECTED: INSIGHTS_REPORT_ACTION_ROW END */}
           </div>
           {createReportMessage && (
             <div
