@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 16:15 AEDT
+- What changed: Fixed barcode product naming so preview no longer shows accidental reversed name order (for example “Blue smooth”). The scanner now keeps barcode rename matching barcode-specific only, and when a source looks reversed it cross-checks OpenFoodFacts name order and uses it only when it is the same words in the correct order.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode -> Preview)
+- What to quickly test: Scan the same cheese barcode again and confirm the preview title shows the correct word order (“Smooth Blue”), then add to diary and confirm the name stays correct.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 13:18 AEDT
 - What changed: Fixed barcode scan reliability and barcode add behavior in Food Diary. Barcode now accepts valid UPC-E scans, lookup also expands UPC-E to UPC-A candidates, successful scans open the action popup first (Add to diary / Preview / Change portion / Cancel), and barcode adds now use the same diary insert flow as other adds so new entries appear immediately without page refresh.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode from add menu, and other Food Diary barcode scan entry points)
