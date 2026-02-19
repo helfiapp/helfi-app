@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 20:29 AEDT
+- What changed: Hardened barcode first-scan reliability in Food Diary. Removed the extra double-read gate, limited scanner detection to retail food barcode formats (EAN/UPC), added stronger automatic retry for temporary lookup failures, and tightened barcode sanity checks to reduce false first reads.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode)
+- What to quickly test: Scan the same packaged item once several times in a row and confirm it opens the action popup on first scan without showing the red “Could not find a match” error unless there is a real lookup failure.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 18:48 AEDT
 - What changed: Admin user page now correctly shows admin-granted premium access (instead of always showing Paid), and refund action is hidden when there is no Stripe-paid subscription. Manual admin grants now clear Stripe subscription linkage so status stays correct.
 - Where to see it (page/link): https://helfi.ai/admin-panel (open a user details page in User Management)
