@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 13:18 AEDT
+- What changed: Fixed barcode scan reliability and barcode add behavior in Food Diary. Barcode now accepts valid UPC-E scans, lookup also expands UPC-E to UPC-A candidates, successful scans open the action popup first (Add to diary / Preview / Change portion / Cancel), and barcode adds now use the same diary insert flow as other adds so new entries appear immediately without page refresh.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode from add menu, and other Food Diary barcode scan entry points)
+- What to quickly test: Scan a UPC-E/UPC-A packaged item once and confirm it resolves on first scan; confirm action popup appears before adding; tap Add to diary and confirm entry appears immediately in the diary list without refreshing.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 13:06 AEDT
 - What changed: Replaced the food edit time picker with a true touch wheel roller (birthday-style scroll + snap). Hour and minute now roll naturally on mobile; AM/PM is clean and simple; picker remains compact and still saves the chosen time correctly.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary edit and Add from favorites -> Change portion)
