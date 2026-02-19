@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 15:11 AEDT
+- What changed: Fixed time picker selection styling so values are no longer hidden by pale green overlays. Selected hour/minute and selected AM/PM now use the main app button green with white text for clear visibility.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary edit and Add from favorites -> Change portion)
+- What to quickly test: Open the time picker, scroll to pick values, and confirm the selected row is clearly readable in green with white text for hour, minute, and AM/PM.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 13:06 AEDT
 - What changed: Replaced the food edit time picker with a true touch wheel roller (birthday-style scroll + snap). Hour and minute now roll naturally on mobile; AM/PM is clean and simple; picker remains compact and still saves the chosen time correctly.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary edit and Add from favorites -> Change portion)
