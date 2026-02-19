@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 11:13 AEDT
+- What changed: Replaced the old dropdown/browser-style time input with a proper app-style roller time picker for food diary time editing. This now appears in both edit paths: Food Diary edit and Add from favorites -> Change portion.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary edit + Add from favorites -> pick item -> Change portion)
+- What to quickly test: Open either edit flow, confirm the new roller time picker appears, change the time, tap Add/Update, and confirm the entry saves under that chosen time.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 02:55 AEDT
 - What changed: Added “Change time entry” to the Add from favorites -> Change portion Build a meal flow (`fromFavoriteAdjust=1`) so you can set a custom time there too, and save now uses that selected time.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary -> Add from favorites -> pick item -> Change portion)
