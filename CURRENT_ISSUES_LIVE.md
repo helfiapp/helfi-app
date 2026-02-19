@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 00:36 AEDT
+- What changed: Fixed Insights weekly report action row stability and manual report create behavior. Restored top action buttons to approved alignment (no forced tall buttons), enabled manual report run for approved manual user when weekly reports were off, improved manual error messages, and added guard-rail protection for this action row so it does not regress.
+- Where to see it (page/link): https://helfi.ai/insights and https://helfi.ai/insights/weekly-report
+- What to quickly test: Open Insights and confirm the top action row buttons look normal and aligned; click Create report now and confirm it starts instead of showing the generic failure message.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 00:15 AEDT
 - What changed: Rolled back Helfi iPhone/PWA icon assets to the original transparent version as requested (temporary fallback until final designer icon is ready).
 - Where to see it (page/link): https://helfi.ai (installed on iPhone home screen)
