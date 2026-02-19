@@ -3507,6 +3507,7 @@ export default function FoodDiary() {
   const [showManualBarcodeInput, setShowManualBarcodeInput] = useState(false)
   const barcodeScannerRef = useRef<any>(null)
   const barcodeLookupInFlightRef = useRef(false)
+  const barcodeLookupFailureRef = useRef<{ code: string; fails: number; at: number } | null>(null)
   const barcodeTorchTrackRef = useRef<MediaStreamTrack | null>(null)
   const nativeBarcodeStreamRef = useRef<MediaStream | null>(null)
   const nativeBarcodeVideoRef = useRef<HTMLVideoElement | null>(null)
@@ -15379,6 +15380,7 @@ Please add nutritional information manually if needed.`);
     setBarcodeError(null)
     setBarcodeValue('')
     setShowManualBarcodeInput(false)
+    barcodeLookupFailureRef.current = null
     barcodeReplaceTargetRef.current = null
     barcodeActionRef.current = null
     resetTorchState()
@@ -15863,18 +15865,55 @@ Please add nutritional information manually if needed.`);
       })
       setShowBarcodeLabelPrompt(true)
     }
+    const shouldSurfaceLookupError = (value: string) => {
+      if (!showBarcodeScanner) return true
+      const now = Date.now()
+      const previous = barcodeLookupFailureRef.current
+      if (!previous || previous.code !== value || now - previous.at > 3500) {
+        barcodeLookupFailureRef.current = { code: value, fails: 1, at: now }
+        return false
+      }
+      const nextFails = previous.fails + 1
+      barcodeLookupFailureRef.current = { code: value, fails: nextFails, at: now }
+      return nextFails >= 2
+    }
+    const fetchLookupWithRetry = async () => {
+      let lastError: unknown = null
+      const retryDelaysMs = [0, 220, 500]
+      for (let attempt = 0; attempt < retryDelaysMs.length; attempt += 1) {
+        const delay = retryDelaysMs[attempt]
+        if (delay > 0) {
+          await new Promise((resolve) => setTimeout(resolve, delay))
+        }
+        try {
+          const response = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
+          if (response.status >= 500 || response.status === 429 || response.status === 425 || response.status === 408) {
+            const text = await response.text().catch(() => '')
+            throw new Error(`Barcode lookup failed with status ${response.status}${text ? `: ${text.slice(0, 120)}` : ''}`)
+          }
+          return response
+        } catch (err) {
+          lastError = err
+          if (attempt < retryDelaysMs.length - 1) continue
+          throw err
+        }
+      }
+      throw lastError || new Error('Lookup failed')
+    }
     barcodeLookupInFlightRef.current = true
     setBarcodeStatus('loading')
     setBarcodeStatusHint('Looking up barcode…')
     setBarcodeError(null)
     try {
-      const res = await fetch(`/api/barcode/lookup?code=${encodeURIComponent(normalized)}`)
+      const res = await fetchLookupWithRetry()
       if (res.status === 404) {
+        barcodeLookupFailureRef.current = null
         const data = await res.json().catch(() => null)
         openBarcodeLabelPrompt(normalized, data)
         return
       }
       if (res.status === 402) {
+        barcodeLookupFailureRef.current = null
         const data = await res.json().catch(() => null)
         const msg =
           data?.message ||
@@ -15885,11 +15924,13 @@ Please add nutritional information manually if needed.`);
         return
       }
       if (res.status === 422) {
+        barcodeLookupFailureRef.current = null
         const data = await res.json().catch(() => null)
         openBarcodeLabelPrompt(normalized, data)
         return
       }
       if (res.status === 401) {
+        barcodeLookupFailureRef.current = null
         setBarcodeError('Please sign in to scan barcodes.')
         setBarcodeStatus('idle')
         return
@@ -15900,10 +15941,12 @@ Please add nutritional information manually if needed.`);
       }
       const data = await res.json()
       if (!data?.food) {
+        barcodeLookupFailureRef.current = null
         openBarcodeLabelPrompt(normalized, data)
         return
       }
       const resolvedBarcode = String((data?.food as any)?.barcode || normalized).replace(/[^0-9A-Za-z]/g, '')
+      barcodeLookupFailureRef.current = null
 
       // Close scanner immediately once a product is confirmed so the user is not forced into a second scan.
       setShowBarcodeScanner(false)
@@ -15925,8 +15968,16 @@ Please add nutritional information manually if needed.`);
       barcodeActionRef.current = null
     } catch (err) {
       console.error('Barcode lookup failed', err)
-      setBarcodeError('Could not find a match. Please rescan or type the code.')
-      resumeScannerAfterLookup()
+      const showHardError = shouldSurfaceLookupError(normalized)
+      if (showHardError) {
+        setBarcodeError('Could not find a match. Please rescan or type the code.')
+        resumeScannerAfterLookup()
+      } else {
+        resumeScannerAfterLookup()
+        setBarcodeError(null)
+        setBarcodeStatus('scanning')
+        setBarcodeStatusHint('Hold steady…')
+      }
     } finally {
       barcodeLookupInFlightRef.current = false
     }
@@ -15999,12 +16050,24 @@ Please add nutritional information manually if needed.`);
     return check === expected
   }
 
+  const isValidGtin14 = (digits: string) => {
+    if (!/^\d{14}$/.test(digits)) return false
+    const nums = digits.split('').map((d) => Number(d))
+    const check = nums[13]
+    const sum = nums
+      .slice(0, 13)
+      .reduce((acc, n, idx) => acc + n * (idx % 2 === 0 ? 3 : 1), 0)
+    const expected = (10 - (sum % 10)) % 10
+    return check === expected
+  }
+
   const passesBarcodeSanityCheck = (value: string) => {
-    if (!/^\d+$/.test(value)) return true
+    if (!/^\d+$/.test(value)) return value.length >= 6
     if (value.length === 8) return isValidEan8(value) || isValidUpcE(value)
     if (value.length === 12) return isValidUpcA(value)
     if (value.length === 13) return isValidEan13(value)
-    return true
+    if (value.length === 14) return isValidGtin14(value)
+    return false
   }
 
   const handleBarcodeDetected = (rawCode: string) => {
@@ -16062,7 +16125,7 @@ Please add nutritional information manually if needed.`);
     const videoEl = region?.querySelector('video') as HTMLVideoElement | null
     if (!videoEl) return
     const detector = new (window as any).BarcodeDetector({
-      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar'],
+      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'],
     })
     const scanFrame = async () => {
       try {
@@ -16116,7 +16179,7 @@ Please add nutritional information manually if needed.`);
       await videoEl.play().catch(() => {})
 
       const detector = new BarcodeDetectorCtor({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'code_128', 'code_39', 'code_93', 'codabar'],
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'],
       })
 
       const scanFrame = async () => {
@@ -16194,10 +16257,6 @@ Please add nutritional information manually if needed.`);
         BarcodeFormat.EAN_8,
         BarcodeFormat.UPC_A,
         BarcodeFormat.UPC_E,
-        BarcodeFormat.CODE_128,
-        BarcodeFormat.CODE_39,
-        BarcodeFormat.CODE_93,
-        BarcodeFormat.ITF,
       ])
       hints.set(DecodeHintType.TRY_HARDER, true)
 
