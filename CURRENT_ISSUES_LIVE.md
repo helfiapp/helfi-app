@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 00:15 AEDT
+- What changed: Rolled back Helfi iPhone/PWA icon assets to the original transparent version as requested (temporary fallback until final designer icon is ready).
+- Where to see it (page/link): https://helfi.ai (installed on iPhone home screen)
+- What to quickly test: Delete current Helfi home-screen icon, add Helfi to Home Screen again from Safari, and confirm the icon matches the previous transparent style.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 21:32 AEDT
 - What changed: Refined Helfi iPhone/PWA icon sizing so the leaf symbol appears larger and clearer against the white background. Rebuilt apple-touch icon and PWA icon sizes from a re-centered master icon.
 - Where to see it (page/link): https://helfi.ai (installed on iPhone home screen)
