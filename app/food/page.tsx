@@ -29,6 +29,7 @@ import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import DailyMacroSummary from '@/components/food/DailyMacroSummary'
+import RollerTimePicker from '@/components/food/RollerTimePicker'
 import { usePathname, useRouter } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MissingFoodReport from '@/components/food/MissingFoodReport'
@@ -23121,12 +23122,7 @@ Please add nutritional information manually if needed.`);
                     <label className="block text-sm font-medium text-gray-700 mb-2">
                       Change time entry
                     </label>
-                    <input
-                      type="time"
-                      value={entryTime}
-                      onChange={(e) => setEntryTime(e.target.value)}
-                      className="w-full px-3 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base"
-                    />
+                    <RollerTimePicker value={entryTime} onChange={setEntryTime} />
                   </div>
                   {manualMealBuildMode && (
                     <button

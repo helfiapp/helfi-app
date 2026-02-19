@@ -774,6 +774,7 @@ Implementation notes (do not remove):
 - In `updateFoodEntry`, db-id resolution fallback must include source id/barcode matching before PUT so renamed entries persist after refresh.
 - Build-a-meal diary edit (`app/food/build-meal/MealBuilderClient.tsx`) must treat `/api/food-log` PUT failures as real failures (no silent success/redirect).
 - Build-a-meal must show a visible **Change time entry** field for diary-edit contexts (`sourceLogId`) and favorites one-off adjust add flow (`fromFavoriteAdjust=1`), and must send `createdAt` so the chosen time persists.
+- Food edit time UI should use the app-style roller picker (`components/food/RollerTimePicker.tsx`) in both `app/food/page.tsx` and `app/food/build-meal/MealBuilderClient.tsx`; do not revert to dated browser-only time inputs.
 - Build-a-meal return override (`foodDiary:entryOverride`) must carry the edited `description` and Food Diary must apply it (with short retries) so renamed titles show immediately after return.
 - Helper functions that must stay wired:
   - `resolveFavoriteForEntry`, `updateFavoriteLabelById`, `renameEntriesWithFavoriteId`
