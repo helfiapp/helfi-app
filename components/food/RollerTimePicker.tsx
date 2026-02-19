@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 
 type RollerTimePickerProps = {
   value: string
@@ -34,66 +34,70 @@ const cycleIndex = (index: number, total: number) => {
 }
 
 function WheelColumn({
-  title,
   options,
   selectedIndex,
   onSelect,
+  ariaLabel,
 }: {
-  title: string
   options: string[]
   selectedIndex: number
   onSelect: (index: number) => void
+  ariaLabel: string
 }) {
   const offsets = [-2, -1, 0, 1, 2]
   return (
-    <div className="space-y-2">
-      <div className="text-[11px] font-semibold uppercase tracking-wide text-gray-500 text-center">{title}</div>
-      <div className="rounded-xl border border-gray-200 bg-white shadow-sm overflow-hidden">
-        <button
-          type="button"
-          onClick={() => onSelect(cycleIndex(selectedIndex - 1, options.length))}
-          className="w-full h-7 text-gray-500 hover:bg-gray-50"
-          aria-label={`${title} up`}
-        >
-          ^
-        </button>
-        <div className="border-y border-gray-100 bg-gradient-to-b from-gray-50 to-white px-1 py-1">
+    <div className="flex flex-col items-center gap-1">
+      <button
+        type="button"
+        onClick={() => onSelect(cycleIndex(selectedIndex - 1, options.length))}
+        className="h-5 w-14 rounded-md text-gray-500 hover:bg-gray-100"
+        aria-label={`${ariaLabel} up`}
+      >
+        ^
+      </button>
+
+      <div className="relative h-28 w-14 overflow-hidden rounded-xl border border-gray-200 bg-white">
+        <div className="pointer-events-none absolute inset-x-1 top-1/2 h-7 -translate-y-1/2 rounded-md border border-emerald-200 bg-emerald-50" />
+        <div className="pointer-events-none absolute inset-x-0 top-0 h-8 bg-gradient-to-b from-white to-transparent" />
+        <div className="pointer-events-none absolute inset-x-0 bottom-0 h-8 bg-gradient-to-t from-white to-transparent" />
+        <div className="relative z-10 flex h-full flex-col justify-center">
           {offsets.map((offset) => {
             const index = cycleIndex(selectedIndex + offset, options.length)
             const selected = offset === 0
             const faded = Math.abs(offset) === 2
             return (
               <button
-                key={`${title}-${offset}-${index}`}
+                key={`${ariaLabel}-${offset}-${index}`}
                 type="button"
                 onClick={() => onSelect(index)}
-                className={`w-full h-8 rounded-md text-sm transition ${
-                  selected
-                    ? 'bg-emerald-500 text-white font-semibold shadow-sm'
-                    : faded
-                    ? 'text-gray-300'
-                    : 'text-gray-700 hover:bg-emerald-50'
+                className={`h-7 w-full text-sm transition ${
+                  selected ? 'font-semibold text-emerald-700' : faded ? 'text-gray-300' : 'text-gray-600 hover:text-gray-900'
                 }`}
+                aria-label={`${ariaLabel} ${options[index]}`}
               >
                 {options[index]}
               </button>
             )
           })}
         </div>
-        <button
-          type="button"
-          onClick={() => onSelect(cycleIndex(selectedIndex + 1, options.length))}
-          className="w-full h-7 text-gray-500 hover:bg-gray-50"
-          aria-label={`${title} down`}
-        >
-          v
-        </button>
       </div>
+
+      <button
+        type="button"
+        onClick={() => onSelect(cycleIndex(selectedIndex + 1, options.length))}
+        className="h-5 w-14 rounded-md text-gray-500 hover:bg-gray-100"
+        aria-label={`${ariaLabel} down`}
+      >
+        v
+      </button>
     </div>
   )
 }
 
 export default function RollerTimePicker({ value, onChange, className }: RollerTimePickerProps) {
+  const [open, setOpen] = useState(false)
+  const rootRef = useRef<HTMLDivElement | null>(null)
+
   const { hour24, minute } = useMemo(() => parseTime24(value), [value])
   const hour12 = hour24 % 12 === 0 ? 12 : hour24 % 12
   const meridiem: 'AM' | 'PM' = hour24 >= 12 ? 'PM' : 'AM'
@@ -123,15 +127,65 @@ export default function RollerTimePicker({ value, onChange, className }: RollerT
   const classValue = className ? ` ${className}` : ''
   const display = `${pad2(hour12)}:${pad2(minute)} ${meridiem.toLowerCase()}`
 
+  useEffect(() => {
+    if (!open) return
+
+    const handleOutside = (event: MouseEvent | TouchEvent) => {
+      const target = event.target as Node | null
+      if (target && rootRef.current && !rootRef.current.contains(target)) {
+        setOpen(false)
+      }
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape') setOpen(false)
+    }
+
+    document.addEventListener('mousedown', handleOutside)
+    document.addEventListener('touchstart', handleOutside)
+    window.addEventListener('keydown', handleEscape)
+    return () => {
+      document.removeEventListener('mousedown', handleOutside)
+      document.removeEventListener('touchstart', handleOutside)
+      window.removeEventListener('keydown', handleEscape)
+    }
+  }, [open])
+
   return (
-    <div className={`rounded-2xl border border-gray-200 bg-white p-3 sm:p-4${classValue}`}>
-      <div className="grid grid-cols-3 gap-2 sm:gap-3">
-        <WheelColumn title="Hour" options={hours} selectedIndex={hourIndex} onSelect={applyHourIndex} />
-        <WheelColumn title="Minute" options={minutes} selectedIndex={minuteIndex} onSelect={applyMinuteIndex} />
-        <WheelColumn title="AM/PM" options={[...meridiems]} selectedIndex={meridiemIndex} onSelect={applyMeridiemIndex} />
-      </div>
-      <div className="mt-2 text-center text-xs text-gray-500">Selected time: {display}</div>
+    <div ref={rootRef} className={`relative${classValue}`}>
+      <button
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="w-full rounded-xl border border-gray-300 bg-white px-3 py-2.5 text-left text-sm font-medium text-gray-900 shadow-sm hover:border-emerald-300 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+        aria-label="Change entry time"
+        aria-expanded={open}
+      >
+        <span className="flex items-center justify-between">
+          <span>{display}</span>
+          <span className="text-xs text-gray-500">{open ? 'Hide' : 'Edit'}</span>
+        </span>
+      </button>
+
+      {open && (
+        <div className="absolute left-0 z-50 mt-2 w-[min(92vw,280px)] rounded-2xl border border-gray-200 bg-white p-3 shadow-xl">
+          <div className="mb-3 flex items-center justify-between">
+            <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Select time</div>
+            <button
+              type="button"
+              onClick={() => setOpen(false)}
+              className="rounded-md px-2 py-1 text-xs font-semibold text-emerald-700 hover:bg-emerald-50"
+            >
+              Done
+            </button>
+          </div>
+
+          <div className="grid grid-cols-3 gap-2">
+            <WheelColumn ariaLabel="Hour" options={hours} selectedIndex={hourIndex} onSelect={applyHourIndex} />
+            <WheelColumn ariaLabel="Minute" options={minutes} selectedIndex={minuteIndex} onSelect={applyMinuteIndex} />
+            <WheelColumn ariaLabel="AM/PM" options={[...meridiems]} selectedIndex={meridiemIndex} onSelect={applyMeridiemIndex} />
+          </div>
+        </div>
+      )}
     </div>
   )
 }
-
