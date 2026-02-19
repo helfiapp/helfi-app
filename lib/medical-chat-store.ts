@@ -93,7 +93,7 @@ export async function createThread(userId: string, context?: ChatContext, title?
   await ensureMedicalChatTables()
   const id = uuid()
   await prisma.$executeRawUnsafe(
-    'INSERT INTO "MedicalChatThread" ("id","userId","title","context") VALUES ($1,$2,$3,$4)',
+    'INSERT INTO "MedicalChatThread" ("id","userId","title","context") VALUES ($1,$2,$3,CAST($4 AS JSONB))',
     id,
     userId,
     title || null,
@@ -152,7 +152,7 @@ export async function updateThreadCost(userId: string, threadId: string, cost: n
 export async function updateThreadContext(userId: string, threadId: string, context: ChatContext): Promise<void> {
   await ensureMedicalChatTables()
   await prisma.$executeRawUnsafe(
-    'UPDATE "MedicalChatThread" SET "context" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "userId" = $3',
+    'UPDATE "MedicalChatThread" SET "context" = CAST($1 AS JSONB), "updatedAt" = NOW() WHERE "id" = $2 AND "userId" = $3',
     JSON.stringify(context),
     threadId,
     userId

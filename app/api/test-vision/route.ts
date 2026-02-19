@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getServerSession } from 'next-auth';
+import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { put } from '@vercel/blob';
@@ -14,16 +15,121 @@ import { createSignedFileToken } from '@/lib/signed-file';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
 import { logServerCall } from '@/lib/server-call-tracker';
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits';
+import { getUserIdFromNativeAuth } from '@/lib/native-auth';
 
 const RATE_LIMIT_WINDOW_MS = 60_000;
 const RATE_LIMIT_MAX = 3;
 
 const contentTypeToExt = (contentType: string) => {
+  if (contentType === 'image/avif') return 'avif';
   if (contentType === 'image/png') return 'png';
   if (contentType === 'image/webp') return 'webp';
   if (contentType === 'image/gif') return 'gif';
   return 'jpg';
 };
+
+const inferContentTypeFromName = (name: string) => {
+  const lower = String(name || '').trim().toLowerCase();
+  if (lower.endsWith('.avif')) return 'image/avif';
+  if (lower.endsWith('.png')) return 'image/png';
+  if (lower.endsWith('.webp')) return 'image/webp';
+  if (lower.endsWith('.gif')) return 'image/gif';
+  if (lower.endsWith('.heic')) return 'image/heic';
+  if (lower.endsWith('.heif')) return 'image/heif';
+  if (lower.endsWith('.jpg') || lower.endsWith('.jpeg')) return 'image/jpeg';
+  return null;
+};
+
+const detectMimeTypeFromBuffer = (buffer: Buffer): string | null => {
+  if (!buffer || buffer.length < 12) return null;
+
+  // JPEG
+  if (buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff) return 'image/jpeg';
+
+  // PNG
+  if (
+    buffer[0] === 0x89 &&
+    buffer[1] === 0x50 &&
+    buffer[2] === 0x4e &&
+    buffer[3] === 0x47 &&
+    buffer[4] === 0x0d &&
+    buffer[5] === 0x0a &&
+    buffer[6] === 0x1a &&
+    buffer[7] === 0x0a
+  ) {
+    return 'image/png';
+  }
+
+  // GIF87a / GIF89a
+  if (
+    buffer[0] === 0x47 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x38 &&
+    (buffer[4] === 0x37 || buffer[4] === 0x39) &&
+    buffer[5] === 0x61
+  ) {
+    return 'image/gif';
+  }
+
+  // WEBP container
+  if (
+    buffer[0] === 0x52 &&
+    buffer[1] === 0x49 &&
+    buffer[2] === 0x46 &&
+    buffer[3] === 0x46 &&
+    buffer[8] === 0x57 &&
+    buffer[9] === 0x45 &&
+    buffer[10] === 0x42 &&
+    buffer[11] === 0x50
+  ) {
+    return 'image/webp';
+  }
+
+  // ISO BMFF family (AVIF/HEIC/HEIF)
+  if (buffer[4] === 0x66 && buffer[5] === 0x74 && buffer[6] === 0x79 && buffer[7] === 0x70) {
+    const brand = buffer.slice(8, 12).toString('ascii').toLowerCase();
+    if (brand === 'avif' || brand === 'avis') return 'image/avif';
+    if (brand === 'heic' || brand === 'heix' || brand === 'hevc' || brand === 'hevx') return 'image/heic';
+    if (brand === 'heif' || brand === 'heis' || brand === 'heim' || brand === 'hevm' || brand === 'mif1' || brand === 'msf1') return 'image/heif';
+  }
+
+  return null;
+};
+
+const resolveImageContentType = (type: string, name: string, detectedFromBuffer: string | null) => {
+  if (detectedFromBuffer && detectedFromBuffer.startsWith('image/')) return detectedFromBuffer;
+  const trimmedType = String(type || '').trim().toLowerCase();
+  if (trimmedType.startsWith('image/')) return trimmedType;
+  return inferContentTypeFromName(name) || 'image/jpeg';
+};
+
+const shouldConvertForAi = (mimeType: string) => {
+  return mimeType === 'image/avif' || mimeType === 'image/heic' || mimeType === 'image/heif';
+};
+
+async function normalizeImageForAi(buffer: Buffer, mimeType: string) {
+  if (!shouldConvertForAi(mimeType)) {
+    return { buffer, mimeType, converted: false as const };
+  }
+
+  try {
+    // Load sharp only when needed and only if it is available in this runtime.
+    // This keeps deployment/build resilient across environments.
+    // eslint-disable-next-line no-new-func
+    const dynamicImport = new Function('specifier', 'return import(specifier)') as (specifier: string) => Promise<any>;
+    const sharpModule = await dynamicImport('sharp').catch(() => null);
+    const sharp = sharpModule?.default || sharpModule;
+    if (!sharp) {
+      return { buffer, mimeType, converted: false as const };
+    }
+    const convertedBuffer = await sharp(buffer).jpeg({ quality: 92 }).toBuffer();
+    return { buffer: convertedBuffer, mimeType: 'image/jpeg', converted: true as const };
+  } catch (error) {
+    console.warn('[test-vision] failed to convert image for AI, using original format', error);
+    return { buffer, mimeType, converted: false as const };
+  }
+}
 
 function getOpenAIClient() {
   if (!process.env.OPENAI_API_KEY) {
@@ -32,18 +138,66 @@ function getOpenAIClient() {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
 }
 
+async function resolveMedicalAnalysisUser(request: NextRequest) {
+  const include = { subscription: true, creditTopUps: true } as const;
+
+  const session = await getServerSession(authOptions);
+  const sessionUserId = String(session?.user?.id || '').trim();
+  if (sessionUserId) {
+    const sessionUser = await prisma.user.findUnique({
+      where: { id: sessionUserId },
+      include,
+    });
+    if (sessionUser) return sessionUser;
+  }
+
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase();
+  if (sessionEmail) {
+    const sessionUser = await prisma.user.findUnique({
+      where: { email: sessionEmail },
+      include,
+    });
+    if (sessionUser) return sessionUser;
+  }
+
+  const token = await getToken({
+    req: request as any,
+    secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+  }).catch(() => null);
+
+  const tokenUserId = String(token?.sub || token?.id || '').trim();
+  if (tokenUserId) {
+    const tokenUser = await prisma.user.findUnique({
+      where: { id: tokenUserId },
+      include,
+    });
+    if (tokenUser) return tokenUser;
+  }
+
+  const tokenEmail = String(token?.email || '').trim().toLowerCase();
+  if (tokenEmail) {
+    const tokenUser = await prisma.user.findUnique({
+      where: { email: tokenEmail },
+      include,
+    });
+    if (tokenUser) return tokenUser;
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(request);
+  if (!nativeUserId) return null;
+
+  const nativeUser = await prisma.user.findUnique({
+    where: { id: nativeUserId },
+    include,
+  });
+  return nativeUser || null;
+}
+
 export async function POST(req: NextRequest) {
   try {
     // Medical image analysis is PREMIUM only
-    const session = await getServerSession(authOptions);
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
-    }
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      include: { subscription: true, creditTopUps: true }
-    });
-    if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 });
+    const user = await resolveMedicalAnalysisUser(req);
+    if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
     logServerCall({
       feature: 'medicalImageAnalysis',
@@ -62,10 +216,12 @@ export async function POST(req: NextRequest) {
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     );
     
+    const hasLegacyCredits = Number((user as any)?.additionalCredits || 0) > 0;
+    const hasPaidAccess = isPremium || hasPurchasedCredits || hasLegacyCredits;
     const hasFreeMedicalCredits = await hasFreeCredits(user.id, 'MEDICAL_ANALYSIS');
     
-    // Allow if: Premium subscription OR has purchased credits OR has free credits remaining
-    if (!isPremium && !hasPurchasedCredits && !hasFreeMedicalCredits) {
+    // Allow if: any paid access OR free credits remaining
+    if (!hasPaidAccess && !hasFreeMedicalCredits) {
       return NextResponse.json(
         { 
           error: 'Payment required',
@@ -88,6 +244,22 @@ export async function POST(req: NextRequest) {
     if (!imageFile) {
       return NextResponse.json({ error: 'No image provided' }, { status: 400 });
     }
+    const originalBuffer = Buffer.from(await imageFile.arrayBuffer());
+    const detectedImageType = detectMimeTypeFromBuffer(originalBuffer);
+    const resolvedImageType = resolveImageContentType(imageFile.type, imageFile.name, detectedImageType);
+    const hasImageHint =
+      Boolean(detectedImageType) ||
+      String(imageFile.type || '').toLowerCase().startsWith('image/') ||
+      Boolean(inferContentTypeFromName(imageFile.name));
+    if (!hasImageHint) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'Please upload an image file (JPG, PNG, GIF, WEBP, or AVIF).',
+        },
+        { status: 400 }
+      );
+    }
 
     const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
     const rateKey = user.id ? `user:${user.id}` : `ip:${clientIp}`;
@@ -101,13 +273,15 @@ export async function POST(req: NextRequest) {
     }
 
     // Convert image to base64
-    const imageBuffer = await imageFile.arrayBuffer();
-    const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-    const imageMeta = getImageMetadata(imageBuffer);
+    const normalizedImage = await normalizeImageForAi(originalBuffer, resolvedImageType);
+    const imageBase64 = normalizedImage.buffer.toString('base64');
+    const imageMeta = getImageMetadata(normalizedImage.buffer);
     
     console.log('Image info:', {
       name: imageFile.name,
-      type: imageFile.type,
+      type: resolvedImageType,
+      aiType: normalizedImage.mimeType,
+      aiConverted: normalizedImage.converted,
       size: imageFile.size,
       base64Length: imageBase64.length
     });
@@ -119,19 +293,26 @@ export async function POST(req: NextRequest) {
     }
     
     // Immediate pre-charge (2 credits) before calling the model (skip for free trial)
-    const allowViaFreeUse = !isPremium && !hasPurchasedCredits && hasFreeMedicalCredits;
+    const allowViaFreeUse = !hasPaidAccess && hasFreeMedicalCredits;
     let prechargedCents = 0;
     if (!allowViaFreeUse) {
       try {
         const cm = new CreditManager(user.id);
         const immediate = 2; // medical image analysis typical cost (credits)
         const okPre = await cm.chargeCents(immediate);
-        if (!okPre) {
+        if (!okPre && !hasPaidAccess) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
         }
-        prechargedCents = immediate;
-      } catch {
-        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+        if (okPre) {
+          prechargedCents = immediate;
+        } else {
+          console.error('[test-vision.POST] paid-user precharge could not be written');
+        }
+      } catch (billingError) {
+        if (!hasPaidAccess) {
+          return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+        }
+        console.error('[test-vision.POST] paid-user precharge fallback', billingError);
       }
     }
 
@@ -193,7 +374,7 @@ export async function POST(req: NextRequest) {
             {
               type: "image_url",
               image_url: {
-                url: `data:${imageFile.type};base64,${imageBase64}`,
+                url: `data:${normalizedImage.mimeType};base64,${imageBase64}`,
                 detail: "high"
               }
             }
@@ -216,8 +397,8 @@ export async function POST(req: NextRequest) {
       image: {
         width: imageMeta.width,
         height: imageMeta.height,
-        bytes: imageBuffer.byteLength,
-        mime: imageFile.type || null,
+        bytes: normalizedImage.buffer.byteLength,
+        mime: normalizedImage.mimeType || null,
       },
       endpoint: '/api/test-vision',
       success: true,
@@ -240,11 +421,21 @@ export async function POST(req: NextRequest) {
     
     // Charge wallet remainder (skip if allowed via free use)
     if (!allowViaFreeUse) {
-      const cm = new CreditManager(user.id);
-      const remainder = Math.max(0, wrapped.costCents - prechargedCents);
-      const ok = await cm.chargeCents(remainder);
-      if (!ok) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      try {
+        const cm = new CreditManager(user.id);
+        const remainder = Math.max(0, wrapped.costCents - prechargedCents);
+        const ok = await cm.chargeCents(remainder);
+        if (!ok && !hasPaidAccess) {
+          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+        }
+        if (!ok && hasPaidAccess) {
+          console.error('[test-vision.POST] paid-user remainder charge could not be written');
+        }
+      } catch (billingError) {
+        if (!hasPaidAccess) {
+          return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+        }
+        console.error('[test-vision.POST] paid-user remainder charge fallback', billingError);
       }
     }
     
@@ -274,6 +465,9 @@ export async function POST(req: NextRequest) {
       analysis: cleanAnalysis,
       debug: {
         imageType: imageFile.type,
+        normalizedImageType: resolvedImageType,
+        aiImageType: normalizedImage.mimeType,
+        aiImageConverted: normalizedImage.converted,
         imageSize: imageFile.size,
         tokensUsed: {
           prompt: wrapped.promptTokens,
@@ -340,11 +534,12 @@ export async function POST(req: NextRequest) {
           throw new Error('Image storage is not configured');
         }
 
-        const ext = contentTypeToExt(imageFile.type);
+        const storageMimeType = normalizedImage.converted ? normalizedImage.mimeType : resolvedImageType;
+        const storageBuffer = normalizedImage.converted ? normalizedImage.buffer : originalBuffer;
+        const ext = contentTypeToExt(storageMimeType);
         const filename = `${Date.now()}.${ext}`;
         const pathname = `medical-images/${user.id}/${filename}`;
-        const buffer = Buffer.from(imageBuffer);
-        const encryptedPayload = encryptBuffer(buffer);
+        const encryptedPayload = encryptBuffer(storageBuffer);
         const blob = await put(pathname, encryptedPayload.encrypted, {
           access: 'public',
           contentType: 'application/octet-stream',
@@ -355,8 +550,8 @@ export async function POST(req: NextRequest) {
           data: {
             originalName: imageFile.name,
             fileName: blob.pathname,
-            fileSize: imageFile.size,
-            mimeType: imageFile.type,
+            fileSize: storageBuffer.byteLength,
+            mimeType: storageMimeType,
             cloudinaryId: blob.pathname,
             cloudinaryUrl: blob.url,
             secureUrl: blob.url,
@@ -429,10 +624,27 @@ export async function POST(req: NextRequest) {
     const anyErr = error as any;
     const status = anyErr?.status ?? anyErr?.statusCode ?? anyErr?.response?.status;
     const message = String(anyErr?.message || '');
+    const errCode = String(anyErr?.code || anyErr?.error?.code || '').toLowerCase();
     const isQuotaOrRateLimit =
       status === 429 ||
       /exceeded your current quota/i.test(message) ||
       /rate limit/i.test(message);
+    const isUnsupportedImageFormat =
+      errCode === 'invalid_image_format' ||
+      /invalid mime type/i.test(message) ||
+      /only image types are supported/i.test(message) ||
+      /unsupported image/i.test(message) ||
+      /invalid image format/i.test(message);
+
+    if (isUnsupportedImageFormat) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: 'This image format is not supported yet. Please use JPG, PNG, GIF, or WEBP.',
+        },
+        { status: 400 }
+      );
+    }
 
     if (isQuotaOrRateLimit) {
       return NextResponse.json(

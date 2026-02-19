@@ -11,6 +11,27 @@ export type CompletionWithCost<T = any> = {
   completionTokens: number;
 };
 
+function shouldReportCriticalOpenAIError(error: any): boolean {
+  const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status ?? 0)
+  const code = String(error?.code || error?.error?.code || '').toLowerCase()
+  const message = String(error?.message || '').toLowerCase()
+
+  // Expected client input errors (bad MIME/file types) should not spam owner alerts.
+  if (status === 400) {
+    if (
+      code === 'invalid_image_format' ||
+      message.includes('invalid mime type') ||
+      message.includes('only image types are supported') ||
+      message.includes('invalid image format') ||
+      message.includes('unsupported image')
+    ) {
+      return false
+    }
+  }
+
+  return true
+}
+
 /**
  * Non-streaming chat completion that returns calculated cost in cents.
  * Callers can then charge the wallet accordingly.
@@ -75,14 +96,16 @@ export async function chatCompletionWithCost(
       Number((params as any).max_tokens) ||
       Number((params as any).max_completion_tokens) ||
       0
-    reportCriticalError({
-      source: 'openai.chat.completions',
-      error,
-      details: {
-        model,
-        maxTokens,
-      },
-    })
+    if (shouldReportCriticalOpenAIError(error)) {
+      reportCriticalError({
+        source: 'openai.chat.completions',
+        error,
+        details: {
+          model,
+          maxTokens,
+        },
+      })
+    }
     throw error
   }
 }
@@ -105,7 +128,6 @@ function extractPromptText(messages: any[]): string {
     return '';
   }
 }
-
 
 
 
