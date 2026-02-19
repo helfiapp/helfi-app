@@ -3290,7 +3290,8 @@ const PhysicalStep = memo(function PhysicalStep({
       <input
         className="w-full rounded-lg border border-gray-300 px-3 py-2 mb-4 focus:border-green-500 focus:ring-1 focus:ring-green-500"
         type="number"
-        inputMode="numeric"
+        inputMode="decimal"
+        step="any"
         placeholder={`Weight (${unit === 'metric' ? 'kg' : 'lbs'})`}
         value={weight}
         onChange={e => setWeight(e.target.value)}
