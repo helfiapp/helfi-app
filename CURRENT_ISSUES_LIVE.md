@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 12:41 AEDT
+- What changed: Fixed the compact time picker so it no longer gets stuck at the page bottom. It now opens upward when space is tight, keeps extra bottom space when opening downward, and AM/PM now shows only one AM and one PM (no duplicates).
+- Where to see it (page/link): https://helfi.ai/food (Build a meal / Food Diary edit time entry, including Add from favorites -> Change portion)
+- What to quickly test: Open time picker near the bottom of the page and confirm it stays fully visible; confirm AM/PM shows only one AM and one PM; save and verify the chosen time is applied.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 11:32 AEDT
 - What changed: Replaced the large intrusive time picker block with a compact modern time field that opens a small popover roller only when tapped. This applies to both Food Diary edit and Add from favorites -> Change portion edit flow.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary edit + Add from favorites -> pick item -> Change portion)
