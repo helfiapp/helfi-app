@@ -124,6 +124,48 @@ const expandUpcEToUpcA = (value: string): string | null => {
   return `${numberSystem}${manufacturer}${product}${check}`
 }
 
+const BARCODE_TRAILING_DESCRIPTOR_TOKENS = new Set([
+  'smooth',
+  'mild',
+  'sharp',
+  'creamy',
+  'soft',
+  'hard',
+  'smoked',
+  'salted',
+  'sweet',
+  'spicy',
+  'classic',
+  'original',
+  'light',
+  'thick',
+  'thin',
+])
+
+const tokenizeBarcodeName = (value: string | null | undefined) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .split(' ')
+    .filter(Boolean)
+
+const shouldProbeOpenFoodFactsForNameOrder = (value: string | null | undefined) => {
+  const tokens = tokenizeBarcodeName(value)
+  if (tokens.length !== 2) return false
+  const [first, second] = tokens
+  return BARCODE_TRAILING_DESCRIPTOR_TOKENS.has(second) && !BARCODE_TRAILING_DESCRIPTOR_TOKENS.has(first)
+}
+
+const haveSameTokenBag = (left: string | null | undefined, right: string | null | undefined) => {
+  const a = tokenizeBarcodeName(left)
+  const b = tokenizeBarcodeName(right)
+  if (a.length === 0 || a.length !== b.length) return false
+  const sortedA = [...a].sort()
+  const sortedB = [...b].sort()
+  return sortedA.every((token, idx) => token === sortedB[idx])
+}
+
 const isLikelyOilProduct = (nameRaw: string | null | undefined): boolean => {
   const name = String(nameRaw || '').toLowerCase()
   if (!name) return false
@@ -707,6 +749,24 @@ export async function GET(req: NextRequest) {
   }
 
   if (food) {
+    // If provider order looks reversed (e.g. "Blue smooth"), try OFF title order.
+    if (food.source !== 'openfoodfacts' && shouldProbeOpenFoodFactsForNameOrder(food.name)) {
+      try {
+        const probe = await fetchFoodFromOpenFoodFacts(code)
+        const candidateName = String(probe?.productName || '').trim()
+        const currentName = String(food.name || '').trim()
+        if (candidateName && currentName && currentName !== candidateName && haveSameTokenBag(currentName, candidateName)) {
+          food = { ...food, name: candidateName }
+          console.log('✅ Barcode name order corrected via OpenFoodFacts title', {
+            from: currentName,
+            to: candidateName,
+          })
+        }
+      } catch (err) {
+        console.warn('OpenFoodFacts name-order probe failed', err)
+      }
+    }
+
     console.log('[BARCODE_DEBUG] source payload', {
       source: food.source,
       serving_size: food.serving_size,

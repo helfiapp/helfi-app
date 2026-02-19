@@ -2094,6 +2094,7 @@ If this ever breaks, restore by:
 - Post-scan UX lock (HEL-220, Feb 19, 2026): for diary scans, show the action chooser first (`Add to diary`, `Preview`, `Change portion`, `Cancel`) and do not auto-add immediately after lookup success.
 - Save path lock (HEL-220, Feb 19, 2026): barcode diary adds must use the same meal insert path as other diary adds (`insertMealIntoDiary`) so new rows appear immediately without a manual page refresh.
 - UPC-E lock (HEL-220, Feb 19, 2026): do not reject valid UPC-E scans in client sanity checks, and keep UPC-E -> UPC-A candidate expansion in `app/api/barcode/lookup/route.ts` to avoid “scan twice” behavior.
+- Name-order lock (HEL-223, Feb 19, 2026): if barcode source text looks reversed (example: `Blue smooth`), probe OpenFoodFacts for display-name order and prefer that title only when the word set matches. Do not apply broad generic rename fallback to barcode display names; barcode rename should be barcode-specific.
 - Editing barcode entries must open the ingredient-card editor (triggered by `isBarcodeEntry` in `editFood`); do not strip the barcode markers or fall back to the manual text editor.
 - If you must touch this area, first explain the exact change in plain language and get approval; then re-test live scanning on iOS PWA.
 

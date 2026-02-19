@@ -14331,6 +14331,22 @@ Please add nutritional information manually if needed.`);
     return base
   }
 
+  const applyBarcodeNameOverride = (raw: any, barcode?: string | null) => {
+    const rawString = raw === null || raw === undefined ? '' : String(raw || '')
+    const base = normalizeMealLabel(extractBaseMealDescription(rawString) || rawString).trim()
+    if (!base) return ''
+    const barcodeValue = String(barcode || '').trim()
+    if (!barcodeValue) return base
+    try {
+      const byBarcode = (foodNameOverrideMap as any)?.__byBarcode
+      if (byBarcode && typeof byBarcode.get === 'function') {
+        const hit = byBarcode.get(barcodeValue)
+        if (hit) return String(hit).trim() || base
+      }
+    } catch {}
+    return base
+  }
+
   const resolveFoodNameOverrideOnly = (raw: any, entry?: any) => {
     const rawString = raw === null || raw === undefined ? '' : String(raw || '')
     const base = normalizeMealLabel(extractBaseMealDescription(rawString) || rawString).trim()
@@ -15453,8 +15469,7 @@ Please add nutritional information manually if needed.`);
     const weightAmount = useMl ? mlValue : gramValue
     const barcodeValue = code || food?.barcode || null
     const baseName = food?.name || 'Scanned food'
-    const renamedName =
-      applyFoodNameOverride(baseName, { items: [{ barcode: barcodeValue }] }) || baseName
+    const renamedName = applyBarcodeNameOverride(baseName, barcodeValue) || baseName
     return {
       // Stable id so "rename this barcode item" can apply across diary/favorites.
       ...(barcodeValue ? { id: `barcode:${String(barcodeValue).trim()}` } : {}),
