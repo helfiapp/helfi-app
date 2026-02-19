@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 21:32 AEDT
+- What changed: Refined Helfi iPhone/PWA icon sizing so the leaf symbol appears larger and clearer against the white background. Rebuilt apple-touch icon and PWA icon sizes from a re-centered master icon.
+- Where to see it (page/link): https://helfi.ai (installed on iPhone home screen)
+- What to quickly test: Delete existing Helfi home screen icon, add Helfi to Home Screen again from Safari, and confirm the leaf appears larger/sharper with better visual balance.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 21:14 AEDT
 - What changed: Replaced Helfi PWA/iPhone app icon image files with the new white-background icon so iOS home screen no longer renders a black background after update. Updated apple-touch-icon plus 192/512/1024 PWA icon assets.
 - Where to see it (page/link): https://helfi.ai (installed on iPhone home screen)
