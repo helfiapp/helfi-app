@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-19 17:36 AEDT
+- What changed: Removed the remaining dummy section images on AI Insights for now. Step 01 still shows the two supplied real photos, and the other sections no longer show placeholder images.
+- Where to see it (page/link): https://helfi.ai/features/ai-insights
+- What to quickly test: Open AI Insights and scroll through all steps. Confirm only Step 01 has images (gym + fireplace), and Steps 02–04 have no dummy images.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 17:17 AEDT
 - What changed: Replaced the two duplicate dummy images in AI insights Step 01 with the supplied real photos (gym scene + woman in front of fireplace).
 - Where to see it (page/link): https://helfi.ai/features/ai-insights
