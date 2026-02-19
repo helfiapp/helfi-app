@@ -98,6 +98,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 01:46 AEDT
+- What changed: Added proper desktop controls to the wheel time picker. Each column now has visible up/down buttons on desktop, supports mouse wheel stepping, and supports keyboard arrow stepping, while keeping the mobile rolling behavior.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary edit and Add from favorites -> Change portion)
+- What to quickly test: On desktop open the picker, use up/down buttons on Hour/Minute/AM-PM, use mouse wheel over a column, and confirm the selected value updates and saves correctly.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-19 15:11 AEDT
 - What changed: Fixed time picker selection styling so values are no longer hidden by pale green overlays. Selected hour/minute and selected AM/PM now use the main app button green with white text for clear visibility.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary edit and Add from favorites -> Change portion)
