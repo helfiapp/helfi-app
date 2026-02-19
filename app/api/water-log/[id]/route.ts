@@ -53,6 +53,14 @@ function asLocalDate(value: unknown): string | null {
   return s
 }
 
+function normalizeCreatedAt(value: unknown): string | null {
+  const raw = String(value ?? '').trim()
+  if (!raw) return null
+  const parsed = new Date(raw)
+  if (Number.isNaN(parsed.getTime())) return null
+  return parsed.toISOString()
+}
+
 function toMl(amount: number, unit: string): number {
   const factor = UNIT_TO_ML[unit] || 1
   return Math.round(amount * factor * 10) / 10
@@ -102,6 +110,11 @@ export async function PATCH(req: NextRequest, context: { params: { id?: string }
     ? normalizeCategory(body?.category)
     : undefined
   const localDate = Object.prototype.hasOwnProperty.call(body || {}, 'localDate') ? asLocalDate(body?.localDate) : null
+  const createdAtProvided = Object.prototype.hasOwnProperty.call(body || {}, 'createdAt')
+  const createdAt = createdAtProvided ? normalizeCreatedAt(body?.createdAt) : null
+  if (createdAtProvided && !createdAt) {
+    return NextResponse.json({ error: 'Invalid createdAt value' }, { status: 400 })
+  }
   const amountMl = toMl(amount, unit)
 
   const data: any = {
@@ -112,6 +125,7 @@ export async function PATCH(req: NextRequest, context: { params: { id?: string }
   if (label !== undefined) data.label = label
   if (category !== undefined) data.category = category
   if (localDate) data.localDate = localDate
+  if (createdAt) data.createdAt = createdAt
 
   try {
     const result = await prisma.waterLog.updateMany({

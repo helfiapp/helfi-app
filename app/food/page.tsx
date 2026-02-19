@@ -3400,6 +3400,7 @@ export default function FoodDiary() {
   const [waterEditEntry, setWaterEditEntry] = useState<WaterLogEntry | null>(null)
   const [waterEditAmountInput, setWaterEditAmountInput] = useState('')
   const [waterEditUnit, setWaterEditUnit] = useState<DrinkAmountOverride['unit']>('ml')
+  const [waterEditTimeInput, setWaterEditTimeInput] = useState('')
   const [waterEditSaving, setWaterEditSaving] = useState(false)
   const [waterEditError, setWaterEditError] = useState<string | null>(null)
   const [aiEntryTab, setAiEntryTab] = useState<'ingredients' | 'recipe' | 'reason'>('ingredients')
@@ -12148,6 +12149,14 @@ Please add nutritional information manually if needed.`);
     setWaterEditEntry(entry)
     setWaterEditAmountInput(entry.amount ? String(entry.amount) : '')
     setWaterEditUnit(normalizeDrinkUnit(entry.unit) || 'ml')
+    const parsed = new Date(entry.createdAt || '')
+    if (!Number.isNaN(parsed.getTime())) {
+      const hh = String(parsed.getHours()).padStart(2, '0')
+      const mm = String(parsed.getMinutes()).padStart(2, '0')
+      setWaterEditTimeInput(`${hh}:${mm}`)
+    } else {
+      setWaterEditTimeInput('')
+    }
     setWaterEditError(null)
   }
 
@@ -12156,6 +12165,7 @@ Please add nutritional information manually if needed.`);
     setWaterEditEntry(null)
     setWaterEditAmountInput('')
     setWaterEditUnit('ml')
+    setWaterEditTimeInput('')
     setWaterEditError(null)
   }
 
@@ -12167,6 +12177,26 @@ Please add nutritional information manually if needed.`);
       return
     }
     const unit = normalizeDrinkUnit(waterEditUnit) || 'ml'
+    let createdAt = waterEditEntry.createdAt
+    if (waterEditTimeInput) {
+      const [h, m] = waterEditTimeInput.split(':').map(Number)
+      const [y, mon, d] = String(waterEditEntry.localDate || selectedDate).split('-').map(Number)
+      if (
+        !Number.isFinite(h) ||
+        !Number.isFinite(m) ||
+        !Number.isFinite(y) ||
+        !Number.isFinite(mon) ||
+        !Number.isFinite(d) ||
+        h < 0 ||
+        h > 23 ||
+        m < 0 ||
+        m > 59
+      ) {
+        setWaterEditError('Enter a valid time.')
+        return
+      }
+      createdAt = new Date(y, mon - 1, d, h, m, 0, 0).toISOString()
+    }
     setWaterEditSaving(true)
     setWaterEditError(null)
     try {
@@ -12180,6 +12210,7 @@ Please add nutritional information manually if needed.`);
           label: waterEditEntry.label || 'Water',
           localDate: waterEditEntry.localDate,
           category: waterEditEntry.category,
+          createdAt,
         }),
       })
       if (!res.ok) throw new Error('water edit failed')
@@ -28595,7 +28626,7 @@ Please add nutritional information manually if needed.`);
             <div className="text-lg font-semibold text-gray-900 mb-1">
               Edit {waterEditEntry.label || 'Water'}
             </div>
-            <div className="text-xs text-gray-500 mb-4">Update the drink amount for this entry.</div>
+            <div className="text-xs text-gray-500 mb-4">Update the drink amount and time for this entry.</div>
             <div className="flex gap-2">
               <input
                 type="number"
@@ -28618,6 +28649,14 @@ Please add nutritional information manually if needed.`);
                 <option value="l">L</option>
                 <option value="oz">oz</option>
               </select>
+            </div>
+            <div className="mt-3">
+              <input
+                type="time"
+                value={waterEditTimeInput}
+                onChange={(e) => setWaterEditTimeInput(e.target.value)}
+                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              />
             </div>
             {waterEditError && <div className="mt-2 text-xs text-red-600">{waterEditError}</div>}
             <div className="mt-4 flex items-center justify-end gap-3">

@@ -124,6 +124,34 @@ function formatTime(value: string) {
   return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
 }
 
+function formatTimeInput(value: string) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  const hh = String(d.getHours()).padStart(2, '0')
+  const mm = String(d.getMinutes()).padStart(2, '0')
+  return `${hh}:${mm}`
+}
+
+function buildCreatedAtIso(localDate: string, timeValue: string): string | null {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(String(localDate || ''))) return null
+  if (!/^\d{2}:\d{2}$/.test(String(timeValue || ''))) return null
+  const [year, month, day] = String(localDate).split('-').map((value) => parseInt(value, 10))
+  const [hours, minutes] = String(timeValue).split(':').map((value) => parseInt(value, 10))
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes)
+  ) {
+    return null
+  }
+  if (hours < 0 || hours > 23 || minutes < 0 || minutes > 59) return null
+  const local = new Date(year, month - 1, day, hours, minutes, 0, 0)
+  if (Number.isNaN(local.getTime())) return null
+  return local.toISOString()
+}
+
 function formatDateLabel(value: string) {
   const today = todayLocalDate()
   if (value === today) return 'Today'
@@ -156,6 +184,10 @@ export default function WaterIntakePage() {
   const [saving, setSaving] = useState(false)
   const [loadError, setLoadError] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingTimeEntry, setEditingTimeEntry] = useState<WaterEntry | null>(null)
+  const [editingTimeValue, setEditingTimeValue] = useState('')
+  const [editingTimeSaving, setEditingTimeSaving] = useState(false)
+  const [editingTimeError, setEditingTimeError] = useState<string | null>(null)
   const [banner, setBanner] = useState<{ type: 'success' | 'error'; message: string } | null>(null)
   const [drinkDetail, setDrinkDetail] = useState<{ amount: number; unit: string } | null>(null)
   const [drinkSugarChoice, setDrinkSugarChoice] = useState<'free' | 'sugar' | 'honey' | null>(null)
@@ -375,6 +407,65 @@ export default function WaterIntakePage() {
       setBanner({ type: 'error', message: 'Could not remove entry.' })
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const openTimeEditor = (entry: WaterEntry) => {
+    setEditingTimeEntry(entry)
+    setEditingTimeValue(formatTimeInput(entry.createdAt))
+    setEditingTimeError(null)
+  }
+
+  const closeTimeEditor = () => {
+    if (editingTimeSaving) return
+    setEditingTimeEntry(null)
+    setEditingTimeValue('')
+    setEditingTimeError(null)
+  }
+
+  const saveTimeEdit = async () => {
+    if (!editingTimeEntry) return
+    const createdAt = buildCreatedAtIso(editingTimeEntry.localDate || selectedDate, editingTimeValue)
+    if (!createdAt) {
+      setEditingTimeError('Please choose a valid time.')
+      return
+    }
+    setEditingTimeSaving(true)
+    setEditingTimeError(null)
+    setBanner(null)
+    try {
+      const res = await fetch(`/api/water-log/${encodeURIComponent(editingTimeEntry.id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        credentials: 'include',
+        body: JSON.stringify({
+          amount: editingTimeEntry.amount,
+          unit: editingTimeEntry.unit,
+          label: editingTimeEntry.label,
+          category: editingTimeEntry.category,
+          localDate: editingTimeEntry.localDate,
+          createdAt,
+        }),
+      })
+      if (!res.ok) throw new Error('time update failed')
+      const data = await res.json()
+      const updated = data?.entry as WaterEntry | undefined
+      if (updated?.id) {
+        setEntries((prev) => {
+          const replaced = prev.map((entry) => (entry.id === updated.id ? updated : entry))
+          return replaced
+            .slice()
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+        })
+      } else {
+        await loadEntries(selectedDate)
+      }
+      setBanner({ type: 'success', message: 'Entry time updated.' })
+      closeTimeEditor()
+    } catch {
+      setEditingTimeError('Could not update time. Please try again.')
+    } finally {
+      setEditingTimeSaving(false)
     }
   }
 
@@ -1032,6 +1123,14 @@ export default function WaterIntakePage() {
                           <p className="text-sm font-bold text-[#111711] dark:text-white">{formatAmount(entry)}</p>
                           <button
                             type="button"
+                            onClick={() => openTimeEditor(entry)}
+                            className="text-gray-300 hover:text-[#62b763]"
+                            aria-label="Edit entry time"
+                          >
+                            <MaterialSymbol name="edit" className="text-xl" />
+                          </button>
+                          <button
+                            type="button"
                             onClick={() => deleteEntry(entry.id)}
                             disabled={deletingId === entry.id}
                             className="text-gray-300 hover:text-red-500 disabled:opacity-60"
@@ -1050,6 +1149,42 @@ export default function WaterIntakePage() {
 
         <div className="h-20 bg-[#f6f7f6] dark:bg-[#151d15]"></div>
       </div>
+      {editingTimeEntry && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/40" onClick={closeTimeEditor} />
+          <div className="relative w-full max-w-sm bg-white dark:bg-gray-900 rounded-2xl shadow-2xl border border-gray-200 dark:border-gray-800 p-5">
+            <div className="text-lg font-semibold text-[#111711] dark:text-white mb-1">Edit Time</div>
+            <p className="text-xs text-gray-500 mb-4">
+              Change when this drink was logged.
+            </p>
+            <input
+              type="time"
+              value={editingTimeValue}
+              onChange={(e) => setEditingTimeValue(e.target.value)}
+              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-base focus:ring-2 focus:ring-[#62b763] focus:border-[#62b763] dark:bg-gray-800 dark:text-white"
+            />
+            {editingTimeError && <div className="mt-2 text-xs text-red-600">{editingTimeError}</div>}
+            <div className="mt-4 flex items-center justify-end gap-3">
+              <button
+                type="button"
+                onClick={closeTimeEditor}
+                disabled={editingTimeSaving}
+                className="px-4 py-2 rounded-lg border border-gray-300 dark:border-gray-700 text-sm font-semibold text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-800"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={saveTimeEdit}
+                disabled={editingTimeSaving}
+                className="px-4 py-2 rounded-lg bg-[#62b763] text-sm font-semibold text-white hover:bg-[#549f55] disabled:opacity-60"
+              >
+                Save
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
       {drinkDetail && (
         <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40">
           <div className="w-full max-w-md bg-[#f6f7f6] dark:bg-[#151d15] rounded-t-[32px] shadow-2xl max-h-[85vh] overflow-hidden">
