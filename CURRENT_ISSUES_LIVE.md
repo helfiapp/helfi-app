@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:56 AEDT
+- What changed: Fixed Food Diary/Water sync reliability. Water page now updates the shared water snapshot cache immediately after load/add/edit/delete, and Food Diary now always runs a background water refresh on date load (while still showing cached rows instantly) so new water entries are no longer hidden by stale cache.
+- Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
+- What to quickly test: On Food Diary choose a date/category, open Water page, add 1 L water, go back to Food Diary, and confirm the water row appears without manual browser refresh. Then edit/delete a water row and confirm Food Diary reflects it immediately.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 01:42 AEDT
 - What changed: Follow-up barcode scanner reliability fix for square product codes. Scanner now runs dedicated live Data Matrix and QR readers in parallel with the normal EAN/UPC reader, adds browser supported-format fallback handling, and improves scanner stop/reset cleanup to avoid missed scans.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode)
