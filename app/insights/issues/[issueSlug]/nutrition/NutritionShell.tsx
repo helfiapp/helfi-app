@@ -147,7 +147,7 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
       const regenResponse = await fetch('/api/insights/regenerate-targeted', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ changeTypes: ['food'], runId }),
+        body: JSON.stringify({ changeTypes: ['food'], runId, issueSlug }),
       })
       const regenData = await regenResponse.json().catch(() => null)
       if (!regenResponse.ok || !regenData?.success) {

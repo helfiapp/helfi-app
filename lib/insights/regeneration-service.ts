@@ -432,9 +432,25 @@ export async function triggerManualSectionRegeneration(
 
       if (!user) return
 
-      const issueNames = user.healthGoals
+      let issueNames = user.healthGoals
         .filter((g) => !g.name.startsWith('__'))
         .map((g) => g.name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+
+      // Fallback: some users keep active issue choices in CheckinIssues.
+      if (!issueNames.length) {
+        try {
+          const rows: Array<{ name: string }> = await prisma.$queryRawUnsafe(
+            'SELECT name FROM "CheckinIssues" WHERE "userId" = $1',
+            userId
+          )
+          issueNames = rows
+            .map((r) => r.name || '')
+            .filter((name) => name && !name.startsWith('__'))
+            .map((name) => name.toLowerCase().replace(/[^a-z0-9]+/g, '-'))
+        } catch (e) {
+          console.warn('[manual-regeneration] fallback issues lookup failed', { userId, error: e })
+        }
+      }
 
       console.log('[manual-regeneration] start', {
         userId,

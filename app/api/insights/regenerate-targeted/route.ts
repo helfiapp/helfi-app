@@ -111,10 +111,35 @@ function parseGoalSlugs(input: unknown): string[] {
   return Array.from(
     new Set(
       input
-        .map((value) => String(value || '').trim())
+        .map((value) => toIssueSlug(String(value || '').trim()))
         .filter(Boolean)
     )
   )
+}
+
+function parseIssueSlug(input: unknown): string | null {
+  if (typeof input !== 'string') return null
+  const slug = toIssueSlug(input)
+  return slug || null
+}
+
+async function getIssueSlugsFromCheckinIssues(userId: string): Promise<string[]> {
+  try {
+    const rows = await prisma.$queryRawUnsafe<Array<{ name: string }>>(
+      'SELECT name FROM "CheckinIssues" WHERE "userId" = $1',
+      userId
+    )
+    return Array.from(
+      new Set(
+        rows
+          .map((row) => toIssueSlug(row.name))
+          .filter((slug) => slug.length > 0)
+      )
+    )
+  } catch (error) {
+    console.warn('[insights.regenerate-targeted] failed to read CheckinIssues slugs', { userId, error })
+    return []
+  }
 }
 
 function isNutritionSummaryWeak(summary: string) {
@@ -266,30 +291,39 @@ export async function POST(request: NextRequest) {
       }, { status: 402 })
     }
 
-    // Log visible goals to diagnose missing-goal cases without blocking the request
-    const goals = await prisma.healthGoal.findMany({
-      where: {
-        userId: session.user.id,
-        name: { not: { startsWith: '__' } },
-      },
+    const requestedIssueSlug = parseIssueSlug(body?.issueSlug)
+
+    // Pull goals without SQL prefix filtering because "__" is a wildcard pattern in SQL LIKE.
+    // Filtering in JS avoids accidentally hiding real goals.
+    const rawGoals = await prisma.healthGoal.findMany({
+      where: { userId: session.user.id },
       select: { name: true },
-      take: 10,
+      take: 100,
     })
+    const goals = rawGoals.filter((goal) => typeof goal.name === 'string' && !goal.name.startsWith('__'))
+    const checkinIssueSlugs = await getIssueSlugsFromCheckinIssues(session.user.id)
+
     console.log('[insights.regenerate-targeted] goals detected', {
       runId,
       userId: session.user.id,
       goalCount: goals.length,
       goalNames: goals.map((g) => g.name),
+      requestedIssueSlug,
+      checkinIssueSlugs,
       changeTypes: effectiveChangeTypes,
     })
 
     const providedGoalSlugs =
       changeTypes.includes('health_goals') ? parseGoalSlugs(body?.goalSlugs) : []
     const goalIssueSlugs = goals.map((g) => toIssueSlug(g.name)).filter(Boolean)
-    const targetIssueSlugs = providedGoalSlugs.length
+    const targetIssueSlugs = requestedIssueSlug
+      ? [requestedIssueSlug]
+      : providedGoalSlugs.length
       ? providedGoalSlugs
       : goalIssueSlugs.length
       ? goalIssueSlugs
+      : checkinIssueSlugs.length
+      ? checkinIssueSlugs
       : ['general-health']
 
     const llmStatus = getInsightsLlmStatus()
@@ -522,7 +556,11 @@ export async function POST(request: NextRequest) {
         inline: true,
         runContext,
         preferQuick: preferQuickProfile,
-        slugs: providedGoalSlugs.length ? providedGoalSlugs : undefined,
+        slugs: requestedIssueSlug
+          ? [requestedIssueSlug]
+          : providedGoalSlugs.length
+          ? providedGoalSlugs
+          : undefined,
         timeoutMs: NUTRITION_REGEN_TIMEOUT_MS,
       })
     } catch (error) {
@@ -579,6 +617,12 @@ export async function POST(request: NextRequest) {
     )
   } catch (error) {
     console.error('[insights.regenerate-targeted] Failed to trigger regeneration', error)
-    return NextResponse.json({ error: 'Failed to start regeneration' }, { status: 500 })
+    return NextResponse.json(
+      {
+        success: false,
+        message: 'Could not start nutrition refresh right now. No credits were used.',
+      },
+      { status: 500 }
+    )
   }
 }
