@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
         dailyAnalysisCredits: true,
         dailyAnalysisUsed: true,
         additionalCredits: true,
+        walletMonthlyResetAt: true,
         totalAnalysisCount: true,
         dailyFoodAnalysisUsed: true,
         dailyFoodReanalysisUsed: true,

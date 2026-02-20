@@ -11,6 +11,7 @@ type AdminUser = {
   dailyAnalysisCredits?: number | null
   dailyAnalysisUsed?: number | null
   additionalCredits?: number | null
+  walletMonthlyResetAt?: string | null
   totalAvailableCredits?: number | null
   totalAnalysisCount?: number | null
   dailyFoodAnalysisUsed?: number | null
@@ -318,10 +319,12 @@ export default function AdminUserPage() {
                       <div className="text-sm font-semibold text-slate-900">{user.totalAnalysisCount || 0}</div>
                     </div>
                     <div className="bg-slate-50 rounded-xl p-4">
-                      <div className="text-xs text-slate-500">Last reset</div>
+                      <div className="text-xs text-slate-500">Wallet reset</div>
                       <div className="text-sm font-semibold text-slate-900">
-                        {user.lastAnalysisResetDate
-                          ? new Date(user.lastAnalysisResetDate).toLocaleDateString()
+                        {user.walletMonthlyResetAt
+                          ? new Date(user.walletMonthlyResetAt).toLocaleString()
+                          : user.lastAnalysisResetDate
+                          ? `${new Date(user.lastAnalysisResetDate).toLocaleDateString()} (legacy daily reset)`
                           : '—'}
                       </div>
                     </div>
