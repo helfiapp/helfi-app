@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 02:09 AEDT
+- What changed: Fixed barcode label scan Food name editing so users can fully clear the field and type any custom name without “Food item” being forced back in while editing. Also blocked generic “Food item” auto-fill on new analysis previews.
+- Where to see it (page/link): https://helfi.ai/food (barcode scan -> no match -> nutrition label flow)
+- What to quickly test: Scan an item not found in barcode database, continue to nutrition label flow, tap Food name, backspace to empty, confirm it stays empty, then type a custom title and save.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 01:56 AEDT
 - What changed: Fixed Food Diary/Water sync reliability. Water page now updates the shared water snapshot cache immediately after load/add/edit/delete, and Food Diary now always runs a background water refresh on date load (while still showing cached rows instantly) so new water entries are no longer hidden by stale cache.
 - Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
