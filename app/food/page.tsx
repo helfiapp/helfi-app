@@ -22284,6 +22284,21 @@ Please add nutritional information manually if needed.`);
                             const trimmed = e.target.value.trim()
                             if (trimmed !== e.target.value) setFoodTitleFromUser(trimmed)
                           }}
+                          onFocus={() => {
+                            // Barcode label flow: one tap should clear prefilled text so users can type from a blank field.
+                            if (!barcodeLabelFlow) return
+                            if (editedFoodTitleUserEditedRef.current) return
+                            const current = String(editedFoodTitle || '').trim()
+                            if (!current) return
+                            setFoodTitleFromUser('')
+                            try {
+                              if (Array.isArray(analyzedItems) && analyzedItems.length === 1) {
+                                const next = [...analyzedItems]
+                                next[0] = { ...(next[0] || {}), name: '' }
+                                setAnalyzedItems(next)
+                              }
+                            } catch {}
+                          }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., Granola cookies"
                         />
