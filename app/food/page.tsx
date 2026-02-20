@@ -27515,7 +27515,7 @@ Please add nutritional information manually if needed.`);
                         if (!isLastCategory || visibleEntries.length === 0) return
                         const sorted = visibleEntries
                           .slice()
-                          .sort((a: any, b: any) => (extractEntryTimestampMs(b) || 0) - (extractEntryTimestampMs(a) || 0))
+                          .sort((a: any, b: any) => (extractEntryTimestampMs(a) || 0) - (extractEntryTimestampMs(b) || 0))
                         const lastEntry = sorted[sorted.length - 1] || sorted[0]
                         if (lastEntry?.id !== undefined && lastEntry?.id !== null) {
                           queueScrollToDiaryEntry({ entryKey: lastEntry.id, category: cat.key })
@@ -28302,7 +28302,7 @@ Please add nutritional information manually if needed.`);
                               ) : (
                                 visibleEntries
                                   .slice()
-                                  .sort((a: any, b: any) => (extractEntryTimestampMs(b) || 0) - (extractEntryTimestampMs(a) || 0))
+                                  .sort((a: any, b: any) => (extractEntryTimestampMs(a) || 0) - (extractEntryTimestampMs(b) || 0))
                                   .map((food) => renderEntryCard(food))
                               )}
                             </div>
