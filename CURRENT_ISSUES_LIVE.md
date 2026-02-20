@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 13:53 AEDT
+- What changed: Fixed unstable mouse-wheel behavior in the shared Food Diary time picker so values no longer bounce back to the previous number while scrolling. Applied in all Food Diary picker usages that share this component (food edit, build-meal edit time, and water time edit).
+- Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
+- What to quickly test: Open any time picker in Food Diary or Water edit modal, use mouse wheel to change hour/minute, and confirm the selected value stays on the chosen number without jumping back.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 11:29 AEDT
 - What changed: Water entry time editing now uses the same roller time picker design as food entries, including desktop and mobile, in both Food Diary water edit and Water Intake edit-time modals.
 - Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
