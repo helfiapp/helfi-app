@@ -48,6 +48,9 @@ function InfiniteWheelColumn({
   enabled: boolean
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const wheelRemainderRef = useRef(0)
+  const lastWheelDirectionRef = useRef<1 | -1 | 0>(0)
+  const lastWheelTsRef = useRef(0)
   const itemCount = options.length * INFINITE_REPEAT_BLOCKS
   const displayValues = useMemo(() => Array.from({ length: itemCount }, (_, i) => options[i % options.length]), [itemCount, options])
 
@@ -70,6 +73,37 @@ function InfiniteWheelColumn({
     const next = (selectedIndex + delta + options.length) % options.length
     onSelect(next)
     scrollToIndex(next, 'auto')
+  }
+
+  const handleWheelStep = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const rawDelta = Number(event.deltaY)
+    if (!Number.isFinite(rawDelta) || rawDelta === 0) return
+
+    const scale = event.deltaMode === 1 ? ITEM_HEIGHT / 3 : event.deltaMode === 2 ? ITEM_HEIGHT : 1
+    const delta = rawDelta * scale
+    if (Math.abs(delta) < 3) return
+
+    const direction: 1 | -1 = delta > 0 ? 1 : -1
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    const elapsed = now - lastWheelTsRef.current
+
+    if (elapsed > 180 || direction !== lastWheelDirectionRef.current) {
+      wheelRemainderRef.current = 0
+    }
+
+    lastWheelDirectionRef.current = direction
+    lastWheelTsRef.current = now
+    wheelRemainderRef.current += delta
+
+    const threshold = 26
+    if (wheelRemainderRef.current >= threshold) {
+      step(1)
+      wheelRemainderRef.current -= threshold
+    } else if (wheelRemainderRef.current <= -threshold) {
+      step(-1)
+      wheelRemainderRef.current += threshold
+    }
   }
 
   const handleScroll = () => {
@@ -109,10 +143,7 @@ function InfiniteWheelColumn({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          onWheel={(event) => {
-            event.preventDefault()
-            step(event.deltaY > 0 ? 1 : -1)
-          }}
+          onWheel={handleWheelStep}
           onKeyDown={(event) => {
             if (event.key === 'ArrowUp') {
               event.preventDefault()
@@ -175,6 +206,9 @@ function FiniteWheelColumn({
   enabled: boolean
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const wheelRemainderRef = useRef(0)
+  const lastWheelDirectionRef = useRef<1 | -1 | 0>(0)
+  const lastWheelTsRef = useRef(0)
 
   useEffect(() => {
     if (!enabled) return
@@ -200,6 +234,37 @@ function FiniteWheelColumn({
     }
   }
 
+  const handleWheelStep = (event: React.WheelEvent<HTMLDivElement>) => {
+    event.preventDefault()
+    const rawDelta = Number(event.deltaY)
+    if (!Number.isFinite(rawDelta) || rawDelta === 0) return
+
+    const scale = event.deltaMode === 1 ? ITEM_HEIGHT / 3 : event.deltaMode === 2 ? ITEM_HEIGHT : 1
+    const delta = rawDelta * scale
+    if (Math.abs(delta) < 3) return
+
+    const direction: 1 | -1 = delta > 0 ? 1 : -1
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+    const elapsed = now - lastWheelTsRef.current
+
+    if (elapsed > 180 || direction !== lastWheelDirectionRef.current) {
+      wheelRemainderRef.current = 0
+    }
+
+    lastWheelDirectionRef.current = direction
+    lastWheelTsRef.current = now
+    wheelRemainderRef.current += delta
+
+    const threshold = 26
+    if (wheelRemainderRef.current >= threshold) {
+      step(1)
+      wheelRemainderRef.current -= threshold
+    } else if (wheelRemainderRef.current <= -threshold) {
+      step(-1)
+      wheelRemainderRef.current += threshold
+    }
+  }
+
   return (
     <div className="w-20">
       <div className="mb-1 text-center text-[10px] font-semibold uppercase tracking-wide text-gray-500">{label}</div>
@@ -220,10 +285,7 @@ function FiniteWheelColumn({
         <div
           ref={scrollRef}
           onScroll={handleScroll}
-          onWheel={(event) => {
-            event.preventDefault()
-            step(event.deltaY > 0 ? 1 : -1)
-          }}
+          onWheel={handleWheelStep}
           onKeyDown={(event) => {
             if (event.key === 'ArrowUp') {
               event.preventDefault()
