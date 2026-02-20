@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 14:55 AEDT
+- What changed: Added a third-pass fast-scroll fix for the shared Food Diary time picker to stop “slingshot” rollback when scrolling quickly. Wheel handling now tracks the active index immediately and temporarily locks momentum drift so fast scroll cannot bounce back several numbers.
+- Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
+- What to quickly test: Open any time picker, scroll quickly with mouse wheel to a target value (example 25/27), and confirm it stays on that selected number instead of snapping back.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 14:23 AEDT
 - What changed: Added a second-pass stability fix to the shared Food Diary time picker wheel logic to filter tiny reverse momentum scroll signals that were causing one-step rollback (for example selecting 27 and snapping back to 26).
 - Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
