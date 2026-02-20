@@ -3877,7 +3877,17 @@ export default function FoodDiary() {
     if (persisted?.entries && Array.isArray(persisted.entries)) return persisted.entries
     return null
   })
-  const [historyFoodsDate, setHistoryFoodsDate] = useState<string | null>(null)
+  const [historyFoodsDate, setHistoryFoodsDate] = useState<string | null>(() => {
+    const isInitialToday = initialSelectedDate === buildTodayIso()
+    if (isInitialToday) return null
+    const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
+    if (Array.isArray(warmHistory) && warmHistory.length > 0) return initialSelectedDate
+    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]
+    if (persisted?.entries && Array.isArray(persisted.entries) && persisted.entries.length > 0) {
+      return initialSelectedDate
+    }
+    return null
+  })
   const [lastDiaryFetchInfo, setLastDiaryFetchInfo] = useState<{
     date: string
     from: 'history' | 'today'
@@ -9044,7 +9054,10 @@ const applyStructuredItems = (
     if (!targetDate) return
 
     const localBaseline = dedupeEntries(
-      filterEntriesForDate(latestTodaysFoodsRef.current, targetDate),
+      [
+        ...filterEntriesForDate(latestTodaysFoodsRef.current, targetDate),
+        ...todaysFoodsForSelectedDate,
+      ],
       { fallbackDate: targetDate },
     )
     const hasLocal = localBaseline.length > 0
@@ -9109,7 +9122,7 @@ const applyStructuredItems = (
       }
       refreshEntriesFromServer()
     }
-  }, [userData, isViewingToday, selectedDate, resumeTick]);
+  }, [userData, isViewingToday, selectedDate, resumeTick, todaysFoodsForSelectedDate]);
 
   // Auto-rebuild ingredient cards from aiDescription when needed
   useEffect(() => {
