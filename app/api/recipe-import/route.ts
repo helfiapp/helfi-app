@@ -5,6 +5,8 @@ import OpenAI from 'openai'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { CreditManager } from '@/lib/credit-system'
+import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -500,16 +502,36 @@ export async function POST(request: NextRequest) {
 
     const user = await prisma.user.findUnique({ where: { email: userEmail } })
     if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    const cm = new CreditManager(user.id)
+
+    const ensureSufficientCredits = async (costCredits: number, message: string) => {
+      const wallet = await cm.getWalletStatus()
+      if (wallet.totalAvailableCents < costCredits) {
+        return NextResponse.json({ error: 'Insufficient credits', message }, { status: 402 })
+      }
+      return null
+    }
+
+    const chargeAndReturnRecipe = async (recipe: ImportedRecipe, costCredits: number, message: string) => {
+      const charged = await cm.chargeCents(costCredits)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', message }, { status: 402 })
+      }
+      return NextResponse.json({ recipe, costCredits }, { status: 200 })
+    }
 
     const contentType = String(request.headers.get('content-type') || '').toLowerCase()
 
     // URL import
     if (contentType.includes('application/json')) {
+      const urlCostMessage = `URL recipe import costs ${RECIPE_IMPORT_URL_CREDITS} credits.`
       const body = await request.json().catch(() => ({} as any))
       const url = String(body?.url || '').trim()
       if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
         return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
       }
+      const insufficientCredits = await ensureSufficientCredits(RECIPE_IMPORT_URL_CREDITS, urlCostMessage)
+      if (insufficientCredits) return insufficientCredits
 
       const rawTextFromClient = clampText(String(body?.rawText || ''), 60_000).trim()
       if (rawTextFromClient) {
@@ -527,11 +549,13 @@ export async function POST(request: NextRequest) {
         if (!recipeFromClientText || isRecipeAbbreviated(recipeFromClientText)) {
           return NextResponse.json({ error: 'Could not import that recipe. Try a photo instead.' }, { status: 422 })
         }
-        return NextResponse.json({ recipe: recipeFromClientText }, { status: 200 })
+        return chargeAndReturnRecipe(recipeFromClientText, RECIPE_IMPORT_URL_CREDITS, urlCostMessage)
       }
 
       const fetchedPage = await fetchRecipePage(url)
-      if (fetchedPage.recipe) return NextResponse.json({ recipe: fetchedPage.recipe }, { status: 200 })
+      if (fetchedPage.recipe) {
+        return chargeAndReturnRecipe(fetchedPage.recipe, RECIPE_IMPORT_URL_CREDITS, urlCostMessage)
+      }
 
       const openai = getOpenAIClient()
       if (!openai) return NextResponse.json({ error: 'Recipe import is temporarily unavailable.' }, { status: 503 })
@@ -593,16 +617,19 @@ export async function POST(request: NextRequest) {
       if (!recipe || isRecipeAbbreviated(recipe)) {
         return NextResponse.json({ error: 'Could not import full recipe details from that page. Try photo import.' }, { status: 422 })
       }
-      return NextResponse.json({ recipe }, { status: 200 })
+      return chargeAndReturnRecipe(recipe, RECIPE_IMPORT_URL_CREDITS, urlCostMessage)
     }
 
     // Photo import
     if (contentType.includes('multipart/form-data')) {
+      const photoCostMessage = `Photo recipe import costs ${RECIPE_IMPORT_PHOTO_CREDITS} credits.`
       const fd = await request.formData()
       const all = fd.getAll('images')
       const files = all.filter((v) => v && typeof (v as any).arrayBuffer === 'function') as File[]
       if (!files.length) return NextResponse.json({ error: 'No images received' }, { status: 400 })
       if (files.length > 6) return NextResponse.json({ error: 'Please upload 6 photos or fewer.' }, { status: 400 })
+      const insufficientCredits = await ensureSufficientCredits(RECIPE_IMPORT_PHOTO_CREDITS, photoCostMessage)
+      if (insufficientCredits) return insufficientCredits
 
       const openai = getOpenAIClient()
       if (!openai) return NextResponse.json({ error: 'Recipe import is temporarily unavailable.' }, { status: 503 })
@@ -651,7 +678,7 @@ export async function POST(request: NextRequest) {
       const parsed = safeJsonParse(String(raw || '').trim().replace(/```json/gi, '').replace(/```/g, '').trim())
       const recipe = coerceRecipeFromModel(parsed, null)
       if (!recipe) return NextResponse.json({ error: 'Could not read a recipe from that photo. Try a clearer photo.' }, { status: 422 })
-      return NextResponse.json({ recipe }, { status: 200 })
+      return chargeAndReturnRecipe(recipe, RECIPE_IMPORT_PHOTO_CREDITS, photoCostMessage)
     }
 
     return NextResponse.json({ error: 'Unsupported request type' }, { status: 415 })

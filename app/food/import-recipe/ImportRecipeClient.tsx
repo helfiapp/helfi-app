@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
+import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
 
 type ImportedRecipe = {
   title: string
@@ -237,7 +238,7 @@ export default function ImportRecipeClient() {
             }`}
             aria-pressed={mode === 'url'}
           >
-            Import by URL
+            Import by URL ({RECIPE_IMPORT_URL_CREDITS} credits)
           </button>
           <button
             type="button"
@@ -249,7 +250,7 @@ export default function ImportRecipeClient() {
             }`}
             aria-pressed={mode === 'photo'}
           >
-            Import by photo
+            Import by photo ({RECIPE_IMPORT_PHOTO_CREDITS} credits)
           </button>
         </div>
 
@@ -276,12 +277,14 @@ export default function ImportRecipeClient() {
                     {loading ? 'Importing…' : 'Import'}
                   </button>
                 </div>
-                <div className="mt-2 text-xs text-gray-500">Tip: if a site blocks imports, use the photo option instead.</div>
+                <div className="mt-2 text-xs text-gray-500">Cost: {RECIPE_IMPORT_URL_CREDITS} credits per URL import.</div>
+                <div className="mt-1 text-xs text-gray-500">Tip: if a site blocks imports, use the photo option instead.</div>
               </>
             ) : (
               <>
                 <div className="text-sm font-semibold text-gray-900">Recipe photos</div>
-                <div className="mt-2 text-xs text-gray-500">You can add multiple photos (useful if the recipe is on 2 pages).</div>
+                <div className="mt-2 text-xs text-gray-500">Cost: {RECIPE_IMPORT_PHOTO_CREDITS} credits per photo import.</div>
+                <div className="mt-1 text-xs text-gray-500">You can add multiple photos (useful if the recipe is on 2 pages).</div>
                 <div className="mt-3 grid grid-cols-1 gap-2 sm:grid-cols-2">
                   <button
                     type="button"

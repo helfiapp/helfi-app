@@ -1,3 +1,9 @@
+READY TO DEPLOY (NOT DEPLOYED BY THIS AGENT):
+- Date/time: 2026-02-20 15:03 AEDT
+- Task: Food Diary pricing update (HEL-243)
+- What changed: Recipe URL import now charges 10 credits, recipe photo import now charges 15 credits, and AI recommended meal now charges 10 credits (was 6). Added clear cost labels in Food Diary menu and Import Recipe screen.
+- What to test: Confirm menu/import screen show the new costs; run one successful URL import and one successful photo import to confirm credits deducted correctly; confirm AI Recommended meal shows/charges 10 credits.
+
 DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 14:55 AEDT

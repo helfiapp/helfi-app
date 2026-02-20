@@ -41,6 +41,7 @@ import { STARTER_FOODS } from '@/data/foods-starter'
 import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
 import { AI_MEAL_RECOMMENDATION_CREDITS, AI_MEAL_RECOMMENDATION_GOAL_NAME } from '@/lib/ai-meal-recommendation'
+import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets'
 import { DEFAULT_HEALTH_CHECK_SETTINGS, normalizeHealthCheckSettings } from '@/lib/food-health-check-settings'
@@ -27794,7 +27795,9 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-base font-semibold text-gray-900">Import Recipe</div>
-                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
+                                          <div className="text-xs text-gray-500">
+                                            Import by URL ({RECIPE_IMPORT_URL_CREDITS} credits) or photo ({RECIPE_IMPORT_PHOTO_CREDITS} credits) and auto-fill Build a meal
+                                          </div>
                                         </div>
                                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -28159,7 +28162,9 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-base font-semibold text-gray-900">Import Recipe</div>
-                                          <div className="text-xs text-gray-500">Import by URL or photo and auto-fill Build a meal</div>
+                                          <div className="text-xs text-gray-500">
+                                            Import by URL ({RECIPE_IMPORT_URL_CREDITS} credits) or photo ({RECIPE_IMPORT_PHOTO_CREDITS} credits) and auto-fill Build a meal
+                                          </div>
                                         </div>
                                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
