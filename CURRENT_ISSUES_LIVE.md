@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:42 AEDT
+- What changed: Follow-up barcode scanner reliability fix for square product codes. Scanner now runs dedicated live Data Matrix and QR readers in parallel with the normal EAN/UPC reader, adds browser supported-format fallback handling, and improves scanner stop/reset cleanup to avoid missed scans.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode)
+- What to quickly test: Scan the same square code from the sausage package again and confirm scanner now picks it up; then scan a normal supermarket barcode and confirm normal one-scan flow still works.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 01:32 AEDT
 - What changed: Follow-up fix for Food Diary energy summary reload flicker. The page now treats cached history/today data as ready immediately on return/refresh so the summary does not re-run a visible cold reload when data already exists.
 - Where to see it (page/link): https://helfi.ai/food
