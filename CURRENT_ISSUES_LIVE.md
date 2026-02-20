@@ -1,5 +1,19 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:17 AEDT
+- What changed: Food Diary energy summary now uses saved local snapshot data immediately on refresh/screen return, so it no longer repeatedly shows the loading state when cached data already exists.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary with existing entries, refresh the page (or switch away and back on mobile), and confirm the summary stays visible immediately instead of showing repeated loading.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:13 AEDT
+- What changed: Food Diary entries inside each meal section now sort by entry time from earliest to latest, including after editing an entry time.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: In one meal section, set one item to 11:30 AM and others to 1:30 PM, then confirm 11:30 AM appears above 1:30 PM entries.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 00:49 AEDT
 - What changed: Food Diary barcode scanner now supports both normal supermarket barcodes and square codes (Data Matrix/QR). Added scan normalization so square-code content can extract a valid product barcode when present before lookup, while keeping existing normal barcode behavior and first-scan reliability flow.
 - Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode)
