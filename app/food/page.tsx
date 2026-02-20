@@ -16103,21 +16103,85 @@ Please add nutritional information manually if needed.`);
     return false
   }
 
+  const extractLookupCodeFromScan = (rawCode: string): string | null => {
+    const raw = String(rawCode || '').trim()
+    if (!raw) return null
+
+    const cleaned = raw
+      .replace(/^\](?:C1|E0|E1|D2|d2|Q3|q3|D1|d1)/, '')
+      .replace(/[^0-9A-Za-z]/g, '')
+    if (!cleaned) return null
+
+    const numericCandidates = new Set<string>()
+    const addNumericCandidate = (value: string) => {
+      if (!value || !/^\d+$/.test(value)) return
+      numericCandidates.add(value)
+    }
+
+    const compactRaw = raw.replace(/\s+/g, '')
+    const ai01Matches = compactRaw.match(/\(01\)\d{14}/g) || []
+    ai01Matches.forEach((hit) => {
+      const digits = hit.replace(/\D/g, '')
+      if (digits.length === 16) addNumericCandidate(digits.slice(2))
+      if (digits.length === 14) addNumericCandidate(digits)
+    })
+
+    const mergedGs1 = compactRaw.replace(/[()]/g, '')
+    const mergedAi01 = mergedGs1.match(/01(\d{14})/)
+    if (mergedAi01?.[1]) addNumericCandidate(mergedAi01[1])
+
+    const digitRuns = raw.match(/\d{8,20}/g) || []
+    const lengths = [14, 13, 12, 8]
+    digitRuns.forEach((run) => {
+      lengths.forEach((len) => {
+        if (run.length === len) {
+          addNumericCandidate(run)
+          return
+        }
+        if (run.length < len) return
+        for (let i = 0; i <= run.length - len; i += 1) {
+          addNumericCandidate(run.slice(i, i + len))
+        }
+      })
+    })
+
+    for (const candidate of numericCandidates) {
+      if (passesBarcodeSanityCheck(candidate)) return candidate
+    }
+
+    const lowered = raw.toLowerCase()
+    if (lowered.includes('http://') || lowered.includes('https://') || lowered.includes('www.')) {
+      return null
+    }
+
+    if (passesBarcodeSanityCheck(cleaned)) return cleaned
+
+    const looksLikeTraceCode =
+      cleaned.length >= 6 &&
+      cleaned.length <= 40 &&
+      /[A-Za-z]/.test(cleaned) &&
+      /\d/.test(cleaned)
+    if (looksLikeTraceCode) return cleaned
+
+    return null
+  }
+
   const handleBarcodeDetected = (rawCode: string) => {
     if (!rawCode || barcodeLookupInFlightRef.current || barcodeDetectLockRef.current) return
-    const cleaned = rawCode.replace(/[^0-9A-Za-z]/g, '')
-    if (!cleaned) return
-    if (!passesBarcodeSanityCheck(cleaned)) {
+    const lookupCode = extractLookupCodeFromScan(rawCode)
+    if (!lookupCode) {
+      const key = rawCode.replace(/[^0-9A-Za-z]/g, '').slice(0, 64)
+      if (!key) return
       const now = Date.now()
       const recent = lastRejectedBarcodeRef.current
-      if (!recent || recent.code !== cleaned || now - recent.at > 1200) {
+      if (!recent || recent.code !== key || now - recent.at > 1200) {
         setBarcodeStatusHint('Hold steady…')
-        lastRejectedBarcodeRef.current = { code: cleaned, at: now }
+        lastRejectedBarcodeRef.current = { code: key, at: now }
       }
       return
     }
     barcodeDetectLockRef.current = true
-    void lookupBarcodeAndAdd(cleaned).finally(() => {
+    void lookupBarcodeAndAdd(lookupCode).finally(() => {
       barcodeDetectLockRef.current = false
     })
   }
@@ -16158,7 +16222,7 @@ Please add nutritional information manually if needed.`);
     const videoEl = region?.querySelector('video') as HTMLVideoElement | null
     if (!videoEl) return
     const detector = new (window as any).BarcodeDetector({
-      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'],
+      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix', 'qr_code'],
     })
     const scanFrame = async () => {
       try {
@@ -16212,7 +16276,7 @@ Please add nutritional information manually if needed.`);
       await videoEl.play().catch(() => {})
 
       const detector = new BarcodeDetectorCtor({
-        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e'],
+        formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix', 'qr_code'],
       })
 
       const scanFrame = async () => {
@@ -16290,6 +16354,8 @@ Please add nutritional information manually if needed.`);
         BarcodeFormat.EAN_8,
         BarcodeFormat.UPC_A,
         BarcodeFormat.UPC_E,
+        BarcodeFormat.DATA_MATRIX,
+        BarcodeFormat.QR_CODE,
       ])
       hints.set(DecodeHintType.TRY_HARDER, true)
 
