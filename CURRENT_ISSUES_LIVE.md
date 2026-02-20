@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 20:54 AEDT
+- What changed: Replaced iPhone/PWA app icon assets with the new designer file “OFFICIAL APP ICON” (leaf icon on white background) and regenerated all live icon sizes used by home screen install.
+- Where to see it (page/link): https://helfi.ai (installed to iPhone home screen)
+- What to quickly test: Remove current Helfi home-screen shortcut, add to Home Screen again from Safari, and confirm the new official icon appears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 20:18 AEDT
 - What changed: Fixed Insights nutrition generation reliability and quality. Nutrition generation now uses a true 7-day food window, richer food context (meal + calories/protein/carbs/fat), improved real generation depth, no-charge quality gate for weak output, hard charge cap per nutrition run, timeout no-charge fallback, and removed all user-facing internal AI cost text from nutrition and weekly report views.
 - Where to see it (page/link): https://helfi.ai/insights/issues/[issue]/nutrition, https://helfi.ai/insights/weekly-report, https://helfi.ai/insights/weekly-report/print?id=[reportId]
