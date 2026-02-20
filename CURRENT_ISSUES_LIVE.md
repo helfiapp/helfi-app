@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:30 AEDT
+- What changed: Premium credit renewal now follows the exact subscription start timestamp each month (hour/minute/second) instead of day-only midnight math. Credits meter reset label now always shows AM/PM with seconds. Admin user page next renewal now shows full date/time with AM/PM.
+- Where to see it (page/link): https://helfi.ai/food, https://helfi.ai/admin-panel/user/[userId]
+- What to quickly test: Confirm sidebar shows reset like \"Mar 21, 2026, 1:09:xx AM\" (with AM/PM). Confirm admin Next Renewal shows full timestamp. Verify renewal time matches the exact time subscription was started.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 01:17 AEDT
 - What changed: Food Diary energy summary now uses saved local snapshot data immediately on refresh/screen return, so it no longer repeatedly shows the loading state when cached data already exists.
 - Where to see it (page/link): https://helfi.ai/food
