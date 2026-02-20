@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 20:18 AEDT
+- What changed: Fixed Insights nutrition generation reliability and quality. Nutrition generation now uses a true 7-day food window, richer food context (meal + calories/protein/carbs/fat), improved real generation depth, no-charge quality gate for weak output, hard charge cap per nutrition run, timeout no-charge fallback, and removed all user-facing internal AI cost text from nutrition and weekly report views.
+- Where to see it (page/link): https://helfi.ai/insights/issues/[issue]/nutrition, https://helfi.ai/insights/weekly-report, https://helfi.ai/insights/weekly-report/print?id=[reportId]
+- What to quickly test: Generate Nutrition Insights and confirm output reflects last 7 days of logged foods; confirm weak/insufficient data gives a clear no-charge message; confirm no AI cost text appears in nutrition or weekly report/print pages.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 16:25 AEDT
 - What changed: Recipe URL import now charges 10 credits, recipe photo import now charges 15 credits, and AI recommended meal now charges 10 credits (was 6). Added clear cost labels in Food Diary menu, Import Recipe screen, and Billing page AI feature cost list.
 - Where to see it (page/link): /food, /food/import-recipe, /food/recommended, /billing
