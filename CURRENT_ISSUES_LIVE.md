@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 02:23 AEDT
+- What changed: Fixed Food Diary date-switch reliability issue that could show false zero energy summary before data loaded. Prevented non-today snapshots from being overwritten with empty data during day switches, added stronger same-day fallback from in-memory cache, and stopped rendering summary rings while a day is still loading.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Use copy-for-7-days, switch across those dates in Food Diary, and confirm existing entries/energy summary appear correctly without manual browser refresh and without temporary fake zero states.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 02:09 AEDT
 - What changed: Fixed barcode label scan Food name editing so users can fully clear the field and type any custom name without “Food item” being forced back in while editing. Also blocked generic “Food item” auto-fill on new analysis previews.
 - Where to see it (page/link): https://helfi.ai/food (barcode scan -> no match -> nutrition label flow)
