@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 11:29 AEDT
+- What changed: Water entry time editing now uses the same roller time picker design as food entries, including desktop and mobile, in both Food Diary water edit and Water Intake edit-time modals.
+- Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
+- What to quickly test: Open a water/drink entry edit modal in both pages, confirm the same roller picker appears as food, change time, save, and confirm updated time shows in the list.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 11:13 AEDT
 - What changed: Unified the Health Setup completion rule into one shared web rule and wired Dashboard status, Insights lock/unlock checks, 5-minute reminder status API, and PWA entry gating to use the same logic.
 - Where to see it (page/link): https://helfi.ai/dashboard, https://helfi.ai/insights, https://helfi.ai/onboarding?step=1
