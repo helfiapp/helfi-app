@@ -3215,6 +3215,15 @@ export default function FoodDiary() {
   // Title is the "name" shown across the app; notes are optional and shown on the entry screen.
   const [editedFoodTitle, setEditedFoodTitle] = useState('')
   const [editedFoodNote, setEditedFoodNote] = useState('')
+  const editedFoodTitleUserEditedRef = useRef(false)
+  const setFoodTitleFromSystem = (value: string) => {
+    editedFoodTitleUserEditedRef.current = false
+    setEditedFoodTitle(value)
+  }
+  const setFoodTitleFromUser = (value: string) => {
+    editedFoodTitleUserEditedRef.current = true
+    setEditedFoodTitle(value)
+  }
   const [analyzedNutrition, setAnalyzedNutrition] = useState<any>(null)
   const [analyzedItems, setAnalyzedItems] = useState<any[]>([]) // Structured items array from API
   const [analyzedTotal, setAnalyzedTotal] = useState<any>(null) // Total nutrition from API
@@ -12787,7 +12796,7 @@ Please add nutritional information manually if needed.`);
   const resetAnalyzerPanel = () => {
     setIsEditingDescription(false)
     setEditedDescription('')
-    setEditedFoodTitle('')
+    setFoodTitleFromSystem('')
     setEditedFoodNote('')
     setPhotoFile(null)
     setPhotoPreview(null)
@@ -18587,7 +18596,7 @@ Please add nutritional information manually if needed.`);
         : ''
     const baseTitle = itemTitle || extractBaseMealDescription(parsed.title || restoredEntry.description) || parsed.title
     const suggestedTitle = resolveFoodNameOverrideOnly(baseTitle || '', restoredEntry) || baseTitle || ''
-    setEditedFoodTitle(suggestedTitle)
+    setFoodTitleFromSystem(suggestedTitle)
     setEditedFoodNote(parsed.note || '')
     setEditedDescription(parsed.note || '')
     setEditingEntry(restoredEntry)
@@ -18614,7 +18623,7 @@ Please add nutritional information manually if needed.`);
       setPhotoFile(null)
       setPhotoPreview(null)
       setAiDescription('')
-      setEditedFoodTitle('')
+      setFoodTitleFromSystem('')
       setEditedFoodNote('')
       setEditedDescription('')
       setAnalyzedItems([])
@@ -18887,7 +18896,7 @@ Please add nutritional information manually if needed.`);
             : ''
         const baseTitle = itemTitle || extractBaseMealDescription(parsed.title || safeFood.description) || parsed.title
         const suggestedTitle = resolveFoodNameOverrideOnly(baseTitle || '', safeFood) || baseTitle || ''
-        setEditedFoodTitle(suggestedTitle)
+        setFoodTitleFromSystem(suggestedTitle)
         setEditedFoodNote(parsed.note || '')
         // Keep legacy editor state in sync (notes live here).
         setEditedDescription(parsed.note || '')
@@ -19693,15 +19702,18 @@ Please add nutritional information manually if needed.`);
   useEffect(() => {
     if (editingEntry) return
     if (!showAiResult) return
+    if (editedFoodTitleUserEditedRef.current) return
     if ((editedFoodTitle || '').trim()) return
     const singleItem =
       Array.isArray(analyzedItems) && analyzedItems.length === 1
         ? String(analyzedItems[0]?.name || analyzedItems[0]?.label || '').trim()
         : ''
-    const suggested =
+    const suggestedRaw =
       mealSummary || singleItem || extractBaseMealDescription(aiDescription) || ''
-    if (suggested) {
-      setEditedFoodTitle(suggested)
+    const suggested = String(suggestedRaw || '').trim()
+    const lowered = suggested.toLowerCase()
+    if (suggested && lowered !== 'food item') {
+      setFoodTitleFromSystem(suggested)
     }
   }, [editingEntry, showAiResult, editedFoodTitle, analyzedItems, mealSummary, aiDescription])
 
@@ -22225,7 +22237,7 @@ Please add nutritional information manually if needed.`);
                           value={editedFoodTitle}
                           onChange={(e) => {
                             const v = e.target.value
-                            setEditedFoodTitle(v)
+                            setFoodTitleFromUser(v)
                             // Keep single-item card name aligned with the title.
                             try {
                               if (Array.isArray(analyzedItems) && analyzedItems.length === 1) {
@@ -22237,7 +22249,7 @@ Please add nutritional information manually if needed.`);
                           }}
                           onBlur={(e) => {
                             const trimmed = e.target.value.trim()
-                            if (trimmed !== e.target.value) setEditedFoodTitle(trimmed)
+                            if (trimmed !== e.target.value) setFoodTitleFromUser(trimmed)
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., Granola cookies"
