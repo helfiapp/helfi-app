@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:32 AEDT
+- What changed: Follow-up fix for Food Diary energy summary reload flicker. The page now treats cached history/today data as ready immediately on return/refresh so the summary does not re-run a visible cold reload when data already exists.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary on a non-today date with entries, switch to another page, return to Food Diary, then refresh and confirm the energy summary stays stable without the full reload behavior.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 01:30 AEDT
 - What changed: Premium credit renewal now follows the exact subscription start timestamp each month (hour/minute/second) instead of day-only midnight math. Credits meter reset label now always shows AM/PM with seconds. Admin user page next renewal now shows full date/time with AM/PM.
 - Where to see it (page/link): https://helfi.ai/food, https://helfi.ai/admin-panel/user/[userId]
