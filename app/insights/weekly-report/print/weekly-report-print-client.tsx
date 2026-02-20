@@ -158,11 +158,6 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
   const talkToAiSummary = (parsedSummary as any)?.talkToAiSummary
   const supplementsList = (parsedSummary as any)?.supplements
   const labTrends = (parsedSummary as any)?.labTrends
-  const llmUsage = (parsedSummary as any)?.llmUsage
-  const estimatedCost =
-    llmUsage?.costCents != null && Number.isFinite(Number(llmUsage.costCents))
-      ? (Number(llmUsage.costCents) / 100).toFixed(2)
-      : null
 
   const coverageItems = useMemo(() => {
     const c = coverage || {}
@@ -301,9 +296,6 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
                 ))}
               </ul>
             )}
-            {estimatedCost ? (
-              <p className="mt-2 text-xs text-slate-500">Estimated AI cost for this report: ${estimatedCost}</p>
-            ) : null}
           </div>
         ) : null}
 
@@ -469,4 +461,3 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
     </div>
   )
 }
-

@@ -1159,14 +1159,16 @@ export async function generateSectionInsightsFromLLM(
 
   const userId = input.userId ?? null
   const issueSlug = input.issueSlug ?? null
-  const focusItems = (input.items ?? []).slice(0, 8)
-  const otherItems = (input.otherItems ?? []).slice(0, 6)
+  const focusItems = (input.items ?? []).slice(0, input.mode === 'nutrition' ? 200 : 8)
+  const otherItems = (input.otherItems ?? []).slice(0, input.mode === 'nutrition' ? 8 : 6)
   const minWorking = options.minWorking ?? (focusItems.length > 0 ? 1 : 0)
   const minSuggested = options.minSuggested ?? 4
   const minAvoid = options.minAvoid ?? 4
-  const costSaver = getRunContext()?.feature === 'insights:targeted'
-  const maxRetries = costSaver ? 1 : options.maxRetries ?? 3
-  const maxTokens = costSaver ? 200 : 650
+  const isTargetedRun = getRunContext()?.feature === 'insights:targeted'
+  const nutritionQualityMode = isTargetedRun && input.mode === 'nutrition'
+  const costSaver = isTargetedRun && input.mode !== 'nutrition'
+  const maxRetries = nutritionQualityMode ? Math.max(options.maxRetries ?? 2, 2) : costSaver ? 1 : options.maxRetries ?? 3
+  const maxTokens = nutritionQualityMode ? 420 : costSaver ? 220 : 650
   const disableCache = options.disableCache ?? false
   const runId = getRunContext()?.runId ?? null
 

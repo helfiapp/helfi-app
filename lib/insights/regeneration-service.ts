@@ -42,6 +42,32 @@ export interface DataChangeEvent {
   timestamp: Date
 }
 
+export class ManualRegenerationTimeoutError extends Error {
+  timeoutMs: number
+
+  constructor(timeoutMs: number) {
+    super(`Manual regeneration timed out after ${timeoutMs}ms`)
+    this.name = 'ManualRegenerationTimeoutError'
+    this.timeoutMs = timeoutMs
+  }
+}
+
+async function withTimeout<T>(promise: Promise<T>, timeoutMs?: number): Promise<T> {
+  if (!timeoutMs || timeoutMs <= 0) return promise
+
+  let timer: ReturnType<typeof setTimeout> | null = null
+  try {
+    return await Promise.race([
+      promise,
+      new Promise<T>((_, reject) => {
+        timer = setTimeout(() => reject(new ManualRegenerationTimeoutError(timeoutMs)), timeoutMs)
+      }),
+    ])
+  } finally {
+    if (timer) clearTimeout(timer)
+  }
+}
+
 /**
  * Creates a fingerprint (hash) of the data to detect real changes
  */
@@ -375,7 +401,13 @@ export async function triggerBackgroundRegeneration(event: DataChangeEvent): Pro
 export async function triggerManualSectionRegeneration(
   userId: string,
   changeTypes: DataChangeEvent['changeType'][],
-  options: { inline?: boolean; runContext?: RunContext | null; preferQuick?: boolean; slugs?: string[] } = {}
+  options: {
+    inline?: boolean
+    runContext?: RunContext | null
+    preferQuick?: boolean
+    slugs?: string[]
+    timeoutMs?: number
+  } = {}
 ): Promise<IssueSectionKey[]> {
   const requestedTypes = Array.isArray(changeTypes) ? changeTypes : []
   const changeTypesForLog = requestedTypes
@@ -411,6 +443,7 @@ export async function triggerManualSectionRegeneration(
         issues: issueNames,
         inline: options.inline === true,
         preferQuick: options.preferQuick === true,
+        timeoutMs: options.timeoutMs,
         runContext: options.runContext,
       })
 
@@ -436,11 +469,8 @@ export async function triggerManualSectionRegeneration(
 
       const runWithScopedContext = async (phase: 'quick' | 'full', runner: () => Promise<void>) => {
         const ctx = buildContextForPhase(phase)
-        if (ctx) {
-          await withRunContext(ctx, runner)
-        } else {
-          await runner()
-        }
+        const runPromise = Promise.resolve(ctx ? withRunContext(ctx, runner) : runner())
+        await withTimeout(runPromise, options.timeoutMs)
       }
 
       // Mark as generating (best-effort; fallback slug may not exist in DB)
@@ -520,6 +550,7 @@ export async function triggerManualSectionRegeneration(
         issues: issueNames,
         inline: options.inline === true,
         preferQuick: options.preferQuick === true,
+        timeoutMs: options.timeoutMs,
         runContext: options.runContext,
       })
     } catch (error) {
@@ -529,6 +560,7 @@ export async function triggerManualSectionRegeneration(
         affectedSections,
         inline: options.inline === true,
         preferQuick: options.preferQuick === true,
+        timeoutMs: options.timeoutMs,
         runContext: options.runContext,
         error,
       })

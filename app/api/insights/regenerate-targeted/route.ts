@@ -2,7 +2,11 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { randomUUID } from 'crypto'
 import { authOptions } from '@/lib/auth'
-import { triggerManualSectionRegeneration, getAffectedSections } from '@/lib/insights/regeneration-service'
+import {
+  triggerManualSectionRegeneration,
+  getAffectedSections,
+  ManualRegenerationTimeoutError,
+} from '@/lib/insights/regeneration-service'
 import { CreditManager } from '@/lib/credit-system'
 import { prisma } from '@/lib/prisma'
 import { getRunCostCents } from '@/lib/ai-usage-runs'
@@ -11,9 +15,10 @@ import type { RunContext } from '@/lib/run-context'
 import { getInsightsLlmStatus } from '@/lib/insights/llm'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { getCachedIssueSection } from '@/lib/insights/issue-engine'
 
-// Allow longer runtime so the full regeneration completes without a gateway timeout
-export const maxDuration = 120
+// Keep runtime bounded so users get a faster response if regeneration is slow.
+export const maxDuration = 45
 
 const VALID_CHANGE_TYPES = [
   'supplements',
@@ -32,8 +37,13 @@ const SUB_CREDIT_VALUE = 0.0143 // $/credit for subscriptions
 const TOPUP_CREDIT_VALUE = 0.02 // $/credit for top-ups
 const SUB_COST_SHARE = 0.4 // 60% margin target (cost = 40% of revenue)
 const TOPUP_COST_SHARE = 0.3 // 70% margin target (cost = 30% of revenue)
+const NUTRITION_REGEN_TIMEOUT_MS = 30_000
+const MAX_NUTRITION_CREDITS_PER_RUN = 12
+const MIN_NUTRITION_SUGGESTIONS = 2
+const MIN_NUTRITION_AVOIDS = 2
 
 type WalletStatus = Awaited<ReturnType<CreditManager['getWalletStatus']>>
+type ChargePlan = ReturnType<typeof calculateChargePlan>
 
 function calculateChargePlan(costCents: number, wallet: WalletStatus) {
   const costUsd = Math.max(0, costCents) / 100
@@ -86,6 +96,127 @@ function calculateChargePlan(costCents: number, wallet: WalletStatus) {
     totalCredits,
     remainingCostUsd: remainingCost,
     canAfford,
+  }
+}
+
+function toIssueSlug(name: string) {
+  return String(name || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '')
+}
+
+function parseGoalSlugs(input: unknown): string[] {
+  if (!Array.isArray(input)) return []
+  return Array.from(
+    new Set(
+      input
+        .map((value) => String(value || '').trim())
+        .filter(Boolean)
+    )
+  )
+}
+
+function isNutritionSummaryWeak(summary: string) {
+  const text = String(summary || '').toLowerCase()
+  return (
+    text.includes('couldn’t generate') ||
+    text.includes("couldn't generate") ||
+    text.includes('could not generate') ||
+    text.includes('please try again') ||
+    text.includes('generation unavailable') ||
+    text.includes('unavailable')
+  )
+}
+
+function applyCreditCap(plan: ChargePlan, wallet: WalletStatus, maxCredits: number) {
+  if (maxCredits <= 0 || plan.totalCredits <= maxCredits) {
+    return { ...plan, capApplied: false }
+  }
+
+  const monthlyAvailable = Math.max(0, wallet.monthlyRemainingCents || 0)
+  const topUpAvailable = (wallet.topUps || []).reduce(
+    (sum, tu) => sum + Math.max(0, tu.availableCents || 0),
+    0
+  )
+
+  const subscriptionCredits = Math.min(plan.subscriptionCredits, maxCredits)
+  const topUpCredits = Math.min(plan.topUpCredits, Math.max(0, maxCredits - subscriptionCredits))
+  const totalCredits = subscriptionCredits + topUpCredits
+
+  return {
+    ...plan,
+    subscriptionCredits,
+    topUpCredits,
+    totalCredits,
+    canAfford: monthlyAvailable + topUpAvailable >= totalCredits,
+    capApplied: true,
+  }
+}
+
+async function checkNutritionQuality(userId: string, targetSlugs: string[]) {
+  let checked = 0
+  let withRecentData = 0
+  let useful = 0
+
+  for (const slug of targetSlugs) {
+    const section = await getCachedIssueSection(userId, slug, 'nutrition', { mode: 'latest' })
+    if (!section) continue
+    checked += 1
+
+    const extras = (section.extras as Record<string, unknown> | undefined) ?? {}
+    const hasRecentFoodData = Boolean(extras.hasRecentFoodData)
+    const workingCount = Array.isArray(extras.workingFocus) ? extras.workingFocus.length : 0
+
+    let suggestedCount = Array.isArray(extras.suggestedFocus) ? extras.suggestedFocus.length : 0
+    let avoidCount = Array.isArray(extras.avoidFoods) ? extras.avoidFoods.length : 0
+
+    if (Array.isArray(extras.suggestionRuns) && extras.suggestionRuns.length > 0) {
+      const latestRun = extras.suggestionRuns[0] as
+        | { suggestedFocus?: unknown[]; avoidFoods?: unknown[] }
+        | undefined
+      if (latestRun) {
+        suggestedCount = Array.isArray(latestRun.suggestedFocus) ? latestRun.suggestedFocus.length : suggestedCount
+        avoidCount = Array.isArray(latestRun.avoidFoods) ? latestRun.avoidFoods.length : avoidCount
+      }
+    }
+
+    if (hasRecentFoodData) withRecentData += 1
+
+    const hasUsefulContent =
+      workingCount > 0 || suggestedCount >= MIN_NUTRITION_SUGGESTIONS || avoidCount >= MIN_NUTRITION_AVOIDS
+
+    if (hasRecentFoodData && hasUsefulContent && !isNutritionSummaryWeak(section.summary || '')) {
+      useful += 1
+    }
+  }
+
+  if (checked === 0 || withRecentData === 0) {
+    return {
+      pass: false,
+      reason: 'Not enough new food data yet. No credits were used.',
+      checked,
+      withRecentData,
+      useful,
+    }
+  }
+
+  if (useful === 0) {
+    return {
+      pass: false,
+      reason: 'Nutrition update completed, but the output was too weak to charge. No credits were used.',
+      checked,
+      withRecentData,
+      useful,
+    }
+  }
+
+  return {
+    pass: true,
+    reason: null,
+    checked,
+    withRecentData,
+    useful,
   }
 }
 
@@ -152,6 +283,15 @@ export async function POST(request: NextRequest) {
       changeTypes: effectiveChangeTypes,
     })
 
+    const providedGoalSlugs =
+      changeTypes.includes('health_goals') ? parseGoalSlugs(body?.goalSlugs) : []
+    const goalIssueSlugs = goals.map((g) => toIssueSlug(g.name)).filter(Boolean)
+    const targetIssueSlugs = providedGoalSlugs.length
+      ? providedGoalSlugs
+      : goalIssueSlugs.length
+      ? goalIssueSlugs
+      : ['general-health']
+
     const llmStatus = getInsightsLlmStatus()
 
     if (changeTypes.length === 0) {
@@ -210,12 +350,48 @@ export async function POST(request: NextRequest) {
     const finalizeCharge = async (overrideSections?: string[]) => {
       const sectionsForCharge =
         Array.isArray(overrideSections) && overrideSections.length ? overrideSections : (sections.length ? sections : affectedUnique)
+      const successMessage = sectionsForCharge.includes('nutrition')
+        ? 'Nutrition insights updated.'
+        : 'Insights updated.'
+
+      if (sectionsForCharge.includes('nutrition')) {
+        const quality = await checkNutritionQuality(session.user.id, targetIssueSlugs)
+        if (!quality.pass) {
+          return {
+            success: true as const,
+            status: 200 as const,
+            body: {
+              success: true,
+              message: quality.reason,
+              noChargeReason: 'nutrition_quality_gate',
+              changeTypes: Array.from(new Set(effectiveChangeTypes)),
+              sectionsTriggered: sectionsForCharge,
+              affectedSections: affectedUnique,
+              runId,
+              costCents: 0,
+              usageEvents: 0,
+              promptTokens: 0,
+              completionTokens: 0,
+              chargedCredits: 0,
+              subscriptionCreditsCharged: 0,
+              topUpCreditsCharged: 0,
+              qualityChecked: quality.checked,
+              qualityWithRecentData: quality.withRecentData,
+              qualityUseful: quality.useful,
+            },
+          }
+        }
+      }
+
       const { costCents, count, promptTokens, completionTokens } = await getRunCostCents(runId, session.user.id)
       const modelPrice = getModelPriceInfo(llmStatus.model)
       const markupMultiplier = getBillingMarkupMultiplier()
       const cm = new CreditManager(session.user.id)
       const walletStatus = await cm.getWalletStatus()
-      const plan = calculateChargePlan(costCents, walletStatus)
+      const basePlan = calculateChargePlan(costCents, walletStatus)
+      const plan = sectionsForCharge.includes('nutrition')
+        ? applyCreditCap(basePlan, walletStatus, MAX_NUTRITION_CREDITS_PER_RUN)
+        : { ...basePlan, capApplied: false }
 
       if (!allowViaFreeUse && !plan.canAfford) {
         return {
@@ -236,7 +412,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (costCents === 0 || count === 0) {
-        console.error('[insights.regenerate-targeted] zero cost/usage recorded – failing run', {
+        console.warn('[insights.regenerate-targeted] no usage recorded - returning no-charge success', {
           runId,
           userId: session.user.id,
           changeTypes: Array.from(new Set(effectiveChangeTypes)),
@@ -245,18 +421,22 @@ export async function POST(request: NextRequest) {
           sectionsTriggered: sectionsForCharge,
         })
         return {
-          success: false as const,
-          status: 500 as const,
+          success: true as const,
+          status: 200 as const,
           body: {
-            success: false,
-            message: 'Insights update failed because no AI usage was recorded. Please retry.',
+            success: true,
+            message: `${successMessage} No credits were used.`,
             runId,
             sectionsTriggered: sectionsForCharge,
             affectedSections: affectedUnique,
-            costCents,
-            usageEvents: count,
+            costCents: 0,
+            usageEvents: 0,
             promptTokens,
             completionTokens,
+            chargedCredits: 0,
+            subscriptionCreditsCharged: 0,
+            topUpCreditsCharged: 0,
+            noChargeReason: 'no_usage_recorded',
             llmStatus,
             modelPrice,
             markupMultiplier,
@@ -307,6 +487,8 @@ export async function POST(request: NextRequest) {
         costCents,
         usageEvents: count,
         chargedCredits,
+        creditCapApplied: plan.capApplied,
+        creditCapMax: sectionsForCharge.includes('nutrition') ? MAX_NUTRITION_CREDITS_PER_RUN : null,
         sectionsTriggered: sectionsForCharge,
       })
 
@@ -315,12 +497,7 @@ export async function POST(request: NextRequest) {
         status: 200 as const,
         body: {
           success: true,
-          message:
-            chargedCredits > 0
-              ? `Charged ${chargedCredits} credits based on actual AI usage.`
-              : allowViaFreeUse
-              ? 'Used a free insights update.'
-              : 'Targeted insights regeneration completed.',
+          message: successMessage,
           changeTypes: Array.from(new Set(effectiveChangeTypes)),
           sectionsTriggered: sectionsForCharge,
           affectedSections: affectedUnique,
@@ -332,6 +509,8 @@ export async function POST(request: NextRequest) {
           chargedCredits,
           subscriptionCreditsCharged: allowViaFreeUse ? 0 : plan.subscriptionCredits,
           topUpCreditsCharged: allowViaFreeUse ? 0 : plan.topUpCredits,
+          creditCapApplied: plan.capApplied,
+          creditCapMax: sectionsForCharge.includes('nutrition') ? MAX_NUTRITION_CREDITS_PER_RUN : null,
           modelPrice,
           markupMultiplier,
         },
@@ -343,9 +522,36 @@ export async function POST(request: NextRequest) {
         inline: true,
         runContext,
         preferQuick: preferQuickProfile,
-        slugs: changeTypes.includes('health_goals') && Array.isArray(body?.goalSlugs) ? body.goalSlugs : undefined,
+        slugs: providedGoalSlugs.length ? providedGoalSlugs : undefined,
+        timeoutMs: NUTRITION_REGEN_TIMEOUT_MS,
       })
     } catch (error) {
+      if (error instanceof ManualRegenerationTimeoutError || (error as any)?.name === 'ManualRegenerationTimeoutError') {
+        console.warn('[insights.regenerate-targeted] regeneration timed out - returning no-charge fallback', {
+          runId,
+          userId: session.user.id,
+          timeoutMs: NUTRITION_REGEN_TIMEOUT_MS,
+          changeTypes: effectiveChangeTypes,
+        })
+        return NextResponse.json(
+          {
+            success: true,
+            message: 'Update is taking longer than expected. Showing your latest saved insights for now. No credits were used.',
+            noChargeReason: 'generation_timeout',
+            runId,
+            sectionsTriggered: sections.length ? sections : affectedUnique,
+            affectedSections: affectedUnique,
+            chargedCredits: 0,
+            subscriptionCreditsCharged: 0,
+            topUpCreditsCharged: 0,
+            costCents: 0,
+            usageEvents: 0,
+            timeout: true,
+            llmStatus,
+          },
+          { status: 200 }
+        )
+      }
       console.error('[insights.regenerate-targeted] regeneration failed', { runId, error })
       return NextResponse.json(
         {

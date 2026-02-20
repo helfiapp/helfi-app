@@ -247,13 +247,6 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         previousDate?: string
       }>
     | undefined
-  const llmUsage = (parsedSummary as any)?.llmUsage as
-    | { costCents?: number; model?: string }
-    | undefined
-  const estimatedCost =
-    llmUsage?.costCents != null && Number.isFinite(Number(llmUsage.costCents))
-      ? (Number(llmUsage.costCents) / 100).toFixed(2)
-      : null
   const pdfHref = useMemo(() => {
     if (!report?.id) return null
     return `/insights/weekly-report/print?id=${encodeURIComponent(report.id)}`
@@ -719,11 +712,6 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             </ul>
           ) : (
             <p className="text-sm text-gray-600 mt-2">{replaceIsoDates(summaryText)}</p>
-          )}
-          {estimatedCost && (
-            <p className="text-xs text-gray-500 mt-2">
-              Estimated AI cost for this report: ${estimatedCost}
-            </p>
           )}
         </div>
 

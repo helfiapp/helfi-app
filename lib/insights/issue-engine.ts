@@ -108,8 +108,15 @@ interface UserInsightContext {
   supplements: Array<{ name: string; dosage: string; timing: string[]; updatedAt: Date }>
   medications: Array<{ name: string; dosage: string; timing: string[]; updatedAt: Date }>
   exerciseLogs: Array<{ type: string; duration: number; intensity: string | null; createdAt: Date }>
-  foodLogs: Array<{ name: string; description: string | null; createdAt: Date }>
-  todaysFoods: Array<{ name?: string; meal?: string; calories?: number }>
+  foodLogs: Array<{
+    name: string
+    description: string | null
+    meal: string | null
+    localDate: string | null
+    nutrients: NutritionSignals
+    createdAt: Date
+  }>
+  todaysFoods: Array<{ name?: string; meal?: string; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number }>
   bloodResults: BloodResultsData | null
   dataNeeds: InsightDataNeed[]
   profile: {
@@ -145,6 +152,13 @@ interface BloodResultsData {
   notes: string
   skipped: boolean
   markers?: Array<{ name: string; value?: number; unit?: string; reference?: string }>
+}
+
+interface NutritionSignals {
+  calories?: number
+  protein_g?: number
+  carbs_g?: number
+  fat_g?: number
 }
 
 const RATING_SCALE_DEFAULT = 6
@@ -484,6 +498,41 @@ function hasRecentExerciseLogs(exerciseLogs: UserInsightContext['exerciseLogs'])
 
 function hasRecentFoodLogs(foodLogs: UserInsightContext['foodLogs']) {
   return foodLogs.some((log) => isRecent(log.createdAt))
+}
+
+function toFiniteNumber(value: unknown): number | undefined {
+  const parsed = Number(value)
+  return Number.isFinite(parsed) ? parsed : undefined
+}
+
+function readNutrientCandidate(source: Record<string, unknown>, keys: string[]) {
+  for (const key of keys) {
+    if (key in source) {
+      const val = toFiniteNumber(source[key])
+      if (val != null) return val
+    }
+  }
+  return undefined
+}
+
+function parseNutritionSignals(input: unknown): NutritionSignals {
+  if (!input || typeof input !== 'object') return {}
+  const obj = input as Record<string, unknown>
+  const calories = readNutrientCandidate(obj, ['calories', 'kcal', 'energy_kcal', 'energyKcal'])
+  const protein_g = readNutrientCandidate(obj, ['protein_g', 'protein', 'proteinG'])
+  const carbs_g = readNutrientCandidate(obj, ['carbs_g', 'carbs', 'carbohydrates', 'carbsG'])
+  const fat_g = readNutrientCandidate(obj, ['fat_g', 'fat', 'fatG'])
+  return { calories, protein_g, carbs_g, fat_g }
+}
+
+function formatNutritionPromptContext(signals: NutritionSignals, fallbackMeal?: string | null) {
+  const parts: string[] = []
+  if (signals.calories != null) parts.push(`${Math.round(signals.calories)} kcal`)
+  if (signals.protein_g != null) parts.push(`P ${Math.round(signals.protein_g)}g`)
+  if (signals.carbs_g != null) parts.push(`C ${Math.round(signals.carbs_g)}g`)
+  if (signals.fat_g != null) parts.push(`F ${Math.round(signals.fat_g)}g`)
+  if (!parts.length && fallbackMeal) return fallbackMeal
+  return parts.join(' | ') || null
 }
 
 const ISSUE_KNOWLEDGE_BASE: Record<string, {
@@ -1508,13 +1557,21 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
           take: 16,
         },
         foodLogs: {
+          where: {
+            createdAt: {
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            },
+          },
           select: {
             name: true,
             description: true,
+            meal: true,
+            localDate: true,
+            nutrients: true,
             createdAt: true,
           },
           orderBy: { createdAt: 'desc' },
-          take: 16,
+          take: 300,
         },
       },
     }),
@@ -1539,7 +1596,7 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
 
   const healthGoals: Record<string, HealthGoalWithLogs> = {}
   const visibleGoals: HealthGoalWithLogs[] = []
-  const todaysFoods: Array<{ name?: string; meal?: string; calories?: number }> = []
+  const todaysFoods: Array<{ name?: string; meal?: string; calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number }> = []
   let bloodResults: BloodResultsData | null = null
   let healthSituations: {
     healthIssues?: string | null
@@ -1589,7 +1646,19 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
         try {
           const parsed = JSON.parse(goal.category ?? '{}')
           if (Array.isArray(parsed.foods)) {
-            todaysFoods.push(...parsed.foods)
+            todaysFoods.push(
+              ...parsed.foods.map((item: any) => {
+                const signals = parseNutritionSignals(item)
+                return {
+                  name: typeof item?.name === 'string' ? item.name : undefined,
+                  meal: typeof item?.meal === 'string' ? item.meal : undefined,
+                  calories: signals.calories,
+                  protein_g: signals.protein_g,
+                  carbs_g: signals.carbs_g,
+                  fat_g: signals.fat_g,
+                }
+              })
+            )
           }
         } catch {
           // ignore
@@ -1713,6 +1782,9 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
     foodLogs: user.foodLogs.map((log) => ({
       name: log.name,
       description: log.description,
+      meal: log.meal,
+      localDate: log.localDate,
+      nutrients: parseNutritionSignals(log.nutrients),
       createdAt: log.createdAt,
     })),
     todaysFoods,
@@ -4712,26 +4784,274 @@ async function buildLabsSection(
   }
 }
 
+type NutritionFoodEntry = {
+  name?: string
+  meal?: string
+  calories?: number
+  protein_g?: number
+  carbs_g?: number
+  fat_g?: number
+  frequency?: number
+}
+
+function aggregateNutritionFoodsFromLogs(foodLogs: UserInsightContext['foodLogs']): NutritionFoodEntry[] {
+  const grouped = new Map<
+    string,
+    {
+      name: string
+      meal?: string
+      count: number
+      caloriesTotal: number
+      caloriesCount: number
+      proteinTotal: number
+      proteinCount: number
+      carbsTotal: number
+      carbsCount: number
+      fatTotal: number
+      fatCount: number
+    }
+  >()
+
+  for (const log of foodLogs) {
+    const name = String(log.name || '').trim()
+    if (!name) continue
+    const meal = log.meal ?? undefined
+    const key = `${canonical(name)}::${canonical(meal || '')}`
+    const current = grouped.get(key) ?? {
+      name,
+      meal,
+      count: 0,
+      caloriesTotal: 0,
+      caloriesCount: 0,
+      proteinTotal: 0,
+      proteinCount: 0,
+      carbsTotal: 0,
+      carbsCount: 0,
+      fatTotal: 0,
+      fatCount: 0,
+    }
+    current.count += 1
+
+    if (log.nutrients.calories != null) {
+      current.caloriesTotal += log.nutrients.calories
+      current.caloriesCount += 1
+    }
+    if (log.nutrients.protein_g != null) {
+      current.proteinTotal += log.nutrients.protein_g
+      current.proteinCount += 1
+    }
+    if (log.nutrients.carbs_g != null) {
+      current.carbsTotal += log.nutrients.carbs_g
+      current.carbsCount += 1
+    }
+    if (log.nutrients.fat_g != null) {
+      current.fatTotal += log.nutrients.fat_g
+      current.fatCount += 1
+    }
+    grouped.set(key, current)
+  }
+
+  return Array.from(grouped.values())
+    .sort((a, b) => b.count - a.count)
+    .map((item) => ({
+      name: item.name,
+      meal: item.meal,
+      calories: item.caloriesCount ? item.caloriesTotal / item.caloriesCount : undefined,
+      protein_g: item.proteinCount ? item.proteinTotal / item.proteinCount : undefined,
+      carbs_g: item.carbsCount ? item.carbsTotal / item.carbsCount : undefined,
+      fat_g: item.fatCount ? item.fatTotal / item.fatCount : undefined,
+      frequency: item.count,
+    }))
+}
+
+function buildMealBasedWorkingFocus(
+  foods: NutritionFoodEntry[],
+  issueName: string
+): Array<{ title: string; reason: string; example: string }> {
+  const grouped = new Map<string, { title: string; count: number; meals: Set<string> }>()
+
+  for (const food of foods) {
+    const title = String(food.name || food.meal || '').trim()
+    if (!title) continue
+    const key = canonical(title)
+    const entry = grouped.get(key) ?? { title, count: 0, meals: new Set<string>() }
+    entry.count += 1
+    if (food.meal) entry.meals.add(food.meal)
+    grouped.set(key, entry)
+  }
+
+  return Array.from(grouped.values())
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3)
+    .map((item) => ({
+      title: item.title,
+      reason: `You logged this ${item.count} time${item.count === 1 ? '' : 's'} recently. Keep portions consistent and track how it affects ${issueName.toLowerCase()}.`,
+      example: item.meals.size ? Array.from(item.meals).slice(0, 2).join(', ') : 'Recent meal log',
+    }))
+}
+
+function buildNutritionFallbackSection(
+  issue: IssueSummary,
+  now: string,
+  foods: NutritionFoodEntry[],
+  hasLoggedFoods: boolean,
+  hasRecentFoodData: boolean
+): BaseSectionResult {
+  const fallbackWorking = buildMealBasedWorkingFocus(foods, issue.name)
+  const kbKey = pickKnowledgeKey(issue.name)
+  const kbBase = kbKey ? ISSUE_KNOWLEDGE_BASE[kbKey] : undefined
+
+  const genericSuggested = [
+    { title: 'Lean protein at each meal', reason: 'Helps steady energy and supports muscle recovery.', detail: null as string | null },
+    { title: 'High-fiber vegetables', reason: 'Supports digestion and helps keep blood sugar stable.', detail: null as string | null },
+    { title: 'Whole-food carbs', reason: 'Gives steadier fuel compared with highly refined snacks.', detail: null as string | null },
+    { title: 'Healthy fats', reason: 'Supports hormones and keeps meals more satisfying.', detail: null as string | null },
+  ]
+  const genericAvoid = [
+    { name: 'Sugary drinks', reason: 'Can drive sharp energy swings and cravings.' },
+    { name: 'Ultra-processed snacks', reason: 'Often high in additives and low in useful nutrients.' },
+    { name: 'Frequent late-night heavy meals', reason: 'Can disrupt sleep quality and next-day energy.' },
+    { name: 'High-alcohol intake', reason: 'Can worsen recovery, hydration, and symptom control.' },
+  ]
+
+  const kbSuggested = (kbBase?.nutritionFocus ?? []).map((item) => ({
+    title: item.title,
+    reason: item.detail,
+    detail: null as string | null,
+  }))
+  const kbAvoid = (kbBase?.avoidFoods ?? []).map((item) => ({
+    name: item.title,
+    reason: item.detail,
+  }))
+
+  const suggestedFocus = ensureMin(
+    kbSuggested.slice(0, 4),
+    kbSuggested.length ? genericSuggested : [...kbSuggested, ...genericSuggested],
+    4
+  ).slice(0, 4)
+  const avoidFoods = ensureMin(
+    kbAvoid.slice(0, 4),
+    kbAvoid.length ? genericAvoid : [...kbAvoid, ...genericAvoid],
+    4
+  ).slice(0, 4)
+
+  const summary = hasLoggedFoods
+    ? 'Using your recent meal logs, here is a starter nutrition plan while deeper analysis catches up.'
+    : 'No meals are logged yet—use this starter food plan and log meals to personalize it further.'
+
+  const highlights: SectionHighlight[] = [
+    {
+      title: 'Nutrition wins',
+      detail: fallbackWorking.length
+        ? fallbackWorking.map((item) => `${item.title}: ${item.reason}`).join('; ')
+        : 'No meal patterns detected yet. Start logging meals so this section can show your personal wins.',
+      tone: fallbackWorking.length ? 'positive' : 'warning',
+    },
+    {
+      title: 'Add to your plan',
+      detail: suggestedFocus.map((item) => `${item.title}: ${item.reason}`).join('; '),
+      tone: 'neutral',
+    },
+    {
+      title: 'Foods to monitor',
+      detail: avoidFoods.map((item) => `${item.name}: ${item.reason}`).join('; '),
+      tone: 'warning',
+    },
+  ]
+
+  if (!hasLoggedFoods) {
+    highlights.unshift({
+      title: 'Log your meals',
+      detail: 'Record breakfast, lunch, dinner, and snacks so we can personalize this guidance.',
+      tone: 'warning',
+    })
+  } else if (!hasRecentFoodData) {
+    highlights.unshift({
+      title: 'Add fresh meal logs',
+      detail: 'Log today’s meals so we can confirm what is helping right now.',
+      tone: 'warning',
+    })
+  }
+
+  const recommendations: SectionRecommendation[] = hasLoggedFoods
+    ? [
+        {
+          title: 'Follow this starter plan',
+          description: 'Use the suggested foods and monitor changes over the next few days.',
+          actions: ['Use Food Diary to log each meal', 'Watch symptom changes daily'],
+          priority: 'soon',
+        },
+      ]
+    : [
+        {
+          title: 'Start with one full day of meal logs',
+          description: 'This gives enough data for stronger personalized nutrition guidance.',
+          actions: ['Open Food Diary', 'Log breakfast, lunch, dinner, and snacks'],
+          priority: 'now',
+        },
+      ]
+
+  const suggestionRuns = [{ generatedAt: now, suggestedFocus, avoidFoods }]
+
+  return {
+    issue,
+    section: 'nutrition',
+    generatedAt: now,
+    confidence: 0.62,
+    summary,
+    highlights,
+    dataPoints: foods.map((item, idx) => ({
+      label: item.meal ? `${item.meal}` : `Meal ${idx + 1}`,
+      value: item.name ?? 'Food logged',
+      context: item.calories ? `${item.calories} kcal` : undefined,
+    })),
+    recommendations,
+    extras: {
+      workingFocus: fallbackWorking,
+      suggestedFocus,
+      avoidFoods,
+      suggestionRuns,
+      totalLogged: foods.length,
+      hasLoggedFoods,
+      hasRecentFoodData,
+      source: 'meal-fallback',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
+      validated: true,
+      degraded: true,
+    },
+  }
+}
+
 async function buildNutritionSection(
   issue: IssueSummary,
   context: UserInsightContext,
   _options: { forceRefresh: boolean }
 ): Promise<BaseSectionResult> {
   const now = new Date().toISOString()
-  const foods: Array<{ name?: string; meal?: string; calories?: number }> = context.todaysFoods.length
-    ? context.todaysFoods
-    : context.foodLogs.slice(0, 10).map((log) => ({
-        name: log.name,
-        meal: log.description ?? undefined,
-        calories: undefined,
-      }))
+  const sevenDayFoods = aggregateNutritionFoodsFromLogs(context.foodLogs)
+  const foods: NutritionFoodEntry[] = sevenDayFoods.length
+    ? sevenDayFoods
+    : context.todaysFoods
 
   const hasRecentFoodData = hasRecentFoodLogs(context.foodLogs) || Boolean(context.todaysFoods.length)
   const hasLoggedFoods = foods.length > 0
 
   const normalizedFoods = foods.map((food, idx) => ({
     name: food.name || food.meal || `Entry ${idx + 1}`,
-    dosage: food.calories ? `${food.calories} kcal` : food.meal ?? null,
+    dosage: [
+      food.frequency && food.frequency > 1 ? `${food.frequency}x in last 7 days` : null,
+      formatNutritionPromptContext(
+        {
+          calories: food.calories,
+          protein_g: food.protein_g,
+          carbs_g: food.carbs_g,
+          fat_g: food.fat_g,
+        },
+        food.meal
+      ),
+    ]
+      .filter(Boolean)
+      .join(' | ') || null,
     timing: food.meal ? [food.meal] : [],
   }))
 
@@ -4776,40 +5096,7 @@ async function buildNutritionSection(
   }
 
   if (!llmResult) {
-    return {
-      issue,
-      section: 'nutrition',
-      generatedAt: now,
-      confidence: 0.4,
-      summary: 'We couldn’t generate nutrition guidance right now. Please try again shortly.',
-      highlights: [
-        {
-          title: 'Generation unavailable',
-          detail: 'The AI service did not return nutrition insights. Retry in a few minutes.',
-          tone: 'warning',
-        },
-      ],
-      dataPoints: foods.map((item, idx) => ({
-        label: item.meal ? `${item.meal}` : `Meal ${idx + 1}`,
-        value: item.name ?? 'Food logged',
-        context: item.calories ? `${item.calories} kcal` : undefined,
-      })),
-      recommendations: [
-        {
-          title: 'Retry insight generation',
-          description: 'Refresh this page or trigger a new report in a few minutes.',
-          actions: ['Tap Daily/Weekly report to regenerate', 'Contact support if the problem persists'],
-          priority: 'soon',
-        },
-      ],
-      extras: {
-        workingFocus: [],
-        suggestedFocus: [],
-        avoidFoods: [],
-        totalLogged: foods.length,
-        source: 'llm-error',
-      },
-    }
+    return buildNutritionFallbackSection(issue, now, foods, hasLoggedFoods, hasRecentFoodData)
   }
 
   const allowFoodName = (name: string, reason: string) => {
@@ -4887,6 +5174,13 @@ async function buildNutritionSection(
         }
         console.log(`[nutrition] Added ${workingFocus.length} total working foods after augmentation`)
       }
+    }
+  }
+
+  if (workingFocus.length === 0 && hasLoggedFoods) {
+    const fallbackWorking = buildMealBasedWorkingFocus(foods, issue.name)
+    if (fallbackWorking.length > 0) {
+      workingFocus = fallbackWorking
     }
   }
 

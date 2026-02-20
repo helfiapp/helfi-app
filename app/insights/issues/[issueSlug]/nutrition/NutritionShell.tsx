@@ -159,15 +159,13 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
       const data = await res.json()
       setResult(data)
 
-      if (typeof regenData.chargedCredits === 'number') {
-        const costPart =
-          typeof regenData.costCents === 'number'
-            ? ` (AI cost ~$${(regenData.costCents / 100).toFixed(2)})`
-            : ''
+      if (typeof regenData?.message === 'string' && regenData.message.trim().length > 0) {
+        setChargeNotice(regenData.message.trim())
+      } else if (typeof regenData?.chargedCredits === 'number') {
         setChargeNotice(
           regenData.chargedCredits > 0
-            ? `Charged ${regenData.chargedCredits} credits${costPart}.`
-            : 'Insights updated without any AI charges.'
+            ? 'Nutrition insights updated.'
+            : 'Insights updated with no credits used.'
         )
       }
       try {
@@ -340,7 +338,6 @@ export default function NutritionShell({ children, initialResult, issueSlug }: N
               >
                 {isRefreshing ? 'Refreshing…' : 'Generate Nutrition Insights'}
               </button>
-              <p className="text-xs text-gray-500">Credits will be charged after generation based on actual AI usage.</p>
               <p className="text-xs text-gray-500">Runs only on new/changed food diary entries.</p>
               {chargeNotice && (
                 <p className="text-sm text-gray-700 bg-gray-100 border border-gray-200 rounded-md px-3 py-2">
