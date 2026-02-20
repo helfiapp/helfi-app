@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 14:23 AEDT
+- What changed: Added a second-pass stability fix to the shared Food Diary time picker wheel logic to filter tiny reverse momentum scroll signals that were causing one-step rollback (for example selecting 27 and snapping back to 26).
+- Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
+- What to quickly test: Open any time picker in Food Diary or Water edit, use mouse wheel to move minute values, and confirm the value stays where selected without bouncing back by one.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 13:53 AEDT
 - What changed: Fixed unstable mouse-wheel behavior in the shared Food Diary time picker so values no longer bounce back to the previous number while scrolling. Applied in all Food Diary picker usages that share this component (food edit, build-meal edit time, and water time edit).
 - Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
