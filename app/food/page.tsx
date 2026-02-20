@@ -8671,6 +8671,12 @@ const applyStructuredItems = (
     const normalized = dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
     return filterEntriesForDate(normalized, selectedDate)
   }, [selectedDate, persistentDiarySnapshotVersion])
+  const todaysCacheEntriesForSelectedDate = useMemo(() => {
+    if (isViewingToday) return []
+    const raw = filterEntriesForDate(todaysFoods, selectedDate)
+    if (!Array.isArray(raw) || raw.length === 0) return []
+    return dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
+  }, [isViewingToday, todaysFoods, selectedDate])
   // SEVERE GUARD RAIL: Keep the local snapshot while history loads.
   // This prevents the "full calories / zero" flash when switching dates.
   const sourceEntries = useMemo(() => {
@@ -8685,10 +8691,13 @@ const applyStructuredItems = (
       ? historyForSelectedDate
       : localSnapshotEntriesForSelectedDate.length > 0
       ? localSnapshotEntriesForSelectedDate
+      : todaysCacheEntriesForSelectedDate.length > 0
+      ? todaysCacheEntriesForSelectedDate
       : []
     return dedupeEntries(normalizeDiaryList(base || [], selectedDate), { fallbackDate: selectedDate })
   }, [
     todaysFoodsForSelectedDate,
+    todaysCacheEntriesForSelectedDate,
     historyFoods,
     historyFoodsDate,
     isViewingToday,
@@ -8700,8 +8709,20 @@ const applyStructuredItems = (
     if (isViewingToday) {
       return isDiaryHydrated(selectedDate) && foodDiaryLoaded
     }
-    return true
-  }, [isViewingToday, selectedDate, foodDiaryLoaded])
+    if (localSnapshotEntriesForSelectedDate.length > 0) return true
+    if (todaysCacheEntriesForSelectedDate.length > 0) return true
+    if (historyFoodsDate === selectedDate && Array.isArray(historyFoods)) return true
+    return !isLoadingHistory
+  }, [
+    isViewingToday,
+    selectedDate,
+    foodDiaryLoaded,
+    localSnapshotEntriesForSelectedDate.length,
+    todaysCacheEntriesForSelectedDate.length,
+    historyFoodsDate,
+    historyFoods,
+    isLoadingHistory,
+  ])
   const sourceDateKeys = useMemo(() => {
     const set = new Set<string>()
     sourceEntries.forEach((entry) => {
@@ -8974,6 +8995,9 @@ const applyStructuredItems = (
     if (typeof window === 'undefined') return
     try {
       if (!isViewingToday && !Array.isArray(historyFoods)) return
+      // Critical: for non-today dates, only persist once that date's history is actually ready.
+      // Otherwise a quick date switch can overwrite a good snapshot with [] before fetch returns.
+      if (!isViewingToday && historyFoodsDate !== selectedDate) return
       const snapshot = readPersistentDiarySnapshot() || { byDate: {} }
       const rawEntries = isViewingToday
         ? todaysFoodsForSelectedDate
@@ -8991,7 +9015,16 @@ const applyStructuredItems = (
     } catch (err) {
       console.warn('Could not persist diary snapshot', err)
     }
-  }, [selectedDate, isViewingToday, todaysFoods, historyFoods, expandedCategories, isLoadingHistory, refreshPersistentDiarySnapshot])
+  }, [
+    selectedDate,
+    isViewingToday,
+    todaysFoods,
+    historyFoods,
+    historyFoodsDate,
+    expandedCategories,
+    isLoadingHistory,
+    refreshPersistentDiarySnapshot,
+  ])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -26305,7 +26338,7 @@ Please add nutritional information manually if needed.`);
                           )}
                         </>
                       )}
-                      {(() => {
+                      {summaryReady && (() => {
                           const slides: JSX.Element[] = []
                           const fatDetailTitles = {
                             good: 'Healthy fats',
