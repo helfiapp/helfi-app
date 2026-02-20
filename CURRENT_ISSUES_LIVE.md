@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 21:02 AEDT
+- What changed: Fixed Nutrition Insights refresh to target the exact issue page the user is on, fixed issue slug selection logic so real goals are not accidentally excluded, and improved failure messaging so users see a clear no-charge message instead of a generic failure.
+- Where to see it (page/link): https://helfi.ai/insights/issues/[issue]/nutrition
+- What to quickly test: Open an issue Nutrition tab (example Erection Quality), click Generate Nutrition Insights, confirm the "Generated" timestamp updates to current time for that issue, and confirm errors show a clear message (not generic) if refresh cannot start.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 20:54 AEDT
 - What changed: Replaced iPhone/PWA app icon assets with the new designer file “OFFICIAL APP ICON” (leaf icon on white background) and regenerated all live icon sizes used by home screen install.
 - Where to see it (page/link): https://helfi.ai (installed to iPhone home screen)
