@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 00:49 AEDT
+- What changed: Food Diary barcode scanner now supports both normal supermarket barcodes and square codes (Data Matrix/QR). Added scan normalization so square-code content can extract a valid product barcode when present before lookup, while keeping existing normal barcode behavior and first-scan reliability flow.
+- Where to see it (page/link): https://helfi.ai/food (Food Diary -> Scan barcode)
+- What to quickly test: Scan a normal barcode and confirm it still works; then scan a square Data Matrix/QR code and confirm scanner detects it and attempts lookup. If a product match exists, action popup appears; if not, standard fallback prompt appears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 21:02 AEDT
 - What changed: Fixed Nutrition Insights refresh to target the exact issue page the user is on, fixed issue slug selection logic so real goals are not accidentally excluded, and improved failure messaging so users see a clear no-charge message instead of a generic failure.
 - Where to see it (page/link): https://helfi.ai/insights/issues/[issue]/nutrition
