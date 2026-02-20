@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 04:39 AEDT
+- What changed: In barcode label scan flow, tapping the Food name field now clears prefilled text instantly so users can type from a clean blank field without backspacing one letter at a time.
+- Where to see it (page/link): https://helfi.ai/food (barcode scan -> no match -> nutrition label flow)
+- What to quickly test: Open nutrition label flow, tap once in Food name, confirm existing text disappears immediately, then type a custom name and save.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 02:23 AEDT
 - What changed: Fixed Food Diary date-switch reliability issue that could show false zero energy summary before data loaded. Prevented non-today snapshots from being overwritten with empty data during day switches, added stronger same-day fallback from in-memory cache, and stopped rendering summary rings while a day is still loading.
 - Where to see it (page/link): https://helfi.ai/food
