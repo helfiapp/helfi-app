@@ -3161,6 +3161,15 @@ export default function FoodDiary() {
   }
   const filterEntriesForDate = (entries: any[] | null | undefined, targetDate: string) =>
     Array.isArray(entries) ? entries.filter((entry) => entryMatchesDate(entry, targetDate)) : []
+  const initialWarmFoods = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : []
+  const initialPersistedFoods = Array.isArray(persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries)
+    ? (persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries as any[])
+    : []
+  const initialUserFoodsForDate = filterEntriesForDate((userData as any)?.todaysFoods, initialSelectedDate)
+  const hasInitialDiarySnapshotData =
+    initialWarmFoods.length > 0 ||
+    initialPersistedFoods.length > 0 ||
+    initialUserFoodsForDate.length > 0
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [todaysFoods, setTodaysFoods] = useState<any[]>(() => {
     const warm = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : null
@@ -3417,11 +3426,11 @@ export default function FoodDiary() {
 
   // New loading state
   const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(() => {
-    if (warmDiaryState) return true
+    if (hasInitialDiarySnapshotData) return true
     return Array.isArray((userData as any)?.todaysFoods)
   })
   const [diaryHydrated, setDiaryHydrated] = useState<boolean>(() => {
-    if (warmDiaryState) return true
+    if (hasInitialDiarySnapshotData) return true
     return false
   })
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
@@ -3813,7 +3822,11 @@ export default function FoodDiary() {
   const verifyMergeTimerRef = useRef<Record<string, { id: number; fireAt: number }>>({})
   const latestTodaysFoodsRef = useRef<any[]>([])
   const latestHistoryFoodsRef = useRef<any[] | null>(null)
-  const diaryHydrationRef = useRef<Record<string, { hydrated: boolean; verified: boolean }>>({})
+  const diaryHydrationRef = useRef<Record<string, { hydrated: boolean; verified: boolean }>>(
+    hasInitialDiarySnapshotData && initialSelectedDate
+      ? { [initialSelectedDate]: { hydrated: true, verified: false } }
+      : {},
+  )
   const diaryMergeInFlightRef = useRef<Record<string, boolean>>({})
   const pendingFoodLogSaveRef = useRef<Map<string, { key: string; targetDate: string; attempts: number; nextAttemptAt: number; lastAttemptAt: number }>>(new Map())
   const pendingFoodLogTimerRef = useRef<number | null>(null)
