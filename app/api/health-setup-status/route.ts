@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
+import { countVisibleHealthGoals, hasBasicProfileData, isHealthSetupComplete } from '@/lib/health-setup-completion'
 import { prisma } from '@/lib/prisma'
 
 // ⚠️ HEALTH SETUP GUARD RAIL
@@ -45,12 +46,16 @@ export async function GET() {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const visibleGoals = user.healthGoals.filter((goal) => !goal.name.startsWith('__'))
-    const hasBasicProfile = !!(user.gender && user.weight && user.height)
-    const hasGoals = visibleGoals.length > 0
+    const hasBasicProfile = hasBasicProfileData(user)
+    const hasGoals = countVisibleHealthGoals(user.healthGoals) > 0
     const hasOtherHealthData = user.supplements.length > 0 || user.medications.length > 0
 
-    const complete = hasBasicProfile && hasGoals
+    const complete = isHealthSetupComplete({
+      gender: user.gender,
+      weight: user.weight,
+      height: user.height,
+      goals: user.healthGoals,
+    })
     const partial = !complete && (hasBasicProfile || hasGoals || hasOtherHealthData)
 
     const reminderRecord = user.healthGoals.find(
@@ -121,5 +126,4 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
-
 

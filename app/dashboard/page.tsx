@@ -8,6 +8,7 @@ import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import { isCacheFresh, readClientCache, writeClientCache } from '@/lib/client-cache'
+import { countVisibleHealthGoals, hasBasicProfileData, isHealthSetupComplete } from '@/lib/health-setup-completion'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FitbitSummary from '@/components/devices/FitbitSummary'
@@ -107,9 +108,14 @@ export default function Dashboard() {
 
       // Define onboarding completion using the same rule as Insights:
       // 1) basic profile data present, and 2) at least one health goal selected.
-      const hasBasicProfile = !!(data.gender && data.weight && data.height)
-      const hasHealthGoals = !!(data.goals && data.goals.length > 0)
-      const onboardingComplete = hasBasicProfile && hasHealthGoals
+      const hasBasicProfile = hasBasicProfileData(data)
+      const hasHealthGoals = countVisibleHealthGoals(data.goals) > 0
+      const onboardingComplete = isHealthSetupComplete({
+        gender: data.gender,
+        weight: data.weight,
+        height: data.height,
+        goals: data.goals,
+      })
 
       // For truly brand-new users with no meaningful data at all, redirect
       // into onboarding on first visit, but respect "I'll do it later"

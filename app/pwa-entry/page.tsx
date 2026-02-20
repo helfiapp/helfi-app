@@ -2,6 +2,7 @@ import { cookies } from 'next/headers'
 import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { isHealthSetupComplete } from '@/lib/health-setup-completion'
 import { prisma } from '@/lib/prisma'
 import { consumePendingNotificationOpen } from '@/lib/notification-inbox'
 
@@ -55,10 +56,12 @@ export default async function PwaEntryPage({
     redirect('/auth/signin?reauth=1')
   }
 
-  const visibleGoals = user.healthGoals.filter((goal) => !goal.name.startsWith('__'))
-  const hasBasicProfile = !!(user.gender && user.weight && user.height)
-  const hasGoals = visibleGoals.length > 0
-  const onboardingComplete = hasBasicProfile && hasGoals
+  const onboardingComplete = isHealthSetupComplete({
+    gender: user.gender,
+    weight: user.weight,
+    height: user.height,
+    goals: user.healthGoals,
+  })
 
   if (!onboardingComplete) {
     redirect('/onboarding')

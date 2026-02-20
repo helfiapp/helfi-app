@@ -1,6 +1,7 @@
 import { cache } from 'react'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
+import { isHealthSetupComplete } from '@/lib/health-setup-completion'
 import { getServerSession } from 'next-auth'
 import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick, generateDegradedSectionQuickStrict, evaluateFocusItemsForIssue } from './llm'
 
@@ -1680,8 +1681,12 @@ const loadUserInsightContext = cache(async (userId: string): Promise<UserInsight
   // Treat onboarding as "complete" only when the user has both:
   // 1) basic profile data (gender, weight, height), and
   // 2) at least one visible health goal.
-  const hasBasicProfile = !!(user.gender && user.weight && user.height)
-  const onboardingComplete = hasBasicProfile && visibleGoals.length > 0
+  const onboardingComplete = isHealthSetupComplete({
+    gender: user.gender,
+    weight: user.weight,
+    height: user.height,
+    goals: visibleGoals,
+  })
 
   return {
     userId,
@@ -1889,8 +1894,12 @@ const loadUserLandingContext = cache(async (userId: string): Promise<UserInsight
   }
 
   // Same onboarding completion rule as the full context loader above.
-  const hasBasicProfileLanding = !!(user.gender && user.weight && user.height)
-  const onboardingComplete = hasBasicProfileLanding && visibleGoals.length > 0
+  const onboardingComplete = isHealthSetupComplete({
+    gender: user.gender,
+    weight: user.weight,
+    height: user.height,
+    goals: visibleGoals,
+  })
 
   return {
     userId,
