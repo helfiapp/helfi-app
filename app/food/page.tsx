@@ -945,7 +945,6 @@ type DeviceStatusSnapshotStore = Record<string, DeviceStatusSnapshot>
 const DEVICE_STATUS_TTL_MS = 5 * 60 * 1000
 const DEVICE_STATUS_SNAPSHOT_KEY = 'foodDiary:deviceStatus'
 const EXERCISE_SNAPSHOT_FRESH_MS = 90 * 1000
-const WATER_SNAPSHOT_FRESH_MS = 90 * 1000
 const WATER_SNAPSHOT_KEY = 'foodDiary:waterSnapshot'
 
 type FavoritesAllSnapshot = {
@@ -9600,16 +9599,11 @@ const applyStructuredItems = (
     const loadWater = async () => {
       const cached = readWaterSnapshot(selectedDate)
       const cachedEntries = Array.isArray(cached?.entries) ? cached.entries : []
-      const cachedFresh =
-        Boolean(cached) &&
-        Number.isFinite(Number(cached?.savedAt)) &&
-        Date.now() - Number(cached?.savedAt || 0) < WATER_SNAPSHOT_FRESH_MS
 
       if (cachedEntries.length > 0) {
         setWaterEntries(cachedEntries)
       }
       setWaterLoading(cachedEntries.length === 0)
-      if (cachedFresh) return
       try {
         const res = await fetch(`/api/water-log?localDate=${encodeURIComponent(selectedDate)}`, {
           cache: 'no-store' as any,

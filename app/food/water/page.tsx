@@ -19,6 +19,13 @@ type WaterEntry = {
   createdAt: string
 }
 
+type WaterSnapshot = {
+  entries: WaterEntry[]
+  savedAt: number
+}
+
+type WaterSnapshotStore = Record<string, WaterSnapshot>
+
 type GoalResponse = {
   targetMl: number
   recommendedMl: number
@@ -52,6 +59,7 @@ const HONEY_TSP_GRAMS = 7
 const HONEY_CAL_PER_GRAM = 64 / HONEY_TBSP_GRAMS
 const HONEY_CARBS_PER_GRAM = 17.3 / HONEY_TBSP_GRAMS
 const HONEY_SUGAR_PER_GRAM = 17.2 / HONEY_TBSP_GRAMS
+const WATER_SNAPSHOT_KEY = 'foodDiary:waterSnapshot'
 
 const sugarToGrams = (amount: number, unit: SugarUnit): number => {
   if (!Number.isFinite(amount) || amount <= 0) return 0
@@ -173,6 +181,49 @@ function normalizeLabel(value: string | null | undefined) {
   return cleaned || 'Water'
 }
 
+function readWaterSnapshot(dateKey: string): WaterSnapshot | null {
+  if (typeof window === 'undefined') return null
+  if (!isValidDate(dateKey)) return null
+  try {
+    const raw = sessionStorage.getItem(WATER_SNAPSHOT_KEY)
+    const parsed = raw ? (JSON.parse(raw) as WaterSnapshotStore) : {}
+    const snap = parsed?.[dateKey]
+    if (!snap || !Array.isArray(snap.entries)) return null
+    return {
+      entries: snap.entries,
+      savedAt: Number(snap.savedAt) || 0,
+    }
+  } catch {
+    return null
+  }
+}
+
+function writeWaterSnapshot(dateKey: string, entries: WaterEntry[]) {
+  if (typeof window === 'undefined') return
+  if (!isValidDate(dateKey)) return
+  try {
+    const raw = sessionStorage.getItem(WATER_SNAPSHOT_KEY)
+    const parsed = raw ? (JSON.parse(raw) as WaterSnapshotStore) : {}
+    const nextEntries = Array.isArray(entries)
+      ? entries.filter((entry) => String(entry?.localDate || '') === dateKey)
+      : []
+    const savedAt = Date.now()
+    const next: WaterSnapshotStore = {
+      ...(parsed && typeof parsed === 'object' ? parsed : {}),
+      [dateKey]: {
+        entries: nextEntries,
+        savedAt,
+      },
+    }
+    sessionStorage.setItem(WATER_SNAPSHOT_KEY, JSON.stringify(next))
+    window.dispatchEvent(
+      new CustomEvent('foodDiary:waterSnapshotUpdated', {
+        detail: { date: dateKey, savedAt },
+      }),
+    )
+  } catch {}
+}
+
 export default function WaterIntakePage() {
   const router = useRouter()
   const { data: session, status } = useSession()
@@ -250,6 +301,10 @@ export default function WaterIntakePage() {
 
   const loadEntries = async (localDate: string) => {
     const requestId = ++entriesRequestIdRef.current
+    const cached = readWaterSnapshot(localDate)
+    if (cached && Array.isArray(cached.entries)) {
+      setEntries(cached.entries)
+    }
     setLoading(true)
     setBanner(null)
     try {
@@ -264,7 +319,9 @@ export default function WaterIntakePage() {
       }
       if (!res.ok) throw new Error('load failed')
       const data = await res.json()
-      setEntries(Array.isArray(data?.entries) ? data.entries : [])
+      const nextEntries = Array.isArray(data?.entries) ? data.entries : []
+      setEntries(nextEntries)
+      writeWaterSnapshot(localDate, nextEntries)
       setLoadError(false)
     } catch {
       if (requestId !== entriesRequestIdRef.current) return
@@ -382,7 +439,13 @@ export default function WaterIntakePage() {
       const data = await res.json()
       const entry = data?.entry as WaterEntry | undefined
       if (entry) {
-        setEntries((prev) => [entry, ...prev])
+        setEntries((prev) => {
+          const next = [entry, ...prev].sort(
+            (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+          )
+          writeWaterSnapshot(selectedDate, next)
+          return next
+        })
       } else {
         await loadEntries(selectedDate)
       }
@@ -402,7 +465,11 @@ export default function WaterIntakePage() {
     try {
       const res = await fetch(`/api/water-log/${encodeURIComponent(id)}`, { method: 'DELETE', credentials: 'include' })
       if (!res.ok) throw new Error('delete failed')
-      setEntries((prev) => prev.filter((entry) => entry.id !== id))
+      setEntries((prev) => {
+        const next = prev.filter((entry) => entry.id !== id)
+        writeWaterSnapshot(selectedDate, next)
+        return next
+      })
       setBanner({ type: 'success', message: 'Entry removed.' })
     } catch {
       setBanner({ type: 'error', message: 'Could not remove entry.' })
@@ -454,9 +521,11 @@ export default function WaterIntakePage() {
       if (updated?.id) {
         setEntries((prev) => {
           const replaced = prev.map((entry) => (entry.id === updated.id ? updated : entry))
-          return replaced
+          const next = replaced
             .slice()
             .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime())
+          writeWaterSnapshot(selectedDate, next)
+          return next
         })
       } else {
         await loadEntries(selectedDate)
