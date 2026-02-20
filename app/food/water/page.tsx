@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useSession } from 'next-auth/react'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MaterialSymbol from '@/components/MaterialSymbol'
+import RollerTimePicker from '@/components/food/RollerTimePicker'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
 
 type WaterEntry = {
@@ -1157,12 +1158,7 @@ export default function WaterIntakePage() {
             <p className="text-xs text-gray-500 mb-4">
               Change when this drink was logged.
             </p>
-            <input
-              type="time"
-              value={editingTimeValue}
-              onChange={(e) => setEditingTimeValue(e.target.value)}
-              className="w-full px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-lg text-base focus:ring-2 focus:ring-[#62b763] focus:border-[#62b763] dark:bg-gray-800 dark:text-white"
-            />
+            <RollerTimePicker value={editingTimeValue} onChange={setEditingTimeValue} />
             {editingTimeError && <div className="mt-2 text-xs text-red-600">{editingTimeError}</div>}
             <div className="mt-4 flex items-center justify-end gap-3">
               <button

@@ -28651,12 +28651,7 @@ Please add nutritional information manually if needed.`);
               </select>
             </div>
             <div className="mt-3">
-              <input
-                type="time"
-                value={waterEditTimeInput}
-                onChange={(e) => setWaterEditTimeInput(e.target.value)}
-                className="w-full px-3 py-2 border border-gray-300 rounded-lg text-base focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-              />
+              <RollerTimePicker value={waterEditTimeInput} onChange={setWaterEditTimeInput} />
             </div>
             {waterEditError && <div className="mt-2 text-xs text-red-600">{waterEditError}</div>}
             <div className="mt-4 flex items-center justify-end gap-3">
