@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { getFreeCreditsStatus, hasExhaustedFreeCredits } from '@/lib/free-credits'
 import { prisma } from '@/lib/prisma'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
-import { CreditManager } from '@/lib/credit-system'
+import { CreditManager, computeNextWalletResetAt } from '@/lib/credit-system'
 import { logServerCall } from '@/lib/server-call-tracker'
 
 // ABSOLUTE GUARD RAIL:
@@ -51,30 +51,8 @@ function monthlyCapFromSubscription(sub: any | null | undefined): number {
 
 function computeNextResetAt(subscriptionStart: Date | null): string | null {
   try {
-    const now = new Date()
-    if (!subscriptionStart) {
-      // Calendar‑month reset: first day of next month (UTC)
-      const nextReset = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0))
-      return nextReset.toISOString()
-    }
-
-    // Align reset with subscription billing day (same logic as usage‑breakdown)
-    const subStartDate = new Date(subscriptionStart)
-    const startYear = subStartDate.getUTCFullYear()
-    const startMonth = subStartDate.getUTCMonth()
-    const startDay = subStartDate.getUTCDate()
-
-    const currentYear = now.getUTCFullYear()
-    const currentMonth = now.getUTCMonth()
-    const currentDay = now.getUTCDate()
-
-    let monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth)
-    if (currentDay >= startDay) {
-      monthsSinceStart += 1
-    }
-
-    const nextReset = new Date(Date.UTC(startYear, startMonth + monthsSinceStart, startDay, 0, 0, 0, 0))
-    return nextReset.toISOString()
+    const nextReset = computeNextWalletResetAt(subscriptionStart, new Date())
+    return nextReset ? nextReset.toISOString() : null
   } catch {
     return null
   }

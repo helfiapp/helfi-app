@@ -178,16 +178,47 @@ export default function AdminUserPage() {
     if (!user?.subscription?.startDate || user.subscription.endDate) return null
     const startDate = new Date(user.subscription.startDate)
     const now = new Date()
-    const startYear = startDate.getUTCFullYear()
-    const startMonth = startDate.getUTCMonth()
-    const startDay = startDate.getUTCDate()
-    const currentYear = now.getUTCFullYear()
-    const currentMonth = now.getUTCMonth()
-    const currentDay = now.getUTCDate()
-    let monthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth)
-    if (currentDay < startDay) monthsSinceStart--
-    const nextRenewalDate = new Date(Date.UTC(startYear, startMonth + monthsSinceStart + 1, startDay, 0, 0, 0, 0))
-    return nextRenewalDate.toLocaleDateString()
+    const addMonthsClampedUtc = (anchor: Date, monthsToAdd: number) => {
+      const y = anchor.getUTCFullYear()
+      const m = anchor.getUTCMonth()
+      const d = anchor.getUTCDate()
+      const hh = anchor.getUTCHours()
+      const mm = anchor.getUTCMinutes()
+      const ss = anchor.getUTCSeconds()
+      const ms = anchor.getUTCMilliseconds()
+
+      const absoluteMonth = m + monthsToAdd
+      const targetYear = y + Math.floor(absoluteMonth / 12)
+      const targetMonth = ((absoluteMonth % 12) + 12) % 12
+      const maxDay = new Date(Date.UTC(targetYear, targetMonth + 1, 0)).getUTCDate()
+      const targetDay = Math.min(d, maxDay)
+
+      return new Date(Date.UTC(targetYear, targetMonth, targetDay, hh, mm, ss, ms))
+    }
+
+    let monthsSinceStart =
+      (now.getUTCFullYear() - startDate.getUTCFullYear()) * 12 +
+      (now.getUTCMonth() - startDate.getUTCMonth())
+
+    let nextRenewalDate = addMonthsClampedUtc(startDate, monthsSinceStart)
+    if (nextRenewalDate.getTime() <= now.getTime()) {
+      monthsSinceStart += 1
+      nextRenewalDate = addMonthsClampedUtc(startDate, monthsSinceStart)
+    }
+    while (nextRenewalDate.getTime() <= now.getTime()) {
+      monthsSinceStart += 1
+      nextRenewalDate = addMonthsClampedUtc(startDate, monthsSinceStart)
+    }
+
+    return nextRenewalDate.toLocaleString(undefined, {
+      year: 'numeric',
+      month: 'short',
+      day: 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+      second: '2-digit',
+      hour12: true,
+    })
   }, [user])
 
   if (!adminToken && !loading) {

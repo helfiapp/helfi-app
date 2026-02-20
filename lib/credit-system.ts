@@ -35,6 +35,73 @@ export interface CreditStatus {
   };
 }
 
+function daysInUtcMonth(year: number, monthIndex: number): number {
+  return new Date(Date.UTC(year, monthIndex + 1, 0)).getUTCDate();
+}
+
+function addMonthsClampedUtc(anchor: Date, monthsToAdd: number): Date {
+  const anchorYear = anchor.getUTCFullYear();
+  const anchorMonth = anchor.getUTCMonth();
+  const anchorDay = anchor.getUTCDate();
+  const anchorHour = anchor.getUTCHours();
+  const anchorMinute = anchor.getUTCMinutes();
+  const anchorSecond = anchor.getUTCSeconds();
+  const anchorMs = anchor.getUTCMilliseconds();
+
+  const absoluteMonth = anchorMonth + monthsToAdd;
+  const targetYear = anchorYear + Math.floor(absoluteMonth / 12);
+  const targetMonth = ((absoluteMonth % 12) + 12) % 12;
+  const targetDay = Math.min(anchorDay, daysInUtcMonth(targetYear, targetMonth));
+
+  return new Date(Date.UTC(targetYear, targetMonth, targetDay, anchorHour, anchorMinute, anchorSecond, anchorMs));
+}
+
+function currentCycleStartUtc(anchor: Date, now: Date): Date {
+  if (now.getTime() <= anchor.getTime()) return anchor;
+
+  let monthsSinceStart =
+    (now.getUTCFullYear() - anchor.getUTCFullYear()) * 12 +
+    (now.getUTCMonth() - anchor.getUTCMonth());
+
+  let cycleStart = addMonthsClampedUtc(anchor, monthsSinceStart);
+  if (cycleStart.getTime() > now.getTime()) {
+    monthsSinceStart -= 1;
+    cycleStart = addMonthsClampedUtc(anchor, monthsSinceStart);
+  }
+
+  // Handle month-length clamping edge cases safely.
+  while (addMonthsClampedUtc(anchor, monthsSinceStart + 1).getTime() <= now.getTime()) {
+    monthsSinceStart += 1;
+    cycleStart = addMonthsClampedUtc(anchor, monthsSinceStart);
+  }
+
+  return cycleStart;
+}
+
+export function computeNextWalletResetAt(subscriptionStart: Date | null, now = new Date()): Date | null {
+  if (!subscriptionStart) {
+    return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth() + 1, 1, 0, 0, 0, 0));
+  }
+
+  const anchor = new Date(subscriptionStart);
+  if (now.getTime() < anchor.getTime()) return anchor;
+
+  let monthsSinceStart =
+    (now.getUTCFullYear() - anchor.getUTCFullYear()) * 12 +
+    (now.getUTCMonth() - anchor.getUTCMonth());
+
+  let nextReset = addMonthsClampedUtc(anchor, monthsSinceStart);
+  if (nextReset.getTime() <= now.getTime()) {
+    monthsSinceStart += 1;
+    nextReset = addMonthsClampedUtc(anchor, monthsSinceStart);
+  }
+  while (nextReset.getTime() <= now.getTime()) {
+    monthsSinceStart += 1;
+    nextReset = addMonthsClampedUtc(anchor, monthsSinceStart);
+  }
+  return nextReset;
+}
+
 export class CreditManager {
   private userId: string;
 
@@ -93,45 +160,16 @@ export class CreditManager {
     
     const hasActiveSubscription = isSubscriptionActive(user.subscription, now);
 
-    // Check if reset is needed based on subscription start date (if subscription exists)
+    // Check if reset is needed based on subscription start timestamp (if subscription exists)
     // Otherwise fall back to calendar month
     let shouldReset = false;
+    let resetAnchor = now;
     
     if (hasActiveSubscription && user.subscription?.startDate) {
-      // Reset based on subscription start date (same calendar day each month)
       const subStartDate = new Date(user.subscription.startDate);
-      const startYear = subStartDate.getUTCFullYear();
-      const startMonth = subStartDate.getUTCMonth();
-      const startDay = subStartDate.getUTCDate();
-      
-      if (!last) {
-        // Never reset before - reset now
-        shouldReset = true;
-      } else {
-        // Check if we've passed the subscription renewal date this month
-        const lastYear = last.getUTCFullYear();
-        const lastMonth = last.getUTCMonth();
-        const lastDay = last.getUTCDate();
-        
-        const currentYear = now.getUTCFullYear();
-        const currentMonth = now.getUTCMonth();
-        const currentDay = now.getUTCDate();
-        
-        // Calculate which subscription month we should be in based on last reset
-        let expectedMonthsSinceStart = (lastYear - startYear) * 12 + (lastMonth - startMonth);
-        if (lastDay < startDay) {
-          expectedMonthsSinceStart--;
-        }
-        
-        // Calculate which subscription month we're actually in now
-        let actualMonthsSinceStart = (currentYear - startYear) * 12 + (currentMonth - startMonth);
-        if (currentDay < startDay) {
-          actualMonthsSinceStart--;
-        }
-        
-        // Reset if we've moved to a new subscription month
-        shouldReset = actualMonthsSinceStart > expectedMonthsSinceStart;
-      }
+      const cycleStart = currentCycleStartUtc(subStartDate, now);
+      resetAnchor = cycleStart;
+      shouldReset = !last || last.getTime() < cycleStart.getTime();
     } else {
       // No subscription - use calendar month reset
       const monthChanged =
@@ -146,7 +184,7 @@ export class CreditManager {
         where: { id: this.userId },
         data: {
           walletMonthlyUsedCents: 0,
-          walletMonthlyResetAt: now,
+          walletMonthlyResetAt: resetAnchor,
           // Reset monthly per-feature usage counters
           monthlySymptomAnalysisUsed: 0,
           monthlyFoodAnalysisUsed: 0,

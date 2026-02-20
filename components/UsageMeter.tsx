@@ -413,7 +413,15 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
       )}
       {showResetDate && walletRefreshAt && !showFreeCredits && (
         <p className="text-xs text-gray-200 mt-1.5">
-          Resets {new Date(walletRefreshAt).toLocaleString(undefined, { dateStyle: 'medium', timeStyle: 'short' })}
+          Resets {new Date(walletRefreshAt).toLocaleString(undefined, {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+            hour: 'numeric',
+            minute: '2-digit',
+            second: '2-digit',
+            hour12: true,
+          })}
         </p>
       )}
     </div>
