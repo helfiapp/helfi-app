@@ -15401,15 +15401,37 @@ Please add nutritional information manually if needed.`);
     setBarcodeStatusHint('')
     disableTorch()
     const scanner = barcodeScannerRef.current as any
+    if (scanner?.auxControls && Array.isArray(scanner.auxControls)) {
+      scanner.auxControls.forEach((control: any) => {
+        if (control?.stop) {
+          try {
+            control.stop()
+          } catch {}
+        }
+      })
+    }
     if (scanner?.controls?.stop) {
       try {
         scanner.controls.stop()
       } catch {}
     }
+    if (scanner?.auxReaders && Array.isArray(scanner.auxReaders)) {
+      scanner.auxReaders.forEach((reader: any) => {
+        if (reader?.reset) {
+          try {
+            reader.reset()
+          } catch {}
+        }
+      })
+    }
     if (scanner?.reader?.reset) {
       try {
         scanner.reader.reset()
       } catch {}
+    }
+    if (hybridBarcodeFrameRef.current) {
+      cancelAnimationFrame(hybridBarcodeFrameRef.current)
+      hybridBarcodeFrameRef.current = null
     }
     if (scanner?.videoEl) {
       try {
@@ -16242,14 +16264,36 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  const startHybridDetector = () => {
+  const startHybridDetector = async () => {
     if (typeof window === 'undefined' || typeof (window as any).BarcodeDetector === 'undefined') return
+    const BarcodeDetectorCtor = (window as any).BarcodeDetector
     const region = document.getElementById(BARCODE_REGION_ID)
     const videoEl = region?.querySelector('video') as HTMLVideoElement | null
     if (!videoEl) return
-    const detector = new (window as any).BarcodeDetector({
-      formats: ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix', 'qr_code'],
-    })
+    if (hybridBarcodeFrameRef.current) {
+      cancelAnimationFrame(hybridBarcodeFrameRef.current)
+      hybridBarcodeFrameRef.current = null
+    }
+    const preferredFormats = ['ean_13', 'ean_8', 'upc_a', 'upc_e', 'data_matrix', 'qr_code']
+    let formats = preferredFormats
+    if (typeof BarcodeDetectorCtor.getSupportedFormats === 'function') {
+      try {
+        const supported = await BarcodeDetectorCtor.getSupportedFormats()
+        if (Array.isArray(supported) && supported.length > 0) {
+          const filtered = preferredFormats.filter((fmt) => supported.includes(fmt))
+          if (filtered.length === 0) return
+          formats = filtered
+        }
+      } catch {
+        // ignore and try preferred formats
+      }
+    }
+    let detector: any = null
+    try {
+      detector = new BarcodeDetectorCtor({ formats })
+    } catch {
+      return
+    }
     const scanFrame = async () => {
       try {
         const detections = await detector.detect(videoEl)
@@ -16332,8 +16376,8 @@ Please add nutritional information manually if needed.`);
     }
   }
 
-  // GUARD RAIL: Barcode scanner is locked. Do not change decoder/library/flow without explicit user approval.
-  // ZXing decodeFromConstraints with rear camera + autofocus + try-harder; no photo flow or alternate decoders.
+  // Barcode scanner flow is owner-approved for dual reliability mode:
+  // 1D EAN/UPC reader + dedicated square-code readers (Data Matrix / QR) on the same camera stream.
   const startBarcodeScanner = async (options?: { forceFacing?: 'front' | 'back' }) => {
     if (!showBarcodeScanner) return
     resetTorchState()
@@ -16371,7 +16415,12 @@ Please add nutritional information manually if needed.`);
       videoEl.style.objectFit = 'cover'
       region.appendChild(videoEl)
 
-      const { BrowserMultiFormatReader, BarcodeFormat } = await import('@zxing/browser')
+      const {
+        BrowserDatamatrixCodeReader,
+        BrowserMultiFormatReader,
+        BrowserQRCodeReader,
+        BarcodeFormat,
+      } = await import('@zxing/browser')
       const { DecodeHintType } = await import('@zxing/library')
 
       const hints = new Map()
@@ -16380,10 +16429,9 @@ Please add nutritional information manually if needed.`);
         BarcodeFormat.EAN_8,
         BarcodeFormat.UPC_A,
         BarcodeFormat.UPC_E,
-        BarcodeFormat.DATA_MATRIX,
-        BarcodeFormat.QR_CODE,
       ])
       hints.set(DecodeHintType.TRY_HARDER, true)
+      hints.set(DecodeHintType.ALSO_INVERTED, true)
 
       const reader = new BrowserMultiFormatReader()
       reader.setHints(hints)
@@ -16391,8 +16439,8 @@ Please add nutritional information manually if needed.`);
       const constraints: any = {
         video: {
           facingMode: desiredFacing === 'front' ? 'user' : { ideal: 'environment' },
-          width: { ideal: 1280 },
-          height: { ideal: 720 },
+          width: { ideal: 1920 },
+          height: { ideal: 1080 },
           advanced: [{ focusMode: 'continuous' }],
         },
       }
@@ -16402,11 +16450,39 @@ Please add nutritional information manually if needed.`);
         if (text) handleBarcodeDetected(text)
       })
 
-      barcodeScannerRef.current = { reader, controls, videoEl }
+      const auxReaders: any[] = []
+      const auxControls: any[] = []
+
+      try {
+        const dataMatrixReader = new BrowserDatamatrixCodeReader()
+        const dataMatrixControls = await dataMatrixReader.decodeFromVideoElement(videoEl, (result: any) => {
+          const text = result?.getText ? result.getText() : result?.text
+          if (text) handleBarcodeDetected(text)
+        })
+        auxReaders.push(dataMatrixReader)
+        auxControls.push(dataMatrixControls)
+      } catch (err) {
+        console.warn('Data Matrix reader unavailable, continuing with primary scanner', err)
+      }
+
+      try {
+        const qrReader = new BrowserQRCodeReader()
+        const qrControls = await qrReader.decodeFromVideoElement(videoEl, (result: any) => {
+          const text = result?.getText ? result.getText() : result?.text
+          if (text) handleBarcodeDetected(text)
+        })
+        auxReaders.push(qrReader)
+        auxControls.push(qrControls)
+      } catch (err) {
+        console.warn('QR reader unavailable, continuing with primary scanner', err)
+      }
+
+      barcodeScannerRef.current = { reader, controls, auxReaders, auxControls, videoEl }
       setCameraFacing(desiredFacing)
       setBarcodeStatus('scanning')
       setBarcodeStatusHint('Scanning…')
       setTimeout(() => attachTorchTrackFromDom(), 150)
+      void startHybridDetector()
     } catch (err) {
       console.error('Barcode scanner start error', err)
       setBarcodeError('Could not start the camera. Please allow camera access, then tap Restart.')
