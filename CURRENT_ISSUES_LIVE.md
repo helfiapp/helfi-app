@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-20 11:13 AEDT
+- What changed: Unified the Health Setup completion rule into one shared web rule and wired Dashboard status, Insights lock/unlock checks, 5-minute reminder status API, and PWA entry gating to use the same logic.
+- Where to see it (page/link): https://helfi.ai/dashboard, https://helfi.ai/insights, https://helfi.ai/onboarding?step=1
+- What to quickly test: 1) With incomplete setup, Insights stays locked and the dashboard shows incomplete setup state. 2) Complete gender/weight/height + at least one real health goal and confirm Insights unlocks and dashboard marks setup complete. 3) Leave setup incomplete for 5 minutes and confirm reminder behavior still follows the same completion status.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-20 02:42 AEDT
 - What changed: Added editable drink log time support so users can change timestamp after logging water/tea/hot chocolate. Also ensured meal entry menu supports Move entry and Copy for 7 days in the Food Diary flow.
 - Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
