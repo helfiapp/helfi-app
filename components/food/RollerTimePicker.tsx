@@ -52,7 +52,7 @@ function InfiniteWheelColumn({
   const displayValues = useMemo(() => Array.from({ length: itemCount }, (_, i) => options[i % options.length]), [itemCount, options])
 
   const scrollToIndex = useCallback(
-    (targetIndex: number, behavior: ScrollBehavior = 'smooth') => {
+    (targetIndex: number, behavior: ScrollBehavior = 'auto') => {
       const el = scrollRef.current
       if (!el) return
       const raw = Math.floor(INFINITE_REPEAT_BLOCKS / 2) * options.length + targetIndex
@@ -69,7 +69,7 @@ function InfiniteWheelColumn({
   const step = (delta: number) => {
     const next = (selectedIndex + delta + options.length) % options.length
     onSelect(next)
-    scrollToIndex(next)
+    scrollToIndex(next, 'auto')
   }
 
   const handleScroll = () => {
@@ -132,7 +132,11 @@ function InfiniteWheelColumn({
               <button
                 key={`${label}-${i}-${value}`}
                 type="button"
-                onClick={() => scrollToIndex(i % options.length)}
+                onClick={() => {
+                  const next = i % options.length
+                  onSelect(next)
+                  scrollToIndex(next, 'auto')
+                }}
                 className={`flex h-9 w-full snap-center items-center justify-center text-base transition ${
                   isSelected ? 'mx-1 rounded-md bg-emerald-500 font-semibold text-white shadow-sm' : 'text-gray-600'
                 }`}
@@ -192,7 +196,7 @@ function FiniteWheelColumn({
     if (next !== selectedIndex) onSelect(next)
     const el = scrollRef.current
     if (el) {
-      el.scrollTo({ top: next * ITEM_HEIGHT, behavior: 'smooth' })
+      el.scrollTo({ top: next * ITEM_HEIGHT, behavior: 'auto' })
     }
   }
 
