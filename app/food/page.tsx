@@ -16431,7 +16431,6 @@ Please add nutritional information manually if needed.`);
         BarcodeFormat.UPC_E,
       ])
       hints.set(DecodeHintType.TRY_HARDER, true)
-      hints.set(DecodeHintType.ALSO_INVERTED, true)
 
       const reader = new BrowserMultiFormatReader()
       reader.setHints(hints)
