@@ -48,32 +48,62 @@ function InfiniteWheelColumn({
   enabled: boolean
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const currentIndexRef = useRef(0)
   const wheelRemainderRef = useRef(0)
   const lastWheelDirectionRef = useRef<1 | -1 | 0>(0)
   const lastWheelTsRef = useRef(0)
+  const wheelControlUntilRef = useRef(0)
   const itemCount = options.length * INFINITE_REPEAT_BLOCKS
   const displayValues = useMemo(() => Array.from({ length: itemCount }, (_, i) => options[i % options.length]), [itemCount, options])
+
+  const normalizeIndex = useCallback(
+    (index: number) => ((index % options.length) + options.length) % options.length,
+    [options.length],
+  )
+
+  const toRawIndex = useCallback(
+    (targetIndex: number) => Math.floor(INFINITE_REPEAT_BLOCKS / 2) * options.length + normalizeIndex(targetIndex),
+    [normalizeIndex, options.length],
+  )
+
+  const topForRaw = useCallback((raw: number) => raw * ITEM_HEIGHT - CENTER_OFFSET, [])
+
+  const topForIndex = useCallback(
+    (targetIndex: number) => topForRaw(toRawIndex(targetIndex)),
+    [toRawIndex, topForRaw],
+  )
+
+  const commitSelection = useCallback(
+    (nextIndex: number) => {
+      const normalized = normalizeIndex(nextIndex)
+      if (normalized === currentIndexRef.current) return
+      currentIndexRef.current = normalized
+      onSelect(normalized)
+    },
+    [normalizeIndex, onSelect],
+  )
 
   const scrollToIndex = useCallback(
     (targetIndex: number, behavior: ScrollBehavior = 'auto') => {
       const el = scrollRef.current
       if (!el) return
-      const raw = Math.floor(INFINITE_REPEAT_BLOCKS / 2) * options.length + targetIndex
-      el.scrollTo({ top: raw * ITEM_HEIGHT - CENTER_OFFSET, behavior })
+      el.scrollTo({ top: topForIndex(targetIndex), behavior })
     },
-    [options.length],
+    [topForIndex],
   )
 
   useEffect(() => {
     if (!enabled) return
-    scrollToIndex(selectedIndex, 'auto')
-  }, [enabled, selectedIndex, scrollToIndex])
+    const normalized = normalizeIndex(selectedIndex)
+    currentIndexRef.current = normalized
+    scrollToIndex(normalized, 'auto')
+  }, [enabled, normalizeIndex, scrollToIndex, selectedIndex])
 
-  const step = (delta: number) => {
-    const next = (selectedIndex + delta + options.length) % options.length
-    onSelect(next)
+  const step = useCallback((delta: number) => {
+    const next = normalizeIndex(currentIndexRef.current + delta)
+    commitSelection(next)
     scrollToIndex(next, 'auto')
-  }
+  }, [commitSelection, normalizeIndex, scrollToIndex])
 
   const handleWheelStep = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -87,6 +117,7 @@ function InfiniteWheelColumn({
     const direction: 1 | -1 = delta > 0 ? 1 : -1
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
     const elapsed = now - lastWheelTsRef.current
+    wheelControlUntilRef.current = now + 180
 
     if (elapsed > 180 || direction !== lastWheelDirectionRef.current) {
       wheelRemainderRef.current = 0
@@ -96,30 +127,42 @@ function InfiniteWheelColumn({
     lastWheelTsRef.current = now
     wheelRemainderRef.current += delta
 
-    const threshold = 26
-    if (wheelRemainderRef.current >= threshold) {
+    const threshold = 24
+    let iterations = 0
+    while (wheelRemainderRef.current >= threshold && iterations < 8) {
       step(1)
       wheelRemainderRef.current -= threshold
-    } else if (wheelRemainderRef.current <= -threshold) {
+      iterations += 1
+    }
+    while (wheelRemainderRef.current <= -threshold && iterations < 8) {
       step(-1)
       wheelRemainderRef.current += threshold
+      iterations += 1
     }
   }
 
   const handleScroll = () => {
     const el = scrollRef.current
     if (!el) return
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+
+    // When wheel-stepping, lock to the commanded index so inertia cannot sling back by one.
+    if (now < wheelControlUntilRef.current) {
+      const expectedTop = topForIndex(currentIndexRef.current)
+      if (Math.abs(el.scrollTop - expectedTop) > 0.5) {
+        el.scrollTop = expectedTop
+      }
+      return
+    }
 
     const raw = Math.round((el.scrollTop + CENTER_OFFSET) / ITEM_HEIGHT)
-    const normalized = ((raw % options.length) + options.length) % options.length
-
-    if (normalized !== selectedIndex) onSelect(normalized)
+    const normalized = normalizeIndex(raw)
+    if (normalized !== currentIndexRef.current) commitSelection(normalized)
 
     const minRaw = options.length * 2
     const maxRaw = itemCount - options.length * 2
     if (raw < minRaw || raw > maxRaw) {
-      const centeredRaw = Math.floor(INFINITE_REPEAT_BLOCKS / 2) * options.length + normalized
-      el.scrollTop = centeredRaw * ITEM_HEIGHT - CENTER_OFFSET
+      el.scrollTop = topForRaw(toRawIndex(normalized))
     }
   }
 
@@ -164,8 +207,8 @@ function InfiniteWheelColumn({
                 key={`${label}-${i}-${value}`}
                 type="button"
                 onClick={() => {
-                  const next = i % options.length
-                  onSelect(next)
+                  const next = normalizeIndex(i)
+                  commitSelection(next)
                   scrollToIndex(next, 'auto')
                 }}
                 className={`flex h-9 w-full snap-center items-center justify-center text-base transition ${
@@ -206,33 +249,65 @@ function FiniteWheelColumn({
   enabled: boolean
 }) {
   const scrollRef = useRef<HTMLDivElement | null>(null)
+  const currentIndexRef = useRef(0)
   const wheelRemainderRef = useRef(0)
   const lastWheelDirectionRef = useRef<1 | -1 | 0>(0)
   const lastWheelTsRef = useRef(0)
+  const wheelControlUntilRef = useRef(0)
+
+  const clampIndex = useCallback(
+    (index: number) => Math.min(options.length - 1, Math.max(0, index)),
+    [options.length],
+  )
+
+  const topForIndex = useCallback((index: number) => clampIndex(index) * ITEM_HEIGHT, [clampIndex])
+
+  const commitSelection = useCallback(
+    (nextIndex: number) => {
+      const clamped = clampIndex(nextIndex)
+      if (clamped === currentIndexRef.current) return
+      currentIndexRef.current = clamped
+      onSelect(clamped)
+    },
+    [clampIndex, onSelect],
+  )
 
   useEffect(() => {
     if (!enabled) return
     const el = scrollRef.current
     if (!el) return
-    el.scrollTo({ top: selectedIndex * ITEM_HEIGHT, behavior: 'auto' })
-  }, [enabled, selectedIndex])
+    const clamped = clampIndex(selectedIndex)
+    currentIndexRef.current = clamped
+    el.scrollTo({ top: topForIndex(clamped), behavior: 'auto' })
+  }, [clampIndex, enabled, selectedIndex, topForIndex])
 
   const handleScroll = () => {
     const el = scrollRef.current
     if (!el) return
+    const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
+
+    // During wheel stepping, keep the column anchored to current selection.
+    if (now < wheelControlUntilRef.current) {
+      const expectedTop = topForIndex(currentIndexRef.current)
+      if (Math.abs(el.scrollTop - expectedTop) > 0.5) {
+        el.scrollTop = expectedTop
+      }
+      return
+    }
+
     const raw = Math.round(el.scrollTop / ITEM_HEIGHT)
-    const clamped = Math.min(options.length - 1, Math.max(0, raw))
-    if (clamped !== selectedIndex) onSelect(clamped)
+    const clamped = clampIndex(raw)
+    if (clamped !== currentIndexRef.current) commitSelection(clamped)
   }
 
-  const step = (delta: number) => {
-    const next = Math.min(options.length - 1, Math.max(0, selectedIndex + delta))
-    if (next !== selectedIndex) onSelect(next)
+  const step = useCallback((delta: number) => {
+    const next = clampIndex(currentIndexRef.current + delta)
+    commitSelection(next)
     const el = scrollRef.current
     if (el) {
-      el.scrollTo({ top: next * ITEM_HEIGHT, behavior: 'auto' })
+      el.scrollTo({ top: topForIndex(next), behavior: 'auto' })
     }
-  }
+  }, [clampIndex, commitSelection, topForIndex])
 
   const handleWheelStep = (event: React.WheelEvent<HTMLDivElement>) => {
     event.preventDefault()
@@ -246,6 +321,7 @@ function FiniteWheelColumn({
     const direction: 1 | -1 = delta > 0 ? 1 : -1
     const now = typeof performance !== 'undefined' ? performance.now() : Date.now()
     const elapsed = now - lastWheelTsRef.current
+    wheelControlUntilRef.current = now + 180
 
     if (elapsed > 180 || direction !== lastWheelDirectionRef.current) {
       wheelRemainderRef.current = 0
@@ -255,13 +331,17 @@ function FiniteWheelColumn({
     lastWheelTsRef.current = now
     wheelRemainderRef.current += delta
 
-    const threshold = 26
-    if (wheelRemainderRef.current >= threshold) {
+    const threshold = 24
+    let iterations = 0
+    while (wheelRemainderRef.current >= threshold && iterations < 8) {
       step(1)
       wheelRemainderRef.current -= threshold
-    } else if (wheelRemainderRef.current <= -threshold) {
+      iterations += 1
+    }
+    while (wheelRemainderRef.current <= -threshold && iterations < 8) {
       step(-1)
       wheelRemainderRef.current += threshold
+      iterations += 1
     }
   }
 
@@ -306,7 +386,13 @@ function FiniteWheelColumn({
               <button
                 key={`${label}-${value}`}
                 type="button"
-                onClick={() => onSelect(i)}
+                onClick={() => {
+                  commitSelection(i)
+                  const el = scrollRef.current
+                  if (el) {
+                    el.scrollTo({ top: topForIndex(i), behavior: 'auto' })
+                  }
+                }}
                 className={`flex h-9 w-full snap-center items-center justify-center text-base transition ${
                   isSelected ? 'mx-1 rounded-md bg-emerald-500 font-semibold text-white shadow-sm' : 'text-gray-600'
                 }`}
