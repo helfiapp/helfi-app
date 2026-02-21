@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:53 PM AEDT
+- What changed: Removed visible desktop loading labels in Food Diary energy summary and meal row preview while keeping background data checks. Users no longer see “Loading this day’s summary...” or “Loading...” flashes.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: On desktop, open Food Diary and switch dates with Previous/Next and browser refresh. Confirm no loading text appears in summary/meals while data updates.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 01:31 PM AEDT
 - What changed: Food Diary today-state reliability hardening. Today now keeps last known local snapshot visible even after a temporary server-empty response, and today fetch now does a delayed recheck before accepting empty so copied breakfasts are less likely to flash/stick as zero/loading.
 - Where to see it (page/link): https://helfi.ai/food?debug=1
