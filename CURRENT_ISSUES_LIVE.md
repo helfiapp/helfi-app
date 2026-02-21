@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 06:27 PM AEDT
+- What changed: Restored missing native app email/password login API routes on live (`/api/native-auth/login` and `/api/native-auth/me`) so native login works again.
+- Where to see it (page/link): Native app login screen and https://helfi.ai/api/native-auth/login
+- What to quickly test: In native app, log in with a valid email/password account. For invalid credentials, endpoint now returns 401 JSON (not 404).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 04:15 PM AEDT
 - What changed: Fixed credit checkout failures in billing. Credit packs ($5/$10/$20) now create Stripe checkout sessions reliably, with a safe fallback if Stripe credit price settings are missing/mismatched. Also fixed one-time checkout mode setting that was blocking credit purchases.
 - Where to see it (page/link): https://helfi.ai/billing and native app Billing screen
