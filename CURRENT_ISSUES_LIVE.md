@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-22 01:55 AM AEDT
+- What changed: Fixed native billing product ID cleanup so hidden escaped characters/newlines/tabs/quotes are removed before Apple SKU matching. This prevents false `SKU not found` / product mismatch errors during iOS top-up purchases.
+- Where to see it (page/link): https://helfi.ai/api/native-billing/catalog and https://helfi.ai/api/native-billing/verify-purchase
+- What to quickly test: In native app Subscription & Billing, tap Buy $5 Credits first, then $10/$20. Confirm checkout opens and no `SKU not found` popup appears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 07:35 PM AEDT
 - What changed: Native iOS in-app purchase verification now supports Apple transaction API lookup using App Store API credentials, with receipt fallback still supported. Added clearer iOS readiness check so billing shows a specific setup warning if Apple verification credentials are missing.
 - Where to see it (page/link): https://helfi.ai/api/native-billing/catalog and native app Subscription & Billing screen
