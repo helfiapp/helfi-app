@@ -3497,6 +3497,7 @@ export default function FoodDiary() {
   const todayServerFetchRef = useRef<Record<string, boolean>>({})
   const todayServerFetchAttemptAtRef = useRef<Record<string, number>>({})
   const TODAY_FETCH_RETRY_COOLDOWN_MS = 2500
+  const TODAY_EMPTY_RECHECK_DELAY_MS = 1200
   const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
   const renameSaveRef = useRef<((value: string) => void) | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
@@ -8722,7 +8723,7 @@ const applyStructuredItems = (
       if (todaysFoodsForSelectedDate.length > 0) {
         base = todaysFoodsForSelectedDate
         branch = 'today-memory'
-      } else if (!todayFetchSucceededForSelectedDate && localSnapshotEntriesForSelectedDate.length > 0) {
+      } else if (localSnapshotEntriesForSelectedDate.length > 0) {
         base = localSnapshotEntriesForSelectedDate
         branch = 'today-local-snapshot'
       } else if (todayFetchSucceededForSelectedDate) {
@@ -10072,18 +10073,43 @@ const applyStructuredItems = (
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
       let serverLogs = logs
-      if (serverLogs.length === 0 && localList.length > 0) {
-        const retryRes = await fetch(`/api/food-log?date=${targetDate}&tz=${tz}&t=${Date.now()}`, {
-          cache: 'no-store',
-        })
-        if (retryRes.ok) {
-          const retryJson = await retryRes.json().catch(() => ({} as any))
-          const retryLogs = Array.isArray(retryJson.logs) ? retryJson.logs : []
-          if (retryLogs.length > 0) {
-            serverLogs = retryLogs
+      const shouldRetryEmpty = fetchSource === 'today' || localList.length > 0
+      let emptyRetryAttempted = false
+      let emptyRetrySucceeded = false
+      if (serverLogs.length === 0 && shouldRetryEmpty) {
+        emptyRetryAttempted = true
+        if (fetchSource === 'today') {
+          await new Promise((resolve) => setTimeout(resolve, TODAY_EMPTY_RECHECK_DELAY_MS))
+        }
+        try {
+          const retryRes = await fetch(`/api/food-log?date=${targetDate}&tz=${tz}&t=${Date.now()}`, {
+            cache: 'no-store',
+          })
+          if (retryRes.ok) {
+            emptyRetrySucceeded = true
+            const retryJson = await retryRes.json().catch(() => ({} as any))
+            const retryLogs = Array.isArray(retryJson.logs) ? retryJson.logs : []
+            if (retryLogs.length > 0) {
+              serverLogs = retryLogs
+            }
           }
+        } catch {
+          emptyRetrySucceeded = false
         }
         if (serverLogs.length === 0) {
+          if (fetchSource === 'today' && emptyRetryAttempted && !emptyRetrySucceeded) {
+            setLastDiaryFetchInfo({
+              date: targetDate,
+              from: fetchSource,
+              ok: false,
+              logsCount: null,
+              logDates: [],
+              logSample: [],
+              receivedAt: Date.now(),
+            })
+            setFoodDiaryLoaded(true)
+            return
+          }
           setLastDiaryFetchInfo({
             date: targetDate,
             from: fetchSource,
@@ -10172,8 +10198,8 @@ const applyStructuredItems = (
 
   useEffect(() => {
     if (!isViewingToday) return
-    if (!foodDiaryLoaded) return
     if (todaysFoodsForSelectedDate.length > 0) return
+    if (todayFetchSucceededForSelectedDate && localSnapshotEntriesForSelectedDate.length === 0) return
     const lastAttemptAt = Number(todayServerFetchAttemptAtRef.current[selectedDate] || 0)
     if (lastAttemptAt > 0 && Date.now() - lastAttemptAt < TODAY_FETCH_RETRY_COOLDOWN_MS) return
     if (todayServerFetchRef.current[selectedDate]) return
@@ -10183,8 +10209,9 @@ const applyStructuredItems = (
   }, [
     isViewingToday,
     selectedDate,
-    foodDiaryLoaded,
     todaysFoodsForSelectedDate.length,
+    localSnapshotEntriesForSelectedDate.length,
+    todayFetchSucceededForSelectedDate,
     lastDiaryFetchInfo?.receivedAt,
     refreshEntriesFromServer,
   ])
