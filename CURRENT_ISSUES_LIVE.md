@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 11:24 AEDT
+- What changed: Follow-up hardening for Food Diary zero-state bug. Today view now falls back to saved same-day snapshot instantly, avoids writing empty snapshot during early load, and refresh now protects existing visible entries from transient empty server reads by retrying once and keeping current entries if still empty.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary where breakfast already exists, press Refresh, and confirm breakfast + energy summary stay visible (no fake zero/no meals). Also browser refresh and return from another page should keep summary stable instead of blank/zero flash.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 11:10 AEDT
 - What changed: Fixed Food Diary first-load consistency for copied days and return-to-page loads. The page now uses the selected URL date immediately, keeps selected-day cached data ready during loading, avoids false empty/zero state while day data is still resolving, and retries once before accepting an empty non-today result.
 - Where to see it (page/link): https://helfi.ai/food?date=2026-02-20&category=snacks
