@@ -26458,9 +26458,7 @@ Please add nutritional information manually if needed.`);
                           </button>
                         </div>
                       </div>
-                      {!summaryReady ? (
-                        <div className="text-xs text-gray-500 mb-3">Loading this day's summary...</div>
-                      ) : (
+                      {summaryReady && (
                         <>
                           {source.length === 0 && (
                             <p className="text-xs text-gray-500 mb-3">
@@ -27830,8 +27828,7 @@ Please add nutritional information manually if needed.`);
                         : []
                       const visibleWaterEntries = Array.isArray(waterInCategory) ? waterInCategory : []
                       const visibleEntries = [...visibleFoodEntries, ...visibleWaterEntries]
-                      const awaitingTodayEntries = isViewingToday && !summaryReady && sourceEntries.length === 0
-                      let summaryText = awaitingTodayEntries ? 'Loading...' : 'No entries yet'
+                      let summaryText = summaryReady ? 'No entries yet' : ''
                       if (visibleEntries.length > 0) {
                         const totals = visibleFoodEntries.reduce(
                           (acc, entry) => {
