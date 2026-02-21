@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 07:35 PM AEDT
+- What changed: Native iOS in-app purchase verification now supports Apple transaction API lookup using App Store API credentials, with receipt fallback still supported. Added clearer iOS readiness check so billing shows a specific setup warning if Apple verification credentials are missing.
+- Where to see it (page/link): https://helfi.ai/api/native-billing/catalog and native app Subscription & Billing screen
+- What to quickly test: In native app on iPhone, open Subscription & Billing and confirm mobile payments setup shows ready; then run a sandbox purchase for $5/$10/$20 credits and confirm credits update + billing history entry appears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 06:27 PM AEDT
 - What changed: Restored missing native app email/password login API routes on live (`/api/native-auth/login` and `/api/native-auth/me`) so native login works again.
 - Where to see it (page/link): Native app login screen and https://helfi.ai/api/native-auth/login
