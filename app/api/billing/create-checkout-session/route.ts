@@ -166,7 +166,7 @@ export async function POST(request: NextRequest) {
       cancel_url: `${origin}/billing?checkout=cancelled`,
       customer_email: customerEmail,
       allow_promotion_codes: true,
-      payment_method_collection: 'always',
+      ...(!isCredits ? { payment_method_collection: 'always' } : {}),
       ...(Object.keys(baseMetadata).length ? { metadata: baseMetadata } : {}),
       ...(isCredits
         ? Object.keys(baseMetadata).length
