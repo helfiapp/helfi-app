@@ -8704,7 +8704,11 @@ const applyStructuredItems = (
       Array.isArray(historyFoods)
     const historyForSelectedDate = historyReady ? historyCacheEntriesForSelectedDate : []
     const base = isViewingToday
-      ? todaysFoodsForSelectedDate
+      ? todaysFoodsForSelectedDate.length > 0
+        ? todaysFoodsForSelectedDate
+        : localSnapshotEntriesForSelectedDate.length > 0
+        ? localSnapshotEntriesForSelectedDate
+        : []
       : historyReady
       ? historyForSelectedDate
       : historyCacheEntriesForSelectedDate.length > 0
@@ -8728,6 +8732,8 @@ const applyStructuredItems = (
   ])
   const summaryReady = useMemo(() => {
     if (isViewingToday) {
+      if (todaysFoodsForSelectedDate.length > 0) return true
+      if (localSnapshotEntriesForSelectedDate.length > 0) return true
       return isDiaryHydrated(selectedDate) && foodDiaryLoaded
     }
     if (historyCacheEntriesForSelectedDate.length > 0) return true
@@ -8739,6 +8745,7 @@ const applyStructuredItems = (
     isViewingToday,
     selectedDate,
     foodDiaryLoaded,
+    todaysFoodsForSelectedDate.length,
     historyFoodsDate,
     historyCacheEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate.length,
@@ -9026,6 +9033,7 @@ const applyStructuredItems = (
       const rawEntries = isViewingToday
         ? todaysFoodsForSelectedDate
         : filterEntriesForDate(historyFoods, selectedDate)
+      if (isViewingToday && !foodDiaryLoaded && rawEntries.length === 0) return
       if (!isViewingToday && isLoadingHistory && rawEntries.length === 0) return
       const sourceEntriesForDate = normalizeDiaryList(rawEntries, selectedDate)
       const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
@@ -9045,6 +9053,7 @@ const applyStructuredItems = (
     todaysFoods,
     historyFoods,
     historyFoodsDate,
+    foodDiaryLoaded,
     expandedCategories,
     isLoadingHistory,
     refreshPersistentDiarySnapshot,
@@ -9965,23 +9974,51 @@ const applyStructuredItems = (
         return;
       }
 
+      const localList = isViewingToday
+        ? dedupeEntries(todaysFoodsForSelectedDate, { fallbackDate: targetDate })
+        : Array.isArray(historyFoods)
+        ? filterEntriesForDate(historyFoods, targetDate)
+        : []
       const json = await res.json();
       const logs = Array.isArray(json.logs) ? json.logs : [];
+      let serverLogs = logs
+      if (serverLogs.length === 0 && localList.length > 0) {
+        const retryRes = await fetch(`/api/food-log?date=${targetDate}&tz=${tz}&t=${Date.now()}`, {
+          cache: 'no-store',
+        })
+        if (retryRes.ok) {
+          const retryJson = await retryRes.json().catch(() => ({} as any))
+          const retryLogs = Array.isArray(retryJson.logs) ? retryJson.logs : []
+          if (retryLogs.length > 0) {
+            serverLogs = retryLogs
+          }
+        }
+        if (serverLogs.length === 0) {
+          setLastDiaryFetchInfo({
+            date: targetDate,
+            from: isViewingToday ? 'today' : 'history',
+            ok: true,
+            logsCount: 0,
+            logDates: [],
+            logSample: [],
+            receivedAt: Date.now(),
+          })
+          markDiaryVerified(targetDate)
+          lastVerifyFetchAtRef.current[targetDate] = Date.now()
+          setFoodDiaryLoaded(true)
+          return
+        }
+      }
       setLastDiaryFetchInfo({
         date: targetDate,
         from: isViewingToday ? 'today' : 'history',
         ok: true,
-        logsCount: logs.length,
-        logDates: extractLogDates(logs),
-        logSample: buildLogSample(logs),
+        logsCount: serverLogs.length,
+        logDates: extractLogDates(serverLogs),
+        logSample: buildLogSample(serverLogs),
         receivedAt: Date.now(),
       })
-      const mapped = mapLogsToEntries(logs, targetDate, { preferCreatedAtDate: true });
-      const localList = isViewingToday
-        ? dedupeEntries(todaysFoodsForSelectedDate, { fallbackDate: targetDate })
-        : Array.isArray(historyFoods)
-        ? historyFoods
-        : []
+      const mapped = mapLogsToEntries(serverLogs, targetDate, { preferCreatedAtDate: true });
       const mappedWithStableIds = mapServerEntriesWithLocalIds(mapped, localList, targetDate)
       const { filtered: cleanedServerEntries, duplicates: duplicateCandidates } = collapseNearDuplicates(
         mappedWithStableIds,
