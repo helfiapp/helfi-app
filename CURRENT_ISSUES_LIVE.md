@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 11:10 AEDT
+- What changed: Fixed Food Diary first-load consistency for copied days and return-to-page loads. The page now uses the selected URL date immediately, keeps selected-day cached data ready during loading, avoids false empty/zero state while day data is still resolving, and retries once before accepting an empty non-today result.
+- Where to see it (page/link): https://helfi.ai/food?date=2026-02-20&category=snacks
+- What to quickly test: Open copied days one by one (including 2026-02-20), confirm meals + energy summary show on first load without pressing Refresh, then leave Food Diary and come back and confirm summary/entries stay stable without fake zero flashes.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 04:39 AEDT
 - What changed: In barcode label scan flow, tapping the Food name field now clears prefilled text instantly so users can type from a clean blank field without backspacing one letter at a time.
 - Where to see it (page/link): https://helfi.ai/food (barcode scan -> no match -> nutrition label flow)
