@@ -2742,11 +2742,23 @@ export default function FoodDiary() {
   const persistentDiarySnapshot = useMemo(() => readPersistentDiarySnapshot(), [persistentDiarySnapshotVersion])
   const initialSelectedDate = (() => {
     const today = buildTodayIso()
+    const routeDate = (() => {
+      if (typeof window === 'undefined') return ''
+      try {
+        const params = new URLSearchParams(window.location.search)
+        const dateParam = String(params.get('date') || '').slice(0, 10)
+        return /^\d{4}-\d{2}-\d{2}$/.test(dateParam) ? dateParam : ''
+      } catch {
+        return ''
+      }
+    })()
     const warmSelected =
-      warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
+      routeDate ||
+      (warmDiaryState?.selectedDate && warmDiaryState.selectedDate.length >= 8
         ? warmDiaryState.selectedDate
-        : today
+        : today)
     if (typeof window === 'undefined') return warmSelected
+    if (routeDate) return routeDate
     try {
       const lastPath = localStorage.getItem('helfi:lastPath') || ''
       const lastPathBase = lastPath.split('?')[0]
@@ -3878,23 +3890,20 @@ export default function FoodDiary() {
     verifyMergeTimerRef.current[date] = { id, fireAt }
     return true
   }
-  const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => {
+  const initialHistoryFoods = useMemo<any[] | null>(() => {
     const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
     if (Array.isArray(warmHistory)) return warmHistory
     const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]
     if (persisted?.entries && Array.isArray(persisted.entries)) return persisted.entries
     return null
-  })
+  }, [warmDiaryState, initialSelectedDate, persistentDiarySnapshot])
+  const [historyFoods, setHistoryFoods] = useState<any[] | null>(() => initialHistoryFoods)
   const [historyFoodsDate, setHistoryFoodsDate] = useState<string | null>(() => {
-    const isInitialToday = initialSelectedDate === buildTodayIso()
-    if (isInitialToday) return null
-    const warmHistory = warmDiaryState?.historyByDate?.[initialSelectedDate]
-    if (Array.isArray(warmHistory) && warmHistory.length > 0) return initialSelectedDate
-    const persisted = persistentDiarySnapshot?.byDate?.[initialSelectedDate]
-    if (persisted?.entries && Array.isArray(persisted.entries) && persisted.entries.length > 0) {
-      return initialSelectedDate
-    }
-    return null
+    const isToday = initialSelectedDate === buildTodayIso()
+    if (isToday) return null
+    if (!Array.isArray(initialHistoryFoods) || initialHistoryFoods.length === 0) return null
+    const filtered = filterEntriesForDate(initialHistoryFoods, initialSelectedDate)
+    return filtered.length > 0 ? initialSelectedDate : null
   })
   const [lastDiaryFetchInfo, setLastDiaryFetchInfo] = useState<{
     date: string
@@ -3917,8 +3926,10 @@ export default function FoodDiary() {
   useEffect(() => {
     const isToday = selectedDate === buildTodayIso()
     if (isToday) return
-    if (historyFoodsDate) return
     if (!Array.isArray(historyFoods) || historyFoods.length === 0) return
+    const sameDate = filterEntriesForDate(historyFoods, selectedDate)
+    if (sameDate.length === 0) return
+    if (historyFoodsDate === selectedDate) return
     setHistoryFoodsDate(selectedDate)
   }, [historyFoods, historyFoodsDate, selectedDate])
   useEffect(() => {
@@ -8677,6 +8688,13 @@ const applyStructuredItems = (
     if (!Array.isArray(raw) || raw.length === 0) return []
     return dedupeEntries(normalizeDiaryList(raw, selectedDate), { fallbackDate: selectedDate })
   }, [isViewingToday, todaysFoods, selectedDate])
+  const historyCacheEntriesForSelectedDate = useMemo(() => {
+    if (!Array.isArray(historyFoods) || historyFoods.length === 0) return []
+    return filterEntriesForDate(
+      dedupeEntries(normalizeDiaryList(historyFoods, selectedDate), { fallbackDate: selectedDate }),
+      selectedDate,
+    )
+  }, [historyFoods, selectedDate])
   // SEVERE GUARD RAIL: Keep the local snapshot while history loads.
   // This prevents the "full calories / zero" flash when switching dates.
   const sourceEntries = useMemo(() => {
@@ -8684,11 +8702,13 @@ const applyStructuredItems = (
       !isViewingToday &&
       historyFoodsDate === selectedDate &&
       Array.isArray(historyFoods)
-    const historyForSelectedDate = historyReady ? historyFoods : []
+    const historyForSelectedDate = historyReady ? historyCacheEntriesForSelectedDate : []
     const base = isViewingToday
       ? todaysFoodsForSelectedDate
       : historyReady
       ? historyForSelectedDate
+      : historyCacheEntriesForSelectedDate.length > 0
+      ? historyCacheEntriesForSelectedDate
       : localSnapshotEntriesForSelectedDate.length > 0
       ? localSnapshotEntriesForSelectedDate
       : todaysCacheEntriesForSelectedDate.length > 0
@@ -8703,12 +8723,14 @@ const applyStructuredItems = (
     isViewingToday,
     deletedEntryNonce,
     selectedDate,
+    historyCacheEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate,
   ])
   const summaryReady = useMemo(() => {
     if (isViewingToday) {
       return isDiaryHydrated(selectedDate) && foodDiaryLoaded
     }
+    if (historyCacheEntriesForSelectedDate.length > 0) return true
     if (localSnapshotEntriesForSelectedDate.length > 0) return true
     if (todaysCacheEntriesForSelectedDate.length > 0) return true
     if (historyFoodsDate === selectedDate && Array.isArray(historyFoods)) return true
@@ -8717,9 +8739,10 @@ const applyStructuredItems = (
     isViewingToday,
     selectedDate,
     foodDiaryLoaded,
+    historyFoodsDate,
+    historyCacheEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate.length,
     todaysCacheEntriesForSelectedDate.length,
-    historyFoodsDate,
     historyFoods,
     isLoadingHistory,
   ])
@@ -8954,6 +8977,7 @@ const applyStructuredItems = (
         setTodaysFoods(normalized)
       } else {
         setHistoryFoods(normalized)
+        setHistoryFoodsDate(selectedDate)
       }
       setExpandedCategories((prev) => {
         const merged = { ...prev, ...(byDate.expandedCategories || {}) }
@@ -9560,19 +9584,14 @@ const applyStructuredItems = (
               setFoodDiaryLoaded(true);
               return;
             }
-            const repaired = await attemptLocalDateRepair()
-            if (repaired && requestId === historyLoadSeqRef.current) {
-              const retry = await fetch(`${apiUrl}&t=${Date.now()}`, { cache: 'no-store' })
-              if (requestId !== historyLoadSeqRef.current) return
-              if (retry.ok) {
-                const retryJson = await retry.json().catch(() => ({} as any))
-                const retryLogs = Array.isArray(retryJson.logs) ? retryJson.logs : []
-                if (retryLogs.length === 0) {
-                  setHistoryFoods([]);
-                  setHistoryFoodsDate(selectedDate)
-                  setFoodDiaryLoaded(true);
-                  return;
-                }
+            await attemptLocalDateRepair()
+            if (requestId !== historyLoadSeqRef.current) return
+            const retry = await fetch(`${apiUrl}&t=${Date.now()}`, { cache: 'no-store' })
+            if (requestId !== historyLoadSeqRef.current) return
+            if (retry.ok) {
+              const retryJson = await retry.json().catch(() => ({} as any))
+              const retryLogs = Array.isArray(retryJson.logs) ? retryJson.logs : []
+              if (retryLogs.length > 0) {
                 const retryMapped = mapLogsToEntries(retryLogs, selectedDate, { preferCreatedAtDate: true })
                 const retryDeduped = dedupeEntries(retryMapped, { fallbackDate: selectedDate })
                 console.log(`✅ Setting historyFoods with ${retryDeduped.length} entries for date ${selectedDate}`);
@@ -10000,6 +10019,7 @@ const applyStructuredItems = (
         updateUserSnapshotForDate(merged, targetDate)
       } else {
         setHistoryFoods(merged)
+        setHistoryFoodsDate(targetDate)
       }
     } catch (error) {
       console.error('Error refreshing food diary after save:', error);
@@ -26214,6 +26234,7 @@ Please add nutritional information manually if needed.`);
                     {debugMode && (
                       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
                         <div>Debug: date={selectedDate} view={isViewingToday ? 'today' : 'history'} loading={isLoadingHistory ? 'yes' : 'no'} historyDate={historyFoodsDate || 'none'}</div>
+                        <div>Debug: historyCacheCount={historyCacheEntriesForSelectedDate.length} localSnapshotCount={localSnapshotEntriesForSelectedDate.length} summaryReady={summaryReady ? 'yes' : 'no'}</div>
                         <div>Debug: sourceCount={source.length} sourceDates={sourceDatesLabel}</div>
                         <div>Debug: sourceSample={sourceSampleLabel}</div>
                         <div>Debug: lastServer={lastServerLabel}</div>
@@ -27047,7 +27068,7 @@ Please add nutritional information manually if needed.`);
 	                className="space-y-3 -mx-4 sm:-mx-6 overflow-visible"
 	                style={isMobile ? { marginLeft: 'calc(50% - 50vw)', marginRight: 'calc(50% - 50vw)' } : undefined}
 	              >
-                {sourceEntries.length === 0 && waterEntries.length === 0 && !waterLoading && (
+                {sourceEntries.length === 0 && waterEntries.length === 0 && !waterLoading && summaryReady && (
                   <div className="text-sm text-gray-500 px-4 sm:px-6 pb-2">
                     No food entries yet {isViewingToday ? 'today' : 'for this date'}. Add a meal to get started.
                   </div>
