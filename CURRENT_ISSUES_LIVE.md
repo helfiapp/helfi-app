@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 01:31 PM AEDT
+- What changed: Food Diary today-state reliability hardening. Today now keeps last known local snapshot visible even after a temporary server-empty response, and today fetch now does a delayed recheck before accepting empty so copied breakfasts are less likely to flash/stick as zero/loading.
+- Where to see it (page/link): https://helfi.ai/food?debug=1
+- What to quickly test: Browser refresh on Food Diary, then tap Next/Next/Previous/Previous back to Today. Confirm summary and meals stay visible without getting stuck on “Loading this day’s summary...” and without needing the Refresh button.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 12:53 AEDT
 - What changed: Fixed Food Diary root cause where failed today fetches could block automatic retry and hide saved summary/meal data. Today now keeps local snapshot visible unless a real successful empty response is confirmed, and failed auto-fetch now unlocks and retries automatically.
 - Where to see it (page/link): https://helfi.ai/food
