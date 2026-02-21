@@ -8765,7 +8765,7 @@ const applyStructuredItems = (
     if (isViewingToday) {
       return (
         isDiaryHydrated(selectedDate) &&
-        (sourceEntries.length > 0 || todayFetchSettledForSelectedDate)
+        (sourceEntries.length > 0 || todayFetchSettledForSelectedDate || foodDiaryLoaded)
       )
     }
     if (historyCacheEntriesForSelectedDate.length > 0) return true
@@ -8778,6 +8778,7 @@ const applyStructuredItems = (
     selectedDate,
     sourceEntries.length,
     todayFetchSettledForSelectedDate,
+    foodDiaryLoaded,
     historyFoodsDate,
     historyCacheEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate.length,
@@ -9096,6 +9097,10 @@ const applyStructuredItems = (
         ? todaysFoodsForSelectedDate
         : filterEntriesForDate(historyFoods, selectedDate)
       if (isViewingToday && !foodDiaryLoaded && rawEntries.length === 0) return
+      if (isViewingToday && rawEntries.length === 0 && !todayFetchSettledForSelectedDate) {
+        const existingRaw = snapshot?.byDate?.[selectedDate]?.entries
+        if (Array.isArray(existingRaw) && existingRaw.length > 0) return
+      }
       if (!isViewingToday && isLoadingHistory && rawEntries.length === 0) return
       const sourceEntriesForDate = normalizeDiaryList(rawEntries, selectedDate)
       const normalized = dedupeEntries(sourceEntriesForDate, { fallbackDate: selectedDate })
@@ -9116,6 +9121,7 @@ const applyStructuredItems = (
     historyFoods,
     historyFoodsDate,
     foodDiaryLoaded,
+    todayFetchSettledForSelectedDate,
     expandedCategories,
     isLoadingHistory,
     refreshPersistentDiarySnapshot,
