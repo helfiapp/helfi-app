@@ -18,7 +18,7 @@ export default function ListYourPracticePage() {
               </h1>
               <p className="text-lg text-gray-600 mt-4 max-w-3xl">
                 Reach people searching for trusted care. You get{' '}
-                <span className="font-semibold text-gray-900">2 months free</span>, then it is{' '}
+                <span className="font-semibold text-gray-900">3 months free</span>, then it is{' '}
                 <span className="font-semibold text-gray-900">$4.95/month</span> (USD). No card is needed to start.
                 Your free period begins only after your listing is approved.
               </p>
@@ -86,7 +86,7 @@ export default function ListYourPracticePage() {
                 <div>
                   <div className="font-semibold text-gray-900">Listing subscription</div>
                   <div>
-                    <span className="font-semibold text-gray-900">2 months free</span> (starts after approval), then{' '}
+                    <span className="font-semibold text-gray-900">3 months free</span> (starts after approval), then{' '}
                     <span className="font-semibold text-gray-900">$4.95/month</span> per listing.
                   </div>
                 </div>

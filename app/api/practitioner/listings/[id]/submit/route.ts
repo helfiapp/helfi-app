@@ -215,7 +215,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 
   const now = new Date()
-  const trialEnd = addMonths(now, 2)
+  const trialEnd = addMonths(now, 3)
 
   const updated = await prisma.practitionerListing.update({
     where: { id: listing.id },

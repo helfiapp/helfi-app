@@ -9,6 +9,15 @@ function daysUntil(date: Date | null | undefined): number | null {
   return Math.max(0, Math.ceil(diffMs / (1000 * 60 * 60 * 24)))
 }
 
+function hasUsedWinbackTrial(subscription: {
+  trialStartAt: Date | null
+  currentPeriodStart: Date | null
+}) {
+  if (!subscription.trialStartAt || !subscription.currentPeriodStart) return false
+  const diffMs = subscription.currentPeriodStart.getTime() - subscription.trialStartAt.getTime()
+  return diffMs > 1000 * 60 * 60 * 24
+}
+
 export async function GET() {
   const session = await getServerSession(authOptions)
   if (!session?.user?.id || !session.user.email) {
@@ -39,6 +48,19 @@ export async function GET() {
   const subscription = listing.subscription
   const trialEndsAt = subscription?.trialEndAt ? new Date(subscription.trialEndAt) : null
   const currentPeriodEnd = subscription?.currentPeriodEnd ? new Date(subscription.currentPeriodEnd) : null
+  const trialStartAt = subscription?.trialStartAt ? new Date(subscription.trialStartAt) : null
+  const currentPeriodStart = subscription?.currentPeriodStart ? new Date(subscription.currentPeriodStart) : null
+  const trialHasEnded = trialEndsAt ? trialEndsAt.getTime() <= Date.now() : false
+  const winbackUsed = subscription
+    ? hasUsedWinbackTrial({ trialStartAt, currentPeriodStart })
+    : false
+  const winbackEligible = Boolean(
+    subscription &&
+    trialHasEnded &&
+    !winbackUsed &&
+    subscription.status !== 'ACTIVE' &&
+    !subscription.providerSubscriptionId
+  )
 
   return NextResponse.json({
     account,
@@ -61,6 +83,8 @@ export async function GET() {
       subscriptionStatus: subscription?.status || null,
       stripeSubscriptionId: subscription?.providerSubscriptionId || null,
       subscriptionPeriodEnd: currentPeriodEnd,
+      winbackEligible,
+      winbackUsed,
     },
   })
 }

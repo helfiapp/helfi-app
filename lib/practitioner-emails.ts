@@ -375,7 +375,8 @@ export async function sendPractitionerTrialEndedEmail(options: {
     <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
       <h2 style="margin: 0 0 12px 0;">Trial ended</h2>
       <p style="margin: 0 0 12px 0;">Your listing for <strong>${options.displayName}</strong> is now hidden because the trial ended.</p>
-      <p style="margin: 0 0 16px 0;">You can reactivate it anytime by starting the subscription in your practitioner dashboard.</p>
+      <p style="margin: 0 0 12px 0;">You can reactivate it anytime by starting the subscription in your practitioner dashboard.</p>
+      <p style="margin: 0 0 16px 0;">Need more time first? A one-time extra 3 months free offer is available in your practitioner dashboard.</p>
       ${getEmailFooter({
         recipientEmail: options.toEmail,
         emailType: 'support',
@@ -398,6 +399,43 @@ export async function sendPractitionerTrialEndedEmail(options: {
       listingId: options.listingId,
       type: 'TRIAL_ENDED',
       toEmail: options.toEmail,
+    },
+  })
+}
+
+export async function sendPractitionerWinbackActivatedEmail(options: {
+  toEmail: string
+  displayName: string
+  trialEndAt: Date
+}) {
+  const resend = getResendClient()
+  if (!resend) return
+
+  const trialEndLabel = new Intl.DateTimeFormat('en-AU', { dateStyle: 'medium' }).format(options.trialEndAt)
+  const subject = `Your extra 3 months free is now active`
+  const dashboardUrl = `${getBaseUrl()}/practitioner`
+  const html = `
+    <div style="font-family: Arial, sans-serif; line-height: 1.5; color: #111827;">
+      <h2 style="margin: 0 0 12px 0;">Extra trial activated</h2>
+      <p style="margin: 0 0 12px 0;">We have activated a one-time extra 3 months free for <strong>${options.displayName}</strong>.</p>
+      <p style="margin: 0 0 16px 0;">Your listing is live again until <strong>${trialEndLabel}</strong>.</p>
+      <a href="${dashboardUrl}" style="display:inline-block;background:#16a34a;color:#fff;text-decoration:none;padding:10px 16px;border-radius:999px;font-weight:600;">Open practitioner dashboard</a>
+      ${getEmailFooter({
+        recipientEmail: options.toEmail,
+        emailType: 'support',
+        reasonText: 'You received this email because your one-time extra practitioner trial was activated.'
+      })}
+    </div>
+  `
+
+  dispatchEmailNoLog({
+    resend,
+    label: 'PRACTITIONER WINBACK ACTIVATED',
+    message: {
+      from: 'Helfi <support@helfi.ai>',
+      to: options.toEmail,
+      subject,
+      html,
     },
   })
 }
