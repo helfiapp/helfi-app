@@ -3491,6 +3491,8 @@ export default function FoodDiary() {
   const historyLoadSeqRef = useRef(0)
   const localDateRepairInFlightRef = useRef(false)
   const todayServerFetchRef = useRef<Record<string, boolean>>({})
+  const todayServerFetchAttemptAtRef = useRef<Record<string, number>>({})
+  const TODAY_FETCH_RETRY_COOLDOWN_MS = 2500
   const foodLibraryRefreshRef = useRef<{ last: number; inFlight: boolean }>({ last: 0, inFlight: false })
   const renameSaveRef = useRef<((value: string) => void) | null>(null)
   const [showFavoritesPicker, setShowFavoritesPicker] = useState(false)
@@ -8697,11 +8699,18 @@ const applyStructuredItems = (
   }, [historyFoods, selectedDate])
   // SEVERE GUARD RAIL: Keep the local snapshot while history loads.
   // This prevents the "full calories / zero" flash when switching dates.
-  const todayFetchSettledForSelectedDate = Boolean(
+  const todayFetchAttemptedForSelectedDate = Boolean(
     lastDiaryFetchInfo &&
       lastDiaryFetchInfo.from === 'today' &&
       lastDiaryFetchInfo.date === selectedDate &&
       lastDiaryFetchInfo.receivedAt > 0,
+  )
+  const todayFetchSucceededForSelectedDate = Boolean(
+    lastDiaryFetchInfo &&
+      lastDiaryFetchInfo.from === 'today' &&
+      lastDiaryFetchInfo.date === selectedDate &&
+      lastDiaryFetchInfo.receivedAt > 0 &&
+      lastDiaryFetchInfo.ok,
   )
   const sourceSelectionState = useMemo(() => {
     const historyReady =
@@ -8717,10 +8726,10 @@ const applyStructuredItems = (
       if (todaysFoodsForSelectedDate.length > 0) {
         base = todaysFoodsForSelectedDate
         branch = 'today-memory'
-      } else if (!todayFetchSettledForSelectedDate && localSnapshotEntriesForSelectedDate.length > 0) {
+      } else if (!todayFetchSucceededForSelectedDate && localSnapshotEntriesForSelectedDate.length > 0) {
         base = localSnapshotEntriesForSelectedDate
         branch = 'today-local-snapshot'
-      } else if (todayFetchSettledForSelectedDate) {
+      } else if (todayFetchSucceededForSelectedDate) {
         branch = 'today-confirmed-empty'
       } else {
         branch = 'today-waiting-fetch'
@@ -8755,7 +8764,7 @@ const applyStructuredItems = (
     todaysFoodsForSelectedDate,
     todaysCacheEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate,
-    todayFetchSettledForSelectedDate,
+    todayFetchSucceededForSelectedDate,
     selectedDate,
     deletedEntryNonce,
   ])
@@ -8765,7 +8774,11 @@ const applyStructuredItems = (
     if (isViewingToday) {
       return (
         isDiaryHydrated(selectedDate) &&
-        (sourceEntries.length > 0 || todayFetchSettledForSelectedDate || foodDiaryLoaded)
+        (
+          sourceEntries.length > 0 ||
+          todayFetchSucceededForSelectedDate ||
+          (foodDiaryLoaded && localSnapshotEntriesForSelectedDate.length > 0)
+        )
       )
     }
     if (historyCacheEntriesForSelectedDate.length > 0) return true
@@ -8777,7 +8790,7 @@ const applyStructuredItems = (
     isViewingToday,
     selectedDate,
     sourceEntries.length,
-    todayFetchSettledForSelectedDate,
+    todayFetchSucceededForSelectedDate,
     foodDiaryLoaded,
     historyFoodsDate,
     historyCacheEntriesForSelectedDate,
@@ -8800,7 +8813,8 @@ const applyStructuredItems = (
       sourceEntriesLength: sourceEntries.length,
       summaryReady,
       sourceBranch,
-      todayFetchSettledForSelectedDate,
+      todayFetchAttemptedForSelectedDate,
+      todayFetchSucceededForSelectedDate,
     })
   }, [
     debugMode,
@@ -8814,7 +8828,8 @@ const applyStructuredItems = (
     sourceEntries.length,
     summaryReady,
     sourceBranch,
-    todayFetchSettledForSelectedDate,
+    todayFetchAttemptedForSelectedDate,
+    todayFetchSucceededForSelectedDate,
   ])
   const sourceDateKeys = useMemo(() => {
     const set = new Set<string>()
@@ -9097,7 +9112,7 @@ const applyStructuredItems = (
         ? todaysFoodsForSelectedDate
         : filterEntriesForDate(historyFoods, selectedDate)
       if (isViewingToday && !foodDiaryLoaded && rawEntries.length === 0) return
-      if (isViewingToday && rawEntries.length === 0 && !todayFetchSettledForSelectedDate) {
+      if (isViewingToday && rawEntries.length === 0 && !todayFetchSucceededForSelectedDate) {
         const existingRaw = snapshot?.byDate?.[selectedDate]?.entries
         if (Array.isArray(existingRaw) && existingRaw.length > 0) return
       }
@@ -9121,7 +9136,7 @@ const applyStructuredItems = (
     historyFoods,
     historyFoodsDate,
     foodDiaryLoaded,
-    todayFetchSettledForSelectedDate,
+    todayFetchSucceededForSelectedDate,
     expandedCategories,
     isLoadingHistory,
     refreshPersistentDiarySnapshot,
@@ -10007,7 +10022,9 @@ const applyStructuredItems = (
   const refreshEntriesFromServer = async (options?: { mode?: 'verify' | 'manual' }) => {
     const targetDate = selectedDate
     if (!targetDate) return
+    const fetchSource: 'today' | 'history' = targetDate === buildTodayIso() ? 'today' : 'history'
     const mode = options?.mode || 'verify'
+    let fetchSucceeded = false
     if (mode === 'verify') {
       const lastVerifyAt = Number(lastVerifyFetchAtRef.current[targetDate] || 0)
       const hasPendingForDate = Array.from(pendingFoodLogSaveRef.current.values()).some(
@@ -10032,13 +10049,14 @@ const applyStructuredItems = (
       if (!res.ok) {
         setLastDiaryFetchInfo({
           date: targetDate,
-          from: isViewingToday ? 'today' : 'history',
+          from: fetchSource,
           ok: false,
           logsCount: null,
           logDates: [],
           logSample: [],
           receivedAt: Date.now(),
         })
+        setFoodDiaryLoaded(true)
         return;
       }
 
@@ -10064,13 +10082,14 @@ const applyStructuredItems = (
         if (serverLogs.length === 0) {
           setLastDiaryFetchInfo({
             date: targetDate,
-            from: isViewingToday ? 'today' : 'history',
+            from: fetchSource,
             ok: true,
             logsCount: 0,
             logDates: [],
             logSample: [],
             receivedAt: Date.now(),
           })
+          fetchSucceeded = true
           markDiaryVerified(targetDate)
           lastVerifyFetchAtRef.current[targetDate] = Date.now()
           setFoodDiaryLoaded(true)
@@ -10079,13 +10098,14 @@ const applyStructuredItems = (
       }
       setLastDiaryFetchInfo({
         date: targetDate,
-        from: isViewingToday ? 'today' : 'history',
+        from: fetchSource,
         ok: true,
         logsCount: serverLogs.length,
         logDates: extractLogDates(serverLogs),
         logSample: buildLogSample(serverLogs),
         receivedAt: Date.now(),
       })
+      fetchSucceeded = true
       const mapped = mapLogsToEntries(serverLogs, targetDate, { preferCreatedAtDate: true });
       const mappedWithStableIds = mapServerEntriesWithLocalIds(mapped, localList, targetDate)
       const { filtered: cleanedServerEntries, duplicates: duplicateCandidates } = collapseNearDuplicates(
@@ -10127,8 +10147,21 @@ const applyStructuredItems = (
         setHistoryFoodsDate(targetDate)
       }
     } catch (error) {
+      setLastDiaryFetchInfo({
+        date: targetDate,
+        from: fetchSource,
+        ok: false,
+        logsCount: null,
+        logDates: [],
+        logSample: [],
+        receivedAt: Date.now(),
+      })
+      setFoodDiaryLoaded(true)
       console.error('Error refreshing food diary after save:', error);
     } finally {
+      if (fetchSource === 'today' && !fetchSucceeded) {
+        todayServerFetchRef.current[targetDate] = false
+      }
       diaryMergeInFlightRef.current[targetDate] = false
     }
   };
@@ -10137,10 +10170,20 @@ const applyStructuredItems = (
     if (!isViewingToday) return
     if (!foodDiaryLoaded) return
     if (todaysFoodsForSelectedDate.length > 0) return
+    const lastAttemptAt = Number(todayServerFetchAttemptAtRef.current[selectedDate] || 0)
+    if (lastAttemptAt > 0 && Date.now() - lastAttemptAt < TODAY_FETCH_RETRY_COOLDOWN_MS) return
     if (todayServerFetchRef.current[selectedDate]) return
     todayServerFetchRef.current[selectedDate] = true
+    todayServerFetchAttemptAtRef.current[selectedDate] = Date.now()
     refreshEntriesFromServer({ mode: 'manual' })
-  }, [isViewingToday, selectedDate, foodDiaryLoaded, todaysFoodsForSelectedDate.length, refreshEntriesFromServer])
+  }, [
+    isViewingToday,
+    selectedDate,
+    foodDiaryLoaded,
+    todaysFoodsForSelectedDate.length,
+    lastDiaryFetchInfo?.receivedAt,
+    refreshEntriesFromServer,
+  ])
 
   // Cross-device sync:
   // - Refresh on focus or manual action (keeps desktop + mobile aligned without constant polling)
@@ -26343,7 +26386,7 @@ Please add nutritional information manually if needed.`);
                         <div>Debug: todayCount={todaysFoodsForSelectedDate.length} localSnapshotCount={localSnapshotEntriesForSelectedDate.length}</div>
                         <div>Debug: historyDate={historyFoodsDate || 'none'} historyCount={historyCacheEntriesForSelectedDate.length}</div>
                         <div>Debug: sourceBranch={sourceBranch} sourceCount={source.length} summaryReady={summaryReady ? 'yes' : 'no'}</div>
-                        <div>Debug: todayFetchSettled={todayFetchSettledForSelectedDate ? 'yes' : 'no'} sourceDates={sourceDatesLabel}</div>
+                        <div>Debug: todayFetchAttempted={todayFetchAttemptedForSelectedDate ? 'yes' : 'no'} todayFetchSucceeded={todayFetchSucceededForSelectedDate ? 'yes' : 'no'} sourceDates={sourceDatesLabel}</div>
                         <div>Debug: sourceSample={sourceSampleLabel}</div>
                         <div>Debug: lastServer={lastServerLabel}</div>
                       </div>
