@@ -45,12 +45,21 @@ export async function POST(request: NextRequest) {
     }
 
     const priceId = requestedPlan ? PLAN_TO_PRICE[requestedPlan] : undefined
+    const isCredits = (requestedPlan ?? '').startsWith('credits_')
 
-    if (!priceId) {
+    if (!isCredits && !priceId) {
       return NextResponse.json({ error: 'Invalid plan or price not configured' }, { status: 400 })
     }
+    if (isCredits && !requestedPlan) {
+      return NextResponse.json({ error: 'Invalid credit plan' }, { status: 400 })
+    }
 
-    const isCredits = (requestedPlan ?? '').startsWith('credits_')
+    const CREDIT_PLAN_FALLBACK: Record<string, { unitAmount: number; title: string }> = {
+      credits_250: { unitAmount: 500, title: 'Helfi Credit Top-up (250 credits)' },
+      credits_500: { unitAmount: 1000, title: 'Helfi Credit Top-up (500 credits)' },
+      credits_1000: { unitAmount: 2000, title: 'Helfi Credit Top-up (1,000 credits)' },
+      credits_100: { unitAmount: 200, title: 'Helfi Credit Top-up (100 credits)' },
+    }
 
     // Get user email from session if available
     const session = await getServerSession(authOptions)
@@ -113,14 +122,46 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    let lineItems: Stripe.Checkout.SessionCreateParams.LineItem[] = []
+    if (!isCredits) {
+      lineItems = [{ price: priceId, quantity }]
+    } else {
+      let canUseConfiguredPrice = false
+      if (priceId) {
+        try {
+          const stripePrice = await stripe.prices.retrieve(priceId)
+          canUseConfiguredPrice = !!(stripePrice?.active && stripePrice?.type === 'one_time')
+        } catch {
+          canUseConfiguredPrice = false
+        }
+      }
+
+      if (canUseConfiguredPrice && priceId) {
+        lineItems = [{ price: priceId, quantity }]
+      } else {
+        const fallback = CREDIT_PLAN_FALLBACK[String(requestedPlan || '')]
+        if (!fallback) {
+          return NextResponse.json(
+            { error: 'Credit package not configured. Please try again shortly.' },
+            { status: 400 },
+          )
+        }
+        lineItems = [
+          {
+            quantity,
+            price_data: {
+              currency: 'usd',
+              unit_amount: fallback.unitAmount,
+              product_data: { name: fallback.title },
+            },
+          },
+        ]
+      }
+    }
+
     const checkoutSession = await stripe.checkout.sessions.create({
       mode: isCredits ? 'payment' : 'subscription',
-      line_items: [
-        {
-          price: priceId,
-          quantity: quantity,
-        },
-      ],
+      line_items: lineItems,
       success_url: `${origin}/billing?checkout=success&session_id={CHECKOUT_SESSION_ID}`,
       cancel_url: `${origin}/billing?checkout=cancelled`,
       customer_email: customerEmail,
@@ -138,8 +179,14 @@ export async function POST(request: NextRequest) {
     })
 
     return NextResponse.json({ url: checkoutSession.url })
-  } catch (error) {
+  } catch (error: any) {
     console.error('Error creating checkout session:', error)
-    return NextResponse.json({ error: 'Failed to create checkout session' }, { status: 500 })
+    return NextResponse.json(
+      {
+        error: 'Failed to create checkout session',
+        message: error?.message || 'Unknown checkout error',
+      },
+      { status: 500 },
+    )
   }
 }
