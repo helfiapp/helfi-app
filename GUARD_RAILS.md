@@ -22,6 +22,7 @@ Use this as the fast “no-touch without approval” checklist for Food Diary.
 - `3.7` Food Diary Manual Refresh Only (Locked)
 - `3.7` Food Diary Deletes & Snapshot Sync (Locked)
 - `3.7.2` Food Diary Restore & Favorites Recovery (Locked)
+- `3.4.3` Desktop Energy/Macro Summary Continuity (Severe Lock)
 - `3.10` Discrete Produce Counts & Weight Seeding (Locked)
 - `3.13` Build a Meal Portion Scaling (Locked)
 - `3.14` Food Diary Edit Calorie Consistency & Macro Validation (Locked)
@@ -1071,6 +1072,53 @@ This caused the left menu to stop working on desktop whenever Food Diary was ope
 **Last stable fix (live):**
 - Commit: `22ef0673`
 - Date: 2026-01-22
+
+### 3.4.3 SEVERE LOCK - Desktop Energy/Macro Summary Continuity (Feb 2026)
+This prevents the desktop Food Diary summary from flashing blank during date changes.
+
+**Protected file:**
+- `app/food/page.tsx`
+
+**What broke before:**
+- On desktop, energy/macros disappeared for 1–3 seconds during date switch or browser refresh.
+- Removing visible loading text exposed a blank summary card (no rings/macros shown).
+- Mobile PWA looked stable, but desktop looked broken/unreliable.
+
+**Non-negotiable rules (do not change):**
+- Keep the `today-local-snapshot` source branch active whenever same-day snapshot entries exist.
+- Keep the summary continuity state path:
+  - `lastStableSummaryEntries`
+  - `summaryDisplayEntries`
+  - `summaryDisplayReady`
+- In the daily totals block, keep `const source = summaryDisplayEntries` (not `sourceEntries`).
+- Render the summary panel from `summaryDisplayReady`, not only `summaryReady`.
+- Do not reintroduce visible desktop “Loading...” text in summary/meal preview.
+- Do not allow a blank summary card while a known prior summary exists.
+
+**Restore steps (exact, no guessing):**
+1) In `app/food/page.tsx`, source selection for today must keep:
+   - `else if (localSnapshotEntriesForSelectedDate.length > 0) branch = 'today-local-snapshot'`
+2) Re-add summary continuity state/effect:
+   - `lastStableSummaryEntries`
+   - effect that updates it only when `summaryReady` is true
+   - `summaryDisplayEntries` fallback memo
+   - `summaryDisplayReady = summaryReady || summaryDisplayEntries.length > 0`
+3) In the daily summary render closure, set:
+   - `const source = summaryDisplayEntries`
+4) Render summary slides with:
+   - `{summaryDisplayReady && (...)}` (not `summaryReady` only)
+5) Validate on desktop with exact flow:
+   - Browser refresh -> Next -> Next -> Previous -> Previous
+   - Summary must never show blank state.
+
+**Recovery commits (live):**
+- `eee21a63` — keep last good today snapshot + retry empty today fetch
+- `c6b6b0b6` — remove visible loading labels
+- `ac546dd4` — keep last visible summary while next date refreshes
+
+**Last stable deployment commit (live):**
+- Commit: `ac546dd4`
+- Date: 2026-02-21
 
 ### 3.6 Food Search Consistency (Jan 2026 – Locked)
 - Single‑food searches must use USDA; packaged searches use FatSecret + OpenFoodFacts.

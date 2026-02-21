@@ -8798,6 +8798,9 @@ const applyStructuredItems = (
     historyFoods,
     isLoadingHistory,
   ])
+  // SEVERE LOCK (Desktop summary continuity):
+  // Keep the last stable summary entries visible while the next date is loading.
+  // Do not remove this fallback unless guard rails are updated and explicitly approved.
   const [lastStableSummaryEntries, setLastStableSummaryEntries] = useState<any[]>([])
   useEffect(() => {
     if (!summaryReady) return
@@ -25067,6 +25070,7 @@ Please add nutritional information manually if needed.`);
 	          {!editingEntry && (
 	            <div className="mb-4">
 	              {(() => {
+                  // SEVERE LOCK: summary rendering must use continuity fallback entries, not only live sourceEntries.
                   const source = summaryDisplayEntries
                   const lastServerLabel = lastDiaryFetchInfo
                     ? `${lastDiaryFetchInfo.from} ${lastDiaryFetchInfo.date} | ok=${lastDiaryFetchInfo.ok ? 'yes' : 'no'} | count=${lastDiaryFetchInfo.logsCount ?? 'n/a'} | dates=${lastDiaryFetchInfo.logDates.length > 0 ? lastDiaryFetchInfo.logDates.join(', ') : 'none'} | sample=${lastDiaryFetchInfo.logSample.length > 0 ? lastDiaryFetchInfo.logSample.join(', ') : 'none'}`
@@ -26566,6 +26570,7 @@ Please add nutritional information manually if needed.`);
                           )}
                         </>
                       )}
+                      {/* SEVERE LOCK: keep summary visible while background fetch resolves to avoid desktop blank flash. */}
                       {summaryDisplayReady && (() => {
                           const slides: JSX.Element[] = []
                           const fatDetailTitles = {
