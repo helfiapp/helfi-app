@@ -1427,7 +1427,7 @@ type RingProps = {
 function TargetRing({ label, valueLabel, percent, tone, color, size = 'normal', isMobile }: RingProps) {
   const isSmallScreen = typeof isMobile === 'boolean'
     ? isMobile
-    : typeof window !== 'undefined' && window.innerWidth < 640
+    : false
   const isCompact = size === 'compact'
   const radius = isCompact ? (isSmallScreen ? 44 : 46) : isSmallScreen ? 56 : 50
   const circumference = 2 * Math.PI * radius
@@ -8538,14 +8538,6 @@ const applyStructuredItems = (
 
   const todayIso = buildTodayIso();
 
-  // Today's date
-  const today = new Date().toLocaleDateString('en-US', { 
-    weekday: 'long', 
-    year: 'numeric', 
-    month: 'long', 
-    day: 'numeric' 
-  });
-
   const isViewingToday = selectedDate === todayIso;
 
   // Friendly label for selected date (local time)
@@ -8770,21 +8762,24 @@ const applyStructuredItems = (
   ])
   const sourceEntries = sourceSelectionState.entries
   const sourceBranch = sourceSelectionState.branch
+  const hasCachedEntriesForSelectedDate =
+    historyCacheEntriesForSelectedDate.length > 0 ||
+    localSnapshotEntriesForSelectedDate.length > 0 ||
+    todaysCacheEntriesForSelectedDate.length > 0
   const summaryReady = useMemo(() => {
     if (isViewingToday) {
+      if (sourceEntries.length > 0) return true
       return (
         isDiaryHydrated(selectedDate) &&
         (
-          sourceEntries.length > 0 ||
           todayFetchSucceededForSelectedDate ||
           (foodDiaryLoaded && localSnapshotEntriesForSelectedDate.length > 0)
         )
       )
     }
-    if (historyCacheEntriesForSelectedDate.length > 0) return true
-    if (localSnapshotEntriesForSelectedDate.length > 0) return true
-    if (todaysCacheEntriesForSelectedDate.length > 0) return true
+    if (hasCachedEntriesForSelectedDate) return true
     if (historyFoodsDate === selectedDate && Array.isArray(historyFoods)) return true
+    if (historyFoodsDate !== selectedDate) return false
     return !isLoadingHistory
   }, [
     isViewingToday,
@@ -8793,9 +8788,8 @@ const applyStructuredItems = (
     todayFetchSucceededForSelectedDate,
     foodDiaryLoaded,
     historyFoodsDate,
-    historyCacheEntriesForSelectedDate,
+    hasCachedEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate.length,
-    todaysCacheEntriesForSelectedDate.length,
     historyFoods,
     isLoadingHistory,
   ])
@@ -9058,7 +9052,13 @@ const applyStructuredItems = (
       const normalized = dedupeEntries(normalizeDiaryList(byDate.entries, selectedDate), {
         fallbackDate: selectedDate,
       })
+      if (!Array.isArray(normalized) || normalized.length === 0) return
       if (isViewingToday) {
+        const existingToday = dedupeEntries(
+          filterEntriesForDate(latestTodaysFoodsRef.current, selectedDate),
+          { fallbackDate: selectedDate },
+        )
+        if (existingToday.length > 0) return
         setTodaysFoods(normalized)
       } else {
         setHistoryFoods(normalized)
