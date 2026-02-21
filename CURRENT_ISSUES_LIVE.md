@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 02:33 PM AEDT
+- What changed: Desktop Food Diary summary now keeps last visible energy/macro panel while date data refreshes in background, so the summary card no longer goes blank between date switches.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: On desktop, tap Next/Previous across copied days and confirm the energy/macro panel stays visible the whole time (no blank gap, no loading text).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 01:53 PM AEDT
 - What changed: Removed visible desktop loading labels in Food Diary energy summary and meal row preview while keeping background data checks. Users no longer see “Loading this day’s summary...” or “Loading...” flashes.
 - Where to see it (page/link): https://helfi.ai/food
