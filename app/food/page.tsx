@@ -2724,6 +2724,10 @@ export default function FoodDiary() {
   const pathname = usePathname()
   const router = useRouter()
   const [debugMode, setDebugMode] = useState(false)
+  const [clientReady, setClientReady] = useState(false)
+  useEffect(() => {
+    setClientReady(true)
+  }, [])
   const isAnalysisRoute = pathname === '/food/analysis'
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
   const { userData, profileImage, updateUserData, refreshData } = useUserData()
@@ -20186,6 +20190,7 @@ Please add nutritional information manually if needed.`);
 
   return (
     <DiaryErrorBoundary>
+      {clientReady ? (
       <div
         ref={pageTopRef}
         className="flex-1 flex flex-col overflow-hidden bg-gray-50"
@@ -30297,6 +30302,11 @@ Please add nutritional information manually if needed.`);
       </nav>
       </div>
     </div>
+      ) : (
+        <div className="min-h-screen bg-gray-50 flex items-center justify-center px-4">
+          <div className="text-sm text-gray-500">Loading Food Diary...</div>
+        </div>
+      )}
     </DiaryErrorBoundary>
   )
 }
