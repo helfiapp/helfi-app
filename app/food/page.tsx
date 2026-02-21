@@ -8697,44 +8697,76 @@ const applyStructuredItems = (
   }, [historyFoods, selectedDate])
   // SEVERE GUARD RAIL: Keep the local snapshot while history loads.
   // This prevents the "full calories / zero" flash when switching dates.
-  const sourceEntries = useMemo(() => {
+  const todayFetchSettledForSelectedDate = Boolean(
+    lastDiaryFetchInfo &&
+      lastDiaryFetchInfo.from === 'today' &&
+      lastDiaryFetchInfo.date === selectedDate &&
+      lastDiaryFetchInfo.receivedAt > 0,
+  )
+  const sourceSelectionState = useMemo(() => {
     const historyReady =
       !isViewingToday &&
       historyFoodsDate === selectedDate &&
       Array.isArray(historyFoods)
     const historyForSelectedDate = historyReady ? historyCacheEntriesForSelectedDate : []
-    const base = isViewingToday
-      ? todaysFoodsForSelectedDate.length > 0
-        ? todaysFoodsForSelectedDate
-        : localSnapshotEntriesForSelectedDate.length > 0
-        ? localSnapshotEntriesForSelectedDate
-        : []
-      : historyReady
-      ? historyForSelectedDate
-      : historyCacheEntriesForSelectedDate.length > 0
-      ? historyCacheEntriesForSelectedDate
-      : localSnapshotEntriesForSelectedDate.length > 0
-      ? localSnapshotEntriesForSelectedDate
-      : todaysCacheEntriesForSelectedDate.length > 0
-      ? todaysCacheEntriesForSelectedDate
-      : []
-    return dedupeEntries(normalizeDiaryList(base || [], selectedDate), { fallbackDate: selectedDate })
+
+    let base: any[] = []
+    let branch = 'none'
+
+    if (isViewingToday) {
+      if (todaysFoodsForSelectedDate.length > 0) {
+        base = todaysFoodsForSelectedDate
+        branch = 'today-memory'
+      } else if (!todayFetchSettledForSelectedDate && localSnapshotEntriesForSelectedDate.length > 0) {
+        base = localSnapshotEntriesForSelectedDate
+        branch = 'today-local-snapshot'
+      } else if (todayFetchSettledForSelectedDate) {
+        branch = 'today-confirmed-empty'
+      } else {
+        branch = 'today-waiting-fetch'
+      }
+    } else if (historyReady && historyForSelectedDate.length > 0) {
+      base = historyForSelectedDate
+      branch = 'history-memory'
+    } else if (historyCacheEntriesForSelectedDate.length > 0) {
+      base = historyCacheEntriesForSelectedDate
+      branch = 'history-cache-memory'
+    } else if (localSnapshotEntriesForSelectedDate.length > 0) {
+      base = localSnapshotEntriesForSelectedDate
+      branch = 'history-local-snapshot'
+    } else if (todaysCacheEntriesForSelectedDate.length > 0) {
+      base = todaysCacheEntriesForSelectedDate
+      branch = 'history-today-cache'
+    } else if (historyReady) {
+      branch = 'history-confirmed-empty'
+    } else {
+      branch = 'history-waiting-fetch'
+    }
+
+    return {
+      branch,
+      entries: dedupeEntries(normalizeDiaryList(base || [], selectedDate), { fallbackDate: selectedDate }),
+    }
   }, [
+    isViewingToday,
+    historyFoodsDate,
+    historyFoods,
+    historyCacheEntriesForSelectedDate,
     todaysFoodsForSelectedDate,
     todaysCacheEntriesForSelectedDate,
-    historyFoods,
-    historyFoodsDate,
-    isViewingToday,
-    deletedEntryNonce,
-    selectedDate,
-    historyCacheEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate,
+    todayFetchSettledForSelectedDate,
+    selectedDate,
+    deletedEntryNonce,
   ])
+  const sourceEntries = sourceSelectionState.entries
+  const sourceBranch = sourceSelectionState.branch
   const summaryReady = useMemo(() => {
     if (isViewingToday) {
-      if (todaysFoodsForSelectedDate.length > 0) return true
-      if (localSnapshotEntriesForSelectedDate.length > 0) return true
-      return isDiaryHydrated(selectedDate) && foodDiaryLoaded
+      return (
+        isDiaryHydrated(selectedDate) &&
+        (sourceEntries.length > 0 || todayFetchSettledForSelectedDate)
+      )
     }
     if (historyCacheEntriesForSelectedDate.length > 0) return true
     if (localSnapshotEntriesForSelectedDate.length > 0) return true
@@ -8744,14 +8776,44 @@ const applyStructuredItems = (
   }, [
     isViewingToday,
     selectedDate,
-    foodDiaryLoaded,
-    todaysFoodsForSelectedDate.length,
+    sourceEntries.length,
+    todayFetchSettledForSelectedDate,
     historyFoodsDate,
     historyCacheEntriesForSelectedDate,
     localSnapshotEntriesForSelectedDate.length,
     todaysCacheEntriesForSelectedDate.length,
     historyFoods,
     isLoadingHistory,
+  ])
+  useEffect(() => {
+    if (!debugMode) return
+    console.log('[FOOD_DIARY_DEBUG_TIMELINE]', {
+      selectedDate,
+      isViewingToday,
+      foodDiaryLoaded,
+      diaryHydratedForSelectedDate: isDiaryHydrated(selectedDate),
+      todaysFoodsForSelectedDateLength: todaysFoodsForSelectedDate.length,
+      localSnapshotEntriesForSelectedDateLength: localSnapshotEntriesForSelectedDate.length,
+      historyFoodsDate: historyFoodsDate || null,
+      historyCacheEntriesForSelectedDateLength: historyCacheEntriesForSelectedDate.length,
+      sourceEntriesLength: sourceEntries.length,
+      summaryReady,
+      sourceBranch,
+      todayFetchSettledForSelectedDate,
+    })
+  }, [
+    debugMode,
+    selectedDate,
+    isViewingToday,
+    foodDiaryLoaded,
+    todaysFoodsForSelectedDate.length,
+    localSnapshotEntriesForSelectedDate.length,
+    historyFoodsDate,
+    historyCacheEntriesForSelectedDate.length,
+    sourceEntries.length,
+    summaryReady,
+    sourceBranch,
+    todayFetchSettledForSelectedDate,
   ])
   const sourceDateKeys = useMemo(() => {
     const set = new Set<string>()
@@ -26270,9 +26332,12 @@ Please add nutritional information manually if needed.`);
                   <div className="space-y-4">
                     {debugMode && (
                       <div className="rounded-md border border-amber-200 bg-amber-50 px-3 py-2 text-[11px] text-amber-900">
-                        <div>Debug: date={selectedDate} view={isViewingToday ? 'today' : 'history'} loading={isLoadingHistory ? 'yes' : 'no'} historyDate={historyFoodsDate || 'none'}</div>
-                        <div>Debug: historyCacheCount={historyCacheEntriesForSelectedDate.length} localSnapshotCount={localSnapshotEntriesForSelectedDate.length} summaryReady={summaryReady ? 'yes' : 'no'}</div>
-                        <div>Debug: sourceCount={source.length} sourceDates={sourceDatesLabel}</div>
+                        <div>Debug: date={selectedDate} view={isViewingToday ? 'today' : 'history'} loading={isLoadingHistory ? 'yes' : 'no'}</div>
+                        <div>Debug: foodDiaryLoaded={foodDiaryLoaded ? 'yes' : 'no'} diaryHydratedForDate={isDiaryHydrated(selectedDate) ? 'yes' : 'no'}</div>
+                        <div>Debug: todayCount={todaysFoodsForSelectedDate.length} localSnapshotCount={localSnapshotEntriesForSelectedDate.length}</div>
+                        <div>Debug: historyDate={historyFoodsDate || 'none'} historyCount={historyCacheEntriesForSelectedDate.length}</div>
+                        <div>Debug: sourceBranch={sourceBranch} sourceCount={source.length} summaryReady={summaryReady ? 'yes' : 'no'}</div>
+                        <div>Debug: todayFetchSettled={todayFetchSettledForSelectedDate ? 'yes' : 'no'} sourceDates={sourceDatesLabel}</div>
                         <div>Debug: sourceSample={sourceSampleLabel}</div>
                         <div>Debug: lastServer={lastServerLabel}</div>
                       </div>
@@ -27684,7 +27749,8 @@ Please add nutritional information manually if needed.`);
                         : []
                       const visibleWaterEntries = Array.isArray(waterInCategory) ? waterInCategory : []
                       const visibleEntries = [...visibleFoodEntries, ...visibleWaterEntries]
-                      let summaryText = 'No entries yet'
+                      const awaitingTodayEntries = isViewingToday && !summaryReady && sourceEntries.length === 0
+                      let summaryText = awaitingTodayEntries ? 'Loading...' : 'No entries yet'
                       if (visibleEntries.length > 0) {
                         const totals = visibleFoodEntries.reduce(
                           (acc, entry) => {
