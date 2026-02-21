@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 02:49 PM AEDT
+- What changed: Added strict Food Diary guard rails and restore playbook for the desktop summary continuity fix, plus in-code severe-lock notes in the protected summary rendering area.
+- Where to see it (page/link): /Volumes/U34 Bolt/HELFI APP/helfi-app-worktrees/hel-257-food-diary-root-cause/GUARD_RAILS.md and https://helfi.ai/food
+- What to quickly test: Confirm Food Diary summary still stays visible on desktop during date switches; review new “Desktop Energy/Macro Summary Continuity (Severe Lock)” section in guard rails.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 02:33 PM AEDT
 - What changed: Desktop Food Diary summary now keeps last visible energy/macro panel while date data refreshes in background, so the summary card no longer goes blank between date switches.
 - Where to see it (page/link): https://helfi.ai/food
