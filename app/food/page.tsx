@@ -8798,6 +8798,17 @@ const applyStructuredItems = (
     historyFoods,
     isLoadingHistory,
   ])
+  const [lastStableSummaryEntries, setLastStableSummaryEntries] = useState<any[]>([])
+  useEffect(() => {
+    if (!summaryReady) return
+    setLastStableSummaryEntries(sourceEntries)
+  }, [summaryReady, sourceEntries, selectedDate])
+  const summaryDisplayEntries = useMemo(() => {
+    if (summaryReady) return sourceEntries
+    if (lastStableSummaryEntries.length > 0) return lastStableSummaryEntries
+    return sourceEntries
+  }, [summaryReady, sourceEntries, lastStableSummaryEntries])
+  const summaryDisplayReady = summaryReady || summaryDisplayEntries.length > 0
   useEffect(() => {
     if (!debugMode) return
     console.log('[FOOD_DIARY_DEBUG_TIMELINE]', {
@@ -25056,7 +25067,7 @@ Please add nutritional information manually if needed.`);
 	          {!editingEntry && (
 	            <div className="mb-4">
 	              {(() => {
-                  const source = sourceEntries
+                  const source = summaryDisplayEntries
                   const lastServerLabel = lastDiaryFetchInfo
                     ? `${lastDiaryFetchInfo.from} ${lastDiaryFetchInfo.date} | ok=${lastDiaryFetchInfo.ok ? 'yes' : 'no'} | count=${lastDiaryFetchInfo.logsCount ?? 'n/a'} | dates=${lastDiaryFetchInfo.logDates.length > 0 ? lastDiaryFetchInfo.logDates.join(', ') : 'none'} | sample=${lastDiaryFetchInfo.logSample.length > 0 ? lastDiaryFetchInfo.logSample.join(', ') : 'none'}`
                     : 'none'
@@ -26555,7 +26566,7 @@ Please add nutritional information manually if needed.`);
                           )}
                         </>
                       )}
-                      {summaryReady && (() => {
+                      {summaryDisplayReady && (() => {
                           const slides: JSX.Element[] = []
                           const fatDetailTitles = {
                             good: 'Healthy fats',
@@ -27828,7 +27839,7 @@ Please add nutritional information manually if needed.`);
                         : []
                       const visibleWaterEntries = Array.isArray(waterInCategory) ? waterInCategory : []
                       const visibleEntries = [...visibleFoodEntries, ...visibleWaterEntries]
-                      let summaryText = summaryReady ? 'No entries yet' : ''
+                      let summaryText = 'No entries yet'
                       if (visibleEntries.length > 0) {
                         const totals = visibleFoodEntries.reduce(
                           (acc, entry) => {
