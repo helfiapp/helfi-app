@@ -105,6 +105,14 @@ function getIosReadiness(products: NativeBillingProduct[]): PlatformReadiness {
   const hasAllProductIds = products.every((p) => p.iosProductId.length > 0)
   if (!hasAllProductIds) warnings.push('iOS product IDs are not fully configured.')
   if (!envString('APPLE_IAP_BUNDLE_ID')) warnings.push('Apple bundle ID is missing.')
+  const hasSharedSecret = envString('APPLE_IAP_SHARED_SECRET').length > 0
+  const hasAppStoreApiCreds =
+    envString('APPLE_IAP_ISSUER_ID').length > 0 &&
+    envString('APPLE_IAP_KEY_ID').length > 0 &&
+    envString('APPLE_IAP_PRIVATE_KEY').length > 0
+  if (!hasSharedSecret && !hasAppStoreApiCreds) {
+    warnings.push('Apple purchase verification key/secret is missing.')
+  }
   return { ready: warnings.length === 0, warnings }
 }
 
