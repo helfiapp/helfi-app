@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-21 04:15 PM AEDT
+- What changed: Fixed credit checkout failures in billing. Credit packs ($5/$10/$20) now create Stripe checkout sessions reliably, with a safe fallback if Stripe credit price settings are missing/mismatched. Also fixed one-time checkout mode setting that was blocking credit purchases.
+- Where to see it (page/link): https://helfi.ai/billing and native app Billing screen
+- What to quickly test: In billing, tap Buy $5 Credits / Buy $10 Credits / Buy $20 Credits and confirm checkout opens successfully.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-21 02:49 PM AEDT
 - What changed: Added strict Food Diary guard rails and restore playbook for the desktop summary continuity fix, plus in-code severe-lock notes in the protected summary rendering area.
 - Where to see it (page/link): /Volumes/U34 Bolt/HELFI APP/helfi-app-worktrees/hel-257-food-diary-root-cause/GUARD_RAILS.md and https://helfi.ai/food
