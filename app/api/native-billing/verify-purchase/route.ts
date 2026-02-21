@@ -47,6 +47,15 @@ type GoogleSubscriptionPurchase = {
   paymentState?: number
 }
 
+function normalizeStoreProductId(value: unknown): string {
+  return String(value || '')
+    .replace(/\\r/g, '')
+    .replace(/\\n/g, '')
+    .replace(/\\t/g, '')
+    .replace(/[\r\n\t]/g, '')
+    .trim()
+}
+
 async function upsertSubscriptionPreservingStartDate(opts: {
   userId: string
   monthlyPriceCents: number
@@ -441,7 +450,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const expectedProductId = product.iosProductId
+    const expectedProductId = normalizeStoreProductId(product.iosProductId)
     if (!expectedProductId) {
       return NextResponse.json({ error: `iOS product ID is not configured for ${code}.` }, { status: 400 })
     }
@@ -455,7 +464,7 @@ export async function POST(request: NextRequest) {
       const lookup = await verifyAppleTransactionById(transactionId)
       if (lookup.ok) {
         const info = lookup.info
-        const actualProductId = String(info?.productId || '').trim()
+        const actualProductId = normalizeStoreProductId(info?.productId)
         if (actualProductId !== expectedProductId) {
           return NextResponse.json(
             { error: `Apple transaction product mismatch. Expected ${expectedProductId}, got ${actualProductId || '(empty)'}.` },
@@ -488,7 +497,7 @@ export async function POST(request: NextRequest) {
       }
 
       const matching = apple.items
-        .filter((item) => String(item?.product_id || '') === expectedProductId)
+        .filter((item) => normalizeStoreProductId(item?.product_id) === expectedProductId)
         .sort((a, b) => Number(b?.purchase_date_ms || 0) - Number(a?.purchase_date_ms || 0))
       const purchase = matching[0]
 

@@ -28,8 +28,25 @@ export type NativeBillingCatalogResponse = {
   android: PlatformReadiness
 }
 
+function sanitizeEnvValue(value: unknown): string {
+  let text = String(value || '')
+    .replace(/\\r/g, '')
+    .replace(/\\n/g, '')
+    .replace(/\\t/g, '')
+    .replace(/[\r\n\t]/g, '')
+    .trim()
+
+  const startsWithQuote = text.startsWith('"') || text.startsWith("'")
+  const endsWithQuote = text.endsWith('"') || text.endsWith("'")
+  if (startsWithQuote && endsWithQuote && text.length >= 2) {
+    text = text.slice(1, -1).trim()
+  }
+
+  return text
+}
+
 function envString(key: string): string {
-  return String(process.env[key] || '').trim()
+  return sanitizeEnvValue(process.env[key])
 }
 
 function getProducts(): NativeBillingProduct[] {
