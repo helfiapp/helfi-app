@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { encode } from 'next-auth/jwt'
 
@@ -58,10 +58,9 @@ const mapOAuthError = (rawError: string) => {
   return value
 }
 
-export async function GET(request: Request) {
+export async function GET(request: NextRequest) {
   try {
-    const requestUrl = new URL(request.url)
-    const rawError = String(requestUrl.searchParams.get('error') || '')
+    const rawError = String(request.nextUrl.searchParams.get('error') || '')
     const mappedError = mapOAuthError(rawError)
     if (mappedError) {
       return new NextResponse(
