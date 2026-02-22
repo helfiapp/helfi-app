@@ -60,19 +60,46 @@ const autoPostHtml = (params: {
         <input type="hidden" name="callbackUrl" value="${callbackUrl}" />
         <input type="hidden" name="native" value="1" />
         <input type="hidden" name="mode" value="${mode}" />
-        <button class="btn" type="submit">Continue</button>
+        <button id="continueBtn" class="btn" type="button">Continue</button>
       </form>
       <p id="errorText" class="muted hidden">Could not start sign in automatically. Tap continue.</p>
     </div>
     <script>
       (async function () {
+        const continueBtn = document.getElementById('continueBtn');
+        let submitting = false;
+
+        async function startAuth() {
+          if (submitting) return;
+          submitting = true;
+          if (continueBtn) continueBtn.setAttribute('disabled', 'true');
+          if (continueBtn) continueBtn.textContent = 'Connecting...';
+
+          try {
+            const csrfRes = await fetch(${JSON.stringify(`${baseUrl}/api/auth/csrf`)}, { credentials: 'include' });
+            const csrfData = await csrfRes.json();
+            const token = String(csrfData?.csrfToken || '').trim();
+            if (!token) throw new Error('Missing csrf token');
+            document.getElementById('csrfToken').value = token;
+            document.getElementById('oauthForm').submit();
+          } catch (err) {
+            const el = document.getElementById('errorText');
+            if (el) el.className = 'muted';
+            submitting = false;
+            if (continueBtn) continueBtn.removeAttribute('disabled');
+            if (continueBtn) continueBtn.textContent = 'Continue';
+          }
+        }
+
+        window.__helfiStartAuth = startAuth;
+        if (continueBtn) {
+          continueBtn.addEventListener('click', function () {
+            void startAuth();
+          });
+        }
+
         try {
-          const csrfRes = await fetch(${JSON.stringify(`${baseUrl}/api/auth/csrf`)}, { credentials: 'include' });
-          const csrfData = await csrfRes.json();
-          const token = String(csrfData?.csrfToken || '').trim();
-          if (!token) throw new Error('Missing csrf token');
-          document.getElementById('csrfToken').value = token;
-          document.getElementById('oauthForm').submit();
+          await startAuth();
         } catch (err) {
           const el = document.getElementById('errorText');
           if (el) el.className = 'muted';
