@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { encode } from 'next-auth/jwt'
 
@@ -58,21 +58,28 @@ const mapOAuthError = (rawError: string) => {
   return value
 }
 
-export async function GET(request: NextRequest) {
-  try {
-    const rawError = String(request.nextUrl.searchParams.get('error') || '')
-    const mappedError = mapOAuthError(rawError)
-    if (mappedError) {
-      return new NextResponse(
-        renderRedirectPage(
-          `helfi://auth-complete?error=${encodeURIComponent(mappedError)}`,
-          'Sign in failed',
-          'Sign in could not be completed. Please try again.',
-        ),
-        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
-      )
+export async function GET(request: Request) {
+  const requestUrl = typeof (request as any)?.url === 'string' ? String((request as any).url) : ''
+  let mappedError: string | null = null
+  if (requestUrl) {
+    try {
+      mappedError = mapOAuthError(String(new URL(requestUrl).searchParams.get('error') || ''))
+    } catch {
+      mappedError = null
     }
+  }
+  if (mappedError) {
+    return new NextResponse(
+      renderRedirectPage(
+        `helfi://auth-complete?error=${encodeURIComponent(mappedError)}`,
+        'Sign in failed',
+        'Sign in could not be completed. Please try again.',
+      ),
+      { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+    )
+  }
 
+  try {
     const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
     if (!secret) {
       return new NextResponse(
