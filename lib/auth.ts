@@ -584,7 +584,7 @@ export const authOptions: NextAuthOptions = {
   },
   pages: {
     signIn: '/auth/signin',
-    error: '/auth/signin',
+    error: '/auth/oauth-error',
   },
   debug: true,
   secret: process.env.NEXTAUTH_SECRET || 'helfi-secret-key-production-2024'
