@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-23 01:44 AM AEDT
+- What changed: Fixed native Apple sign-in fallback. If Apple sign-in fails, it now routes back to the app (with a clear in-app error) instead of dropping the user onto the web login page. Also improved Apple account matching so repeat Apple logins can still resolve to the correct user even when Apple does not resend email.
+- Where to see it (page/link): Native app login screen (Continue with Apple), plus https://helfi.ai/api/native-auth/oauth/complete
+- What to quickly test: 1) Log out in native app. 2) Tap Continue with Apple and complete Apple sign-in. 3) Confirm it returns to the app dashboard. 4) If Apple auth is canceled/blocked, confirm app shows a clear login error instead of landing on web login page.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 12:03 AM AEDT
 - What changed: Added new feedback messaging flow. New users now get a professional welcome email asking for feedback and explaining how to find Help & Support (profile icon top-right -> Help & Support). Existing verified members can be sent the same feedback request via admin send tool. Added web popup that appears once after 3 consecutive active days and links directly to Help & Support.
 - Where to see it (page/link): https://helfi.ai/auth/verify (new-user welcome email), https://helfi.ai/admin-panel (send feedback request email button), https://helfi.ai/support (support destination)
