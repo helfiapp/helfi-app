@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-23 02:32 AM AEDT
+- What changed: Added new server-side OAuth error page (`/auth/oauth-error`) for native flows. This now redirects native Apple/Google auth errors straight to native completion endpoint before any web sign-in page can show, preventing users getting stuck on the web login screen.
+- Where to see it (page/link): https://helfi.ai/auth/oauth-error?error=OAuthCallback&callbackUrl=https%3A%2F%2Fhelfi.ai%2Fapi%2Fnative-auth%2Foauth%2Fcomplete%3Fnative%3D1
+- What to quickly test: In native app, log out then tap Continue with Apple. If auth fails/cancels, confirm app handles return flow and does not remain on helfi.ai web sign-in screen.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 02:15 AM AEDT
 - What changed: Added a hard native OAuth fallback for Apple/Google. If social auth bounces to web sign-in with an auth error, it now auto-routes back through native completion and returns to the app flow instead of leaving users stuck on the web login page.
 - Where to see it (page/link): https://helfi.ai/api/native-auth/oauth/start?provider=apple&mode=signin and https://helfi.ai/auth/signin
