@@ -162,9 +162,14 @@ export async function GET(request: NextRequest) {
   }
 
   const baseUrl = readBaseUrl(request)
-  const callbackUrl = completeUrl(baseUrl)
-  return new NextResponse(
+  const callbackUrl = `${completeUrl(baseUrl)}?native=1`
+  const response = new NextResponse(
     autoPostHtml({ baseUrl, provider, callbackUrl, mode }),
     { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
   )
+  response.headers.append(
+    'set-cookie',
+    `helfi_native_oauth=1; Path=/; Max-Age=900; SameSite=Lax${baseUrl.startsWith('https://') ? '; Secure' : ''}`,
+  )
+  return response
 }

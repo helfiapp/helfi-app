@@ -29,6 +29,25 @@ function SearchParamsHandler({
     const modeParam = searchParams.get('mode')
     const contextParam = searchParams.get('context')
     const nextParam = searchParams.get('next')
+
+    const callbackUrlParam = String(searchParams.get('callbackUrl') || '')
+    const isNativeCallback = callbackUrlParam.includes('/api/native-auth/oauth/complete')
+    const hasNativeCookie =
+      typeof document !== 'undefined' &&
+      document.cookie.split(';').some((item) => item.trim().startsWith('helfi_native_oauth=1'))
+    const isOAuthError =
+      errorParam === 'OAuthSignin' ||
+      errorParam === 'OAuthCallback' ||
+      errorParam === 'AccessDenied' ||
+      errorParam === 'Configuration' ||
+      errorParam === 'Callback'
+
+    // Hard fallback for native auth: if OAuth fails while native flow cookie/callback exists,
+    // send user back through native completion route instead of leaving them on web sign-in.
+    if (isOAuthError && (isNativeCallback || hasNativeCookie)) {
+      window.location.replace(`/api/native-auth/oauth/complete?error=${encodeURIComponent(String(errorParam || 'OAuthCallback'))}`)
+      return
+    }
     
     // If plan parameter exists, show signup form by default
     if (planParam) {

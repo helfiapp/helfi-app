@@ -58,6 +58,14 @@ const mapOAuthError = (rawError: string) => {
   return value
 }
 
+const applyNativeCookieCleanup = (response: NextResponse) => {
+  response.headers.append(
+    'set-cookie',
+    'helfi_native_oauth=; Path=/; Max-Age=0; SameSite=Lax',
+  )
+  return response
+}
+
 export async function GET(request: Request) {
   const requestUrl = typeof (request as any)?.url === 'string' ? String((request as any).url) : ''
   let mappedError: string | null = null
@@ -69,27 +77,27 @@ export async function GET(request: Request) {
     }
   }
   if (mappedError) {
-    return new NextResponse(
+    return applyNativeCookieCleanup(new NextResponse(
       renderRedirectPage(
         `helfi://auth-complete?error=${encodeURIComponent(mappedError)}`,
         'Sign in failed',
         'Sign in could not be completed. Please try again.',
       ),
       { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
-    )
+    ))
   }
 
   try {
     const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
     if (!secret) {
-      return new NextResponse(
+      return applyNativeCookieCleanup(new NextResponse(
         renderRedirectPage(
           'helfi://auth-complete?error=missing_secret',
           'Sign in failed',
           'Server sign in configuration is missing. Please try again later.',
         ),
         { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
-      )
+      ))
     }
 
     const session = await getServerSession(authOptions)
@@ -99,14 +107,14 @@ export async function GET(request: Request) {
     const image = session?.user?.image || null
 
     if (!userId || !email) {
-      return new NextResponse(
+      return applyNativeCookieCleanup(new NextResponse(
         renderRedirectPage(
           'helfi://auth-complete?error=missing_session',
           'Sign in not completed',
           'We could not find your session after sign in. Please try again.',
         ),
         { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
-      )
+      ))
     }
 
     const nowSeconds = Math.floor(Date.now() / 1000)
@@ -134,23 +142,23 @@ export async function GET(request: Request) {
     if (image) params.set('image', String(image))
 
     const targetUrl = `helfi://auth-complete?${params.toString()}`
-    return new NextResponse(
+    return applyNativeCookieCleanup(new NextResponse(
       renderRedirectPage(
         targetUrl,
         'Sign in complete',
         'You are signed in. Returning to Helfi app now.',
       ),
       { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
-    )
+    ))
   } catch (error) {
     console.error('Native OAuth complete failed:', error)
-    return new NextResponse(
+    return applyNativeCookieCleanup(new NextResponse(
       renderRedirectPage(
         'helfi://auth-complete?error=oauth_complete_failed',
         'Sign in failed',
         'Something went wrong while finishing sign in. Please try again.',
       ),
       { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
-    )
+    ))
   }
 }
