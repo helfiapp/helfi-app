@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-23 02:15 AM AEDT
+- What changed: Added a hard native OAuth fallback for Apple/Google. If social auth bounces to web sign-in with an auth error, it now auto-routes back through native completion and returns to the app flow instead of leaving users stuck on the web login page.
+- Where to see it (page/link): https://helfi.ai/api/native-auth/oauth/start?provider=apple&mode=signin and https://helfi.ai/auth/signin
+- What to quickly test: Log out in native app, tap Continue with Apple, then complete/cancel Apple auth. Confirm it returns to Helfi app flow (success or clear in-app error), not the web sign-in screen.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 01:44 AM AEDT
 - What changed: Fixed native Apple sign-in fallback. If Apple sign-in fails, it now routes back to the app (with a clear in-app error) instead of dropping the user onto the web login page. Also improved Apple account matching so repeat Apple logins can still resolve to the correct user even when Apple does not resend email.
 - Where to see it (page/link): Native app login screen (Continue with Apple), plus https://helfi.ai/api/native-auth/oauth/complete
