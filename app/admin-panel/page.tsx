@@ -3,6 +3,12 @@
 import React, { useState, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { useRouter } from 'next/navigation'
+import {
+  FEEDBACK_REQUEST_EMAIL_SUBJECT,
+  WELCOME_EMAIL_SUBJECT,
+  buildExistingMemberFeedbackTemplateMessage,
+  buildWelcomeFeedbackTemplateMessage,
+} from '@/lib/feedback-message-copy'
 
 const PRACTITIONER_REJECTION_REASONS = [
   {
@@ -140,6 +146,7 @@ export default function AdminPanel() {
   const [userEmailSubject, setUserEmailSubject] = useState('')
   const [userEmailMessage, setUserEmailMessage] = useState('')
   const [isComposingUserEmail, setIsComposingUserEmail] = useState(false)
+  const [isSendingFeedbackRequestBlast, setIsSendingFeedbackRequestBlast] = useState(false)
   const [emailTemplate, setEmailTemplate] = useState('custom')
 
   // Template Management states
@@ -1719,6 +1726,60 @@ https://www.helfi.ai`)
     setSelectedUserEmails(filteredUsers.map(user => user.email))
   }
 
+  const handleSelectAllMatchingUsers = async () => {
+    const storedToken = (() => {
+      try {
+        return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+      } catch {
+        return null
+      }
+    })()
+    const authToken = storedToken || adminToken
+    if (!authToken) {
+      alert('Please sign in again before selecting all users.')
+      return
+    }
+
+    setIsLoadingManagement(true)
+    try {
+      const allEmails: string[] = []
+      let page = 1
+      const limit = 200
+      let totalPagesFromApi = 1
+
+      while (page <= totalPagesFromApi) {
+        const params = new URLSearchParams({
+          search: userSearch,
+          plan: userFilter,
+          page: String(page),
+          limit: String(limit),
+        })
+        const response = await fetch(`/api/admin/user-management?${params}`, {
+          headers: {
+            Authorization: `Bearer ${authToken}`,
+          },
+        })
+        if (!response.ok) {
+          throw new Error(`Failed to load users (page ${page})`)
+        }
+        const result = await response.json()
+        const pageUsers = Array.isArray(result?.users) ? result.users : []
+        allEmails.push(...pageUsers.map((user: any) => String(user.email || '').trim()).filter(Boolean))
+        totalPagesFromApi = Number(result?.pagination?.pages || 1)
+        page += 1
+      }
+
+      const uniqueEmails = Array.from(new Set(allEmails))
+      setSelectedUserEmails(uniqueEmails)
+      alert(`Selected ${uniqueEmails.length} matching users across all pages.`)
+    } catch (error: any) {
+      console.error('Error selecting all matching users:', error)
+      alert(error?.message || 'Failed to select all users.')
+    } finally {
+      setIsLoadingManagement(false)
+    }
+  }
+
   // Bulk delete function
   const handleBulkDelete = async () => {
     if (selectedUserEmails.length === 0) {
@@ -1822,23 +1883,13 @@ https://www.helfi.ai`)
     // Fallback to hardcoded templates for backwards compatibility
     switch (templateType) {
       case 'welcome':
-        setUserEmailSubject('🎉 Welcome to Helfi - Your AI Health Journey Begins!')
-        setUserEmailMessage(`Hi {name},
+        setUserEmailSubject(WELCOME_EMAIL_SUBJECT)
+        setUserEmailMessage(buildWelcomeFeedbackTemplateMessage('{name}'))
+        break
 
-Welcome to the Helfi community! We're thrilled to have you on board.
-
-🚀 **Getting Started:**
-• Complete your health profile for personalized insights
-• Start logging your meals with AI-powered analysis
-• Set your health goals and track your progress
-• Explore our medication interaction checker
-
-💡 **Pro Tip:** The more you use Helfi, the smarter your AI health coach becomes!
-
-Need help getting started? Just reply to this email or contact our support team.
-
-Best regards,
-The Helfi Team`)
+      case 'feedback_request':
+        setUserEmailSubject(FEEDBACK_REQUEST_EMAIL_SUBJECT)
+        setUserEmailMessage(buildExistingMemberFeedbackTemplateMessage('{name}'))
         break
       
       case 'premium_upgrade':
@@ -1962,6 +2013,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
           name: user?.name || 'there'
         }
       })
+      const isFeedbackRequest = emailTemplate === 'feedback_request'
       
       const response = await fetch('/api/admin/send-emails', {
         method: 'POST',
@@ -1974,8 +2026,10 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
           subject: userEmailSubject,
           message: userEmailMessage,
           waitlistData: emailData, // Using same structure for compatibility
-          emailType: 'marketing',
-          reasonText: 'You received this email because you have a Helfi account.'
+          emailType: isFeedbackRequest ? 'support' : 'marketing',
+          reasonText: isFeedbackRequest
+            ? 'You received this email because you have a Helfi account and we value your feedback.'
+            : 'You received this email because you have a Helfi account.'
         })
       })
 
@@ -1993,6 +2047,49 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     }
     
     setIsComposingUserEmail(false)
+  }
+
+  const handleSendFeedbackRequestToAllMembers = async () => {
+    if (!adminToken) {
+      alert('Admin sign-in is required.')
+      return
+    }
+
+    const confirmed = confirm(
+      'Send the feedback request email to all existing verified members now? This can take a little time.'
+    )
+    if (!confirmed) return
+
+    setIsSendingFeedbackRequestBlast(true)
+    try {
+      const response = await fetch('/api/admin/send-feedback-request', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${adminToken}`,
+        },
+        body: JSON.stringify({ dryRun: false }),
+      })
+      const result = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(result?.error || 'Failed to send feedback emails.')
+      }
+
+      const summary = result?.summary || {}
+      const sent = Number(summary?.sent || 0)
+      const failed = Number(summary?.failed || 0)
+      const total = Number(summary?.total || 0)
+      alert(
+        failed === 0
+          ? `✅ Feedback request email sent to ${sent} members.`
+          : `⚠️ Feedback request email sent to ${sent} members, ${failed} failed (out of ${total}).`
+      )
+    } catch (error: any) {
+      console.error('Error sending feedback request email blast:', error)
+      alert(error?.message || 'Failed to send feedback request emails.')
+    } finally {
+      setIsSendingFeedbackRequestBlast(false)
+    }
   }
 
   // Template Management Functions
@@ -5514,6 +5611,13 @@ The Helfi Team`,
                 <div className="flex flex-wrap gap-2">
                   {/* Quick Selection Buttons */}
                   <button
+                    onClick={handleSelectAllMatchingUsers}
+                    disabled={isLoadingManagement}
+                    className="bg-emerald-700 text-white px-3 py-2 rounded-lg hover:bg-emerald-800 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isLoadingManagement ? 'Selecting...' : '📬 All Matching (All Pages)'}
+                  </button>
+                  <button
                     onClick={() => handleSelectByTier('all')}
                     className="bg-gray-500 text-white px-3 py-2 rounded-lg hover:bg-gray-600 transition-colors text-sm"
                   >
@@ -5534,14 +5638,38 @@ The Helfi Team`,
                 </div>
               </div>
 
+              <div className="mb-4 rounded-lg border border-emerald-200 bg-emerald-50 p-3">
+                <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+                  <p className="text-sm text-emerald-900">
+                    Need to email all existing members in one go?
+                  </p>
+                  <button
+                    onClick={handleSendFeedbackRequestToAllMembers}
+                    disabled={isSendingFeedbackRequestBlast}
+                    className="bg-emerald-600 text-white px-3 py-2 rounded-lg hover:bg-emerald-700 transition-colors text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    {isSendingFeedbackRequestBlast
+                      ? 'Sending to all members...'
+                      : '📣 Send Feedback Request to All Members'}
+                  </button>
+                </div>
+              </div>
+
               {/* Email Template Buttons */}
-              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-3 mb-4">
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-7 gap-3 mb-4">
                 <button
                   onClick={() => handleStartUserEmail('welcome')}
                   disabled={selectedUserEmails.length === 0}
                   className="bg-green-500 text-white px-4 py-3 rounded-lg hover:bg-green-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
                 >
                   🎉 Welcome Email
+                </button>
+                <button
+                  onClick={() => handleStartUserEmail('feedback_request')}
+                  disabled={selectedUserEmails.length === 0}
+                  className="bg-emerald-600 text-white px-4 py-3 rounded-lg hover:bg-emerald-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed text-sm"
+                >
+                  🗣️ Feedback Request
                 </button>
                 <button
                   onClick={() => handleStartUserEmail('premium_upgrade')}
@@ -5659,6 +5787,7 @@ The Helfi Team`,
                       {/* Built-in Templates */}
                       <optgroup label="📦 Built-in Templates">
                         <option value="welcome">🎉 Welcome Email</option>
+                        <option value="feedback_request">🗣️ Feedback Request</option>
                         <option value="premium_upgrade">🔥 Premium Upgrade</option>
                         <option value="engagement">🌟 Re-engagement</option>
                         <option value="feature_announcement">🆕 Feature Announcement</option>

@@ -9,6 +9,7 @@ import { createPortal } from 'react-dom'
 import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
 import WeeklyReportReadyModal from '@/components/WeeklyReportReadyModal'
+import { FEEDBACK_POPUP_COPY } from '@/lib/feedback-message-copy'
 
 function storePendingNotificationId(id?: string | null) {
   if (!id || typeof window === 'undefined') return
@@ -287,11 +288,58 @@ interface LayoutWrapperProps {
   children: ReactNode
 }
 
+const FEEDBACK_REQUIRED_ACTIVE_DAYS = 3
+
+function toLocalDateKey(date: Date): string {
+  const y = date.getFullYear()
+  const m = `${date.getMonth() + 1}`.padStart(2, '0')
+  const d = `${date.getDate()}`.padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+function previousLocalDateKey(dateKey: string): string | null {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateKey)
+  if (!match) return null
+  const year = Number(match[1])
+  const month = Number(match[2])
+  const day = Number(match[3])
+  if (!Number.isFinite(year) || !Number.isFinite(month) || !Number.isFinite(day)) return null
+  const date = new Date(year, month - 1, day)
+  date.setDate(date.getDate() - 1)
+  return toLocalDateKey(date)
+}
+
+function parseActiveDayList(raw: string | null): string[] {
+  if (!raw) return []
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return []
+    return parsed
+      .filter((value) => typeof value === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(value))
+      .slice(-60)
+  } catch {
+    return []
+  }
+}
+
+function calculateConsecutiveActiveDays(activeDays: string[], todayKey: string): number {
+  if (!activeDays.length) return 0
+  const activeSet = new Set(activeDays)
+  let streak = 0
+  let cursor: string | null = todayKey
+  while (cursor && activeSet.has(cursor)) {
+    streak += 1
+    cursor = previousLocalDateKey(cursor)
+  }
+  return streak
+}
+
 export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const pathname = usePathname()
   const router = useRouter()
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
+  const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false)
   const [goalSyncNotice, setGoalSyncNotice] = useState<string | null>(null)
   const lastLocationRef = useRef('')
   const sidebarNavLockRef = useRef(0)
@@ -361,6 +409,27 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     isNewsPath ||
     (publicPages.includes(pathname) && !isOnboardingPath)
 
+  const feedbackPromptStorageKey = session?.user?.email
+    ? `helfi:feedback-prompt-shown:${session.user.email.toLowerCase()}`
+    : ''
+  const feedbackActiveDaysStorageKey = session?.user?.email
+    ? `helfi:feedback-active-days:${session.user.email.toLowerCase()}`
+    : ''
+
+  const dismissFeedbackPrompt = useCallback((openSupport: boolean) => {
+    setShowFeedbackPrompt(false)
+    if (feedbackPromptStorageKey && typeof window !== 'undefined') {
+      try {
+        localStorage.setItem(feedbackPromptStorageKey, '1')
+      } catch {
+        // Ignore storage errors
+      }
+    }
+    if (openSupport) {
+      router.push('/support')
+    }
+  }, [feedbackPromptStorageKey, router])
+
   useEffect(() => {
     if (typeof document === 'undefined') return
 
@@ -384,6 +453,42 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     if (isPractitionerAllowedPath) return
     router.replace('/practitioner')
   }, [status, isPractitioner, isAdminPanelPath, isPractitionerAllowedPath, router])
+
+  useEffect(() => {
+    if (status !== 'authenticated') return
+    if (!feedbackActiveDaysStorageKey) return
+    if (!feedbackPromptStorageKey) return
+    if (isPublicPage || isAdminPanelPath || isPractitionerPortalPath) return
+    if (pathname.startsWith('/support')) return
+    if ((session as any)?.user?.needsVerification) return
+
+    try {
+      const todayKey = toLocalDateKey(new Date())
+      const activeDays = parseActiveDayList(localStorage.getItem(feedbackActiveDaysStorageKey))
+      if (!activeDays.includes(todayKey)) {
+        activeDays.push(todayKey)
+        activeDays.sort()
+        localStorage.setItem(feedbackActiveDaysStorageKey, JSON.stringify(activeDays.slice(-60)))
+      }
+
+      const streak = calculateConsecutiveActiveDays(activeDays, todayKey)
+      if (streak < FEEDBACK_REQUIRED_ACTIVE_DAYS) return
+      if (localStorage.getItem(feedbackPromptStorageKey) === '1') return
+    } catch {
+      // Ignore storage errors
+    }
+
+    setShowFeedbackPrompt(true)
+  }, [
+    status,
+    feedbackActiveDaysStorageKey,
+    feedbackPromptStorageKey,
+    isPublicPage,
+    isAdminPanelPath,
+    isPractitionerPortalPath,
+    pathname,
+    session,
+  ])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -1215,6 +1320,38 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
               ) : (
                 <span>{pullOffset >= PULL_REFRESH_THRESHOLD ? 'Release to refresh' : 'Pull to refresh'}</span>
               )}
+            </div>
+          )}
+          {showFeedbackPrompt && (
+            <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 p-4">
+              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
+                <h2 className="text-xl font-semibold text-gray-900">{FEEDBACK_POPUP_COPY.title}</h2>
+                <p className="mt-3 text-sm leading-6 text-gray-700">{FEEDBACK_POPUP_COPY.body}</p>
+                <ul className="mt-4 space-y-2 text-sm text-gray-700">
+                  {FEEDBACK_POPUP_COPY.supportSteps.map((step) => (
+                    <li key={step} className="flex items-start gap-2">
+                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span>{step}</span>
+                    </li>
+                  ))}
+                </ul>
+                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                  <button
+                    type="button"
+                    onClick={() => dismissFeedbackPrompt(true)}
+                    className="flex-1 rounded-md bg-helfi-green px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                  >
+                    {FEEDBACK_POPUP_COPY.primaryButtonLabel}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => dismissFeedbackPrompt(false)}
+                    className="flex-1 rounded-md bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                  >
+                    {FEEDBACK_POPUP_COPY.secondaryButtonLabel}
+                  </button>
+                </div>
+              </div>
             </div>
           )}
           {showHealthSetupReminder && (

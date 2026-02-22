@@ -1,6 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
+import {
+  FEEDBACK_REQUEST_EMAIL_SUBJECT,
+  WELCOME_EMAIL_SUBJECT,
+  buildExistingMemberFeedbackTemplateMessage,
+  buildWelcomeFeedbackTemplateMessage,
+} from '@/lib/feedback-message-copy'
 
 const prisma = new PrismaClient()
 
@@ -47,11 +53,15 @@ export async function POST(request: NextRequest) {
     const templateId3 = 'tmpl_' + Math.random().toString(36).substring(2)
     const templateId4 = 'tmpl_' + Math.random().toString(36).substring(2)
     const templateId5 = 'tmpl_' + Math.random().toString(36).substring(2)
+    const templateId6 = 'tmpl_' + Math.random().toString(36).substring(2)
 
     await prisma.$executeRaw`
       INSERT INTO "EmailTemplate" ("id", "name", "category", "subject", "content", "isBuiltIn", "createdBy") VALUES
-      (${templateId1}, 'Welcome Email', 'ONBOARDING', '🎉 Welcome to Helfi - Your AI Health Journey Begins!', 
-       'Hi {name},\n\nWelcome to the Helfi community! We''re thrilled to have you on board.\n\n🚀 Getting Started:\n• Complete your health profile for personalized insights\n• Start logging your meals with AI-powered analysis\n• Set your health goals and track your progress\n• Explore our medication interaction checker\n\n💡 Pro Tip: The more you use Helfi, the smarter your AI health coach becomes!\n\nNeed help getting started? Just reply to this email or contact our support team.\n\nBest regards,\nThe Helfi Team', 
+      (${templateId1}, 'Welcome Email', 'ONBOARDING', ${WELCOME_EMAIL_SUBJECT}, 
+       ${buildWelcomeFeedbackTemplateMessage('{name}')}, 
+       true, ${admin.adminId}),
+      (${templateId6}, 'Feedback Request', 'SUPPORT', ${FEEDBACK_REQUEST_EMAIL_SUBJECT},
+       ${buildExistingMemberFeedbackTemplateMessage('{name}')},
        true, ${admin.adminId}),
       (${templateId2}, 'Premium Upgrade', 'MARKETING', '🔥 Unlock Your Full Health Potential with Helfi Premium',
        'Hi {name},\n\nReady to supercharge your health journey? Helfi Premium gives you everything you need:\n\n✨ Premium Benefits:\n• 30 AI food analyses per day (vs 3 on free)\n• 30 medical image analyses per day\n• Advanced medication interaction checking\n• Priority customer support\n• Early access to new features\n\n🎯 Special Offer: Get 14 days free when you upgrade today!\n\n[Upgrade to Premium - helfi.ai/billing]\n\nYour health deserves the best tools. Let''s make it happen!\n\nBest regards,\nThe Helfi Team',
@@ -69,8 +79,8 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ 
       message: 'Email templates initialized successfully!',
-      created: 5,
-      templates: ['Welcome Email', 'Premium Upgrade', 'Re-engagement', 'Feature Announcement', 'Support Follow-up']
+      created: 6,
+      templates: ['Welcome Email', 'Feedback Request', 'Premium Upgrade', 'Re-engagement', 'Feature Announcement', 'Support Follow-up']
     })
   } catch (error) {
     console.error('Error initializing email templates:', error)

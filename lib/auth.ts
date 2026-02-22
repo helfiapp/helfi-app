@@ -10,6 +10,7 @@ import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 import { getSessionRevokedAt } from '@/lib/session-revocation'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
 import { getAppleClientSecret } from '@/lib/apple-client-secret'
+import { sendWelcomeEmail } from '@/lib/welcome-email'
 import bcrypt from 'bcryptjs'
 
 // Initialize Resend for welcome emails
@@ -47,66 +48,6 @@ async function isOnboardingComplete(userId: string): Promise<boolean> {
     return !!(hasBasicProfile && hasHealthGoals)
   } catch (error) {
     console.error('Error checking onboarding completion:', error)
-    return false
-  }
-}
-
-// Function to send welcome email
-async function sendWelcomeEmail(email: string, name: string) {
-  const resend = getResend()
-  if (!resend) {
-    console.log('📧 Resend API not configured, skipping welcome email')
-    return false
-  }
-
-  try {
-    const welcomeMessage = `Hi ${name},
-
-Welcome to the Helfi community! We're thrilled to have you on board.
-
-🚀 Getting Started:
-• Complete your health profile for personalized insights
-• Start logging your meals with AI-powered analysis
-• Set your health goals and track your progress
-• Explore our medication interaction checker
-
-💡 Pro Tip: The more you use Helfi, the smarter your AI health coach becomes!
-
-Need help getting started? Just reply to this email or contact our support team.
-
-Best regards,
-The Helfi Team`
-
-    const emailResponse = await resend.emails.send({
-      from: 'Helfi Team <support@helfi.ai>',
-      to: email,
-      subject: '🎉 Welcome to Helfi - Your AI Health Journey Begins!',
-      html: `
-        <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; background: #f8fafc;">
-          <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-            <h1 style="margin: 0; font-size: 32px; font-weight: bold; letter-spacing: -0.5px;">Helfi</h1>
-            <p style="margin: 12px 0 0 0; opacity: 0.95; font-size: 16px;">Your AI-Powered Health Coach</p>
-          </div>
-          
-          <div style="padding: 40px 30px; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-            ${welcomeMessage.split('\n').map((line: string) => 
-              line.trim() ? `<p style="margin: 18px 0; line-height: 1.7; font-size: 16px;">${line}</p>` : '<div style="height: 10px;"></div>'
-            ).join('')}
-            
-            <div style="margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center;">
-              <a href="https://helfi.ai/dashboard" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🚀 Complete Your Profile</a>
-            </div>
-            
-            ${getEmailFooter({ recipientEmail: email, emailType: 'welcome' })}
-          </div>
-        </div>
-      `
-    })
-
-    console.log(`✅ [WELCOME EMAIL] Sent to ${email} with ID: ${emailResponse.data?.id}`)
-    return true
-  } catch (error) {
-    console.error(`❌ [WELCOME EMAIL] Failed to send to ${email}:`, error)
     return false
   }
 }
@@ -370,7 +311,10 @@ export const authOptions: NextAuthOptions = {
           if (isNewUser) {
             const userName = dbUser.name || dbUser.email.split('@')[0]
             console.log(`📧 Sending welcome email to new ${providerLabel} user:`, userName)
-            sendWelcomeEmail(dbUser.email, userName).catch(error => {
+            sendWelcomeEmail({
+              email: dbUser.email,
+              name: userName,
+            }).catch(error => {
               console.error(`❌ ${providerLabel} welcome email failed (non-blocking):`, error)
             })
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
+import { sendWelcomeEmail } from '@/lib/welcome-email'
 
 // This API route uses dynamic data and should not be statically generated
 export const runtime = 'nodejs'
@@ -81,63 +82,14 @@ export async function GET(request: NextRequest) {
 
     // Send welcome email now that user is verified
     try {
-      const { Resend } = await import('resend')
-      
-      if (process.env.RESEND_API_KEY) {
-        const resend = new Resend(process.env.RESEND_API_KEY)
-        const userName = user.name || user.email.split('@')[0]
-        
-        const welcomeMessage = `Hi ${userName},
-
-Welcome to the Helfi community! We're thrilled to have you on board.
-
-🚀 Getting Started:
-• Complete your health profile for personalized insights
-• Start logging your meals with AI-powered analysis
-• Set your health goals and track your progress
-• Explore our medication interaction checker
-
-💡 Pro Tip: The more you use Helfi, the smarter your AI health coach becomes!
-
-Need help getting started? Just reply to this email or contact our support team.
-
-Best regards,
-The Helfi Team`
-
-        await resend.emails.send({
-          from: 'Helfi Team <support@helfi.ai>',
-          to: user.email,
-          subject: '🎉 Welcome to Helfi - Your AI Health Journey Begins!',
-          html: `
-            <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; background: #f8fafc;">
-              <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
-                <h1 style="margin: 0; font-size: 32px; font-weight: bold; letter-spacing: -0.5px;">Helfi</h1>
-                <p style="margin: 12px 0 0 0; opacity: 0.95; font-size: 16px;">Your AI-Powered Health Coach</p>
-              </div>
-              
-              <div style="padding: 40px 30px; background: white; border-radius: 0 0 12px 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">
-                ${welcomeMessage.split('\n').map((line: string) => 
-                  line.trim() ? `<p style="margin: 18px 0; line-height: 1.7; font-size: 16px;">${line}</p>` : '<div style="height: 10px;"></div>'
-                ).join('')}
-                
-                <div style="margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center;">
-                  <a href="https://helfi.ai/auth/signin" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🚀 Start Your Health Journey</a>
-                </div>
-                
-                <div style="margin-top: 40px; padding-top: 30px; border-top: 1px solid #e5e7eb; font-size: 14px; color: #6b7280; text-align: center;">
-                  <p style="margin: 0 0 16px 0; font-size: 16px; color: #374151;"><strong>Best regards,<br>The Helfi Team</strong></p>
-                  <p style="margin: 20px 0 0 0; font-size: 14px;">
-                    <a href="https://helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">🌐 helfi.ai</a> | 
-                    <a href="mailto:support@helfi.ai" style="color: #10b981; text-decoration: none; font-weight: 500;">📧 support@helfi.ai</a>
-                  </p>
-                </div>
-              </div>
-            </div>
-          `
-        })
-        
-        console.log('📧 Welcome email sent to newly verified user:', userName)
-      }
+      const userName = user.name || user.email.split('@')[0]
+      await sendWelcomeEmail({
+        email: user.email,
+        name: userName,
+        ctaHref: 'https://helfi.ai/auth/signin',
+        ctaLabel: 'Sign in to Helfi',
+      })
+      console.log('📧 Welcome email sent to newly verified user:', userName)
     } catch (emailError) {
       console.error('❌ Welcome email failed (non-blocking):', emailError)
     }

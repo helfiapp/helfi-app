@@ -70,6 +70,9 @@ export async function POST(request: NextRequest) {
           .replace(/{company}/g, company)
           .replace(/{region}/g, region)
           .replace(/{notes}/g, notes)
+        const isSupportStyleEmail = emailType === 'support'
+        const ctaHref = isSupportStyleEmail ? 'https://helfi.ai/support' : 'https://helfi.ai'
+        const ctaLabel = isSupportStyleEmail ? 'Open Help & Support' : 'Get Started with Helfi'
         
         // Send real email using Resend
         const resend = getResend()
@@ -94,7 +97,7 @@ export async function POST(request: NextRequest) {
                  ).join('')}
                 
                 <div style="margin-top: 40px; padding-top: 30px; border-top: 2px solid #e5e7eb; text-align: center;">
-                  <a href="https://helfi.ai" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">🚀 Get Started with Helfi</a>
+                  <a href="${ctaHref}" style="display: inline-block; background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; text-decoration: none; padding: 16px 32px; border-radius: 8px; font-weight: 600; font-size: 16px; margin: 10px 0; box-shadow: 0 2px 8px rgba(16, 185, 129, 0.3);">${ctaLabel}</a>
                 </div>
                 
                 ${getEmailFooter({
