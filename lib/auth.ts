@@ -1,5 +1,6 @@
 import { type NextAuthOptions } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
+import AppleProvider from 'next-auth/providers/apple'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from '@/lib/prisma'
 import { Resend } from 'resend'
@@ -8,6 +9,7 @@ import { notifyOwner } from '@/lib/owner-notifications'
 import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
 import { getSessionRevokedAt } from '@/lib/session-revocation'
 import { ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits'
+import { getAppleClientSecret } from '@/lib/apple-client-secret'
 import bcrypt from 'bcryptjs'
 
 // Initialize Resend for welcome emails
@@ -180,6 +182,93 @@ function generateVerificationToken(): string {
   return Math.random().toString(36).substring(2) + Date.now().toString(36)
 }
 
+const providers: NonNullable<NextAuthOptions['providers']> = [
+  CredentialsProvider({
+    name: 'credentials',
+    credentials: {
+      email: { label: 'Email', type: 'email' },
+      password: { label: 'Password', type: 'password' }
+    },
+    async authorize(credentials) {
+      console.log('🔐 Credentials authorize called:', { email: credentials?.email })
+      if (!credentials?.email || !credentials?.password) {
+        console.log('❌ Missing credentials')
+        return null
+      }
+
+      const email = credentials.email.toLowerCase()
+      const user = await prisma.user
+        .findUnique({
+          where: { email },
+          select: {
+            id: true,
+            email: true,
+            name: true,
+            image: true,
+            passwordHash: true,
+            emailVerified: true,
+          },
+        })
+        .catch((e) => {
+          console.error('⚠️ prisma.user.findUnique failed:', e)
+          return null
+        })
+
+      if (!user || !user.passwordHash) {
+        console.log('❌ No password set for user:', email)
+        return null
+      }
+
+      const match = await bcrypt.compare(credentials.password, user.passwordHash)
+      if (!match) {
+        console.log('❌ Invalid password for user:', email)
+        return null
+      }
+
+      if (!user.emailVerified) {
+        try {
+          await prisma.user.update({
+            where: { id: user.id },
+            data: { emailVerified: new Date() },
+          })
+        } catch (error) {
+          console.warn('⚠️ Failed to set emailVerified for user:', email, error)
+        }
+      }
+
+      console.log('✅ Allowing credentials signin for user:', user.email)
+      return {
+        id: user.id,
+        email: user.email,
+        name: user.name || user.email.split('@')[0],
+        image: user.image,
+      }
+    }
+  }),
+  GoogleProvider({
+    clientId: process.env.GOOGLE_CLIENT_ID || '',
+    clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
+    authorization: {
+      params: {
+        prompt: "consent",
+        access_type: "offline",
+        response_type: "code"
+      }
+    }
+  }),
+]
+
+const appleClientId = String(process.env.APPLE_CLIENT_ID || '').trim()
+const appleClientSecret = getAppleClientSecret()
+if (appleClientId && appleClientSecret) {
+  providers.push(
+    AppleProvider({
+      clientId: appleClientId,
+      clientSecret: appleClientSecret,
+    }),
+  )
+}
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
@@ -222,81 +311,7 @@ export const authOptions: NextAuthOptions = {
       },
     },
   },
-  providers: [
-    CredentialsProvider({
-      name: 'credentials',
-      credentials: {
-        email: { label: 'Email', type: 'email' },
-        password: { label: 'Password', type: 'password' }
-      },
-      async authorize(credentials) {
-        console.log('🔐 Credentials authorize called:', { email: credentials?.email })
-        if (!credentials?.email || !credentials?.password) {
-          console.log('❌ Missing credentials')
-          return null
-        }
-
-        const email = credentials.email.toLowerCase()
-        const user = await prisma.user
-          .findUnique({
-            where: { email },
-            select: {
-              id: true,
-              email: true,
-              name: true,
-              image: true,
-              passwordHash: true,
-              emailVerified: true,
-            },
-          })
-          .catch((e) => {
-            console.error('⚠️ prisma.user.findUnique failed:', e)
-            return null
-          })
-
-        if (!user || !user.passwordHash) {
-          console.log('❌ No password set for user:', email)
-          return null
-        }
-
-        const match = await bcrypt.compare(credentials.password, user.passwordHash)
-        if (!match) {
-          console.log('❌ Invalid password for user:', email)
-          return null
-        }
-
-        if (!user.emailVerified) {
-          try {
-            await prisma.user.update({
-              where: { id: user.id },
-              data: { emailVerified: new Date() },
-            })
-          } catch (error) {
-            console.warn('⚠️ Failed to set emailVerified for user:', email, error)
-          }
-        }
-
-        console.log('✅ Allowing credentials signin for user:', user.email)
-        return {
-          id: user.id,
-          email: user.email,
-          name: user.name || user.email.split('@')[0],
-          image: user.image,
-        }
-      }
-    }),
-    GoogleProvider({
-      clientId: process.env.GOOGLE_CLIENT_ID || '',
-      clientSecret: process.env.GOOGLE_CLIENT_SECRET || '',
-      authorization: {
-        params: {
-          prompt: "consent",
-          access_type: "offline",
-          response_type: "code"
-        }
-      }
-    }),
-  ],
+  providers,
   callbacks: {
     async signIn({ user, account, profile }) {
       console.log('🔑 SignIn callback:', { 
@@ -304,8 +319,14 @@ export const authOptions: NextAuthOptions = {
         provider: account?.provider 
       })
       
-      if (account?.provider === 'google') {
+      if (account?.provider === 'google' || account?.provider === 'apple') {
         try {
+          if (!user?.email) {
+            console.error('❌ OAuth sign in failed: provider did not return email', { provider: account?.provider })
+            return false
+          }
+
+          const providerLabel = account?.provider === 'apple' ? 'Apple' : 'Google'
           // Ensure wallet metering columns exist (avoid column-missing errors on fresh DBs)
           // try {
           //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
@@ -317,43 +338,43 @@ export const authOptions: NextAuthOptions = {
           // } catch (e) {
           //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
           // }
-          // Find or create user for Google OAuth
+          // Find or create user for OAuth provider.
           let dbUser = await prisma.user.findUnique({
             where: { email: user.email! }
           })
 
           let isNewUser = false
           if (!dbUser) {
-            console.log('👤 Creating Google user:', user.email)
+            console.log(`👤 Creating ${providerLabel} user:`, user.email)
             await ensureFreeCreditColumns()
             dbUser = await prisma.user.create({
               data: {
                 email: user.email!.toLowerCase(),
                 name: user.name || user.email!.split('@')[0],
                 image: user.image,
-                emailVerified: new Date(), // Google users are auto-verified
+                emailVerified: new Date(), // OAuth users are auto-verified
                 ...NEW_USER_FREE_CREDITS,
               }
             })
             isNewUser = true
           } else if (!dbUser.emailVerified) {
-            // Auto-verify existing users who sign in with Google
-            console.log('🔄 Auto-verifying existing Google user:', dbUser.email)
+            // Auto-verify existing users who sign in with OAuth.
+            console.log(`🔄 Auto-verifying existing ${providerLabel} user:`, dbUser.email)
             await prisma.user.update({
               where: { id: dbUser.id },
               data: { emailVerified: new Date() }
             })
           }
           
-          // Send welcome email for new Google users (don't await to avoid blocking auth)
+          // Send welcome email for new OAuth users (don't await to avoid blocking auth)
           if (isNewUser) {
             const userName = dbUser.name || dbUser.email.split('@')[0]
-            console.log('📧 Sending welcome email to new Google user:', userName)
+            console.log(`📧 Sending welcome email to new ${providerLabel} user:`, userName)
             sendWelcomeEmail(dbUser.email, userName).catch(error => {
-              console.error('❌ Google welcome email failed (non-blocking):', error)
+              console.error(`❌ ${providerLabel} welcome email failed (non-blocking):`, error)
             })
 
-            // Notify owner of new Google signup (don't await to avoid blocking auth)
+            // Notify owner of new OAuth signup (don't await to avoid blocking auth)
             notifyOwner({
               event: 'signup',
               userEmail: dbUser.email,
@@ -372,9 +393,9 @@ export const authOptions: NextAuthOptions = {
           
           // Update user ID for session
           user.id = dbUser.id
-          console.log('✅ Google user processed:', { id: dbUser.id, email: dbUser.email, isNew: isNewUser })
+          console.log(`✅ ${providerLabel} user processed:`, { id: dbUser.id, email: dbUser.email, isNew: isNewUser })
         } catch (error) {
-          console.error('❌ Google user creation error:', error)
+          console.error('❌ OAuth user creation error:', error)
           return false
         }
       }
