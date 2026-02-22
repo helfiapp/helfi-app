@@ -210,6 +210,29 @@ if (appleClientId && appleClientSecret) {
   )
 }
 
+const normalizeEmail = (value: unknown) => {
+  const email = String(value || '').trim().toLowerCase()
+  return email || null
+}
+
+const readEmailFromIdToken = (idToken: unknown) => {
+  const raw = String(idToken || '').trim()
+  if (!raw) return null
+  const parts = raw.split('.')
+  if (parts.length < 2) return null
+  try {
+    const payload = parts[1]
+      .replace(/-/g, '+')
+      .replace(/_/g, '/')
+      .padEnd(Math.ceil(parts[1].length / 4) * 4, '=')
+    const decoded = Buffer.from(payload, 'base64').toString('utf8')
+    const parsed = JSON.parse(decoded) as { email?: string }
+    return normalizeEmail(parsed?.email)
+  } catch {
+    return null
+  }
+}
+
 export const authOptions: NextAuthOptions = {
   session: {
     strategy: 'jwt',
@@ -262,12 +285,38 @@ export const authOptions: NextAuthOptions = {
       
       if (account?.provider === 'google' || account?.provider === 'apple') {
         try {
-          if (!user?.email) {
-            console.error('❌ OAuth sign in failed: provider did not return email', { provider: account?.provider })
+          const providerLabel = account?.provider === 'apple' ? 'Apple' : 'Google'
+          const provider = String(account?.provider || '').trim()
+          const providerAccountId = String((account as any)?.providerAccountId || '').trim()
+
+          // Apple can omit email on later sign-ins, so first try account-link lookup.
+          const linkedAccount =
+            provider && providerAccountId
+              ? await prisma.account.findUnique({
+                  where: {
+                    provider_providerAccountId: {
+                      provider,
+                      providerAccountId,
+                    },
+                  },
+                  include: { user: true },
+                })
+              : null
+
+          let resolvedEmail =
+            normalizeEmail(user?.email) ||
+            normalizeEmail((profile as any)?.email) ||
+            readEmailFromIdToken((account as any)?.id_token) ||
+            normalizeEmail(linkedAccount?.user?.email)
+
+          if (!resolvedEmail) {
+            console.error('❌ OAuth sign in failed: provider did not return email and no linked account found', {
+              provider: account?.provider,
+              providerAccountId: providerAccountId || null,
+            })
             return false
           }
 
-          const providerLabel = account?.provider === 'apple' ? 'Apple' : 'Google'
           // Ensure wallet metering columns exist (avoid column-missing errors on fresh DBs)
           // try {
           //   await prisma.$executeRawUnsafe('ALTER TABLE "User" ADD COLUMN IF NOT EXISTS "walletMonthlyUsedCents" INTEGER NOT NULL DEFAULT 0')
@@ -279,19 +328,21 @@ export const authOptions: NextAuthOptions = {
           // } catch (e) {
           //   console.warn('walletMonthlyResetAt ensure failed (safe to ignore if already exists):', e)
           // }
-          // Find or create user for OAuth provider.
-          let dbUser = await prisma.user.findUnique({
-            where: { email: user.email! }
-          })
+          // Find user by linked account first, then fallback to email match.
+          let dbUser =
+            linkedAccount?.user ||
+            (await prisma.user.findUnique({
+              where: { email: resolvedEmail },
+            }))
 
           let isNewUser = false
           if (!dbUser) {
-            console.log(`👤 Creating ${providerLabel} user:`, user.email)
+            console.log(`👤 Creating ${providerLabel} user:`, resolvedEmail)
             await ensureFreeCreditColumns()
             dbUser = await prisma.user.create({
               data: {
-                email: user.email!.toLowerCase(),
-                name: user.name || user.email!.split('@')[0],
+                email: resolvedEmail,
+                name: user.name || resolvedEmail.split('@')[0],
                 image: user.image,
                 emailVerified: new Date(), // OAuth users are auto-verified
                 ...NEW_USER_FREE_CREDITS,
@@ -304,6 +355,43 @@ export const authOptions: NextAuthOptions = {
             await prisma.user.update({
               where: { id: dbUser.id },
               data: { emailVerified: new Date() }
+            })
+          }
+
+          if (provider && providerAccountId) {
+            await prisma.account.upsert({
+              where: {
+                provider_providerAccountId: {
+                  provider,
+                  providerAccountId,
+                },
+              },
+              update: {
+                userId: dbUser.id,
+                type: String(account?.type || 'oauth'),
+                refresh_token: (account as any)?.refresh_token || null,
+                access_token: (account as any)?.access_token || null,
+                expires_at:
+                  typeof (account as any)?.expires_at === 'number' ? (account as any).expires_at : null,
+                token_type: (account as any)?.token_type || null,
+                scope: (account as any)?.scope || null,
+                id_token: (account as any)?.id_token || null,
+                session_state: (account as any)?.session_state || null,
+              },
+              create: {
+                userId: dbUser.id,
+                type: String(account?.type || 'oauth'),
+                provider,
+                providerAccountId,
+                refresh_token: (account as any)?.refresh_token || null,
+                access_token: (account as any)?.access_token || null,
+                expires_at:
+                  typeof (account as any)?.expires_at === 'number' ? (account as any).expires_at : null,
+                token_type: (account as any)?.token_type || null,
+                scope: (account as any)?.scope || null,
+                id_token: (account as any)?.id_token || null,
+                session_state: (account as any)?.session_state || null,
+              },
             })
           }
           
@@ -337,6 +425,11 @@ export const authOptions: NextAuthOptions = {
           
           // Update user ID for session
           user.id = dbUser.id
+          user.email = dbUser.email
+          if (!user.name) {
+            user.name = dbUser.name || dbUser.email.split('@')[0]
+          }
+          resolvedEmail = dbUser.email
           console.log(`✅ ${providerLabel} user processed:`, { id: dbUser.id, email: dbUser.email, isNew: isNewUser })
         } catch (error) {
           console.error('❌ OAuth user creation error:', error)
@@ -358,6 +451,22 @@ export const authOptions: NextAuthOptions = {
       // Handle signout - go to home
       if (url.includes('signout') || url.includes('signOut')) {
         return actualBaseUrl + '/'
+      }
+
+      // Native OAuth safety: if OAuth fails, route back into native completion endpoint
+      // so the app can receive a clear error instead of landing on the web sign-in page.
+      try {
+        const parsed = new URL(url, actualBaseUrl)
+        const isNativeOAuthError =
+          parsed.pathname === '/auth/signin' &&
+          parsed.searchParams.has('error') &&
+          String(parsed.searchParams.get('callbackUrl') || '').includes('/api/native-auth/oauth/complete')
+        if (isNativeOAuthError) {
+          const oauthError = String(parsed.searchParams.get('error') || 'OAuthSignin').trim()
+          return `${actualBaseUrl}/api/native-auth/oauth/complete?error=${encodeURIComponent(oauthError)}`
+        }
+      } catch {
+        // ignore parse issues and continue with normal redirect handling
       }
       
       // If URL is relative, use it with actualBaseUrl

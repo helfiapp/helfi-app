@@ -46,8 +46,34 @@ const renderRedirectPage = (targetUrl: string, title: string, message: string) =
 </html>`
 }
 
-export async function GET() {
+const mapOAuthError = (rawError: string) => {
+  const value = rawError.trim()
+  if (!value) return null
+  const normalized = value.toLowerCase()
+  if (normalized === 'oauthsignin') return 'oauth_signin_failed'
+  if (normalized === 'oauthcallback') return 'oauth_callback_failed'
+  if (normalized === 'accessdenied') return 'oauth_access_denied'
+  if (normalized === 'configuration') return 'oauth_config_error'
+  if (normalized === 'callback') return 'oauth_callback_failed'
+  return value
+}
+
+export async function GET(request: Request) {
   try {
+    const requestUrl = new URL(request.url)
+    const rawError = String(requestUrl.searchParams.get('error') || '')
+    const mappedError = mapOAuthError(rawError)
+    if (mappedError) {
+      return new NextResponse(
+        renderRedirectPage(
+          `helfi://auth-complete?error=${encodeURIComponent(mappedError)}`,
+          'Sign in failed',
+          'Sign in could not be completed. Please try again.',
+        ),
+        { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' } },
+      )
+    }
+
     const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
     if (!secret) {
       return new NextResponse(
