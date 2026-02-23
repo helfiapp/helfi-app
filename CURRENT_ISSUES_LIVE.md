@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-23 04:16 PM AEDT
+- What changed: Fixed OAuth session image handling so existing user profile photo is preserved after Apple/Google login. Native app now gets the saved profile image from account data instead of falling back to initial letter when image exists.
+- Where to see it (page/link): Native app dashboard top-right profile avatar, and /api/native-auth/oauth/complete session payload
+- What to quickly test: Log out and sign in again with Apple. Confirm top-right avatar shows your real profile photo (if your account already has one saved).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 03:44 PM AEDT
 - What changed: Fixed Apple sign-in root cause by changing OAuth verifier cookie settings for production cross-site callback. The required Apple callback cookie (`pkce code verifier`) now uses `SameSite=None; Secure`, so Apple callback can complete instead of failing with OAuth callback error.
 - Where to see it (page/link): https://helfi.ai/api/auth/signin/apple (cookie behavior) and native app Apple sign-in flow
