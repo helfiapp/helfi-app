@@ -460,6 +460,9 @@ export const authOptions: NextAuthOptions = {
           if (!user.name) {
             user.name = dbUser.name || dbUser.email.split('@')[0]
           }
+          if (!user.image && dbUser.image) {
+            user.image = dbUser.image
+          }
           resolvedEmail = dbUser.email
           console.log(`✅ ${providerLabel} user processed:`, { id: dbUser.id, email: dbUser.email, isNew: isNewUser })
         } catch (error) {
@@ -563,7 +566,7 @@ export const authOptions: NextAuthOptions = {
             id: token.id as string,
             email: token.email as string,
             name: token.name as string,
-            image: token.image as string || null,
+            image: (dbUser.image as string) || (token.image as string) || null,
             needsVerification: !dbUser.emailVerified,
             isPractitioner: !!dbUser.practitionerAccount,
           }
