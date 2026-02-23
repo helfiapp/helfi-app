@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-23 03:44 PM AEDT
+- What changed: Fixed Apple sign-in root cause by changing OAuth verifier cookie settings for production cross-site callback. The required Apple callback cookie (`pkce code verifier`) now uses `SameSite=None; Secure`, so Apple callback can complete instead of failing with OAuth callback error.
+- Where to see it (page/link): https://helfi.ai/api/auth/signin/apple (cookie behavior) and native app Apple sign-in flow
+- What to quickly test: Log out in native app, tap Continue with Apple, complete Apple auth, then confirm it returns into Helfi logged in (not “Sign in failed”).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 02:32 AM AEDT
 - What changed: Added new server-side OAuth error page (`/auth/oauth-error`) for native flows. This now redirects native Apple/Google auth errors straight to native completion endpoint before any web sign-in page can show, preventing users getting stuck on the web login screen.
 - Where to see it (page/link): https://helfi.ai/auth/oauth-error?error=OAuthCallback&callbackUrl=https%3A%2F%2Fhelfi.ai%2Fapi%2Fnative-auth%2Foauth%2Fcomplete%3Fnative%3D1
