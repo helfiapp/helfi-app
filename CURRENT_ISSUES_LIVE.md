@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-23 01:08 PM AEDT
+- What changed: Fixed Water Intake and Food Diary sync for drink favorites/renames (including tea with honey flow). Drink adds from favorites now always repair/check the linked water row, and Water Intake labels/icons stay aligned with renamed diary drink titles.
+- Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
+- What to quickly test: Add Tea 500 ml with Honey from Water -> Add from favorites, confirm Food Diary shows the drink and Water Intake Recent Logs also shows it; rename favorite and repeat to confirm both screens stay in sync.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 02:32 AM AEDT
 - What changed: Added new server-side OAuth error page (`/auth/oauth-error`) for native flows. This now redirects native Apple/Google auth errors straight to native completion endpoint before any web sign-in page can show, preventing users getting stuck on the web login screen.
 - Where to see it (page/link): https://helfi.ai/auth/oauth-error?error=OAuthCallback&callbackUrl=https%3A%2F%2Fhelfi.ai%2Fapi%2Fnative-auth%2Foauth%2Fcomplete%3Fnative%3D1
