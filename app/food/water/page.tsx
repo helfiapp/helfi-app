@@ -224,6 +224,18 @@ function writeWaterSnapshot(dateKey: string, entries: WaterEntry[]) {
   } catch {}
 }
 
+function resolveDrinkConfig(label: string) {
+  const normalized = normalizeLabel(label)
+    .replace(/\([^)]*\)/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+  if (!normalized) return null
+  const exact = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === normalized)
+  if (exact) return exact
+  return DRINK_TYPES.find((drink) => normalized.includes(drink.id.toLowerCase())) || null
+}
+
 export default function WaterIntakePage() {
   const router = useRouter()
   const { data: session, status } = useSession()
@@ -733,7 +745,17 @@ export default function WaterIntakePage() {
     setDrinkDetailSaving(true)
     setDrinkDetailError(null)
     try {
-      const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, activeDrink)
+      const navigationLabel = (() => {
+        if (drinkSugarChoice === 'sugar' || drinkSugarChoice === 'honey') {
+          const rawAmount = Number(drinkSugarAmount)
+          if (Number.isFinite(rawAmount) && rawAmount > 0) {
+            return `${activeDrink} with ${drinkSugarChoice} (${formatNumber(rawAmount)} ${drinkSugarUnit})`
+          }
+          return `${activeDrink} with ${drinkSugarChoice}`
+        }
+        return activeDrink
+      })()
+      const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, navigationLabel)
       closeDrinkDetail()
       const category = sourceCategory || 'uncategorized'
       const amountParam = String(drinkDetail.amount)
@@ -1167,11 +1189,10 @@ export default function WaterIntakePage() {
                 {!loading &&
                   entries.map((entry) => {
                     const label = normalizeLabel(entry.label)
-                    const baseLabel = label.replace(/\s*\(.*\)\s*$/, '').trim()
-                    const drinkConfig = DRINK_TYPES.find((drink) => drink.id.toLowerCase() === baseLabel.toLowerCase())
+                    const drinkConfig = resolveDrinkConfig(label)
                     const icon = drinkConfig?.icon || '/mobile-assets/MOBILE%20ICONS/WATER.png'
                     const accent =
-                      label.toLowerCase() === 'coffee'
+                      (drinkConfig?.id || '').toLowerCase() === 'coffee'
                         ? 'bg-orange-50 text-orange-500 dark:bg-orange-900/20'
                         : 'bg-blue-50 text-blue-500 dark:bg-blue-900/20'
                     return (

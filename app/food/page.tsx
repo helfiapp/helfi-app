@@ -12291,12 +12291,14 @@ Please add nutritional information manually if needed.`);
     localDate: string,
     category?: string | null,
     linkedAt?: string | number | null,
+    labelOverride?: string | null,
   ) => {
     const normalizedCategory = normalizeCategory(category) || 'uncategorized'
+    const resolvedLabel = String(labelOverride || meta.type || '').trim() || meta.type
     const payload = {
       amount: meta.amount,
       unit: meta.unit,
-      label: meta.type,
+      label: resolvedLabel,
       localDate,
       category: normalizedCategory,
     }
@@ -12634,7 +12636,13 @@ Please add nutritional information manually if needed.`);
     let drinkMeta = resolvedDrinkMeta
     if (drinkMeta?.type) {
       try {
-        const waterResult = await syncDrinkWaterLog(drinkMeta, entryLocalDate, entryCategory, newCreatedAt)
+        const waterResult = await syncDrinkWaterLog(
+          drinkMeta,
+          entryLocalDate,
+          entryCategory,
+          newCreatedAt,
+          nextLabel || resolvedTitle || drinkMeta.type,
+        )
         if (waterResult?.id) {
           drinkMeta = { ...drinkMeta, waterLogId: waterResult.id }
           editingDrinkMetaRef.current = drinkMeta
@@ -17415,13 +17423,14 @@ Please add nutritional information manually if needed.`);
     queueScrollToDiaryEntry({ entryKey: pendingEntry.id, category })
     let entryForSave = pendingEntry
     const drinkMetaForEntry = getDrinkMetaFromEntry(pendingEntry)
-    if (drinkMetaForEntry?.type && !drinkMetaForEntry.waterLogId) {
+    if (drinkMetaForEntry?.type) {
       try {
         const waterResult = await syncDrinkWaterLog(
           drinkMetaForEntry,
           pendingEntry.localDate || selectedDate,
           pendingEntry.category || pendingEntry.meal,
           pendingEntry.createdAt,
+          pendingEntry.description || pendingEntry.label || drinkMetaForEntry.type,
         )
         if (waterResult?.id) {
           const updatedMeta = { ...drinkMetaForEntry, waterLogId: waterResult.id }
@@ -18183,13 +18192,14 @@ Please add nutritional information manually if needed.`);
     }
     let entryForSave = pendingEntry
     const drinkMetaForEntry = getDrinkMetaFromEntry(pendingEntry)
-    if (drinkMetaForEntry?.type && !drinkMetaForEntry.waterLogId) {
+    if (drinkMetaForEntry?.type) {
       try {
         const waterResult = await syncDrinkWaterLog(
           drinkMetaForEntry,
           pendingEntry.localDate || selectedDate,
           pendingEntry.category || pendingEntry.meal,
           pendingEntry.createdAt,
+          pendingEntry.description || pendingEntry.label || drinkMetaForEntry.type,
         )
         if (waterResult?.id) {
           const updatedMeta = { ...drinkMetaForEntry, waterLogId: waterResult.id }

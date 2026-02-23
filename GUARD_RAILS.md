@@ -2678,6 +2678,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
   - parse/track pending sweetener context
   - skip ml scaling when sweetener context is active
   - apply `applyPendingDrinkSweetenerGuard(...)` before creating entry payload in add flows
+  - when a drink entry is added from Food Diary/Favorites, always run water-log sync even if `__waterLogId` already exists, so stale/missing links are repaired and Water Intake label stays aligned with the diary title
 - `app/api/food-log/route.ts` must enforce sweetener guard at save time for Water-flow drinks:
   - if sweetener choice is `free`, keep base drink nutrition (never multiplied by ml)
   - if sweetener choice is `sugar`/`honey`, save sweetener-only nutrition (never multiplied by drink ml)
@@ -2688,6 +2689,7 @@ entry for the **same day** only **if that diary entry was not manually edited**.
 2. In `app/food/page.tsx`, confirm `applyPendingDrinkSweetenerGuard(...)`:
    - `free` path keeps base drink totals and only clears sweetener contribution
    - sugar/honey path uses `sweetenerToMacros(...)` only
+   - drink add flows still call `syncDrinkWaterLog(...)` even when drink metadata already includes a `waterLogId` (so deleted/stale links are rebuilt)
 3. In `app/food/page.tsx`, confirm `buildSugarFreeHotChocolateLockedTotals(...)`:
    - sugar-free legacy rows keep safe base calories (example 8), not 0, not 319
 4. In `app/api/food-log/route.ts`, confirm `normalizeSugarFreeHotChocolatePayload(...)`:
