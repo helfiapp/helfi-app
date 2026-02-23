@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 03:27 AM AEDT
+- What changed: Practitioner free listing flow is now 3 months (not 2). Added a one-time “extra 3 months free” win-back if a practitioner cancels checkout instead of subscribing at trial end. Updated dashboard messaging and reminder email copy to match.
+- Where to see it (page/link): https://helfi.ai/list-your-practice, practitioner dashboard at https://helfi.ai/practitioner, and practitioner trial emails
+- What to quickly test: Approve a new practitioner listing and confirm trial end date is 3 months ahead; simulate trial-ended dashboard state and click “Claim extra 3 months free” once; confirm second attempt is blocked and success email sends on first use.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 01:08 PM AEDT
 - What changed: Fixed Water Intake and Food Diary sync for drink favorites/renames (including tea with honey flow). Drink adds from favorites now always repair/check the linked water row, and Water Intake labels/icons stay aligned with renamed diary drink titles.
 - Where to see it (page/link): https://helfi.ai/food and https://helfi.ai/food/water
