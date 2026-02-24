@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-25 12:32 AM AEDT
+- What changed: Final hardening for Food Diary Ask AI meal builder flow. The Build this meal button now appears for both multi-option replies and single full-recipe replies. Added backend recipe parsing to generate meal import payload even when AI does not use Option 1/2 format, and added UI fallback parsing so recipe replies can still show the button if formatting varies.
+- Where to see it (page/link): https://helfi.ai/chat?context=food
+- What to quickly test: Ask Food Diary AI for one recipe (for example chicken Alfredo) and confirm Build this meal appears at the end; ask for multiple options and confirm button appears under each option; tap button and confirm it opens Build a Meal with imported recipe fields.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 09:58 PM AEDT
 - What changed: Fixed Food Diary Ask AI regression where the Build this meal button disappeared again. Restored meal option parsing in chat, restored per-option Build this meal buttons, and added stronger fallback parsing so raw meal JSON markers are hidden and button rendering still works even if AI formatting is slightly messy.
 - Where to see it (page/link): https://helfi.ai/chat?context=food
