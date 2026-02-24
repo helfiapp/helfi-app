@@ -105,6 +105,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-25 12:21 AM AEDT
+- What changed: Increased mobile text size and readability for the feedback popup (title, body, bullet points, and action buttons). Added safe popup scrolling on small screens so larger text remains fully readable.
+- Where to see it (page/link): https://helfi.ai/dashboard (feedback popup overlay)
+- What to quickly test: Open the feedback popup on phone/mobile view and confirm text is clearly readable without strain and buttons remain easy to tap.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-23 12:03 AM AEDT
 - What changed: Added new feedback messaging flow. New users now get a professional welcome email asking for feedback and explaining how to find Help & Support (profile icon top-right -> Help & Support). Existing verified members can be sent the same feedback request via admin send tool. Added web popup that appears once after 3 consecutive active days and links directly to Help & Support.
 - Where to see it (page/link): https://helfi.ai/auth/verify (new-user welcome email), https://helfi.ai/admin-panel (send feedback request email button), https://helfi.ai/support (support destination)
