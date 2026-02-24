@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-25 01:44 AM AEDT
+- What changed: Final reliability hardening for Food Diary Ask AI recipe requests. Direct recipe prompts now return a full recipe on first reply (no forced clarifying question), still include current/target/after macro context, and still attach Build this meal import data. Added stronger macro parsing and a food-diary-style macro progress card so current/after values can display clearly when targets are present.
+- Where to see it (page/link): https://helfi.ai/chat?context=food
+- What to quickly test: Ask Food Diary AI for a specific recipe (for example “healthy gluten-free chicken Alfredo with penne”), confirm the first assistant reply includes the recipe and shows Build this meal button; tap Build this meal and confirm it opens Build a Meal prefilled; confirm macro progress cards appear under the assistant message when current/target/after values are included.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-25 12:32 AM AEDT
 - What changed: Final hardening for Food Diary Ask AI meal builder flow. The Build this meal button now appears for both multi-option replies and single full-recipe replies. Added backend recipe parsing to generate meal import payload even when AI does not use Option 1/2 format, and added UI fallback parsing so recipe replies can still show the button if formatting varies.
 - Where to see it (page/link): https://helfi.ai/chat?context=food
