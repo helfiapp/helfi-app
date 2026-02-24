@@ -15,6 +15,7 @@
     "canary:food-rename": "node scripts/canary-food-rename-sync.js",
     "check:food-log-date-guard": "node scripts/assert-food-log-date-guard.js",
     "check:rename-guard": "bash scripts/check-rename-guard.sh",
+    "seo:keywords": "node scripts/search-console-keyword-tracker.js",
     "test:food-normalization": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-normalization-check.ts",
     "seed:exercise-types": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/seed-exercise-types.ts",
     "import:usda": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/import-usda-foods.ts"

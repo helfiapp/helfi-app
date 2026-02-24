@@ -9,11 +9,17 @@ import { featurePages } from '@/data/feature-pages'
 export const metadata: Metadata = {
   title: 'Helfi Features | Food Tracking, AI Insights, and Health Tracking',
   description:
-    'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
+    'Explore Helfi features for food calorie tracking, calorie tracker app workflows, AI food tracker tools, and AI health report reviews.',
   keywords: [
     'health tracking app features',
     'food tracking features',
     'AI health insights',
+    'food calorie tracking app',
+    'calorie tracker app',
+    'AI calorie tracker app',
+    'AI food tracker app',
+    'AI food calorie tracker app',
+    'AI health report app',
     'hydration tracking app',
     'Helfi features',
   ],
@@ -23,7 +29,7 @@ export const metadata: Metadata = {
   openGraph: {
     title: 'Helfi Features | Food Tracking, AI Insights, and Health Tracking',
     description:
-      'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
+      'Explore Helfi features for food calorie tracking, calorie tracker app workflows, AI food tracker tools, and AI health report reviews.',
     url: absoluteUrl('/features'),
     type: 'website',
   },
@@ -31,7 +37,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: 'Helfi Features | Food Tracking, AI Insights, and Health Tracking',
     description:
-      'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
+      'Explore Helfi features for food calorie tracking, calorie tracker app workflows, AI food tracker tools, and AI health report reviews.',
   },
 }
 
@@ -44,7 +50,7 @@ export default function FeaturesIndexPage() {
         name: 'Helfi Features',
         url: absoluteUrl('/features'),
         description:
-          'Explore Helfi features including food tracking, AI health insights, hydration tracking, and weekly health reports.',
+          'Explore Helfi features for food calorie tracking, calorie tracker app workflows, AI food tracker tools, and AI health report reviews.',
       },
       {
         '@type': 'ItemList',

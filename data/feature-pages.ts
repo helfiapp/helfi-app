@@ -331,7 +331,8 @@ export const featurePages: FeaturePageContent[] = [
       'Weekly reporting keeps the focus on consistent patterns rather than noisy daily fluctuations.',
       'Insights are designed to help you ask better questions and stay aligned with your health goals.',
       'Issue-specific views break down nutrition, supplements, sleep, exercise, and lifestyle inputs in one place.',
-      'This AI health insights layer turns daily tracking into a weekly health report you can act on.',
+      'This AI health insights layer turns daily tracking into a weekly AI health report you can act on.',
+      'If you are searching for an AI health report app, this page shows exactly how the reporting flow works inside Helfi.',
     ],
     summary: 'Weekly reports and focused insights built from your last 7 days.',
     heroImage: aiInsightsPhoto(
@@ -520,9 +521,9 @@ export const featurePages: FeaturePageContent[] = [
       },
     ],
     seo: {
-      title: 'AI Insights and Weekly Reports',
+      title: 'AI Health Report and Weekly Insights',
       description:
-        'Get weekly health reports and focused insights from your last 7 days of data.',
+        'AI health report app with weekly summaries and focused insights from your last 7 days of data.',
     },
   },
   {
@@ -536,6 +537,7 @@ export const featurePages: FeaturePageContent[] = [
       'Photo-assisted analysis gives you a starting point, and manual edits keep the final entry under your control.',
       'Consistent food logging feeds into weekly insights and makes nutrition trends more meaningful.',
       'As a food diary app and nutrition tracking app, it supports macro tracking, packaged foods, and manual entries in one flow.',
+      'It works as a food calorie tracking app, a calorie tracker app, an AI calorie tracker app, an AI food tracker app, and an AI food calorie tracker app in one place.',
     ],
     summary: 'Photo-assisted meal logging with flexible edits and trends.',
     heroImage: foodDiaryPhoto(
@@ -978,9 +980,9 @@ export const featurePages: FeaturePageContent[] = [
       },
     ],
     seo: {
-      title: 'Food Analysis and Nutrition Logging',
+      title: 'AI Food Calorie Tracker App and Nutrition Logging',
       description:
-        'Food diary app with AI photo scan, barcode scanner, recipe import, meal reuse tools, and water and drinks logging.',
+        'Food calorie tracking app and AI food tracker app with AI photo scan, barcode scanner, recipe import, meal reuse tools, and water logging.',
     },
   },
   {

@@ -147,7 +147,7 @@ export default function SplashPage() {
         url: absoluteUrl('/'),
         logo: absoluteUrl('/icons/app-512.png'),
         description:
-          'Helfi helps people track food, symptoms, and daily habits with practical AI health insights.',
+          'Helfi is an AI food tracker and calorie tracker app for food calorie tracking, weekly reports, and practical AI health insights.',
       },
       {
         '@type': 'WebSite',
@@ -158,7 +158,7 @@ export default function SplashPage() {
           '@id': absoluteUrl('/#organization'),
         },
         description:
-          'AI health tracking app for food logging, weekly insights, hydration, and daily habit tracking.',
+          'AI food calorie tracker app for food logging, weekly AI health report reviews, hydration, and daily habit tracking.',
         potentialAction: {
           '@type': 'SearchAction',
           target: `${absoluteUrl('/practitioners')}?query={search_term_string}`,
@@ -509,7 +509,7 @@ export default function SplashPage() {
               Fully Featured Food Tracking
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Helfi food tracking is not just basic calorie logging. You can log meals in multiple ways, edit fast, and reuse meals.
+              Helfi works as a food calorie tracking app, calorie tracker app, AI calorie tracker app, and AI food tracker app. You can log meals in multiple ways, edit fast, and reuse meals.
             </p>
           </div>
 

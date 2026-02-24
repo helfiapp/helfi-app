@@ -15,7 +15,7 @@ const inter = Inter({
 const siteUrl = getSiteUrl()
 const defaultTitle = 'Helfi - AI Health Intelligence Platform'
 const defaultDescription =
-  'AI health tracking app for food logs, symptoms, supplements, weekly reports, and a practitioner directory to find trusted healthcare providers.'
+  'AI food tracker and calorie tracker app for food calorie tracking, AI health report workflows, weekly reports, and practitioner support.'
 
 export const metadata: Metadata = {
   metadataBase: new URL(siteUrl),
@@ -26,6 +26,18 @@ export const metadata: Metadata = {
     'health tracker',
     'weekly health report',
     'food and symptom tracker',
+    'food calorie tracking',
+    'food calorie tracking app',
+    'calorie tracker',
+    'calorie tracker app',
+    'AI calorie tracker',
+    'AI calorie tracker app',
+    'AI food tracker',
+    'AI food tracker app',
+    'AI food calorie tracker',
+    'AI food calorie tracker app',
+    'AI health report',
+    'AI health report app',
     'find practitioner',
     'practitioner directory',
   ],
