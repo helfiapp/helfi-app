@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 09:13 PM AEDT
+- What changed: Food Diary Ask AI reliability hotfix for first-send failures and missing chat log items. Added one safe automatic retry for food-chat send failures, added duplicate-protection key for user messages during retry, and forced chat-list refresh after send success/failure so threads appear in the chat sidebar immediately.
+- Where to see it (page/link): https://helfi.ai/chat?context=food
+- What to quickly test: Send a first message in Food Diary Ask AI (for example gluten-free chicken Alfredo), confirm response returns without red error on first try, open chat sidebar and confirm the chat thread appears immediately, then repeat with a second message and confirm the same thread keeps updating.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 07:56 PM AEDT
 - What changed: Fixed Food Diary Ask AI meal recommendation rendering on mobile. Raw `[[MEAL_OPTIONS_JSON]]` payload text is now hidden from chat output again, per-option “Build this meal” buttons are restored, and long assistant text now wraps safely instead of overflowing the screen.
 - Where to see it (page/link): https://helfi.ai/chat?context=food
