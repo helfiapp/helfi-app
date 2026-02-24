@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 04:50 PM AEDT
+- What changed: SEO keyword targeting update for calorie and AI food tracking terms. Added direct targeting for: Food calorie tracking, Calorie tracker, AI calorie tracker, AI food tracker, AI food calorie tracker, AI health report, plus each term with “app” at the end. Also added a Search Console keyword tracker command to monitor these exact terms.
+- Where to see it (page/link): https://helfi.ai/, https://helfi.ai/features, https://helfi.ai/features/nutrition-food, https://helfi.ai/features/ai-insights
+- What to quickly test: Check page source on homepage/features pages for updated title/description/keyword text; run `npm run seo:keywords -- --days 28` with Google credentials to view current rank/impression baseline for all 12 terms.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 03:30 PM AEDT
 - What changed: Fixed native app Notification Inbox auth check so signed-in native users are accepted correctly (session id, native token decode, and token fallback). This removes the false "Please log in again" error for valid logged-in users.
 - Where to see it (page/link): Native app -> Notifications -> Notification inbox, API: https://helfi.ai/api/notifications/inbox
