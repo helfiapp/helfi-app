@@ -48,6 +48,21 @@ type ParsedFoodOption = {
   cookMinutes: number | null
 }
 
+type FoodMacroValues = {
+  calories: number | null
+  protein: number | null
+  carbs: number | null
+  fat: number | null
+  fiber: number | null
+  sugar: number | null
+}
+
+type FoodMacroSnapshot = {
+  current: FoodMacroValues | null
+  targets: FoodMacroValues | null
+  after: FoodMacroValues | null
+}
+
 const MEAL_OPTIONS_JSON_START = '[[MEAL_OPTIONS_JSON]]'
 const MEAL_OPTIONS_JSON_END = '[[/MEAL_OPTIONS_JSON]]'
 
@@ -249,6 +264,113 @@ const parseSingleRecipeOptionFromText = (text: string): ParsedFoodOption | null 
     prepMinutes: null,
     cookMinutes: null,
   }
+}
+
+const EMPTY_FOOD_MACROS: FoodMacroValues = {
+  calories: null,
+  protein: null,
+  carbs: null,
+  fat: null,
+  fiber: null,
+  sugar: null,
+}
+
+const hasAnyFoodMacroValues = (values: FoodMacroValues | null) =>
+  Boolean(
+    values &&
+      (values.calories != null ||
+        values.protein != null ||
+        values.carbs != null ||
+        values.fat != null ||
+        values.fiber != null ||
+        values.sugar != null),
+  )
+
+const parseFoodMacroValuesFromText = (line: string): FoodMacroValues => {
+  const text = String(line || '')
+  const pick = (regex: RegExp) => {
+    const match = text.match(regex)
+    if (!match) return null
+    const value = Number(match[1])
+    return Number.isFinite(value) ? value : null
+  }
+  return {
+    calories: pick(/(-?\d+(?:\.\d+)?)\s*kcal/i),
+    protein: pick(/(-?\d+(?:\.\d+)?)\s*g\s*protein/i),
+    carbs: pick(/(-?\d+(?:\.\d+)?)\s*g\s*carbs?/i),
+    fat: pick(/(-?\d+(?:\.\d+)?)\s*g\s*fat/i),
+    fiber: pick(/(-?\d+(?:\.\d+)?)\s*g\s*(?:fiber|fibre)/i),
+    sugar: pick(/(-?\d+(?:\.\d+)?)\s*g\s*sugar/i),
+  }
+}
+
+const mergeFoodMacroValues = (base: FoodMacroValues | null, patch: FoodMacroValues): FoodMacroValues | null => {
+  if (!hasAnyFoodMacroValues(patch)) return base
+  const seed = base || EMPTY_FOOD_MACROS
+  return {
+    calories: patch.calories ?? seed.calories,
+    protein: patch.protein ?? seed.protein,
+    carbs: patch.carbs ?? seed.carbs,
+    fat: patch.fat ?? seed.fat,
+    fiber: patch.fiber ?? seed.fiber,
+    sugar: patch.sugar ?? seed.sugar,
+  }
+}
+
+const parseFoodMacroSnapshot = (content: string): FoodMacroSnapshot | null => {
+  const lines = String(content || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => stripOuterBold(line).trim())
+    .filter(Boolean)
+
+  let current: FoodMacroValues | null = null
+  let targets: FoodMacroValues | null = null
+  let after: FoodMacroValues | null = null
+  let active: 'current' | 'targets' | 'after' | null = null
+
+  for (const rawLine of lines) {
+    const line = rawLine.replace(/^[•*\-]\s+/, '').trim()
+    if (!line) continue
+
+    const currentHeader = line.match(/^Current totals:\s*(.*)$/i)
+    if (currentHeader) {
+      current = mergeFoodMacroValues(current, parseFoodMacroValuesFromText(currentHeader[1] || ''))
+      active = 'current'
+      continue
+    }
+
+    const targetsHeader = line.match(/^Targets:\s*(.*)$/i)
+    if (targetsHeader) {
+      targets = mergeFoodMacroValues(targets, parseFoodMacroValuesFromText(targetsHeader[1] || ''))
+      active = 'targets'
+      continue
+    }
+
+    const afterHeader = line.match(/^After eating:\s*(.*)$/i)
+    if (afterHeader) {
+      after = mergeFoodMacroValues(after, parseFoodMacroValuesFromText(afterHeader[1] || ''))
+      active = 'after'
+      continue
+    }
+
+    if (/^(option\s+\d+:|recipe:|ingredients?:|steps?:|macros:)/i.test(line)) {
+      active = null
+      continue
+    }
+
+    if (active) {
+      const parsed = parseFoodMacroValuesFromText(line)
+      if (active === 'current') current = mergeFoodMacroValues(current, parsed)
+      if (active === 'targets') targets = mergeFoodMacroValues(targets, parsed)
+      if (active === 'after') after = mergeFoodMacroValues(after, parsed)
+    }
+  }
+
+  if (!hasAnyFoodMacroValues(targets)) return null
+  if (!hasAnyFoodMacroValues(current) && !hasAnyFoodMacroValues(after)) return null
+
+  return { current, targets, after }
 }
 
 const parseQuotedStringArray = (raw: string) => {
@@ -2191,6 +2313,60 @@ export default function VoiceChat({
     })
   }
 
+  const renderFoodMacroProgressCard = (
+    label: string,
+    totals: FoodMacroValues,
+    targets: FoodMacroValues,
+  ) => {
+    const rows = [
+      { key: 'protein' as const, label: 'Protein', bar: 'bg-red-500', text: 'text-red-500' },
+      { key: 'carbs' as const, label: 'Carbs', bar: 'bg-green-500', text: 'text-green-500' },
+      { key: 'fat' as const, label: 'Fat', bar: 'bg-indigo-500', text: 'text-indigo-500' },
+      { key: 'fiber' as const, label: 'Fibre', bar: 'bg-cyan-500', text: 'text-cyan-500' },
+      { key: 'sugar' as const, label: 'Sugar (max)', bar: 'bg-orange-500', text: 'text-orange-500' },
+    ]
+    const caloriesLabel =
+      totals.calories != null ? `${Math.round(totals.calories)} kcal` : 'N/A'
+
+    return (
+      <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
+        <div className="text-[15px] md:text-[13px] font-semibold text-gray-900">{label}: {caloriesLabel}</div>
+        <div className="mt-3 space-y-3">
+          {rows.map((row) => {
+            const consumed = totals[row.key]
+            const target = targets[row.key]
+            if (consumed == null || target == null || target <= 0) return null
+            const left = target - consumed
+            const leftLabel =
+              row.key === 'sugar'
+                ? left >= 0
+                  ? `${Math.round(left * 10) / 10} g left`
+                  : `${Math.round(Math.abs(left) * 10) / 10} g over`
+                : left >= 0
+                ? `${Math.round(left * 10) / 10} g left`
+                : `${Math.round(Math.abs(left) * 10) / 10} g over`
+            const percent = Math.max(0, Math.min(100, (consumed / target) * 100))
+            return (
+              <div key={row.key}>
+                <div className="flex items-baseline justify-between gap-2 text-[14px] md:text-[12px]">
+                  <div className="min-w-0 truncate">
+                    <span className="font-semibold text-gray-900">{row.label}</span>{' '}
+                    <span className="text-gray-700">{Math.round(consumed * 10) / 10} / {Math.round(target * 10) / 10} g</span>{' '}
+                    <span className={`font-semibold ${row.text}`}>{leftLabel}</span>
+                  </div>
+                  <span className="font-semibold text-gray-800">{Math.round(percent)}%</span>
+                </div>
+                <div className="mt-1 h-3 w-full rounded-full bg-gray-200">
+                  <div className={`h-3 rounded-full ${row.bar}`} style={{ width: `${percent}%` }} />
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      </div>
+    )
+  }
+
   const threadList = (
     <div className="flex flex-col h-full">
       <div className="p-3">
@@ -2558,6 +2734,10 @@ export default function VoiceChat({
                   m.role === 'assistant' && isFoodEntry ? parseFoodAssistantResponse(m.content) : null
                 const parsedFoodOptions = parsedFoodPayload?.options || []
                 const messageContentForDisplay = parsedFoodPayload?.displayContent || m.content
+                const macroSnapshot =
+                  m.role === 'assistant' && isFoodEntry
+                    ? parseFoodMacroSnapshot(messageContentForDisplay)
+                    : null
                 return (
                 <div ref={assistantRef} key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <div className={`hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
@@ -2576,6 +2756,16 @@ export default function VoiceChat({
                         <div className="text-[18px] md:text-[16px] leading-7 text-gray-800 whitespace-pre-wrap break-words [overflow-wrap:anywhere]">
                           {renderFormattedContent(messageContentForDisplay, true)}
                         </div>
+                        {macroSnapshot?.targets && macroSnapshot.current && (
+                          <div className="mt-3">
+                            {renderFoodMacroProgressCard('Current totals', macroSnapshot.current, macroSnapshot.targets)}
+                          </div>
+                        )}
+                        {macroSnapshot?.targets && macroSnapshot.after && (
+                          <div className="mt-3">
+                            {renderFoodMacroProgressCard('After eating', macroSnapshot.after, macroSnapshot.targets)}
+                          </div>
+                        )}
                         {parsedFoodOptions.length > 0 && (
                           <div className="mt-3 space-y-2">
                             {parsedFoodOptions.map((option) => (

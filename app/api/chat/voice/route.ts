@@ -435,12 +435,101 @@ function buildSystemPrompt(
   return parts.join('\n')
 }
 
-function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): string {
+const isRecipeCreationRequest = (question: string) => {
+  const q = String(question || '').toLowerCase()
+  if (!q) return false
+  const asksRecipe =
+    /\b(recipe|create|make|cook|prepare)\b/.test(q) &&
+    /\b(meal|dish|pasta|chicken|salad|bowl|stir fry|curry|alfredo|soup|dinner|lunch|breakfast)\b/.test(q)
+  const asksByCalories = /\b(recommend|suggest|what should i eat|based on my current|according to my current|macro)\b/.test(q)
+  return asksRecipe && !asksByCalories
+}
+
+function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null, question: string): string {
+  const recipeMode = isRecipeCreationRequest(question)
   if (!foodDiarySnapshot) {
+    if (recipeMode) {
+      return [
+        'You are Helfi, a food and macro coach.',
+        'The user asked for a specific recipe.',
+        'Provide one complete recipe directly. Do not ask follow-up questions first.',
+        'If details are missing, choose sensible defaults and continue.',
+        'Use this exact format:',
+        'Current totals: unavailable',
+        'Targets: unavailable',
+        'Recipe: ...',
+        'Ingredients:',
+        '- ...',
+        '- ...',
+        'Steps:',
+        '1. ...',
+        '2. ...',
+        'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
+        'After eating: unavailable',
+        'After the visible response, append this wrapper with one recipe option:',
+        '[[MEAL_OPTIONS_JSON]]',
+        '{"options":[{"optionNumber":1,"title":"...","category":"breakfast|lunch|dinner|snacks|uncategorized","servings":1,"prepMinutes":10,"cookMinutes":15,"ingredients":["..."],"steps":["..."]}]}',
+        '[[/MEAL_OPTIONS_JSON]]',
+      ].join('\n')
+    }
     return [
       'You are Helfi, a food and macro coach.',
       'The user has no food diary data for today.',
       'Ask a short question to confirm what they have eaten so far, then give 2-3 simple ideas.',
+    ].join('\n')
+  }
+
+  if (recipeMode) {
+    return [
+      'You are Helfi, a food and macro coach.',
+      'The user asked for a specific recipe. You must provide ONE full recipe directly.',
+      'Do not ask follow-up questions first.',
+      'Keep the recipe aligned to their requested food and dietary restriction.',
+      'Include current totals and after-eating totals using today’s diary values.',
+      'If you must estimate, say “approximate”. If unknown, say “unknown”.',
+      '',
+      'Use this exact format:',
+      'Current totals: ...',
+      'Targets: ...',
+      'Recipe: ...',
+      'Ingredients:',
+      '- ...',
+      '- ...',
+      'Steps:',
+      '1. ...',
+      '2. ...',
+      'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
+      'After eating: ...',
+      '',
+      'After the visible response, append a machine-only JSON block at the very end using this exact wrapper:',
+      '[[MEAL_OPTIONS_JSON]]',
+      '{"options":[{"optionNumber":1,"title":"...","category":"breakfast|lunch|dinner|snacks|uncategorized","servings":1,"prepMinutes":10,"cookMinutes":15,"ingredients":["..."],"steps":["..."]}]}',
+      '[[/MEAL_OPTIONS_JSON]]',
+      'Rules for JSON block:',
+      '- valid JSON only, double quotes only, no markdown code fences',
+      '- include the same single recipe shown in the visible answer',
+      '- include at least 3 ingredients and 3 steps',
+      '- keep ingredients and steps concise and realistic',
+      '',
+      `Today (${foodDiarySnapshot.localDate})`,
+      `Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')} - ` +
+        `${formatMacroValue(foodDiarySnapshot.totals.protein_g, 'g')} protein - ` +
+        `${formatMacroValue(foodDiarySnapshot.totals.carbs_g, 'g')} carbs - ` +
+        `${formatMacroValue(foodDiarySnapshot.totals.fat_g, 'g')} fat - ` +
+        `${formatMacroValue(foodDiarySnapshot.totals.fiber_g, 'g')} fiber - ` +
+        `${formatMacroValue(foodDiarySnapshot.totals.sugar_g, 'g')} sugar`,
+      `Targets: ${formatMacroValue(foodDiarySnapshot.targets.calories, 'kcal')} - ` +
+        `${formatMacroValue(foodDiarySnapshot.targets.protein_g, 'g')} protein - ` +
+        `${formatMacroValue(foodDiarySnapshot.targets.carbs_g, 'g')} carbs - ` +
+        `${formatMacroValue(foodDiarySnapshot.targets.fat_g, 'g')} fat - ` +
+        `${formatMacroValue(foodDiarySnapshot.targets.fiber_g, 'g')} fiber - ` +
+        `${formatMacroValue(foodDiarySnapshot.targets.sugar_g, 'g')} sugar (max)`,
+      `Remaining: ${formatRemaining(foodDiarySnapshot.remaining.calories)} kcal - ` +
+        `${formatRemaining(foodDiarySnapshot.remaining.protein_g)} protein - ` +
+        `${formatRemaining(foodDiarySnapshot.remaining.carbs_g)} carbs - ` +
+        `${formatRemaining(foodDiarySnapshot.remaining.fat_g)} fat - ` +
+        `${formatRemaining(foodDiarySnapshot.remaining.fiber_g)} fiber - ` +
+        `${formatRemaining(foodDiarySnapshot.remaining.sugar_g)} sugar`,
     ].join('\n')
   }
 
@@ -458,6 +547,7 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null): str
     '',
     'Use this exact format:',
     'Current totals: ...',
+    'Targets: ...',
     'Option 1: ...',
     'Macros: kcal - protein g - carbs g - fat g - fiber g - sugar g',
     'After eating: ...',
@@ -1088,7 +1178,7 @@ export async function POST(req: NextRequest) {
       tzOffsetMin: resolvedTzOffset,
     })
     let systemPrompt = isFoodChat
-      ? buildFoodSystemPrompt(foodDiarySnapshot)
+      ? buildFoodSystemPrompt(foodDiarySnapshot, question)
       : buildSystemPrompt(context, foodDiarySnapshot)
     const foodContextOverride =
       typeof body?.foodContextOverride === 'string' ? body.foodContextOverride.trim() : ''
@@ -1126,9 +1216,13 @@ export async function POST(req: NextRequest) {
 
     const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
     const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
-    // Add formatting reminder to user message for better compliance
+    // Add formatting reminder to user message for better compliance.
+    // Food chat uses strict system prompts and should not be pushed to ask follow-up questions first.
     const trimmedQuestion = trimMessageContent(question)
-    const enhancedQuestion = `${trimmedQuestion}\n\nPlease format your response with proper paragraphs, line breaks, and structure. Keep it concise and ask any clarifying questions first.`
+    const formattingInstruction = isFoodChat
+      ? 'Please format your response with proper paragraphs, line breaks, and structure. Keep it concise.'
+      : 'Please format your response with proper paragraphs, line breaks, and structure. Keep it concise and ask any clarifying questions first.'
+    const enhancedQuestion = `${trimmedQuestion}\n\n${formattingInstruction}`
     const chatMessages = [
       { role: 'system' as const, content: systemPrompt },
       ...historyMessages,
@@ -1170,7 +1264,7 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const maxTokens = 500
+    const maxTokens = isFoodChat ? 900 : 500
 
     if (wantsStream) {
       let usedModel = model
