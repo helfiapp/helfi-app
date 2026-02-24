@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 06:53 PM AEDT
+- What changed: Fixed notification inbox timing logic so push notifications are saved but hidden for 24 hours first. They now only appear in Notification Inbox after the 24-hour missed window (instead of immediately). This applies to web and native because both use the same backend inbox rules.
+- Where to see it (page/link): https://helfi.ai/notifications/inbox and native app -> Notifications -> Notification inbox
+- What to quickly test: Send a new check-in/mood/smart coach push reminder, then open Notification Inbox immediately and confirm it is NOT there yet; complete a reminder task and confirm it does not appear in inbox from that reminder.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 04:50 PM AEDT
 - What changed: SEO keyword targeting update for calorie and AI food tracking terms. Added direct targeting for: Food calorie tracking, Calorie tracker, AI calorie tracker, AI food tracker, AI food calorie tracker, AI health report, plus each term with “app” at the end. Also added a Search Console keyword tracker command to monitor these exact terms.
 - Where to see it (page/link): https://helfi.ai/, https://helfi.ai/features, https://helfi.ai/features/nutrition-food, https://helfi.ai/features/ai-insights
