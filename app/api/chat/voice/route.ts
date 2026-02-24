@@ -607,6 +607,153 @@ const parseOptionTitlesFromVisibleText = (text: string) => {
   return out
 }
 
+const isRecipeIngredientHeader = (line: string) =>
+  /^(ingredients?|you(?:'|’)ll need|what you(?:'|’)ll need|shopping list)\b[:\-]?\s*$/i.test(
+    String(line || '').trim(),
+  )
+
+const isRecipeStepHeader = (line: string) =>
+  /^(instructions?|directions?|method|steps?|how to (make|cook|prepare))\b[:\-]?\s*$/i.test(
+    String(line || '').trim(),
+  )
+
+const cleanRecipeTitle = (line: string) =>
+  String(line || '')
+    .replace(/^recipe[:\-]?\s*/i, '')
+    .replace(/^here(?:'|’)s\s+(?:a|the)\s+/i, '')
+    .replace(/^option\s+\d+:\s*/i, '')
+    .replace(/[.!?]+$/, '')
+    .trim()
+
+const isRecipeSignalLine = (line: string) => {
+  const normalized = String(line || '').toLowerCase()
+  if (!normalized) return false
+  return (
+    normalized.includes('ingredient') ||
+    normalized.includes('instruction') ||
+    normalized.includes('directions') ||
+    normalized.includes('method') ||
+    normalized.includes('step') ||
+    normalized.includes('cook') ||
+    normalized.includes('serve') ||
+    normalized.includes('stir') ||
+    normalized.includes('simmer') ||
+    normalized.includes('bake') ||
+    normalized.includes('saute')
+  )
+}
+
+const inferRecipeTitleFromQuestion = (question: string) => {
+  const q = String(question || '').trim()
+  if (!q) return 'Custom meal recipe'
+  const cleaned = q
+    .replace(/^can you\s+/i, '')
+    .replace(/^please\s+/i, '')
+    .replace(/^could you\s+/i, '')
+    .replace(/^make(?:\s+me)?\s+/i, '')
+    .replace(/^create(?:\s+me)?\s+/i, '')
+    .replace(/^give me\s+/i, '')
+    .replace(/^a\s+/i, '')
+    .replace(/\?+$/, '')
+    .trim()
+  return cleanRecipeTitle(cleaned || q).slice(0, 120) || 'Custom meal recipe'
+}
+
+const parseSingleRecipeOptionFromVisibleText = (
+  visibleMessage: string,
+  fallbackTitle: string,
+): StructuredMealOption | null => {
+  const lines = String(visibleMessage || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => String(line || '').trim())
+    .filter(Boolean)
+  if (lines.length === 0) return null
+
+  const hasRecipeSignal = lines.some((line) => isRecipeSignalLine(line))
+  if (!hasRecipeSignal) return null
+
+  let inferredTitle = ''
+  for (const line of lines) {
+    if (isRecipeIngredientHeader(line) || isRecipeStepHeader(line)) break
+    if (/^(current totals|macros|after eating|option\s+\d+):/i.test(line)) continue
+    if (/^\d+[.)]\s+/.test(line)) continue
+    if (/^[-•*]\s+/.test(line)) continue
+    if (line.length < 4) continue
+    inferredTitle = cleanRecipeTitle(line)
+    break
+  }
+  const title = inferredTitle || inferRecipeTitleFromQuestion(fallbackTitle)
+
+  const ingredients: string[] = []
+  const steps: string[] = []
+  let inIngredients = false
+  let inSteps = false
+  let sawNumberedStep = false
+
+  for (const rawLine of lines) {
+    if (isRecipeIngredientHeader(rawLine)) {
+      inIngredients = true
+      inSteps = false
+      continue
+    }
+    if (isRecipeStepHeader(rawLine)) {
+      inSteps = true
+      inIngredients = false
+      continue
+    }
+
+    const numbered = rawLine.match(/^(\d+)[.)]\s+(.+)$/)
+    if (numbered) {
+      sawNumberedStep = true
+      inSteps = true
+      inIngredients = false
+      const stepLine = sanitizeLine(numbered[2])
+      if (stepLine) steps.push(stepLine)
+      continue
+    }
+
+    const bullet = rawLine.match(/^[-•*]\s+(.+)$/)
+    if (bullet) {
+      const bulletLine = sanitizeLine(bullet[1])
+      if (!bulletLine) continue
+      if (inSteps) {
+        steps.push(bulletLine)
+      } else if (inIngredients || !sawNumberedStep) {
+        ingredients.push(bulletLine)
+      }
+      continue
+    }
+
+    if (inIngredients) {
+      ingredients.push(sanitizeLine(rawLine))
+      continue
+    }
+    if (inSteps) {
+      steps.push(sanitizeLine(rawLine))
+    }
+  }
+
+  const uniqueIngredients = Array.from(new Set(ingredients.map((line) => line.toLowerCase())))
+    .map((key) => ingredients.find((line) => line.toLowerCase() === key) || '')
+    .filter(Boolean)
+    .slice(0, 60)
+  const cleanSteps = steps.map((line) => sanitizeLine(line)).filter(Boolean).slice(0, 30)
+
+  if (uniqueIngredients.length < 2 || cleanSteps.length < 2) return null
+
+  return {
+    optionNumber: 1,
+    title,
+    category: inferMealCategory(title),
+    servings: 1,
+    prepMinutes: null,
+    cookMinutes: null,
+    ingredients: uniqueIngredients,
+    steps: cleanSteps,
+  }
+}
+
 const stripMealOptionsJsonBlock = (message: string) => {
   const raw = String(message || '')
   const start = raw.indexOf(MEAL_OPTIONS_JSON_START)
@@ -758,11 +905,29 @@ const ensureFoodMealOptionsPayload = async (params: {
   assistantMessage: string
   model: string
   fallbackModel: string
+  userQuestion: string
 }) => {
   const stripped = stripMealOptionsJsonBlock(params.assistantMessage)
   const visibleMessage = stripped.visibleMessage
   const optionTitles = parseOptionTitlesFromVisibleText(visibleMessage)
-  if (optionTitles.length === 0) return { assistantMessage: params.assistantMessage, extraCostCents: 0 }
+  if (optionTitles.length === 0) {
+    if (stripped.jsonRaw) {
+      const parsed = safeParseObject(stripped.jsonRaw)
+      const normalized = normalizeStructuredMealOptions(parsed, [])
+      if (normalized.length > 0) {
+        return { assistantMessage: appendMealOptionsJsonBlock(visibleMessage, normalized), extraCostCents: 0 }
+      }
+    }
+
+    const singleOption = parseSingleRecipeOptionFromVisibleText(visibleMessage, params.userQuestion)
+    if (singleOption) {
+      return {
+        assistantMessage: appendMealOptionsJsonBlock(visibleMessage, [singleOption]),
+        extraCostCents: 0,
+      }
+    }
+    return { assistantMessage: visibleMessage, extraCostCents: 0 }
+  }
 
   if (stripped.jsonRaw) {
     const parsed = safeParseObject(stripped.jsonRaw)
@@ -1062,6 +1227,7 @@ export async function POST(req: NextRequest) {
             assistantMessage,
             model,
             fallbackModel,
+            userQuestion: question,
           })
           assistantMessage = ensured.assistantMessage
           structuredExtraCostCents = ensured.extraCostCents
@@ -1167,6 +1333,7 @@ export async function POST(req: NextRequest) {
             assistantMessage,
             model,
             fallbackModel,
+            userQuestion: question,
           })
           assistantMessage = ensured.assistantMessage
           structuredExtraCostCents = ensured.extraCostCents

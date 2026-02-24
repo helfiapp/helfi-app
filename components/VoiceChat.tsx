@@ -121,6 +121,136 @@ const splitTitleIntoIngredients = (title: string) => {
   return unique.filter(Boolean).slice(0, 12)
 }
 
+const isRecipeIngredientHeader = (line: string) =>
+  /^(ingredients?|you(?:'|’)ll need|what you(?:'|’)ll need|shopping list)\b[:\-]?\s*$/i.test(
+    String(line || '').trim(),
+  )
+
+const isRecipeStepHeader = (line: string) =>
+  /^(instructions?|directions?|method|steps?|how to (make|cook|prepare))\b[:\-]?\s*$/i.test(
+    String(line || '').trim(),
+  )
+
+const cleanRecipeTitle = (line: string) =>
+  String(line || '')
+    .replace(/^recipe[:\-]?\s*/i, '')
+    .replace(/^here(?:'|’)s\s+(?:a|the)\s+/i, '')
+    .replace(/[.!?]+$/, '')
+    .trim()
+
+const isRecipeSignalLine = (line: string) => {
+  const normalized = String(line || '').toLowerCase()
+  if (!normalized) return false
+  return (
+    normalized.includes('ingredient') ||
+    normalized.includes('instruction') ||
+    normalized.includes('directions') ||
+    normalized.includes('method') ||
+    normalized.includes('step') ||
+    normalized.includes('cook') ||
+    normalized.includes('serve') ||
+    normalized.includes('stir') ||
+    normalized.includes('simmer') ||
+    normalized.includes('bake') ||
+    normalized.includes('saute')
+  )
+}
+
+const parseSingleRecipeOptionFromText = (text: string): ParsedFoodOption | null => {
+  const lines = String(text || '')
+    .replace(/\r/g, '')
+    .split('\n')
+    .map((line) => stripOuterBold(line).trim())
+    .filter(Boolean)
+  if (lines.length === 0) return null
+
+  const hasRecipeSignal = lines.some((line) => isRecipeSignalLine(line))
+  if (!hasRecipeSignal) return null
+
+  let inferredTitle = ''
+  for (const line of lines) {
+    if (isRecipeIngredientHeader(line) || isRecipeStepHeader(line)) break
+    if (/^(current totals|macros|after eating|option\s+\d+):/i.test(line)) continue
+    if (/^\d+[.)]\s+/.test(line)) continue
+    if (/^[-•*]\s+/.test(line)) continue
+    if (line.length < 4) continue
+    inferredTitle = cleanRecipeTitle(line)
+    break
+  }
+
+  const ingredients: string[] = []
+  const steps: string[] = []
+  let inIngredients = false
+  let inSteps = false
+  let sawNumberedStep = false
+
+  for (const rawLine of lines) {
+    const line = String(rawLine || '').trim()
+    if (!line) continue
+    if (isRecipeIngredientHeader(line)) {
+      inIngredients = true
+      inSteps = false
+      continue
+    }
+    if (isRecipeStepHeader(line)) {
+      inSteps = true
+      inIngredients = false
+      continue
+    }
+
+    const numbered = line.match(/^(\d+)[.)]\s+(.+)$/)
+    if (numbered) {
+      sawNumberedStep = true
+      inSteps = true
+      inIngredients = false
+      const stepLine = normalizeIngredientToken(numbered[2])
+      if (stepLine) steps.push(stepLine)
+      continue
+    }
+
+    const bullet = line.match(/^[-•*]\s+(.+)$/)
+    if (bullet) {
+      const bulletLine = normalizeIngredientToken(bullet[1])
+      if (!bulletLine) continue
+      if (inSteps) {
+        steps.push(bulletLine)
+      } else if (inIngredients || !sawNumberedStep) {
+        ingredients.push(bulletLine)
+      }
+      continue
+    }
+
+    if (inIngredients) {
+      ingredients.push(normalizeIngredientToken(line))
+      continue
+    }
+    if (inSteps) {
+      steps.push(normalizeIngredientToken(line))
+    }
+  }
+
+  const uniqueIngredients = Array.from(new Set(ingredients.map((line) => line.toLowerCase())))
+    .map((key) => ingredients.find((line) => line.toLowerCase() === key) || '')
+    .filter(Boolean)
+    .slice(0, 60)
+  const cleanSteps = steps.map((line) => normalizeIngredientToken(line)).filter(Boolean).slice(0, 30)
+
+  if (uniqueIngredients.length < 2 || cleanSteps.length < 2) return null
+
+  const title = inferredTitle || 'Custom meal recipe'
+  return {
+    key: `option-1-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+    index: 1,
+    title,
+    ingredients: uniqueIngredients,
+    steps: cleanSteps,
+    category: inferCategoryFromMealTitle(title),
+    servings: 1,
+    prepMinutes: null,
+    cookMinutes: null,
+  }
+}
+
 const parseQuotedStringArray = (raw: string) => {
   const out: string[] = []
   const rx = /"((?:\\.|[^"\\])*)"/g
@@ -312,7 +442,16 @@ const parseFoodAssistantResponse = (
     })
     .filter((opt) => opt.title.length > 0)
 
-  return { displayContent, options: fallbackOptions }
+  if (fallbackOptions.length > 0) {
+    return { displayContent, options: fallbackOptions }
+  }
+
+  const singleRecipeOption = parseSingleRecipeOptionFromText(displayContent)
+  if (singleRecipeOption) {
+    return { displayContent, options: [singleRecipeOption] }
+  }
+
+  return { displayContent, options: [] }
 }
 
 export default function VoiceChat({
