@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { signOut, useSession } from 'next-auth/react'
@@ -152,7 +152,7 @@ export default function PractitionerPage() {
     }
   }
 
-  const loadDashboard = async () => {
+  const loadDashboard = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
@@ -200,7 +200,7 @@ export default function PractitionerPage() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
   const findAddressComponent = (components: any[], types: string[]) => {
     return components.find((component) => types.some((type) => component?.types?.includes(type)))
@@ -324,9 +324,9 @@ export default function PractitionerPage() {
     loadDashboard()
     loadStats()
     loadNotifications()
-  }, [session])
+  }, [session, loadDashboard])
 
-  const attemptUpgradeToPractitioner = async () => {
+  const attemptUpgradeToPractitioner = useCallback(async () => {
     if (upgradeInFlightRef.current) return
     upgradeInFlightRef.current = true
     setUpgradeLoading(true)
@@ -348,7 +348,7 @@ export default function PractitionerPage() {
       setUpgradeLoading(false)
       upgradeInFlightRef.current = false
     }
-  }
+  }, [loadDashboard, update])
 
   useEffect(() => {
     if (!session?.user) return
@@ -369,7 +369,7 @@ export default function PractitionerPage() {
     if (shouldUpgrade) {
       void attemptUpgradeToPractitioner()
     }
-  }, [session])
+  }, [session, attemptUpgradeToPractitioner])
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
