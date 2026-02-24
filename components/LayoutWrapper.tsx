@@ -1324,29 +1324,33 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           )}
           {showFeedbackPrompt && (
             <div className="fixed inset-0 z-[10001] flex items-center justify-center bg-black/40 p-4">
-              <div className="w-full max-w-lg rounded-xl bg-white p-6 shadow-2xl">
-                <h2 className="text-xl font-semibold text-gray-900">{FEEDBACK_POPUP_COPY.title}</h2>
-                <p className="mt-3 text-sm leading-6 text-gray-700">{FEEDBACK_POPUP_COPY.body}</p>
-                <ul className="mt-4 space-y-2 text-sm text-gray-700">
+              <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl bg-white p-5 shadow-2xl sm:p-6">
+                <h2 className="text-[2rem] font-semibold leading-tight text-gray-900 sm:text-2xl">
+                  {FEEDBACK_POPUP_COPY.title}
+                </h2>
+                <p className="mt-4 text-[1.35rem] leading-[2rem] text-gray-700 sm:mt-3 sm:text-base sm:leading-7">
+                  {FEEDBACK_POPUP_COPY.body}
+                </p>
+                <ul className="mt-5 space-y-3 text-[1.35rem] leading-[2rem] text-gray-700 sm:mt-4 sm:space-y-2 sm:text-base sm:leading-7">
                   {FEEDBACK_POPUP_COPY.supportSteps.map((step) => (
                     <li key={step} className="flex items-start gap-2">
-                      <span className="mt-1 h-1.5 w-1.5 rounded-full bg-emerald-500" />
+                      <span className="mt-2 h-2.5 w-2.5 rounded-full bg-emerald-500 sm:mt-2 sm:h-1.5 sm:w-1.5" />
                       <span>{step}</span>
                     </li>
                   ))}
                 </ul>
-                <div className="mt-6 flex flex-col gap-2 sm:flex-row">
+                <div className="mt-6 flex flex-col gap-3 sm:flex-row sm:gap-2">
                   <button
                     type="button"
                     onClick={() => dismissFeedbackPrompt(true)}
-                    className="flex-1 rounded-md bg-helfi-green px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-emerald-700"
+                    className="flex-1 rounded-md bg-helfi-green px-4 py-3 text-[1.45rem] font-semibold text-white transition-colors hover:bg-emerald-700 sm:py-2 sm:text-base"
                   >
                     {FEEDBACK_POPUP_COPY.primaryButtonLabel}
                   </button>
                   <button
                     type="button"
                     onClick={() => dismissFeedbackPrompt(false)}
-                    className="flex-1 rounded-md bg-gray-100 px-4 py-2 text-sm font-semibold text-gray-700 transition-colors hover:bg-gray-200"
+                    className="flex-1 rounded-md bg-gray-100 px-4 py-3 text-[1.45rem] font-semibold text-gray-700 transition-colors hover:bg-gray-200 sm:py-2 sm:text-base"
                   >
                     {FEEDBACK_POPUP_COPY.secondaryButtonLabel}
                   </button>
