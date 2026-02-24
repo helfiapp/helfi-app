@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 02:07 PM AEDT
+- What changed: Public SEO pass for homepage + practitioner directory. Added stronger keyword metadata, structured data on homepage/practitioner pages, metadata for practitioner profile and A-Z pages, and expanded sitemap coverage for practitioner URLs.
+- Where to see it (page/link): https://helfi.ai/, https://helfi.ai/practitioners, https://helfi.ai/practitioners/a-z, https://helfi.ai/list-your-practice
+- What to quickly test: View page source and confirm title/description/canonical exist; confirm `/sitemap.xml` includes `/practitioners/a-z` and practitioner profile URLs; run URL Inspection in Search Console for practitioners pages.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 11:15 AM AEDT
 - What changed: Cleaned up practitioner dashboard code warning (no feature or UI change). This keeps quality checks clean and stable for future updates.
 - Where to see it (page/link): https://helfi.ai/practitioner
