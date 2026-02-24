@@ -1373,6 +1373,49 @@ export default function VoiceChat({
       return
     }
 
+    const refreshThreadsFromServer = async () => {
+      try {
+        const threadsRes = await fetch(threadsUrl)
+        if (!threadsRes.ok) return null
+        const threadsData = await threadsRes.json()
+        if (!Array.isArray(threadsData?.threads)) return null
+        setThreads(threadsData.threads)
+        return threadsData.threads as ChatThread[]
+      } catch {
+        return null
+      }
+    }
+
+    const recoverAssistantMessage = async () => {
+      try {
+        let threadId = currentThreadId
+        if (!threadId) {
+          const threads = await refreshThreadsFromServer()
+          const latest = threads?.[0]
+          if (latest?.id) {
+            threadId = latest.id
+            setCurrentThreadId(latest.id)
+            setCurrentThreadCharged(Boolean(latest.chargedOnce))
+          }
+        }
+        if (!threadId) return false
+        const messagesRes = await fetch(`/api/chat/voice?threadId=${threadId}`)
+        if (!messagesRes.ok) return false
+        const messagesData = await messagesRes.json().catch(() => null)
+        const messageList = Array.isArray(messagesData?.messages) ? messagesData.messages : []
+        const lastAssistant = [...messageList].reverse().find((msg) => msg.role === 'assistant')
+        if (!lastAssistant?.content) return false
+        setMessages((prev) => {
+          const last = prev[prev.length - 1]
+          if (last?.role === 'assistant' && last.content === lastAssistant.content) return prev
+          return [...prev, { role: 'assistant', content: lastAssistant.content }]
+        })
+        return true
+      } catch {
+        return false
+      }
+    }
+
     try {
       setLoading(true)
       setError(null)
@@ -1394,24 +1437,55 @@ export default function VoiceChat({
 
       const url = `/api/chat/voice`
       const wantsStream = entryContext !== 'food'
+      const clientMessageId =
+        typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
+          ? crypto.randomUUID()
+          : `chat-${Date.now()}-${Math.random().toString(16).slice(2)}`
       const { localDate, tzOffsetMin } = buildLocalDatePayload()
-      const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Accept: wantsStream ? 'text/event-stream' : 'application/json',
-        },
-        body: JSON.stringify({
-          message: text,
-          threadId: currentThreadId || undefined,
-          newThread: !currentThreadId,
-          entryContext,
-          localDate,
-          tzOffsetMin,
-          ...(foodContextOverride ? { foodContextOverride } : {}),
-          ...context,
-        }),
-      })
+      let requestedThreadId = currentThreadId || undefined
+      let requestNewThread = !currentThreadId
+      const sendVoiceRequest = () =>
+        fetch(url, {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Accept: wantsStream ? 'text/event-stream' : 'application/json',
+          },
+          body: JSON.stringify({
+            message: text,
+            threadId: requestedThreadId,
+            newThread: requestNewThread,
+            clientMessageId,
+            entryContext,
+            localDate,
+            tzOffsetMin,
+            ...(foodContextOverride ? { foodContextOverride } : {}),
+            ...context,
+          }),
+        })
+
+      let res: Response
+      try {
+        res = await sendVoiceRequest()
+      } catch (firstError) {
+        if (!isFoodEntry) throw firstError
+        const threads = await refreshThreadsFromServer()
+        const latestThread = threads?.[0]
+        requestedThreadId = latestThread?.id || requestedThreadId
+        requestNewThread = !requestedThreadId
+        res = await sendVoiceRequest()
+      }
+
+      if (!res.ok && isFoodEntry && res.status >= 500) {
+        const threads = await refreshThreadsFromServer()
+        const latestThread = threads?.[0]
+        requestedThreadId = latestThread?.id || requestedThreadId
+        requestNewThread = !requestedThreadId
+        const retryRes = await sendVoiceRequest().catch(() => null)
+        if (retryRes) {
+          res = retryRes
+        }
+      }
       if (res.status === 402) {
         const data = await res.json()
         setError(`Insufficient credits. Estimated cost: ${data.estimatedCost} credits. Available: ${data.availableCredits} credits.`)
@@ -1429,6 +1503,13 @@ export default function VoiceChat({
           message.toLowerCase().includes('prisma') || message.toLowerCase().includes('transaction')
             ? 'Something went wrong. Please try again.'
             : message
+        const recovered = await recoverAssistantMessage()
+        await refreshThreadsFromServer()
+        if (recovered) {
+          setError(null)
+          setLoading(false)
+          return
+        }
         setError(safeMessage)
         setLoading(false)
         return
@@ -1437,39 +1518,6 @@ export default function VoiceChat({
       const contentType = (res.headers.get('content-type') || '').toLowerCase()
       const isEventStream = contentType.includes('text/event-stream')
       const resClone = isEventStream ? null : res.clone()
-
-      const recoverAssistantMessage = async () => {
-        try {
-          let threadId = currentThreadId
-          if (!threadId) {
-            const threadsRes = await fetch(threadsUrl)
-            if (threadsRes.ok) {
-              const threadsData = await threadsRes.json()
-              const latest = threadsData?.threads?.[0]
-              if (latest?.id) {
-                threadId = latest.id
-                setCurrentThreadId(latest.id)
-                setCurrentThreadCharged(Boolean(latest.chargedOnce))
-              }
-            }
-          }
-          if (!threadId) return false
-          const messagesRes = await fetch(`/api/chat/voice?threadId=${threadId}`)
-          if (!messagesRes.ok) return false
-          const messagesData = await messagesRes.json().catch(() => null)
-          const messageList = Array.isArray(messagesData?.messages) ? messagesData.messages : []
-          const lastAssistant = [...messageList].reverse().find((msg) => msg.role === 'assistant')
-          if (!lastAssistant?.content) return false
-          setMessages((prev) => {
-            const last = prev[prev.length - 1]
-            if (last?.role === 'assistant' && last.content === lastAssistant.content) return prev
-            return [...prev, { role: 'assistant', content: lastAssistant.content }]
-          })
-          return true
-        } catch {
-          return false
-        }
-      }
 
       const parseSsePayload = async (rawPayload: string) => {
         const chunks = rawPayload.split('\n\n')
@@ -1659,6 +1707,7 @@ export default function VoiceChat({
           }
           try { window.dispatchEvent(new Event('credits:refresh')) } catch {}
         }
+        await refreshThreadsFromServer()
       }
     } catch (err: any) {
       const raw = err?.message || 'Something went wrong'
@@ -1666,6 +1715,7 @@ export default function VoiceChat({
         raw.toLowerCase().includes('prisma') || raw.toLowerCase().includes('transaction')
           ? 'Something went wrong. Please try again.'
           : raw
+      await refreshThreadsFromServer()
       setError(safeMessage)
     } finally {
       setLoading(false)

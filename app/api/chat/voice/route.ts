@@ -822,6 +822,8 @@ export async function POST(req: NextRequest) {
 
     const body = await req.json().catch(() => ({}))
     const question = String(body?.message || '').trim()
+    const clientMessageId =
+      typeof body?.clientMessageId === 'string' ? body.clientMessageId.trim() : undefined
     if (!question) {
       return NextResponse.json({ error: 'Message required' }, { status: 400 })
     }
@@ -969,7 +971,7 @@ export async function POST(req: NextRequest) {
     ]
 
     // Save user message
-    await appendMessage(threadId, 'user', question)
+    await appendMessage(threadId, 'user', question, undefined, clientMessageId)
 
     // Auto-generate title from first message if thread has no title
     const threads = await listThreads(session.user.id, chatContext)

@@ -163,11 +163,17 @@ export async function listMessages(threadId: string, limit = 40): Promise<ChatMe
   return rows.map((r) => ({ id: r.id, role: r.role as 'user' | 'assistant', content: r.content, createdAt: r.createdAt.toISOString() }))
 }
 
-export async function appendMessage(threadId: string, role: 'user' | 'assistant', content: string, tokenCount?: number): Promise<string> {
+export async function appendMessage(
+  threadId: string,
+  role: 'user' | 'assistant',
+  content: string,
+  tokenCount?: number,
+  messageId?: string,
+): Promise<string> {
   await ensureTalkToAITables()
-  const id = uuid()
+  const id = typeof messageId === 'string' && /^[a-zA-Z0-9-]{10,120}$/.test(messageId) ? messageId : uuid()
   await prisma.$executeRawUnsafe(
-    'INSERT INTO "TalkToAIChatMessage" ("id","threadId","role","content","tokenCount") VALUES ($1,$2,$3,$4,$5)',
+    'INSERT INTO "TalkToAIChatMessage" ("id","threadId","role","content","tokenCount") VALUES ($1,$2,$3,$4,$5) ON CONFLICT ("id") DO NOTHING',
     id,
     threadId,
     role,
