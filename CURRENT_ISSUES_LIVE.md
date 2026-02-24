@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 11:15 AM AEDT
+- What changed: Cleaned up practitioner dashboard code warning (no feature or UI change). This keeps quality checks clean and stable for future updates.
+- Where to see it (page/link): https://helfi.ai/practitioner
+- What to quickly test: Open practitioner dashboard and confirm page loads and actions still work normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 03:27 AM AEDT
 - What changed: Practitioner free listing flow is now 3 months (not 2). Added a one-time “extra 3 months free” win-back if a practitioner cancels checkout instead of subscribing at trial end. Updated dashboard messaging and reminder email copy to match.
 - Where to see it (page/link): https://helfi.ai/list-your-practice, practitioner dashboard at https://helfi.ai/practitioner, and practitioner trial emails
