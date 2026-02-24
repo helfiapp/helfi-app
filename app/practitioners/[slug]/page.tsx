@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import dynamic from 'next/dynamic'
+import { absoluteUrl } from '@/lib/site-url'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
 
@@ -17,7 +18,7 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
     return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(value.trim())
   }
 
-  const trackClick = (action: string) => {
+  const trackClick = useCallback((action: string) => {
     if (!listing?.id || !listing?.trackingToken) return
     const payload = JSON.stringify({
       listingId: listing.id,
@@ -34,7 +35,7 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
       body: payload,
       keepalive: true,
     }).catch(() => undefined)
-  }
+  }, [listing?.id, listing?.trackingToken])
 
   useEffect(() => {
     const loadListing = async () => {
@@ -59,7 +60,7 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
     if (!listing?.id || !listing?.trackingToken || trackedRef.current) return
     trackedRef.current = true
     trackClick('profile_view')
-  }, [listing])
+  }, [listing, trackClick])
 
   if (loading) {
     return (
@@ -88,6 +89,28 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
   const galleryUrls = Array.isArray(listing?.images?.gallery) ? listing.images.gallery : []
   const hoursNotes = listing?.hours?.notes || null
   const lightboxOpen = lightboxIndex !== null && galleryUrls[lightboxIndex]
+  const listingUrl = absoluteUrl(`/practitioners/${listing.slug}`)
+  const practitionerSchema = {
+    '@context': 'https://schema.org',
+    '@type': 'MedicalBusiness',
+    name: listing.displayName,
+    url: listingUrl,
+    description: listing.description || undefined,
+    telephone: listing.phone || undefined,
+    email: isValidEmail(listing.emailPublic) ? listing.emailPublic : undefined,
+    medicalSpecialty: listing.subcategoryName || listing.categoryName || undefined,
+    areaServed: [listing.suburbCity, listing.stateRegion, listing.country].filter(Boolean).join(', ') || undefined,
+    address: address
+      ? {
+          '@type': 'PostalAddress',
+          streetAddress: [listing.addressLine1, listing.addressLine2].filter(Boolean).join(', ') || undefined,
+          addressLocality: listing.suburbCity || undefined,
+          addressRegion: listing.stateRegion || undefined,
+          postalCode: listing.postcode || undefined,
+          addressCountry: listing.country || undefined,
+        }
+      : undefined,
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -215,6 +238,12 @@ export default function PractitionerProfilePage({ params }: { params: { slug: st
           </div>
         )}
       </div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(practitionerSchema),
+        }}
+      />
 
       {lightboxOpen && (
         <div

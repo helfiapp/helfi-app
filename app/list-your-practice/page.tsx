@@ -3,8 +3,41 @@
 import Link from 'next/link'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
+import { absoluteUrl } from '@/lib/site-url'
 
 export default function ListYourPracticePage() {
+  const listPageSchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': absoluteUrl('/list-your-practice#webpage'),
+        url: absoluteUrl('/list-your-practice'),
+        name: 'List Your Practice for Free | Practitioner Directory | Helfi',
+        description:
+          'Join Helfi’s practitioner directory with 3 months free, then $4.95/month.',
+      },
+      {
+        '@type': 'Service',
+        '@id': absoluteUrl('/list-your-practice#service'),
+        name: 'Practitioner Directory Listing',
+        provider: {
+          '@type': 'Organization',
+          name: 'Helfi',
+          url: absoluteUrl('/'),
+        },
+        areaServed: 'Worldwide',
+        offers: {
+          '@type': 'Offer',
+          priceCurrency: 'USD',
+          price: '4.95',
+          description: '3 months free, then $4.95/month per listing.',
+          url: absoluteUrl('/list-your-practice'),
+        },
+      },
+    ],
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-emerald-50/40 to-white">
       <PublicHeader />
@@ -17,7 +50,7 @@ export default function ListYourPracticePage() {
                 List your practice on Helfi
               </h1>
               <p className="text-lg text-gray-600 mt-4 max-w-3xl">
-                Reach people searching for trusted care. You get{' '}
+                Reach people searching for trusted care in a free practitioner directory. You get{' '}
                 <span className="font-semibold text-gray-900">3 months free</span>, then it is{' '}
                 <span className="font-semibold text-gray-900">$4.95/month</span> (USD). No card is needed to start.
                 Your free period begins only after your listing is approved.
@@ -74,7 +107,7 @@ export default function ListYourPracticePage() {
               <ol className="space-y-2 text-sm text-gray-600 list-decimal pl-5">
                 <li>Create your listing and submit it.</li>
                 <li>Our system runs an automated review process.</li>
-                <li>If approved, your listing goes live and your free 2 months start.</li>
+                <li>If approved, your listing goes live and your free 3 months start.</li>
                 <li>If flagged, your listing stays hidden until staff approves it.</li>
                 <li>Manage your listing, subscription, and boosts in your dashboard.</li>
               </ol>
@@ -147,6 +180,12 @@ export default function ListYourPracticePage() {
           </section>
         </div>
       </main>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(listPageSchema),
+        }}
+      />
       <PublicFooter />
     </div>
   )

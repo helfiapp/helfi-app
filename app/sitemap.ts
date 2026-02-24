@@ -2,9 +2,10 @@ import type { MetadataRoute } from 'next'
 
 import { featurePages } from '@/data/feature-pages'
 import { newsPosts } from '@/data/news-posts'
+import { prisma } from '@/lib/prisma'
 import { getSiteUrl } from '@/lib/site-url'
 
-export default function sitemap(): MetadataRoute.Sitemap {
+export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   const siteUrl = getSiteUrl()
   const now = new Date()
 
@@ -21,6 +22,7 @@ export default function sitemap(): MetadataRoute.Sitemap {
     { path: '/terms', changeFrequency: 'yearly', priority: 0.4 },
     { path: '/affiliate/terms', changeFrequency: 'yearly', priority: 0.4 },
     { path: '/practitioners', changeFrequency: 'daily', priority: 0.8 },
+    { path: '/practitioners/a-z', changeFrequency: 'weekly', priority: 0.7 },
     { path: '/list-your-practice', changeFrequency: 'weekly', priority: 0.7 },
     { path: '/list-your-practice/start', changeFrequency: 'weekly', priority: 0.6 },
   ]
@@ -46,5 +48,33 @@ export default function sitemap(): MetadataRoute.Sitemap {
     priority: 0.7,
   }))
 
-  return [...staticEntries, ...featureEntries, ...newsEntries]
+  let practitionerProfileEntries: MetadataRoute.Sitemap = []
+  try {
+    const listings = await prisma.practitionerListing.findMany({
+      where: {
+        status: 'ACTIVE',
+        reviewStatus: 'APPROVED',
+        visibilityReason: { in: ['TRIAL_ACTIVE', 'SUB_ACTIVE'] },
+      },
+      select: {
+        slug: true,
+        updatedAt: true,
+      },
+      orderBy: {
+        updatedAt: 'desc',
+      },
+      take: 5000,
+    })
+
+    practitionerProfileEntries = listings.map((listing) => ({
+      url: `${siteUrl}/practitioners/${listing.slug}`,
+      lastModified: listing.updatedAt || now,
+      changeFrequency: 'daily',
+      priority: 0.6,
+    }))
+  } catch {
+    practitionerProfileEntries = []
+  }
+
+  return [...staticEntries, ...featureEntries, ...newsEntries, ...practitionerProfileEntries]
 }

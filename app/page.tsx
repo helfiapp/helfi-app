@@ -159,6 +159,11 @@ export default function SplashPage() {
         },
         description:
           'AI health tracking app for food logging, weekly insights, hydration, and daily habit tracking.',
+        potentialAction: {
+          '@type': 'SearchAction',
+          target: `${absoluteUrl('/practitioners')}?query={search_term_string}`,
+          'query-input': 'required name=search_term_string',
+        },
       },
       {
         '@type': 'WebPage',
@@ -171,6 +176,14 @@ export default function SplashPage() {
         about: {
           '@id': absoluteUrl('/#organization'),
         },
+      },
+      {
+        '@type': 'MedicalBusiness',
+        '@id': absoluteUrl('/#practitioner-directory'),
+        name: 'Helfi Practitioner Directory',
+        url: absoluteUrl('/practitioners'),
+        description:
+          'Find trusted healthcare practitioners by category, location, and telehealth options.',
       },
     ],
   }
@@ -259,7 +272,8 @@ export default function SplashPage() {
             <p className="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed max-w-4xl mx-auto">
               Track meals, supplements, symptoms, and daily health metrics in one place. Get weekly AI
               health insights, monitor trends, and turn your data into practical next steps. Analyze food
-              photos, lab reports, and medical images with clear guidance you can actually use.
+              photos, lab reports, and medical images with clear guidance you can actually use. Find trusted
+              healthcare providers in our practitioner directory.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
               <Link

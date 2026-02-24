@@ -7,6 +7,7 @@ import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 import MaterialSymbol from '@/components/MaterialSymbol'
 import { PRACTITIONER_SYMPTOM_HINTS } from '@/data/practitioner-symptoms'
+import { absoluteUrl } from '@/lib/site-url'
 
 const DirectoryMap = dynamic(() => import('@/components/practitioner/DirectoryMap'), { ssr: false })
 
@@ -509,6 +510,38 @@ export default function PractitionerDirectoryPage() {
       : { lat: -37.8136, lng: 144.9631 }
 
   const quickRows = [QUICK_ACCESS.slice(0, 6), QUICK_ACCESS.slice(6, 12), QUICK_ACCESS.slice(12, 18)]
+  const directorySchema = {
+    '@context': 'https://schema.org',
+    '@graph': [
+      {
+        '@type': 'WebPage',
+        '@id': absoluteUrl('/practitioners#webpage'),
+        url: absoluteUrl('/practitioners'),
+        name: 'Find Health Practitioners Near You | Helfi Directory',
+        description:
+          'Search a free practitioner directory by specialty, location, and telehealth.',
+      },
+      {
+        '@type': 'MedicalBusiness',
+        '@id': absoluteUrl('/practitioners#directory'),
+        name: 'Helfi Practitioner Directory',
+        url: absoluteUrl('/practitioners'),
+        description:
+          'Directory for finding trusted health practitioners by category, location, and telehealth.',
+      },
+      {
+        '@type': 'ItemList',
+        '@id': absoluteUrl('/practitioners#quick-categories'),
+        name: 'Practitioner quick access categories',
+        itemListElement: QUICK_ACCESS.slice(0, 10).map((item, index) => ({
+          '@type': 'ListItem',
+          position: index + 1,
+          name: item.label,
+          url: absoluteUrl(`/practitioners?query=${encodeURIComponent(item.label)}`),
+        })),
+      },
+    ],
+  }
 
   const PULL_REFRESH_ACTIVATE = 80
   const PULL_REFRESH_THRESHOLD = 320
@@ -649,7 +682,8 @@ export default function PractitionerDirectoryPage() {
               Your health, <span className="text-emerald-600">simplified</span> and within reach.
             </h1>
             <p className="text-lg md:text-xl text-slate-600 mb-8 px-4 leading-relaxed">
-              Discover trusted healthcare practitioners. Search by name, location, or category to find the right care.
+              Discover trusted healthcare practitioners in a free practitioner directory. Search by name,
+              location, or category to find the right care.
             </p>
             <div className="flex justify-center mb-6">
               <Link
@@ -964,6 +998,12 @@ export default function PractitionerDirectoryPage() {
           </div>
         </div>
       </section>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{
+          __html: JSON.stringify(directorySchema),
+        }}
+      />
       <PublicFooter />
     </div>
   )
