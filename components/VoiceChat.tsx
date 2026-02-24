@@ -48,10 +48,10 @@ type ParsedFoodOption = {
   cookMinutes: number | null
 }
 
-const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim())
 const MEAL_OPTIONS_JSON_START = '[[MEAL_OPTIONS_JSON]]'
 const MEAL_OPTIONS_JSON_END = '[[/MEAL_OPTIONS_JSON]]'
 
+const isIsoDate = (value: string) => /^\d{4}-\d{2}-\d{2}$/.test(String(value || '').trim())
 const buildTodayIso = () => {
   const now = new Date()
   const year = now.getFullYear()
@@ -121,6 +121,55 @@ const splitTitleIntoIngredients = (title: string) => {
   return unique.filter(Boolean).slice(0, 12)
 }
 
+const parseQuotedStringArray = (raw: string) => {
+  const out: string[] = []
+  const rx = /"((?:\\.|[^"\\])*)"/g
+  let match: RegExpExecArray | null = null
+  while ((match = rx.exec(String(raw || '')))) {
+    try {
+      out.push(String(JSON.parse(`"${match[1]}"`) || '').trim())
+    } catch {
+      out.push(String(match[1] || '').trim())
+    }
+  }
+  return out.filter(Boolean)
+}
+
+const safeParseJson = (raw: string) => {
+  const cleaned = String(raw || '')
+    .replace(/```json/gi, '')
+    .replace(/```/g, '')
+    .trim()
+  if (!cleaned) return null
+  const tryParse = (value: string) => {
+    try {
+      return JSON.parse(value)
+    } catch {
+      return null
+    }
+  }
+  const direct = tryParse(cleaned)
+  if (direct) return direct
+  const noTrailingCommas = cleaned.replace(/,\s*([}\]])/g, '$1')
+  const retry = tryParse(noTrailingCommas)
+  if (retry) return retry
+  const firstBrace = cleaned.indexOf('{')
+  if (firstBrace >= 0) {
+    let depth = 0
+    for (let i = firstBrace; i < cleaned.length; i += 1) {
+      const ch = cleaned[i]
+      if (ch === '{') depth += 1
+      if (ch === '}') depth -= 1
+      if (depth === 0) {
+        const candidate = cleaned.slice(firstBrace, i + 1)
+        const extracted = tryParse(candidate)
+        if (extracted) return extracted
+        break
+      }
+    }
+  }
+  return null
+}
 const parseStructuredFoodOptions = (raw: any): ParsedFoodOption[] => {
   const source = Array.isArray(raw) ? raw : Array.isArray(raw?.options) ? raw.options : []
   return source
@@ -150,29 +199,61 @@ const parseStructuredFoodOptions = (raw: any): ParsedFoodOption[] => {
     .filter((entry: ParsedFoodOption | null): entry is ParsedFoodOption => Boolean(entry))
 }
 
+const parseLooseStructuredFoodOptions = (raw: string): ParsedFoodOption[] => {
+  const options: ParsedFoodOption[] = []
+  const text = String(raw || '').replace(/\r/g, '')
+  const rx =
+    /"optionNumber"\s*:\s*(\d+)[\s\S]*?"title"\s*:\s*"([^"]+)"[\s\S]*?"category"\s*:\s*"([^"]*)"[\s\S]*?"servings"\s*:\s*(null|-?\d+(?:\.\d+)?)?[\s\S]*?"prepMinutes"\s*:\s*(null|-?\d+(?:\.\d+)?)?[\s\S]*?"cookMinutes"\s*:\s*(null|-?\d+(?:\.\d+)?)?[\s\S]*?"ingredients"\s*:\s*\[([\s\S]*?)\][\s\S]*?"steps"\s*:\s*\[([\s\S]*?)\]/gi
+  let match: RegExpExecArray | null = null
+  while ((match = rx.exec(text))) {
+    const indexRaw = Number(match[1])
+    const title = String(match[2] || '').trim()
+    if (!title) continue
+    const ingredients = parseQuotedStringArray(match[7]).map((line) => normalizeIngredientToken(line)).filter(Boolean)
+    const steps = parseQuotedStringArray(match[8]).map((line) => normalizeIngredientToken(line)).filter(Boolean)
+    options.push({
+      key: `option-${indexRaw}-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
+      index: Number.isFinite(indexRaw) && indexRaw > 0 ? Math.round(indexRaw) : options.length + 1,
+      title,
+      ingredients: ingredients.length > 0 ? ingredients : splitTitleIntoIngredients(title),
+      steps: steps.length > 0 ? steps : [`Assemble ${title}.`],
+      category: normalizeMealCategory(match[3]),
+      servings: toPositiveNumberOrNull(match[4]),
+      prepMinutes: toPositiveNumberOrNull(match[5]),
+      cookMinutes: toPositiveNumberOrNull(match[6]),
+    })
+  }
+  return options
+}
 const parseFoodAssistantResponse = (
   content: string,
 ): { displayContent: string; options: ParsedFoodOption[] } => {
   const raw = String(content || '')
   const start = raw.indexOf(MEAL_OPTIONS_JSON_START)
-  const end = raw.indexOf(MEAL_OPTIONS_JSON_END)
+  const end = start >= 0 ? raw.indexOf(MEAL_OPTIONS_JSON_END, start + MEAL_OPTIONS_JSON_START.length) : -1
   let displayContent = raw
   let structuredOptions: ParsedFoodOption[] = []
 
-  if (start >= 0 && end > start) {
+  if (start >= 0) {
+    const hasEndMarker = end > start
     const before = raw.slice(0, start).trimEnd()
-    const after = raw.slice(end + MEAL_OPTIONS_JSON_END.length).trimStart()
+    const after = hasEndMarker ? raw.slice(end + MEAL_OPTIONS_JSON_END.length).trimStart() : ''
     displayContent = `${before}${before && after ? '\n\n' : ''}${after}`.trim()
-    const jsonRaw = raw.slice(start + MEAL_OPTIONS_JSON_START.length, end).trim()
+    const jsonRaw = raw
+      .slice(start + MEAL_OPTIONS_JSON_START.length, hasEndMarker ? end : raw.length)
+      .trim()
     if (jsonRaw) {
-      try {
-        structuredOptions = parseStructuredFoodOptions(JSON.parse(jsonRaw))
-      } catch {
-        structuredOptions = []
+      structuredOptions = parseStructuredFoodOptions(safeParseJson(jsonRaw))
+      if (structuredOptions.length === 0) {
+        structuredOptions = parseLooseStructuredFoodOptions(jsonRaw)
       }
     }
   }
 
+  displayContent = displayContent
+    .replaceAll(MEAL_OPTIONS_JSON_START, '')
+    .replaceAll(MEAL_OPTIONS_JSON_END, '')
+    .trim()
   if (structuredOptions.length > 0) {
     return { displayContent, options: structuredOptions }
   }
@@ -1756,6 +1837,7 @@ export default function VoiceChat({
       sessionStorage.setItem('food:recipeImportDraft', JSON.stringify(draft))
     } catch {
       setError('Could not open Build a meal right now. Please try again.')
+      setOpeningFoodOptionKey(null)
       return
     }
 
