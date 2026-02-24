@@ -2836,6 +2836,31 @@ Last stable deployment: `a0544590` (2026-02-15)
 
 Last stable deployment: `d1b55505` (2026-02-16)
 
+## 7.10 Notification Inbox Timing Rule (HEL-92, Feb 2026 - LOCKED)
+
+**Goal:**
+- A push alert must **not** appear in Notification Inbox straight away.
+- It should only appear after about **24 hours** if the user did not action it.
+- If user finishes the reminder task (check-in/mood), it should clear and not stay in inbox.
+
+**Must keep in `lib/notification-inbox.ts`:**
+- Push-origin items (`source: 'push'`) are saved with a delayed inbox timestamp (`inboxVisibleAfterMs`).
+- Inbox list and unread count must only include items where delayed time has passed.
+- `consumePendingNotificationOpen(...)` must still work for fresh push taps so open-from-notification flow works.
+
+**Do not do without owner approval:**
+- Do not make push reminders appear in inbox immediately again.
+- Do not remove the delayed visibility filter from list/unread count.
+
+**If this breaks again, restore in this order:**
+1. Re-add delayed metadata on push notifications at create time.
+2. Re-add delayed visibility filter in `listInboxNotifications(...)`.
+3. Re-add the same delayed visibility filter in `countUnreadNotifications(...)`.
+4. Re-test with a fresh reminder:
+   - push arrives now,
+   - inbox does not show it immediately,
+   - completing check-in/mood prevents it from showing later.
+
 ## 8. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:

@@ -19,6 +19,18 @@ export type InboxNotification = {
 }
 
 let inboxTablesEnsured = false
+const DEFAULT_PUSH_INBOX_DELAY_HOURS = 24
+
+function buildInboxVisibilitySql(nowParamIndex: number) {
+  return `(
+    metadata IS NULL
+    OR jsonb_typeof(metadata) <> 'object'
+    OR (metadata->>'inboxVisibleAfterMs') IS NULL
+    OR (metadata->>'inboxVisibleAfterMs') = ''
+    OR (metadata->>'inboxVisibleAfterMs') !~ '^[0-9]+$'
+    OR (metadata->>'inboxVisibleAfterMs')::bigint <= $${nowParamIndex}
+  )`
+}
 
 export async function ensureNotificationInboxTable() {
   if (inboxTablesEnsured) return
@@ -91,6 +103,7 @@ export async function createInboxNotification(params: {
   source?: string | null
   eventKey?: string | null
   metadata?: Record<string, unknown> | null
+  inboxDelayHours?: number | null
 }) {
   await ensureNotificationInboxTable()
   if (!params.userId || !params.title) return null
@@ -100,7 +113,21 @@ export async function createInboxNotification(params: {
   const type = params.type ?? null
   const source = params.source ?? null
   const eventKey = params.eventKey ?? null
-  const metadata = params.metadata ?? {}
+  const baseMetadata = params.metadata ?? {}
+  const delayHoursRaw =
+    typeof params.inboxDelayHours === 'number' && Number.isFinite(params.inboxDelayHours)
+      ? params.inboxDelayHours
+      : source === 'push'
+        ? DEFAULT_PUSH_INBOX_DELAY_HOURS
+        : 0
+  const delayHours = Math.max(0, delayHoursRaw)
+  const metadata =
+    delayHours > 0
+      ? {
+          ...baseMetadata,
+          inboxVisibleAfterMs: Date.now() + Math.round(delayHours * 60 * 60 * 1000),
+        }
+      : baseMetadata
   try {
     await prisma.$executeRawUnsafe(
       `INSERT INTO NotificationInbox (id, userId, title, body, url, type, status, source, eventKey, metadata)
@@ -180,18 +207,22 @@ export async function listInboxNotifications(
   const limit = Math.min(Math.max(Number(options?.limit || 30), 1), 100)
   const offset = Math.max(Number(options?.offset || 0), 0)
   const status = options?.status && options.status !== 'all' ? options.status : null
+  const nowMs = Date.now()
+  const visibilitySql = buildInboxVisibilitySql(status ? 3 : 2)
   try {
     const rows: any[] = status
       ? await prisma.$queryRawUnsafe(
-          `SELECT * FROM NotificationInbox WHERE userId = $1 AND status = $2 ORDER BY createdAt DESC LIMIT $3 OFFSET $4`,
+          `SELECT * FROM NotificationInbox WHERE userId = $1 AND status = $2 AND ${visibilitySql} ORDER BY createdAt DESC LIMIT $4 OFFSET $5`,
           userId,
           status,
+          nowMs,
           limit,
           offset
         )
       : await prisma.$queryRawUnsafe(
-          `SELECT * FROM NotificationInbox WHERE userId = $1 ORDER BY createdAt DESC LIMIT $2 OFFSET $3`,
+          `SELECT * FROM NotificationInbox WHERE userId = $1 AND ${visibilitySql} ORDER BY createdAt DESC LIMIT $3 OFFSET $4`,
           userId,
+          nowMs,
           limit,
           offset
         )
@@ -204,10 +235,13 @@ export async function listInboxNotifications(
 
 export async function countUnreadNotifications(userId: string): Promise<number> {
   await ensureNotificationInboxTable()
+  const nowMs = Date.now()
+  const visibilitySql = buildInboxVisibilitySql(2)
   try {
     const rows: Array<{ count: string }> = await prisma.$queryRawUnsafe(
-      `SELECT COUNT(*)::text AS count FROM NotificationInbox WHERE userId = $1 AND status = 'unread'`,
-      userId
+      `SELECT COUNT(*)::text AS count FROM NotificationInbox WHERE userId = $1 AND status = 'unread' AND ${visibilitySql}`,
+      userId,
+      nowMs
     )
     const count = rows?.[0]?.count ? parseInt(rows[0].count, 10) : 0
     return Number.isFinite(count) ? count : 0
