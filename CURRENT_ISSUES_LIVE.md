@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 03:30 PM AEDT
+- What changed: Fixed native app Notification Inbox auth check so signed-in native users are accepted correctly (session id, native token decode, and token fallback). This removes the false "Please log in again" error for valid logged-in users.
+- Where to see it (page/link): Native app -> Notifications -> Notification inbox, API: https://helfi.ai/api/notifications/inbox
+- What to quickly test: Open native app while logged in, go to Notifications -> Notification inbox, confirm inbox loads without the login error.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 02:07 PM AEDT
 - What changed: Public SEO pass for homepage + practitioner directory. Added stronger keyword metadata, structured data on homepage/practitioner pages, metadata for practitioner profile and A-Z pages, and expanded sitemap coverage for practitioner URLs.
 - Where to see it (page/link): https://helfi.ai/, https://helfi.ai/practitioners, https://helfi.ai/practitioners/a-z, https://helfi.ai/list-your-practice
