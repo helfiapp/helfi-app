@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-24 07:56 PM AEDT
+- What changed: Fixed Food Diary Ask AI meal recommendation rendering on mobile. Raw `[[MEAL_OPTIONS_JSON]]` payload text is now hidden from chat output again, per-option “Build this meal” buttons are restored, and long assistant text now wraps safely instead of overflowing the screen.
+- Where to see it (page/link): https://helfi.ai/chat?context=food
+- What to quickly test: In Food Diary Ask AI, ask for meal options using ingredients, confirm Option cards show with a Build this meal button under each option, tap Build this meal and confirm it opens Build a Meal with recipe import flow, and confirm no raw JSON block appears in chat.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-24 06:53 PM AEDT
 - What changed: Fixed notification inbox timing logic so push notifications are saved but hidden for 24 hours first. They now only appear in Notification Inbox after the 24-hour missed window (instead of immediately). This applies to web and native because both use the same backend inbox rules.
 - Where to see it (page/link): https://helfi.ai/notifications/inbox and native app -> Notifications -> Notification inbox
