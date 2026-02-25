@@ -57,22 +57,28 @@ export default async function InsightsPage() {
   }
 
   let weeklyState = await getWeeklyReportState(session.user.id)
-  if (!weeklyState?.nextReportDueAt) {
-    // If the user is on a paid plan, weekly reports should not silently show as "off".
-    const cm = new CreditManager(session.user.id)
-    const wallet = await cm.getWalletStatus().catch(() => null)
-    const hasPlan = !!wallet?.plan
-    if (hasPlan) {
-      await setWeeklyReportsEnabled(session.user.id, true, { scheduleFrom: new Date() })
-    } else {
-      await markWeeklyReportOnboardingComplete(session.user.id)
-    }
+  const cm = new CreditManager(session.user.id)
+  const wallet = await cm.getWalletStatus().catch(() => null)
+  const hasPlan = Boolean(wallet?.plan)
+
+  // Self-heal: if paid users lose report state/schedule, recreate it before rendering.
+  if (hasPlan && (!weeklyState?.reportsEnabled || !weeklyState?.nextReportDueAt)) {
+    await setWeeklyReportsEnabled(session.user.id, true, { scheduleFrom: new Date() })
+    weeklyState = await getWeeklyReportState(session.user.id)
+  } else if (!weeklyState?.nextReportDueAt) {
+    await markWeeklyReportOnboardingComplete(session.user.id)
     weeklyState = await getWeeklyReportState(session.user.id)
   }
+
   const latestReport = await getLatestWeeklyReport(session.user.id)
   const reportReady = latestReport?.status === 'READY'
   const reportLocked = latestReport?.status === 'LOCKED'
-  const reportsEnabled = Boolean(weeklyState?.reportsEnabled)
+  const reportsEnabled =
+    Boolean(weeklyState?.reportsEnabled) ||
+    Boolean(weeklyState?.reportsEnabledAt) ||
+    Boolean(weeklyState?.nextReportDueAt) ||
+    reportReady ||
+    reportLocked
 
   return (
     <InsightsLandingClient

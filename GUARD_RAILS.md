@@ -896,6 +896,24 @@ If this breaks again, restore in this order:
 - Commit `16ed1f02` on 2026‑01‑09 (weekly report data summary + wins/gaps).
   - Baseline for Health Insights pages and weekly report. No changes without written approval.
 
+### 2.7.1 Insights Weekly Report UI Consistency Lock (Feb 25, 2026)
+
+This lock exists because repeated regressions created contradictory states on `/insights`.
+
+**Do not allow contradictory card states:**
+- If `Weekly reports are off by default...` is shown, do **not** show `View report` as the primary report action in the same card state.
+- If `View report` or `Unlock report` is shown, the card must behave as report-enabled and keep messaging consistent.
+
+**Owner account test path must remain available:**
+- For owner test account `info@sonicweb.com.au`, `Create report now` must stay available in report-enabled/report-action states so report generation can be validated quickly.
+
+**State-heal rule:**
+- If weekly report state row is missing for a paid active user, the app must recreate report state (enabled + next due date) before rendering final Insights report card state.
+
+**Regression reference:**
+- Commit `d8155c57` introduced a split-state UI path (`reportsEnabled` warning + `canUseReportActions` action fallback), which can show mixed signals.
+- Any future edits in the protected weekly report files must explicitly test and prevent this mismatch.
+
 ### 2.8 Notification Inbox + Profile Badge (Jan 2026 – Locked)
 
 **Protected files:**

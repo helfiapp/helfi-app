@@ -54,7 +54,12 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const lastLoaded = generatedAt
   const isReportRunning = weeklyStatus?.status === 'RUNNING'
   const reportsEnabled = weeklyStatus?.reportsEnabled ?? false
-  const canUseReportActions = reportsEnabled || Boolean(weeklyStatus?.reportReady) || Boolean(weeklyStatus?.reportLocked)
+  const reportAccessActive =
+    reportsEnabled ||
+    Boolean(weeklyStatus?.reportReady) ||
+    Boolean(weeklyStatus?.reportLocked) ||
+    Boolean(weeklyStatus?.nextReportDueAt)
+  const canUseReportActions = reportAccessActive
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -213,7 +218,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   }
 
   async function handleCreateReportNow() {
-    if (!reportsEnabled) {
+    if (!reportAccessActive) {
       setCreateReportError(true)
       setCreateReportMessage('Turn on weekly reports first.')
       return
@@ -409,22 +414,22 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 <p className="mt-1 text-base text-gray-600 leading-relaxed">
                   We build this report automatically every 7 days based on how you use Helfi.
                 </p>
-                {!reportsEnabled && (
+                {!reportAccessActive && (
                   <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     Weekly reports are off by default. Turn them on to get a full, data-driven report each week. Reports
                     use credits based on how much you log.
                   </div>
                 )}
-                {reportsEnabled && weeklyStatus?.reportReady && (
+                {reportAccessActive && weeklyStatus?.reportReady && (
                   <p className="text-sm text-emerald-700 mt-3">Your latest report is ready to view.</p>
                 )}
-                {reportsEnabled && weeklyStatus?.reportLocked && (
+                {reportAccessActive && weeklyStatus?.reportLocked && (
                   <p className="text-sm text-amber-700 mt-3">
                     Your latest report is ready, but it needs a subscription or top-up credits to unlock.
                   </p>
                 )}
               </div>
-              {reportsEnabled && weeklyStatus?.nextReportDueAt && countdown && (
+              {reportAccessActive && weeklyStatus?.nextReportDueAt && countdown && (
                 <div className="space-y-4">
                   <div className="flex items-end justify-between">
                     <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -536,7 +541,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   </Link>
                 </>
               )}
-              {reportsEnabled && canManualReport && (
+              {reportAccessActive && canManualReport && (
                 <div className="flex flex-col items-end gap-2">
                   <button
                     type="button"
