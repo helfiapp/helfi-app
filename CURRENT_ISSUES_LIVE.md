@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-25 12:20 PM AEDT
+- What changed: Fixed Ask AI -> Build a Meal serving-size carry-through so imported recipes no longer default to “1 serving = full recipe.” Added realistic servings inference in backend, chat fallback parsing, and Build a Meal import fallback. Portion control now scales macros/calories proportionally using a realistic full-recipe serving count.
+- Where to see it (page/link): https://helfi.ai/chat?context=food then Build this meal -> https://helfi.ai/food/build-meal
+- What to quickly test: Ask AI for a recipe (for example chicken Alfredo), tap Build this meal, confirm portion control shows multiple recipe servings (not 1 for full recipe), and verify 1 serving calories/macros look proportionate instead of full-recipe totals.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-25 01:44 AM AEDT
 - What changed: Final reliability hardening for Food Diary Ask AI recipe requests. Direct recipe prompts now return a full recipe on first reply (no forced clarifying question), still include current/target/after macro context, and still attach Build this meal import data. Added stronger macro parsing and a food-diary-style macro progress card so current/after values can display clearly when targets are present.
 - Where to see it (page/link): https://helfi.ai/chat?context=food
