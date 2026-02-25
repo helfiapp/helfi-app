@@ -54,12 +54,14 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   const lastLoaded = generatedAt
   const isReportRunning = weeklyStatus?.status === 'RUNNING'
   const reportsEnabled = weeklyStatus?.reportsEnabled ?? false
+  // PROTECTED: INSIGHTS_REPORT_STATE_DERIVATION START
   const reportAccessActive =
     reportsEnabled ||
     Boolean(weeklyStatus?.reportReady) ||
     Boolean(weeklyStatus?.reportLocked) ||
     Boolean(weeklyStatus?.nextReportDueAt)
   const canUseReportActions = reportAccessActive
+  // PROTECTED: INSIGHTS_REPORT_STATE_DERIVATION END
 
   const actionableNeeds = dataNeeds.filter((need) => need.status !== 'complete')
   const completedNeeds = dataNeeds.filter((need) => need.status === 'complete')
@@ -93,19 +95,26 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     }
   }, [initialWeeklyStatus])
 
+  // PROTECTED: INSIGHTS_COUNTDOWN_TIMER_LOGIC START
   useEffect(() => {
+    const periodMs = 7 * 24 * 60 * 60 * 1000
     const dueRaw = weeklyStatus?.nextReportDueAt
-    if (!dueRaw) {
-      setCountdown(null)
-      return
+    const enabledRaw = weeklyStatus?.reportsEnabledAt
+
+    let dueAt = Number.NaN
+    if (dueRaw) {
+      dueAt = new Date(dueRaw).getTime()
+    } else if (enabledRaw) {
+      const enabledAt = new Date(enabledRaw).getTime()
+      if (!Number.isNaN(enabledAt)) {
+        dueAt = enabledAt + periodMs
+      }
     }
-    let dueAt = new Date(dueRaw).getTime()
     if (Number.isNaN(dueAt)) {
       setCountdown(null)
       return
     }
 
-    const periodMs = 7 * 24 * 60 * 60 * 1000
     const now = Date.now()
     if (dueAt <= now) {
       dueAt = now + periodMs
@@ -136,7 +145,8 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
     tick()
     const interval = setInterval(tick, 1000)
     return () => clearInterval(interval)
-  }, [weeklyStatus?.nextReportDueAt])
+  }, [weeklyStatus?.nextReportDueAt, weeklyStatus?.reportsEnabledAt])
+  // PROTECTED: INSIGHTS_COUNTDOWN_TIMER_LOGIC END
 
   useEffect(() => {
     return () => {
@@ -414,6 +424,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                 <p className="mt-1 text-base text-gray-600 leading-relaxed">
                   We build this report automatically every 7 days based on how you use Helfi.
                 </p>
+                {/* PROTECTED: INSIGHTS_REPORT_STATUS_AND_COUNTDOWN START */}
                 {!reportAccessActive && (
                   <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 px-4 py-3 text-sm text-amber-800">
                     Weekly reports are off by default. Turn them on to get a full, data-driven report each week. Reports
@@ -429,7 +440,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   </p>
                 )}
               </div>
-              {reportAccessActive && weeklyStatus?.nextReportDueAt && countdown && (
+              {reportAccessActive && countdown && (
                 <div className="space-y-4">
                   <div className="flex items-end justify-between">
                     <span className="text-xs font-semibold text-gray-700 uppercase tracking-wide">
@@ -497,6 +508,7 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                   </div>
                 </div>
               )}
+              {/* PROTECTED: INSIGHTS_REPORT_STATUS_AND_COUNTDOWN END */}
             </div>
             {/* PROTECTED: INSIGHTS_REPORT_ACTION_ROW START */}
             <div className="flex items-start gap-3">

@@ -57,6 +57,7 @@ export default async function InsightsPage() {
     )
   }
 
+  // PROTECTED: INSIGHTS_WEEKLY_STATE_SELF_HEAL START
   let weeklyState = await getWeeklyReportState(session.user.id)
   const user = await prisma.user.findUnique({
     where: { id: session.user.id },
@@ -80,6 +81,7 @@ export default async function InsightsPage() {
     await markWeeklyReportOnboardingComplete(session.user.id)
     weeklyState = await getWeeklyReportState(session.user.id)
   }
+  // PROTECTED: INSIGHTS_WEEKLY_STATE_SELF_HEAL END
 
   const latestReport = await getLatestWeeklyReport(session.user.id)
   const reportReady = latestReport?.status === 'READY'

@@ -16,6 +16,7 @@ export async function GET() {
     getLatestWeeklyReport(session.user.id),
   ])
 
+  // PROTECTED: WEEKLY_STATUS_SELF_HEAL START
   if (!state?.nextReportDueAt) {
     const isOwnerTestAccount = String(session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
     const user = await prisma.user.findUnique({
@@ -72,6 +73,7 @@ export async function GET() {
       }
     }
   }
+  // PROTECTED: WEEKLY_STATUS_SELF_HEAL END
 
   const reportReady = latest?.status === 'READY'
   const reportLocked = latest?.status === 'LOCKED'

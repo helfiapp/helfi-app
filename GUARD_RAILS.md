@@ -914,6 +914,23 @@ This lock exists because repeated regressions created contradictory states on `/
 - Commit `d8155c57` introduced a split-state UI path (`reportsEnabled` warning + `canUseReportActions` action fallback), which can show mixed signals.
 - Any future edits in the protected weekly report files must explicitly test and prevent this mismatch.
 
+### 2.7.2 Insights Hard Lock (Feb 26, 2026)
+
+These sections are now build-protected by `scripts/protect-regions.js`.
+If any of these are edited, build fails unless an explicit override env var is used:
+
+- `PROTECTED: INSIGHTS_REPORT_STATE_DERIVATION` in `app/insights/InsightLandingClient.tsx`
+- `PROTECTED: INSIGHTS_COUNTDOWN_TIMER_LOGIC` in `app/insights/InsightLandingClient.tsx`
+- `PROTECTED: INSIGHTS_REPORT_STATUS_AND_COUNTDOWN` in `app/insights/InsightLandingClient.tsx`
+- `PROTECTED: INSIGHTS_REPORT_ACTION_ROW` in `app/insights/InsightLandingClient.tsx`
+- `PROTECTED: INSIGHTS_WEEKLY_STATE_SELF_HEAL` in `app/insights/page.tsx`
+- `PROTECTED: WEEKLY_STATUS_SELF_HEAL` in `app/api/reports/weekly/status/route.ts`
+- `PROTECTED: WEEKLY_STATE_INSERT_CASTS` in `lib/weekly-health-report.ts`
+
+Critical note:
+- Root cause for missing countdown was fixed in commit `c6cbdcdc` (timestamp cast fix for weekly state insert query).
+- Do not remove `::timestamptz` casts in weekly state insert.
+
 ### 2.8 Notification Inbox + Profile Badge (Jan 2026 – Locked)
 
 **Protected files:**

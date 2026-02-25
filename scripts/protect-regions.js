@@ -249,6 +249,54 @@ function main() {
   });
   checkProtectedRegion({
     filePath: path.join(__dirname, '..', 'app', 'insights', 'InsightLandingClient.tsx'),
+    startMarker: 'PROTECTED: INSIGHTS_REPORT_STATE_DERIVATION START',
+    endMarker: 'PROTECTED: INSIGHTS_REPORT_STATE_DERIVATION END',
+    expectedHash: '47e356d2d50beb407227c8a83a542dfbcaa2ae3506bbf95b3ee649abfea04171',
+    allowEnvVar: 'ALLOW_INSIGHTS_REPORT_STATE_DERIVATION_EDIT',
+    description: 'Insights report active-state derivation logic',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'insights', 'InsightLandingClient.tsx'),
+    startMarker: 'PROTECTED: INSIGHTS_COUNTDOWN_TIMER_LOGIC START',
+    endMarker: 'PROTECTED: INSIGHTS_COUNTDOWN_TIMER_LOGIC END',
+    expectedHash: 'f13148a452f3d4d6f81d69493afa4c5f9e7148c332fdb33be20e55503d7587c0',
+    allowEnvVar: 'ALLOW_INSIGHTS_COUNTDOWN_TIMER_LOGIC_EDIT',
+    description: 'Insights countdown timer fallback logic',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'insights', 'InsightLandingClient.tsx'),
+    startMarker: 'PROTECTED: INSIGHTS_REPORT_STATUS_AND_COUNTDOWN START',
+    endMarker: 'PROTECTED: INSIGHTS_REPORT_STATUS_AND_COUNTDOWN END',
+    expectedHash: 'd7c59d103a323a84c73edff310f6338d3d86d5e97c040fbb4dac14c72048d6ce',
+    allowEnvVar: 'ALLOW_INSIGHTS_REPORT_STATUS_AND_COUNTDOWN_EDIT',
+    description: 'Insights report status and countdown UI block',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'insights', 'page.tsx'),
+    startMarker: 'PROTECTED: INSIGHTS_WEEKLY_STATE_SELF_HEAL START',
+    endMarker: 'PROTECTED: INSIGHTS_WEEKLY_STATE_SELF_HEAL END',
+    expectedHash: 'ba078b30794b95986182199851ceadae56193807b4373834ee60fe34e76f5419',
+    allowEnvVar: 'ALLOW_INSIGHTS_WEEKLY_STATE_SELF_HEAL_EDIT',
+    description: 'Insights weekly state self-heal logic',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'reports', 'weekly', 'status', 'route.ts'),
+    startMarker: 'PROTECTED: WEEKLY_STATUS_SELF_HEAL START',
+    endMarker: 'PROTECTED: WEEKLY_STATUS_SELF_HEAL END',
+    expectedHash: '871126610c699c2db7d4e55bc77f9b1340ed06f7537013d0b5d76dd5c8e9f07f',
+    allowEnvVar: 'ALLOW_WEEKLY_STATUS_SELF_HEAL_EDIT',
+    description: 'Weekly report status API self-heal logic',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'lib', 'weekly-health-report.ts'),
+    startMarker: 'PROTECTED: WEEKLY_STATE_INSERT_CASTS START',
+    endMarker: 'PROTECTED: WEEKLY_STATE_INSERT_CASTS END',
+    expectedHash: '8a1b58aa702c777f7299ed20a0a44e4e9579d23a595d5c9a933889a0f616762a',
+    allowEnvVar: 'ALLOW_WEEKLY_STATE_INSERT_CASTS_EDIT',
+    description: 'Weekly report state insert timestamp casting query',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'insights', 'InsightLandingClient.tsx'),
     startMarker: 'PROTECTED: INSIGHTS_REPORT_ACTION_ROW START',
     endMarker: 'PROTECTED: INSIGHTS_REPORT_ACTION_ROW END',
     expectedHash: '14c93b97b73a2031bf3c4d0d7d580a69b71c17631c689b7bad8b4e67fe17351b',

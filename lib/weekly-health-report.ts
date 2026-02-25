@@ -244,6 +244,7 @@ export async function upsertWeeklyReportState(
       `DELETE FROM WeeklyHealthReportState WHERE userId = $1`,
       merged.userId
     )
+    // PROTECTED: WEEKLY_STATE_INSERT_CASTS START
     await prisma.$executeRawUnsafe(
       `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
        VALUES ($1, $2::timestamptz, $3::timestamptz, $4::timestamptz, $5::timestamptz, $6, $7, $8::timestamptz)`,
@@ -256,6 +257,7 @@ export async function upsertWeeklyReportState(
       merged.reportsEnabled,
       merged.reportsEnabledAt
     )
+    // PROTECTED: WEEKLY_STATE_INSERT_CASTS END
     return merged
   } catch (error) {
     console.warn('[weekly-report] Failed to upsert state', error)
