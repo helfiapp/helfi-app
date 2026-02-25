@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 03:38 AM AEDT
+- What changed: Fixed Insights 7-day health report state consistency. Premium users with missing report schedule state now self-heal to enabled weekly report state, and the report card now uses one consistent active/off state so it no longer shows mixed signals (for example “reports off” with “View report” at the same time). Restored owner test flow visibility for “Create report now” in active report states.
+- Where to see it (page/link): https://helfi.ai/insights
+- What to quickly test: Sign in as premium owner account, open Insights, confirm no “reports off” warning appears together with “View report”, confirm countdown/progress appears when due date exists, and confirm “Create report now” is visible in active report states.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-25 09:44 PM AEDT
 - What changed: Fixed iPhone PWA naming and install guidance flow. Home Screen app name now shows Helfi (not STG). Google sign-in now returns through the sign-in page so Safari install instructions are shown before entering the app, and install prompts are no longer hidden forever after one skip (cooldown-based re-show).
 - Where to see it (page/link): https://helfi.ai/auth/signin
