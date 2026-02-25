@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 04:37 AM AEDT
+- What changed: Restored missing 7-day report countdown recovery on Insights. Added stronger schedule self-heal that checks active subscription directly and recreates weekly report schedule state when missing (including owner test account fallback), so next due date and countdown can appear again.
+- Where to see it (page/link): https://helfi.ai/insights
+- What to quickly test: Refresh Insights as owner premium account, confirm countdown/progress block is visible under the 7-day report card, confirm `Create report now` still appears, and confirm no mixed “reports off” message appears with `View report`.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 03:38 AM AEDT
 - What changed: Fixed Insights 7-day health report state consistency. Premium users with missing report schedule state now self-heal to enabled weekly report state, and the report card now uses one consistent active/off state so it no longer shows mixed signals (for example “reports off” with “View report” at the same time). Restored owner test flow visibility for “Create report now” in active report states.
 - Where to see it (page/link): https://helfi.ai/insights
