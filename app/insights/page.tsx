@@ -2,9 +2,10 @@ import { getServerSession } from 'next-auth'
 import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { CreditManager } from '@/lib/credit-system'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
 import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { prisma } from '@/lib/prisma'
 import InsightsLandingClient from './InsightLandingClient'
 
 export default async function InsightsPage() {
@@ -57,12 +58,22 @@ export default async function InsightsPage() {
   }
 
   let weeklyState = await getWeeklyReportState(session.user.id)
-  const cm = new CreditManager(session.user.id)
-  const wallet = await cm.getWalletStatus().catch(() => null)
-  const hasPlan = Boolean(wallet?.plan)
+  const user = await prisma.user.findUnique({
+    where: { id: session.user.id },
+    select: {
+      subscription: {
+        select: {
+          plan: true,
+          endDate: true,
+        },
+      },
+    },
+  })
+  const hasActivePlan = isSubscriptionActive(user?.subscription ?? null, new Date())
+  const isOwnerTestAccount = String(session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
 
   // Self-heal: if paid users lose report state/schedule, recreate it before rendering.
-  if (hasPlan && (!weeklyState?.reportsEnabled || !weeklyState?.nextReportDueAt)) {
+  if ((hasActivePlan || isOwnerTestAccount) && (!weeklyState?.reportsEnabled || !weeklyState?.nextReportDueAt)) {
     await setWeeklyReportsEnabled(session.user.id, true, { scheduleFrom: new Date() })
     weeklyState = await getWeeklyReportState(session.user.id)
   } else if (!weeklyState?.nextReportDueAt) {

@@ -1,8 +1,9 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete } from '@/lib/weekly-health-report'
+import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
 import { prisma } from '@/lib/prisma'
+import { isSubscriptionActive } from '@/lib/subscription-utils'
 
 export async function GET() {
   const session = await getServerSession(authOptions)
@@ -16,17 +17,30 @@ export async function GET() {
   ])
 
   if (!state?.nextReportDueAt) {
+    const isOwnerTestAccount = String(session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: {
         gender: true,
         weight: true,
         height: true,
+        subscription: {
+          select: {
+            plan: true,
+            endDate: true,
+          },
+        },
         healthGoals: { select: { name: true, category: true } },
       },
     })
 
     if (user) {
+      const hasActivePlan = isSubscriptionActive(user.subscription ?? null, new Date())
+      if (hasActivePlan || isOwnerTestAccount) {
+        await setWeeklyReportsEnabled(session.user.id, true, { scheduleFrom: new Date() })
+        state = await getWeeklyReportState(session.user.id)
+      }
+
       const hasBasicProfile = !!(user.gender && user.weight && user.height)
       const visibleGoals = user.healthGoals.filter((goal) => !goal.name.startsWith('__'))
       const selectedRecord = user.healthGoals.find((goal) => goal.name === '__SELECTED_ISSUES__')
@@ -52,7 +66,7 @@ export async function GET() {
       }
 
       const eligible = hasBasicProfile && (visibleGoals.length > 0 || hasSelectedIssues || hasCheckinIssues)
-      if (eligible) {
+      if (!state?.nextReportDueAt && eligible) {
         await markWeeklyReportOnboardingComplete(session.user.id)
         state = await getWeeklyReportState(session.user.id)
       }
