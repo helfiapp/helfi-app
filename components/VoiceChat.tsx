@@ -171,6 +171,81 @@ const isRecipeSignalLine = (line: string) => {
   )
 }
 
+const clampServingCount = (value: number) => {
+  if (!Number.isFinite(value)) return 1
+  return Math.max(1, Math.min(12, Math.round(value)))
+}
+
+const parseServingCountFromText = (text: string): number | null => {
+  const raw = String(text || '')
+  if (!raw) return null
+
+  const rangeMatch =
+    raw.match(/\b(?:serves?|servings?)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)/i) ||
+    raw.match(/\b(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*servings?\b/i)
+  if (rangeMatch) {
+    const first = Number(rangeMatch[1])
+    const second = Number(rangeMatch[2])
+    if (Number.isFinite(first) && Number.isFinite(second) && first > 0 && second > 0) {
+      return clampServingCount((first + second) / 2)
+    }
+  }
+
+  const singleMatch =
+    raw.match(/\b(?:serves?|servings?)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i) ||
+    raw.match(/\bfor\s+(\d+(?:\.\d+)?)\s+(?:people|servings?)\b/i) ||
+    raw.match(/\b(\d+(?:\.\d+)?)\s+servings?\b/i)
+  if (!singleMatch) return null
+  const value = Number(singleMatch[1])
+  if (!Number.isFinite(value) || value <= 0) return null
+  return clampServingCount(value)
+}
+
+const parseApproxRecipeCaloriesFromText = (text: string): number | null => {
+  const match = String(text || '').match(/(-?\d+(?:\.\d+)?)\s*kcal\b/i)
+  if (!match) return null
+  const value = Number(match[1])
+  if (!Number.isFinite(value) || value <= 0) return null
+  return value
+}
+
+const resolveRecipeServingCount = (params: {
+  text: string
+  title: string
+  ingredientsCount: number
+  seed?: number | null
+}) => {
+  const text = String(params.text || '')
+  const title = String(params.title || '')
+  const context = `${title}\n${text}`
+  const explicit = parseServingCountFromText(text) || parseServingCountFromText(title)
+  if (explicit) return explicit
+  if (/\b(single serve|single-serving|for one|one serving)\b/i.test(context)) return 1
+
+  let estimate =
+    Number.isFinite(Number(params.seed)) && Number(params.seed) > 0 ? clampServingCount(Number(params.seed)) : 1
+
+  const calories = parseApproxRecipeCaloriesFromText(text)
+  if (calories !== null) {
+    if (calories >= 2200) estimate = Math.max(estimate, 4)
+    else if (calories >= 1500) estimate = Math.max(estimate, 3)
+    else if (calories >= 900) estimate = Math.max(estimate, 2)
+  }
+
+  const count = Number(params.ingredientsCount)
+  if (Number.isFinite(count) && count > 0) {
+    if (count >= 10) estimate = Math.max(estimate, 4)
+    else if (count >= 7) estimate = Math.max(estimate, 3)
+    else if (count >= 4) estimate = Math.max(estimate, 2)
+  }
+
+  if (estimate < 2 && /\b(pasta|alfredo|curry|stir fry|soup|chili|salad|roast|casserole)\b/i.test(context)) {
+    estimate = 2
+  }
+
+  return clampServingCount(estimate)
+}
+
 const parseSingleRecipeOptionFromText = (text: string): ParsedFoodOption | null => {
   const lines = String(text || '')
     .replace(/\r/g, '')
@@ -185,7 +260,7 @@ const parseSingleRecipeOptionFromText = (text: string): ParsedFoodOption | null 
   let inferredTitle = ''
   for (const line of lines) {
     if (isRecipeIngredientHeader(line) || isRecipeStepHeader(line)) break
-    if (/^(current totals|macros|after eating|option\s+\d+):/i.test(line)) continue
+    if (/^(current totals|targets|macros|after eating|servings?|serves|option\s+\d+):/i.test(line)) continue
     if (/^\d+[.)]\s+/.test(line)) continue
     if (/^[-•*]\s+/.test(line)) continue
     if (line.length < 4) continue
@@ -253,6 +328,11 @@ const parseSingleRecipeOptionFromText = (text: string): ParsedFoodOption | null 
   if (uniqueIngredients.length < 2 || cleanSteps.length < 2) return null
 
   const title = inferredTitle || 'Custom meal recipe'
+  const servings = resolveRecipeServingCount({
+    text,
+    title,
+    ingredientsCount: uniqueIngredients.length,
+  })
   return {
     key: `option-1-${title.toLowerCase().replace(/[^a-z0-9]+/g, '-')}`,
     index: 1,
@@ -260,7 +340,7 @@ const parseSingleRecipeOptionFromText = (text: string): ParsedFoodOption | null 
     ingredients: uniqueIngredients,
     steps: cleanSteps,
     category: inferCategoryFromMealTitle(title),
-    servings: 1,
+    servings,
     prepMinutes: null,
     cookMinutes: null,
   }
@@ -506,6 +586,16 @@ const parseFoodAssistantResponse = (
     .replaceAll(MEAL_OPTIONS_JSON_START, '')
     .replaceAll(MEAL_OPTIONS_JSON_END, '')
     .trim()
+  if (structuredOptions.length === 1) {
+    const option = structuredOptions[0]
+    const resolvedServings = resolveRecipeServingCount({
+      text: displayContent,
+      title: option.title,
+      ingredientsCount: option.ingredients.length,
+      seed: option.servings,
+    })
+    structuredOptions = [{ ...option, servings: resolvedServings }]
+  }
   if (structuredOptions.length > 0) {
     return { displayContent, options: structuredOptions }
   }

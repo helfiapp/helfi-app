@@ -175,6 +175,61 @@ const toNumber = (v: any): number | null => {
   return Number.isFinite(n) ? n : null
 }
 
+const clampRecipeServings = (value: number) => {
+  if (!Number.isFinite(value)) return 1
+  return Math.max(1, Math.min(12, Math.round(value)))
+}
+
+const parseRecipeServingsFromText = (text: string): number | null => {
+  const raw = String(text || '')
+  if (!raw) return null
+  const rangeMatch =
+    raw.match(/\b(?:serves?|servings?)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)/i) ||
+    raw.match(/\b(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*servings?\b/i)
+  if (rangeMatch) {
+    const first = Number(rangeMatch[1])
+    const second = Number(rangeMatch[2])
+    if (Number.isFinite(first) && Number.isFinite(second) && first > 0 && second > 0) {
+      return clampRecipeServings((first + second) / 2)
+    }
+  }
+  const singleMatch =
+    raw.match(/\b(?:serves?|servings?)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i) ||
+    raw.match(/\bfor\s+(\d+(?:\.\d+)?)\s+(?:people|servings?)\b/i) ||
+    raw.match(/\b(\d+(?:\.\d+)?)\s+servings?\b/i)
+  if (!singleMatch) return null
+  const value = Number(singleMatch[1])
+  if (!Number.isFinite(value) || value <= 0) return null
+  return clampRecipeServings(value)
+}
+
+const inferImportedRecipeServings = (draft: any) => {
+  const declared = Number(draft?.servings)
+  const title = String(draft?.title || '')
+  const ingredients = Array.isArray(draft?.ingredients) ? draft.ingredients : []
+  const steps = Array.isArray(draft?.steps) ? draft.steps : []
+  const combinedText = [title, ...ingredients, ...steps].join('\n')
+  const explicit = parseRecipeServingsFromText(combinedText)
+  if (explicit) return explicit
+  if (/\b(single serve|single-serving|for one|one serving)\b/i.test(combinedText)) return 1
+  if (Number.isFinite(declared) && declared > 1) return clampRecipeServings(declared)
+
+  const hasSourceUrl = typeof draft?.sourceUrl === 'string' && draft.sourceUrl.trim().length > 0
+  if (hasSourceUrl && Number.isFinite(declared) && declared > 0) return clampRecipeServings(declared)
+
+  let estimate = 1
+  const ingredientCount = ingredients.length
+  if (ingredientCount >= 10) estimate = 4
+  else if (ingredientCount >= 7) estimate = 3
+  else if (ingredientCount >= 4) estimate = 2
+
+  if (estimate < 2 && /\b(pasta|alfredo|curry|stir fry|soup|chili|salad|roast|casserole)\b/i.test(title)) {
+    estimate = 2
+  }
+
+  return clampRecipeServings(estimate)
+}
+
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 const KCAL_TO_KJ = 4.184
 
@@ -2924,7 +2979,11 @@ export default function MealBuilderClient() {
       return
     }
 
-    setRecipeImportDraft(draft)
+    const normalizedDraft = {
+      ...(draft as any),
+      servings: inferImportedRecipeServings(draft),
+    }
+    setRecipeImportDraft(normalizedDraft)
     setRecipeImportMissing([])
     setSaveImportedRecipeToFavorites(false)
     // Start recipe imports from a clean builder state so stale drafts cannot duplicate cards.
@@ -2934,12 +2993,12 @@ export default function MealBuilderClient() {
     try {
       sessionStorage.removeItem(draftKey)
     } catch {}
-    const draftServings = Number((draft as any)?.servings)
+    const draftServings = Number((normalizedDraft as any)?.servings)
     if (Number.isFinite(draftServings) && draftServings > 0) {
       setRecipeServingsForPortion(draftServings)
     }
 
-    const title = String((draft as any).title || '').trim()
+    const title = String((normalizedDraft as any).title || '').trim()
     if (title) {
       setMealName(title)
       mealNameEditedRef.current = true

@@ -458,6 +458,7 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null, ques
         'Current totals: unavailable',
         'Targets: unavailable',
         'Recipe: ...',
+        'Servings: ...',
         'Ingredients:',
         '- ...',
         '- ...',
@@ -468,7 +469,7 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null, ques
         'After eating: unavailable',
         'After the visible response, append this wrapper with one recipe option:',
         '[[MEAL_OPTIONS_JSON]]',
-        '{"options":[{"optionNumber":1,"title":"...","category":"breakfast|lunch|dinner|snacks|uncategorized","servings":1,"prepMinutes":10,"cookMinutes":15,"ingredients":["..."],"steps":["..."]}]}',
+        '{"options":[{"optionNumber":1,"title":"...","category":"breakfast|lunch|dinner|snacks|uncategorized","servings":4,"prepMinutes":10,"cookMinutes":15,"ingredients":["..."],"steps":["..."]}]}',
         '[[/MEAL_OPTIONS_JSON]]',
       ].join('\n')
     }
@@ -492,6 +493,7 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null, ques
       'Current totals: ...',
       'Targets: ...',
       'Recipe: ...',
+      'Servings: ...',
       'Ingredients:',
       '- ...',
       '- ...',
@@ -503,13 +505,15 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null, ques
       '',
       'After the visible response, append a machine-only JSON block at the very end using this exact wrapper:',
       '[[MEAL_OPTIONS_JSON]]',
-      '{"options":[{"optionNumber":1,"title":"...","category":"breakfast|lunch|dinner|snacks|uncategorized","servings":1,"prepMinutes":10,"cookMinutes":15,"ingredients":["..."],"steps":["..."]}]}',
+      '{"options":[{"optionNumber":1,"title":"...","category":"breakfast|lunch|dinner|snacks|uncategorized","servings":4,"prepMinutes":10,"cookMinutes":15,"ingredients":["..."],"steps":["..."]}]}',
       '[[/MEAL_OPTIONS_JSON]]',
       'Rules for JSON block:',
       '- valid JSON only, double quotes only, no markdown code fences',
       '- include the same single recipe shown in the visible answer',
       '- include at least 3 ingredients and 3 steps',
       '- keep ingredients and steps concise and realistic',
+      '- servings must be total servings for the full recipe (not always 1)',
+      '- only use 1 serving if the user explicitly asks for one serving',
       '',
       `Today (${foodDiarySnapshot.localDate})`,
       `Consumed: ${formatMacroValue(foodDiarySnapshot.totals.calories, 'kcal')} - ` +
@@ -680,6 +684,90 @@ const sanitizeLine = (value: any) =>
     .replace(/\s+/g, ' ')
     .trim()
 
+const clampServingCount = (value: number) => {
+  if (!Number.isFinite(value)) return 1
+  return Math.max(1, Math.min(12, Math.round(value)))
+}
+
+const parseServingCountFromText = (text: string): number | null => {
+  const raw = String(text || '')
+  if (!raw) return null
+
+  const rangeMatch =
+    raw.match(/\b(?:serves?|servings?)\s*[:\-]?\s*(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)/i) ||
+    raw.match(/\b(\d+(?:\.\d+)?)\s*(?:to|-)\s*(\d+(?:\.\d+)?)\s*servings?\b/i)
+  if (rangeMatch) {
+    const first = Number(rangeMatch[1])
+    const second = Number(rangeMatch[2])
+    if (Number.isFinite(first) && Number.isFinite(second) && first > 0 && second > 0) {
+      return clampServingCount((first + second) / 2)
+    }
+  }
+
+  const singleMatch =
+    raw.match(/\b(?:serves?|servings?)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i) ||
+    raw.match(/\bfor\s+(\d+(?:\.\d+)?)\s+(?:people|servings?)\b/i) ||
+    raw.match(/\b(\d+(?:\.\d+)?)\s+servings?\b/i)
+  if (!singleMatch) return null
+  const value = Number(singleMatch[1])
+  if (!Number.isFinite(value) || value <= 0) return null
+  return clampServingCount(value)
+}
+
+const parseApproxRecipeCaloriesFromText = (text: string): number | null => {
+  const raw = String(text || '')
+  if (!raw) return null
+  const match = raw.match(/(-?\d+(?:\.\d+)?)\s*kcal\b/i)
+  if (!match) return null
+  const value = Number(match[1])
+  if (!Number.isFinite(value) || value <= 0) return null
+  return value
+}
+
+const resolveRecipeServingCount = (params: {
+  visibleMessage: string
+  fallbackText?: string
+  title?: string
+  ingredientsCount?: number
+  seed?: number | null
+}) => {
+  const visible = String(params.visibleMessage || '')
+  const fallback = String(params.fallbackText || '')
+  const title = String(params.title || '')
+  const contextText = `${title}\n${visible}\n${fallback}`.trim()
+
+  const explicit =
+    parseServingCountFromText(visible) ||
+    parseServingCountFromText(fallback) ||
+    parseServingCountFromText(title)
+  if (explicit) return explicit
+
+  if (/\b(single serve|single-serving|for one|one serving)\b/i.test(contextText)) return 1
+
+  let estimate =
+    Number.isFinite(Number(params.seed)) && Number(params.seed) > 0 ? clampServingCount(Number(params.seed)) : 1
+
+  const calories = parseApproxRecipeCaloriesFromText(visible)
+  if (calories !== null) {
+    if (calories >= 2200) estimate = Math.max(estimate, 4)
+    else if (calories >= 1500) estimate = Math.max(estimate, 3)
+    else if (calories >= 900) estimate = Math.max(estimate, 2)
+  }
+
+  const ingredientCount = Number(params.ingredientsCount)
+  if (Number.isFinite(ingredientCount) && ingredientCount > 0) {
+    if (ingredientCount >= 10) estimate = Math.max(estimate, 4)
+    else if (ingredientCount >= 7) estimate = Math.max(estimate, 3)
+    else if (ingredientCount >= 4) estimate = Math.max(estimate, 2)
+  }
+
+  if (estimate < 2 && /\b(pasta|alfredo|curry|stir fry|soup|chili|salad|roast|casserole)\b/i.test(contextText)) {
+    estimate = 2
+  }
+
+  return clampServingCount(estimate)
+}
+
 const parseOptionTitlesFromVisibleText = (text: string) => {
   const lines = String(text || '')
     .split('\n')
@@ -766,7 +854,7 @@ const parseSingleRecipeOptionFromVisibleText = (
   let inferredTitle = ''
   for (const line of lines) {
     if (isRecipeIngredientHeader(line) || isRecipeStepHeader(line)) break
-    if (/^(current totals|macros|after eating|option\s+\d+):/i.test(line)) continue
+    if (/^(current totals|targets|macros|after eating|servings?|serves|option\s+\d+):/i.test(line)) continue
     if (/^\d+[.)]\s+/.test(line)) continue
     if (/^[-•*]\s+/.test(line)) continue
     if (line.length < 4) continue
@@ -832,11 +920,18 @@ const parseSingleRecipeOptionFromVisibleText = (
 
   if (uniqueIngredients.length < 2 || cleanSteps.length < 2) return null
 
+  const servings = resolveRecipeServingCount({
+    visibleMessage,
+    fallbackText: fallbackTitle,
+    title,
+    ingredientsCount: uniqueIngredients.length,
+  })
+
   return {
     optionNumber: 1,
     title,
     category: inferMealCategory(title),
-    servings: 1,
+    servings,
     prepMinutes: null,
     cookMinutes: null,
     ingredients: uniqueIngredients,
@@ -1005,7 +1100,20 @@ const ensureFoodMealOptionsPayload = async (params: {
       const parsed = safeParseObject(stripped.jsonRaw)
       const normalized = normalizeStructuredMealOptions(parsed, [])
       if (normalized.length > 0) {
-        return { assistantMessage: appendMealOptionsJsonBlock(visibleMessage, normalized), extraCostCents: 0 }
+        const adjusted =
+          normalized.length === 1
+            ? normalized.map((option) => ({
+                ...option,
+                servings: resolveRecipeServingCount({
+                  visibleMessage,
+                  fallbackText: params.userQuestion,
+                  title: option.title,
+                  ingredientsCount: option.ingredients.length,
+                  seed: option.servings,
+                }),
+              }))
+            : normalized
+        return { assistantMessage: appendMealOptionsJsonBlock(visibleMessage, adjusted), extraCostCents: 0 }
       }
     }
 
