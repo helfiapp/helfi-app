@@ -96,6 +96,16 @@ type BuilderItem = {
   __importKey?: string | null
 }
 
+type RecipePanelData = {
+  title: string
+  sourceUrl: string | null
+  servings: number | null
+  prepMinutes: number | null
+  cookMinutes: number | null
+  ingredients: string[]
+  steps: string[]
+}
+
 const CATEGORY_LABELS: Record<MealCategory, string> = {
   breakfast: 'Breakfast',
   lunch: 'Lunch',
@@ -232,6 +242,83 @@ const inferImportedRecipeServings = (draft: any) => {
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 const KCAL_TO_KJ = 4.184
+
+const toRecipeTextLine = (raw: any) =>
+  String(raw || '')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const toRecipeTextLines = (input: any, limit: number) => {
+  const source = Array.isArray(input) ? input : typeof input === 'string' ? String(input).split('\n') : []
+  return source.map((entry) => toRecipeTextLine(entry)).filter(Boolean).slice(0, limit)
+}
+
+const uniqueRecipeLines = (lines: string[], limit: number) => {
+  const seen = new Set<string>()
+  const out: string[] = []
+  for (const line of lines) {
+    const key = line.toLowerCase()
+    if (seen.has(key)) continue
+    seen.add(key)
+    out.push(line)
+    if (out.length >= limit) break
+  }
+  return out
+}
+
+const buildIngredientLinesFromItems = (items: any[] | null | undefined) => {
+  if (!Array.isArray(items) || items.length === 0) return []
+  const lines: string[] = []
+  for (const raw of items) {
+    const name = toRecipeTextLine(raw?.name || raw?.food || raw?.label || raw?.description || '')
+    if (!name) continue
+    const amountValue = Number(raw?.__amount ?? raw?.amount ?? raw?.weightAmount)
+    const amount = Number.isFinite(amountValue) && amountValue > 0 ? round3(amountValue) : null
+    const unit = toRecipeTextLine(raw?.__unit || raw?.unit || raw?.weightUnit || '')
+    lines.push(amount !== null ? `${amount}${unit ? ` ${unit}` : ''} ${name}`.trim() : name)
+  }
+  return uniqueRecipeLines(lines, 80)
+}
+
+const normalizeRecipePanelData = (
+  raw: any,
+  fallback?: { title?: string; ingredients?: string[]; steps?: string[] },
+): RecipePanelData | null => {
+  if (!raw || typeof raw !== 'object') return null
+  const ingredients = uniqueRecipeLines(
+    [...toRecipeTextLines(raw?.ingredients, 80), ...toRecipeTextLines(fallback?.ingredients || [], 80)],
+    80,
+  )
+  const steps = uniqueRecipeLines(
+    [...toRecipeTextLines(raw?.steps, 40), ...toRecipeTextLines(fallback?.steps || [], 40)],
+    40,
+  )
+  if (ingredients.length === 0 && steps.length === 0) return null
+  const fallbackTitle = toRecipeTextLine(fallback?.title || '')
+  const title = toRecipeTextLine(raw?.title || fallbackTitle || 'Recipe')
+  const sourceUrlRaw = toRecipeTextLine(raw?.sourceUrl || '')
+  const sourceUrl = sourceUrlRaw || null
+  const servingsRaw = Number(raw?.servings)
+  const combinedText = [title, ...ingredients, ...steps].join('\n')
+  const inferredServings = parseRecipeServingsFromText(combinedText)
+  const servings =
+    Number.isFinite(servingsRaw) && servingsRaw > 0
+      ? clampRecipeServings(servingsRaw)
+      : inferredServings
+      ? clampRecipeServings(inferredServings)
+      : null
+  const prepRaw = Number(raw?.prepMinutes)
+  const cookRaw = Number(raw?.cookMinutes)
+  return {
+    title,
+    sourceUrl,
+    servings,
+    prepMinutes: Number.isFinite(prepRaw) && prepRaw >= 0 ? Math.round(prepRaw) : null,
+    cookMinutes: Number.isFinite(cookRaw) && cookRaw >= 0 ? Math.round(cookRaw) : null,
+    ingredients,
+    steps,
+  }
+}
 
 const formatEnergyValue = (value: number | null | undefined, unit: 'kcal' | 'kJ') => {
   const base = typeof value === 'number' && Number.isFinite(value) ? value : 0
@@ -1849,6 +1936,8 @@ export default function MealBuilderClient() {
     current: '',
   })
   const [saveImportedRecipeToFavorites, setSaveImportedRecipeToFavorites] = useState(false)
+  const [persistedRecipePanel, setPersistedRecipePanel] = useState<RecipePanelData | null>(null)
+  const [shareRecipeFeedback, setShareRecipeFeedback] = useState<string | null>(null)
   const recipeImportAppliedRef = useRef(false)
   const recipeImportPortionPrefilledRef = useRef(false)
   const editCollapseAppliedScopeRef = useRef<string | null>(null)
@@ -1891,6 +1980,12 @@ export default function MealBuilderClient() {
     sourceId: string
     label: string
   } | null>(null)
+
+  useEffect(() => {
+    if (!shareRecipeFeedback) return
+    const timeout = window.setTimeout(() => setShareRecipeFeedback(null), 2400)
+    return () => window.clearTimeout(timeout)
+  }, [shareRecipeFeedback])
 
   const applySavedPortion = (source: any) => {
     if (!source || typeof source !== 'object') return
@@ -2285,12 +2380,16 @@ export default function MealBuilderClient() {
       editFavoriteIsCustomRef.current = false
       initialItemsSignatureRef.current = ''
       initialPortionTotalWeightRef.current = null
+      setPersistedRecipePanel(null)
       return
     }
     if (loadedFavoriteId === editFavoriteId) return
     const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
     const fav = favorites.find((f: any) => String(f?.id || '') === editFavoriteId) || null
-    if (!fav) return
+    if (!fav) {
+      setPersistedRecipePanel(null)
+      return
+    }
 
     // If we restored a draft, do not overwrite the user's in-progress changes.
     if (draftAppliedRef.current) {
@@ -2305,6 +2404,23 @@ export default function MealBuilderClient() {
     initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(favoriteTotals)
 
     const favItems = parseFavoriteItems(fav)
+    const favoriteRecipeRaw = {
+      ...(((fav as any)?.recipe && typeof (fav as any).recipe === 'object' ? (fav as any).recipe : {}) as any),
+      title:
+        ((fav as any)?.recipe && (fav as any).recipe.title) ||
+        normalizeMealLabel((fav as any)?.label || (fav as any)?.description || '').trim() ||
+        'Recipe',
+      sourceUrl:
+        (typeof (fav as any)?.sourceUrl === 'string' && (fav as any).sourceUrl.trim()
+          ? (fav as any).sourceUrl.trim()
+          : null) ||
+        null,
+    }
+    const favoriteRecipePanel = normalizeRecipePanelData(favoriteRecipeRaw, {
+      title: normalizeMealLabel((fav as any)?.label || (fav as any)?.description || '').trim() || 'Recipe',
+      ingredients: buildIngredientLinesFromItems(favItems),
+    })
+    setPersistedRecipePanel(favoriteRecipePanel)
     editFavoriteSourceItemsRef.current = favItems ? JSON.parse(JSON.stringify(favItems)) : null
     editFavoriteIsCustomRef.current = isCustomMealFavorite(fav)
     if (favItems && favItems.length > 0) {
@@ -2343,6 +2459,7 @@ export default function MealBuilderClient() {
         initialItemsSignatureRef.current = ''
         initialPortionTotalWeightRef.current = null
       }
+      if (!editFavoriteId) setPersistedRecipePanel(null)
       return
     }
     if (editFavoriteId) return
@@ -2385,6 +2502,20 @@ export default function MealBuilderClient() {
         initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(logTotals)
 
         const rawItems = Array.isArray(log?.items) ? log.items : null
+        const logRecipeRaw = {
+          ...(((logTotals as any)?.__importRecipe && typeof (logTotals as any).__importRecipe === 'object'
+            ? (logTotals as any).__importRecipe
+            : {}) as any),
+          title:
+            ((logTotals as any)?.__importRecipe && (logTotals as any).__importRecipe.title) ||
+            label ||
+            'Recipe',
+        }
+        const logRecipePanel = normalizeRecipePanelData(logRecipeRaw, {
+          title: label || 'Recipe',
+          ingredients: buildIngredientLinesFromItems(rawItems),
+        })
+        if (!cancelled) setPersistedRecipePanel(logRecipePanel)
         if (!cancelled && rawItems && rawItems.length > 0) {
           const converted = convertToBuilderItems(rawItems)
           setItems(converted)
@@ -2579,6 +2710,88 @@ export default function MealBuilderClient() {
     () => applyPortionScaleToTotals(baseMealTotals, effectivePortionScale),
     [baseMealTotals, effectivePortionScale],
   )
+
+  const fallbackRecipeIngredients = useMemo(() => buildIngredientLinesFromItems(items), [items])
+
+  const activeRecipePanel = useMemo(() => {
+    const fromImport = normalizeRecipePanelData(recipeImportDraft, {
+      title: mealName,
+      ingredients: fallbackRecipeIngredients,
+    })
+    if (fromImport) return fromImport
+    return normalizeRecipePanelData(persistedRecipePanel, {
+      title: mealName,
+      ingredients: fallbackRecipeIngredients,
+    })
+  }, [recipeImportDraft, persistedRecipePanel, mealName, fallbackRecipeIngredients])
+
+  const shareRecipeText = useMemo(() => {
+    if (!activeRecipePanel) return ''
+    const lines: string[] = []
+    const title = activeRecipePanel.title || mealName || 'Recipe'
+    lines.push(title)
+    if (activeRecipePanel.servings && activeRecipePanel.servings > 0) {
+      lines.push(`Servings: ${activeRecipePanel.servings}`)
+    }
+    if (activeRecipePanel.prepMinutes !== null || activeRecipePanel.cookMinutes !== null) {
+      const prep = activeRecipePanel.prepMinutes !== null ? `${activeRecipePanel.prepMinutes} min prep` : null
+      const cook = activeRecipePanel.cookMinutes !== null ? `${activeRecipePanel.cookMinutes} min cook` : null
+      lines.push([prep, cook].filter(Boolean).join(' • '))
+    }
+    lines.push('')
+    lines.push('Nutrition:')
+    lines.push(`Calories: ${Math.round(mealTotals.calories)} kcal`)
+    lines.push(`Protein: ${round3(mealTotals.protein)} g`)
+    lines.push(`Carbs: ${round3(mealTotals.carbs)} g`)
+    lines.push(`Fat: ${round3(mealTotals.fat)} g`)
+    lines.push(`Fibre: ${round3(mealTotals.fiber)} g`)
+    lines.push(`Sugar: ${round3(mealTotals.sugar)} g`)
+    if (portionControlEnabled) {
+      const amount = parseNumericInput(portionAmountInput)
+      if (amount && amount > 0) {
+        lines.push('')
+        lines.push(`Portion shown: ${round3(amount)} ${portionUnit}`)
+      }
+    }
+    if (activeRecipePanel.ingredients.length > 0) {
+      lines.push('')
+      lines.push('Ingredients:')
+      activeRecipePanel.ingredients.forEach((item) => lines.push(`- ${item}`))
+    }
+    if (activeRecipePanel.steps.length > 0) {
+      lines.push('')
+      lines.push('Method:')
+      activeRecipePanel.steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
+    }
+    if (activeRecipePanel.sourceUrl) {
+      lines.push('')
+      lines.push(`Source: ${activeRecipePanel.sourceUrl}`)
+    }
+    return lines.join('\n').trim()
+  }, [activeRecipePanel, mealName, mealTotals, portionControlEnabled, portionAmountInput, portionUnit])
+
+  const handleShareRecipe = useCallback(async () => {
+    if (!activeRecipePanel) return
+    const title = activeRecipePanel.title || mealName || 'Recipe'
+    const text = shareRecipeText
+    if (!text) return
+    try {
+      if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+        await (navigator as any).share({ title, text })
+        setShareRecipeFeedback('Recipe shared.')
+        return
+      }
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+        setShareRecipeFeedback('Recipe copied. You can paste it anywhere.')
+        return
+      }
+      setShareRecipeFeedback('Share is not available on this device.')
+    } catch (err: any) {
+      if (String(err?.name || '') === 'AbortError') return
+      setShareRecipeFeedback('Could not share right now. Please try again.')
+    }
+  }, [activeRecipePanel, mealName, shareRecipeText])
 
   useEffect(() => {
     if (portionUnit !== 'serving') return
@@ -2983,6 +3196,7 @@ export default function MealBuilderClient() {
       ...(draft as any),
       servings: inferImportedRecipeServings(draft),
     }
+    setPersistedRecipePanel(null)
     setRecipeImportDraft(normalizedDraft)
     setRecipeImportMissing([])
     setSaveImportedRecipeToFavorites(false)
@@ -5059,23 +5273,26 @@ export default function MealBuilderClient() {
           }
         : null
 
-    const importedRecipeMeta =
-      recipeImportDraft &&
-      Array.isArray((recipeImportDraft as any).steps) &&
-      (recipeImportDraft as any).steps.length > 0
-        ? {
-            title: String((recipeImportDraft as any).title || title).trim() || title,
-            sourceUrl: (recipeImportDraft as any).sourceUrl || null,
-            servings: Number.isFinite(Number((recipeImportDraft as any).servings)) ? Number((recipeImportDraft as any).servings) : null,
-            prepMinutes: Number.isFinite(Number((recipeImportDraft as any).prepMinutes))
-              ? Number((recipeImportDraft as any).prepMinutes)
+    const importedRecipeMeta = activeRecipePanel
+      ? {
+          title: activeRecipePanel.title || title,
+          sourceUrl: activeRecipePanel.sourceUrl || null,
+          servings:
+            Number.isFinite(Number(activeRecipePanel.servings)) && Number(activeRecipePanel.servings) > 0
+              ? Number(activeRecipePanel.servings)
               : null,
-            cookMinutes: Number.isFinite(Number((recipeImportDraft as any).cookMinutes))
-              ? Number((recipeImportDraft as any).cookMinutes)
+          prepMinutes:
+            Number.isFinite(Number(activeRecipePanel.prepMinutes)) && Number(activeRecipePanel.prepMinutes) >= 0
+              ? Number(activeRecipePanel.prepMinutes)
               : null,
-            steps: (recipeImportDraft as any).steps.map((s: any) => String(s || '').trim()).filter(Boolean).slice(0, 30),
-          }
-        : null
+          cookMinutes:
+            Number.isFinite(Number(activeRecipePanel.cookMinutes)) && Number(activeRecipePanel.cookMinutes) >= 0
+              ? Number(activeRecipePanel.cookMinutes)
+              : null,
+          ingredients: activeRecipePanel.ingredients.slice(0, 80),
+          steps: activeRecipePanel.steps.slice(0, 30),
+        }
+      : null
 
     const createdAtIso = buildCreatedAtFromEntryTime(selectedDate, entryTime, new Date().toISOString())
 
@@ -5486,6 +5703,7 @@ export default function MealBuilderClient() {
               servings: importedRecipeMeta.servings,
               prepMinutes: importedRecipeMeta.prepMinutes,
               cookMinutes: importedRecipeMeta.cookMinutes,
+              ingredients: importedRecipeMeta.ingredients,
               steps: importedRecipeMeta.steps,
             }
             favoritePayload.sourceUrl = importedRecipeMeta.sourceUrl || null
@@ -5995,7 +6213,7 @@ export default function MealBuilderClient() {
             </div>
           )}
 
-	          {(recipeImportLoading || recipeImportMissing.length > 0 || (recipeImportDraft && Array.isArray((recipeImportDraft as any).steps) && (recipeImportDraft as any).steps.length > 0)) && (
+	          {(recipeImportLoading || recipeImportMissing.length > 0 || activeRecipePanel) && (
 	            <div className="space-y-3">
 	              {recipeImportLoading && (
 	                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
@@ -6012,19 +6230,66 @@ export default function MealBuilderClient() {
 	                </div>
 	              )}
 
-	              {recipeImportDraft && Array.isArray((recipeImportDraft as any).steps) && (recipeImportDraft as any).steps.length > 0 && (
+	              {activeRecipePanel && (
 	                <details className="rounded-2xl border border-gray-200 bg-white p-4">
-	                  <summary className="cursor-pointer text-sm font-semibold text-gray-900">Recipe instructions (from import)</summary>
-	                  <ol className="mt-3 space-y-2 text-sm text-gray-700 list-decimal pl-5">
-	                    {(recipeImportDraft as any).steps.slice(0, 20).map((step: any, i: number) => (
-	                      <li key={i} className="leading-relaxed">
-	                        {String(step || '').trim()}
-	                      </li>
-	                    ))}
-	                  </ol>
-	                  {typeof (recipeImportDraft as any).sourceUrl === 'string' && (recipeImportDraft as any).sourceUrl.trim() ? (
-	                    <div className="mt-3 text-xs text-gray-500">Source: {(recipeImportDraft as any).sourceUrl}</div>
-	                  ) : null}
+	                  <summary className="cursor-pointer text-sm font-semibold text-gray-900">
+	                    Recipe details (from import)
+	                  </summary>
+	                  <div className="mt-3 space-y-3 text-sm text-gray-700">
+	                    <div className="font-medium text-gray-900">
+	                      {activeRecipePanel.title || 'Recipe'}
+	                    </div>
+	                    {(activeRecipePanel.servings !== null ||
+	                      activeRecipePanel.prepMinutes !== null ||
+	                      activeRecipePanel.cookMinutes !== null) && (
+	                      <div className="text-xs text-gray-600">
+	                        {[
+	                          activeRecipePanel.servings !== null
+	                            ? `${activeRecipePanel.servings} serving${activeRecipePanel.servings === 1 ? '' : 's'}`
+	                            : null,
+	                          activeRecipePanel.prepMinutes !== null ? `${activeRecipePanel.prepMinutes} min prep` : null,
+	                          activeRecipePanel.cookMinutes !== null ? `${activeRecipePanel.cookMinutes} min cook` : null,
+	                        ]
+	                          .filter(Boolean)
+	                          .join(' • ')}
+	                      </div>
+	                    )}
+	                    {activeRecipePanel.ingredients.length > 0 && (
+	                      <div>
+	                        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Ingredients</div>
+	                        <ul className="mt-2 space-y-1 list-disc pl-5">
+	                          {activeRecipePanel.ingredients.slice(0, 30).map((ingredient, i) => (
+	                            <li key={`ing-${i}`}>{ingredient}</li>
+	                          ))}
+	                        </ul>
+	                      </div>
+	                    )}
+	                    {activeRecipePanel.steps.length > 0 && (
+	                      <div>
+	                        <div className="text-xs font-semibold uppercase tracking-wide text-gray-500">Method</div>
+	                        <ol className="mt-2 space-y-1 list-decimal pl-5">
+	                          {activeRecipePanel.steps.slice(0, 30).map((step, i) => (
+	                            <li key={`step-${i}`} className="leading-relaxed">
+	                              {step}
+	                            </li>
+	                          ))}
+	                        </ol>
+	                      </div>
+	                    )}
+	                    {activeRecipePanel.sourceUrl ? (
+	                      <div className="text-xs text-gray-500 break-words">Source: {activeRecipePanel.sourceUrl}</div>
+	                    ) : null}
+	                    <div className="flex flex-wrap items-center gap-2 pt-1">
+	                      <button
+	                        type="button"
+	                        onClick={handleShareRecipe}
+	                        className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
+	                      >
+	                        Share recipe
+	                      </button>
+	                      {shareRecipeFeedback ? <span className="text-xs text-gray-600">{shareRecipeFeedback}</span> : null}
+	                    </div>
+	                  </div>
 	                </details>
 	              )}
 
@@ -6572,7 +6837,7 @@ export default function MealBuilderClient() {
                 const baseUnits = allowedUnitsForItem(it)
                 const hasCustomUnits = Boolean(getFoodUnitGrams(it.name))
                 const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
-                const isImportedRecipeView = Boolean(recipeImportDraft || recipeImportFlag)
+                const isImportedRecipeView = Boolean(activeRecipePanel || recipeImportDraft || recipeImportFlag)
                 const totals = computeItemTotals(it)
                 const displayTotals = applyPortionScaleToTotals(totals, effectivePortionScale)
                 const macroTotals = isImportedRecipeView ? totals : displayTotals
