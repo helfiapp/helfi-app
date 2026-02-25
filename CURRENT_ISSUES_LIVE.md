@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-25 07:44 PM AEDT
+- What changed: Build a Meal now keeps the expandable recipe panel for Ask AI meal imports and reopened saved custom meals. Added Share recipe in that panel (shares recipe title, ingredients, method, calories, and macros; with copy fallback if share is unavailable).
+- Where to see it (page/link): https://helfi.ai/food/build-meal (open via Food Diary Ask AI -> Build this meal)
+- What to quickly test: Ask AI for a recipe in Food Diary, tap Build this meal, confirm recipe details panel appears at top with ingredients + method; save as custom meal and reopen it to confirm panel still appears; tap Share recipe and confirm share sheet (or copied text fallback) includes calories and macros.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-25 02:44 PM AEDT
 - What changed: Removed duplicate written calorie/macro summary text in Food Diary Ask AI chat when the nutrition progress card is shown. The progress card remains, recipe text remains, and Build this meal buttons still appear.
 - Where to see it (page/link): https://helfi.ai/chat?context=food
