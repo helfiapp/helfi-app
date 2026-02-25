@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-25 02:44 PM AEDT
+- What changed: Removed duplicate written calorie/macro summary text in Food Diary Ask AI chat when the nutrition progress card is shown. The progress card remains, recipe text remains, and Build this meal buttons still appear.
+- Where to see it (page/link): https://helfi.ai/chat?context=food
+- What to quickly test: Ask for a recipe in Food Diary Ask AI, confirm you see the progress-card nutrition panel, confirm the text blocks like “Current totals / After eating” are no longer duplicated above it, and confirm Build this meal buttons still open Build a Meal.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-25 12:20 PM AEDT
 - What changed: Fixed Ask AI -> Build a Meal serving-size carry-through so imported recipes no longer default to “1 serving = full recipe.” Added realistic servings inference in backend, chat fallback parsing, and Build a Meal import fallback. Portion control now scales macros/calories proportionally using a realistic full-recipe serving count.
 - Where to see it (page/link): https://helfi.ai/chat?context=food then Build this meal -> https://helfi.ai/food/build-meal
