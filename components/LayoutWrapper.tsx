@@ -340,6 +340,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   const { data: session, status } = useSession()
   const [showHealthSetupReminder, setShowHealthSetupReminder] = useState(false)
   const [showFeedbackPrompt, setShowFeedbackPrompt] = useState(false)
+  const [feedbackPromptSeenServer, setFeedbackPromptSeenServer] = useState<boolean | null>(null)
   const [goalSyncNotice, setGoalSyncNotice] = useState<string | null>(null)
   const lastLocationRef = useRef('')
   const sidebarNavLockRef = useRef(0)
@@ -416,8 +417,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     ? `helfi:feedback-active-days:${session.user.email.toLowerCase()}`
     : ''
 
-  const dismissFeedbackPrompt = useCallback((openSupport: boolean) => {
-    setShowFeedbackPrompt(false)
+  const rememberFeedbackPromptSeen = useCallback((syncServer = true) => {
     if (feedbackPromptStorageKey && typeof window !== 'undefined') {
       try {
         localStorage.setItem(feedbackPromptStorageKey, '1')
@@ -425,10 +425,20 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
         // Ignore storage errors
       }
     }
+    setFeedbackPromptSeenServer(true)
+    if (!syncServer) return
+    fetch('/api/feedback-prompt', { method: 'POST' }).catch(() => {
+      // Ignore network errors; local marker already prevents repeat in this browser
+    })
+  }, [feedbackPromptStorageKey])
+
+  const dismissFeedbackPrompt = useCallback((openSupport: boolean) => {
+    setShowFeedbackPrompt(false)
+    rememberFeedbackPromptSeen(true)
     if (openSupport) {
       router.push('/support')
     }
-  }, [feedbackPromptStorageKey, router])
+  }, [rememberFeedbackPromptSeen, router])
 
   useEffect(() => {
     if (typeof document === 'undefined') return
@@ -455,9 +465,45 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
   }, [status, isPractitioner, isAdminPanelPath, isPractitionerAllowedPath, router])
 
   useEffect(() => {
+    if (status !== 'authenticated' || !feedbackPromptStorageKey) {
+      setFeedbackPromptSeenServer(null)
+      return
+    }
+
+    let cancelled = false
+    ;(async () => {
+      try {
+        const response = await fetch('/api/feedback-prompt', { method: 'GET', cache: 'no-store' })
+        if (!response.ok) {
+          if (!cancelled) setFeedbackPromptSeenServer(false)
+          return
+        }
+        const data = await response.json().catch(() => ({}))
+        const seen = Boolean(data?.seen)
+        if (seen && feedbackPromptStorageKey && typeof window !== 'undefined') {
+          try {
+            localStorage.setItem(feedbackPromptStorageKey, '1')
+          } catch {
+            // Ignore storage errors
+          }
+        }
+        if (!cancelled) setFeedbackPromptSeenServer(seen)
+      } catch {
+        if (!cancelled) setFeedbackPromptSeenServer(false)
+      }
+    })()
+
+    return () => {
+      cancelled = true
+    }
+  }, [status, feedbackPromptStorageKey, session?.user?.id])
+
+  useEffect(() => {
     if (status !== 'authenticated') return
     if (!feedbackActiveDaysStorageKey) return
     if (!feedbackPromptStorageKey) return
+    if (feedbackPromptSeenServer === null) return
+    if (feedbackPromptSeenServer) return
     if (isPublicPage || isAdminPanelPath || isPractitionerPortalPath) return
     if (pathname.startsWith('/support')) return
     if ((session as any)?.user?.needsVerification) return
@@ -473,20 +519,28 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
       const streak = calculateConsecutiveActiveDays(activeDays, todayKey)
       if (streak < FEEDBACK_REQUIRED_ACTIVE_DAYS) return
-      if (localStorage.getItem(feedbackPromptStorageKey) === '1') return
+      if (localStorage.getItem(feedbackPromptStorageKey) === '1') {
+        setFeedbackPromptSeenServer(true)
+        return
+      }
     } catch {
       // Ignore storage errors
+      return
     }
 
+    // Mark as shown immediately so it can only appear once per user.
+    rememberFeedbackPromptSeen(true)
     setShowFeedbackPrompt(true)
   }, [
     status,
     feedbackActiveDaysStorageKey,
     feedbackPromptStorageKey,
+    feedbackPromptSeenServer,
     isPublicPage,
     isAdminPanelPath,
     isPractitionerPortalPath,
     pathname,
+    rememberFeedbackPromptSeen,
     session,
   ])
 
