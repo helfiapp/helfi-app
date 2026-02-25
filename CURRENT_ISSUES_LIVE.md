@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 05:12 AM AEDT
+- What changed: Added hard-lock protection for Insights weekly report logic so accidental regressions now fail build. Locked countdown timer logic, report status/countdown UI block, report state derivation, insights self-heal logic, status API self-heal logic, and weekly state DB insert cast query via protected region hashes.
+- Where to see it (page/link): https://helfi.ai/insights
+- What to quickly test: Confirm Insights countdown still shows; then verify guard lock by confirming build would fail if those protected blocks are edited without explicit override env vars.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 04:49 AM AEDT
 - What changed: Fixed root-cause bug in weekly report state saving. The schedule-state insert was using wrong timestamp typing and silently failing, which prevented countdown state from being stored. Added proper timestamp casting in state insert so weekly report schedule now saves correctly.
 - Where to see it (page/link): https://helfi.ai/insights
