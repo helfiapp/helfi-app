@@ -147,6 +147,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 03:18 AM AEDT
+- What changed: Fixed feedback popup repeat bug. Popup is now permanently tracked at account level, so once it appears once for a user, it will never show again (even if they tap “Maybe later,” and even across devices/browsers).
+- Where to see it (page/link): https://helfi.ai/food and other signed-in app pages using the shared layout popup
+- What to quickly test: Sign in as a user who already saw the popup, tap “Maybe later,” refresh and navigate across pages, then sign in on another device/browser. Popup should not appear again.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-25 12:21 AM AEDT
 - What changed: Increased mobile text size and readability for the feedback popup (title, body, bullet points, and action buttons). Added safe popup scrolling on small screens so larger text remains fully readable.
 - Where to see it (page/link): https://helfi.ai/dashboard (feedback popup overlay)
