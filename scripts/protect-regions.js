@@ -251,7 +251,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'insights', 'InsightLandingClient.tsx'),
     startMarker: 'PROTECTED: INSIGHTS_REPORT_ACTION_ROW START',
     endMarker: 'PROTECTED: INSIGHTS_REPORT_ACTION_ROW END',
-    expectedHash: '4a457d1a09d685c2f58b3b7620aeed6db925aacb0717ff38e7249267207b3adb',
+    expectedHash: '14c93b97b73a2031bf3c4d0d7d580a69b71c17631c689b7bad8b4e67fe17351b',
     allowEnvVar: 'ALLOW_INSIGHTS_REPORT_ACTION_ROW_EDIT',
     description: 'Insights report action row UI',
   });
