@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-25 09:44 PM AEDT
+- What changed: Fixed iPhone PWA naming and install guidance flow. Home Screen app name now shows Helfi (not STG). Google sign-in now returns through the sign-in page so Safari install instructions are shown before entering the app, and install prompts are no longer hidden forever after one skip (cooldown-based re-show).
+- Where to see it (page/link): https://helfi.ai/auth/signin
+- What to quickly test: On iPhone Safari, sign in with Google and confirm the "Add Helfi to your Home Screen" steps modal appears; tap Share -> Add to Home Screen and confirm the default app name is "Helfi" (not STG).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-25 07:44 PM AEDT
 - What changed: Build a Meal now keeps the expandable recipe panel for Ask AI meal imports and reopened saved custom meals. Added Share recipe in that panel (shares recipe title, ingredients, method, calories, and macros; with copy fallback if share is unavailable).
 - Where to see it (page/link): https://helfi.ai/food/build-meal (open via Food Diary Ask AI -> Build this meal)
