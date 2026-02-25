@@ -453,6 +453,51 @@ const parseFoodMacroSnapshot = (content: string): FoodMacroSnapshot | null => {
   return { current, targets, after }
 }
 
+const stripFoodMacroSummaryFromDisplay = (content: string): string => {
+  const lines = String(content || '').replace(/\r/g, '').split('\n')
+  const keptLines: string[] = []
+  let inMacroBlock = false
+
+  for (const rawLine of lines) {
+    const line = String(rawLine || '')
+    const trimmed = stripOuterBold(line).trim()
+    if (!trimmed) {
+      if (!inMacroBlock) keptLines.push(line)
+      continue
+    }
+
+    const normalized = trimmed.replace(/^[•*\-]\s+/, '').trim()
+    const isMacroHeader = /^(current totals|targets|after eating|macros(?:\s*\([^)]+\))?|consumed|remaining)\s*:/i.test(
+      normalized,
+    )
+    const isBoundary = /^(option\s+\d+:|recipe:|ingredients?:|steps?:|directions?:|method:|servings?:|serves\b)/i.test(
+      normalized,
+    )
+    const isMacroLine = hasAnyFoodMacroValues(parseFoodMacroValuesFromText(normalized))
+
+    if (isMacroHeader) {
+      inMacroBlock = true
+      continue
+    }
+
+    if (inMacroBlock) {
+      if (isBoundary) {
+        inMacroBlock = false
+        keptLines.push(line)
+        continue
+      }
+      if (isMacroLine) continue
+      inMacroBlock = false
+      keptLines.push(line)
+      continue
+    }
+
+    keptLines.push(line)
+  }
+
+  return keptLines.join('\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
 const parseQuotedStringArray = (raw: string) => {
   const out: string[] = []
   const rx = /"((?:\\.|[^"\\])*)"/g
@@ -2823,11 +2868,16 @@ export default function VoiceChat({
                 const parsedFoodPayload =
                   m.role === 'assistant' && isFoodEntry ? parseFoodAssistantResponse(m.content) : null
                 const parsedFoodOptions = parsedFoodPayload?.options || []
-                const messageContentForDisplay = parsedFoodPayload?.displayContent || m.content
+                const rawMessageContentForDisplay = parsedFoodPayload?.displayContent || m.content
                 const macroSnapshot =
                   m.role === 'assistant' && isFoodEntry
-                    ? parseFoodMacroSnapshot(messageContentForDisplay)
+                    ? parseFoodMacroSnapshot(rawMessageContentForDisplay)
                     : null
+                const shouldHideMacroSummaryText =
+                  Boolean(macroSnapshot?.targets) && Boolean(macroSnapshot?.current || macroSnapshot?.after)
+                const messageContentForDisplay = shouldHideMacroSummaryText
+                  ? stripFoodMacroSummaryFromDisplay(rawMessageContentForDisplay)
+                  : rawMessageContentForDisplay
                 return (
                 <div ref={assistantRef} key={idx} className={`group flex gap-4 ${m.role === 'user' ? 'flex-row-reverse' : ''}`}>
                   <div className={`hidden md:flex h-8 w-8 shrink-0 items-center justify-center rounded-full ${
