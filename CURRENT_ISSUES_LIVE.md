@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 04:49 AM AEDT
+- What changed: Fixed root-cause bug in weekly report state saving. The schedule-state insert was using wrong timestamp typing and silently failing, which prevented countdown state from being stored. Added proper timestamp casting in state insert so weekly report schedule now saves correctly.
+- Where to see it (page/link): https://helfi.ai/insights
+- What to quickly test: Open Insights and confirm the 7-day countdown/progress section appears under the 7-day report card; confirm it remains after refresh and does not disappear again.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 04:37 AM AEDT
 - What changed: Restored missing 7-day report countdown recovery on Insights. Added stronger schedule self-heal that checks active subscription directly and recreates weekly report schedule state when missing (including owner test account fallback), so next due date and countdown can appear again.
 - Where to see it (page/link): https://helfi.ai/insights
