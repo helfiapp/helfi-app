@@ -246,7 +246,7 @@ export async function upsertWeeklyReportState(
     )
     await prisma.$executeRawUnsafe(
       `INSERT INTO WeeklyHealthReportState (userId, onboardingCompletedAt, nextReportDueAt, lastReportAt, lastAttemptAt, lastStatus, reportsEnabled, reportsEnabledAt)
-       VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+       VALUES ($1, $2::timestamptz, $3::timestamptz, $4::timestamptz, $5::timestamptz, $6, $7, $8::timestamptz)`,
       merged.userId,
       merged.onboardingCompletedAt,
       merged.nextReportDueAt,
