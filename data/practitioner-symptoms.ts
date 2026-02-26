@@ -28,9 +28,9 @@ export const PRACTITIONER_SYMPTOM_HINTS: PractitionerSymptomHint[] = [
   { terms: ['sleep apnea', 'snoring', 'insomnia'], category: 'GPs & Doctors', subcategory: 'Sleep Physician' },
   { terms: ['infectious disease', 'travel disease', 'hiv'], category: 'GPs & Doctors', subcategory: 'Infectious Disease Physician' },
 
-  { terms: ['physio', 'rehab', 'sprain', 'strain', 'mobility'], category: 'Allied Health', subcategory: 'Physiotherapist' },
-  { terms: ['back pain', 'spine', 'alignment', 'chiro'], category: 'Allied Health', subcategory: 'Chiropractor' },
-  { terms: ['osteopath', 'joint pain', 'posture'], category: 'Allied Health', subcategory: 'Osteopath' },
+  { terms: ['physio', 'rehab', 'sprain', 'strain', 'mobility', 'leg injury', 'knee injury', 'ankle sprain', 'hamstring strain', 'calf strain', 'shin splints', 'sore leg', 'leg pain', 'calf pain', 'hamstring pain', 'quad pain', 'shin pain', 'sore back', 'lower back pain', 'upper back pain'], category: 'Allied Health', subcategory: 'Physiotherapist' },
+  { terms: ['back pain', 'sore back', 'backache', 'lower back pain', 'upper back pain', 'neck pain', 'stiff neck', 'spine', 'alignment', 'chiro'], category: 'Allied Health', subcategory: 'Chiropractor' },
+  { terms: ['osteopath', 'joint pain', 'posture', 'sore back', 'back pain', 'backache', 'hip pain', 'sore leg', 'leg pain'], category: 'Allied Health', subcategory: 'Osteopath' },
   { terms: ['exercise', 'fitness rehab', 'chronic disease exercise'], category: 'Allied Health', subcategory: 'Exercise Physiologist' },
   { terms: ['foot pain', 'heel pain', 'plantar fasciitis', 'ingrown toenail'], category: 'Allied Health', subcategory: 'Podiatrist' },
   { terms: ['occupational therapy', 'daily living'], category: 'Allied Health', subcategory: 'Occupational Therapist (OT)' },
@@ -58,8 +58,8 @@ export const PRACTITIONER_SYMPTOM_HINTS: PractitionerSymptomHint[] = [
   { terms: ['mens health', 'male health'], category: "Men's Health", subcategory: "Men's Health GP" },
   { terms: ['urology', 'prostate'], category: "Men's Health", subcategory: 'Urologist' },
 
-  { terms: ['muscle pain', 'back pain', 'neck pain'], category: 'Musculoskeletal & Pain', subcategory: 'Spinal / Back Pain Clinic' },
-  { terms: ['sports physio', 'sports injury rehab'], category: 'Musculoskeletal & Pain', subcategory: 'Sports Physiotherapy' },
+  { terms: ['muscle pain', 'back pain', 'sore back', 'backache', 'neck pain', 'stiff neck', 'sciatica'], category: 'Musculoskeletal & Pain', subcategory: 'Spinal / Back Pain Clinic' },
+  { terms: ['sports physio', 'sports injury rehab', 'sports injury', 'running injury', 'gym injury', 'sore leg', 'leg pain', 'back pain', 'sore back'], category: 'Musculoskeletal & Pain', subcategory: 'Sports Physiotherapy' },
   { terms: ['pain specialist', 'chronic pain clinic'], category: 'Musculoskeletal & Pain', subcategory: 'Pain Specialist' },
   { terms: ['myotherapy', 'muscle release'], category: 'Musculoskeletal & Pain', subcategory: 'Myotherapy' },
   { terms: ['remedial massage', 'massage therapy'], category: 'Musculoskeletal & Pain', subcategory: 'Remedial Massage' },
