@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 09:20 AM AEDT
+- What changed: Removed the practitioner delete-account panel from the create-listing flow. It now appears only after a listing already exists, so new practitioner account creation is clean and not mixed with destructive actions.
+- Where to see it (page/link): https://helfi.ai/practitioner
+- What to quickly test: Open practitioner create flow before saving a listing and confirm delete-account section is not shown. Save a listing and confirm the delete-account section appears only after that.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 02:06 AM AEDT
 - What changed: Fixed public header `Go to Dashboard` behavior for users who also have practitioner access. Dashboard path is now allowed by practitioner redirect guard, so clicking that button opens user dashboard correctly.
 - Where to see it (page/link): https://helfi.ai/list-your-practice/start
