@@ -23,6 +23,8 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const emailRaw = typeof body?.email === 'string' ? body.email : ''
     const passwordRaw = typeof body?.password === 'string' ? body.password : ''
+    const accountTypeRaw = typeof body?.accountType === 'string' ? body.accountType : ''
+    const practitionerIntent = accountTypeRaw.trim().toLowerCase() === 'practitioner'
 
     const email = emailRaw.trim().toLowerCase()
     const password = passwordRaw.trim()
@@ -40,6 +42,7 @@ export async function POST(req: NextRequest) {
         image: true,
         passwordHash: true,
         emailVerified: true,
+        practitionerAccount: { select: { id: true } },
       },
     })
 
@@ -59,6 +62,22 @@ export async function POST(req: NextRequest) {
         await prisma.user.update({ where: { id: user.id }, data: { emailVerified: new Date() } })
       } catch {
         // Non-blocking.
+      }
+    }
+
+    let hasPractitionerAccount = Boolean(user.practitionerAccount?.id)
+    if (practitionerIntent && !hasPractitionerAccount) {
+      try {
+        await prisma.practitionerAccount.create({
+          data: {
+            userId: user.id,
+            contactEmail: user.email.toLowerCase(),
+          },
+        })
+        hasPractitionerAccount = true
+      } catch {
+        // Non-blocking: if it already exists due to a race, treat as practitioner account present.
+        hasPractitionerAccount = true
       }
     }
 
@@ -83,7 +102,13 @@ export async function POST(req: NextRequest) {
         ok: true,
         token,
         expiresAt: exp * 1000,
-        user: { id: user.id, email: user.email, name: user.name, image: user.image },
+        user: {
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
+          isPractitioner: hasPractitionerAccount,
+        },
       },
       { status: 200 },
     )
@@ -94,4 +119,3 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Login failed' }, { status: 500 })
   }
 }
-

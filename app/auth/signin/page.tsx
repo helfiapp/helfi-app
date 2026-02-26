@@ -29,25 +29,6 @@ function SearchParamsHandler({
     const modeParam = searchParams.get('mode')
     const contextParam = searchParams.get('context')
     const nextParam = searchParams.get('next')
-
-    const callbackUrlParam = String(searchParams.get('callbackUrl') || '')
-    const isNativeCallback = callbackUrlParam.includes('/api/native-auth/oauth/complete')
-    const hasNativeCookie =
-      typeof document !== 'undefined' &&
-      document.cookie.split(';').some((item) => item.trim().startsWith('helfi_native_oauth=1'))
-    const isOAuthError =
-      errorParam === 'OAuthSignin' ||
-      errorParam === 'OAuthCallback' ||
-      errorParam === 'AccessDenied' ||
-      errorParam === 'Configuration' ||
-      errorParam === 'Callback'
-
-    // Hard fallback for native auth: if OAuth fails while native flow cookie/callback exists,
-    // send user back through native completion route instead of leaving them on web sign-in.
-    if (isOAuthError && (isNativeCallback || hasNativeCookie)) {
-      window.location.replace(`/api/native-auth/oauth/complete?error=${encodeURIComponent(String(errorParam || 'OAuthCallback'))}`)
-      return
-    }
     
     // If plan parameter exists, show signup form by default
     if (planParam) {
@@ -61,6 +42,11 @@ function SearchParamsHandler({
 
     if (contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner'))) {
       setAuthContext('practitioner')
+      try {
+        sessionStorage.setItem('helfi:practitionerAuthIntent', '1')
+      } catch {
+        // Ignore storage issues.
+      }
     }
 
     
@@ -100,7 +86,7 @@ function SearchParamsHandler({
           setMessage('Status updated.')
       }
     }
-  }, [searchParams, setError, setMessage, setIsSignUp, setShowResendVerification])
+  }, [searchParams, setError, setMessage, setIsSignUp, setShowResendVerification, setAuthContext])
 
   return null
 }
@@ -111,8 +97,6 @@ interface BeforeInstallPromptEvent extends Event {
   prompt: () => Promise<void>
   userChoice: Promise<{ outcome: 'accepted' | 'dismissed'; platform: string }>
 }
-
-const PWA_INSTALL_PROMPT_COOLDOWN_MS = 1000 * 60 * 60 * 24 * 7
 
 const getInstallPlatform = (): InstallPlatform => {
   if (typeof window === 'undefined') return 'other'
@@ -206,13 +190,37 @@ export default function SignIn() {
     }
 
     const resume = async () => {
+      const nextParam = sanitizeNextTarget(searchParams.get('next'))
+      const contextParam = searchParams.get('context')
+      let practitionerIntent = contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner')) || authContext === 'practitioner'
+      if (!practitionerIntent) {
+        try {
+          practitionerIntent = sessionStorage.getItem('helfi:practitionerAuthIntent') === '1'
+        } catch {
+          // Ignore storage issues.
+        }
+      }
+
       if (session?.user?.isPractitioner) {
+        try {
+          sessionStorage.removeItem('helfi:practitionerAuthIntent')
+        } catch {}
         if (maybeShowInstallPrompt('/practitioner')) {
           return
         }
         router.replace('/practitioner')
         return
       }
+
+      if (practitionerIntent) {
+        const practitionerTarget = '/practitioner?practitionerSignup=1'
+        if (maybeShowInstallPrompt(practitionerTarget)) {
+          return
+        }
+        router.replace(practitionerTarget)
+        return
+      }
+
       // Check for plan parameter - first from URL, then from sessionStorage (for post-verification flow)
       let planParam = searchParams.get('plan')
       
@@ -248,8 +256,6 @@ export default function SignIn() {
         }
       }
 
-      const nextParam = sanitizeNextTarget(searchParams.get('next'))
-      const contextParam = searchParams.get('context')
       const isPractitionerFlow =
         contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner'))
 
@@ -337,7 +343,7 @@ export default function SignIn() {
     }
 
     void resume()
-  }, [status, router, installPromptVisible, session])
+  }, [status, router, installPromptVisible, session, authContext])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -400,13 +406,7 @@ export default function SignIn() {
     if (!eligible) return false
 
     try {
-      if (localStorage.getItem('helfi:pwaInstalled') === '1') {
-        return false
-      }
-
-      const seenAtRaw = localStorage.getItem('helfi:pwaInstallPromptSeenAt')
-      const seenAt = seenAtRaw ? Number(seenAtRaw) : NaN
-      if (Number.isFinite(seenAt) && Date.now() - seenAt < PWA_INSTALL_PROMPT_COOLDOWN_MS) {
+      if (localStorage.getItem('helfi:pwaInstallPromptSeen') === '1') {
         return false
       }
     } catch {
@@ -414,7 +414,6 @@ export default function SignIn() {
     }
 
     try {
-      localStorage.setItem('helfi:pwaInstallPromptSeenAt', String(Date.now()))
       localStorage.setItem('helfi:pwaInstallPromptSeen', '1')
     } catch {
       // Ignore storage errors
@@ -429,7 +428,6 @@ export default function SignIn() {
   const handleContinueToApp = () => {
     setInstallPromptVisible(false)
     try {
-      localStorage.setItem('helfi:pwaInstallPromptSeenAt', String(Date.now()))
       localStorage.setItem('helfi:pwaInstallPromptSeen', '1')
     } catch {
       // Ignore storage errors
@@ -468,7 +466,7 @@ export default function SignIn() {
 
   const handleGoogleAuth = async () => {
     setLoading(true)
-    // Route back through /auth/signin after OAuth so install instructions can show consistently.
+    // Check for plan parameter to preserve it through OAuth flow
     const searchParams = new URLSearchParams(window.location.search)
     const planParam = searchParams.get('plan')
     const nextParam = sanitizeNextTarget(searchParams.get('next'))
@@ -476,15 +474,9 @@ export default function SignIn() {
     const nextTarget = authContext === 'practitioner' && (nextParam === '/practitioner' || nextParam?.startsWith('/practitioner'))
       ? withQueryParam(nextParam, 'practitionerSignup', '1')
       : nextParam
-    const callbackParams = new URLSearchParams()
-    if (planParam) {
-      callbackParams.set('plan', planParam)
-    }
-    callbackParams.set('next', nextTarget || fallbackTarget)
-    if (authContext === 'practitioner') {
-      callbackParams.set('context', 'practitioner')
-    }
-    const callbackUrl = `/auth/signin?${callbackParams.toString()}`
+    const callbackUrl = planParam
+      ? `/auth/signin?plan=${encodeURIComponent(planParam)}`
+      : nextTarget || fallbackTarget
     if (authContext === 'practitioner') {
       try {
         sessionStorage.setItem('helfi:practitionerSignup', '1')

@@ -31,11 +31,16 @@ export async function middleware(request: NextRequest) {
     // If we have a valid token, preserve it by adding stability headers
     if (token) {
       // PWA guard rail: signed-in Home Screen opens must skip login/marketing.
-      // If you touch this, read GUARD_RAILS.md (PWA Home Screen / Entry Path).
+      // Keep practitioner auth links intact so "list your practice" flows
+      // can reach the practitioner portal instead of being sent to dashboard.
       const forceLogin =
         request.nextUrl.searchParams.get('reauth') === '1' ||
         request.nextUrl.searchParams.get('forceLogin') === '1'
-      if (!forceLogin && (request.nextUrl.pathname === '/auth/signin' || request.nextUrl.pathname === '/')) {
+      const practitionerContext = request.nextUrl.searchParams.get('context') === 'practitioner'
+      const nextParam = String(request.nextUrl.searchParams.get('next') || '')
+      const practitionerNext = nextParam.startsWith('/practitioner')
+      const practitionerAuthIntent = practitionerContext || practitionerNext
+      if (!forceLogin && (request.nextUrl.pathname === '/auth/signin' || request.nextUrl.pathname === '/') && !practitionerAuthIntent) {
         const redirectUrl = request.nextUrl.clone()
         redirectUrl.pathname = '/pwa-entry'
         return NextResponse.redirect(redirectUrl)
