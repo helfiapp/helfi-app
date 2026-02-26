@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 01:32 PM AEDT
+- What changed: Practitioner search phrase mapping expanded and corrected. Restored chiropractor matching for sore back phrases and added broader leg/back phrase coverage so suggestions map to physiotherapist, chiropractor, osteopath, spinal/back pain clinic, and sports physiotherapy more reliably.
+- Where to see it (page/link): https://helfi.ai/practitioners
+- What to quickly test: Search sore back and confirm chiropractor appears in suggested categories; search sore leg and confirm physio-related suggestions appear (physiotherapist/sports physio/osteopath as relevant), then run Search now.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 05:12 AM AEDT
 - What changed: Added hard-lock protection for Insights weekly report logic so accidental regressions now fail build. Locked countdown timer logic, report status/countdown UI block, report state derivation, insights self-heal logic, status API self-heal logic, and weekly state DB insert cast query via protected region hashes.
 - Where to see it (page/link): https://helfi.ai/insights
