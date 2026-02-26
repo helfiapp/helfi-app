@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 02:06 AM AEDT
+- What changed: Fixed public header `Go to Dashboard` behavior for users who also have practitioner access. Dashboard path is now allowed by practitioner redirect guard, so clicking that button opens user dashboard correctly.
+- Where to see it (page/link): https://helfi.ai/list-your-practice/start
+- What to quickly test: While signed in, click `Go to Dashboard` in the public header and confirm it opens `https://helfi.ai/dashboard`.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 10:54 PM AEDT
 - What changed: Fixed practitioner account entry flow so signed-in users are no longer forced to dashboard when opening practitioner sign-up/sign-in links. Practitioner auth intent now routes correctly to the practitioner portal. Also updated native login API so practitioner-mode native login can create/use practitioner account context.
 - Where to see it (page/link): https://helfi.ai/list-your-practice/start, https://helfi.ai/auth/signin?context=practitioner&mode=signup&next=/practitioner, https://helfi.ai/practitioner
