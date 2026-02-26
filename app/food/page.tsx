@@ -17584,6 +17584,172 @@ Please add nutritional information manually if needed.`);
     return { item, label, servingLabel, totals }
   }
 
+  const getFavoriteSourceFromState = (state: any) => {
+    if (!state) return null
+    return state?.item?.favorite || state?.item?.entry || state?.item || state
+  }
+
+  const getFavoriteShareableItems = (state: any) => {
+    const source = getFavoriteSourceFromState(state)
+    if (!source) return []
+    const items = parseEntryItemsForMatching(source)
+    if (Array.isArray(items) && items.length > 0) return items
+    if (Array.isArray(source?.ingredients) && source.ingredients.length > 0) {
+      return source.ingredients
+        .map((entry: any) => (typeof entry === 'string' ? { name: entry } : entry))
+        .filter((entry: any) => entry && (entry.name || entry.label || entry.description))
+    }
+    return []
+  }
+
+  const isShareableFavoriteMeal = (state: any) => {
+    return getFavoriteShareableItems(state).length > 1
+  }
+
+  const shareRound = (value: number) => {
+    const rounded = Math.round(value * 1000) / 1000
+    if (Math.abs(rounded - Math.round(rounded)) < 0.0001) return String(Math.round(rounded))
+    return String(rounded)
+  }
+
+  const toShareTextLine = (raw: any) =>
+    String(raw || '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+  const toShareTextLines = (input: any, limit: number) => {
+    const source = Array.isArray(input) ? input : typeof input === 'string' ? String(input).split('\n') : []
+    const lines: string[] = []
+    const seen = new Set<string>()
+    for (const raw of source) {
+      const line = toShareTextLine(raw)
+      if (!line) continue
+      const key = line.toLowerCase()
+      if (seen.has(key)) continue
+      seen.add(key)
+      lines.push(line)
+      if (lines.length >= limit) break
+    }
+    return lines
+  }
+
+  const buildFavoriteShareIngredientLines = (state: any) => {
+    const items = getFavoriteShareableItems(state)
+    const lines: string[] = []
+    const seen = new Set<string>()
+    for (const item of items) {
+      const name = toShareTextLine(item?.name || item?.label || item?.description || '')
+      if (!name) continue
+      const amountRaw = Number(item?.__amount ?? item?.amount ?? item?.weightAmount)
+      const unit = toShareTextLine(item?.__unit || item?.unit || item?.weightUnit || '')
+      const servingsRaw = Number(item?.servings)
+      const servingLabel = toShareTextLine(item?.serving_size || '')
+      let line = name
+      if (Number.isFinite(amountRaw) && amountRaw > 0) {
+        line = `${shareRound(amountRaw)}${unit ? ` ${unit}` : ''} ${name}`.trim()
+      } else if (Number.isFinite(servingsRaw) && servingsRaw > 0 && servingLabel) {
+        line = `${shareRound(servingsRaw)} x ${servingLabel} ${name}`.trim()
+      } else if (servingLabel) {
+        line = `${servingLabel} ${name}`.trim()
+      }
+      const dedupeKey = line.toLowerCase()
+      if (seen.has(dedupeKey)) continue
+      seen.add(dedupeKey)
+      lines.push(line)
+      if (lines.length >= 80) break
+    }
+    return lines
+  }
+
+  const buildFavoriteShareText = (state: any) => {
+    if (!isShareableFavoriteMeal(state)) return ''
+    const source = getFavoriteSourceFromState(state)
+    if (!source) return ''
+    const title =
+      toShareTextLine(state?.label || source?.description || source?.label || '') || 'Meal'
+    const totals = state?.totals || getEntryTotals(source) || {}
+    const nutrition =
+      source?.nutrition && typeof source.nutrition === 'object'
+        ? source.nutrition
+        : source?.total && typeof source.total === 'object'
+        ? source.total
+        : null
+    const recipeRaw =
+      nutrition && typeof (nutrition as any).__importRecipe === 'object'
+        ? (nutrition as any).__importRecipe
+        : nutrition && typeof (nutrition as any).__aiRecipe === 'object'
+        ? (nutrition as any).__aiRecipe
+        : null
+    const recipeIngredients = toShareTextLines(recipeRaw?.ingredients, 80)
+    const ingredientLines = recipeIngredients.length > 0 ? recipeIngredients : buildFavoriteShareIngredientLines(state)
+    const steps = toShareTextLines(recipeRaw?.steps, 40)
+    const servings = Number(recipeRaw?.servings)
+    const prepMinutes = Number(recipeRaw?.prepMinutes)
+    const cookMinutes = Number(recipeRaw?.cookMinutes)
+    const sourceUrl = toShareTextLine(recipeRaw?.sourceUrl || '')
+
+    const lines: string[] = []
+    lines.push(title)
+    if (Number.isFinite(servings) && servings > 0) {
+      lines.push(`Servings: ${Math.round(servings)}`)
+    }
+    const timeParts: string[] = []
+    if (Number.isFinite(prepMinutes) && prepMinutes >= 0) timeParts.push(`${Math.round(prepMinutes)} min prep`)
+    if (Number.isFinite(cookMinutes) && cookMinutes >= 0) timeParts.push(`${Math.round(cookMinutes)} min cook`)
+    if (timeParts.length > 0) lines.push(timeParts.join(' • '))
+    lines.push('')
+    lines.push('Nutrition:')
+    lines.push(`Calories: ${Math.round(Number((totals as any)?.calories) || 0)} kcal`)
+    lines.push(`Protein: ${shareRound(Number((totals as any)?.protein) || 0)} g`)
+    lines.push(`Carbs: ${shareRound(Number((totals as any)?.carbs) || 0)} g`)
+    lines.push(`Fat: ${shareRound(Number((totals as any)?.fat) || 0)} g`)
+    lines.push(`Fibre: ${shareRound(Number((totals as any)?.fiber) || 0)} g`)
+    lines.push(`Sugar: ${shareRound(Number((totals as any)?.sugar) || 0)} g`)
+    if (ingredientLines.length > 0) {
+      lines.push('')
+      lines.push('Ingredients:')
+      ingredientLines.forEach((line) => lines.push(`- ${line}`))
+    }
+    if (steps.length > 0) {
+      lines.push('')
+      lines.push('Method:')
+      steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
+    }
+    if (sourceUrl) {
+      lines.push('')
+      lines.push(`Source: ${sourceUrl}`)
+    }
+    return lines.join('\n').trim()
+  }
+
+  const handleShareFavoriteMeal = async (state: any) => {
+    if (!isShareableFavoriteMeal(state)) return
+    const source = getFavoriteSourceFromState(state)
+    const title =
+      toShareTextLine(state?.label || source?.description || source?.label || '') || 'Meal'
+    const text = buildFavoriteShareText(state)
+    if (!text) {
+      showQuickToast('Could not build share text for this meal')
+      return
+    }
+    try {
+      if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
+        await (navigator as any).share({ title, text })
+        showQuickToast('Meal shared')
+        return
+      }
+      if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+        showQuickToast('Meal copied. You can paste it anywhere.')
+        return
+      }
+      showQuickToast('Share is not available on this device')
+    } catch (err: any) {
+      if (String(err?.name || '') === 'AbortError') return
+      showQuickToast('Could not share right now. Please try again.')
+    }
+  }
+
   const openFavoritePortionEditor = (state: any) => {
     if (!state) return
     const item = state?.item || state
@@ -29686,6 +29852,17 @@ Please add nutritional information manually if needed.`);
               >
                 Change portion
               </button>
+              {isShareableFavoriteMeal(favoriteActionModal) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    void handleShareFavoriteMeal(favoriteActionModal)
+                  }}
+                  className="w-full px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100"
+                >
+                  Share meal
+                </button>
+              )}
               <button
                 type="button"
                 onClick={closeFavoritesPicker}
@@ -29726,6 +29903,17 @@ Please add nutritional information manually if needed.`);
           <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
             <div className="w-full max-w-6xl mx-auto">
               <div className="flex flex-col sm:flex-row gap-2 sm:justify-end mb-4">
+                {isShareableFavoriteMeal(favoriteActionModal) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      void handleShareFavoriteMeal(favoriteActionModal)
+                    }}
+                    className="px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100"
+                  >
+                    Share meal
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => openFavoritePortionEditor(favoriteActionModal)}

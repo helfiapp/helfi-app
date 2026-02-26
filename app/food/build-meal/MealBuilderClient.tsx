@@ -2725,17 +2725,32 @@ export default function MealBuilderClient() {
     })
   }, [recipeImportDraft, persistedRecipePanel, mealName, fallbackRecipeIngredients])
 
+  const shareableMealPanel = useMemo(() => {
+    if (activeRecipePanel) return activeRecipePanel
+    if (fallbackRecipeIngredients.length <= 1) return null
+    const servingsRaw = Number(recipeServingsForPortion)
+    return {
+      title: toRecipeTextLine(mealName || 'Meal') || 'Meal',
+      sourceUrl: null,
+      servings: Number.isFinite(servingsRaw) && servingsRaw > 0 ? Math.round(servingsRaw) : null,
+      prepMinutes: null,
+      cookMinutes: null,
+      ingredients: fallbackRecipeIngredients,
+      steps: [],
+    } satisfies RecipePanelData
+  }, [activeRecipePanel, fallbackRecipeIngredients, mealName, recipeServingsForPortion])
+
   const shareRecipeText = useMemo(() => {
-    if (!activeRecipePanel) return ''
+    if (!shareableMealPanel) return ''
     const lines: string[] = []
-    const title = activeRecipePanel.title || mealName || 'Recipe'
+    const title = shareableMealPanel.title || mealName || 'Recipe'
     lines.push(title)
-    if (activeRecipePanel.servings && activeRecipePanel.servings > 0) {
-      lines.push(`Servings: ${activeRecipePanel.servings}`)
+    if (shareableMealPanel.servings && shareableMealPanel.servings > 0) {
+      lines.push(`Servings: ${shareableMealPanel.servings}`)
     }
-    if (activeRecipePanel.prepMinutes !== null || activeRecipePanel.cookMinutes !== null) {
-      const prep = activeRecipePanel.prepMinutes !== null ? `${activeRecipePanel.prepMinutes} min prep` : null
-      const cook = activeRecipePanel.cookMinutes !== null ? `${activeRecipePanel.cookMinutes} min cook` : null
+    if (shareableMealPanel.prepMinutes !== null || shareableMealPanel.cookMinutes !== null) {
+      const prep = shareableMealPanel.prepMinutes !== null ? `${shareableMealPanel.prepMinutes} min prep` : null
+      const cook = shareableMealPanel.cookMinutes !== null ? `${shareableMealPanel.cookMinutes} min cook` : null
       lines.push([prep, cook].filter(Boolean).join(' • '))
     }
     lines.push('')
@@ -2753,37 +2768,37 @@ export default function MealBuilderClient() {
         lines.push(`Portion shown: ${round3(amount)} ${portionUnit}`)
       }
     }
-    if (activeRecipePanel.ingredients.length > 0) {
+    if (shareableMealPanel.ingredients.length > 0) {
       lines.push('')
       lines.push('Ingredients:')
-      activeRecipePanel.ingredients.forEach((item) => lines.push(`- ${item}`))
+      shareableMealPanel.ingredients.forEach((item) => lines.push(`- ${item}`))
     }
-    if (activeRecipePanel.steps.length > 0) {
+    if (shareableMealPanel.steps.length > 0) {
       lines.push('')
       lines.push('Method:')
-      activeRecipePanel.steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
+      shareableMealPanel.steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
     }
-    if (activeRecipePanel.sourceUrl) {
+    if (shareableMealPanel.sourceUrl) {
       lines.push('')
-      lines.push(`Source: ${activeRecipePanel.sourceUrl}`)
+      lines.push(`Source: ${shareableMealPanel.sourceUrl}`)
     }
     return lines.join('\n').trim()
-  }, [activeRecipePanel, mealName, mealTotals, portionControlEnabled, portionAmountInput, portionUnit])
+  }, [shareableMealPanel, mealName, mealTotals, portionControlEnabled, portionAmountInput, portionUnit])
 
   const handleShareRecipe = useCallback(async () => {
-    if (!activeRecipePanel) return
-    const title = activeRecipePanel.title || mealName || 'Recipe'
+    if (!shareableMealPanel) return
+    const title = shareableMealPanel.title || mealName || 'Recipe'
     const text = shareRecipeText
     if (!text) return
     try {
       if (typeof navigator !== 'undefined' && typeof (navigator as any).share === 'function') {
         await (navigator as any).share({ title, text })
-        setShareRecipeFeedback('Recipe shared.')
+        setShareRecipeFeedback('Meal shared.')
         return
       }
       if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(text)
-        setShareRecipeFeedback('Recipe copied. You can paste it anywhere.')
+        setShareRecipeFeedback('Meal copied. You can paste it anywhere.')
         return
       }
       setShareRecipeFeedback('Share is not available on this device.')
@@ -2791,7 +2806,7 @@ export default function MealBuilderClient() {
       if (String(err?.name || '') === 'AbortError') return
       setShareRecipeFeedback('Could not share right now. Please try again.')
     }
-  }, [activeRecipePanel, mealName, shareRecipeText])
+  }, [shareableMealPanel, mealName, shareRecipeText])
 
   useEffect(() => {
     if (portionUnit !== 'serving') return
@@ -6279,19 +6294,9 @@ export default function MealBuilderClient() {
 	                    {activeRecipePanel.sourceUrl ? (
 	                      <div className="text-xs text-gray-500 break-words">Source: {activeRecipePanel.sourceUrl}</div>
 	                    ) : null}
-	                    <div className="flex flex-wrap items-center gap-2 pt-1">
-	                      <button
-	                        type="button"
-	                        onClick={handleShareRecipe}
-	                        className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
-	                      >
-	                        Share recipe
-	                      </button>
-	                      {shareRecipeFeedback ? <span className="text-xs text-gray-600">{shareRecipeFeedback}</span> : null}
-	                    </div>
-	                  </div>
-	                </details>
-	              )}
+                  </div>
+                </details>
+              )}
 
 	              {recipeImportMissing.length > 0 && (
 	                <div className="rounded-2xl border border-amber-200 bg-amber-50 p-4">
@@ -6348,8 +6353,8 @@ export default function MealBuilderClient() {
 
 	        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
 	          <div className="text-sm font-semibold text-gray-900">Meal name (optional)</div>
-	          <input
-	            value={mealName}
+          <input
+            value={mealName}
             onFocus={() => {
               mealNameBackupRef.current = mealName
               mealNameEditedRef.current = false
@@ -6370,6 +6375,18 @@ export default function MealBuilderClient() {
             placeholder={buildDefaultMealName(items)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
+          {shareableMealPanel ? (
+            <div className="flex flex-wrap items-center gap-2 pt-2">
+              <button
+                type="button"
+                onClick={handleShareRecipe}
+                className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
+              >
+                Share meal
+              </button>
+              {shareRecipeFeedback ? <span className="text-xs text-gray-600">{shareRecipeFeedback}</span> : null}
+            </div>
+          ) : null}
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
