@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 19:48 AEDT
+- What changed: Share meal now opens an in-app quick-share row (WhatsApp, X, Telegram, Facebook, Email, SMS, Copy, More) and Share meal buttons are now solid global green with white text.
+- Where to see it (page/link): /food/build-meal and Food Diary favorites meal share popups
+- What to quickly test: Click Share meal and confirm quick-share row appears; test one social channel and Copy; confirm Share meal buttons are solid green with white text.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 18:08 AEDT
 - What changed: Added Share meal button in Add from favorites popup, favorites preview screen, and Build a meal editor; share now includes ingredients, recipe steps (if available), calories, and macros.
 - Where to see it (page/link): Food Diary → Add from favorites flow and /food/build-meal
