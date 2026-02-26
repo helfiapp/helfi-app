@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 10:22 AM AEDT
+- What changed: Updated chatbot support team to 5 rotating agent profiles using your new uploaded photos. Replaced old 3-agent cycle with a full 24-hour roster: each agent now appears for 4 hours 48 minutes.
+- Where to see it (page/link): https://helfi.ai (public chatbot) and https://helfi.ai/support (support portal chatbot)
+- What to quickly test: Open homepage chat and support portal chat and confirm the same active agent name/photo is shown in both places; check again after a shift window and confirm it changes to the next agent.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 09:20 AM AEDT
 - What changed: Removed the practitioner delete-account panel from the create-listing flow. It now appears only after a listing already exists, so new practitioner account creation is clean and not mixed with destructive actions.
 - Where to see it (page/link): https://helfi.ai/practitioner
