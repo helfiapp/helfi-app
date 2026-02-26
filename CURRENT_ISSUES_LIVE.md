@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 10:15 PM AEDT
+- What changed: Added strict hard-lock guard rails for the full Ask AI -> Build Meal flow so unapproved edits now fail build/deploy. Locked Food Diary Ask AI entry, food chat meal parsing and Build this meal handoff, backend structured meal JSON enforcement, Build a Meal recipe import apply + recipe panel, and Share meal strips in Build a Meal/favorites/recommended flows.
+- Where to see it (page/link): /chat?context=food, /food/build-meal, Food Diary favorites share popups, /food/recommended
+- What to quickly test: Ask AI for a recipe and confirm Build this meal still appears and opens builder; confirm recipe panel and Share meal row still show in Build a Meal; confirm favorites share popup still has branded share icons.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 09:14 PM AEDT
 - What changed: Upgraded Share meal with official branded quick-share icons/colors (WhatsApp, X, Telegram, Facebook) and fixed shared meal text so recipe method appears reliably even when step data comes in different formats or is partially missing.
 - Where to see it (page/link): /food/build-meal and Food Diary favorites meal share popups
