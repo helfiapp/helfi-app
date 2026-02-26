@@ -4039,6 +4039,7 @@ export default function FoodDiary() {
     servingLabel: string
     totals: NutritionTotals | null
     mode: 'choose' | 'preview' | 'adjust'
+    shareOptionsOpen?: boolean
     adjustItems?: any[] | null
     adjustSource?: any
     overallTargets?: any
@@ -16187,6 +16188,7 @@ Please add nutritional information manually if needed.`);
       setFavoriteActionModal({
         ...preview,
         mode: 'choose',
+        shareOptionsOpen: false,
       })
     }
     const openBarcodeLabelPrompt = (code: string, data?: any) => {
@@ -17750,6 +17752,73 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const openFavoriteShareHref = (href: string, openNewTab = true) => {
+    if (typeof window === 'undefined' || !href) return
+    if (openNewTab) {
+      const opened = window.open(href, '_blank', 'noopener,noreferrer')
+      if (!opened) window.location.href = href
+      return
+    }
+    window.location.href = href
+  }
+
+  const handleQuickShareFavoriteMeal = async (
+    target: 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
+    state: any,
+  ) => {
+    if (!isShareableFavoriteMeal(state)) return
+    const source = getFavoriteSourceFromState(state)
+    const title = toShareTextLine(state?.label || source?.description || source?.label || '') || 'Meal'
+    const text = buildFavoriteShareText(state)
+    if (!text) {
+      showQuickToast('Could not build share text for this meal')
+      return
+    }
+    const encodedText = encodeURIComponent(text)
+    const appUrl = encodeURIComponent('https://helfi.ai')
+
+    if (target === 'more') {
+      await handleShareFavoriteMeal(state)
+      return
+    }
+    if (target === 'copy') {
+      try {
+        if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+          await navigator.clipboard.writeText(text)
+          showQuickToast('Meal copied. You can paste it anywhere.')
+        } else {
+          showQuickToast('Copy is not available on this device')
+        }
+      } catch {
+        showQuickToast('Could not copy right now. Please try again.')
+      }
+      return
+    }
+    if (target === 'whatsapp') {
+      openFavoriteShareHref(`https://wa.me/?text=${encodedText}`)
+      return
+    }
+    if (target === 'x') {
+      openFavoriteShareHref(`https://twitter.com/intent/tweet?text=${encodedText}`)
+      return
+    }
+    if (target === 'telegram') {
+      openFavoriteShareHref(`https://t.me/share/url?url=${appUrl}&text=${encodedText}`)
+      return
+    }
+    if (target === 'facebook') {
+      openFavoriteShareHref(`https://www.facebook.com/sharer/sharer.php?u=${appUrl}&quote=${encodedText}`)
+      return
+    }
+    if (target === 'email') {
+      openFavoriteShareHref(`mailto:?subject=${encodeURIComponent(title)}&body=${encodedText}`, false)
+      return
+    }
+    if (target === 'sms') {
+      openFavoriteShareHref(`sms:?&body=${encodedText}`, false)
+    }
+  }
+
   const openFavoritePortionEditor = (state: any) => {
     if (!state) return
     const item = state?.item || state
@@ -17935,6 +18004,7 @@ Please add nutritional information manually if needed.`);
         ? {
             ...prev,
             mode: 'adjust',
+            shareOptionsOpen: false,
             adjustSource: prev.adjustSource || prev.item?.favorite || prev.item?.entry || prev.item,
             adjustItems,
             totals: nextTotals || prev.totals,
@@ -29042,6 +29112,7 @@ Please add nutritional information manually if needed.`);
                             setFavoriteActionModal({
                               ...preview,
                               mode: 'choose',
+                              shareOptionsOpen: false,
                             })
                             return
                           }
@@ -29834,7 +29905,7 @@ Please add nutritional information manually if needed.`);
                       sugar: 0,
                     }
                     const overall = computeOverallMacrosAfterAddingFavorite(totals)
-                    return { ...prev, ...overall, mode: 'preview' }
+                    return { ...prev, ...overall, mode: 'preview', shareOptionsOpen: false }
                   })
                 }
                 className="w-full px-4 py-2 rounded-lg border border-gray-300 text-gray-700 text-sm font-semibold hover:bg-gray-50"
@@ -29853,15 +29924,55 @@ Please add nutritional information manually if needed.`);
                 Change portion
               </button>
               {isShareableFavoriteMeal(favoriteActionModal) && (
-                <button
-                  type="button"
-                  onClick={() => {
-                    void handleShareFavoriteMeal(favoriteActionModal)
-                  }}
-                  className="w-full px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100"
-                >
-                  Share meal
-                </button>
+                <>
+                  <button
+                    type="button"
+                    onClick={() =>
+                      setFavoriteActionModal((prev) =>
+                        prev ? { ...prev, shareOptionsOpen: !prev.shareOptionsOpen } : prev,
+                      )
+                    }
+                    className="w-full px-4 py-2 rounded-lg bg-helfi-green text-white text-sm font-semibold hover:bg-emerald-700"
+                  >
+                    Share meal
+                  </button>
+                  {favoriteActionModal.shareOptionsOpen ? (
+                    <div className="w-full flex flex-wrap gap-2">
+                      {[
+                        { key: 'whatsapp', label: 'WhatsApp' },
+                        { key: 'x', label: 'X' },
+                        { key: 'telegram', label: 'Telegram' },
+                        { key: 'facebook', label: 'Facebook' },
+                        { key: 'email', label: 'Email' },
+                        { key: 'sms', label: 'SMS' },
+                        { key: 'copy', label: 'Copy' },
+                        { key: 'more', label: 'More' },
+                      ].map((option) => (
+                        <button
+                          key={option.key}
+                          type="button"
+                          onClick={() =>
+                            void handleQuickShareFavoriteMeal(
+                              option.key as
+                                | 'whatsapp'
+                                | 'x'
+                                | 'telegram'
+                                | 'facebook'
+                                | 'email'
+                                | 'sms'
+                                | 'copy'
+                                | 'more',
+                              favoriteActionModal,
+                            )
+                          }
+                          className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                        >
+                          {option.label}
+                        </button>
+                      ))}
+                    </div>
+                  ) : null}
+                </>
               )}
               <button
                 type="button"
@@ -29881,7 +29992,7 @@ Please add nutritional information manually if needed.`);
             <button
               type="button"
               onClick={() =>
-                setFavoriteActionModal((prev) => (prev ? { ...prev, mode: 'choose' } : prev))
+                setFavoriteActionModal((prev) => (prev ? { ...prev, mode: 'choose', shareOptionsOpen: false } : prev))
               }
               className="text-sm font-semibold text-gray-700 hover:text-gray-900"
             >
@@ -29906,10 +30017,12 @@ Please add nutritional information manually if needed.`);
                 {isShareableFavoriteMeal(favoriteActionModal) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      void handleShareFavoriteMeal(favoriteActionModal)
-                    }}
-                    className="px-4 py-2 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-sm font-semibold hover:bg-emerald-100"
+                    onClick={() =>
+                      setFavoriteActionModal((prev) =>
+                        prev ? { ...prev, shareOptionsOpen: !prev.shareOptionsOpen } : prev,
+                      )
+                    }
+                    className="px-4 py-2 rounded-lg bg-helfi-green text-white text-sm font-semibold hover:bg-emerald-700"
                   >
                     Share meal
                   </button>
@@ -29933,6 +30046,42 @@ Please add nutritional information manually if needed.`);
                   Add
                 </button>
               </div>
+              {isShareableFavoriteMeal(favoriteActionModal) && favoriteActionModal.shareOptionsOpen ? (
+                <div className="flex flex-wrap gap-2 mb-4 sm:justify-end">
+                  {[
+                    { key: 'whatsapp', label: 'WhatsApp' },
+                    { key: 'x', label: 'X' },
+                    { key: 'telegram', label: 'Telegram' },
+                    { key: 'facebook', label: 'Facebook' },
+                    { key: 'email', label: 'Email' },
+                    { key: 'sms', label: 'SMS' },
+                    { key: 'copy', label: 'Copy' },
+                    { key: 'more', label: 'More' },
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() =>
+                        void handleQuickShareFavoriteMeal(
+                          option.key as
+                            | 'whatsapp'
+                            | 'x'
+                            | 'telegram'
+                            | 'facebook'
+                            | 'email'
+                            | 'sms'
+                            | 'copy'
+                            | 'more',
+                          favoriteActionModal,
+                        )
+                      }
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
 
               <div className="text-lg font-semibold text-gray-900">{favoriteActionModal.label}</div>
               <div className="text-xs text-gray-500 mt-1">This is a preview. It does not add the meal yet.</div>
@@ -30011,6 +30160,7 @@ Please add nutritional information manually if needed.`);
                   return {
                     ...prev,
                     mode: 'preview',
+                    shareOptionsOpen: false,
                     adjustItems: nextItems,
                     totals: nextTotals || prev.totals,
                     ...overall,

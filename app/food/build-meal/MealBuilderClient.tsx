@@ -1938,6 +1938,7 @@ export default function MealBuilderClient() {
   const [saveImportedRecipeToFavorites, setSaveImportedRecipeToFavorites] = useState(false)
   const [persistedRecipePanel, setPersistedRecipePanel] = useState<RecipePanelData | null>(null)
   const [shareRecipeFeedback, setShareRecipeFeedback] = useState<string | null>(null)
+  const [showShareRecipeOptions, setShowShareRecipeOptions] = useState(false)
   const recipeImportAppliedRef = useRef(false)
   const recipeImportPortionPrefilledRef = useRef(false)
   const editCollapseAppliedScopeRef = useRef<string | null>(null)
@@ -2785,6 +2786,16 @@ export default function MealBuilderClient() {
     return lines.join('\n').trim()
   }, [shareableMealPanel, mealName, mealTotals, portionControlEnabled, portionAmountInput, portionUnit])
 
+  const openShareHref = useCallback((href: string, openNewTab = true) => {
+    if (typeof window === 'undefined' || !href) return
+    if (openNewTab) {
+      const opened = window.open(href, '_blank', 'noopener,noreferrer')
+      if (!opened) window.location.href = href
+      return
+    }
+    window.location.href = href
+  }, [])
+
   const handleShareRecipe = useCallback(async () => {
     if (!shareableMealPanel) return
     const title = shareableMealPanel.title || mealName || 'Recipe'
@@ -2807,6 +2818,63 @@ export default function MealBuilderClient() {
       setShareRecipeFeedback('Could not share right now. Please try again.')
     }
   }, [shareableMealPanel, mealName, shareRecipeText])
+
+  const handleQuickShareRecipe = useCallback(
+    async (target: 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more') => {
+      const text = shareRecipeText
+      const title = shareableMealPanel?.title || mealName || 'Meal'
+      if (!text) return
+      const encodedText = encodeURIComponent(text)
+      const appUrl = encodeURIComponent('https://helfi.ai')
+
+      if (target === 'more') {
+        await handleShareRecipe()
+        return
+      }
+      if (target === 'copy') {
+        try {
+          if (typeof navigator !== 'undefined' && navigator.clipboard?.writeText) {
+            await navigator.clipboard.writeText(text)
+            setShareRecipeFeedback('Meal copied. You can paste it anywhere.')
+          } else {
+            setShareRecipeFeedback('Copy is not available on this device.')
+          }
+        } catch {
+          setShareRecipeFeedback('Could not copy right now. Please try again.')
+        }
+        return
+      }
+      if (target === 'whatsapp') {
+        openShareHref(`https://wa.me/?text=${encodedText}`)
+        return
+      }
+      if (target === 'x') {
+        openShareHref(`https://twitter.com/intent/tweet?text=${encodedText}`)
+        return
+      }
+      if (target === 'telegram') {
+        openShareHref(`https://t.me/share/url?url=${appUrl}&text=${encodedText}`)
+        return
+      }
+      if (target === 'facebook') {
+        openShareHref(`https://www.facebook.com/sharer/sharer.php?u=${appUrl}&quote=${encodedText}`)
+        return
+      }
+      if (target === 'email') {
+        openShareHref(`mailto:?subject=${encodeURIComponent(title)}&body=${encodedText}`, false)
+        return
+      }
+      if (target === 'sms') {
+        openShareHref(`sms:?&body=${encodedText}`, false)
+      }
+    },
+    [shareRecipeText, shareableMealPanel, mealName, openShareHref, handleShareRecipe],
+  )
+
+  useEffect(() => {
+    if (shareableMealPanel) return
+    setShowShareRecipeOptions(false)
+  }, [shareableMealPanel])
 
   useEffect(() => {
     if (portionUnit !== 'serving') return
@@ -6379,12 +6447,39 @@ export default function MealBuilderClient() {
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
                 type="button"
-                onClick={handleShareRecipe}
-                className="px-3 py-1.5 rounded-lg border border-emerald-200 bg-emerald-50 text-emerald-700 text-xs font-semibold hover:bg-emerald-100"
+                onClick={() => setShowShareRecipeOptions((prev) => !prev)}
+                className="px-3 py-1.5 rounded-lg bg-helfi-green text-white text-xs font-semibold hover:bg-emerald-700"
               >
                 Share meal
               </button>
               {shareRecipeFeedback ? <span className="text-xs text-gray-600">{shareRecipeFeedback}</span> : null}
+              {showShareRecipeOptions ? (
+                <div className="w-full flex flex-wrap gap-2 pt-1">
+                  {[
+                    { key: 'whatsapp', label: 'WhatsApp' },
+                    { key: 'x', label: 'X' },
+                    { key: 'telegram', label: 'Telegram' },
+                    { key: 'facebook', label: 'Facebook' },
+                    { key: 'email', label: 'Email' },
+                    { key: 'sms', label: 'SMS' },
+                    { key: 'copy', label: 'Copy' },
+                    { key: 'more', label: 'More' },
+                  ].map((option) => (
+                    <button
+                      key={option.key}
+                      type="button"
+                      onClick={() =>
+                        void handleQuickShareRecipe(
+                          option.key as 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
+                        )
+                      }
+                      className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                    >
+                      {option.label}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
             </div>
           ) : null}
         </div>
