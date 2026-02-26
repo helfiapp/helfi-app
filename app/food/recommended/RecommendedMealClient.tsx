@@ -787,6 +787,7 @@ export default function RecommendedMealClient() {
     }
   }
 
+  // PROTECTED: RECOMMENDED_MEAL_BUILD_HANDOFF START
   const openInMealBuilder = () => {
     if (!active) return
     const draft = buildRecipeImportDraftFromRecommendation(active, currentItems, categoryLabel)
@@ -810,6 +811,7 @@ export default function RecommendedMealClient() {
     qs.set('t', String(Date.now()))
     router.push(`/food/build-meal?${qs.toString()}`)
   }
+  // PROTECTED: RECOMMENDED_MEAL_BUILD_HANDOFF END
 
   const pageTitle = `AI Recommended ${categoryLabel}`
 
@@ -823,6 +825,7 @@ export default function RecommendedMealClient() {
     return parts.length > 0 ? parts.join(' • ') : null
   }, [active?.recipe])
 
+  // PROTECTED: RECOMMENDED_MEAL_BUILD_BUTTON_ROW START
   const ActionButtons = ({ className }: { className?: string }) => (
     <div className={`space-y-2 w-full ${className || ''}`}>
       <button
@@ -853,6 +856,7 @@ export default function RecommendedMealClient() {
       </div>
     </div>
   )
+  // PROTECTED: RECOMMENDED_MEAL_BUILD_BUTTON_ROW END
 
   return (
     <div className="min-h-screen bg-white overflow-x-hidden">

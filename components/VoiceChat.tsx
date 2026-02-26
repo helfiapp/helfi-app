@@ -602,6 +602,7 @@ const parseLooseStructuredFoodOptions = (raw: string): ParsedFoodOption[] => {
   }
   return options
 }
+// PROTECTED: FOOD_CHAT_PARSE_AND_FALLBACK START
 const parseFoodAssistantResponse = (
   content: string,
 ): { displayContent: string; options: ParsedFoodOption[] } => {
@@ -710,6 +711,7 @@ const parseFoodAssistantResponse = (
 
   return { displayContent, options: [] }
 }
+// PROTECTED: FOOD_CHAT_PARSE_AND_FALLBACK END
 
 export default function VoiceChat({
   context,
@@ -2203,6 +2205,7 @@ export default function VoiceChat({
     sendChatMessageRef.current = sendChatMessage
   }, [sendChatMessage])
 
+  // PROTECTED: FOOD_CHAT_BUILD_MEAL_HANDOFF START
   const openFoodOptionInMealBuilder = (option: ParsedFoodOption) => {
     const title = String(option?.title || '').trim()
     const ingredients = Array.isArray(option?.ingredients)
@@ -2246,6 +2249,7 @@ export default function VoiceChat({
     qs.set('t', String(Date.now()))
     router.push(`/food/build-meal?${qs.toString()}`)
   }
+  // PROTECTED: FOOD_CHAT_BUILD_MEAL_HANDOFF END
 
   const renderFormattedContent = (content: string, enableMacroColors = false) => {
     const formatted = formatChatContent(content)
@@ -2862,6 +2866,7 @@ export default function VoiceChat({
                 </div>
               )}
 
+              {/* PROTECTED: FOOD_CHAT_ASSISTANT_OPTION_RENDER START */}
               {messages.map((m, idx) => {
                 const isLast = idx === messages.length - 1
                 const assistantRef = m.role === 'assistant' && isLast ? latestAssistantRef : undefined
@@ -2934,6 +2939,7 @@ export default function VoiceChat({
                   </div>
                 </div>
               )})}
+              {/* PROTECTED: FOOD_CHAT_ASSISTANT_OPTION_RENDER END */}
 
               {loading && (
                 <div className="group flex gap-4">

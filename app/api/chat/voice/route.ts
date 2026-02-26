@@ -435,6 +435,7 @@ function buildSystemPrompt(
   return parts.join('\n')
 }
 
+// PROTECTED: FOOD_CHAT_RECIPE_INTENT_AND_PROMPT START
 const isRecipeCreationRequest = (question: string) => {
   const q = String(question || '').toLowerCase()
   if (!q) return false
@@ -596,6 +597,7 @@ function buildFoodSystemPrompt(foodDiarySnapshot: FoodDiarySnapshot | null, ques
       : 'Near/over cap: none',
   ].join('\n')
 }
+// PROTECTED: FOOD_CHAT_RECIPE_INTENT_AND_PROMPT END
 
 const MAX_HISTORY_MESSAGES = 16
 const MAX_MESSAGE_CHARS = 2000
@@ -1085,6 +1087,7 @@ const buildStructuredFoodOptions = async (params: {
   return { options: normalized, costCents: totalCostCents }
 }
 
+// PROTECTED: FOOD_CHAT_STRUCTURED_MEAL_PAYLOAD_ENFORCER START
 const ensureFoodMealOptionsPayload = async (params: {
   openai: OpenAI
   assistantMessage: string
@@ -1152,6 +1155,7 @@ const ensureFoodMealOptionsPayload = async (params: {
     extraCostCents: structured.costCents,
   }
 }
+// PROTECTED: FOOD_CHAT_STRUCTURED_MEAL_PAYLOAD_ENFORCER END
 
 export async function GET(req: NextRequest) {
   try {
@@ -1422,6 +1426,7 @@ export async function POST(req: NextRequest) {
         await markThreadCharged(threadId)
       }
 
+      // PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_STREAM START
       if (isFoodChat && assistantMessage) {
         try {
           const ensured = await ensureFoodMealOptionsPayload({
@@ -1437,6 +1442,7 @@ export async function POST(req: NextRequest) {
           console.warn('[voice-chat] food option payload enrichment failed', foodOptionError)
         }
       }
+      // PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_STREAM END
 
       const apiCostCents = (wrapped.costCents + structuredExtraCostCents) * 2
 
@@ -1528,6 +1534,7 @@ export async function POST(req: NextRequest) {
         assistantMessage = 'I apologize, but I could not generate a response.'
       }
       let structuredExtraCostCents = 0
+      // PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_NON_STREAM START
       if (isFoodChat && assistantMessage) {
         try {
           const ensured = await ensureFoodMealOptionsPayload({
@@ -1543,6 +1550,7 @@ export async function POST(req: NextRequest) {
           console.warn('[voice-chat] food option payload enrichment failed', foodOptionError)
         }
       }
+      // PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_NON_STREAM END
 
       // Log AI usage for cost tracking (voice chat, non-streaming)
       try {

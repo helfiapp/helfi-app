@@ -33,6 +33,7 @@ Use this as the fast “no-touch without approval” checklist for Food Diary.
 - `7.6.2` Favorites “Change Portion” One-Off Lock (Strict Lock)
 - `7.6.3` Water Favorites Drink Sweetener Carry-Through (Strict Lock)
 - `7.6.4` Water/Favorites Add Must Not Wipe Existing Meal Rows (Strict Lock)
+- `7.7` Ask AI -> Build Meal End-to-End Lock (Strict Lock)
 
 If any of the above is touched, agent must read that full section first.
 
@@ -2112,6 +2113,42 @@ If changes are requested, explain them to the user first, get explicit approval,
 3. Confirm `parseFoodAssistantResponse(...)` returns structured options (fallback parsing only if JSON missing).
 4. Confirm clicking button writes `sessionStorage['food:recipeImportDraft']`.
 5. Confirm route push includes `/food/build-meal?...&recipeImport=1`.
+
+### 7.7 Ask AI -> Build Meal End-to-End Lock (Feb 2026 - Strict Lock)
+
+This full flow is now hard-locked with build-time checks.
+
+Scope that is locked:
+- Ask AI entry link in Food Diary
+- Food chat recipe detection + JSON wrapper format
+- Food chat fallback parsing for single-recipe replies
+- Food chat `Build this meal` button rendering + click handoff
+- Recipe import draft apply logic in Build a Meal (including serving inference)
+- Imported recipe panel shown at the top of Build a Meal
+- Share meal text + branded social/mobile share row in Build a Meal
+- Favorite meal share helpers + chooser/preview share strips
+- Recommended meals `Build this meal` handoff/button row
+
+Protected files:
+- `components/VoiceChat.tsx`
+- `app/api/chat/voice/route.ts`
+- `app/food/build-meal/MealBuilderClient.tsx`
+- `app/food/page.tsx`
+- `app/food/recommended/RecommendedMealClient.tsx`
+- `scripts/protect-regions.js`
+
+Hard rule:
+- Any unapproved change in these protected regions will fail build/deploy.
+
+If a change is truly required:
+1. Get explicit written approval from the owner first.
+2. Use the matching `ALLOW_*` override env var for that specific guard.
+3. Update the expected hash in `scripts/protect-regions.js`.
+4. Re-test full flow end-to-end before deploy.
+
+Last stable deployment reference:
+- Commit: `5a91ed30`
+- Date: `2026-02-26`
 
 ---
 

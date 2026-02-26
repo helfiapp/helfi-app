@@ -17739,6 +17739,7 @@ Please add nutritional information manually if needed.`);
     return lines
   }
 
+  // PROTECTED: FOOD_PAGE_FAVORITE_SHARE_HELPERS START
   const buildFavoriteShareText = (state: any) => {
     if (!isShareableFavoriteMeal(state)) return ''
     const source = getFavoriteSourceFromState(state)
@@ -17963,6 +17964,8 @@ Please add nutritional information manually if needed.`);
       </svg>
     )
   }
+
+  // PROTECTED: FOOD_PAGE_FAVORITE_SHARE_HELPERS END
 
   const openFavoritePortionEditor = (state: any) => {
     if (!state) return
@@ -27462,12 +27465,14 @@ Please add nutritional information manually if needed.`);
                       kJ
                     </button>
                   </div>
+                  {/* PROTECTED: FOOD_PAGE_ASK_AI_ENTRY_LINK START */}
                   <Link
                     href={`/chat?context=food&date=${encodeURIComponent(selectedDate)}`}
                     className="inline-flex items-center rounded-lg bg-emerald-600 px-3 py-2 text-xs font-semibold text-white shadow-sm hover:bg-emerald-700"
                   >
                     Ask AI
                   </Link>
+                  {/* PROTECTED: FOOD_PAGE_ASK_AI_ENTRY_LINK END */}
                 </div>
               </div>
 
@@ -30081,6 +30086,7 @@ Please add nutritional information manually if needed.`);
               >
                 Change portion
               </button>
+              {/* PROTECTED: FOOD_PAGE_FAVORITE_SHARE_CHOOSER_MODAL START */}
               {isShareableFavoriteMeal(favoriteActionModal) && (
                 <>
                   <button
@@ -30157,6 +30163,7 @@ Please add nutritional information manually if needed.`);
                   ) : null}
                 </>
               )}
+              {/* PROTECTED: FOOD_PAGE_FAVORITE_SHARE_CHOOSER_MODAL END */}
               <button
                 type="button"
                 onClick={closeFavoritesPicker}
@@ -30197,6 +30204,7 @@ Please add nutritional information manually if needed.`);
           <div className="flex-1 overflow-y-auto px-4 md:px-6 py-5">
             <div className="w-full max-w-6xl mx-auto">
               <div className="flex flex-col sm:flex-row gap-2 sm:justify-end mb-4">
+                {/* PROTECTED: FOOD_PAGE_FAVORITE_SHARE_PREVIEW_MODAL START */}
                 {isShareableFavoriteMeal(favoriteActionModal) && (
                   <button
                     type="button"
@@ -30210,6 +30218,7 @@ Please add nutritional information manually if needed.`);
                     Share meal
                   </button>
                 )}
+                {/* PROTECTED: FOOD_PAGE_FAVORITE_SHARE_PREVIEW_MODAL END */}
                 <button
                   type="button"
                   onClick={() => openFavoritePortionEditor(favoriteActionModal)}

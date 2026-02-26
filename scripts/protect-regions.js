@@ -303,6 +303,142 @@ function main() {
     allowEnvVar: 'ALLOW_INSIGHTS_REPORT_ACTION_ROW_EDIT',
     description: 'Insights report action row UI',
   });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'components', 'VoiceChat.tsx'),
+    startMarker: 'PROTECTED: FOOD_CHAT_PARSE_AND_FALLBACK START',
+    endMarker: 'PROTECTED: FOOD_CHAT_PARSE_AND_FALLBACK END',
+    expectedHash: 'f98ed8250eb65740b0ff83f5d0af227a8e25ccf78da50914c4a80e58f3292166',
+    allowEnvVar: 'ALLOW_FOOD_CHAT_PARSE_EDIT',
+    description: 'Food chat parsing + fallback conversion to Build this meal options',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'components', 'VoiceChat.tsx'),
+    startMarker: 'PROTECTED: FOOD_CHAT_BUILD_MEAL_HANDOFF START',
+    endMarker: 'PROTECTED: FOOD_CHAT_BUILD_MEAL_HANDOFF END',
+    expectedHash: '0965a5db6e8adbaeb015c710ac97d72fcb54bb6cc1480feb8362f1a5df062d97',
+    allowEnvVar: 'ALLOW_FOOD_CHAT_BUILD_HANDOFF_EDIT',
+    description: 'Food chat Build this meal button handoff to recipeImport draft',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'components', 'VoiceChat.tsx'),
+    startMarker: 'PROTECTED: FOOD_CHAT_ASSISTANT_OPTION_RENDER START',
+    endMarker: 'PROTECTED: FOOD_CHAT_ASSISTANT_OPTION_RENDER END',
+    expectedHash: '4f7e7b19b3425793fd933e091df82ea2c0cb392a961da17113e27b1219aa535b',
+    allowEnvVar: 'ALLOW_FOOD_CHAT_OPTION_RENDER_EDIT',
+    description: 'Food chat assistant option cards + Build this meal buttons rendering',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'chat', 'voice', 'route.ts'),
+    startMarker: 'PROTECTED: FOOD_CHAT_RECIPE_INTENT_AND_PROMPT START',
+    endMarker: 'PROTECTED: FOOD_CHAT_RECIPE_INTENT_AND_PROMPT END',
+    expectedHash: '93fd4f39384c730b4d15a2f4d8bd3721de6b056eb85bbcd0bb0a61b5db9cf9a2',
+    allowEnvVar: 'ALLOW_FOOD_CHAT_PROMPT_RULES_EDIT',
+    description: 'Food chat recipe-intent detection + recipe JSON wrapper prompt rules',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'chat', 'voice', 'route.ts'),
+    startMarker: 'PROTECTED: FOOD_CHAT_STRUCTURED_MEAL_PAYLOAD_ENFORCER START',
+    endMarker: 'PROTECTED: FOOD_CHAT_STRUCTURED_MEAL_PAYLOAD_ENFORCER END',
+    expectedHash: '14ed2841ad974a7d3b90d1babe1e2343efec49ad6614ff3330db25d35b611e17',
+    allowEnvVar: 'ALLOW_FOOD_CHAT_PAYLOAD_ENFORCER_EDIT',
+    description: 'Food chat structured meal payload enforcer',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'chat', 'voice', 'route.ts'),
+    startMarker: 'PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_STREAM START',
+    endMarker: 'PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_STREAM END',
+    expectedHash: 'a5947dc68e2243bd92cee7e7e8f2434814b2faa60ff3bc21b33cbe2a0f6dd09c',
+    allowEnvVar: 'ALLOW_FOOD_CHAT_PAYLOAD_ENRICH_STREAM_EDIT',
+    description: 'Food chat stream-path payload enrichment call',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'chat', 'voice', 'route.ts'),
+    startMarker: 'PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_NON_STREAM START',
+    endMarker: 'PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_NON_STREAM END',
+    expectedHash: 'a5947dc68e2243bd92cee7e7e8f2434814b2faa60ff3bc21b33cbe2a0f6dd09c',
+    allowEnvVar: 'ALLOW_FOOD_CHAT_PAYLOAD_ENRICH_NON_STREAM_EDIT',
+    description: 'Food chat non-stream payload enrichment call',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
+    startMarker: 'PROTECTED: MEAL_BUILDER_SHARE_PAYLOAD_AND_CHANNELS START',
+    endMarker: 'PROTECTED: MEAL_BUILDER_SHARE_PAYLOAD_AND_CHANNELS END',
+    expectedHash: '69db01c088c74722bec03e11d7b050b78a65f129a7cb65642164f0fdaaf9e674',
+    allowEnvVar: 'ALLOW_MEAL_BUILDER_SHARE_FLOW_EDIT',
+    description: 'Meal builder share payload + quick-share channel handlers',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
+    startMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY START',
+    endMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY END',
+    expectedHash: 'ef787b3947e92bba2bbd1e884b73d8b0b99bd33ded3384cde6f3b53a4c24e4fa',
+    allowEnvVar: 'ALLOW_MEAL_BUILDER_RECIPE_IMPORT_APPLY_EDIT',
+    description: 'Meal builder recipe-import draft apply + serving inference flow',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
+    startMarker: 'PROTECTED: MEAL_BUILDER_IMPORTED_RECIPE_PANEL START',
+    endMarker: 'PROTECTED: MEAL_BUILDER_IMPORTED_RECIPE_PANEL END',
+    expectedHash: '13f8df5efba005cf2bbc3c1a008427e2f4d0192c409700bae8717ecfd3c1a2d8',
+    allowEnvVar: 'ALLOW_MEAL_BUILDER_IMPORTED_RECIPE_PANEL_EDIT',
+    description: 'Meal builder imported recipe expander panel',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
+    startMarker: 'PROTECTED: MEAL_BUILDER_SHARE_BUTTON_ROW START',
+    endMarker: 'PROTECTED: MEAL_BUILDER_SHARE_BUTTON_ROW END',
+    expectedHash: 'ce3d878384e25019246d838a86f48eb6c9201d1cb6af3cc9230ad4199b551d12',
+    allowEnvVar: 'ALLOW_MEAL_BUILDER_SHARE_BUTTON_ROW_EDIT',
+    description: 'Meal builder Share meal button + branded icon strip',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: FOOD_PAGE_ASK_AI_ENTRY_LINK START',
+    endMarker: 'PROTECTED: FOOD_PAGE_ASK_AI_ENTRY_LINK END',
+    expectedHash: '08adfd06aef902fc15db8f167acc7b40459e396bb527161384377216f00ae888',
+    allowEnvVar: 'ALLOW_FOOD_PAGE_ASK_AI_ENTRY_EDIT',
+    description: 'Food Diary Ask AI entry link',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: FOOD_PAGE_FAVORITE_SHARE_HELPERS START',
+    endMarker: 'PROTECTED: FOOD_PAGE_FAVORITE_SHARE_HELPERS END',
+    expectedHash: 'e55709ceb095672f8098b86429ab5c85fd4bc291d0904af69cec2ce3a67ca7a7',
+    allowEnvVar: 'ALLOW_FOOD_PAGE_FAVORITE_SHARE_HELPERS_EDIT',
+    description: 'Food Diary favorite share-text + channel handlers',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: FOOD_PAGE_FAVORITE_SHARE_CHOOSER_MODAL START',
+    endMarker: 'PROTECTED: FOOD_PAGE_FAVORITE_SHARE_CHOOSER_MODAL END',
+    expectedHash: '10ad7b520be2d002d78563a5e58bfb05dfd18af78f5edfb5ec560ac76689849b',
+    allowEnvVar: 'ALLOW_FOOD_PAGE_FAVORITE_SHARE_CHOOSER_EDIT',
+    description: 'Food Diary favorites chooser modal share controls',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: FOOD_PAGE_FAVORITE_SHARE_PREVIEW_MODAL START',
+    endMarker: 'PROTECTED: FOOD_PAGE_FAVORITE_SHARE_PREVIEW_MODAL END',
+    expectedHash: 'd945412300577516369ea0670a512aa961e4a5b1c5679ed27cb70712f8bda59a',
+    allowEnvVar: 'ALLOW_FOOD_PAGE_FAVORITE_SHARE_PREVIEW_EDIT',
+    description: 'Food Diary favorites preview modal share controls',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'recommended', 'RecommendedMealClient.tsx'),
+    startMarker: 'PROTECTED: RECOMMENDED_MEAL_BUILD_HANDOFF START',
+    endMarker: 'PROTECTED: RECOMMENDED_MEAL_BUILD_HANDOFF END',
+    expectedHash: 'c096f4bb9961a788239828b8ef11bf6f1a0183b25b2e0e40890e5b9f25c657ff',
+    allowEnvVar: 'ALLOW_RECOMMENDED_MEAL_HANDOFF_EDIT',
+    description: 'Recommended meal Build this meal handoff',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'recommended', 'RecommendedMealClient.tsx'),
+    startMarker: 'PROTECTED: RECOMMENDED_MEAL_BUILD_BUTTON_ROW START',
+    endMarker: 'PROTECTED: RECOMMENDED_MEAL_BUILD_BUTTON_ROW END',
+    expectedHash: '6415d69be130bdc45205d017c51328c7c6569cf8460ac63757980dc595630e83',
+    allowEnvVar: 'ALLOW_RECOMMENDED_MEAL_BUTTON_ROW_EDIT',
+    description: 'Recommended meal action buttons row',
+  });
   console.log('✅ Guard Rails: Protected regions verified.');
 }
 

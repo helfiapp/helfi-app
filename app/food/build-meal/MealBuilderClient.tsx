@@ -2766,6 +2766,7 @@ export default function MealBuilderClient() {
     })
   }, [recipeImportDraft, persistedRecipePanel, mealName, fallbackRecipeIngredients])
 
+  // PROTECTED: MEAL_BUILDER_SHARE_PAYLOAD_AND_CHANNELS START
   const shareableMealPanel = useMemo(() => {
     if (activeRecipePanel) return activeRecipePanel
     if (fallbackRecipeIngredients.length <= 1) return null
@@ -2979,6 +2980,8 @@ export default function MealBuilderClient() {
       </svg>
     )
   }
+
+  // PROTECTED: MEAL_BUILDER_SHARE_PAYLOAD_AND_CHANNELS END
 
   useEffect(() => {
     if (shareableMealPanel) return
@@ -3360,6 +3363,7 @@ export default function MealBuilderClient() {
     }
   }
 
+  // PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY START
   useEffect(() => {
     if (!recipeImportFlag) return
     if (recipeImportAppliedRef.current) return
@@ -3809,6 +3813,7 @@ export default function MealBuilderClient() {
     run()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [recipeImportFlag])
+  // PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY END
 
   const fetchBrandSuggestions = async (searchQuery: string) => {
     const prefix = getBrandMatchTokens(searchQuery)[0] || ''
@@ -6410,7 +6415,8 @@ export default function MealBuilderClient() {
             </div>
           )}
 
-	          {(recipeImportLoading || recipeImportMissing.length > 0 || activeRecipePanel) && (
+		          {/* PROTECTED: MEAL_BUILDER_IMPORTED_RECIPE_PANEL START */}
+		          {(recipeImportLoading || recipeImportMissing.length > 0 || activeRecipePanel) && (
 	            <div className="space-y-3">
 	              {recipeImportLoading && (
 	                <div className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
@@ -6425,7 +6431,7 @@ export default function MealBuilderClient() {
 	                    This can take a little while. Please stay on this page until it finishes.
 	                  </div>
 	                </div>
-	              )}
+		          )}
 
 	              {activeRecipePanel && (
 	                <details className="rounded-2xl border border-gray-200 bg-white p-4">
@@ -6496,6 +6502,7 @@ export default function MealBuilderClient() {
 	              )}
 	            </div>
 	          )}
+	          {/* PROTECTED: MEAL_BUILDER_IMPORTED_RECIPE_PANEL END */}
 
           {recipeImportLoading && recipeImportProgress.total > 0 && (
             <div className="fixed bottom-5 right-5 z-[70] w-[min(92vw,360px)] rounded-2xl border border-emerald-200 bg-white shadow-xl p-4">
@@ -6557,6 +6564,7 @@ export default function MealBuilderClient() {
             placeholder={buildDefaultMealName(items)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
+          {/* PROTECTED: MEAL_BUILDER_SHARE_BUTTON_ROW START */}
           {shareableMealPanel ? (
             <div className="flex flex-wrap items-center gap-2 pt-2">
               <button
@@ -6603,6 +6611,7 @@ export default function MealBuilderClient() {
               ) : null}
             </div>
           ) : null}
+          {/* PROTECTED: MEAL_BUILDER_SHARE_BUTTON_ROW END */}
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
