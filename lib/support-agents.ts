@@ -7,16 +7,21 @@ type SupportAgent = {
 const SUPPORT_AGENT_ROLE = 'Helfi Support'
 
 const SUPPORT_AGENTS: SupportAgent[] = [
-  { name: 'Zoe', role: SUPPORT_AGENT_ROLE, avatar: '/support/zoe.jpg' },
-  { name: 'Nora', role: SUPPORT_AGENT_ROLE, avatar: '/support/nora.jpg' },
-  { name: 'Aria', role: SUPPORT_AGENT_ROLE, avatar: '/support/aria.jpg' },
+  { name: 'Amelia Brooks', role: SUPPORT_AGENT_ROLE, avatar: '/support/amelia-brooks.jpg' },
+  { name: 'Luca Bennett', role: SUPPORT_AGENT_ROLE, avatar: '/support/luca-bennett.jpg' },
+  { name: 'Priya Shah', role: SUPPORT_AGENT_ROLE, avatar: '/support/priya-shah.jpg' },
+  { name: 'Mateo Reed', role: SUPPORT_AGENT_ROLE, avatar: '/support/mateo-reed.jpg' },
+  { name: 'Chloe Nguyen', role: SUPPORT_AGENT_ROLE, avatar: '/support/chloe-nguyen.jpg' },
 ]
 
-const SHIFT_DURATION_MS = 8 * 60 * 60 * 1000
+const MINUTES_PER_DAY = 24 * 60
+const SHIFT_DURATION_MINUTES = MINUTES_PER_DAY / SUPPORT_AGENTS.length
 
 function shiftIndexForTimestamp(timestamp: number) {
   if (!Number.isFinite(timestamp)) return 0
-  return Math.floor(timestamp / SHIFT_DURATION_MS) % SUPPORT_AGENTS.length
+  const date = new Date(timestamp)
+  const minutesSinceUtcMidnight = date.getUTCHours() * 60 + date.getUTCMinutes()
+  return Math.floor(minutesSinceUtcMidnight / SHIFT_DURATION_MINUTES) % SUPPORT_AGENTS.length
 }
 
 export function getSupportAgentForTimestamp(date: Date): SupportAgent {
