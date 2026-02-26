@@ -17252,6 +17252,70 @@ Please add nutritional information manually if needed.`);
       source.items && Array.isArray(source.items) && source.items.length > 0
         ? JSON.parse(JSON.stringify(source.items))
         : null
+    const sourceNutritionTotals = stripWaterLogIdFromTotals(source.nutrition || source.total || null)
+    const sourceTotalTotals = stripWaterLogIdFromTotals(source.total || source.nutrition || null)
+    const sourceTotals = sourceNutritionTotals || sourceTotalTotals || null
+    const recipeMetaRaw =
+      source?.recipe && typeof source.recipe === 'object'
+        ? source.recipe
+        : sourceTotals && typeof (sourceTotals as any).__importRecipe === 'object'
+        ? (sourceTotals as any).__importRecipe
+        : sourceTotals && typeof (sourceTotals as any).__aiRecipe === 'object'
+        ? (sourceTotals as any).__aiRecipe
+        : null
+    const recipeIngredients = (() => {
+      const rawIngredients =
+        Array.isArray((recipeMetaRaw as any)?.ingredients)
+          ? (recipeMetaRaw as any).ingredients
+          : Array.isArray((recipeMetaRaw as any)?.items)
+          ? (recipeMetaRaw as any).items
+          : []
+      return rawIngredients.map((entry: any) => String(entry || '').trim()).filter(Boolean)
+    })()
+    const recipeSteps = (() => {
+      const rawSteps =
+        Array.isArray((recipeMetaRaw as any)?.steps)
+          ? (recipeMetaRaw as any).steps
+          : Array.isArray((recipeMetaRaw as any)?.method)
+          ? (recipeMetaRaw as any).method
+          : Array.isArray((recipeMetaRaw as any)?.instructions)
+          ? (recipeMetaRaw as any).instructions
+          : Array.isArray((recipeMetaRaw as any)?.directions)
+          ? (recipeMetaRaw as any).directions
+          : typeof (recipeMetaRaw as any)?.steps === 'string'
+          ? String((recipeMetaRaw as any).steps).split('\n')
+          : typeof (recipeMetaRaw as any)?.method === 'string'
+          ? String((recipeMetaRaw as any).method).split('\n')
+          : typeof (recipeMetaRaw as any)?.instructions === 'string'
+          ? String((recipeMetaRaw as any).instructions).split('\n')
+          : typeof (recipeMetaRaw as any)?.directions === 'string'
+          ? String((recipeMetaRaw as any).directions).split('\n')
+          : []
+      return rawSteps.map((entry: any) => String(entry || '').trim()).filter(Boolean)
+    })()
+    const recipeMeta =
+      recipeMetaRaw && typeof recipeMetaRaw === 'object'
+        ? {
+            title:
+              normalizeMealLabel(String((recipeMetaRaw as any).title || cleanLabel || 'Recipe')) ||
+              'Recipe',
+            sourceUrl:
+              typeof (recipeMetaRaw as any).sourceUrl === 'string'
+                ? String((recipeMetaRaw as any).sourceUrl).trim()
+                : '',
+            servings: Number.isFinite(Number((recipeMetaRaw as any).servings))
+              ? Number((recipeMetaRaw as any).servings)
+              : null,
+            prepMinutes: Number.isFinite(Number((recipeMetaRaw as any).prepMinutes))
+              ? Number((recipeMetaRaw as any).prepMinutes)
+              : null,
+            cookMinutes: Number.isFinite(Number((recipeMetaRaw as any).cookMinutes))
+              ? Number((recipeMetaRaw as any).cookMinutes)
+              : null,
+            ingredients: recipeIngredients,
+            steps: recipeSteps,
+          }
+        : null
     const sourceMethod = String(source?.method || 'text').toLowerCase()
     // GUARD RAIL: Single ingredient entries should NEVER be marked as custom meals
     // Only multi-item meals created via "Build a Meal" should be custom meals
@@ -17274,10 +17338,12 @@ Please add nutritional information manually if needed.`);
       sourceId: (source as any)?.dbId || (source as any)?.id || null,
       label: cleanLabel || 'Favorite meal',
       description: cleanLabel || 'Favorite meal',
-      nutrition: stripWaterLogIdFromTotals(source.nutrition || source.total || null),
-      total: stripWaterLogIdFromTotals(source.total || source.nutrition || null),
+      nutrition: sourceNutritionTotals,
+      total: sourceTotalTotals,
       items: clonedItems,
       photo: source.photo || null,
+      ...(recipeMeta ? { recipe: recipeMeta } : {}),
+      ...(recipeMeta?.sourceUrl ? { sourceUrl: recipeMeta.sourceUrl } : {}),
       method:
         inferredCustomMeal && sourceMethod !== 'meal-builder' && sourceMethod !== 'combined'
           ? 'meal-builder'
@@ -17635,6 +17701,16 @@ Please add nutritional information manually if needed.`);
     return lines
   }
 
+  const buildFallbackShareSteps = (title: string, ingredientLines: string[]) => {
+    if (!Array.isArray(ingredientLines) || ingredientLines.length < 2) return []
+    const dish = toShareTextLine(title || 'this meal') || 'this meal'
+    return [
+      `Prep ingredients for ${dish}.`,
+      'Cook the main ingredients until done.',
+      'Combine, season to taste, and serve.',
+    ]
+  }
+
   const buildFavoriteShareIngredientLines = (state: any) => {
     const items = getFavoriteShareableItems(state)
     const lines: string[] = []
@@ -17677,14 +17753,24 @@ Please add nutritional information manually if needed.`);
         ? source.total
         : null
     const recipeRaw =
+      source?.recipe && typeof source.recipe === 'object'
+        ? source.recipe
+        : 
       nutrition && typeof (nutrition as any).__importRecipe === 'object'
         ? (nutrition as any).__importRecipe
         : nutrition && typeof (nutrition as any).__aiRecipe === 'object'
         ? (nutrition as any).__aiRecipe
         : null
-    const recipeIngredients = toShareTextLines(recipeRaw?.ingredients, 80)
+    const recipeIngredients = toShareTextLines(
+      recipeRaw?.ingredients || recipeRaw?.items,
+      80,
+    )
     const ingredientLines = recipeIngredients.length > 0 ? recipeIngredients : buildFavoriteShareIngredientLines(state)
-    const steps = toShareTextLines(recipeRaw?.steps, 40)
+    const steps = toShareTextLines(
+      recipeRaw?.steps || recipeRaw?.method || recipeRaw?.instructions || recipeRaw?.directions,
+      40,
+    )
+    const shareSteps = steps.length > 0 ? steps : buildFallbackShareSteps(title, ingredientLines)
     const servings = Number(recipeRaw?.servings)
     const prepMinutes = Number(recipeRaw?.prepMinutes)
     const cookMinutes = Number(recipeRaw?.cookMinutes)
@@ -17712,10 +17798,10 @@ Please add nutritional information manually if needed.`);
       lines.push('Ingredients:')
       ingredientLines.forEach((line) => lines.push(`- ${line}`))
     }
-    if (steps.length > 0) {
+    if (shareSteps.length > 0) {
       lines.push('')
       lines.push('Method:')
-      steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
+      shareSteps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
     }
     if (sourceUrl) {
       lines.push('')
@@ -17819,6 +17905,65 @@ Please add nutritional information manually if needed.`);
     }
   }
 
+  const shareOptionBrandStyles: Record<
+    'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
+    string
+  > = {
+    whatsapp: 'bg-[#25D366]',
+    x: 'bg-black',
+    telegram: 'bg-[#26A5E4]',
+    facebook: 'bg-[#1877F2]',
+    email: 'bg-[#6C757D]',
+    sms: 'bg-[#10B981]',
+    copy: 'bg-[#F59E0B]',
+    more: 'bg-[#111827]',
+  }
+
+  const renderShareOptionIcon = (
+    key: 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
+    label: string,
+  ) => {
+    if (key === 'whatsapp' || key === 'x' || key === 'telegram' || key === 'facebook') {
+      const iconMap: Record<'whatsapp' | 'x' | 'telegram' | 'facebook', string> = {
+        whatsapp: '/social-icons/whatsapp-white.svg',
+        x: '/social-icons/x-white.svg',
+        telegram: '/social-icons/telegram-white.svg',
+        facebook: '/social-icons/facebook-white.svg',
+      }
+      return <img src={iconMap[key]} alt={`${label} icon`} className="h-4 w-4 pointer-events-none" />
+    }
+    if (key === 'email') {
+      return (
+        <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 6h16v12H4z" />
+          <path d="m4 8 8 6 8-6" />
+        </svg>
+      )
+    }
+    if (key === 'sms') {
+      return (
+        <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      )
+    }
+    if (key === 'copy') {
+      return (
+        <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <rect x="2" y="2" width="13" height="13" rx="2" />
+        </svg>
+      )
+    }
+    return (
+      <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="19" cy="12" r="1" />
+        <circle cx="5" cy="12" r="1" />
+      </svg>
+    )
+  }
+
   const openFavoritePortionEditor = (state: any) => {
     if (!state) return
     const item = state?.item || state
@@ -17858,6 +18003,19 @@ Please add nutritional information manually if needed.`);
         items: sourceItems,
         nutrition: totals,
         total: totals,
+        recipe:
+          source?.recipe && typeof source.recipe === 'object'
+            ? source.recipe
+            : totals && typeof (totals as any).__importRecipe === 'object'
+            ? (totals as any).__importRecipe
+            : totals && typeof (totals as any).__aiRecipe === 'object'
+            ? (totals as any).__aiRecipe
+            : null,
+        sourceUrl:
+          (source?.sourceUrl && String(source.sourceUrl).trim()) ||
+          (totals && typeof (totals as any).__importRecipe === 'object' && String((totals as any).__importRecipe?.sourceUrl || '').trim()) ||
+          (totals && typeof (totals as any).__aiRecipe === 'object' && String((totals as any).__aiRecipe?.sourceUrl || '').trim()) ||
+          '',
       },
     }
 
@@ -29965,9 +30123,34 @@ Please add nutritional information manually if needed.`);
                               favoriteActionModal,
                             )
                           }
-                          className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                          className={`h-10 w-10 rounded-full flex items-center justify-center shadow-sm transition-transform hover:scale-105 ${
+                            shareOptionBrandStyles[
+                              option.key as
+                                | 'whatsapp'
+                                | 'x'
+                                | 'telegram'
+                                | 'facebook'
+                                | 'email'
+                                | 'sms'
+                                | 'copy'
+                                | 'more'
+                            ]
+                          }`}
+                          aria-label={`Share via ${option.label}`}
+                          title={option.label}
                         >
-                          {option.label}
+                          {renderShareOptionIcon(
+                            option.key as
+                              | 'whatsapp'
+                              | 'x'
+                              | 'telegram'
+                              | 'facebook'
+                              | 'email'
+                              | 'sms'
+                              | 'copy'
+                              | 'more',
+                            option.label,
+                          )}
                         </button>
                       ))}
                     </div>
@@ -30075,9 +30258,34 @@ Please add nutritional information manually if needed.`);
                           favoriteActionModal,
                         )
                       }
-                      className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                      className={`h-10 w-10 rounded-full flex items-center justify-center shadow-sm transition-transform hover:scale-105 ${
+                        shareOptionBrandStyles[
+                          option.key as
+                            | 'whatsapp'
+                            | 'x'
+                            | 'telegram'
+                            | 'facebook'
+                            | 'email'
+                            | 'sms'
+                            | 'copy'
+                            | 'more'
+                        ]
+                      }`}
+                      aria-label={`Share via ${option.label}`}
+                      title={option.label}
                     >
-                      {option.label}
+                      {renderShareOptionIcon(
+                        option.key as
+                          | 'whatsapp'
+                          | 'x'
+                          | 'telegram'
+                          | 'facebook'
+                          | 'email'
+                          | 'sms'
+                          | 'copy'
+                          | 'more',
+                        option.label,
+                      )}
                     </button>
                   ))}
                 </div>

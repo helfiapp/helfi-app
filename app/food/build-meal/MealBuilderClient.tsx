@@ -253,6 +253,16 @@ const toRecipeTextLines = (input: any, limit: number) => {
   return source.map((entry) => toRecipeTextLine(entry)).filter(Boolean).slice(0, limit)
 }
 
+const buildFallbackRecipeShareSteps = (title: string, ingredientLines: string[]) => {
+  if (!Array.isArray(ingredientLines) || ingredientLines.length < 2) return []
+  const dish = toRecipeTextLine(title || 'this meal') || 'this meal'
+  return [
+    `Prep ingredients for ${dish}.`,
+    'Cook the main ingredients until done.',
+    'Combine, season to taste, and serve.',
+  ]
+}
+
 const uniqueRecipeLines = (lines: string[], limit: number) => {
   const seen = new Set<string>()
   const out: string[] = []
@@ -285,12 +295,14 @@ const normalizeRecipePanelData = (
   fallback?: { title?: string; ingredients?: string[]; steps?: string[] },
 ): RecipePanelData | null => {
   if (!raw || typeof raw !== 'object') return null
+  const rawIngredientSource = raw?.ingredients ?? raw?.items ?? []
+  const rawStepSource = raw?.steps ?? raw?.method ?? raw?.instructions ?? raw?.directions ?? []
   const ingredients = uniqueRecipeLines(
-    [...toRecipeTextLines(raw?.ingredients, 80), ...toRecipeTextLines(fallback?.ingredients || [], 80)],
+    [...toRecipeTextLines(rawIngredientSource, 80), ...toRecipeTextLines(fallback?.ingredients || [], 80)],
     80,
   )
   const steps = uniqueRecipeLines(
-    [...toRecipeTextLines(raw?.steps, 40), ...toRecipeTextLines(fallback?.steps || [], 40)],
+    [...toRecipeTextLines(rawStepSource, 40), ...toRecipeTextLines(fallback?.steps || [], 40)],
     40,
   )
   if (ingredients.length === 0 && steps.length === 0) return null
@@ -2268,6 +2280,21 @@ export default function MealBuilderClient() {
         : Array.isArray((source as any)?.ingredients)
         ? (source as any).ingredients
         : null
+      const seedRecipeRaw = {
+        ...(((source as any)?.recipe && typeof (source as any).recipe === 'object' ? (source as any).recipe : {}) as any),
+        ...(((totals as any)?.__importRecipe && typeof (totals as any).__importRecipe === 'object'
+          ? (totals as any).__importRecipe
+          : {}) as any),
+        ...(((totals as any)?.__aiRecipe && typeof (totals as any).__aiRecipe === 'object'
+          ? (totals as any).__aiRecipe
+          : {}) as any),
+        title: label || 'Recipe',
+      }
+      const seedRecipePanel = normalizeRecipePanelData(seedRecipeRaw, {
+        title: label || 'Recipe',
+        ingredients: buildIngredientLinesFromItems(sourceItems),
+      })
+      setPersistedRecipePanel(seedRecipePanel)
 
       if (sourceItems && sourceItems.length > 0) {
         const converted = convertToBuilderItems(sourceItems)
@@ -2407,6 +2434,12 @@ export default function MealBuilderClient() {
     const favItems = parseFavoriteItems(fav)
     const favoriteRecipeRaw = {
       ...(((fav as any)?.recipe && typeof (fav as any).recipe === 'object' ? (fav as any).recipe : {}) as any),
+      ...(((favoriteTotals as any)?.__importRecipe && typeof (favoriteTotals as any).__importRecipe === 'object'
+        ? (favoriteTotals as any).__importRecipe
+        : {}) as any),
+      ...(((favoriteTotals as any)?.__aiRecipe && typeof (favoriteTotals as any).__aiRecipe === 'object'
+        ? (favoriteTotals as any).__aiRecipe
+        : {}) as any),
       title:
         ((fav as any)?.recipe && (fav as any).recipe.title) ||
         normalizeMealLabel((fav as any)?.label || (fav as any)?.description || '').trim() ||
@@ -2504,11 +2537,18 @@ export default function MealBuilderClient() {
 
         const rawItems = Array.isArray(log?.items) ? log.items : null
         const logRecipeRaw = {
+          ...(((log as any)?.recipe && typeof (log as any).recipe === 'object'
+            ? (log as any).recipe
+            : {}) as any),
           ...(((logTotals as any)?.__importRecipe && typeof (logTotals as any).__importRecipe === 'object'
             ? (logTotals as any).__importRecipe
             : {}) as any),
+          ...(((logTotals as any)?.__aiRecipe && typeof (logTotals as any).__aiRecipe === 'object'
+            ? (logTotals as any).__aiRecipe
+            : {}) as any),
           title:
             ((logTotals as any)?.__importRecipe && (logTotals as any).__importRecipe.title) ||
+            ((logTotals as any)?.__aiRecipe && (logTotals as any).__aiRecipe.title) ||
             label ||
             'Recipe',
         }
@@ -2745,6 +2785,10 @@ export default function MealBuilderClient() {
     if (!shareableMealPanel) return ''
     const lines: string[] = []
     const title = shareableMealPanel.title || mealName || 'Recipe'
+    const shareSteps =
+      shareableMealPanel.steps.length > 0
+        ? shareableMealPanel.steps
+        : buildFallbackRecipeShareSteps(title, shareableMealPanel.ingredients)
     lines.push(title)
     if (shareableMealPanel.servings && shareableMealPanel.servings > 0) {
       lines.push(`Servings: ${shareableMealPanel.servings}`)
@@ -2774,10 +2818,10 @@ export default function MealBuilderClient() {
       lines.push('Ingredients:')
       shareableMealPanel.ingredients.forEach((item) => lines.push(`- ${item}`))
     }
-    if (shareableMealPanel.steps.length > 0) {
+    if (shareSteps.length > 0) {
       lines.push('')
       lines.push('Method:')
-      shareableMealPanel.steps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
+      shareSteps.forEach((step, index) => lines.push(`${index + 1}. ${step}`))
     }
     if (shareableMealPanel.sourceUrl) {
       lines.push('')
@@ -2870,6 +2914,71 @@ export default function MealBuilderClient() {
     },
     [shareRecipeText, shareableMealPanel, mealName, openShareHref, handleShareRecipe],
   )
+
+  const shareOptionBrandStyles: Record<
+    'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
+    string
+  > = {
+    whatsapp: 'bg-[#25D366]',
+    x: 'bg-black',
+    telegram: 'bg-[#26A5E4]',
+    facebook: 'bg-[#1877F2]',
+    email: 'bg-[#6C757D]',
+    sms: 'bg-[#10B981]',
+    copy: 'bg-[#F59E0B]',
+    more: 'bg-[#111827]',
+  }
+
+  const renderShareOptionIcon = (
+    key: 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
+    label: string,
+  ) => {
+    if (key === 'whatsapp' || key === 'x' || key === 'telegram' || key === 'facebook') {
+      const iconMap: Record<'whatsapp' | 'x' | 'telegram' | 'facebook', string> = {
+        whatsapp: '/social-icons/whatsapp-white.svg',
+        x: '/social-icons/x-white.svg',
+        telegram: '/social-icons/telegram-white.svg',
+        facebook: '/social-icons/facebook-white.svg',
+      }
+      return (
+        <img
+          src={iconMap[key]}
+          alt={`${label} icon`}
+          className="h-4 w-4 pointer-events-none"
+        />
+      )
+    }
+    if (key === 'email') {
+      return (
+        <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M4 6h16v12H4z" />
+          <path d="m4 8 8 6 8-6" />
+        </svg>
+      )
+    }
+    if (key === 'sms') {
+      return (
+        <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <path d="M21 15a2 2 0 0 1-2 2H8l-5 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+        </svg>
+      )
+    }
+    if (key === 'copy') {
+      return (
+        <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+          <rect x="9" y="9" width="13" height="13" rx="2" />
+          <rect x="2" y="2" width="13" height="13" rx="2" />
+        </svg>
+      )
+    }
+    return (
+      <svg className="h-4 w-4 text-white" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <circle cx="12" cy="12" r="1" />
+        <circle cx="19" cy="12" r="1" />
+        <circle cx="5" cy="12" r="1" />
+      </svg>
+    )
+  }
 
   useEffect(() => {
     if (shareableMealPanel) return
@@ -5373,7 +5482,12 @@ export default function MealBuilderClient() {
               ? Number(activeRecipePanel.cookMinutes)
               : null,
           ingredients: activeRecipePanel.ingredients.slice(0, 80),
-          steps: activeRecipePanel.steps.slice(0, 30),
+          steps:
+            (
+              activeRecipePanel.steps.length > 0
+                ? activeRecipePanel.steps
+                : buildFallbackRecipeShareSteps(activeRecipePanel.title || title, activeRecipePanel.ingredients)
+            ).slice(0, 30),
         }
       : null
 
@@ -6473,9 +6587,16 @@ export default function MealBuilderClient() {
                           option.key as 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
                         )
                       }
-                      className="px-3 py-1.5 rounded-lg border border-gray-200 bg-white text-gray-700 text-xs font-semibold hover:bg-gray-50"
+                      className={`h-10 w-10 rounded-full flex items-center justify-center shadow-sm transition-transform hover:scale-105 ${
+                        shareOptionBrandStyles[option.key as 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more']
+                      }`}
+                      aria-label={`Share via ${option.label}`}
+                      title={option.label}
                     >
-                      {option.label}
+                      {renderShareOptionIcon(
+                        option.key as 'whatsapp' | 'x' | 'telegram' | 'facebook' | 'email' | 'sms' | 'copy' | 'more',
+                        option.label,
+                      )}
                     </button>
                   ))}
                 </div>
