@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 09:14 PM AEDT
+- What changed: Upgraded Share meal with official branded quick-share icons/colors (WhatsApp, X, Telegram, Facebook) and fixed shared meal text so recipe method appears reliably even when step data comes in different formats or is partially missing.
+- Where to see it (page/link): /food/build-meal and Food Diary favorites meal share popups
+- What to quickly test: Open a meal and tap Share meal, confirm branded icon strip appears; share to WhatsApp and confirm message includes meal title, servings, nutrition, ingredients, and a Method section.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 19:48 AEDT
 - What changed: Share meal now opens an in-app quick-share row (WhatsApp, X, Telegram, Facebook, Email, SMS, Copy, More) and Share meal buttons are now solid global green with white text.
 - Where to see it (page/link): /food/build-meal and Food Diary favorites meal share popups
