@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 18:08 AEDT
+- What changed: Added Share meal button in Add from favorites popup, favorites preview screen, and Build a meal editor; share now includes ingredients, recipe steps (if available), calories, and macros.
+- Where to see it (page/link): Food Diary → Add from favorites flow and /food/build-meal
+- What to quickly test: Open a multi-ingredient meal from favorites and confirm Share meal appears in popup + preview; open Build a meal with multi-ingredient meal and confirm Share meal appears under meal name; single-food entries should not show Share meal.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 01:32 PM AEDT
 - What changed: Practitioner search phrase mapping expanded and corrected. Restored chiropractor matching for sore back phrases and added broader leg/back phrase coverage so suggestions map to physiotherapist, chiropractor, osteopath, spinal/back pain clinic, and sports physiotherapy more reliably.
 - Where to see it (page/link): https://helfi.ai/practitioners
