@@ -405,6 +405,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
 
   const isPractitionerAllowedPath =
     isPractitionerPortalPath ||
+    pathname === '/dashboard' ||
     isPractitionerDirectoryPath ||
     isFeaturePath ||
     isNewsPath ||
