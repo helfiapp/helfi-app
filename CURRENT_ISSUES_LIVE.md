@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-26 10:54 PM AEDT
+- What changed: Fixed practitioner account entry flow so signed-in users are no longer forced to dashboard when opening practitioner sign-up/sign-in links. Practitioner auth intent now routes correctly to the practitioner portal. Also updated native login API so practitioner-mode native login can create/use practitioner account context.
+- Where to see it (page/link): https://helfi.ai/list-your-practice/start, https://helfi.ai/auth/signin?context=practitioner&mode=signup&next=/practitioner, https://helfi.ai/practitioner
+- What to quickly test: While signed in as a normal user, open List your practice and choose Create practitioner account; confirm you land in practitioner portal flow (not dashboard). In native practitioner mode, sign in and confirm practitioner path is used.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-26 10:15 PM AEDT
 - What changed: Added strict hard-lock guard rails for the full Ask AI -> Build Meal flow so unapproved edits now fail build/deploy. Locked Food Diary Ask AI entry, food chat meal parsing and Build this meal handoff, backend structured meal JSON enforcement, Build a Meal recipe import apply + recipe panel, and Share meal strips in Build a Meal/favorites/recommended flows.
 - Where to see it (page/link): /chat?context=food, /food/build-meal, Food Diary favorites share popups, /food/recommended
