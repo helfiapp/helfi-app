@@ -54,6 +54,22 @@ Restore steps if background updates stop after the first exit:
    - resets `exitUpdateTriggeredRef.current = false`
 2. Do NOT leave `exitUpdateTriggeredRef` latched after a prior exit, or future edits will never trigger background updates.
 
+## 0.1 Practitioner Portal + Navigation Lock (Feb 2026 – Strict Lock)
+- File lock (web): `app/practitioner/page.tsx` must keep:
+  - `← Back` action
+  - `Go to dashboard` action
+  - back behavior: `window.history.back()` + fallback to `/list-your-practice/start`
+- Delete-account panel must remain gated to existing listings only (`dashboard?.listing?.id` guard).
+- File lock (web layout): `components/LayoutWrapper.tsx` must NOT force practitioner accounts back to `/practitioner` from normal app pages.
+- Automated lock check: `npm run check:practitioner-web-lock` (also runs in `prebuild`).
+- If this check fails, do not deploy until fixed.
+
+Native parity lock for practitioner flow:
+- `native/src/screens/ListYourPracticeStartScreen.tsx` must keep practitioner account routing:
+  - signup path uses `accountType: 'practitioner'`
+  - login path uses `accountType: 'practitioner'`
+- `native/src/screens/MoreScreen.tsx` and `native/src/screens/DashboardScreen.tsx` must not reintroduce `Sleep Coach`.
+
 ## 1. Email & Waitlist Protection (summary)
 
 **Primary reference:** `WAITLIST_EMAIL_PROTECTION.md`
