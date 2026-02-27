@@ -402,7 +402,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     !isAdminPanelPath &&
     (!isPublicPage || isOnboardingPath)
 
-
   const feedbackPromptStorageKey = session?.user?.email
     ? `helfi:feedback-prompt-shown:${session.user.email.toLowerCase()}`
     : ''
@@ -432,7 +431,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       router.push('/support')
     }
   }, [rememberFeedbackPromptSeen, router])
-
   useEffect(() => {
     if (typeof document === 'undefined') return
 
