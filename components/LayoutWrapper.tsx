@@ -388,7 +388,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     publicPages.includes(pathname) || isFeaturePath || isNewsPath || isPractitionerDirectoryPath
   const isChatPage = pathname === '/chat'
   const isFoodDiaryPage = pathname === '/food'
-  const isPractitioner = !!session?.user?.isPractitioner
   
   // Admin panel paths should never show user sidebar
   const isAdminPanelPath =
@@ -403,13 +402,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     !isAdminPanelPath &&
     (!isPublicPage || isOnboardingPath)
 
-  const isPractitionerAllowedPath =
-    isPractitionerPortalPath ||
-    pathname === '/dashboard' ||
-    isPractitionerDirectoryPath ||
-    isFeaturePath ||
-    isNewsPath ||
-    (publicPages.includes(pathname) && !isOnboardingPath)
 
   const feedbackPromptStorageKey = session?.user?.email
     ? `helfi:feedback-prompt-shown:${session.user.email.toLowerCase()}`
@@ -456,14 +448,6 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
       // Ignore storage errors
     }
   }, [themeAllowed])
-
-  useEffect(() => {
-    if (status !== 'authenticated') return
-    if (!isPractitioner) return
-    if (isAdminPanelPath) return
-    if (isPractitionerAllowedPath) return
-    router.replace('/practitioner')
-  }, [status, isPractitioner, isAdminPanelPath, isPractitionerAllowedPath, router])
 
   useEffect(() => {
     if (status !== 'authenticated' || !feedbackPromptStorageKey) {
