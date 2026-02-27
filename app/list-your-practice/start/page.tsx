@@ -1,7 +1,7 @@
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
-import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
+import AppFlowHeader from '@/components/practitioner/AppFlowHeader'
 import { authOptions } from '@/lib/auth'
 
 export default async function ListYourPracticeStartPage() {
@@ -18,22 +18,7 @@ export default async function ListYourPracticeStartPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-emerald-50/40 to-white">
-      {isSignedIn ? (
-        <header className="px-6 pt-6">
-          <div className="max-w-5xl mx-auto rounded-2xl border border-emerald-100 bg-white px-5 py-4">
-            <div className="flex flex-wrap items-center gap-3">
-              <Link
-                href={dashboardHref}
-                className="inline-flex items-center justify-center px-5 py-2 rounded-full border border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
-              >
-                Back to dashboard
-              </Link>
-            </div>
-          </div>
-        </header>
-      ) : (
-        <PublicHeader />
-      )}
+      <AppFlowHeader fallbackHref="/list-your-practice" dashboardHref={dashboardHref} maxWidthClassName="max-w-5xl" />
       <main className="px-6 pb-20">
         <div className="max-w-5xl mx-auto">
           <section className="pt-10 pb-8">
