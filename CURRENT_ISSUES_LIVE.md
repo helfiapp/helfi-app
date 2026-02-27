@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 11:34 AM AEDT
+- What changed: Chatbot support names now show first names only (no surnames), and chatbot profile photos were made slightly larger for clearer visibility in the chat launcher and chat header.
+- Where to see it (page/link): https://helfi.ai and https://helfi.ai/support
+- What to quickly test: Open chatbot on homepage and support page; confirm name format is first name only (for example “Chat with Amelia”, not “Amelia Brooks”) and confirm avatar appears slightly larger than before.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 10:22 AM AEDT
 - What changed: Updated chatbot support team to 5 rotating agent profiles using your new uploaded photos. Replaced old 3-agent cycle with a full 24-hour roster: each agent now appears for 4 hours 48 minutes.
 - Where to see it (page/link): https://helfi.ai (public chatbot) and https://helfi.ai/support (support portal chatbot)
