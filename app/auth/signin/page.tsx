@@ -42,11 +42,6 @@ function SearchParamsHandler({
 
     if (contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner'))) {
       setAuthContext('practitioner')
-      try {
-        sessionStorage.setItem('helfi:practitionerAuthIntent', '1')
-      } catch {
-        // Ignore storage issues.
-      }
     }
 
     
@@ -192,19 +187,10 @@ export default function SignIn() {
     const resume = async () => {
       const nextParam = sanitizeNextTarget(searchParams.get('next'))
       const contextParam = searchParams.get('context')
-      let practitionerIntent = contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner')) || authContext === 'practitioner'
-      if (!practitionerIntent) {
-        try {
-          practitionerIntent = sessionStorage.getItem('helfi:practitionerAuthIntent') === '1'
-        } catch {
-          // Ignore storage issues.
-        }
-      }
+      const practitionerIntent =
+        contextParam === 'practitioner' || (nextParam && nextParam.startsWith('/practitioner')) || authContext === 'practitioner'
 
       if (session?.user?.isPractitioner) {
-        try {
-          sessionStorage.removeItem('helfi:practitionerAuthIntent')
-        } catch {}
         if (maybeShowInstallPrompt('/practitioner')) {
           return
         }
@@ -213,11 +199,15 @@ export default function SignIn() {
       }
 
       if (practitionerIntent) {
-        const practitionerTarget = '/practitioner?practitionerSignup=1'
-        if (maybeShowInstallPrompt(practitionerTarget)) {
-          return
+        // Hard lock: normal signed-in users must re-auth for practitioner flow.
+        skipAutoRedirectRef.current = true
+        try {
+          await signOut({ redirect: false })
+        } catch (error) {
+          console.warn('Session clear failed for practitioner auth flow', error)
+        } finally {
+          skipAutoRedirectRef.current = false
         }
-        router.replace(practitionerTarget)
         return
       }
 
