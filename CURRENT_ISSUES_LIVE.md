@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-28 12:29 AM AEDT
+- What changed: Forced simple app-flow header on practitioner pages to stop fallback to public menu/logo. Updated `/practitioners`, `/list-your-practice`, and `/list-your-practice/start` to always show only `Back` (left) and `Go to Dashboard` (right) at top.
+- Where to see it (page/link): https://helfi.ai/practitioners, https://helfi.ai/list-your-practice, https://helfi.ai/list-your-practice/start
+- What to quickly test: Open each page above and confirm top has only `Back` + `Go to Dashboard` with no logo and no Home/Features/Pricing/News/FAQ row.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-28 12:11 AM AEDT
 - What changed: Practitioner account entry flow cleanup. Removed top `Go to practitioner portal` button on `/list-your-practice/start` and added a real `Back` button on practitioner auth page (`/auth/signin?context=practitioner...`) that returns to previous page.
 - Where to see it (page/link): https://helfi.ai/list-your-practice/start and https://helfi.ai/auth/signin?context=practitioner&mode=signup&next=%2Fpractitioner
