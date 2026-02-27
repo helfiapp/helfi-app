@@ -439,6 +439,22 @@ function main() {
     allowEnvVar: 'ALLOW_RECOMMENDED_MEAL_BUTTON_ROW_EDIT',
     description: 'Recommended meal action buttons row',
   });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: FOOD_BARCODE_LOOKUP_FLOW START',
+    endMarker: 'PROTECTED: FOOD_BARCODE_LOOKUP_FLOW END',
+    expectedHash: 'f9e936baf0eb0efa7b0e075d7ed414eeeab67def541dba92fd311df75d4c128c',
+    allowEnvVar: 'ALLOW_FOOD_BARCODE_LOOKUP_FLOW_EDIT',
+    description: 'Food Diary barcode lookup + action routing flow',
+  });
+  checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
+    startMarker: 'PROTECTED: FOOD_BARCODE_SCANNER_ENGINE START',
+    endMarker: 'PROTECTED: FOOD_BARCODE_SCANNER_ENGINE END',
+    expectedHash: 'bd609b1e4f7905450a0185241ea10d013097e145e26be668f6e640abfb5fb9d3',
+    allowEnvVar: 'ALLOW_FOOD_BARCODE_SCANNER_ENGINE_EDIT',
+    description: 'Food Diary barcode scanner camera + decoder engine',
+  });
   console.log('✅ Guard Rails: Protected regions verified.');
 }
 

@@ -2235,6 +2235,19 @@ If this ever breaks, restore by:
 - Editing barcode entries must open the ingredient-card editor (triggered by `isBarcodeEntry` in `editFood`); do not strip the barcode markers or fall back to the manual text editor.
 - If you must touch this area, first explain the exact change in plain language and get approval; then re-test live scanning on iOS PWA.
 
+### 11.1 Hard lock (deploy blocker) - Feb 27, 2026
+
+This scanner flow is now deploy-block protected. If these regions change, build/deploy fails unless an override env var is intentionally used.
+
+- `app/food/page.tsx`
+  - `PROTECTED: FOOD_BARCODE_LOOKUP_FLOW` (scan lookup + action routing)
+  - `PROTECTED: FOOD_BARCODE_SCANNER_ENGINE` (camera + decoder startup flow)
+- `scripts/protect-regions.js`
+  - `ALLOW_FOOD_BARCODE_LOOKUP_FLOW_EDIT`
+  - `ALLOW_FOOD_BARCODE_SCANNER_ENGINE_EDIT`
+
+Last stable hard-lock update: `Feb 27, 2026` (barcode scanner flow)
+
 ---
 
 ## 12. Diet Preferences, Warnings, and Macro Targets (Dec 2025 – Locked)

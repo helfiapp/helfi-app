@@ -16152,6 +16152,7 @@ Please add nutritional information manually if needed.`);
     void saveBarcodeLabelIfNeeded(analyzedItems, { preserveFlow: true, quiet: true })
   }, [barcodeLabelFlow?.barcode, labelValidation.ok, analyzedItems, photoPreview])
 
+  // PROTECTED: FOOD_BARCODE_LOOKUP_FLOW START
   const lookupBarcodeAndAdd = async (code: string) => {
     const normalized = (code || '').replace(/[^0-9A-Za-z]/g, '')
     if (!normalized) {
@@ -16322,6 +16323,7 @@ Please add nutritional information manually if needed.`);
       barcodeLookupInFlightRef.current = false
     }
   }
+  // PROTECTED: FOOD_BARCODE_LOOKUP_FLOW END
 
   const barcodeDetectLockRef = useRef(false)
   const lastRejectedBarcodeRef = useRef<{ code: string; at: number } | null>(null)
@@ -16637,6 +16639,7 @@ Please add nutritional information manually if needed.`);
 
   // Barcode scanner flow is owner-approved for dual reliability mode:
   // 1D EAN/UPC reader + dedicated square-code readers (Data Matrix / QR) on the same camera stream.
+  // PROTECTED: FOOD_BARCODE_SCANNER_ENGINE START
   const startBarcodeScanner = async (options?: { forceFacing?: 'front' | 'back' }) => {
     if (!showBarcodeScanner) return
     resetTorchState()
@@ -16749,6 +16752,7 @@ Please add nutritional information manually if needed.`);
       stopBarcodeScanner()
     }
   }
+  // PROTECTED: FOOD_BARCODE_SCANNER_ENGINE END
 
   useEffect(() => {
     if (showBarcodeScanner) {
