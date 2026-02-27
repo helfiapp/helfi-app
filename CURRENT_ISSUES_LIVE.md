@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 06:23 PM AEDT
+- What changed: Added a hard deployment safety lock. `./scripts/check-deployment-status.sh` now fails if `helfi.ai` or `www.helfi.ai` are still pointing to an older deployment, and prints exact alias-fix commands.
+- Where to see it (page/link): Deployment workflow script + live domain mapping checks (`helfi.ai`, `www.helfi.ai`).
+- What to quickly test: Push any commit, run `./scripts/check-deployment-status.sh`, confirm it reports READY plus `Live domains verified`; if alias is stale it should fail with clear fix commands.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 05:48 PM AEDT
 - What changed: Emergency practitioner navigation hotfix. Removed the forced redirect rule that was trapping practitioner users on `/practitioner` and preventing normal dashboard access.
 - Where to see it (page/link): https://helfi.ai/practitioner and https://helfi.ai/dashboard
