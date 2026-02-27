@@ -68,7 +68,13 @@ After pushing to GitHub, you MUST check the deployment status using the Vercel A
    ```bash
    ./scripts/check-deployment-status.sh
    ```
-   **IMPORTANT**: This script will wait until deployment is READY or ERROR. Do NOT report "deployment in progress" - wait for completion.
+   **IMPORTANT**: This script will wait until deployment is READY or ERROR, and it now also verifies `helfi.ai` + `www.helfi.ai` point to that newest READY deployment. Do NOT report "deployment in progress" - wait for completion.
+   If it reports a live-domain mismatch, run:
+   ```bash
+   vercel alias set <latest-deployment-url> helfi.ai
+   vercel alias set <latest-deployment-url> www.helfi.ai
+   ./scripts/check-deployment-status.sh
+   ```
    - Optional only (run only if owner asks for rename diagnostics):
    ```bash
    RUN_RENAME_GUARD=1 CANARY_AUTH_COOKIE="next-auth.session-token=..." ./scripts/check-deployment-status.sh

@@ -114,6 +114,11 @@ Before pushing ANY code changes to GitHub, you MUST:
 1. Verify Deployment Status: After pushing code, ALWAYS check deployment status before claiming changes are live
    - Run: ./scripts/check-deployment-status.sh
    - Or check manually: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
+   - The script now also verifies `helfi.ai` and `www.helfi.ai` both point to the newest READY deployment
+   - If it reports live-domain mismatch, run:
+     - `vercel alias set <latest-deployment-url> helfi.ai`
+     - `vercel alias set <latest-deployment-url> www.helfi.ai`
+     - Then rerun `./scripts/check-deployment-status.sh`
    - NEVER tell the user "changes are live" without verifying deployment succeeded
    - Only report success when deployment state is READY
 
@@ -179,5 +184,6 @@ git push origin master
 RUN_RENAME_GUARD=1 CANARY_AUTH_COOKIE="next-auth.session-token=..." ./scripts/check-deployment-status.sh
 
 # 4. Script will only exit when deployment is READY or ERROR
+#    It also verifies helfi.ai/www.helfi.ai alias mapping.
 #    DO NOT report "deployment in progress" - wait for script to complete
 ```

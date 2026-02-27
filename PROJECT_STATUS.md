@@ -13,7 +13,7 @@ Last updated: Feb 7, 2026
 - Live site: `https://helfi.ai`
 - Staging (test site): `https://stg.helfi.ai`
 - Vercel deployments page: `https://vercel.com/louie-veleskis-projects/helfi-app/deployments`
-- Deployment status script (must be used after pushes): `./scripts/check-deployment-status.sh`
+- Deployment status script (must be used after pushes): `./scripts/check-deployment-status.sh` (also verifies `helfi.ai` and `www.helfi.ai` point to the newest READY deploy)
 
 ## Agent Coordination (Required)
 

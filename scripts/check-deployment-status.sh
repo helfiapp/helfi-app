@@ -12,6 +12,7 @@ TARGET="${VERCEL_TARGET:-production}"
 RUN_RENAME_GUARD="${RUN_RENAME_GUARD:-0}"
 MAX_WAIT=300  # Maximum wait time in seconds (5 minutes)
 POLL_INTERVAL=5  # Check every 5 seconds
+LIVE_DOMAINS=("helfi.ai" "www.helfi.ai")
 
 echo "🔍 Checking latest deployment status for Helfi production project..."
 echo "⏳ Waiting for deployment to complete (this may take 1-2 minutes)..."
@@ -53,9 +54,51 @@ while true; do
   case "$STATE" in
     "READY")
       if [ "$READY_STATE" = "READY" ]; then
+        DEPLOYMENT_ID=$(echo "$RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('deployments', [{}])[0].get('uid', ''))" 2>/dev/null)
+        if [ -z "$DEPLOYMENT_ID" ]; then
+          echo ""
+          echo "❌ Could not read deployment ID for READY build"
+          exit 1
+        fi
+
+        ALIAS_MISMATCH=0
+        for DOMAIN in "${LIVE_DOMAINS[@]}"; do
+          ALIAS_RESPONSE=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
+            "https://api.vercel.com/v2/aliases/$DOMAIN?teamId=$TEAM_ID")
+
+          if echo "$ALIAS_RESPONSE" | grep -q '"error"'; then
+            echo ""
+            echo "❌ Could not verify live domain mapping for $DOMAIN"
+            echo "$ALIAS_RESPONSE" | python3 -m json.tool 2>/dev/null || echo "$ALIAS_RESPONSE"
+            exit 1
+          fi
+
+          ALIAS_DEPLOYMENT_ID=$(echo "$ALIAS_RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('deploymentId', ''))" 2>/dev/null)
+          ALIAS_DEPLOYMENT_URL=$(echo "$ALIAS_RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print((d.get('deployment') or {}).get('url', ''))" 2>/dev/null)
+
+          if [ -z "$ALIAS_DEPLOYMENT_ID" ] || [ "$ALIAS_DEPLOYMENT_ID" != "$DEPLOYMENT_ID" ]; then
+            ALIAS_MISMATCH=1
+            echo ""
+            echo "❌ LIVE DOMAIN MISMATCH: $DOMAIN is not pointing to the newest READY deployment."
+            echo "   Newest deployment: https://$URL ($DEPLOYMENT_ID)"
+            echo "   Current $DOMAIN target: https://$ALIAS_DEPLOYMENT_URL ($ALIAS_DEPLOYMENT_ID)"
+            echo ""
+            echo "   Fix:"
+            echo "   vercel alias set $URL $DOMAIN"
+          fi
+        done
+
+        if [ "$ALIAS_MISMATCH" -ne 0 ]; then
+          echo ""
+          echo "❌ Deployment is READY but LIVE alias mapping is stale."
+          echo "   Reassign aliases above, then rerun ./scripts/check-deployment-status.sh"
+          exit 2
+        fi
+
         echo ""
         echo "✅ Deployment successful - changes are live!"
         echo "🌐 URL: https://$URL"
+        echo "✅ Live domains verified: ${LIVE_DOMAINS[*]}"
         if [ "$RUN_RENAME_GUARD" = "1" ]; then
           echo ""
           echo "🔒 RUN_RENAME_GUARD=1 set, running rename canary..."
