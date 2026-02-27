@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 11:58 PM AEDT
+- What changed: Updated `/list-your-practice` for logged-in users to use a simple app header: `Back` on the left and `Go to Dashboard` on the right. Removed the top logo/menu bar from this logged-in flow.
+- Where to see it (page/link): https://helfi.ai/list-your-practice
+- What to quickly test: While logged in, open `/list-your-practice`; confirm no logo/menu row and confirm only `Back` (left) and `Go to Dashboard` (right) are shown.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 11:07 PM AEDT
 - What changed: Simplified header for logged-in user flow on the practitioner directory page. Removed top logo/menu cluster in that flow and replaced it with a simple `Back` button plus `Go to Dashboard`.
 - Where to see it (page/link): https://helfi.ai/practitioners

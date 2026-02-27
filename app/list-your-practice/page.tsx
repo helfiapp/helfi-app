@@ -1,11 +1,15 @@
 'use client'
 
 import Link from 'next/link'
+import { useSession } from 'next-auth/react'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 import { absoluteUrl } from '@/lib/site-url'
 
 export default function ListYourPracticePage() {
+  const { status } = useSession()
+  const showSimpleAppHeader = status !== 'unauthenticated'
+
   const listPageSchema = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -40,7 +44,33 @@ export default function ListYourPracticePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-emerald-50/40 to-white">
-      <PublicHeader />
+      {showSimpleAppHeader ? (
+        <header className="px-6 pt-6">
+          <div className="max-w-6xl mx-auto flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  window.history.back()
+                  return
+                }
+                window.location.href = '/dashboard'
+              }}
+              className="inline-flex items-center justify-center px-5 py-2 rounded-full border border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
+            >
+              ← Back
+            </button>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center px-5 py-2 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+            >
+              Go to Dashboard
+            </Link>
+          </div>
+        </header>
+      ) : (
+        <PublicHeader />
+      )}
       <main className="px-6 pb-20">
         <div className="max-w-6xl mx-auto">
           <section className="pt-10 pb-12">
