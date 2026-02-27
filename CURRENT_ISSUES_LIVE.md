@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 11:07 PM AEDT
+- What changed: Simplified header for logged-in user flow on the practitioner directory page. Removed top logo/menu cluster in that flow and replaced it with a simple `Back` button plus `Go to Dashboard`.
+- Where to see it (page/link): https://helfi.ai/practitioners
+- What to quickly test: While logged in, open Find a Practitioner and confirm top shows `Back` (left) and `Go to Dashboard` (right), with no Home/Features/Pricing/News/FAQ menu row.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 10:56 PM AEDT
 - What changed: Fixed practitioner entry-page regressions for signed-in users. `/list-your-practice/start` now shows signed-in actions (`Back to dashboard`, plus practitioner-account path) instead of public login/signup header. Practitioner directory header no longer shows `Log in / Sign up` buttons in that flow and now uses dashboard CTA/back-style mobile behavior.
 - Where to see it (page/link): https://helfi.ai/list-your-practice/start and https://helfi.ai/practitioners
