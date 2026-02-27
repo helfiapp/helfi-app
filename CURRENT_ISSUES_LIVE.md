@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-28 12:11 AM AEDT
+- What changed: Practitioner account entry flow cleanup. Removed top `Go to practitioner portal` button on `/list-your-practice/start` and added a real `Back` button on practitioner auth page (`/auth/signin?context=practitioner...`) that returns to previous page.
+- Where to see it (page/link): https://helfi.ai/list-your-practice/start and https://helfi.ai/auth/signin?context=practitioner&mode=signup&next=%2Fpractitioner
+- What to quickly test: Open `/list-your-practice/start` while logged in and confirm only `Back to dashboard` shows at top. Then tap `Create practitioner account` and confirm new `Back` button appears at top-left on auth page and returns to previous page.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 11:58 PM AEDT
 - What changed: Updated `/list-your-practice` for logged-in users to use a simple app header: `Back` on the left and `Go to Dashboard` on the right. Removed the top logo/menu bar from this logged-in flow.
 - Where to see it (page/link): https://helfi.ai/list-your-practice
