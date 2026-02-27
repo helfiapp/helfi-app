@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 07:02 PM AEDT
+- What changed: Added a hard lock in auth routing so a normal logged-in user can never auto-jump into the practitioner listing flow. Practitioner intent now forces a clean account switch first.
+- Where to see it (page/link): https://helfi.ai/auth/signin?context=practitioner&mode=signup&next=%2Fpractitioner and https://helfi.ai/list-your-practice/start
+- What to quickly test: While logged in as a normal user, open the practitioner auth URL above and confirm it stays on auth/create-account flow (no direct listing form jump). Then complete practitioner auth and confirm listing opens afterward.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 06:49 PM AEDT
 - What changed: Fixed practitioner account entry routing so users who are already logged in are now forced through a clean account switch before practitioner sign-up/sign-in. This stops the “Create practitioner account” flow from dumping normal users straight into the listing form.
 - Where to see it (page/link): https://helfi.ai/list-your-practice/start, https://helfi.ai/list-your-practice, https://helfi.ai/practitioner
