@@ -13,6 +13,25 @@ type FeaturePageProps = {
 }
 
 export default function FeaturePage({ page, related }: FeaturePageProps) {
+  const isHomeHashLink = (href: string) => href.startsWith('/#')
+
+  const renderCtaLink = (href: string, label: string, className: string) => {
+    // Use a normal anchor for home hash links so the browser always jumps to the section.
+    if (isHomeHashLink(href)) {
+      return (
+        <a href={href} className={className}>
+          {label}
+        </a>
+      )
+    }
+
+    return (
+      <Link href={href} className={className}>
+        {label}
+      </Link>
+    )
+  }
+
   const featureUrl = absoluteUrl(`/features/${page.slug}`)
   const sectionLinks = [
     { id: 'overview', label: 'Overview' },
@@ -74,18 +93,16 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
 
   const ctaButtons = (
     <div className={ctaButtonsClass}>
-      <Link
-        href={page.primaryCta.href}
-        className="px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-      >
-        {page.primaryCta.label}
-      </Link>
-      <Link
-        href={page.secondaryCta.href}
-        className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-      >
-        {page.secondaryCta.label}
-      </Link>
+      {renderCtaLink(
+        page.primaryCta.href,
+        page.primaryCta.label,
+        'px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors'
+      )}
+      {renderCtaLink(
+        page.secondaryCta.href,
+        page.secondaryCta.label,
+        'px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors'
+      )}
     </div>
   )
 
@@ -523,18 +540,16 @@ export default function FeaturePage({ page, related }: FeaturePageProps) {
               </p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Link
-                href={page.primaryCta.href}
-                className="px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-              >
-                {page.primaryCta.label}
-              </Link>
-              <Link
-                href={page.secondaryCta.href}
-                className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-              >
-                {page.secondaryCta.label}
-              </Link>
+              {renderCtaLink(
+                page.primaryCta.href,
+                page.primaryCta.label,
+                'px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors'
+              )}
+              {renderCtaLink(
+                page.secondaryCta.href,
+                page.secondaryCta.label,
+                'px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors'
+              )}
             </div>
           </div>
         </section>
