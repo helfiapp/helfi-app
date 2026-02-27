@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 05:48 PM AEDT
+- What changed: Emergency practitioner navigation hotfix. Removed the forced redirect rule that was trapping practitioner users on `/practitioner` and preventing normal dashboard access.
+- Where to see it (page/link): https://helfi.ai/practitioner and https://helfi.ai/dashboard
+- What to quickly test: While signed in on practitioner page, click `Go to dashboard` and confirm it opens `/dashboard` and stays there. Click `Back` and confirm it returns to the previous page (or fallback to `/list-your-practice/start`).
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 01:13 PM AEDT
 - What changed: Hard-locked the Food Diary barcode scanner flow with deploy-time guard rails. Added strict protected regions for barcode lookup/action routing and scanner camera/decoder engine, so future edits to those blocks will fail deployment unless an explicit override is used.
 - Where to see it (page/link): https://helfi.ai/food
