@@ -9,15 +9,6 @@ if [ ! -f "$FILE" ]; then
   exit 1
 fi
 
-check_contains() {
-  local pattern="$1"
-  local message="$2"
-  if ! has_match "$pattern" "$FILE"; then
-    echo "[practitioner-lock] $message"
-    exit 1
-  fi
-}
-
 has_match() {
   local pattern="$1"
   local target_file="$2"
@@ -26,6 +17,15 @@ has_match() {
     return $?
   fi
   grep -Eq "$pattern" "$target_file"
+}
+
+check_contains() {
+  local pattern="$1"
+  local message="$2"
+  if ! has_match "$pattern" "$FILE"; then
+    echo "[practitioner-lock] $message"
+    exit 1
+  fi
 }
 
 # Required header actions and fallback behavior.
@@ -38,11 +38,9 @@ check_contains "/list-your-practice/start" "Back fallback route is missing."
 check_contains "dashboard\\?\\.listing\\?\\.id" "Delete-account visibility guard is missing."
 
 # Practitioner accounts must not be globally forced back to /practitioner.
-if [ -f "$LAYOUT_FILE" ]; then
-  if has_match "router.replace\\('/practitioner'\\)" "$LAYOUT_FILE"; then
-    echo "[practitioner-lock] Global redirect to /practitioner found in LayoutWrapper and will break normal app navigation."
-    exit 1
-  fi
+if [ -f "$LAYOUT_FILE" ] && has_match "router.replace\\('/practitioner'\\)" "$LAYOUT_FILE"; then
+  echo "[practitioner-lock] Global redirect to /practitioner found in LayoutWrapper and will break normal app navigation."
+  exit 1
 fi
 
 echo "[practitioner-lock] PASS"
