@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-28 02:53 AEDT
+- What changed: Fixed practitioner navigation split by account state. Signed-out visitors now see normal website navigation (no dashboard button) on practitioner pages. Signed-in normal users now see only `Back` + `Go to Dashboard` on practitioner pages. Added an always-available `Back` button on `/auth/signin`.
+- Where to see it (page/link): https://helfi.ai/practitioners, https://helfi.ai/list-your-practice, https://helfi.ai/list-your-practice/start, https://helfi.ai/auth/signin
+- What to quickly test: Signed out: open the first 3 pages and confirm website menu + no dashboard button. Signed in as normal user: open the same 3 pages and confirm only `Back` + `Go to Dashboard`. Open `/auth/signin` and confirm `Back` is visible and returns to previous page.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-28 12:29 AM AEDT
 - What changed: Forced simple app-flow header on practitioner pages to stop fallback to public menu/logo. Updated `/practitioners`, `/list-your-practice`, and `/list-your-practice/start` to always show only `Back` (left) and `Go to Dashboard` (right) at top.
 - Where to see it (page/link): https://helfi.ai/practitioners, https://helfi.ai/list-your-practice, https://helfi.ai/list-your-practice/start
