@@ -1,9 +1,20 @@
 import Link from 'next/link'
+import { getServerSession } from 'next-auth'
 import PublicFooter from '@/components/marketing/PublicFooter'
+import PublicHeader from '@/components/marketing/PublicHeader'
 import AppFlowHeader from '@/components/practitioner/AppFlowHeader'
+import { authOptions } from '@/lib/auth'
 import { absoluteUrl } from '@/lib/site-url'
 
-export default function ListYourPracticePage() {
+export default async function ListYourPracticePage() {
+  const session = await getServerSession(authOptions)
+  const isSignedIn = Boolean(session?.user)
+  const isPractitioner = Boolean(session?.user?.isPractitioner)
+  const showSignedInUserFlow = isSignedIn && !isPractitioner
+  const practitionerSigninHref = showSignedInUserFlow
+    ? '/auth/signin?reauth=1&context=practitioner&next=/practitioner'
+    : '/auth/signin?context=practitioner&next=/practitioner'
+
   const listPageSchema = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -38,7 +49,11 @@ export default function ListYourPracticePage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-emerald-50/40 to-white">
-      <AppFlowHeader fallbackHref="/" dashboardHref="/dashboard" maxWidthClassName="max-w-6xl" />
+      {showSignedInUserFlow ? (
+        <AppFlowHeader fallbackHref="/" dashboardHref="/dashboard" maxWidthClassName="max-w-6xl" />
+      ) : (
+        <PublicHeader />
+      )}
       <main className="px-6 pb-20">
         <div className="max-w-6xl mx-auto">
           <section className="pt-10 pb-12">
@@ -69,7 +84,7 @@ export default function ListYourPracticePage() {
               </div>
               <div className="mt-4 text-sm text-gray-600">
                 Already have a practitioner account?{' '}
-                <Link href="/auth/signin?reauth=1&context=practitioner&next=/practitioner" className="text-emerald-700 font-semibold hover:underline">
+                <Link href={practitionerSigninHref} className="text-emerald-700 font-semibold hover:underline">
                   Sign in here
                 </Link>
                 .

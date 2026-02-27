@@ -164,6 +164,7 @@ export default function SignIn() {
   const [isSafariIOS, setIsSafariIOS] = useState(false)
   const skipAutoRedirectRef = useRef(false)
   const [authContext, setAuthContext] = useState<'default' | 'practitioner'>('default')
+  const backFallbackHref = authContext === 'practitioner' ? '/list-your-practice/start' : '/'
 
   // If the user is already logged in and somehow lands on the sign-in page
   // (for example, via the iOS Home Screen icon), immediately send them into
@@ -784,23 +785,29 @@ export default function SignIn() {
       
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
         <div className="max-w-md w-full space-y-8">
-          {authContext === 'practitioner' && (
-            <div className="flex justify-start">
-              <button
-                type="button"
-                onClick={() => {
-                  if (typeof window !== 'undefined' && window.history.length > 1) {
-                    router.back()
-                    return
-                  }
-                  router.push('/list-your-practice/start')
-                }}
-                className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
+          <div className="flex items-center justify-between">
+            <button
+              type="button"
+              onClick={() => {
+                if (typeof window !== 'undefined' && window.history.length > 1) {
+                  router.back()
+                  return
+                }
+                window.location.href = backFallbackHref
+              }}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
+            >
+              ← Back
+            </button>
+            {status === 'authenticated' && !session?.user?.isPractitioner && (
+              <Link
+                href="/dashboard"
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
               >
-                ← Back
-              </button>
-            </div>
-          )}
+                Go to Dashboard
+              </Link>
+            )}
+          </div>
 
           {/* Logo */}
           <div className="flex justify-center">

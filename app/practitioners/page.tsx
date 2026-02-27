@@ -3,7 +3,9 @@
 import React, { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { useSession } from 'next-auth/react'
 import PublicFooter from '@/components/marketing/PublicFooter'
+import PublicHeader from '@/components/marketing/PublicHeader'
 import AppFlowHeader from '@/components/practitioner/AppFlowHeader'
 import MaterialSymbol from '@/components/MaterialSymbol'
 import { PRACTITIONER_SYMPTOM_HINTS } from '@/data/practitioner-symptoms'
@@ -92,6 +94,8 @@ const QUICK_ACCESS: QuickAccess[] = [
 const SYMPTOM_CATEGORY_HINTS = PRACTITIONER_SYMPTOM_HINTS
 
 export default function PractitionerDirectoryPage() {
+  const { data: session, status } = useSession()
+  const showSignedInUserFlow = status === 'authenticated' && !session?.user?.isPractitioner
   const [quickAccessOpen, setQuickAccessOpen] = useState(false)
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [categoryId, setCategoryId] = useState('')
@@ -670,7 +674,11 @@ export default function PractitionerDirectoryPage() {
           )}
         </div>
       )}
-      <AppFlowHeader fallbackHref="/" dashboardHref="/dashboard" maxWidthClassName="max-w-7xl" />
+      {showSignedInUserFlow ? (
+        <AppFlowHeader fallbackHref="/" dashboardHref="/dashboard" maxWidthClassName="max-w-7xl" />
+      ) : (
+        <PublicHeader />
+      )}
       <section className="relative bg-gradient-to-b from-emerald-50/60 via-white to-white pt-20 pb-20 overflow-hidden border-b border-emerald-100/70">
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-100/40 to-transparent -z-10" />
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl -z-10" />

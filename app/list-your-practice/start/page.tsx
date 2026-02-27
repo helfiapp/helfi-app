@@ -1,6 +1,7 @@
 import Link from 'next/link'
 import { getServerSession } from 'next-auth'
 import PublicFooter from '@/components/marketing/PublicFooter'
+import PublicHeader from '@/components/marketing/PublicHeader'
 import AppFlowHeader from '@/components/practitioner/AppFlowHeader'
 import { authOptions } from '@/lib/auth'
 
@@ -8,17 +9,21 @@ export default async function ListYourPracticeStartPage() {
   const session = await getServerSession(authOptions)
   const isSignedIn = Boolean(session?.user)
   const isPractitioner = Boolean(session?.user?.isPractitioner)
-  const dashboardHref = isPractitioner ? '/practitioner' : '/dashboard'
-  const practitionerSignupHref = isSignedIn
+  const showSignedInUserFlow = isSignedIn && !isPractitioner
+  const practitionerSignupHref = showSignedInUserFlow
     ? '/auth/signin?reauth=1&context=practitioner&mode=signup&next=/practitioner'
     : '/auth/signin?context=practitioner&mode=signup&next=/practitioner'
-  const practitionerSigninHref = isSignedIn
+  const practitionerSigninHref = showSignedInUserFlow
     ? '/auth/signin?reauth=1&context=practitioner&next=/practitioner'
     : '/auth/signin?context=practitioner&next=/practitioner'
 
   return (
     <div className="min-h-screen bg-gradient-to-b from-white via-emerald-50/40 to-white">
-      <AppFlowHeader fallbackHref="/list-your-practice" dashboardHref={dashboardHref} maxWidthClassName="max-w-5xl" />
+      {showSignedInUserFlow ? (
+        <AppFlowHeader fallbackHref="/list-your-practice" dashboardHref="/dashboard" maxWidthClassName="max-w-5xl" />
+      ) : (
+        <PublicHeader />
+      )}
       <main className="px-6 pb-20">
         <div className="max-w-5xl mx-auto">
           <section className="pt-10 pb-8">
@@ -54,10 +59,10 @@ export default async function ListYourPracticeStartPage() {
                 Sign in to manage your listing and boosts.
               </p>
               <Link
-                href={isSignedIn ? dashboardHref : practitionerSigninHref}
+                href={showSignedInUserFlow ? '/dashboard' : practitionerSigninHref}
                 className="inline-flex items-center justify-center w-full px-5 py-3 rounded-full border-2 border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
               >
-                {isSignedIn ? 'Back to dashboard' : 'Sign in'}
+                {showSignedInUserFlow ? 'Back to dashboard' : 'Sign in'}
               </Link>
             </div>
           </section>
