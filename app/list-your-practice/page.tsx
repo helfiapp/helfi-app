@@ -9,8 +9,7 @@ import { absoluteUrl } from '@/lib/site-url'
 export default async function ListYourPracticePage() {
   const session = await getServerSession(authOptions)
   const isSignedIn = Boolean(session?.user)
-  const isPractitioner = Boolean(session?.user?.isPractitioner)
-  const showSignedInUserFlow = isSignedIn && !isPractitioner
+  const showSignedInUserFlow = isSignedIn
   const practitionerSigninHref = showSignedInUserFlow
     ? '/auth/signin?reauth=1&context=practitioner&next=/practitioner'
     : '/auth/signin?context=practitioner&next=/practitioner'

@@ -8,8 +8,7 @@ import { authOptions } from '@/lib/auth'
 export default async function ListYourPracticeStartPage() {
   const session = await getServerSession(authOptions)
   const isSignedIn = Boolean(session?.user)
-  const isPractitioner = Boolean(session?.user?.isPractitioner)
-  const showSignedInUserFlow = isSignedIn && !isPractitioner
+  const showSignedInUserFlow = isSignedIn
   const practitionerSignupHref = showSignedInUserFlow
     ? '/auth/signin?reauth=1&context=practitioner&mode=signup&next=/practitioner'
     : '/auth/signin?context=practitioner&mode=signup&next=/practitioner'

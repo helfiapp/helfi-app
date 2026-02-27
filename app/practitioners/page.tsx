@@ -95,7 +95,7 @@ const SYMPTOM_CATEGORY_HINTS = PRACTITIONER_SYMPTOM_HINTS
 
 export default function PractitionerDirectoryPage() {
   const { data: session, status } = useSession()
-  const showSignedInUserFlow = status === 'authenticated' && !session?.user?.isPractitioner
+  const showSignedInUserFlow = status === 'authenticated'
   const [quickAccessOpen, setQuickAccessOpen] = useState(false)
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [categoryId, setCategoryId] = useState('')
