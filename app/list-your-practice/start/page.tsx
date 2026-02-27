@@ -28,21 +28,6 @@ export default async function ListYourPracticeStartPage() {
               >
                 Back to dashboard
               </Link>
-              {!isPractitioner ? (
-                <Link
-                  href={practitionerSignupHref}
-                  className="inline-flex items-center justify-center px-5 py-2 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-                >
-                  Sign out and create practitioner account
-                </Link>
-              ) : (
-                <Link
-                  href="/practitioner"
-                  className="inline-flex items-center justify-center px-5 py-2 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-                >
-                  Go to practitioner portal
-                </Link>
-              )}
             </div>
           </div>
         </header>

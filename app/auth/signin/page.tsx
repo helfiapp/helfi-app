@@ -784,6 +784,24 @@ export default function SignIn() {
       
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 p-4">
         <div className="max-w-md w-full space-y-8">
+          {authContext === 'practitioner' && (
+            <div className="flex justify-start">
+              <button
+                type="button"
+                onClick={() => {
+                  if (typeof window !== 'undefined' && window.history.length > 1) {
+                    router.back()
+                    return
+                  }
+                  router.push('/list-your-practice/start')
+                }}
+                className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
+              >
+                ← Back
+              </button>
+            </div>
+          )}
+
           {/* Logo */}
           <div className="flex justify-center">
             <Link
