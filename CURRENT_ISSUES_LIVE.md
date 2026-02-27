@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 12:27 PM AEDT
+- What changed: Fixed all feature-page `View pricing` buttons so they now jump directly to the homepage Pricing section instead of only loading the homepage top.
+- Where to see it (page/link): https://helfi.ai/features/nutrition-food (and all /features/* pages)
+- What to quickly test: Open any feature page, click View pricing, and confirm it lands at the Pricing section on https://helfi.ai/#pricing.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 11:34 AM AEDT
 - What changed: Chatbot support names now show first names only (no surnames), and chatbot profile photos were made slightly larger for clearer visibility in the chat launcher and chat header.
 - Where to see it (page/link): https://helfi.ai and https://helfi.ai/support
