@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 01:13 PM AEDT
+- What changed: Hard-locked the Food Diary barcode scanner flow with deploy-time guard rails. Added strict protected regions for barcode lookup/action routing and scanner camera/decoder engine, so future edits to those blocks will fail deployment unless an explicit override is used.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary, tap Scan barcode, scan a product, confirm flow works as before. Then note this area is now hard-locked against accidental future changes.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 12:27 PM AEDT
 - What changed: Fixed all feature-page `View pricing` buttons so they now jump directly to the homepage Pricing section instead of only loading the homepage top.
 - Where to see it (page/link): https://helfi.ai/features/nutrition-food (and all /features/* pages)
