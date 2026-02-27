@@ -26,6 +26,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
   const pathname = usePathname()
   const router = useRouter()
   const isPractitionerDirectory = pathname === '/practitioners' || pathname?.startsWith('/practitioners/')
+  const forceDashboardCta = isPractitionerDirectory
   const loginHref = isPractitionerDirectory
     ? '/auth/signin?context=practitioner&next=/practitioner'
     : '/auth/signin'
@@ -367,7 +368,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
           >
             FAQ
           </button>
-          {status === 'authenticated' ? (
+          {status === 'authenticated' || forceDashboardCta ? (
             <Link
               href="/dashboard"
               className="btn-primary text-base px-5 py-2 bg-helfi-green hover:bg-green-600 text-white"
@@ -394,7 +395,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
 
         {!hideMobileCtas && (
           <div className="md:hidden flex items-center space-x-3">
-            {status === 'authenticated' ? (
+            {status === 'authenticated' || forceDashboardCta ? (
               <Link
                 href="/dashboard"
                 className="btn-primary text-base px-3 py-2 bg-helfi-green hover:bg-green-600 text-white"
