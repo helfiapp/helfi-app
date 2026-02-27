@@ -680,8 +680,8 @@ export default function SupportChatWidget() {
                 <Image
                   src={agent.avatar}
                   alt={`${agent.name} avatar`}
-                  width={36}
-                  height={36}
+                  width={40}
+                  height={40}
                   className="rounded-full object-cover ring-2 ring-white"
                 />
                 <div className="text-left">
@@ -711,8 +711,8 @@ export default function SupportChatWidget() {
                     <Image
                       src={agent.avatar}
                       alt={`${agent.name} avatar`}
-                      width={36}
-                      height={36}
+                      width={40}
+                      height={40}
                       className="rounded-full object-cover border border-gray-100"
                     />
                     <span className="absolute bottom-0.5 right-0.5 h-2.5 w-2.5 bg-emerald-500 rounded-full border-2 border-white" />

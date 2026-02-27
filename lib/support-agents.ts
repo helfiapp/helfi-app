@@ -7,11 +7,11 @@ type SupportAgent = {
 const SUPPORT_AGENT_ROLE = 'Helfi Support'
 
 const SUPPORT_AGENTS: SupportAgent[] = [
-  { name: 'Amelia Brooks', role: SUPPORT_AGENT_ROLE, avatar: '/support/amelia-brooks.jpg' },
-  { name: 'Luca Bennett', role: SUPPORT_AGENT_ROLE, avatar: '/support/luca-bennett.jpg' },
-  { name: 'Priya Shah', role: SUPPORT_AGENT_ROLE, avatar: '/support/priya-shah.jpg' },
-  { name: 'Mateo Reed', role: SUPPORT_AGENT_ROLE, avatar: '/support/mateo-reed.jpg' },
-  { name: 'Chloe Nguyen', role: SUPPORT_AGENT_ROLE, avatar: '/support/chloe-nguyen.jpg' },
+  { name: 'Amelia', role: SUPPORT_AGENT_ROLE, avatar: '/support/amelia-brooks.jpg' },
+  { name: 'Luca', role: SUPPORT_AGENT_ROLE, avatar: '/support/luca-bennett.jpg' },
+  { name: 'Priya', role: SUPPORT_AGENT_ROLE, avatar: '/support/priya-shah.jpg' },
+  { name: 'Mateo', role: SUPPORT_AGENT_ROLE, avatar: '/support/mateo-reed.jpg' },
+  { name: 'Chloe', role: SUPPORT_AGENT_ROLE, avatar: '/support/chloe-nguyen.jpg' },
 ]
 
 const MINUTES_PER_DAY = 24 * 60
