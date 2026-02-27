@@ -12,10 +12,20 @@ fi
 check_contains() {
   local pattern="$1"
   local message="$2"
-  if ! rg -q "$pattern" "$FILE"; then
+  if ! has_match "$pattern" "$FILE"; then
     echo "[practitioner-lock] $message"
     exit 1
   fi
+}
+
+has_match() {
+  local pattern="$1"
+  local target_file="$2"
+  if command -v rg >/dev/null 2>&1; then
+    rg -q "$pattern" "$target_file"
+    return $?
+  fi
+  grep -Eq "$pattern" "$target_file"
 }
 
 # Required header actions and fallback behavior.
@@ -29,7 +39,7 @@ check_contains "dashboard\\?\\.listing\\?\\.id" "Delete-account visibility guard
 
 # Practitioner accounts must not be globally forced back to /practitioner.
 if [ -f "$LAYOUT_FILE" ]; then
-  if rg -q "router.replace\\('/practitioner'\\)" "$LAYOUT_FILE"; then
+  if has_match "router.replace\\('/practitioner'\\)" "$LAYOUT_FILE"; then
     echo "[practitioner-lock] Global redirect to /practitioner found in LayoutWrapper and will break normal app navigation."
     exit 1
   fi
