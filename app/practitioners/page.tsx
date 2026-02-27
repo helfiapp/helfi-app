@@ -3,6 +3,7 @@
 import React, { useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import dynamic from 'next/dynamic'
+import { useSession } from 'next-auth/react'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import PublicFooter from '@/components/marketing/PublicFooter'
 import MaterialSymbol from '@/components/MaterialSymbol'
@@ -92,6 +93,8 @@ const QUICK_ACCESS: QuickAccess[] = [
 const SYMPTOM_CATEGORY_HINTS = PRACTITIONER_SYMPTOM_HINTS
 
 export default function PractitionerDirectoryPage() {
+  const { status } = useSession()
+  const showSimpleAppHeader = status !== 'unauthenticated'
   const [quickAccessOpen, setQuickAccessOpen] = useState(false)
   const [categories, setCategories] = useState<CategoryNode[]>([])
   const [categoryId, setCategoryId] = useState('')
@@ -640,6 +643,14 @@ export default function PractitionerDirectoryPage() {
     }
   }
 
+  const handleBack = () => {
+    if (typeof window !== 'undefined' && window.history.length > 1) {
+      window.history.back()
+      return
+    }
+    window.location.href = '/dashboard'
+  }
+
   return (
     <div
       className="min-h-screen bg-white"
@@ -670,7 +681,27 @@ export default function PractitionerDirectoryPage() {
           )}
         </div>
       )}
-      <PublicHeader mobileVariant="back" />
+      {showSimpleAppHeader ? (
+        <header className="px-4 sm:px-6 lg:px-8 pt-4">
+          <div className="max-w-7xl mx-auto flex items-center justify-between">
+            <button
+              type="button"
+              onClick={handleBack}
+              className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
+            >
+              ← Back
+            </button>
+            <Link
+              href="/dashboard"
+              className="inline-flex items-center justify-center px-5 py-2 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
+            >
+              Go to Dashboard
+            </Link>
+          </div>
+        </header>
+      ) : (
+        <PublicHeader mobileVariant="back" />
+      )}
       <section className="relative bg-gradient-to-b from-emerald-50/60 via-white to-white pt-20 pb-20 overflow-hidden border-b border-emerald-100/70">
         <div className="absolute inset-x-0 top-0 h-24 bg-gradient-to-b from-emerald-100/40 to-transparent -z-10" />
         <div className="absolute -top-24 -left-24 w-96 h-96 bg-emerald-100/50 rounded-full blur-3xl -z-10" />
