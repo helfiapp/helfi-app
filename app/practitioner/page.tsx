@@ -257,6 +257,27 @@ export default function PractitionerPage() {
   const registrationError =
     registrationTouched && !registrationValidation.valid ? registrationValidation.error : null
 
+  const handleBack = () => {
+    if (typeof window === 'undefined') return
+
+    try {
+      if (window.history.length > 1) {
+        const referrer = document.referrer || ''
+        if (referrer) {
+          const ref = new URL(referrer)
+          if (ref.origin === window.location.origin) {
+            window.history.back()
+            return
+          }
+        }
+      }
+    } catch {
+      // fall back below
+    }
+
+    window.location.href = '/list-your-practice/start'
+  }
+
   useEffect(() => {
     if (!addressQuery || addressQuery.trim().length < 3) {
       setAddressSuggestions([])
@@ -755,21 +776,38 @@ export default function PractitionerPage() {
     <div className="min-h-screen bg-gray-50 p-6">
       <div className="max-w-4xl mx-auto space-y-6">
         <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+          <div className="flex flex-col gap-4">
             <h1 className="text-2xl font-bold text-gray-900">Practitioner Listing</h1>
-            <div className="flex items-center gap-3 text-sm">
-              <button
-                onClick={() => signOut({ callbackUrl: '/practitioners' })}
-                className="text-emerald-700 font-semibold hover:underline"
-              >
-                Sign out
-              </button>
-              <a
-                href="/public-home"
-                className="text-emerald-700 hover:underline"
-              >
-                Go to the public homepage
-              </a>
+            <div className="space-y-3">
+              <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+                <button
+                  onClick={handleBack}
+                  className="inline-flex items-center justify-center rounded-full border border-emerald-200 px-4 py-2.5 text-sm font-semibold text-emerald-700 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                >
+                  ← Back
+                </button>
+                <Link
+                  href="/dashboard"
+                  className="inline-flex items-center justify-center rounded-full bg-helfi-green px-5 py-2.5 text-sm font-semibold text-white shadow-sm hover:bg-helfi-green/90 transition-colors"
+                >
+                  Go to dashboard
+                </Link>
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-2 text-sm">
+                <button
+                  onClick={() => signOut({ callbackUrl: '/practitioners' })}
+                  className="text-emerald-700 font-semibold hover:underline"
+                >
+                  Sign out
+                </button>
+                <a
+                  href="/public-home"
+                  className="text-emerald-700 hover:underline"
+                >
+                  Go to the public homepage
+                </a>
+              </div>
             </div>
           </div>
           <p className="text-gray-600 mt-2">
