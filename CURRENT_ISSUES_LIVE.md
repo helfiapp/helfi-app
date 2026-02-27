@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-27 06:49 PM AEDT
+- What changed: Fixed practitioner account entry routing so users who are already logged in are now forced through a clean account switch before practitioner sign-up/sign-in. This stops the “Create practitioner account” flow from dumping normal users straight into the listing form.
+- Where to see it (page/link): https://helfi.ai/list-your-practice/start, https://helfi.ai/list-your-practice, https://helfi.ai/practitioner
+- What to quickly test: While logged in as a normal user, click `Create practitioner account` from `/list-your-practice/start`; confirm you land on sign-up form (not listing form). Also click practitioner `Sign in` and confirm it shows sign-in form for account switching.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-27 06:23 PM AEDT
 - What changed: Added a hard deployment safety lock. `./scripts/check-deployment-status.sh` now fails if `helfi.ai` or `www.helfi.ai` are still pointing to an older deployment, and prints exact alias-fix commands.
 - Where to see it (page/link): Deployment workflow script + live domain mapping checks (`helfi.ai`, `www.helfi.ai`).
