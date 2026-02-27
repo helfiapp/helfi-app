@@ -715,14 +715,14 @@ export default function PractitionerPage() {
             <Link
               replace
               className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-              href="/auth/signin?context=practitioner&mode=signup&next=/practitioner"
+              href="/auth/signin?reauth=1&context=practitioner&mode=signup&next=/practitioner"
             >
               Create account
             </Link>
             <Link
               replace
               className="px-5 py-2.5 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-              href="/auth/signin?context=practitioner&next=/practitioner"
+              href="/auth/signin?reauth=1&context=practitioner&next=/practitioner"
             >
               Sign in
             </Link>

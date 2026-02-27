@@ -30,7 +30,7 @@ export default function ListYourPracticeStartPage() {
                 Create your practitioner account and start your listing.
               </p>
               <Link
-                href="/auth/signin?context=practitioner&mode=signup&next=/practitioner"
+                href="/auth/signin?reauth=1&context=practitioner&mode=signup&next=/practitioner"
                 className="inline-flex items-center justify-center w-full px-5 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
               >
                 Create practitioner account
@@ -43,7 +43,7 @@ export default function ListYourPracticeStartPage() {
                 Sign in to manage your listing and boosts.
               </p>
               <Link
-                href="/auth/signin?context=practitioner&next=/practitioner"
+                href="/auth/signin?reauth=1&context=practitioner&next=/practitioner"
                 className="inline-flex items-center justify-center w-full px-5 py-3 rounded-full border-2 border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
               >
                 Sign in

@@ -351,20 +351,29 @@ export default function SignIn() {
     const searchParams = new URLSearchParams(window.location.search)
     if (searchParams.get('reauth') !== '1') return
 
-    skipAutoRedirectRef.current = true
-    const clearSession = async () => {
-      try {
-        await signOut({ redirect: false })
-      } catch (error) {
-        console.warn('Session clear failed', error)
-      }
+    const clearReauthParam = () => {
       try {
         const nextUrl = new URL(window.location.href)
         nextUrl.searchParams.delete('reauth')
         window.history.replaceState({}, '', nextUrl.toString())
       } catch {
         // Ignore URL cleanup errors
+      }
+    }
+
+    if (status !== 'authenticated') {
+      clearReauthParam()
+      return
+    }
+
+    skipAutoRedirectRef.current = true
+    const clearSession = async () => {
+      try {
+        await signOut({ redirect: false })
+      } catch (error) {
+        console.warn('Session clear failed', error)
       } finally {
+        clearReauthParam()
         skipAutoRedirectRef.current = false
       }
     }
