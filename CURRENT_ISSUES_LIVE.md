@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-28 11:30 AEDT
+- What changed: Improved practitioner symptom search matching so common phrase variations now work better (examples: `head ache` matches `headache`, `sore foot` matches `foot pain`, `sore neck` matches `neck pain`). Added auto-category fallback so symptom text can map to a relevant specialty when no category is selected.
+- Where to see it (page/link): https://helfi.ai/practitioners
+- What to quickly test: On practitioners search, try `head ache`, `sore foot`, `sore neck` and confirm suggested categories appear and search no longer fails just because wording/spacing is slightly different.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-28 11:07 AEDT
 - What changed: Fixed auth-page trap that could leave users stuck on sign-in after navigation. Removed auto-signout behavior from `reauth` flow and hardened Back button fallback so it exits safely instead of looping on sign-in.
 - Where to see it (page/link): https://helfi.ai/auth/signin
