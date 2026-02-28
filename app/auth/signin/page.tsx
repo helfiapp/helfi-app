@@ -164,7 +164,12 @@ export default function SignIn() {
   const [isSafariIOS, setIsSafariIOS] = useState(false)
   const skipAutoRedirectRef = useRef(false)
   const [authContext, setAuthContext] = useState<'default' | 'practitioner'>('default')
-  const backFallbackHref = authContext === 'practitioner' ? '/list-your-practice/start' : '/'
+  const backFallbackHref =
+    status === 'authenticated' && !session?.user?.isPractitioner
+      ? '/dashboard'
+      : authContext === 'practitioner'
+        ? '/list-your-practice/start'
+        : '/'
 
   // If the user is already logged in and somehow lands on the sign-in page
   // (for example, via the iOS Home Screen icon), immediately send them into
@@ -335,42 +340,6 @@ export default function SignIn() {
 
     void resume()
   }, [status, router, installPromptVisible, session, authContext])
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return
-    if (status === 'loading') return
-    const searchParams = new URLSearchParams(window.location.search)
-    if (searchParams.get('reauth') !== '1') return
-
-    const clearReauthParam = () => {
-      try {
-        const nextUrl = new URL(window.location.href)
-        nextUrl.searchParams.delete('reauth')
-        window.history.replaceState({}, '', nextUrl.toString())
-      } catch {
-        // Ignore URL cleanup errors
-      }
-    }
-
-    if (status !== 'authenticated') {
-      clearReauthParam()
-      return
-    }
-
-    skipAutoRedirectRef.current = true
-    const clearSession = async () => {
-      try {
-        await signOut({ redirect: false })
-      } catch (error) {
-        console.warn('Session clear failed', error)
-      } finally {
-        clearReauthParam()
-        skipAutoRedirectRef.current = false
-      }
-    }
-
-    void clearSession()
-  }, [status])
 
   useEffect(() => {
     if (typeof window === 'undefined') return
@@ -789,11 +758,17 @@ export default function SignIn() {
             <button
               type="button"
               onClick={() => {
-                if (typeof window !== 'undefined' && window.history.length > 1) {
-                  router.back()
+                if (typeof window !== 'undefined') {
+                  const referrer = document.referrer || ''
+                  const referrerPath = referrer ? new URL(referrer, window.location.origin).pathname : ''
+                  const canSafelyGoBack = window.history.length > 1 && !referrerPath.startsWith('/auth/signin')
+                  if (canSafelyGoBack) {
+                    router.back()
+                    return
+                  }
+                  window.location.href = backFallbackHref
                   return
                 }
-                window.location.href = backFallbackHref
               }}
               className="inline-flex items-center justify-center px-4 py-2 rounded-full border border-emerald-200 text-emerald-800 font-semibold hover:border-emerald-300 hover:text-emerald-900 transition-colors"
             >
