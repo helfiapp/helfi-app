@@ -4,7 +4,53 @@ import { calculateDistanceKm } from '@/lib/practitioner-utils'
 import { createTrackingToken } from '@/lib/practitioner-tracking'
 
 function normalize(value: string | null | undefined): string {
-  return String(value || '').trim().toLowerCase()
+  return String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+const WORD_EQUIVALENTS: Record<string, string> = {
+  sore: 'pain',
+  aching: 'pain',
+  ache: 'pain',
+  hurts: 'pain',
+  hurt: 'pain',
+  feet: 'foot',
+}
+
+function compact(value: string | null | undefined): string {
+  return normalize(value).replace(/\s+/g, '')
+}
+
+function normalizeWord(word: string): string {
+  const mapped = WORD_EQUIVALENTS[word] || word
+  if (mapped.endsWith('s') && mapped.length > 3) return mapped.slice(0, -1)
+  return mapped
+}
+
+function tokenize(value: string | null | undefined): string[] {
+  return normalize(value)
+    .split(' ')
+    .filter(Boolean)
+    .map(normalizeWord)
+}
+
+function matchesQueryText(source: string | null | undefined, query: string): boolean {
+  const normalizedSource = normalize(source)
+  if (!normalizedSource || !query) return false
+
+  if (normalizedSource.includes(query) || query.includes(normalizedSource)) return true
+
+  const compactSource = compact(source)
+  const compactQuery = compact(query)
+  if (compactSource.includes(compactQuery) || compactQuery.includes(compactSource)) return true
+
+  const sourceTokens = tokenize(source)
+  const queryTokens = tokenize(query)
+  if (!sourceTokens.length || !queryTokens.length) return false
+  return queryTokens.every((token) => sourceTokens.includes(token))
 }
 
 function deriveRadiusTier(radiusKm: number) {
@@ -81,11 +127,11 @@ export async function GET(request: NextRequest) {
         listing.subcategory?.name,
         ...(listing.tags || []),
       ]
-      const textMatch = textValues.some((value) => normalize(value).includes(query))
+      const textMatch = textValues.some((value) => matchesQueryText(value, query))
       if (textMatch) return true
       const categorySynonyms = synonymsMap.get(listing.categoryId) || []
       const subcategorySynonyms = listing.subcategoryId ? synonymsMap.get(listing.subcategoryId) || [] : []
-      return [...categorySynonyms, ...subcategorySynonyms].some((syn) => syn.includes(query))
+      return [...categorySynonyms, ...subcategorySynonyms].some((syn) => matchesQueryText(syn, query))
     })
   }
 

@@ -92,6 +92,51 @@ const QUICK_ACCESS: QuickAccess[] = [
 ]
 
 const SYMPTOM_CATEGORY_HINTS = PRACTITIONER_SYMPTOM_HINTS
+const SEARCH_WORD_EQUIVALENTS: Record<string, string> = {
+  sore: 'pain',
+  aching: 'pain',
+  ache: 'pain',
+  hurts: 'pain',
+  hurt: 'pain',
+  feet: 'foot',
+}
+
+const normalizeSearchText = (value: string) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+
+const compactSearchText = (value: string) => normalizeSearchText(value).replace(/\s+/g, '')
+
+const normalizeSearchWord = (word: string) => {
+  const mapped = SEARCH_WORD_EQUIVALENTS[word] || word
+  if (mapped.endsWith('s') && mapped.length > 3) return mapped.slice(0, -1)
+  return mapped
+}
+
+const tokenizeSearchText = (value: string) =>
+  normalizeSearchText(value)
+    .split(' ')
+    .filter(Boolean)
+    .map(normalizeSearchWord)
+
+const matchesSearchText = (source: string, input: string) => {
+  const normalizedSource = normalizeSearchText(source)
+  const normalizedInput = normalizeSearchText(input)
+  if (!normalizedSource || !normalizedInput) return false
+  if (normalizedSource.includes(normalizedInput) || normalizedInput.includes(normalizedSource)) return true
+
+  const compactSource = compactSearchText(source)
+  const compactInput = compactSearchText(input)
+  if (compactSource.includes(compactInput) || compactInput.includes(compactSource)) return true
+
+  const sourceTokens = tokenizeSearchText(source)
+  const inputTokens = tokenizeSearchText(input)
+  if (!sourceTokens.length || !inputTokens.length) return false
+  return inputTokens.every((token) => sourceTokens.includes(token))
+}
 
 export default function PractitionerDirectoryPage() {
   const { data: session, status } = useSession()
@@ -144,13 +189,12 @@ export default function PractitionerDirectoryPage() {
   }, [categories, categoryId])
 
   const categoryMatches = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedQuery = normalizeSearchText(query)
     if (!normalizedQuery) return []
     const matches: CategoryMatch[] = []
     categories.forEach((category) => {
-      const categoryName = category.name.toLowerCase()
       const categorySynonyms = category.synonyms || []
-      const categoryMatch = categoryName.includes(normalizedQuery) || categorySynonyms.some((syn) => syn.toLowerCase().includes(normalizedQuery))
+      const categoryMatch = matchesSearchText(category.name, normalizedQuery) || categorySynonyms.some((syn) => matchesSearchText(syn, normalizedQuery))
       if (categoryMatch) {
         matches.push({
           id: `category-${category.id}`,
@@ -159,9 +203,8 @@ export default function PractitionerDirectoryPage() {
         })
       }
       category.children?.forEach((child) => {
-        const childName = child.name.toLowerCase()
         const childSynonyms = child.synonyms || []
-        const childMatch = childName.includes(normalizedQuery) || childSynonyms.some((syn) => syn.toLowerCase().includes(normalizedQuery))
+        const childMatch = matchesSearchText(child.name, normalizedQuery) || childSynonyms.some((syn) => matchesSearchText(syn, normalizedQuery))
         if (childMatch) {
           matches.push({
             id: `subcategory-${child.id}`,
@@ -177,7 +220,7 @@ export default function PractitionerDirectoryPage() {
   }, [categories, query])
 
   const symptomMatches = useMemo(() => {
-    const normalizedQuery = query.trim().toLowerCase()
+    const normalizedQuery = normalizeSearchText(query)
     if (!normalizedQuery || normalizedQuery.length < 3) return []
     const matches: CategoryMatch[] = []
     const categoryLookup = new Map<string, CategoryNode>()
@@ -186,10 +229,7 @@ export default function PractitionerDirectoryPage() {
     })
 
     SYMPTOM_CATEGORY_HINTS.forEach((hint) => {
-      const matched = hint.terms.some((term) => {
-        const normalizedTerm = term.toLowerCase()
-        return normalizedTerm.includes(normalizedQuery) || normalizedQuery.includes(normalizedTerm)
-      })
+      const matched = hint.terms.some((term) => matchesSearchText(term, normalizedQuery))
       if (!matched) return
       const category = categoryLookup.get(hint.category.toLowerCase())
       if (!category) return
@@ -213,6 +253,44 @@ export default function PractitionerDirectoryPage() {
 
     return matches
   }, [categories, query])
+
+  const findSymptomMatchForQuery = (searchQuery: string): CategoryMatch | null => {
+    const normalizedQuery = normalizeSearchText(searchQuery)
+    if (!normalizedQuery || normalizedQuery.length < 3) return null
+
+    const categoryLookup = new Map<string, CategoryNode>()
+    categories.forEach((category) => {
+      categoryLookup.set(category.name.toLowerCase(), category)
+    })
+
+    for (const hint of SYMPTOM_CATEGORY_HINTS) {
+      const matched = hint.terms.some((term) => matchesSearchText(term, normalizedQuery))
+      if (!matched) continue
+
+      const category = categoryLookup.get(hint.category.toLowerCase())
+      if (!category) continue
+
+      let matchedSubcategoryId: string | undefined
+      let matchedParentLabel: string | undefined
+      if (hint.subcategory) {
+        const child = category.children?.find((item) => item.name.toLowerCase() === hint.subcategory?.toLowerCase())
+        if (child) {
+          matchedSubcategoryId = child.id
+          matchedParentLabel = category.name
+        }
+      }
+
+      return {
+        id: `auto-symptom-${category.id}-${matchedSubcategoryId || 'all'}`,
+        label: hint.subcategory || category.name,
+        categoryId: category.id,
+        subcategoryId: matchedSubcategoryId,
+        parentLabel: matchedParentLabel,
+      }
+    }
+
+    return null
+  }
 
   const suggestedMatches = useMemo(() => {
     const merged: CategoryMatch[] = []
@@ -406,9 +484,22 @@ export default function PractitionerDirectoryPage() {
     setError(null)
     setPendingScroll(true)
     try {
-      const effectiveCategoryId = overrides?.categoryId ?? categoryId
-      const effectiveSubcategoryId = overrides?.subcategoryId ?? subcategoryId
-      const effectiveQuery = overrides?.query ?? query
+      let effectiveCategoryId = overrides?.categoryId ?? categoryId
+      let effectiveSubcategoryId = overrides?.subcategoryId ?? subcategoryId
+      let effectiveQuery = overrides?.query ?? query
+
+      if (!effectiveCategoryId && !effectiveSubcategoryId && effectiveQuery.trim()) {
+        const autoSymptomMatch = findSymptomMatchForQuery(effectiveQuery)
+        if (autoSymptomMatch) {
+          effectiveCategoryId = autoSymptomMatch.categoryId
+          effectiveSubcategoryId = autoSymptomMatch.subcategoryId || ''
+          // Keep the search broad once we identify the right specialty.
+          effectiveQuery = ''
+          setCategoryId(effectiveCategoryId)
+          setSubcategoryId(effectiveSubcategoryId)
+        }
+      }
+
       const params = new URLSearchParams()
       if (effectiveCategoryId) params.set('categoryId', effectiveCategoryId)
       if (effectiveSubcategoryId) params.set('subcategoryId', effectiveSubcategoryId)
