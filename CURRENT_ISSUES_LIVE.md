@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-02-28 11:07 AEDT
+- What changed: Fixed auth-page trap that could leave users stuck on sign-in after navigation. Removed auto-signout behavior from `reauth` flow and hardened Back button fallback so it exits safely instead of looping on sign-in.
+- Where to see it (page/link): https://helfi.ai/auth/signin
+- What to quickly test: While signed in, open practitioner pages and click `Go to Dashboard`; confirm it opens dashboard instead of sending you to sign-in. Open `/auth/signin` and confirm `Back` exits the page safely.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-28 04:06 AEDT
 - What changed: Final navigation correction for signed-in users on practitioner pages. When logged in, `/practitioners`, `/list-your-practice`, and `/list-your-practice/start` now always show only `Back` and `Go to Dashboard` (no logo/menu bar).
 - Where to see it (page/link): https://helfi.ai/practitioners, https://helfi.ai/list-your-practice, https://helfi.ai/list-your-practice/start
