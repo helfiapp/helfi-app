@@ -10497,9 +10497,7 @@ const applyStructuredItems = (
       // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
       // Some flows (atomic delete) already updated the server snapshot in the same request.
       if (options?.skipServerSnapshot !== true) {
-        void syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate).catch((err) => {
-          console.warn('Snapshot sync failed (non-blocking save path)', err)
-        })
+        await syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate)
       }
 
       // 3) For brand new entries, write directly into the permanent FoodLog history table.
