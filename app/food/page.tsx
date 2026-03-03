@@ -3855,6 +3855,7 @@ export default function FoodDiary() {
       : {},
   )
   const diaryMergeInFlightRef = useRef<Record<string, boolean>>({})
+  const lastManualRefreshAtRef = useRef<Record<string, number>>({})
   const pendingFoodLogSaveRef = useRef<Map<string, { key: string; targetDate: string; attempts: number; nextAttemptAt: number; lastAttemptAt: number }>>(new Map())
   const pendingFoodLogTimerRef = useRef<number | null>(null)
   const pendingFoodLogFlushRef = useRef(false)
@@ -3864,6 +3865,7 @@ export default function FoodDiary() {
   const DUPLICATE_CLEANUP_WINDOW_MS = 2 * 60 * 1000
   const VERIFY_MERGE_HOLD_MS = 4000
   const VERIFY_FETCH_FRESH_MS = 30 * 1000
+  const MANUAL_REFRESH_COOLDOWN_MS = 1200
   const lastVerifyFetchAtRef = useRef<Record<string, number>>({})
   const holdVerifyMergeForDate = (date: string, durationMs: number = VERIFY_MERGE_HOLD_MS) => {
     if (!date) return
@@ -10058,6 +10060,13 @@ const applyStructuredItems = (
         return
       }
     }
+    if (mode === 'manual') {
+      const lastManualAt = Number(lastManualRefreshAtRef.current[targetDate] || 0)
+      if (lastManualAt > 0 && Date.now() - lastManualAt < MANUAL_REFRESH_COOLDOWN_MS) {
+        return
+      }
+      lastManualRefreshAtRef.current[targetDate] = Date.now()
+    }
     if (diaryMergeInFlightRef.current[targetDate]) return
     diaryMergeInFlightRef.current[targetDate] = true
     try {
@@ -10488,7 +10497,9 @@ const applyStructuredItems = (
       // 2) Persist today's foods snapshot (fast "today" view) via /api/user-data.
       // Some flows (atomic delete) already updated the server snapshot in the same request.
       if (options?.skipServerSnapshot !== true) {
-        await syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate)
+        void syncSnapshotToServer(snapshotFoods, options?.snapshotDateOverride ?? selectedDate).catch((err) => {
+          console.warn('Snapshot sync failed (non-blocking save path)', err)
+        })
       }
 
       // 3) For brand new entries, write directly into the permanent FoodLog history table.
