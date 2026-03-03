@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-03 10:03 PM AEDT
+- What changed: Food Diary save/update reliability and refresh behavior patch. Kept manual refresh mode, added short manual refresh burst guard, and ensured save path keeps cross-device snapshot consistency so new meals appear after refresh on other devices.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: On desktop add a new meal on 2026-03-02, then on mobile open the same date and pull-to-refresh once. Confirm the meal appears under the correct category.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-02-28 11:30 AEDT
 - What changed: Improved practitioner symptom search matching so common phrase variations now work better (examples: `head ache` matches `headache`, `sore foot` matches `foot pain`, `sore neck` matches `neck pain`). Added auto-category fallback so symptom text can map to a relevant specialty when no category is selected.
 - Where to see it (page/link): https://helfi.ai/practitioners
