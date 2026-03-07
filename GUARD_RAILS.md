@@ -11,6 +11,31 @@ protected areas listed below.
 
 ---
 
+## Full Page Lock (Mar 7, 2026)
+
+The current live web app and current native app are now baseline-locked.
+
+Locked now:
+- all web route files in `app/**` that are `page`, `layout`, or `loading`
+- all shared web UI files in `components/**`
+- all native UI files in `native/src/**`
+
+What happens now:
+- web build/deploy fails if any locked file changed without explicit approval
+- native start/build commands fail if any locked native UI file changed without explicit approval
+
+Commands:
+- web + native lock check: `npm run check:page-locks`
+- native-only lock check: `npm --prefix native run check:page-locks`
+- refresh lock snapshot after owner-approved changes: `npm run write:page-locks`
+
+Approval rule:
+- only unlock the exact file(s) the owner asked to change
+- use `ALLOW_LOCKED_FILES=file1,file2`
+- after the approved change is finished and verified, refresh the lock snapshot
+
+---
+
 ## Food Diary Lock List (Quick View)
 
 Use this as the fast “no-touch without approval” checklist for Food Diary.

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-07 01:34 AEDT
+- What changed: Forced a fresh LIVE rebuild and repointed helfi.ai/www.helfi.ai to the newest build so the latest dashboard/chat version is live again instead of the older regressed build.
+- Where to see it (page/link): https://helfi.ai/dashboard , https://helfi.ai/chat
+- What to quickly test: Refresh dashboard and chat. Dashboard should show Daily Tools and My Health. Chat should show the newer composer version.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-03 10:03 PM AEDT
 - What changed: Food Diary save/update reliability and refresh behavior patch. Kept manual refresh mode, added short manual refresh burst guard, and ensured save path keeps cross-device snapshot consistency so new meals appear after refresh on other devices.
 - Where to see it (page/link): https://helfi.ai/food

@@ -3,6 +3,11 @@
   "version": "1.0.0",
   "main": "index.ts",
   "scripts": {
+    "check:page-locks": "node ../scripts/check-page-locks.js --scope=native-ui",
+    "prestart": "npm run check:page-locks",
+    "preandroid": "npm run check:page-locks",
+    "preios": "npm run check:page-locks",
+    "preweb": "npm run check:page-locks",
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
