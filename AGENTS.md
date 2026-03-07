@@ -105,6 +105,30 @@ DEPLOYED:
 
 1. Before working on any area, read GUARD_RAILS.md and any other notes for that area so you are fully informed.
 
+## Full Page Lock (Must Follow)
+
+The current live web app and current native app are baseline-locked.
+
+This means:
+- Do not touch locked pages or shared UI unless the owner explicitly asked for that exact area.
+- Work only in the real main folders for the current app.
+- Do not create side copies, side folders, or extra versions for normal work.
+
+Required checks:
+- Web + shared UI lock check: `npm run check:page-locks`
+- Native UI lock check: `npm --prefix native run check:page-locks`
+
+If a locked file changes:
+- Build/start will fail.
+- Only unlock the exact file(s) the owner approved.
+- Use: `ALLOW_LOCKED_FILES=file1,file2`
+- After the approved change is finished and verified, refresh the lock snapshot with:
+  - `npm run write:page-locks`
+
+Important:
+- This lock exists to stop regressions on the current live web app and current native app.
+- If the owner did not ask for a page/section to be changed, do not touch it.
+
 ## Mandatory Pre-Deployment Checklist
 
 0. Use Vercel access: You have full Vercel access via token. Inspect deployments/logs in Vercel, and do not report "done" until the deployment is READY. If you see ERROR, open the Vercel deployment logs, fix the issue, redeploy, and re-check until green.
