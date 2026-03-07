@@ -17,6 +17,7 @@ import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 
 import { API_BASE_URL } from '../config'
+import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -1331,7 +1332,22 @@ export function TrackCaloriesScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setEntryMenu(null)
+      setSwipeMenuEntryId(null)
+      setSectionMenuMeal(null)
+      setTopAddCategoryOpen(false)
+      setTopAddOptionsOpen(false)
       setProfileMenuOpen(false)
+      setEditModalOpen(false)
+      setFavoritesOpen(false)
+      setIngredientOpen(false)
+      setBarcodeOpen(false)
+      setBarcodeLabelOpen(false)
+      setRecommendedOpen(false)
+      setRecommendedExplainOpen(false)
+      setCombineOpen(false)
+      setWaterEditOpen(false)
+      setExerciseOpen(false)
       void loadAll()
       return () => {}
     }, [loadAll]),
@@ -2121,6 +2137,14 @@ export function TrackCaloriesScreen() {
     })
   }
 
+  const openAskAIChat = () => {
+    const parent = navigation.getParent?.()
+    parent?.navigate?.('NativeWebTool', {
+      title: NATIVE_WEB_PAGES.talkToHelfi.title,
+      path: `/chat?context=food&date=${encodeURIComponent(selectedDate)}`,
+    })
+  }
+
   const openCombine = (meal: string) => {
     setCombineTargetMeal(meal)
     setCombineIds([])
@@ -2842,7 +2866,7 @@ export function TrackCaloriesScreen() {
                 <Text style={[energyToggleText, energyUnit === 'kj' && energyToggleTextActive]}>kJ</Text>
               </Pressable>
             </View>
-            <Pressable onPress={() => openRecommended('lunch')} style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 }}>
+            <Pressable onPress={openAskAIChat} style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 }}>
               <Text style={{ color: '#fff', fontWeight: '900' }}>Ask AI</Text>
             </Pressable>
           </View>
