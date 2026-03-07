@@ -8,8 +8,9 @@
   "scripts": {
     "dev": "next dev",
     "check:page-locks": "node scripts/check-page-locks.js",
+    "check:page-locks:web": "node scripts/check-page-locks.js --scope=web-routes && node scripts/check-page-locks.js --scope=web-components",
     "write:page-locks": "node scripts/check-page-locks.js --write",
-    "prebuild": "node scripts/check-page-locks.js && node scripts/protect-regions.js && node scripts/assert-food-log-date-guard.js && bash scripts/check-practitioner-web-lock.sh && node scripts/build-support-code-index.js",
+    "prebuild": "npm run check:page-locks:web && node scripts/protect-regions.js && node scripts/assert-food-log-date-guard.js && bash scripts/check-practitioner-web-lock.sh && node scripts/build-support-code-index.js",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
