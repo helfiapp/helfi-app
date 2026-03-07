@@ -109,6 +109,12 @@ DEPLOYED:
 
 The current live web app and current native app are baseline-locked.
 
+Main source of truth:
+- Web + native work must happen only in: `/Volumes/U34 Bolt/HELFI APP/helfi-app`
+- Do not use worktrees for normal work on this project.
+- Do not recreate duplicate app copies, duplicate native folders, or side versions of the app.
+- If you discover another app copy or worktree, stop and tell the owner before doing anything else.
+
 This means:
 - Do not touch locked pages or shared UI unless the owner explicitly asked for that exact area.
 - Work only in the real main folders for the current app.

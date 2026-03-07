@@ -51,6 +51,8 @@ If/when real users are on the site, switch to staging-first to avoid breaking th
 - Location: `native/`
 - Approach: one shared codebase for iPhone + Android (React Native).
 - Not published yet.
+- Source of truth: the only valid native app folder is `native/` inside `/Volumes/U34 Bolt/HELFI APP/helfi-app`
+- Do not use separate worktrees or duplicate app copies as alternate native sources.
 
 ## Protected Areas (Do Not Change Without Explicit Owner Approval)
 Before changing sensitive areas, read:

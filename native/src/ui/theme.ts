@@ -5,8 +5,8 @@ export const theme = {
     text: '#0B1B17',
     muted: '#45615B',
     border: '#D8E6E2',
-    primary: '#10B981',
-    primaryText: '#06231B',
+    primary: '#439A45',
+    primaryText: '#FFFFFF',
     danger: '#DC2626',
   },
   spacing: {
@@ -22,4 +22,3 @@ export const theme = {
     lg: 18,
   },
 } as const
-
