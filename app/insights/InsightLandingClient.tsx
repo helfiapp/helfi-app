@@ -188,26 +188,26 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
   }
 
   const updateProgressStage = (percent: number) => {
-    if (percent < 20) return 'Getting your data'
-    if (percent < 45) return 'Reading your last 7 days'
-    if (percent < 70) return 'Finding patterns'
-    return 'Writing your report'
+    if (percent < 25) return 'Getting your data'
+    if (percent < 55) return 'Finding patterns'
+    if (percent < 80) return 'Writing your report'
+    return 'Final checks'
   }
 
   const startProgress = () => {
     setProgressActive(true)
-    setProgressPercent(12)
+    setProgressPercent(10)
     setProgressStage('Getting your data')
     if (progressTimerRef.current) {
       window.clearInterval(progressTimerRef.current)
     }
     progressTimerRef.current = window.setInterval(() => {
       setProgressPercent((prev) => {
-        const next = Math.min(prev + (prev < 45 ? 6 : prev < 70 ? 4 : 2), 82)
+        const next = Math.min(prev + 4, 95)
         setProgressStage(updateProgressStage(next))
         return next
       })
-    }, 1100)
+    }, 900)
   }
 
   const stopProgress = (success: boolean) => {
@@ -567,11 +567,11 @@ export default function InsightsLandingClient({ sessionUser, issues, generatedAt
                     <div className="w-full max-w-xs">
                       <div className="flex items-center justify-between text-xs text-gray-500">
                         <span>{progressStage}</span>
-                        <span>Working...</span>
+                        <span>{progressPercent}%</span>
                       </div>
                       <div className="mt-1 h-2 w-full rounded-full bg-gray-200">
                         <div
-                          className="h-2 rounded-full bg-emerald-500 transition-[width] duration-700 ease-out"
+                          className="h-2 rounded-full bg-emerald-500"
                           style={{ width: `${progressPercent}%` }}
                         />
                       </div>
