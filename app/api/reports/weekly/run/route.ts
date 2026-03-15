@@ -285,6 +285,267 @@ function sanitizeSupplementAndMedicationSections(
   return output
 }
 
+function extractNamedValues(input: unknown): string[] {
+  if (!input) return []
+  if (typeof input === 'string') {
+    const value = input.trim()
+    return value ? [value] : []
+  }
+  if (Array.isArray(input)) {
+    return input.flatMap((item) => extractNamedValues(item))
+  }
+  if (typeof input === 'object') {
+    const record = input as Record<string, unknown>
+    const directKeys = ['name', 'title', 'label', 'issue', 'goal', 'condition']
+    const direct = directKeys
+      .map((key) => String(record[key] || '').trim())
+      .filter(Boolean)
+    if (direct.length) return direct
+    return Object.values(record)
+      .flatMap((value) => (typeof value === 'string' ? extractNamedValues(value) : []))
+      .slice(0, 6)
+  }
+  return []
+}
+
+function parseSupplementDose(value: string | null | undefined) {
+  const raw = String(value || '').trim().toLowerCase()
+  if (!raw) return null
+  const match = raw.match(/(\d+(\.\d+)?)\s*(mcg|mg|g|iu)\b/)
+  if (!match) return null
+  const amount = Number(match[1])
+  if (!Number.isFinite(amount)) return null
+  return { amount, unit: match[3] }
+}
+
+function formatSupplementNameList(names: string[], max = 3) {
+  const clean = names.map((name) => String(name || '').trim()).filter(Boolean)
+  if (!clean.length) return 'your current stack'
+  const visible = clean.slice(0, max)
+  const extra = clean.length - visible.length
+  if (extra > 0) {
+    return `${visible.join(', ')} + ${extra} more`
+  }
+  return visible.join(', ')
+}
+
+function buildSupplementGuidance(context: any): Pick<ReportSectionBucket, 'suggested' | 'avoid'> {
+  const supplements = Array.isArray(context?.supplements) ? context.supplements : []
+  const medications = Array.isArray(context?.medications) ? context.medications : []
+  const checkinGoals = Array.isArray(context?.checkinSummary?.goals) ? context.checkinSummary.goals : []
+  const issueLabels = extractNamedValues(context?.issues)
+  const goalLabels = [
+    ...extractNamedValues(context?.goals),
+    ...checkinGoals.map((goal: any) => String(goal?.goal || '').trim()).filter(Boolean),
+  ]
+  const healthSituationText = extractNamedValues(context?.healthSituations).join(' ')
+  const focusLabels = [...goalLabels, ...issueLabels]
+  const focusText = `${focusLabels.join(' ')} ${healthSituationText}`.toLowerCase()
+  const knownSupplements = buildKnownNameSet(supplements)
+  const lowHydrationDays = Array.isArray(context?.dataFlags?.lowHydrationDays) ? context.dataFlags.lowHydrationDays : []
+  const lowMoodDays = Array.isArray(context?.dataFlags?.lowMoodDays) ? context.dataFlags.lowMoodDays : []
+  const symptomHeavyDays = Array.isArray(context?.dataFlags?.symptomHeavyDays) ? context.dataFlags.symptomHeavyDays : []
+  const topSymptoms = Array.isArray(context?.symptomSummary?.topSymptoms) ? context.symptomSummary.topSymptoms : []
+  const currentSupplementNames: string[] = supplements.map((item: any) => String(item?.name || '').trim()).filter(Boolean)
+  const currentMedicationNames: string[] = medications.map((item: any) => String(item?.name || '').trim()).filter(Boolean)
+
+  const hasSupplement = (pattern: RegExp) =>
+    supplements.some((item: any) => pattern.test(String(item?.name || '').toLowerCase()))
+  const findSupplements = (pattern: RegExp) =>
+    supplements.filter((item: any) => pattern.test(String(item?.name || '').toLowerCase()))
+  const addUnique = (bucket: ReportItem[], name: string, reason: string) => {
+    const key = canonicalizeNameForMatch(name)
+    if (!key) return
+    if (bucket.some((item) => canonicalizeNameForMatch(String(item?.name || '')) === key)) return
+    if (knownSupplements.has(key)) return
+    bucket.push({ name, reason })
+  }
+  const pickFocusLabel = (patterns: RegExp[], fallback: string) =>
+    focusLabels.find((label) => patterns.some((pattern) => pattern.test(label.toLowerCase()))) || fallback
+
+  const suggested: ReportItem[] = []
+  const avoid: ReportItem[] = []
+
+  const libidoFocus = /libido|erection|sexual|testosterone/.test(focusText)
+  const moodFocus = /mood|stress|anxiety|depression|focus|brain fog/.test(focusText)
+  const gutFocus = /bowel|digestion|gut|bloat|constipation|diarrh|stomach|ibs|reflux/.test(focusText)
+  const energyFocus = /energy|fatigue|tired|motivation/.test(focusText)
+  const sleepFocus = /sleep|insomnia|rest/.test(focusText)
+  const exerciseMinutes = Number(context?.exerciseSummary?.totalMinutes || 0)
+  const labHighlights = Array.isArray(context?.labs?.highlights) ? context.labs.highlights : []
+  const hasKidneyConcern = /kidney|renal/.test(focusText)
+  const onVascularMedication = currentMedicationNames.some((name: string) =>
+    /tadalafil|sildenafil|vardenafil|avanafil|nitroglycerin|nitrate/.test(name.toLowerCase())
+  )
+
+  if (libidoFocus && !onVascularMedication && !hasSupplement(/\bcitrulline\b/i)) {
+    const focus = pickFocusLabel([/libido/, /erection/, /sexual/, /testosterone/], 'libido support')
+    addUnique(
+      suggested,
+      'L-Citrulline',
+      `Your goals mention ${focus}, and your current stack already includes ${formatSupplementNameList(currentSupplementNames)}.\nL-Citrulline is one to review if you want a more targeted option that is not already in the stack.`
+    )
+  }
+
+  if ((moodFocus || lowMoodDays.length >= 2) && !hasSupplement(/omega[\s-]*3|fish oil|epa|dha/i)) {
+    const focus = pickFocusLabel([/mood/, /stress/, /anxiety/, /focus/, /brain fog/], 'mood support')
+    addUnique(
+      suggested,
+      'Omega-3',
+      `${focus} shows up in your goals${lowMoodDays.length ? `, and ${lowMoodDays.length} lower-mood day(s) showed up in this report` : ''}. Omega-3 does not appear in your current stack.\nIt is one to review before piling on more overlapping vitamins.`
+    )
+  }
+
+  if ((gutFocus || topSymptoms.some((item: any) => /bloat|constipation|diarrh|reflux|gut|stomach/i.test(String(item?.name || '').toLowerCase()))) && !hasSupplement(/psyllium|fiber|fibre/i)) {
+    const topSymptom = topSymptoms.map((item: any) => String(item?.name || '').trim()).filter(Boolean)[0]
+    addUnique(
+      suggested,
+      'Psyllium husk',
+      `${pickFocusLabel([/bowel/, /digestion/, /gut/, /bloat/, /constipation/, /diarrh/, /reflux/], 'Digestion')} shows up in your report${topSymptom ? `, with ${topSymptom} also logged this week` : ''}. Psyllium husk does not appear in your current stack.\nIt is a simpler option to review before adding a bigger gut blend.`
+    )
+  }
+
+  if (lowHydrationDays.length >= 2 && !hasSupplement(/electrolyte|hydration/i)) {
+    addUnique(
+      suggested,
+      'Electrolyte support',
+      `${lowHydrationDays.length} lower-water day(s) showed up this week, and no electrolyte product appears in your current stack of ${currentSupplementNames.length} supplement(s).\nA simple electrolyte option may fit better than adding another random capsule.`
+    )
+  }
+
+  if ((exerciseMinutes >= 60 || /strength|muscle|training|performance/.test(focusText)) && !hasKidneyConcern && !hasSupplement(/\bcreatine\b/i)) {
+    addUnique(
+      suggested,
+      'Creatine monohydrate',
+      `You logged about ${exerciseMinutes || 0} minutes of movement this week, and creatine does not appear in your current stack.\nIf performance or recovery matters to you, this is one to review before adding more niche products.`
+    )
+  }
+
+  if ((sleepFocus || moodFocus) && !hasKidneyConcern && !hasSupplement(/magnesium/i)) {
+    const focus = pickFocusLabel([/sleep/, /stress/, /mood/, /anxiety/], 'sleep or stress support')
+    addUnique(
+      suggested,
+      'Magnesium glycinate',
+      `Your goals mention ${focus}, and magnesium does not appear in your current stack of ${currentSupplementNames.length} supplement(s).\nIt is a more focused option than adding another mixed calming blend.`
+    )
+  }
+
+  const zincProducts = findSupplements(/\bzinc\b/i)
+  if (zincProducts.length >= 2) {
+    addUnique(
+      avoid,
+      'Extra zinc products',
+      `Your current stack already includes ${formatSupplementNameList(zincProducts.map((item: any) => String(item?.name || '').trim()), 4)}. That is ${zincProducts.length} zinc product(s) before adding anything else.\nSteer away from extra zinc products unless a clinician gives a clear reason.`
+    )
+  }
+
+  const vitaminDProducts = findSupplements(/vitamin\s*d|\bd-?3\b/i)
+  const totalVitaminDIu = vitaminDProducts.reduce((sum: number, item: any) => {
+    const parsed = parseSupplementDose(item?.dosage)
+    if (!parsed) return sum
+    if (parsed.unit === 'iu') return sum + parsed.amount
+    return sum
+  }, 0)
+  if (totalVitaminDIu >= 4000) {
+    addUnique(
+      avoid,
+      'More vitamin D on top',
+      `Your current stack already shows ${formatSupplementNameList(vitaminDProducts.map((item: any) => String(item?.name || '').trim()))} at about ${Math.round(totalVitaminDIu)} IU total.\nSteer away from adding more vitamin D on top until labs say it is needed.`
+    )
+  }
+
+  const vitaminCProducts = findSupplements(/vitamin\s*c|\bascorb/i)
+  const totalVitaminCMg = vitaminCProducts.reduce((sum: number, item: any) => {
+    const parsed = parseSupplementDose(item?.dosage)
+    if (!parsed) return sum
+    if (parsed.unit === 'mg') return sum + parsed.amount
+    if (parsed.unit === 'g') return sum + parsed.amount * 1000
+    if (parsed.unit === 'mcg') return sum + parsed.amount / 1000
+    return sum
+  }, 0)
+  if (totalVitaminCMg >= 1000) {
+    addUnique(
+      avoid,
+      'More vitamin C on top',
+      `Your current stack already shows about ${Math.round(totalVitaminCMg)} mg of vitamin C, which is already a large daily dose.\nSteer away from piling more vitamin C on top of that dose.`
+    )
+  }
+
+  if ((libidoFocus || energyFocus) && currentSupplementNames.length >= 6) {
+    addUnique(
+      avoid,
+      'Testosterone booster blends',
+      `Your goals mention ${pickFocusLabel([/libido/, /erection/, /sexual/, /testosterone/, /energy/, /fatigue/], 'energy or performance')}, and your current routine already lists ${currentSupplementNames.length} supplements.\nSteer away from testosterone booster blends because they make it harder to tell what is really helping.`
+    )
+  }
+
+  if ((lowMoodDays.length >= 2 || symptomHeavyDays.length >= 2) && currentSupplementNames.length >= 6) {
+    addUnique(
+      avoid,
+      'High-stimulant pre-workouts',
+      `${lowMoodDays.length} lower-mood day(s) and ${symptomHeavyDays.length} heavier-symptom day(s) showed up this week, while your current routine already lists ${currentSupplementNames.length} supplements.\nSteer away from high-stimulant pre-workouts if you want cleaner feedback from the report.`
+    )
+  }
+
+  if (avoid.length < 2 && currentSupplementNames.length >= 6) {
+    addUnique(
+      avoid,
+      'Extra multi-ingredient blends',
+      `Your current routine already lists ${currentSupplementNames.length} supplements, which is a big stack to judge cleanly.\nSteer away from adding another big multi-ingredient blend all at once.`
+    )
+  }
+
+  if (!suggested.length && !hasSupplement(/omega[\s-]*3|fish oil|epa|dha/i)) {
+    const fallbackFocus = goalLabels[0] || issueLabels[0] || 'your current goals'
+    addUnique(
+      suggested,
+      'Omega-3',
+      `${fallbackFocus} is one of the focus areas in this report, and omega-3 does not appear in your current stack of ${currentSupplementNames.length} supplement(s).\nIt is one of the cleaner gaps to review before adding more overlap.`
+    )
+  }
+
+  if (!suggested.length && !hasSupplement(/probiotic/i)) {
+    const symptomLabel = topSymptoms.map((item: any) => String(item?.name || '').trim()).filter(Boolean)[0] || 'your current symptoms'
+    addUnique(
+      suggested,
+      'Probiotic',
+      `${symptomLabel} shows up in this report, and probiotic support does not appear in your current stack.\nIt is one simple option to review if you want to add something new carefully.`
+    )
+  }
+
+  if (!avoid.length && labHighlights.length) {
+    addUnique(
+      avoid,
+      'Iron unless labs clearly need it',
+      `${labHighlights.length} lab highlight(s) showed up in this report, but the report should stay targeted to what those labs actually show.\nSteer away from adding iron just in case unless a lab result clearly points that way.`
+    )
+  }
+
+  return {
+    suggested: suggested.slice(0, 3),
+    avoid: avoid.slice(0, 3),
+  }
+}
+
+function applySupplementGuidance(
+  sections: Record<ReportSectionKey, ReportSectionBucket>,
+  context: any
+): Record<ReportSectionKey, ReportSectionBucket> {
+  const next = { ...sections }
+  const supplements = next.supplements || { working: [], suggested: [], avoid: [] }
+  const guidance = buildSupplementGuidance(context)
+
+  if (!Array.isArray(supplements.suggested) || supplements.suggested.length === 0) {
+    supplements.suggested = guidance.suggested
+  }
+  if (!Array.isArray(supplements.avoid) || supplements.avoid.length === 0) {
+    supplements.avoid = guidance.avoid
+  }
+
+  next.supplements = supplements
+  return next
+}
+
 function dedupeReportSections(
   sections: Record<ReportSectionKey, ReportSectionBucket>
 ): Record<ReportSectionKey, ReportSectionBucket> {
@@ -3281,7 +3542,9 @@ ${llmPayloadJson}
     }
   })
 
-  reportPayload.sections = dedupeReportSections(sanitizeSupplementAndMedicationSections(sections, reportContext))
+  reportPayload.sections = dedupeReportSections(
+    applySupplementGuidance(sanitizeSupplementAndMedicationSections(sections, reportContext), reportContext)
+  )
   reportPayload.wins = wins
   reportPayload.gaps = gaps
   if (!summaryText) {
