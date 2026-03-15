@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-15 11:45 AEDT
+- What changed: Weekly health report now includes saved medical image analyser data in the report builder, report page, visuals, and print view. The weekly data summary also now shows journal notes and medical scans so the report uses a broader health picture.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report and https://helfi.ai/insights
+- What to quickly test: Open the latest 7-day report. Check that saved medical image scans now appear in the report when available, and that the data-used area/visual snapshot now includes journal notes and medical scans.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-07 01:34 AEDT
 - What changed: Forced a fresh LIVE rebuild and repointed helfi.ai/www.helfi.ai to the newest build so the latest dashboard/chat version is live again instead of the older regressed build.
 - Where to see it (page/link): https://helfi.ai/dashboard , https://helfi.ai/chat
