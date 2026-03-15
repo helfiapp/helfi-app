@@ -5,7 +5,9 @@ import {
   Image,
   Modal,
   Pressable,
+  Share,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   View,
@@ -15,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
+import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
@@ -43,6 +46,7 @@ type Nutrients = {
 type FoodEntry = {
   id: string
   name: string
+  label?: string | null
   meal: string | null
   category?: string | null
   description?: string | null
@@ -50,6 +54,7 @@ type FoodEntry = {
   nutrients?: Nutrients | null
   items?: any[] | null
   createdAt: string
+  raw?: any
 }
 
 type WaterEntry = {
@@ -95,6 +100,40 @@ type FavoriteMeal = {
   description?: string
   ingredients?: Array<{ name: string; amount: number; unit: string }>
   custom?: boolean
+  items?: any[] | null
+  createdAt?: string | number | null
+  lastUsedAt?: string | number | null
+  sourceId?: string | null
+  method?: string | null
+  raw?: any
+}
+
+type FavoritesListItem = {
+  id: string
+  label: string
+  serving: string
+  calories: number
+  sourceTag: 'Favorite' | 'Custom' | 'Manual'
+  createdAtMs: number
+  lastUsedAtMs: number
+  sortPriority: number
+  favorite: FavoriteMeal | null
+  entry: FoodEntry | null
+  isSaved: boolean
+}
+
+type FavoriteAdjustItem = {
+  id: string
+  name: string
+  servingLabel: string
+  servings: number
+  calories: number
+  protein: number
+  carbs: number
+  fat: number
+  fiber: number
+  sugar: number
+  raw?: any
 }
 
 type SearchFoodSource = 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom' | string
@@ -509,6 +548,7 @@ function normalizeFoodApiEntry(raw: any): FoodEntry {
     },
     items: Array.isArray(raw?.items) ? raw.items : null,
     createdAt: String(raw?.createdAt || new Date().toISOString()),
+    raw,
   }
 }
 
@@ -630,12 +670,390 @@ function makeFavoriteFromEntry(entry: FoodEntry): FavoriteMeal {
       sugar: readNutrient(nutrients, ['sugar', 'sugar_g']),
     },
     custom: false,
+    items: Array.isArray(entry.items) ? JSON.parse(JSON.stringify(entry.items)) : null,
+    createdAt: entry.createdAt,
+    raw: entry.raw || entry,
   }
+}
+
+function normalizeFavoriteLabel(value: any) {
+  return String(value || '')
+    .trim()
+    .replace(/\s+/g, ' ')
+}
+
+function normalizeFavoriteKey(value: any) {
+  return normalizeFavoriteLabel(value).toLowerCase()
+}
+
+function toTimestampMs(value: any) {
+  if (typeof value === 'number' && Number.isFinite(value)) return value
+  if (typeof value === 'string' && value.trim()) {
+    const numeric = Number(value)
+    if (Number.isFinite(numeric)) return numeric
+    const parsed = new Date(value).getTime()
+    if (Number.isFinite(parsed)) return parsed
+  }
+  if (value instanceof Date) {
+    const parsed = value.getTime()
+    if (Number.isFinite(parsed)) return parsed
+  }
+  return 0
+}
+
+function cloneFavoriteItems(raw: any) {
+  if (Array.isArray(raw)) {
+    try {
+      return JSON.parse(JSON.stringify(raw))
+    } catch {
+      return raw
+    }
+  }
+  if (typeof raw === 'string' && raw.trim()) {
+    try {
+      const parsed = JSON.parse(raw)
+      return Array.isArray(parsed) ? parsed : null
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function favoriteTotalsFromRaw(raw: any) {
+  const itemsTotals = recalculateTotalsFromItems(cloneFavoriteItems(raw?.items))
+  const storedTotals = sanitizeEntryTotals(raw?.nutrition || raw?.total || raw?.nourishment || raw?.nutrients)
+  const parsedTotals = extractTotalsFromDescriptionText(raw?.description || raw?.label || raw?.name || '')
+  if (hasNonZeroEntryTotals(itemsTotals)) return itemsTotals
+  if (storedTotals && hasNonZeroEntryTotals(storedTotals)) return storedTotals
+  return parsedTotals || storedTotals || itemsTotals || {
+    calories: 0,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    fiber: 0,
+    sugar: 0,
+    satFat: 0,
+  }
+}
+
+function looksLikeMealBuilderCreatedItemId(rawId: any) {
+  const id = typeof rawId === 'string' ? rawId : ''
+  if (!id) return false
+  if (/^(openfoodfacts|usda|fatsecret):[^:]+:\d{9,}$/i.test(id)) return true
+  if (/^ai:\d{9,}:[0-9a-f]+$/i.test(id)) return true
+  if (/^edit:\d{9,}:[0-9a-f]+$/i.test(id)) return true
+  return false
+}
+
+function isCustomFavoriteMeal(raw: any, items: any[] | null) {
+  if (raw?.custom === true || raw?.customMeal === true) return true
+  const method = String(raw?.method || '').toLowerCase()
+  if (method === 'combined' || method === 'meal-builder') return true
+  return Array.isArray(items) && items.some((item) => looksLikeMealBuilderCreatedItemId(item?.id))
+}
+
+function favoriteServingLabel(favorite: FavoriteMeal | null | undefined) {
+  const firstItem = Array.isArray(favorite?.items) ? favorite?.items?.[0] : null
+  const direct =
+    favorite?.raw?.serving ||
+    favorite?.raw?.serving_size ||
+    firstItem?.serving_size ||
+    favorite?.description?.split(',').slice(1).join(',').trim()
+  const cleaned = normalizeFavoriteLabel(direct)
+  return cleaned || '1 serving'
+}
+
+function normalizeFavoriteMeal(raw: any): FavoriteMeal | null {
+  if (!raw || typeof raw !== 'object') return null
+  const items = cloneFavoriteItems(raw?.items) || cloneFavoriteItems(raw?.ingredients)
+  const totals = favoriteTotalsFromRaw(raw)
+  const name = normalizeFavoriteLabel(raw?.label || raw?.description || raw?.name || 'Favorite meal') || 'Favorite meal'
+  return {
+    id: String(raw?.id || `fav-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    name,
+    meal: String(raw?.meal || raw?.category || 'uncategorized').toLowerCase(),
+    description: normalizeFavoriteLabel(raw?.description || raw?.label || raw?.name || ''),
+    nutrients: {
+      calories: Math.max(0, Math.round(Number(totals?.calories) || 0)),
+      protein: Math.max(0, round1(Number(totals?.protein) || 0)),
+      carbs: Math.max(0, round1(Number(totals?.carbs) || 0)),
+      fat: Math.max(0, round1(Number(totals?.fat) || 0)),
+      fiber: Math.max(0, round1(Number(totals?.fiber) || 0)),
+      sugar: Math.max(0, round1(Number(totals?.sugar) || 0)),
+    },
+    ingredients: Array.isArray(raw?.ingredients)
+      ? raw.ingredients
+      : Array.isArray(items)
+      ? items.map((item: any) => ({
+          name: String(item?.name || item?.label || 'Ingredient').trim(),
+          amount: Number(item?.amount ?? item?.servings ?? item?.__amount) || 1,
+          unit: String(item?.unit || item?.weightUnit || item?.__unit || item?.serving_size || 'serving').trim(),
+        }))
+      : undefined,
+    custom: isCustomFavoriteMeal(raw, items),
+    items,
+    createdAt: raw?.createdAt || null,
+    lastUsedAt: raw?.lastUsedAt || raw?.lastUsed || raw?.recentlyUsedAt || null,
+    sourceId: raw?.sourceId ? String(raw.sourceId) : null,
+    method: raw?.method ? String(raw.method) : null,
+    raw,
+  }
+}
+
+function normalizeFavoriteList(raw: any): FavoriteMeal[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((item) => normalizeFavoriteMeal(item))
+    .filter((item): item is FavoriteMeal => Boolean(item))
+}
+
+function favoriteStorageRecord(favorite: FavoriteMeal) {
+  const baseRaw = favorite?.raw && typeof favorite.raw === 'object' ? { ...favorite.raw } : {}
+  const totals = {
+    calories: Math.max(0, Math.round(Number(favorite?.nutrients?.calories) || 0)),
+    protein: Math.max(0, round1(Number(favorite?.nutrients?.protein) || 0)),
+    carbs: Math.max(0, round1(Number(favorite?.nutrients?.carbs) || 0)),
+    fat: Math.max(0, round1(Number(favorite?.nutrients?.fat) || 0)),
+    fiber: Math.max(0, round1(Number(favorite?.nutrients?.fiber) || 0)),
+    sugar: Math.max(0, round1(Number(favorite?.nutrients?.sugar) || 0)),
+  }
+  return {
+    ...baseRaw,
+    id: favorite.id,
+    sourceId: favorite.sourceId || baseRaw?.sourceId || null,
+    label: favorite.name,
+    description: favorite.description || favorite.name,
+    meal: favorite.meal,
+    category: favorite.meal,
+    nutrition: { ...(baseRaw?.nutrition || {}), ...totals },
+    total: { ...(baseRaw?.total || {}), ...totals },
+    items: Array.isArray(favorite.items) ? favorite.items : baseRaw?.items || null,
+    customMeal: favorite.custom === true,
+    createdAt: favorite.createdAt || baseRaw?.createdAt || Date.now(),
+    lastUsedAt: favorite.lastUsedAt || baseRaw?.lastUsedAt || null,
+    method: favorite.method || baseRaw?.method || (favorite.custom ? 'meal-builder' : 'text'),
+  }
+}
+
+function mergeFavoriteMeals(primary: FavoriteMeal[], secondary: FavoriteMeal[]) {
+  const next = new Map<string, FavoriteMeal>()
+  const push = (favorite: FavoriteMeal) => {
+    const key =
+      String(favorite?.sourceId || '').trim() ||
+      normalizeFavoriteKey(favorite?.name || favorite?.description || '') ||
+      String(favorite?.id || '').trim()
+    if (!key) return
+    if (!next.has(key)) {
+      next.set(key, favorite)
+      return
+    }
+    const existing = next.get(key)!
+    const existingTs = Math.max(toTimestampMs(existing?.lastUsedAt), toTimestampMs(existing?.createdAt))
+    const candidateTs = Math.max(toTimestampMs(favorite?.lastUsedAt), toTimestampMs(favorite?.createdAt))
+    if (candidateTs >= existingTs) next.set(key, favorite)
+  }
+  primary.forEach(push)
+  secondary.forEach(push)
+  return Array.from(next.values())
+}
+
+function linkedFavoriteIdFromEntry(entry: FoodEntry | null | undefined) {
+  const raw = entry?.raw && typeof entry.raw === 'object' ? entry.raw : null
+  const nutrition = raw?.nutrients && typeof raw.nutrients === 'object' ? raw.nutrients : null
+  const total = raw?.total && typeof raw.total === 'object' ? raw.total : null
+  const fromNutrition = typeof nutrition?.__favoriteId === 'string' ? String(nutrition.__favoriteId).trim() : ''
+  if (fromNutrition) return fromNutrition
+  return typeof total?.__favoriteId === 'string' ? String(total.__favoriteId).trim() : ''
+}
+
+function favoriteFromLinkedEntry(entry: FoodEntry): FavoriteMeal | null {
+  const favoriteId = linkedFavoriteIdFromEntry(entry)
+  if (!favoriteId) return null
+
+  const raw = entry?.raw && typeof entry.raw === 'object' ? { ...entry.raw } : {}
+  const items =
+    Array.isArray(entry?.items) && entry.items.length > 0
+      ? JSON.parse(JSON.stringify(entry.items))
+      : cloneFavoriteItems(raw?.items)
+  const method = normalizeFavoriteLabel(raw?.method || raw?.__origin || raw?.origin).toLowerCase()
+  const label =
+    normalizeFavoriteLabel(raw?.label || entry?.name || entry?.description || raw?.description || 'Favorite meal') ||
+    'Favorite meal'
+  const custom =
+    isCustomFavoriteMeal(raw, items) ||
+    method === 'combined' ||
+    method === 'meal-builder'
+  const base = makeFavoriteFromEntry(entry)
+  const meal = String(entry?.meal || entry?.category || raw?.meal || raw?.category || 'uncategorized').toLowerCase()
+  const createdAt = entry?.createdAt || raw?.createdAt || Date.now()
+
+  return {
+    ...base,
+    id: favoriteId,
+    name: label,
+    meal,
+    description: label,
+    custom,
+    items,
+    createdAt,
+    lastUsedAt: createdAt,
+    sourceId: raw?.sourceId ? String(raw.sourceId) : String(entry?.id || ''),
+    method: method || (custom ? 'meal-builder' : 'text'),
+    raw: {
+      ...raw,
+      label,
+      description: label,
+      meal,
+      category: meal,
+      items,
+      ...(custom ? { customMeal: true } : {}),
+    },
+  }
+}
+
+function mergeRecoveredFavorites(existing: FavoriteMeal[], recovered: FavoriteMeal[]) {
+  const next = [...existing]
+  const existingIds = new Set(existing.map((favorite) => String(favorite?.id || '').trim()).filter(Boolean))
+  const existingSources = new Set(existing.map((favorite) => String(favorite?.sourceId || '').trim()).filter(Boolean))
+  const existingKeys = new Set(
+    existing.map((favorite) => normalizeFavoriteKey(favorite?.name || favorite?.description || '')).filter(Boolean),
+  )
+  let changed = false
+
+  recovered.forEach((favorite) => {
+    const id = String(favorite?.id || '').trim()
+    const sourceId = String(favorite?.sourceId || '').trim()
+    const key = normalizeFavoriteKey(favorite?.name || favorite?.description || '')
+    if ((id && existingIds.has(id)) || (sourceId && existingSources.has(sourceId)) || (key && existingKeys.has(key))) {
+      return
+    }
+    if (id) existingIds.add(id)
+    if (sourceId) existingSources.add(sourceId)
+    if (key) existingKeys.add(key)
+    next.push(favorite)
+    changed = true
+  })
+
+  return { next, changed }
+}
+
+function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[] {
+  const source = item.favorite || item.entry
+  const rawItems = Array.isArray(source?.items) ? source.items : []
+  if (rawItems.length > 0) {
+    return rawItems.map((raw: any, index: number) => ({
+      id: String(raw?.id || raw?.foodId || `${item.id}-${index}`),
+      name: String(raw?.name || raw?.label || `Ingredient ${index + 1}`).trim(),
+      servingLabel: normalizeFavoriteLabel(raw?.serving_size || raw?.unit || raw?.weightUnit || '1 serving') || '1 serving',
+      servings: Number.isFinite(Number(raw?.servings)) && Number(raw?.servings) > 0 ? Number(raw.servings) : 1,
+      calories: Math.max(0, Number(raw?.calories ?? raw?.calories_kcal) || 0),
+      protein: Math.max(0, Number(raw?.protein_g ?? raw?.protein) || 0),
+      carbs: Math.max(0, Number(raw?.carbs_g ?? raw?.carbs) || 0),
+      fat: Math.max(0, Number(raw?.fat_g ?? raw?.fat) || 0),
+      fiber: Math.max(0, Number(raw?.fiber_g ?? raw?.fiber) || 0),
+      sugar: Math.max(0, Number(raw?.sugar_g ?? raw?.sugar) || 0),
+      raw: { ...raw },
+    }))
+  }
+  const sourceTotals = item.favorite?.nutrients || item.entry?.nutrients || {
+    calories: item.calories,
+    protein: 0,
+    carbs: 0,
+    fat: 0,
+    fiber: 0,
+    sugar: 0,
+  }
+  return [
+    {
+      id: `${item.id}-portion`,
+      name: item.label,
+      servingLabel: item.serving || '1 serving',
+      servings: 1,
+      calories: Math.max(0, Number(sourceTotals?.calories) || 0),
+      protein: Math.max(0, Number(sourceTotals?.protein) || 0),
+      carbs: Math.max(0, Number(sourceTotals?.carbs) || 0),
+      fat: Math.max(0, Number(sourceTotals?.fat) || 0),
+      fiber: Math.max(0, Number(sourceTotals?.fiber) || 0),
+      sugar: Math.max(0, Number(sourceTotals?.sugar) || 0),
+      raw: null,
+    },
+  ]
+}
+
+function buildFavoriteAdjustItemFromSearchFood(item: SearchFoodItem): FavoriteAdjustItem {
+  return {
+    id: String(item?.id || `search-${Date.now()}-${Math.random().toString(16).slice(2)}`),
+    name: String(item?.name || 'Ingredient').trim() || 'Ingredient',
+    servingLabel: normalizeFavoriteLabel(item?.serving_size || '1 serving') || '1 serving',
+    servings: Number.isFinite(Number(item?.servings)) && Number(item?.servings) > 0 ? Number(item.servings) : 1,
+    calories: Math.max(0, Number(item?.calories ?? item?.calories_kcal) || 0),
+    protein: Math.max(0, Number(item?.protein_g) || 0),
+    carbs: Math.max(0, Number(item?.carbs_g) || 0),
+    fat: Math.max(0, Number(item?.fat_g) || 0),
+    fiber: Math.max(0, Number(item?.fiber_g) || 0),
+    sugar: Math.max(0, Number(item?.sugar_g) || 0),
+    raw: { ...item },
+  }
+}
+
+function calculateFavoriteAdjustTotals(items: FavoriteAdjustItem[]) {
+  return items.reduce(
+    (acc, item) => {
+      const servings = Number.isFinite(Number(item?.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1
+      acc.calories += Math.max(0, Number(item?.calories) || 0) * servings
+      acc.protein += Math.max(0, Number(item?.protein) || 0) * servings
+      acc.carbs += Math.max(0, Number(item?.carbs) || 0) * servings
+      acc.fat += Math.max(0, Number(item?.fat) || 0) * servings
+      acc.fiber += Math.max(0, Number(item?.fiber) || 0) * servings
+      acc.sugar += Math.max(0, Number(item?.sugar) || 0) * servings
+      return acc
+    },
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+  )
+}
+
+function buildFavoritesListItemFromFavorite(favorite: FavoriteMeal): FavoritesListItem {
+  const createdAtMs = toTimestampMs(favorite?.createdAt)
+  const lastUsedAtMs = Math.max(toTimestampMs(favorite?.lastUsedAt), createdAtMs)
+  return {
+    id: `favorite-only-${favorite.id}`,
+    label: normalizeFavoriteLabel(favorite?.name || favorite?.description || 'Favorite meal') || 'Favorite meal',
+    serving: favoriteServingLabel(favorite),
+    calories: Math.max(0, Math.round(Number(favorite?.nutrients?.calories) || 0)),
+    sourceTag: favorite?.custom ? 'Custom' : 'Favorite',
+    createdAtMs,
+    lastUsedAtMs,
+    sortPriority: 1,
+    favorite,
+    entry: null,
+    isSaved: true,
+  }
+}
+
+function buildFavoriteShareText(item: FavoritesListItem, adjustItems?: FavoriteAdjustItem[]) {
+  const lines = [item.label, '']
+  const ingredients = Array.isArray(adjustItems) && adjustItems.length > 0 ? adjustItems : buildFavoriteAdjustItems(item)
+  const totals = calculateFavoriteAdjustTotals(ingredients)
+  lines.push(`Calories: ${Math.round(totals.calories)} kcal`)
+  lines.push(`Protein: ${formatMacroAmount(totals.protein)} g`)
+  lines.push(`Carbs: ${formatMacroAmount(totals.carbs)} g`)
+  lines.push(`Fat: ${formatMacroAmount(totals.fat)} g`)
+  lines.push(`Fibre: ${formatMacroAmount(totals.fiber)} g`)
+  lines.push(`Sugar: ${formatMacroAmount(totals.sugar)} g`)
+  if (ingredients.length > 0) {
+    lines.push('', 'Ingredients:')
+    ingredients.forEach((entry) => {
+      lines.push(`- ${formatMacroAmount(entry.servings)} x ${entry.servingLabel} ${entry.name}`.trim())
+    })
+  }
+  return lines.join('\n').trim()
 }
 
 export function TrackCaloriesScreen() {
   const navigation = useNavigation<any>()
   const { mode, session, signOut } = useAppMode()
+  const insets = useSafeAreaInsets()
 
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
@@ -702,6 +1120,35 @@ export function TrackCaloriesScreen() {
   const [favoritesTab, setFavoritesTab] = useState<'all' | 'favorites' | 'custom'>('all')
   const [favoritesSearch, setFavoritesSearch] = useState('')
   const [favoritesTargetMeal, setFavoritesTargetMeal] = useState('breakfast')
+  const [favoritesUsageMode, setFavoritesUsageMode] = useState<'diary' | 'editor'>('diary')
+  const [favoritesLibraryEntries, setFavoritesLibraryEntries] = useState<FoodEntry[]>([])
+  const [favoritesLibraryLoading, setFavoritesLibraryLoading] = useState(false)
+  const [favoriteActionItem, setFavoriteActionItem] = useState<FavoritesListItem | null>(null)
+  const [favoritePreviewItem, setFavoritePreviewItem] = useState<FavoritesListItem | null>(null)
+  const [favoriteAdjustItem, setFavoriteAdjustItem] = useState<FavoritesListItem | null>(null)
+  const [favoriteAdjustItems, setFavoriteAdjustItems] = useState<FavoriteAdjustItem[]>([])
+  const [favoriteEditItem, setFavoriteEditItem] = useState<FavoritesListItem | null>(null)
+  const [favoriteEditItems, setFavoriteEditItems] = useState<FavoriteAdjustItem[]>([])
+  const [favoriteEditName, setFavoriteEditName] = useState('')
+  const [favoriteEditIngredientsExpanded, setFavoriteEditIngredientsExpanded] = useState(false)
+  const [favoriteEditExpandedItemId, setFavoriteEditExpandedItemId] = useState<string | null>(null)
+  const [favoriteEditSearchKind, setFavoriteEditSearchKind] = useState<'single' | 'packaged'>('packaged')
+  const [favoriteEditSearchQuery, setFavoriteEditSearchQuery] = useState('')
+  const [favoriteEditSearchResults, setFavoriteEditSearchResults] = useState<SearchFoodItem[]>([])
+  const [favoriteEditSearchLoading, setFavoriteEditSearchLoading] = useState(false)
+  const [favoriteEditSearchError, setFavoriteEditSearchError] = useState('')
+  const [favoriteEditPortionControlEnabled, setFavoriteEditPortionControlEnabled] = useState(false)
+  const [favoriteEditPhotoLoading, setFavoriteEditPhotoLoading] = useState(false)
+  const [favoriteEditMissingReportOpen, setFavoriteEditMissingReportOpen] = useState(false)
+  const [favoriteEditMissingReportName, setFavoriteEditMissingReportName] = useState('')
+  const [favoriteEditMissingReportBrand, setFavoriteEditMissingReportBrand] = useState('')
+  const [favoriteEditMissingReportSize, setFavoriteEditMissingReportSize] = useState('')
+  const [favoriteEditMissingReportNotes, setFavoriteEditMissingReportNotes] = useState('')
+  const [favoriteEditMissingReportBusy, setFavoriteEditMissingReportBusy] = useState(false)
+  const [favoriteEditMissingReportDone, setFavoriteEditMissingReportDone] = useState(false)
+  const [favoriteEditMissingReportError, setFavoriteEditMissingReportError] = useState('')
+  const [favoriteRenameItem, setFavoriteRenameItem] = useState<FavoritesListItem | null>(null)
+  const [favoriteRenameValue, setFavoriteRenameValue] = useState('')
 
   const [ingredientOpen, setIngredientOpen] = useState(false)
   const [ingredientTargetMeal, setIngredientTargetMeal] = useState('breakfast')
@@ -712,6 +1159,7 @@ export function TrackCaloriesScreen() {
   const [ingredientResults, setIngredientResults] = useState<SearchFoodItem[]>([])
 
   const [barcodeOpen, setBarcodeOpen] = useState(false)
+  const [barcodeUsageMode, setBarcodeUsageMode] = useState<'diary' | 'editor'>('diary')
   const [barcodeTargetMeal, setBarcodeTargetMeal] = useState('breakfast')
   const [barcodeCode, setBarcodeCode] = useState('')
   const [barcodeLoading, setBarcodeLoading] = useState(false)
@@ -948,39 +1396,159 @@ export function TrackCaloriesScreen() {
     return clamp(100 - creditsPercentUsed, 0, 100)
   }, [creditsPercentUsed])
 
+  const recoveredFavoritesFromLibrary = useMemo(() => {
+    const byId = new Map<string, FavoriteMeal>()
+    favoritesLibraryEntries.forEach((entry) => {
+      const recovered = favoriteFromLinkedEntry(entry)
+      const favoriteId = String(recovered?.id || '').trim()
+      if (!recovered || !favoriteId) return
+      const existing = byId.get(favoriteId)
+      if (!existing) {
+        byId.set(favoriteId, recovered)
+        return
+      }
+      const existingTs = Math.max(toTimestampMs(existing?.lastUsedAt), toTimestampMs(existing?.createdAt))
+      const candidateTs = Math.max(toTimestampMs(recovered?.lastUsedAt), toTimestampMs(recovered?.createdAt))
+      if (candidateTs >= existingTs) byId.set(favoriteId, recovered)
+    })
+    return Array.from(byId.values())
+  }, [favoritesLibraryEntries])
+
   const favoritesForList = useMemo(() => {
-    const byNameMap = new Map<string, FavoriteMeal>()
-
-    favorites.forEach((item) => {
-      byNameMap.set(`${item.name.toLowerCase()}::${item.meal}`, item)
+    const favoritesById = new Map<string, FavoriteMeal>()
+    const favoritesByLabel = new Map<string, FavoriteMeal>()
+    favorites.forEach((favorite) => {
+      const id = String(favorite?.id || '').trim()
+      const key = normalizeFavoriteKey(favorite?.name || favorite?.description || '')
+      if (id) favoritesById.set(id, favorite)
+      if (key && !favoritesByLabel.has(key)) favoritesByLabel.set(key, favorite)
     })
 
-    entries.forEach((entry) => {
-      const fav = makeFavoriteFromEntry(entry)
-      const key = `${fav.name.toLowerCase()}::${fav.meal}`
-      if (!byNameMap.has(key)) byNameMap.set(key, fav)
+    const allRawItems: FavoritesListItem[] = favoritesLibraryEntries.map((entry) => {
+      const linkedFavoriteId = String(entry?.raw?.nutrients?.__favoriteId || entry?.raw?.total?.__favoriteId || '').trim()
+      const matchedFavorite =
+        (linkedFavoriteId && favoritesById.get(linkedFavoriteId)) ||
+        favoritesByLabel.get(normalizeFavoriteKey(entry?.name || entry?.description || '')) ||
+        null
+      const entryLabel = normalizeFavoriteLabel(matchedFavorite?.name || entry?.name || entry?.description || 'Meal') || 'Meal'
+      const entryCreatedAtMs = toTimestampMs(entry?.createdAt)
+      const entryCustom =
+        Boolean(matchedFavorite?.custom) ||
+        entry?.raw?.customMeal === true ||
+        String(entry?.raw?.method || '').toLowerCase() === 'combined' ||
+        String(entry?.raw?.method || '').toLowerCase() === 'meal-builder'
+      return {
+        id: `entry-${entry.id}`,
+        label: entryLabel,
+        serving: favoriteServingLabel(matchedFavorite || makeFavoriteFromEntry(entry)),
+        calories: Math.max(0, Math.round(Number(entry?.nutrients?.calories) || 0)),
+        sourceTag: matchedFavorite ? 'Favorite' : entryCustom ? 'Custom' : 'Manual',
+        createdAtMs: entryCreatedAtMs,
+        lastUsedAtMs: entryCreatedAtMs,
+        sortPriority: 2,
+        favorite: matchedFavorite,
+        entry,
+        isSaved: Boolean(matchedFavorite),
+      }
     })
 
-    let list = Array.from(byNameMap.values())
+    const dedupedByLabel = new Map<string, FavoritesListItem>()
+    allRawItems.forEach((item) => {
+      const key = normalizeFavoriteKey(item.label)
+      if (!key) return
+      if (!dedupedByLabel.has(key)) {
+        dedupedByLabel.set(key, item)
+        return
+      }
+      const existing = dedupedByLabel.get(key)!
+      if (item.lastUsedAtMs >= existing.lastUsedAtMs) {
+        dedupedByLabel.set(key, item)
+      }
+    })
 
-    if (favoritesTab === 'favorites') {
-      list = list.filter((item) => favorites.some((f) => f.id === item.id))
-    }
-    if (favoritesTab === 'custom') {
-      list = list.filter((item) => item.custom || (Array.isArray(item.ingredients) && item.ingredients.length > 1))
-    }
+    const allItems = Array.from(dedupedByLabel.values())
+    const usedFavoriteKeys = new Set(allItems.map((item) => normalizeFavoriteKey(item.label)).filter(Boolean))
+    const usedFavoriteIds = new Set(allItems.map((item) => String(item?.favorite?.id || '').trim()).filter(Boolean))
 
+    favorites.forEach((favorite) => {
+      const key = normalizeFavoriteKey(favorite?.name || favorite?.description || '')
+      if ((favorite.id && usedFavoriteIds.has(String(favorite.id))) || (key && usedFavoriteKeys.has(key))) return
+      const createdAtMs = toTimestampMs(favorite?.createdAt)
+      const lastUsedAtMs = Math.max(toTimestampMs(favorite?.lastUsedAt), createdAtMs)
+      allItems.push({
+        id: `favorite-${favorite.id}`,
+        label: normalizeFavoriteLabel(favorite?.name || favorite?.description || 'Favorite meal') || 'Favorite meal',
+        serving: favoriteServingLabel(favorite),
+        calories: Math.max(0, Math.round(Number(favorite?.nutrients?.calories) || 0)),
+        sourceTag: favorite?.custom ? 'Custom' : 'Favorite',
+        createdAtMs,
+        lastUsedAtMs,
+        sortPriority: 1,
+        favorite,
+        entry: null,
+        isSaved: true,
+      })
+    })
+
+    const favoriteItems: FavoritesListItem[] = favorites.map((favorite) => {
+      const createdAtMs = toTimestampMs(favorite?.createdAt)
+      const lastUsedAtMs = Math.max(toTimestampMs(favorite?.lastUsedAt), createdAtMs)
+      return {
+        id: `favorite-only-${favorite.id}`,
+        label: normalizeFavoriteLabel(favorite?.name || favorite?.description || 'Favorite meal') || 'Favorite meal',
+        serving: favoriteServingLabel(favorite),
+        calories: Math.max(0, Math.round(Number(favorite?.nutrients?.calories) || 0)),
+        sourceTag: favorite?.custom ? 'Custom' : 'Favorite',
+        createdAtMs,
+        lastUsedAtMs,
+        sortPriority: 1,
+        favorite,
+        entry: null,
+        isSaved: true,
+      }
+    })
+
+    const customItems = favoriteItems.filter((item) => item.favorite?.custom)
     const query = favoritesSearch.trim().toLowerCase()
-    if (query) {
-      list = list.filter((item) => item.name.toLowerCase().includes(query))
+    const filterBySearch = (item: FavoritesListItem) => {
+      if (!query) return true
+      return (
+        item.label.toLowerCase().includes(query) ||
+        item.serving.toLowerCase().includes(query) ||
+        item.sourceTag.toLowerCase().includes(query)
+      )
     }
+    const sortItems = (items: FavoritesListItem[]) =>
+      [...items].sort((a, b) => {
+        if (a.sortPriority !== b.sortPriority) return b.sortPriority - a.sortPriority
+        if (a.lastUsedAtMs !== b.lastUsedAtMs) return b.lastUsedAtMs - a.lastUsedAtMs
+        return b.createdAtMs - a.createdAtMs
+      })
 
-    return [...list].sort((a, b) => {
-      const byName = compareLabelAz(a.name, b.name)
-      if (byName !== 0) return byName
-      return compareLabelAz(a.meal, b.meal)
-    })
-  }, [entries, favorites, favoritesSearch, favoritesTab])
+    if (favoritesTab === 'favorites') return sortItems(favoriteItems.filter(filterBySearch))
+    if (favoritesTab === 'custom') return sortItems(customItems.filter(filterBySearch))
+    return sortItems(allItems.filter(filterBySearch))
+  }, [favorites, favoritesLibraryEntries, favoritesSearch, favoritesTab])
+
+  const favoritePreviewItems = useMemo(
+    () => (favoritePreviewItem ? buildFavoriteAdjustItems(favoritePreviewItem) : []),
+    [favoritePreviewItem],
+  )
+
+  const favoritePreviewTotals = useMemo(
+    () => calculateFavoriteAdjustTotals(favoritePreviewItems),
+    [favoritePreviewItems],
+  )
+
+  const favoriteEditTotals = useMemo(
+    () => calculateFavoriteAdjustTotals(favoriteEditItems),
+    [favoriteEditItems],
+  )
+
+  const favoriteAdjustTotals = useMemo(
+    () => calculateFavoriteAdjustTotals(favoriteAdjustItems),
+    [favoriteAdjustItems],
+  )
 
   const buildAddMenuActions = useCallback(
     (meal: string) => {
@@ -1144,26 +1712,91 @@ export function TrackCaloriesScreen() {
   )
 
   const loadFavorites = useCallback(async () => {
+    let localFavorites: FavoriteMeal[] = []
     try {
       const raw = await AsyncStorage.getItem(FAVORITES_KEY)
-      if (!raw) {
-        setFavorites([])
-        return
+      localFavorites = normalizeFavoriteList(raw ? JSON.parse(raw) : [])
+      let nextFavorites = localFavorites
+
+      if (authHeaders) {
+        const res = await fetch(`${API_BASE_URL}/api/user-data`, { headers: authHeaders })
+        const data: any = await res.json().catch(() => ({}))
+        const serverFavorites = normalizeFavoriteList(data?.favorites)
+        nextFavorites = mergeFavoriteMeals(serverFavorites, localFavorites)
       }
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed)) setFavorites(parsed)
-      else setFavorites([])
+
+      setFavorites(nextFavorites)
+      await AsyncStorage.setItem(
+        FAVORITES_KEY,
+        JSON.stringify(nextFavorites.map((favorite) => favoriteStorageRecord(favorite))),
+      )
     } catch {
-      setFavorites([])
+      setFavorites(localFavorites)
     }
-  }, [])
+  }, [authHeaders])
 
   const saveFavorites = useCallback(async (next: FavoriteMeal[]) => {
     setFavorites(next)
     try {
-      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(next))
+      const payload = next.map((favorite) => favoriteStorageRecord(favorite))
+      await AsyncStorage.setItem(FAVORITES_KEY, JSON.stringify(payload))
+      if (session?.token) {
+        await fetch(`${API_BASE_URL}/api/user-data`, {
+          method: 'POST',
+          headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
+          body: JSON.stringify({ favorites: payload }),
+        })
+      }
     } catch {}
+  }, [session?.token])
+
+  const closeFavoritesFlow = useCallback(() => {
+    setFavoritesOpen(false)
+    setFavoritesUsageMode('diary')
+    setFavoriteActionItem(null)
+    setFavoritePreviewItem(null)
+    setFavoriteAdjustItem(null)
+    setFavoriteAdjustItems([])
+    setFavoriteEditItem(null)
+    setFavoriteEditItems([])
+    setFavoriteEditName('')
+    setFavoriteEditIngredientsExpanded(false)
+    setFavoriteEditExpandedItemId(null)
+    setFavoriteEditSearchKind('packaged')
+    setFavoriteEditSearchQuery('')
+    setFavoriteEditSearchResults([])
+    setFavoriteEditSearchLoading(false)
+    setFavoriteEditSearchError('')
+    setFavoriteEditPortionControlEnabled(false)
+    setFavoriteEditPhotoLoading(false)
+    setFavoriteEditMissingReportOpen(false)
+    setFavoriteEditMissingReportName('')
+    setFavoriteEditMissingReportBrand('')
+    setFavoriteEditMissingReportSize('')
+    setFavoriteEditMissingReportNotes('')
+    setFavoriteEditMissingReportBusy(false)
+    setFavoriteEditMissingReportDone(false)
+    setFavoriteEditMissingReportError('')
+    setFavoriteRenameItem(null)
+    setFavoriteRenameValue('')
   }, [])
+
+  const loadFavoritesLibrary = useCallback(async () => {
+    if (!authHeaders) return
+    setFavoritesLibraryLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/food-log/library?limit=5000`, {
+        headers: authHeaders,
+      })
+      const data: any = await res.json().catch(() => ({}))
+      const logs = Array.isArray(data?.logs) ? data.logs : []
+      setFavoritesLibraryEntries(logs.map((entry: any) => normalizeFoodApiEntry(entry)))
+    } catch {
+      setFavoritesLibraryEntries([])
+    } finally {
+      setFavoritesLibraryLoading(false)
+    }
+  }, [authHeaders])
 
   const loadRecommendedExplainSeen = useCallback(async () => {
     try {
@@ -1307,6 +1940,8 @@ export function TrackCaloriesScreen() {
       if (!isCurrentRequest()) return
       if (userDataRes.ok) {
         setDailyTargets(buildDailyTargetsFromUserData(userData))
+        const serverFavorites = normalizeFavoriteList(userData?.favorites)
+        setFavorites((prev) => mergeFavoriteMeals(serverFavorites, prev))
       } else {
         setDailyTargets(DEFAULT_TARGETS)
       }
@@ -1332,6 +1967,8 @@ export function TrackCaloriesScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      setCopyMode(false)
+      setSelectedIds([])
       setEntryMenu(null)
       setSwipeMenuEntryId(null)
       setSectionMenuMeal(null)
@@ -1339,7 +1976,7 @@ export function TrackCaloriesScreen() {
       setTopAddOptionsOpen(false)
       setProfileMenuOpen(false)
       setEditModalOpen(false)
-      setFavoritesOpen(false)
+      closeFavoritesFlow()
       setIngredientOpen(false)
       setBarcodeOpen(false)
       setBarcodeLabelOpen(false)
@@ -1350,13 +1987,26 @@ export function TrackCaloriesScreen() {
       setExerciseOpen(false)
       void loadAll()
       return () => {}
-    }, [loadAll]),
+    }, [closeFavoritesFlow, loadAll]),
   )
 
   useEffect(() => {
     if (mode !== 'signedIn' || !session?.token) return
     void loadAll()
   }, [loadAll, mode, selectedDate, session?.token])
+
+  useEffect(() => {
+    if (!favoritesOpen) return
+    void loadFavoritesLibrary()
+  }, [favoritesOpen, loadFavoritesLibrary])
+
+  useEffect(() => {
+    if (!favoritesOpen) return
+    if (recoveredFavoritesFromLibrary.length === 0) return
+    const { next, changed } = mergeRecoveredFavorites(favorites, recoveredFavoritesFromLibrary)
+    if (!changed) return
+    void saveFavorites(next)
+  }, [favorites, favoritesOpen, recoveredFavoritesFromLibrary, saveFavorites])
 
   useEffect(() => {
     if (!exerciseOpen) return
@@ -1389,6 +2039,10 @@ export function TrackCaloriesScreen() {
       sugar?: number
       description?: string
       localDate?: string
+      items?: any[] | null
+      nutrition?: Record<string, any> | null
+      total?: Record<string, any> | null
+      createdAt?: string | null
     }) => {
       if (!authHeaders) return false
       const name = String(payload.name || '').trim()
@@ -1403,7 +2057,9 @@ export function TrackCaloriesScreen() {
         sugar: Math.max(0, roundTo(payload.sugar || 0)),
       }
       const descriptionRaw = String(payload.description || '').trim()
-      const description = descriptionRaw ? `${name}, ${descriptionRaw}` : name
+      const description = descriptionRaw || name
+      const nutritionPayload = payload.nutrition ? { ...payload.nutrition } : totals
+      const totalPayload = payload.total ? { ...payload.total } : totals
 
       const res = await fetch(`${API_BASE_URL}/api/food-log`, {
         method: 'POST',
@@ -1413,8 +2069,10 @@ export function TrackCaloriesScreen() {
           meal: payload.meal,
           category: payload.meal,
           description,
-          nutrition: totals,
-          total: totals,
+          nutrition: nutritionPayload,
+          total: totalPayload,
+          items: Array.isArray(payload.items) ? payload.items : undefined,
+          createdAt: payload.createdAt || undefined,
         }),
       })
       return res.ok
@@ -1453,15 +2111,59 @@ export function TrackCaloriesScreen() {
     setEntrySwipeOffsets({})
   }, [])
 
+  const resetCopyMode = useCallback(() => {
+    setCopyMode(false)
+    setSelectedIds([])
+  }, [])
+
+  const removeFoodEntryLocally = useCallback((entryId: string) => {
+    setEntries((prev) => prev.filter((entry) => entry.id !== entryId))
+    setSelectedIds((prev) => prev.filter((id) => id !== entryId))
+    setCombineIds((prev) => prev.filter((id) => id !== entryId))
+    setCopiedEntries((prev) => prev.filter((entry) => entry.id !== entryId))
+    setMoveEntryTarget((prev) => (prev?.id === entryId ? null : prev))
+    setEditTarget((prev) => (prev?.id === entryId ? null : prev))
+  }, [])
+
+  const restoreFoodEntryLocally = useCallback(
+    (
+      snapshot: {
+        entries: FoodEntry[]
+        selectedIds: string[]
+        combineIds: string[]
+        copiedEntries: FoodEntry[]
+        moveEntryTarget: FoodEntry | null
+        editTarget: FoodEntry | null
+      },
+    ) => {
+      setEntries(snapshot.entries)
+      setSelectedIds(snapshot.selectedIds)
+      setCombineIds(snapshot.combineIds)
+      setCopiedEntries(snapshot.copiedEntries)
+      setMoveEntryTarget(snapshot.moveEntryTarget)
+      setEditTarget(snapshot.editTarget)
+    },
+    [],
+  )
+
   const handleEntryDelete = async (entry: FoodEntry) => {
     setEntryMenu(null)
     closeEntrySwipeMenus()
+    const snapshot = {
+      entries,
+      selectedIds,
+      combineIds,
+      copiedEntries,
+      moveEntryTarget,
+      editTarget,
+    }
+    removeFoodEntryLocally(entry.id)
     const ok = await deleteFoodEntry(entry.id)
     if (!ok) {
+      restoreFoodEntryLocally(snapshot)
       Alert.alert('Delete failed', 'Could not delete this entry.')
       return
     }
-    await loadAll()
   }
 
   const openEditModal = (entry: FoodEntry) => {
@@ -1671,35 +2373,520 @@ export function TrackCaloriesScreen() {
     Alert.alert('Copied', `${count} item${count === 1 ? '' : 's'} copied to today.`)
   }
 
-  const openFavorites = (meal: string) => {
+  const openFavorites = (meal: string, mode: 'diary' | 'editor' = 'diary') => {
     setFavoritesTargetMeal(meal)
+    setFavoritesUsageMode(mode)
+    setFavoritesLibraryLoading(true)
     setFavoritesOpen(true)
     setSectionMenuMeal(null)
   }
 
-  const addFavoriteToDiary = async (item: FavoriteMeal) => {
+  const saveListItemToFavorites = async (item: FavoritesListItem) => {
+    if (!item.entry) return
+    const base = makeFavoriteFromEntry(item.entry)
+    const candidate: FavoriteMeal = {
+      ...base,
+      name: item.label,
+      description: item.label,
+      meal: String(item.entry.meal || item.entry.category || favoritesTargetMeal || 'uncategorized'),
+      custom:
+        String(item.entry?.raw?.method || '').toLowerCase() === 'combined' ||
+        String(item.entry?.raw?.method || '').toLowerCase() === 'meal-builder' ||
+        (Array.isArray(item.entry.items) && item.entry.items.length > 1),
+      sourceId: String(item.entry?.raw?.sourceId || item.entry?.id || ''),
+      createdAt: item.entry.createdAt || Date.now(),
+      lastUsedAt: Date.now(),
+      raw: {
+        ...(item.entry.raw || {}),
+        label: item.label,
+        description: item.label,
+        meal: String(item.entry.meal || item.entry.category || favoritesTargetMeal || 'uncategorized'),
+        category: String(item.entry.meal || item.entry.category || favoritesTargetMeal || 'uncategorized'),
+        items: Array.isArray(item.entry.items) ? JSON.parse(JSON.stringify(item.entry.items)) : null,
+        nutrition: {
+          calories: base.nutrients.calories,
+          protein: base.nutrients.protein,
+          carbs: base.nutrients.carbs,
+          fat: base.nutrients.fat,
+          fiber: base.nutrients.fiber,
+          sugar: base.nutrients.sugar,
+        },
+        total: {
+          calories: base.nutrients.calories,
+          protein: base.nutrients.protein,
+          carbs: base.nutrients.carbs,
+          fat: base.nutrients.fat,
+          fiber: base.nutrients.fiber,
+          sugar: base.nutrients.sugar,
+        },
+      },
+    }
+
+    const key = normalizeFavoriteKey(candidate.name)
+    const existing = favorites.find((favorite) => {
+      const sameId = candidate.sourceId && favorite.sourceId && String(favorite.sourceId) === String(candidate.sourceId)
+      const sameName = normalizeFavoriteKey(favorite.name || favorite.description || '') === key
+      return sameId || sameName
+    })
+    const nextFavorite = existing ? { ...candidate, id: existing.id } : candidate
+    const next = existing
+      ? favorites.map((favorite) => (favorite.id === existing.id ? nextFavorite : favorite))
+      : [nextFavorite, ...favorites]
+    await saveFavorites(next)
+    setFavoritesTab('favorites')
+  }
+
+  const renameFavoriteItem = async () => {
+    if (!favoriteRenameItem?.favorite) return
+    const nextName = normalizeFavoriteLabel(favoriteRenameValue)
+    if (!nextName) return
+    const next = favorites.map((favorite) => {
+      if (favorite.id !== favoriteRenameItem.favorite?.id) return favorite
+      return {
+        ...favorite,
+        name: nextName,
+        description: nextName,
+        raw: {
+          ...(favorite.raw || {}),
+          label: nextName,
+          description: nextName,
+        },
+      }
+    })
+    await saveFavorites(next)
+    setFavoriteRenameItem(null)
+    setFavoriteRenameValue('')
+  }
+
+  const deleteFavorite = async (item: FavoriteMeal) => {
+    const next = favorites.filter((favorite) => favorite.id !== item.id)
+    await saveFavorites(next)
+  }
+
+  const markFavoriteAsUsed = async (item: FavoritesListItem) => {
+    if (!item.favorite) return
+    const usedAt = Date.now()
+    const next = favorites.map((favorite) => {
+      if (favorite.id !== item.favorite?.id) return favorite
+      return {
+        ...favorite,
+        lastUsedAt: usedAt,
+        raw: {
+          ...(favorite.raw || {}),
+          lastUsedAt: usedAt,
+        },
+      }
+    })
+    await saveFavorites(next)
+  }
+
+  const addFavoriteToDiary = async (item: FavoritesListItem, adjustedItems?: FavoriteAdjustItem[]) => {
+    const sourceFavorite = item.favorite
+    const sourceEntry = item.entry
+    const source = sourceFavorite || sourceEntry
+    const totals =
+      adjustedItems && adjustedItems.length > 0
+        ? calculateFavoriteAdjustTotals(adjustedItems)
+        : sourceFavorite?.nutrients ||
+          sourceEntry?.nutrients || {
+            calories: item.calories,
+            protein: 0,
+            carbs: 0,
+            fat: 0,
+            fiber: 0,
+            sugar: 0,
+          }
+    const favoriteId = String(sourceFavorite?.id || '').trim()
+    const normalizedItems =
+      adjustedItems && adjustedItems.length > 0
+        ? adjustedItems.map((entry) => ({
+            ...(entry.raw && typeof entry.raw === 'object' ? entry.raw : {}),
+            name: entry.name,
+            serving_size: entry.servingLabel,
+            servings: entry.servings,
+            calories: entry.calories,
+            protein_g: entry.protein,
+            carbs_g: entry.carbs,
+            fat_g: entry.fat,
+            fiber_g: entry.fiber,
+            sugar_g: entry.sugar,
+          }))
+        : Array.isArray(source?.items)
+        ? JSON.parse(JSON.stringify(source.items))
+        : null
+    const nutritionPayload = {
+      ...(sourceFavorite?.raw?.nutrition || sourceFavorite?.raw?.total || sourceEntry?.raw?.nutrition || sourceEntry?.raw?.total || {}),
+      calories: Math.max(0, Math.round(Number(totals?.calories) || 0)),
+      protein: Math.max(0, round1(Number(totals?.protein) || 0)),
+      carbs: Math.max(0, round1(Number(totals?.carbs) || 0)),
+      fat: Math.max(0, round1(Number(totals?.fat) || 0)),
+      fiber: Math.max(0, round1(Number(totals?.fiber) || 0)),
+      sugar: Math.max(0, round1(Number(totals?.sugar) || 0)),
+      ...(favoriteId ? { __favoriteId: favoriteId, __favoriteManualEdit: false } : {}),
+    }
     const ok = await createFoodEntry({
-      name: item.name,
+      name: item.label,
       meal: favoritesTargetMeal,
-      calories: item.nutrients.calories,
-      protein: item.nutrients.protein,
-      carbs: item.nutrients.carbs,
-      fat: item.nutrients.fat,
-      fiber: item.nutrients.fiber,
-      sugar: item.nutrients.sugar,
-      description: item.description || '',
+      calories: Number(totals?.calories) || 0,
+      protein: Number(totals?.protein) || 0,
+      carbs: Number(totals?.carbs) || 0,
+      fat: Number(totals?.fat) || 0,
+      fiber: Number(totals?.fiber) || 0,
+      sugar: Number(totals?.sugar) || 0,
+      description: item.label,
+      items: normalizedItems,
+      nutrition: nutritionPayload,
+      total: { ...nutritionPayload },
+      createdAt: new Date().toISOString(),
     })
     if (!ok) {
       Alert.alert('Failed', 'Could not add favorite to diary.')
       return
     }
-    setFavoritesOpen(false)
+    if (item.favorite) {
+      await markFavoriteAsUsed(item)
+    }
+    closeFavoritesFlow()
     await loadAll()
   }
 
-  const deleteFavorite = async (item: FavoriteMeal) => {
-    const next = favorites.filter((f) => f.id !== item.id)
+  const openFavoritePreview = (item: FavoritesListItem) => {
+    setFavoriteActionItem(null)
+    setFavoritePreviewItem(item)
+  }
+
+  const openFavoriteAdjust = (item: FavoritesListItem) => {
+    setFavoriteActionItem(null)
+    setFavoritePreviewItem(null)
+    setFavoriteAdjustItem(item)
+    setFavoriteAdjustItems(buildFavoriteAdjustItems(item))
+  }
+
+  const openFavoriteEditor = (item: FavoritesListItem) => {
+    setFavoriteActionItem(null)
+    setFavoritePreviewItem(null)
+    setFavoriteAdjustItem(null)
+    setFavoriteAdjustItems([])
+    setFavoriteRenameItem(null)
+    setFavoriteRenameValue('')
+    setFavoriteEditItem(item)
+    setFavoriteEditItems(buildFavoriteAdjustItems(item))
+    setFavoriteEditName(item.label)
+    setFavoriteEditIngredientsExpanded(false)
+    setFavoriteEditExpandedItemId(null)
+    setFavoriteEditSearchKind('packaged')
+    setFavoriteEditSearchQuery('')
+    setFavoriteEditSearchResults([])
+    setFavoriteEditSearchError('')
+    setFavoriteEditPortionControlEnabled(false)
+  }
+
+  const updateFavoriteFromEditor = async () => {
+    if (!favoriteEditItem?.favorite) return
+    const nextName = normalizeFavoriteLabel(favoriteEditName) || favoriteEditItem.label || 'Favorite meal'
+    const sourceFavorite = favoriteEditItem.favorite
+    const totals = calculateFavoriteAdjustTotals(favoriteEditItems)
+    const nextItems = favoriteEditItems.map((entry) => ({
+      ...(entry.raw && typeof entry.raw === 'object' ? entry.raw : {}),
+      id: entry.raw?.id || entry.id,
+      name: entry.name,
+      label: entry.name,
+      serving_size: entry.servingLabel,
+      servings: Number.isFinite(Number(entry.servings)) && Number(entry.servings) > 0 ? Number(entry.servings) : 1,
+      calories: Math.max(0, Number(entry.calories) || 0),
+      protein_g: Math.max(0, Number(entry.protein) || 0),
+      carbs_g: Math.max(0, Number(entry.carbs) || 0),
+      fat_g: Math.max(0, Number(entry.fat) || 0),
+      fiber_g: Math.max(0, Number(entry.fiber) || 0),
+      sugar_g: Math.max(0, Number(entry.sugar) || 0),
+    }))
+    const meal = String(sourceFavorite.meal || favoriteEditItem.entry?.meal || favoritesTargetMeal || 'uncategorized').toLowerCase()
+    const method = String(sourceFavorite.method || sourceFavorite.raw?.method || '').toLowerCase()
+    const custom =
+      isCustomFavoriteMeal(
+        {
+          ...(sourceFavorite.raw || {}),
+          method,
+          customMeal: sourceFavorite.custom === true || sourceFavorite.raw?.customMeal === true,
+        },
+        nextItems,
+      ) || sourceFavorite.custom === true
+
+    const nextFavorite: FavoriteMeal = {
+      ...sourceFavorite,
+      name: nextName,
+      description: nextName,
+      meal,
+      custom,
+      items: nextItems,
+      nutrients: {
+        calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
+        protein: Math.max(0, round1(Number(totals.protein) || 0)),
+        carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
+        fat: Math.max(0, round1(Number(totals.fat) || 0)),
+        fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
+        sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+      },
+      raw: {
+        ...(sourceFavorite.raw || {}),
+        label: nextName,
+        description: nextName,
+        meal,
+        category: meal,
+        items: nextItems,
+        nutrition: {
+          ...((sourceFavorite.raw?.nutrition || sourceFavorite.raw?.total || {}) as any),
+          calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
+          protein: Math.max(0, round1(Number(totals.protein) || 0)),
+          carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
+          fat: Math.max(0, round1(Number(totals.fat) || 0)),
+          fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
+          sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+        },
+        total: {
+          ...((sourceFavorite.raw?.total || sourceFavorite.raw?.nutrition || {}) as any),
+          calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
+          protein: Math.max(0, round1(Number(totals.protein) || 0)),
+          carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
+          fat: Math.max(0, round1(Number(totals.fat) || 0)),
+          fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
+          sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+        },
+        method: method || (custom ? 'meal-builder' : 'text'),
+        ...(custom ? { customMeal: true } : {}),
+      },
+    }
+
+    const next = favorites.map((favorite) =>
+      favorite.id === sourceFavorite.id ? nextFavorite : favorite,
+    )
     await saveFavorites(next)
+    const updatedListItem = buildFavoritesListItemFromFavorite(nextFavorite)
+    setFavoriteEditItem(null)
+    setFavoriteEditItems([])
+    setFavoriteEditName('')
+    setFavoriteEditIngredientsExpanded(false)
+    setFavoriteEditExpandedItemId(null)
+    Alert.alert('Favorite updated', 'Would you like to add this updated meal to your diary now?', [
+      {
+        text: 'Not now',
+        style: 'cancel',
+      },
+      {
+        text: 'Add Meal',
+        onPress: () => {
+          void addFavoriteToDiary(updatedListItem)
+        },
+      },
+    ])
+  }
+
+  const appendItemsToFavoriteEditor = useCallback((items: FavoriteAdjustItem[]) => {
+    if (!items.length) return
+    setFavoriteEditIngredientsExpanded(true)
+    setFavoriteEditItems((prev) => [...prev, ...items])
+    setFavoriteEditExpandedItemId(items[0]?.id || null)
+  }, [])
+
+  const addSearchResultToFavoriteEditor = (item: SearchFoodItem) => {
+    appendItemsToFavoriteEditor([buildFavoriteAdjustItemFromSearchFood(item)])
+    setFavoriteEditSearchQuery('')
+    setFavoriteEditSearchResults([])
+    setFavoriteEditSearchError('')
+  }
+
+  const addFavoriteListItemToFavoriteEditor = (item: FavoritesListItem) => {
+    const items = buildFavoriteAdjustItems(item)
+    if (!items.length) return
+    appendItemsToFavoriteEditor(items)
+    setFavoritesOpen(false)
+    setFavoritesUsageMode('diary')
+  }
+
+  const runFavoriteEditSearch = async (
+    kindOverride?: 'single' | 'packaged',
+    queryOverride?: string,
+  ) => {
+    const kind = kindOverride || favoriteEditSearchKind
+    const query = String(queryOverride ?? favoriteEditSearchQuery).trim()
+    if (!query) {
+      setFavoriteEditSearchResults([])
+      setFavoriteEditSearchError('Please enter a food name to search.')
+      return
+    }
+    if (!authHeaders) return
+
+    const sourceParam = kind === 'single' ? 'usda' : 'auto'
+
+    try {
+      setFavoriteEditSearchLoading(true)
+      setFavoriteEditSearchError('')
+      const res = await fetch(
+        `${API_BASE_URL}/api/food-data?source=${sourceParam}&kind=${kind}&q=${encodeURIComponent(query)}&limit=20`,
+        { headers: authHeaders },
+      )
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok) {
+        setFavoriteEditSearchResults([])
+        setFavoriteEditSearchError('Search failed. Please try again.')
+        return
+      }
+      let items: SearchFoodItem[] = Array.isArray(data?.items) ? data.items : []
+      if (kind === 'single') {
+        items = items.filter((entry) => entry?.source === 'usda' || entry?.__custom === true)
+      }
+      const sorted = sortSearchResultsAz(items, { kind, query })
+      setFavoriteEditSearchResults(sorted)
+      if (sorted.length === 0) {
+        setFavoriteEditSearchError('No results yet. Try a different search.')
+      }
+    } catch {
+      setFavoriteEditSearchResults([])
+      setFavoriteEditSearchError('Search failed. Please try again.')
+    } finally {
+      setFavoriteEditSearchLoading(false)
+    }
+  }
+
+  const removeFavoriteEditIngredient = (id: string) => {
+    setFavoriteEditItems((prev) => prev.filter((item) => item.id !== id))
+    setFavoriteEditExpandedItemId((prev) => (prev === id ? null : prev))
+  }
+
+  const submitFavoriteEditMissingReport = async () => {
+    const trimmedName = favoriteEditMissingReportName.trim()
+    if (!trimmedName) {
+      setFavoriteEditMissingReportError('Please enter the item name.')
+      return
+    }
+    if (!session?.token) return
+
+    try {
+      setFavoriteEditMissingReportBusy(true)
+      setFavoriteEditMissingReportError('')
+      const res = await fetch(`${API_BASE_URL}/api/food-missing`, {
+        method: 'POST',
+        headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
+        body: JSON.stringify({
+          name: trimmedName,
+          brand: favoriteEditMissingReportBrand.trim() || null,
+          chain: favoriteEditMissingReportBrand.trim() || null,
+          size: favoriteEditMissingReportSize.trim() || null,
+          notes: favoriteEditMissingReportNotes.trim() || null,
+          kind: favoriteEditSearchKind,
+          query: favoriteEditSearchQuery.trim() || null,
+          source: 'favorites-edit',
+        }),
+      })
+      if (!res.ok) {
+        setFavoriteEditMissingReportError('Something went wrong. Please try again.')
+        return
+      }
+      setFavoriteEditMissingReportDone(true)
+      setFavoriteEditMissingReportBrand('')
+      setFavoriteEditMissingReportSize('')
+      setFavoriteEditMissingReportNotes('')
+    } catch {
+      setFavoriteEditMissingReportError('Something went wrong. Please try again.')
+    } finally {
+      setFavoriteEditMissingReportBusy(false)
+    }
+  }
+
+  const openFavoriteEditMissingReport = () => {
+    setFavoriteEditMissingReportOpen(true)
+    setFavoriteEditMissingReportDone(false)
+    setFavoriteEditMissingReportError('')
+    if (favoriteEditSearchQuery.trim()) setFavoriteEditMissingReportName(favoriteEditSearchQuery.trim())
+  }
+
+  const addBarcodeFoodToFavoriteEditor = async () => {
+    if (!barcodeFood) return
+    appendItemsToFavoriteEditor([
+      buildFavoriteAdjustItemFromSearchFood({
+        ...barcodeFood,
+        serving_size: barcodeFood.serving_size || '1 serving',
+      }),
+    ])
+    setBarcodeOpen(false)
+    setBarcodeUsageMode('diary')
+    setBarcodeFood(null)
+    setBarcodeCode('')
+  }
+
+  const createFromImageForFavoriteEditor = async (modeValue: 'camera' | 'library') => {
+    if (!session?.token) return
+
+    try {
+      const permission =
+        modeValue === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync()
+      if (!permission.granted) {
+        Alert.alert('Permission needed', 'Please allow access to continue.')
+        return
+      }
+
+      const picked =
+        modeValue === 'camera'
+          ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+          : await ImagePicker.launchImageLibraryAsync({ quality: 0.7 })
+
+      if (picked.canceled || !picked.assets?.[0]?.uri) return
+
+      const asset = picked.assets[0]
+      const form = new FormData()
+      form.append('mealType', favoritesTargetMeal)
+      form.append('image', {
+        uri: asset.uri,
+        type: asset.mimeType || 'image/jpeg',
+        name: asset.fileName || 'food.jpg',
+      } as any)
+
+      setFavoriteEditPhotoLoading(true)
+      const res = await fetch(`${API_BASE_URL}/api/analyze-food`, {
+        method: 'POST',
+        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
+        body: form,
+      })
+      const data: any = await res.json().catch(() => ({}))
+
+      if (!res.ok) {
+        Alert.alert('Analysis failed', String(data?.error || 'Could not analyze this image.'))
+        return
+      }
+
+      const foundItems = Array.isArray(data?.items) ? data.items : []
+      if (foundItems.length > 0) {
+        appendItemsToFavoriteEditor(foundItems.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)))
+        return
+      }
+
+      const summary = data?.food || data || {}
+      appendItemsToFavoriteEditor([
+        buildFavoriteAdjustItemFromSearchFood({
+          id: `photo-${Date.now()}`,
+          name: String(summary?.name || 'Photo analyzed meal'),
+          serving_size: String(summary?.description || '1 serving'),
+          calories: numberOrZero(summary?.calories || summary?.calories_kcal),
+          protein_g: numberOrZero(summary?.protein || summary?.protein_g),
+          carbs_g: numberOrZero(summary?.carbs || summary?.carbs_g),
+          fat_g: numberOrZero(summary?.fat || summary?.fat_g),
+          fiber_g: numberOrZero(summary?.fiber || summary?.fiber_g),
+          sugar_g: numberOrZero(summary?.sugar || summary?.sugar_g),
+        }),
+      ])
+    } catch {
+      Alert.alert('Analysis failed', 'Could not analyze this image.')
+    } finally {
+      setFavoriteEditPhotoLoading(false)
+    }
+  }
+
+  const shareFavoriteItem = async (item: FavoritesListItem, adjustedItems?: FavoriteAdjustItem[]) => {
+    try {
+      await Share.share({ message: buildFavoriteShareText(item, adjustedItems) })
+    } catch {}
   }
 
   const openIngredientSearch = (meal: string) => {
@@ -1808,7 +2995,8 @@ export function TrackCaloriesScreen() {
     await loadAll()
   }
 
-  const openBarcode = (meal: string) => {
+  const openBarcode = (meal: string, mode: 'diary' | 'editor' = 'diary') => {
+    setBarcodeUsageMode(mode)
     setBarcodeTargetMeal(meal)
     setBarcodeCode('')
     setBarcodeFood(null)
@@ -1858,6 +3046,11 @@ export function TrackCaloriesScreen() {
 
   const addBarcodeFood = async () => {
     if (!barcodeFood) return
+
+    if (barcodeUsageMode === 'editor') {
+      await addBarcodeFoodToFavoriteEditor()
+      return
+    }
 
     const ok = await createFoodEntry({
       name: String(barcodeFood.name || 'Scanned item'),
@@ -1941,8 +3134,13 @@ export function TrackCaloriesScreen() {
     }
   }
 
-  const createFromImage = async (modeValue: 'camera' | 'library', meal: string) => {
+  const createFromImage = async (modeValue: 'camera' | 'library', meal: string, usageMode: 'diary' | 'editor' = 'diary') => {
     if (!session?.token) return
+
+    if (usageMode === 'editor') {
+      await createFromImageForFavoriteEditor(modeValue)
+      return
+    }
 
     try {
       const permission =
@@ -2440,12 +3638,11 @@ export function TrackCaloriesScreen() {
 
     if (action === 'Photo Library') {
       closeAllAddMenus()
-      await createFromImage('library', meal)
-      return
-    }
-    if (action === 'Camera') {
-      closeAllAddMenus()
-      await createFromImage('camera', meal)
+      resetCopyMode()
+      navigation.getParent()?.navigate('FoodAnalysis', {
+        meal,
+        date: selectedDate,
+      })
       return
     }
     if (action === 'Favorites') {
@@ -3381,9 +4578,9 @@ export function TrackCaloriesScreen() {
                 setEntryMenu(null)
                 closeEntrySwipeMenus()
               }}
-              style={[entryActionRow, entryActionRowDivider, { backgroundColor: '#FFFFFF' }]}
+              style={[entryActionRow, entryActionRowDivider, { backgroundColor: '#FFFFFF', justifyContent: 'center' }]}
             >
-              <Text style={entryActionText}>Cancel</Text>
+              <Text style={[entryActionText, { flex: 0, textAlign: 'center' }]}>Cancel</Text>
             </Pressable>
           </View>
         </View>
@@ -3450,64 +4647,954 @@ export function TrackCaloriesScreen() {
         </View>
       </Modal>
 
-      <Modal transparent visible={favoritesOpen} animationType="fade" onRequestClose={() => setFavoritesOpen(false)}>
-        <View style={modalBackdrop}>
-          <View style={modalCardLarge}>
-            <Text style={modalTitle}>Favorites picker</Text>
-            <Text style={{ color: theme.colors.muted }}>Adding to: {mealLabel(favoritesTargetMeal)}</Text>
+      {favoritesOpen ? (
+        <View style={{ position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, zIndex: 40, backgroundColor: '#FFFFFF' }}>
+          <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+            <View style={{ paddingHorizontal: 18, paddingTop: Math.max(insets.top + 10, 28), paddingBottom: 16, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center' }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[modalTitle, { fontSize: 18 }]}>Add from favorites</Text>
+                <Text style={{ color: '#6B7280', marginTop: 4 }}>
+                  {favoritesUsageMode === 'editor'
+                    ? 'Add saved ingredients into this meal'
+                    : `Insert into ${mealLabel(favoritesTargetMeal)}`}
+                </Text>
+              </View>
+              <Pressable onPress={closeFavoritesFlow} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }}>
+                <MaterialCommunityIcons name="close" size={22} color="#4B5563" />
+              </Pressable>
+            </View>
 
-            <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-              {(['all', 'favorites', 'custom'] as const).map((tab) => (
-                <Pressable key={tab} onPress={() => setFavoritesTab(tab)} style={[chip, favoritesTab === tab && chipActive]}>
-                  <Text style={[chipText, favoritesTab === tab && chipTextActive]}>{tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}</Text>
+            <View style={{ paddingHorizontal: 16, paddingTop: 14, paddingBottom: 12, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
+              <View
+                style={{
+                  flexDirection: 'row',
+                  alignItems: 'center',
+                  borderWidth: 1,
+                  borderColor: '#D1D5DB',
+                  backgroundColor: '#FFFFFF',
+                  paddingHorizontal: 12,
+                  paddingVertical: 10,
+                }}
+              >
+                <MaterialCommunityIcons name="magnify" size={20} color="#9CA3AF" />
+                <TextInput
+                  value={favoritesSearch}
+                  onChangeText={setFavoritesSearch}
+                  placeholder="Search all foods..."
+                  placeholderTextColor="#8AA39D"
+                  style={{ flex: 1, marginLeft: 8, color: '#111827', fontSize: 16, fontWeight: '700' }}
+                />
+                {favoritesSearch ? (
+                  <Pressable onPress={() => setFavoritesSearch('')}>
+                    <MaterialCommunityIcons name="close" size={18} color="#6B7280" />
+                  </Pressable>
+                ) : null}
+              </View>
+
+              <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
+                {(['all', 'favorites', 'custom'] as const).map((tab) => (
+                  <Pressable
+                    key={tab}
+                    onPress={() => setFavoritesTab(tab)}
+                    style={{
+                      flex: 1,
+                      borderWidth: 1,
+                      borderColor: '#D1D5DB',
+                      backgroundColor: favoritesTab === tab ? '#E5E7EB' : '#FFFFFF',
+                      paddingVertical: 10,
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                    }}
+                  >
+                    <Text style={{ color: '#111827', fontWeight: '800' }}>
+                      {tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}
+                    </Text>
+                  </Pressable>
+                ))}
+              </View>
+            </View>
+
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingVertical: 18, paddingBottom: 32 }}>
+              {favoritesLibraryLoading && favoritesTab === 'all' && favoritesForList.length === 0 ? (
+                <View style={{ paddingVertical: 28, alignItems: 'center' }}>
+                  <ActivityIndicator color={theme.colors.primary} />
+                  <Text style={{ color: '#6B7280', marginTop: 8 }}>Loading favorites...</Text>
+                </View>
+              ) : favoritesForList.length === 0 ? (
+                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 28 }}>
+                  <Text style={{ color: '#6B7280', textAlign: 'center' }}>
+                    {favoritesTab === 'all'
+                      ? 'No meals yet. Add some entries to see them here.'
+                      : favoritesTab === 'favorites'
+                      ? 'Save a meal using "Add to Favorites" to see it here.'
+                      : 'Create custom meals and they will appear here.'}
+                  </Text>
+                </View>
+              ) : (
+                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
+                  {favoritesForList.map((item, index) => {
+                    const lastUsedText =
+                      item.lastUsedAtMs > 0
+                        ? `Last used ${new Date(item.lastUsedAtMs).toLocaleString(undefined, {
+                            weekday: 'short',
+                            month: 'short',
+                            day: 'numeric',
+                            hour: 'numeric',
+                            minute: '2-digit',
+                          })}`
+                        : ''
+                    const canDelete = Boolean(item.favorite)
+                    const canEdit = Boolean(item.favorite)
+                    const canSave = favoritesTab === 'all' && !item.isSaved && Boolean(item.entry)
+                    const showStar = favoritesTab === 'all'
+                    return (
+                      <View
+                        key={item.id}
+                        style={{
+                          flexDirection: 'row',
+                          alignItems: 'stretch',
+                          borderTopWidth: index === 0 ? 0 : 1,
+                          borderTopColor: '#E5E7EB',
+                          backgroundColor: '#FFFFFF',
+                        }}
+                      >
+                        <Pressable
+                          onPress={() => {
+                            if (favoritesUsageMode === 'editor') {
+                              addFavoriteListItemToFavoriteEditor(item)
+                              return
+                            }
+                            setFavoriteActionItem(item)
+                          }}
+                          style={{ flex: 1, paddingHorizontal: 16, paddingVertical: 14 }}
+                        >
+                          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                            <View style={{ flex: 1 }}>
+                              <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }} numberOfLines={1}>
+                                {item.label}
+                              </Text>
+                              <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
+                                {item.serving || '1 serving'}
+                              </Text>
+                              {lastUsedText ? (
+                                <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 3 }} numberOfLines={1}>
+                                  {lastUsedText}
+                                </Text>
+                              ) : null}
+                            </View>
+                            <View style={{ alignItems: 'flex-end' }}>
+                              <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>
+                                {Math.round(item.calories)} kcal
+                              </Text>
+                              <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 3 }}>{item.sourceTag}</Text>
+                            </View>
+                          </View>
+                        </Pressable>
+
+                        {showStar && favoritesUsageMode === 'diary' ? (
+                          <Pressable
+                            disabled={!canSave}
+                            onPress={() => void saveListItemToFavorites(item)}
+                            style={{ width: 50, alignItems: 'center', justifyContent: 'center', opacity: canSave || item.isSaved ? 1 : 0.4 }}
+                          >
+                            <MaterialCommunityIcons
+                              name={item.isSaved ? 'star' : 'star-outline'}
+                              size={22}
+                              color="#10B981"
+                            />
+                          </Pressable>
+                        ) : null}
+
+                        {canDelete && favoritesUsageMode === 'diary' ? (
+                          <Pressable
+                            onPress={() => void deleteFavorite(item.favorite!)}
+                            style={{ width: 50, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <MaterialCommunityIcons name="trash-can-outline" size={21} color="#DC2626" />
+                          </Pressable>
+                        ) : null}
+
+                        {canEdit && favoritesUsageMode === 'diary' ? (
+                          <Pressable
+                            onPress={() => openFavoriteEditor(item)}
+                            style={{ width: 50, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <MaterialCommunityIcons name="pencil-outline" size={21} color="#4B5563" />
+                          </Pressable>
+                        ) : null}
+                      </View>
+                    )
+                  })}
+                </View>
+              )}
+            </ScrollView>
+          </View>
+        </View>
+      ) : null}
+
+      <Modal transparent visible={favoriteActionItem != null} animationType="fade" onRequestClose={() => setFavoriteActionItem(null)}>
+        <View style={modalBackdrop}>
+          <View style={[modalCard, { borderRadius: 20, padding: 18 }]}>
+            <Text style={{ color: '#111827', fontSize: 16, fontWeight: '800' }}>{favoriteActionItem?.label}</Text>
+            <Text style={{ color: '#6B7280', marginTop: 4 }}>What would you like to do?</Text>
+
+            <View style={{ marginTop: 14, gap: 10 }}>
+              <Pressable onPress={() => favoriteActionItem && void addFavoriteToDiary(favoriteActionItem)} style={primaryButton}>
+                <Text style={primaryButtonText}>Add to diary</Text>
+              </Pressable>
+              <Pressable onPress={() => favoriteActionItem && openFavoritePreview(favoriteActionItem)} style={secondaryButton}>
+                <Text style={secondaryButtonText}>Preview</Text>
+              </Pressable>
+              <Pressable onPress={() => favoriteActionItem && openFavoriteAdjust(favoriteActionItem)} style={secondaryButton}>
+                <Text style={secondaryButtonText}>Change portion</Text>
+              </Pressable>
+              {favoriteActionItem && buildFavoriteAdjustItems(favoriteActionItem).length > 1 ? (
+                <Pressable onPress={() => void shareFavoriteItem(favoriteActionItem)} style={primaryButton}>
+                  <Text style={primaryButtonText}>Share meal</Text>
                 </Pressable>
+              ) : null}
+              <Pressable onPress={() => setFavoriteActionItem(null)} style={secondaryButton}>
+                <Text style={secondaryButtonText}>Cancel</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={favoritePreviewItem != null} animationType="slide" onRequestClose={() => setFavoritePreviewItem(null)}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center' }}>
+            <Pressable onPress={() => { if (favoritePreviewItem) { setFavoritePreviewItem(null); setFavoriteActionItem(favoritePreviewItem) } }}>
+              <Text style={{ color: '#374151', fontWeight: '800' }}>Back</Text>
+            </Pressable>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={{ color: '#111827', fontWeight: '800' }}>Preview</Text>
+              <Text style={{ color: '#6B7280', fontSize: 12 }}>{favoritePreviewItem?.serving || '1 serving'}</Text>
+            </View>
+            <Pressable onPress={() => setFavoritePreviewItem(null)} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+              <Text style={{ color: '#374151', fontWeight: '800' }}>Cancel</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 36 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, justifyContent: 'flex-end' }}>
+              {favoritePreviewItem && favoritePreviewItems.length > 1 ? (
+                <Pressable onPress={() => void shareFavoriteItem(favoritePreviewItem, favoritePreviewItems)} style={[miniPrimaryButton, { paddingHorizontal: 14, paddingVertical: 10 }]}>
+                  <Text style={miniPrimaryText}>Share meal</Text>
+                </Pressable>
+              ) : null}
+              <Pressable onPress={() => favoritePreviewItem && openFavoriteAdjust(favoritePreviewItem)} style={[miniSecondaryButton, { paddingHorizontal: 14, paddingVertical: 10 }]}>
+                <Text style={miniSecondaryText}>Change portion</Text>
+              </Pressable>
+              <Pressable onPress={() => favoritePreviewItem && void addFavoriteToDiary(favoritePreviewItem)} style={[miniPrimaryButton, { paddingHorizontal: 18, paddingVertical: 10, backgroundColor: '#111827' }]}>
+                <Text style={miniPrimaryText}>Add</Text>
+              </Pressable>
+            </View>
+
+            <Text style={{ color: '#111827', fontSize: 22, fontWeight: '900', marginTop: 18 }}>
+              {favoritePreviewItem?.label}
+            </Text>
+            <Text style={{ color: '#6B7280', marginTop: 4 }}>This is a preview. It does not add the meal yet.</Text>
+
+            <View style={{ marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {[
+                { label: energyUnit === 'kj' ? 'Kilojoules' : 'Calories', value: energyUnit === 'kj' ? Math.round(favoritePreviewTotals.calories * 4.184) : Math.round(favoritePreviewTotals.calories) },
+                { label: 'Protein', value: `${formatMacroAmount(favoritePreviewTotals.protein)} g` },
+                { label: 'Carbs', value: `${formatMacroAmount(favoritePreviewTotals.carbs)} g` },
+                { label: 'Fat', value: `${formatMacroAmount(favoritePreviewTotals.fat)} g` },
+                { label: 'Fibre', value: `${formatMacroAmount(favoritePreviewTotals.fiber)} g` },
+                { label: 'Sugar', value: `${formatMacroAmount(favoritePreviewTotals.sugar)} g` },
+              ].map((card) => (
+                <View key={card.label} style={{ width: '47%', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14, backgroundColor: '#F9FAFB' }}>
+                  <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>{card.value}</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '800', marginTop: 6, textTransform: 'uppercase' }}>{card.label}</Text>
+                </View>
               ))}
             </View>
 
-            <TextInput
-              value={favoritesSearch}
-              onChangeText={setFavoritesSearch}
-              placeholder="Search saved meals"
-              placeholderTextColor="#8AA39D"
-              style={[inputStyle, { marginTop: 8 }]}
-            />
+            <View style={{ marginTop: 24 }}>
+              <Text style={{ color: '#111827', fontWeight: '800' }}>Daily totals after adding</Text>
+              <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>This shows what your full day would look like if you added this.</Text>
+              <View style={{ marginTop: 12, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, gap: 8 }}>
+                {[
+                  { label: energyUnit === 'kj' ? 'Calories' : 'Calories', value: `${Math.round(totals.calories + favoritePreviewTotals.calories)} kcal / ${dailyAllowanceKcal} kcal` },
+                  { label: 'Protein', value: `${formatMacroAmount(totals.protein + favoritePreviewTotals.protein)} g / ${formatMacroAmount(macroTargetsWithExercise.protein)} g` },
+                  { label: 'Carbs', value: `${formatMacroAmount(totals.carbs + favoritePreviewTotals.carbs)} g / ${formatMacroAmount(macroTargetsWithExercise.carbs)} g` },
+                  { label: 'Fat', value: `${formatMacroAmount(totals.fat + favoritePreviewTotals.fat)} g / ${formatMacroAmount(macroTargetsWithExercise.fat)} g` },
+                  { label: 'Fibre', value: `${formatMacroAmount(totals.fiber + favoritePreviewTotals.fiber)} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g` },
+                  { label: 'Sugar', value: `${formatMacroAmount(totals.sugar + favoritePreviewTotals.sugar)} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g` },
+                ].map((row) => (
+                  <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                    <Text style={{ color: '#374151', fontWeight: '700' }}>{row.label}</Text>
+                    <Text style={{ color: '#111827', fontWeight: '800', textAlign: 'right', flex: 1 }}>{row.value}</Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+          </ScrollView>
+        </View>
+      </Modal>
 
-            <ScrollView style={{ marginTop: 10, maxHeight: 320 }}>
-              {favoritesForList.length === 0 ? (
-                <Text style={{ color: theme.colors.muted }}>No items found.</Text>
-              ) : (
-                favoritesForList.map((item) => (
-                  <View key={item.id} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#FBFDFC' }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{item.name}</Text>
-                    <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
-                      {formatCalories(item.nutrients.calories, energyUnit)} • P {round1(item.nutrients.protein)}g • C {round1(item.nutrients.carbs)}g • F {round1(item.nutrients.fat)}g
+      <Modal
+        visible={favoriteEditItem != null}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setFavoriteEditItem(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: Math.max(insets.top + 8, 18),
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E5E7EB',
+              backgroundColor: '#FFFFFF',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+              <Pressable
+                onPress={() => {
+                  setFavoriteEditItem(null)
+                  setFavoriteEditItems([])
+                  setFavoriteEditName('')
+                }}
+                style={{ width: 36, paddingTop: 2 }}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#4B5563" />
+              </Pressable>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>Edit meal</Text>
+                <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                  <View style={{ borderRadius: 999, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ color: '#047857', fontSize: 13, fontWeight: '700' }}>{mealLabel(favoritesTargetMeal)}</Text>
+                  </View>
+                  <Text style={{ color: '#9CA3AF', fontSize: 12 }}>•</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 13 }}>{selectedDate}</Text>
+                </View>
+              </View>
+              <View style={{ width: 36 }} />
+            </View>
+          </View>
+
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' }}>
+              <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>Meal name (optional)</Text>
+              <TextInput
+                value={favoriteEditName}
+                onChangeText={setFavoriteEditName}
+                placeholder="Meal name"
+                placeholderTextColor="#9CA3AF"
+                style={{
+                  marginTop: 10,
+                  borderWidth: 1,
+                  borderColor: '#D1D5DB',
+                  borderRadius: 12,
+                  paddingHorizontal: 14,
+                  paddingVertical: 12,
+                  color: '#111827',
+                  fontSize: 16,
+                  fontWeight: '700',
+                }}
+              />
+              {favoriteEditItem && favoriteEditItems.length > 1 ? (
+                <Pressable
+                  onPress={() => void shareFavoriteItem(favoriteEditItem, favoriteEditItems)}
+                  style={[miniPrimaryButton, { marginTop: 12, alignSelf: 'flex-start', paddingHorizontal: 14, paddingVertical: 10 }]}
+                >
+                  <Text style={miniPrimaryText}>Share meal</Text>
+                </Pressable>
+              ) : null}
+            </View>
+
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' }}>
+              <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>Search ingredients</Text>
+              <View style={{ marginTop: 12, position: 'relative' }}>
+                <TextInput
+                  value={favoriteEditSearchQuery}
+                  onChangeText={(text) => {
+                    setFavoriteEditSearchQuery(text)
+                    setFavoriteEditSearchError('')
+                  }}
+                  onSubmitEditing={() => void runFavoriteEditSearch()}
+                  returnKeyType="search"
+                  placeholder="e.g. chicken breast"
+                  autoCorrect={false}
+                  autoCapitalize="none"
+                  placeholderTextColor="#9CA3AF"
+                  style={[inputStyle, { paddingRight: 48 }]}
+                />
+                <Pressable
+                  onPress={() => void runFavoriteEditSearch()}
+                  disabled={favoriteEditSearchLoading || !favoriteEditSearchQuery.trim()}
+                  style={{
+                    position: 'absolute',
+                    right: 8,
+                    top: '50%',
+                    marginTop: -16,
+                    width: 32,
+                    height: 32,
+                    borderRadius: 16,
+                    backgroundColor: '#6B7280',
+                    alignItems: 'center',
+                    justifyContent: 'center',
+                    opacity: favoriteEditSearchLoading || !favoriteEditSearchQuery.trim() ? 0.6 : 1,
+                  }}
+                >
+                  {favoriteEditSearchLoading ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : (
+                    <MaterialCommunityIcons name="magnify" size={18} color="#FFFFFF" />
+                  )}
+                </Pressable>
+              </View>
+
+              <Pressable onPress={openFavoriteEditMissingReport} style={{ marginTop: 12, alignSelf: 'flex-start' }}>
+                <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>Missing item? Tell us</Text>
+              </Pressable>
+
+              <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+                <Pressable
+                  onPress={() => {
+                    setFavoriteEditSearchKind('packaged')
+                    if (favoriteEditSearchQuery.trim()) void runFavoriteEditSearch('packaged', favoriteEditSearchQuery)
+                  }}
+                  style={[chip, { flex: 1, alignItems: 'center', justifyContent: 'center' }, favoriteEditSearchKind === 'packaged' && chipActive]}
+                >
+                  <Text style={[chipText, favoriteEditSearchKind === 'packaged' && chipTextActive]}>Packaged/Fast-foods</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => {
+                    setFavoriteEditSearchKind('single')
+                    if (favoriteEditSearchQuery.trim()) void runFavoriteEditSearch('single', favoriteEditSearchQuery)
+                  }}
+                  style={[chip, { flex: 1, alignItems: 'center', justifyContent: 'center' }, favoriteEditSearchKind === 'single' && chipActive]}
+                >
+                  <Text style={[chipText, favoriteEditSearchKind === 'single' && chipTextActive]}>Single food</Text>
+                </Pressable>
+              </View>
+
+              <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <Pressable
+                  onPress={() =>
+                    Alert.alert('Add by photo', 'Choose where to get the image from.', [
+                      { text: 'Camera', onPress: () => void createFromImage('camera', favoritesTargetMeal, 'editor') },
+                      { text: 'Photo Library', onPress: () => void createFromImage('library', favoritesTargetMeal, 'editor') },
+                      { text: 'Cancel', style: 'cancel' },
+                    ])
+                  }
+                  style={[miniSecondaryButton, { width: '48%', alignItems: 'center', justifyContent: 'center' }]}
+                >
+                  <Text style={miniSecondaryText}>{favoriteEditPhotoLoading ? 'Adding photo…' : 'Add by photo'}</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => openBarcode(favoritesTargetMeal, 'editor')}
+                  style={[miniSecondaryButton, { width: '48%', alignItems: 'center', justifyContent: 'center' }]}
+                >
+                  <Text style={miniSecondaryText}>Scan barcode</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => openFavorites(favoritesTargetMeal, 'editor')}
+                  style={[miniSecondaryButton, { width: '100%', alignItems: 'center', justifyContent: 'center' }]}
+                >
+                  <Text style={miniSecondaryText}>Add from favorites</Text>
+                </Pressable>
+              </View>
+
+              <View style={{ marginTop: 14 }}>
+                <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Credits remaining</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
+                  <View style={{ flex: 1, height: 8, borderRadius: 999, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                    <View
+                      style={{
+                        width: `${Math.max(0, 100 - creditsPercentUsed)}%`,
+                        height: '100%',
+                        backgroundColor: '#4CAF50',
+                      }}
+                    />
+                  </View>
+                  <Text style={{ color: '#374151', fontSize: 12, fontWeight: '800' }}>
+                    {creditsRemaining !== null ? creditsRemaining.toLocaleString() : '—'}
+                  </Text>
+                </View>
+              </View>
+
+              <View style={{ marginTop: 14, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 16, backgroundColor: '#ECFDF5', padding: 14 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ color: '#374151', fontSize: 12, fontWeight: '800' }}>Portion control</Text>
+                    <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4 }}>
+                      {favoriteEditPortionControlEnabled
+                        ? 'Toggle is on: you are editing a portion amount.'
+                        : 'Toggle is off: this meal uses 100% of ingredients.'}
                     </Text>
-                    <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-                      <Pressable onPress={() => void addFavoriteToDiary(item)} style={miniPrimaryButton}>
+                  </View>
+                  <Switch
+                    value={favoriteEditPortionControlEnabled}
+                    onValueChange={setFavoriteEditPortionControlEnabled}
+                    trackColor={{ false: '#D1D5DB', true: '#10B981' }}
+                    thumbColor="#FFFFFF"
+                  />
+                </View>
+                <Text style={{ color: '#047857', fontSize: 11, marginTop: 10 }}>
+                  {favoriteEditPortionControlEnabled
+                    ? 'These update live when you change ingredient amounts.'
+                    : 'This meal is 100% of the full amount.'}
+                </Text>
+                <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                  {[
+                    `${Math.round(favoriteEditTotals.calories)} kcal`,
+                    `${formatMacroAmount(favoriteEditTotals.protein)} g protein`,
+                    `${formatMacroAmount(favoriteEditTotals.carbs)} g carbs`,
+                    `${formatMacroAmount(favoriteEditTotals.fat)} g fat`,
+                    `${formatMacroAmount(favoriteEditTotals.fiber)} g fibre`,
+                    `${formatMacroAmount(favoriteEditTotals.sugar)} g sugar`,
+                  ].map((value) => (
+                    <View key={value} style={{ borderRadius: 999, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: '#FFFFFF', paddingHorizontal: 10, paddingVertical: 6 }}>
+                      <Text style={{ color: '#374151', fontSize: 11, fontWeight: '700' }}>{value}</Text>
+                    </View>
+                  ))}
+                </View>
+                <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 10 }}>
+                  Full meal has {favoriteEditItems.length} ingredient{favoriteEditItems.length === 1 ? '' : 's'}.
+                </Text>
+              </View>
+
+              {favoriteEditSearchError ? <Text style={{ color: '#DC2626', marginTop: 10 }}>{favoriteEditSearchError}</Text> : null}
+
+              {(favoriteEditSearchLoading || favoriteEditSearchResults.length > 0) ? (
+                <ScrollView style={{ marginTop: 12, maxHeight: 280 }}>
+                  {favoriteEditSearchResults.map((item) => (
+                    <View key={`${String(item.source || 'auto')}:${String(item.id)}`} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 12, marginBottom: 8 }}>
+                      <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>{item.name}</Text>
+                      <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 3 }}>
+                        {item.serving_size ? `Serving: ${item.serving_size} • ` : ''}
+                        {Math.round(numberOrZero(item.calories ?? item.calories_kcal))} kcal
+                      </Text>
+                      <Text style={{ color: '#9CA3AF', fontSize: 11, marginTop: 3 }}>Source: {ingredientSourceLabel(item)}</Text>
+                      <Pressable onPress={() => addSearchResultToFavoriteEditor(item)} style={[miniPrimaryButton, { marginTop: 8 }]}>
                         <Text style={miniPrimaryText}>Add</Text>
                       </Pressable>
-                      <Pressable
-                        onPress={() => {
-                          const nextMeal = item.meal === 'breakfast' ? 'lunch' : item.meal === 'lunch' ? 'dinner' : 'breakfast'
-                          const next = favorites.map((fav) => (fav.id === item.id ? { ...fav, meal: nextMeal } : fav))
-                          void saveFavorites(next)
-                        }}
-                        style={miniSecondaryButton}
-                      >
-                        <Text style={miniSecondaryText}>Edit meal</Text>
-                      </Pressable>
-                      <Pressable onPress={() => void deleteFavorite(item)} style={miniDangerButton}>
-                        <Text style={miniDangerText}>Delete</Text>
-                      </Pressable>
                     </View>
-                  </View>
-                ))
-              )}
-            </ScrollView>
+                  ))}
+                </ScrollView>
+              ) : null}
+            </View>
 
-            <Pressable onPress={() => setFavoritesOpen(false)} style={modalCancelButton}>
-              <Text style={modalCancelText}>Close</Text>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <Pressable
+                  onPress={() => {
+                    if (favoriteEditItems.length === 0) return
+                    setFavoriteEditIngredientsExpanded((prev) => !prev)
+                  }}
+                  style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
+                >
+                  <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>Your ingredients</Text>
+                  {favoriteEditItems.length > 0 ? (
+                    <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{favoriteEditIngredientsExpanded ? '▾' : '▸'}</Text>
+                  ) : null}
+                </Pressable>
+                <Text style={{ color: '#6B7280', fontSize: 12 }}>
+                  {favoriteEditItems.length} item{favoriteEditItems.length === 1 ? '' : 's'}
+                </Text>
+              </View>
+
+              {favoriteEditItems.length === 0 ? (
+                <Text style={{ color: '#6B7280', marginTop: 12 }}>Add ingredients using the search above.</Text>
+              ) : !favoriteEditIngredientsExpanded ? (
+                <Pressable
+                  onPress={() => setFavoriteEditIngredientsExpanded(true)}
+                  style={{ marginTop: 12, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 10 }}
+                >
+                  <Text style={{ color: '#6B7280', fontSize: 12 }}>Ingredients are hidden. Tap to expand.</Text>
+                </Pressable>
+              ) : (
+                <View style={{ marginTop: 12, gap: 10 }}>
+                  {favoriteEditItems.map((editItem) => {
+                    const expanded = favoriteEditExpandedItemId === editItem.id
+                    return (
+                      <View key={editItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
+                        <Pressable
+                          onPress={() => setFavoriteEditExpandedItemId(expanded ? null : editItem.id)}
+                          style={{ paddingHorizontal: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+                        >
+                          <View style={{ flex: 1 }}>
+                            <Text style={{ color: '#111827', fontWeight: '800', fontSize: 16 }}>{editItem.name}</Text>
+                            <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>
+                              Serving: {editItem.servingLabel} • Amount (full recipe): {formatMacroAmount(editItem.servings)}
+                            </Text>
+                          </View>
+                          <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{expanded ? '▾' : '▸'}</Text>
+                        </Pressable>
+
+                        {expanded ? (
+                          <View style={{ paddingHorizontal: 14, paddingBottom: 14, gap: 12 }}>
+                            <View style={{ flexDirection: 'row', gap: 10 }}>
+                              <View style={{ flex: 1 }}>
+                                <Text style={{ color: '#374151', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Amount</Text>
+                                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                  <Pressable
+                                    onPress={() =>
+                                      setFavoriteEditItems((prev) =>
+                                        prev.map((entry) =>
+                                          entry.id === editItem.id
+                                            ? { ...entry, servings: Math.max(0.25, roundTo(entry.servings - 0.25, 2)) }
+                                            : entry,
+                                        ),
+                                      )
+                                    }
+                                    style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
+                                  >
+                                    <Text style={{ color: '#111827', fontSize: 20, fontWeight: '800' }}>-</Text>
+                                  </Pressable>
+                                  <TextInput
+                                    value={String(editItem.servings)}
+                                    onChangeText={(value) =>
+                                      setFavoriteEditItems((prev) =>
+                                        prev.map((entry) =>
+                                          entry.id === editItem.id
+                                            ? { ...entry, servings: Math.max(0.25, Number(value) || 0.25) }
+                                            : entry,
+                                        ),
+                                      )
+                                    }
+                                    keyboardType="decimal-pad"
+                                    style={{ flex: 1, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#111827', fontWeight: '800', textAlign: 'center' }}
+                                  />
+                                  <Pressable
+                                    onPress={() =>
+                                      setFavoriteEditItems((prev) =>
+                                        prev.map((entry) =>
+                                          entry.id === editItem.id ? { ...entry, servings: roundTo(entry.servings + 0.25, 2) } : entry,
+                                        ),
+                                      )
+                                    }
+                                    style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
+                                  >
+                                    <Text style={{ color: '#111827', fontSize: 20, fontWeight: '800' }}>+</Text>
+                                  </Pressable>
+                                </View>
+                              </View>
+                              <View style={{ width: 124 }}>
+                                <Text style={{ color: '#374151', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Serving size</Text>
+                                <View style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                  <Text style={{ color: '#374151', fontWeight: '700', flex: 1 }} numberOfLines={1}>
+                                    {editItem.servingLabel}
+                                  </Text>
+                                  <Text style={{ color: '#9CA3AF', marginLeft: 8 }}>▾</Text>
+                                </View>
+                              </View>
+                            </View>
+
+                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                              {[
+                                `${Math.round(editItem.calories * editItem.servings)} kcal`,
+                                `${formatMacroAmount(editItem.protein * editItem.servings)} g protein`,
+                                `${formatMacroAmount(editItem.carbs * editItem.servings)} g carbs`,
+                                `${formatMacroAmount(editItem.fat * editItem.servings)} g fat`,
+                                `${formatMacroAmount(editItem.fiber * editItem.servings)} g fibre`,
+                                `${formatMacroAmount(editItem.sugar * editItem.servings)} g sugar`,
+                              ].map((value) => (
+                                <View key={value} style={{ borderRadius: 999, backgroundColor: '#F3F4F6', paddingHorizontal: 10, paddingVertical: 6 }}>
+                                  <Text style={{ color: '#374151', fontSize: 11, fontWeight: '700' }}>{value}</Text>
+                                </View>
+                              ))}
+                            </View>
+
+                            <Pressable
+                              onPress={() => removeFavoriteEditIngredient(editItem.id)}
+                              style={{ borderWidth: 1, borderColor: '#FECACA', borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center', paddingVertical: 11 }}
+                            >
+                              <Text style={{ color: '#DC2626', fontWeight: '800' }}>Remove ingredient</Text>
+                            </Pressable>
+                          </View>
+                        ) : null}
+                      </View>
+                    )
+                  })}
+                </View>
+              )}
+            </View>
+
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
+                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>
+                  {favoriteEditPortionControlEnabled ? 'Your portion totals' : 'Meal totals'}
+                </Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, backgroundColor: '#F3F4F6', padding: 2 }}>
+                  <Pressable onPress={() => setEnergyUnit('kcal')} style={{ borderRadius: 999, backgroundColor: energyUnit === 'kcal' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ color: energyUnit === 'kcal' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '700' }}>kcal</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setEnergyUnit('kj')} style={{ borderRadius: 999, backgroundColor: energyUnit === 'kj' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ color: energyUnit === 'kj' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '700' }}>kJ</Text>
+                  </Pressable>
+                </View>
+              </View>
+              <Text style={{ color: '#6B7280', fontSize: 12, marginBottom: 12 }}>
+                {favoriteEditPortionControlEnabled
+                  ? 'Your portion is based on the ingredient amounts shown above.'
+                  : 'This meal is 100% of the full amount.'}
+              </Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+                {[
+                  { label: energyUnit === 'kj' ? 'Kilojoules' : 'Calories', value: energyUnit === 'kj' ? `${Math.round(favoriteEditTotals.calories * 4.184)} kJ` : `${Math.round(favoriteEditTotals.calories)} kcal`, bg: '#FFF7ED', color: '#F97316' },
+                  { label: 'Protein', value: `${formatMacroAmount(favoriteEditTotals.protein)} g`, bg: '#EFF6FF', color: '#3B82F6' },
+                  { label: 'Carbs', value: `${formatMacroAmount(favoriteEditTotals.carbs)} g`, bg: '#ECFDF5', color: '#22C55E' },
+                  { label: 'Fat', value: `${formatMacroAmount(favoriteEditTotals.fat)} g`, bg: '#F5F3FF', color: '#8B5CF6' },
+                  { label: 'Fibre', value: `${formatMacroAmount(favoriteEditTotals.fiber)} g`, bg: '#FEFCE8', color: '#EAB308' },
+                  { label: 'Sugar', value: `${formatMacroAmount(favoriteEditTotals.sugar)} g`, bg: '#FDF2F8', color: '#EC4899' },
+                ].map((card) => (
+                  <View key={card.label} style={{ width: '47%', borderRadius: 16, padding: 14, backgroundColor: card.bg }}>
+                    <Text style={{ color: card.color, fontSize: 16, fontWeight: '900' }}>{card.value}</Text>
+                    <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '800', marginTop: 6, textTransform: 'uppercase' }}>
+                      {card.label}
+                    </Text>
+                  </View>
+                ))}
+              </View>
+            </View>
+
+            <Pressable onPress={() => void updateFavoriteFromEditor()} style={primaryButton}>
+              <Text style={primaryButtonText}>Update</Text>
             </Pressable>
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={favoriteEditMissingReportOpen}
+        animationType="fade"
+        transparent
+        onRequestClose={() => setFavoriteEditMissingReportOpen(false)}
+      >
+        <View style={modalBackdrop}>
+          <View style={[modalCardLarge, { maxHeight: 620 }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Report missing item</Text>
+              <Pressable onPress={() => setFavoriteEditMissingReportOpen(false)}>
+                <Text style={{ fontSize: 18, color: '#6B7280' }}>✕</Text>
+              </Pressable>
+            </View>
+
+            <View style={{ marginTop: 12, gap: 10 }}>
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Item name *</Text>
+                <TextInput
+                  value={favoriteEditMissingReportName}
+                  onChangeText={setFavoriteEditMissingReportName}
+                  placeholder="e.g. Strawberry sundae"
+                  placeholderTextColor="#9CA3AF"
+                  style={inputStyle}
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Brand or chain</Text>
+                <TextInput
+                  value={favoriteEditMissingReportBrand}
+                  onChangeText={setFavoriteEditMissingReportBrand}
+                  placeholder="e.g. McDonald's"
+                  placeholderTextColor="#9CA3AF"
+                  style={inputStyle}
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Size (optional)</Text>
+                <TextInput
+                  value={favoriteEditMissingReportSize}
+                  onChangeText={setFavoriteEditMissingReportSize}
+                  placeholder="e.g. Small / Medium / Large"
+                  placeholderTextColor="#9CA3AF"
+                  style={inputStyle}
+                />
+              </View>
+
+              <View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Extra notes</Text>
+                <TextInput
+                  value={favoriteEditMissingReportNotes}
+                  onChangeText={setFavoriteEditMissingReportNotes}
+                  placeholder="Anything else that helps"
+                  placeholderTextColor="#9CA3AF"
+                  multiline
+                  textAlignVertical="top"
+                  style={[inputStyle, { minHeight: 84 }]}
+                />
+              </View>
+
+              {favoriteEditMissingReportError ? <Text style={{ fontSize: 12, color: '#DC2626' }}>{favoriteEditMissingReportError}</Text> : null}
+              {favoriteEditMissingReportDone ? <Text style={{ fontSize: 12, color: '#047857' }}>Thanks. We have it.</Text> : null}
+
+              <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 4 }}>
+                <Pressable onPress={() => setFavoriteEditMissingReportOpen(false)}>
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280' }}>Close</Text>
+                </Pressable>
+                <Pressable
+                  disabled={favoriteEditMissingReportBusy}
+                  onPress={() => void submitFavoriteEditMissingReport()}
+                  style={({ pressed }) => ({
+                    borderRadius: 10,
+                    backgroundColor: '#059669',
+                    paddingHorizontal: 14,
+                    paddingVertical: 10,
+                    opacity: favoriteEditMissingReportBusy ? 0.6 : pressed ? 0.9 : 1,
+                  })}
+                >
+                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                    {favoriteEditMissingReportBusy ? 'Sending…' : 'Send'}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal visible={favoriteAdjustItem != null} animationType="slide" onRequestClose={() => setFavoriteAdjustItem(null)}>
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center' }}>
+            <Pressable
+              onPress={() => {
+                if (!favoriteAdjustItem) return
+                setFavoriteAdjustItem(null)
+                setFavoriteAdjustItems([])
+                setFavoritePreviewItem(favoriteAdjustItem)
+              }}
+            >
+              <Text style={{ color: '#374151', fontWeight: '800' }}>Back</Text>
+            </Pressable>
+            <View style={{ flex: 1, alignItems: 'center' }}>
+              <Text style={{ color: '#111827', fontWeight: '800' }}>Change portion</Text>
+              <Text style={{ color: '#6B7280', fontSize: 12 }} numberOfLines={1}>
+                {favoriteAdjustItem?.label}
+              </Text>
+            </View>
+            <Pressable onPress={() => { setFavoriteAdjustItem(null); setFavoriteAdjustItems([]) }} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
+              <Text style={{ color: '#374151', fontWeight: '800' }}>Cancel</Text>
+            </Pressable>
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 36 }}>
+            <Text style={{ color: '#6B7280', marginBottom: 14 }}>Update the amount now, then tap Add.</Text>
+
+            <View style={{ gap: 12 }}>
+              {favoriteAdjustItems.map((adjustItem) => (
+                <View key={adjustItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 14 }}>
+                  <Text style={{ color: '#111827', fontWeight: '800' }}>{adjustItem.name}</Text>
+                  <Text style={{ color: '#6B7280', marginTop: 4 }}>{adjustItem.servingLabel}</Text>
+
+                  <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+                    <Pressable
+                      onPress={() =>
+                        setFavoriteAdjustItems((prev) =>
+                          prev.map((entry) =>
+                            entry.id === adjustItem.id ? { ...entry, servings: Math.max(0.25, roundTo(entry.servings - 0.25, 2)) } : entry,
+                          ),
+                        )
+                      }
+                      style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ color: '#111827', fontSize: 20, fontWeight: '800' }}>-</Text>
+                    </Pressable>
+                    <TextInput
+                      value={String(adjustItem.servings)}
+                      onChangeText={(value) =>
+                        setFavoriteAdjustItems((prev) =>
+                          prev.map((entry) =>
+                            entry.id === adjustItem.id
+                              ? { ...entry, servings: Math.max(0.25, Number(value) || 0.25) }
+                              : entry,
+                          ),
+                        )
+                      }
+                      keyboardType="decimal-pad"
+                      style={{ width: 84, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#111827', fontWeight: '800', textAlign: 'center' }}
+                    />
+                    <Pressable
+                      onPress={() =>
+                        setFavoriteAdjustItems((prev) =>
+                          prev.map((entry) =>
+                            entry.id === adjustItem.id ? { ...entry, servings: roundTo(entry.servings + 0.25, 2) } : entry,
+                          ),
+                        )
+                      }
+                      style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                      <Text style={{ color: '#111827', fontSize: 20, fontWeight: '800' }}>+</Text>
+                    </Pressable>
+                  </View>
+
+                  <Text style={{ color: '#6B7280', marginTop: 10 }}>
+                    {Math.round(adjustItem.calories * adjustItem.servings)} kcal • P {formatMacroAmount(adjustItem.protein * adjustItem.servings)}g • C {formatMacroAmount(adjustItem.carbs * adjustItem.servings)}g • F {formatMacroAmount(adjustItem.fat * adjustItem.servings)}g
+                  </Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={{ marginTop: 22, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+              {[
+                { label: energyUnit === 'kj' ? 'Kilojoules' : 'Calories', value: energyUnit === 'kj' ? Math.round(favoriteAdjustTotals.calories * 4.184) : Math.round(favoriteAdjustTotals.calories) },
+                { label: 'Protein', value: `${formatMacroAmount(favoriteAdjustTotals.protein)} g` },
+                { label: 'Carbs', value: `${formatMacroAmount(favoriteAdjustTotals.carbs)} g` },
+                { label: 'Fat', value: `${formatMacroAmount(favoriteAdjustTotals.fat)} g` },
+                { label: 'Fibre', value: `${formatMacroAmount(favoriteAdjustTotals.fiber)} g` },
+                { label: 'Sugar', value: `${formatMacroAmount(favoriteAdjustTotals.sugar)} g` },
+              ].map((card) => (
+                <View key={card.label} style={{ width: '47%', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14, backgroundColor: '#F9FAFB' }}>
+                  <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>{card.value}</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '800', marginTop: 6, textTransform: 'uppercase' }}>{card.label}</Text>
+                </View>
+              ))}
+            </View>
+
+            <View style={{ marginTop: 24, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, gap: 8 }}>
+              <Text style={{ color: '#111827', fontWeight: '800' }}>Daily totals after adding</Text>
+              <Text style={{ color: '#6B7280', fontSize: 12 }}>This updates live as you change amounts.</Text>
+              {[
+                { label: 'Calories', value: `${Math.round(totals.calories + favoriteAdjustTotals.calories)} kcal / ${dailyAllowanceKcal} kcal` },
+                { label: 'Protein', value: `${formatMacroAmount(totals.protein + favoriteAdjustTotals.protein)} g / ${formatMacroAmount(macroTargetsWithExercise.protein)} g` },
+                { label: 'Carbs', value: `${formatMacroAmount(totals.carbs + favoriteAdjustTotals.carbs)} g / ${formatMacroAmount(macroTargetsWithExercise.carbs)} g` },
+                { label: 'Fat', value: `${formatMacroAmount(totals.fat + favoriteAdjustTotals.fat)} g / ${formatMacroAmount(macroTargetsWithExercise.fat)} g` },
+                { label: 'Fibre', value: `${formatMacroAmount(totals.fiber + favoriteAdjustTotals.fiber)} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g` },
+                { label: 'Sugar', value: `${formatMacroAmount(totals.sugar + favoriteAdjustTotals.sugar)} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g` },
+              ].map((row) => (
+                <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                  <Text style={{ color: '#374151', fontWeight: '700' }}>{row.label}</Text>
+                  <Text style={{ color: '#111827', fontWeight: '800', textAlign: 'right', flex: 1 }}>{row.value}</Text>
+                </View>
+              ))}
+            </View>
+          </ScrollView>
+
+          <View style={{ padding: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
+            <Pressable onPress={() => favoriteAdjustItem && void addFavoriteToDiary(favoriteAdjustItem, favoriteAdjustItems)} style={[primaryButton, { flex: undefined }]}>
+              <Text style={primaryButtonText}>Add</Text>
+            </Pressable>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={favoriteRenameItem != null} animationType="fade" onRequestClose={() => setFavoriteRenameItem(null)}>
+        <View style={modalBackdrop}>
+          <View style={modalCard}>
+            <Text style={modalTitle}>Rename to:</Text>
+            <TextInput
+              value={favoriteRenameValue}
+              onChangeText={setFavoriteRenameValue}
+              placeholder="Favorite name"
+              placeholderTextColor="#8AA39D"
+              style={[inputStyle, { marginTop: 10 }]}
+            />
+            <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+              <Pressable onPress={() => setFavoriteRenameItem(null)} style={secondaryButton}>
+                <Text style={secondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={() => void renameFavoriteItem()} style={primaryButton}>
+                <Text style={primaryButtonText}>OK</Text>
+              </Pressable>
+            </View>
           </View>
         </View>
       </Modal>
@@ -3602,7 +5689,11 @@ export function TrackCaloriesScreen() {
               <Pressable
                 onPress={() => {
                   setIngredientOpen(false)
-                  void createFromImage('library', ingredientTargetMeal)
+                  resetCopyMode()
+                  navigation.getParent()?.navigate('FoodAnalysis', {
+                    meal: ingredientTargetMeal,
+                    date: selectedDate,
+                  })
                 }}
                 style={[miniSecondaryButton, { flexBasis: '31%', alignItems: 'center' }]}
               >
@@ -3647,7 +5738,9 @@ export function TrackCaloriesScreen() {
         <View style={modalBackdrop}>
           <View style={modalCard}>
             <Text style={modalTitle}>Barcode scanner</Text>
-            <Text style={{ color: theme.colors.muted }}>Adding to: {mealLabel(barcodeTargetMeal)}</Text>
+            <Text style={{ color: theme.colors.muted }}>
+              {barcodeUsageMode === 'editor' ? 'Adding ingredient to the meal editor' : `Adding to: ${mealLabel(barcodeTargetMeal)}`}
+            </Text>
             <TextInput
               value={barcodeCode}
               onChangeText={setBarcodeCode}
@@ -3677,7 +5770,7 @@ export function TrackCaloriesScreen() {
                   {formatCalories(numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal), energyUnit)} • P {round1(numberOrZero(barcodeFood.protein_g))}g • C {round1(numberOrZero(barcodeFood.carbs_g))}g • F {round1(numberOrZero(barcodeFood.fat_g))}g
                 </Text>
                 <Pressable onPress={() => void addBarcodeFood()} style={[primaryButton, { marginTop: 8 }]}> 
-                  <Text style={primaryButtonText}>Add to diary</Text>
+                  <Text style={primaryButtonText}>{barcodeUsageMode === 'editor' ? 'Add ingredient' : 'Add to diary'}</Text>
                 </Pressable>
               </View>
             ) : null}
