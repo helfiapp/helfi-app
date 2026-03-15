@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-15 12:09 AEDT
+- What changed: Weekly health report supplements section now fills Suggestions and Things to avoid more usefully. It now adds safer supplement suggestions based on goals, symptoms, hydration, exercise, labs, and the current stack, and it adds caution items like avoiding extra overlapping products.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report
+- What to quickly test: Create a fresh weekly report, open the Supplements tab, and check that Suggestions and Things to avoid are no longer blank when there is enough supplement and health context.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-15 11:45 AEDT
 - What changed: Weekly health report now includes saved medical image analyser data in the report builder, report page, visuals, and print view. The weekly data summary also now shows journal notes and medical scans so the report uses a broader health picture.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report and https://helfi.ai/insights
