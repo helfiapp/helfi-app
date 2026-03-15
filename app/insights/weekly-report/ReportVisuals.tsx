@@ -60,6 +60,31 @@ type Coverage = {
   exerciseCount?: number
   labCount?: number
   talkToAiCount?: number
+  journalCount?: number
+  medicalImageCount?: number
+}
+
+type MedicalImageSummary = {
+  entries?: number
+  daysWithScans?: number
+  highlights?: Array<{
+    date?: string
+    time?: string
+    summary?: string
+    possibleCauses?: string[]
+    redFlags?: string[]
+    nextSteps?: string[]
+  }>
+}
+
+type JournalSummary = {
+  entries?: number
+  daysWithNotes?: number
+  highlights?: Array<{
+    date?: string
+    time?: string
+    note?: string
+  }>
 }
 
 function toDateKey(value?: string | null) {
@@ -123,6 +148,8 @@ export default function ReportVisuals(props: {
   dailyStats?: DailyStat[]
   symptomSummary?: { topSymptoms?: Array<{ name?: string; count?: number }> }
   exerciseSummary?: { topActivities?: Array<{ name?: string; count?: number }> }
+  medicalImageSummary?: MedicalImageSummary
+  journalSummary?: JournalSummary
 }) {
   const periodStartKey = toDateKey(props.periodStart) || ''
   const periodEndKey = toDateKey(props.periodEnd) || ''
@@ -221,6 +248,8 @@ export default function ReportVisuals(props: {
       { label: 'Exercise', value: Number(c.exerciseCount ?? 0) || 0 },
       { label: 'Labs', value: Number(c.labCount ?? 0) || 0 },
       { label: 'Chat', value: Number(c.talkToAiCount ?? 0) || 0 },
+      { label: 'Journal', value: Number(c.journalCount ?? 0) || 0 },
+      { label: 'Scans', value: Number(c.medicalImageCount ?? 0) || 0 },
     ].filter((b) => b.value > 0)
     const total = buckets.reduce((sum, b) => sum + b.value, 0)
     return {
@@ -306,6 +335,8 @@ export default function ReportVisuals(props: {
   const topSymptoms = Array.isArray(props.symptomSummary?.topSymptoms) ? props.symptomSummary?.topSymptoms : []
   const topActivities = Array.isArray(props.exerciseSummary?.topActivities) ? props.exerciseSummary?.topActivities : []
   const topFoods = Array.isArray(props.nutritionSummary?.topFoods) ? props.nutritionSummary?.topFoods : []
+  const medicalHighlights = Array.isArray(props.medicalImageSummary?.highlights) ? props.medicalImageSummary?.highlights : []
+  const journalHighlights = Array.isArray(props.journalSummary?.highlights) ? props.journalSummary?.highlights : []
 
   return (
     <div className="space-y-6">
@@ -335,7 +366,7 @@ export default function ReportVisuals(props: {
                   datasets: [
                     {
                       data: coverageDonut.values,
-                      backgroundColor: ['#10b981', '#38bdf8', '#60a5fa', '#f472b6', '#f59e0b', '#a78bfa', '#94a3b8'],
+                      backgroundColor: ['#10b981', '#38bdf8', '#60a5fa', '#f472b6', '#f59e0b', '#a78bfa', '#94a3b8', '#34d399', '#0ea5e9'],
                       borderColor: 'rgba(255,255,255,0.95)',
                       borderWidth: 2,
                     },
@@ -627,6 +658,68 @@ export default function ReportVisuals(props: {
           ) : (
             <div className="mt-4">
               <EmptyChart message="No symptom highlights yet. This fills in once symptom analysis has been used a few times." />
+            </div>
+          )}
+        </div>
+      </div>
+
+      <div className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
+        <div className={cardClassName('sky')}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-sky-700/80">Medical image analyser</div>
+          <div className="mt-1 text-lg font-semibold text-sky-950">Saved scan highlights</div>
+          <div className="mt-1 text-sm text-sky-900/80">
+            {Number(props.medicalImageSummary?.entries ?? 0) || 0} scans • {Number(props.medicalImageSummary?.daysWithScans ?? 0) || 0} days
+          </div>
+          {medicalHighlights.length ? (
+            <div className="mt-4 space-y-3">
+              {medicalHighlights.slice(0, 3).map((item, idx) => (
+                <div key={`medical-highlight-${idx}`} className="rounded-xl border border-sky-100 bg-white p-3">
+                  <div className="text-xs font-semibold text-sky-800">
+                    {[item.date, item.time].filter(Boolean).join(' • ') || 'Saved scan'}
+                  </div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{item.summary || 'Saved medical image scan'}</div>
+                  {Array.isArray(item.possibleCauses) && item.possibleCauses.length ? (
+                    <div className="mt-2 flex flex-wrap gap-2">
+                      {item.possibleCauses.slice(0, 3).map((cause, causeIdx) => (
+                        <span
+                          key={`${cause}-${causeIdx}`}
+                          className="rounded-full border border-sky-100 bg-sky-50 px-2.5 py-1 text-[11px] font-semibold text-sky-900"
+                        >
+                          {cause}
+                        </span>
+                      ))}
+                    </div>
+                  ) : null}
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4">
+              <EmptyChart message="No saved medical image scans this week yet. If you save a scan, a summary will show here." />
+            </div>
+          )}
+        </div>
+
+        <div className={cardClassName('mint')}>
+          <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700/80">Health journal</div>
+          <div className="mt-1 text-lg font-semibold text-emerald-950">Recent notes</div>
+          <div className="mt-1 text-sm text-emerald-900/80">
+            {Number(props.journalSummary?.entries ?? 0) || 0} notes • {Number(props.journalSummary?.daysWithNotes ?? 0) || 0} days
+          </div>
+          {journalHighlights.length ? (
+            <div className="mt-4 space-y-3">
+              {journalHighlights.slice(0, 3).map((item, idx) => (
+                <div key={`journal-highlight-${idx}`} className="rounded-xl border border-emerald-100 bg-white p-3">
+                  <div className="text-xs font-semibold text-emerald-800">
+                    {[item.date, item.time].filter(Boolean).join(' • ') || 'Journal note'}
+                  </div>
+                  <div className="mt-1 text-sm text-slate-900">{item.note || 'Saved note'}</div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="mt-4">
+              <EmptyChart message="No health journal notes this week yet. If you add notes, they will show up here." />
             </div>
           )}
         </div>

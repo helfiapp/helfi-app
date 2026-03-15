@@ -591,6 +591,48 @@ function buildJournalSummary(
   }
 }
 
+function buildMedicalImageSummary(
+  entries: Array<{ summary?: string | null; analysisText?: string | null; analysisData?: any; createdAt: Date }>,
+  timezone: string
+) {
+  const daySet = new Set<string>()
+  const highlights = entries.slice(0, 4).map((entry) => {
+    const date = formatLocalDate(entry.createdAt, timezone)
+    daySet.add(date)
+    const possibleCauses = Array.isArray(entry?.analysisData?.possibleCauses)
+      ? entry.analysisData.possibleCauses
+          .map((item: any) => String(item?.name || '').trim())
+          .filter(Boolean)
+          .slice(0, 3)
+      : []
+    const redFlags = Array.isArray(entry?.analysisData?.redFlags)
+      ? entry.analysisData.redFlags.map((item: any) => String(item || '').trim()).filter(Boolean)
+      : []
+    const nextSteps = Array.isArray(entry?.analysisData?.nextSteps)
+      ? entry.analysisData.nextSteps.map((item: any) => String(item || '').trim()).filter(Boolean).slice(0, 2)
+      : []
+
+    const rawSummary = String(entry?.summary || '').trim()
+    const rawAnalysis = String(entry?.analysisText || '').trim()
+    const summary = clipText(rawSummary || rawAnalysis || 'Saved medical image scan.', 220)
+
+    return {
+      date,
+      time: formatLocalTime(entry.createdAt, timezone),
+      summary,
+      possibleCauses,
+      redFlags,
+      nextSteps,
+    }
+  })
+
+  return {
+    entries: entries.length,
+    daysWithScans: daySet.size,
+    highlights,
+  }
+}
+
 function buildJournalDigest(
   entries: Array<{ content: string; createdAt: Date; localDate?: string | null }>,
   timezone: string
@@ -643,6 +685,7 @@ function buildReportSignals(params: {
   overlapSignals: any
   labHighlights: any
   labTrends: any
+  medicalImageSummary: any
   insightCandidates: any
   talkToAiSummary: any
   journalEntries: Array<{ content: string; createdAt: Date; localDate?: string | null; time?: string | null }>
@@ -698,6 +741,13 @@ function buildReportSignals(params: {
     overlapSignals: params.overlapSignals,
     labHighlights: params.labHighlights,
     labTrends: sliceList(params.labTrends, 6),
+    medicalImageSummary: params.medicalImageSummary
+      ? {
+          entries: params.medicalImageSummary.entries,
+          daysWithScans: params.medicalImageSummary.daysWithScans,
+          highlights: sliceList(params.medicalImageSummary.highlights, 3),
+        }
+      : null,
     journalHighlights,
     talkToAi: {
       userMessageCount: params.talkToAiSummary?.userMessageCount,
@@ -1406,6 +1456,13 @@ function buildModelInput(reportSignals: any) {
     overlapSignals: reportSignals.overlapSignals,
     labHighlights: sliceList(reportSignals.labHighlights, 8),
     labTrends: sliceList(reportSignals.labTrends, 6),
+    medicalImageSummary: reportSignals.medicalImageSummary
+      ? {
+          entries: reportSignals.medicalImageSummary.entries,
+          daysWithScans: reportSignals.medicalImageSummary.daysWithScans,
+          highlights: sliceList(reportSignals.medicalImageSummary.highlights, 3),
+        }
+      : null,
     journalHighlights: sliceList(reportSignals.journalHighlights, 4),
     talkToAi: reportSignals.talkToAi
       ? {
@@ -2027,6 +2084,7 @@ function buildFallbackReport(context: any) {
   const supplements = Array.isArray(context?.supplements) ? context.supplements : []
   const medications = Array.isArray(context?.medications) ? context.medications : []
   const journalSummary = context?.journalSummary || {}
+  const medicalImageSummary = context?.medicalImageSummary || {}
 
   const addItem = (
     section: ReportSectionKey,
@@ -2130,6 +2188,19 @@ function buildFallbackReport(context: any) {
       })
     }
   }
+  if (Array.isArray(medicalImageSummary?.highlights) && medicalImageSummary.highlights.length) {
+    const highlight = medicalImageSummary.highlights[0]
+    const causeText = Array.isArray(highlight?.possibleCauses) && highlight.possibleCauses.length
+      ? `Possible causes mentioned: ${highlight.possibleCauses.join(', ')}.`
+      : ''
+    const nextStepText = Array.isArray(highlight?.nextSteps) && highlight.nextSteps.length
+      ? `Next steps noted: ${highlight.nextSteps.join(' ')}`
+      : ''
+    sections.overview.working.push({
+      name: 'Medical image scan',
+      reason: `On ${highlight?.date || 'this week'} at ${highlight?.time || 'recently'} the saved scan said: \"${highlight?.summary || 'Saved medical image scan.'}\" ${causeText} ${nextStepText}`.trim(),
+    })
+  }
 
   const summarySentences: string[] = []
   if (working[0]) {
@@ -2146,6 +2217,12 @@ function buildFallbackReport(context: any) {
     if (highlight?.date && highlight?.time && highlight?.note) {
       summarySentences.push(`Journal note on ${highlight.date} at ${highlight.time}: \"${highlight.note}\".`)
     }
+  }
+  if (Array.isArray(medicalImageSummary?.highlights) && medicalImageSummary.highlights.length) {
+    const highlight = medicalImageSummary.highlights[0]
+    summarySentences.push(
+      `Saved medical image scan on ${highlight?.date || 'this week'}${highlight?.time ? ` at ${highlight.time}` : ''}: \"${highlight?.summary || 'Saved medical image scan.'}\".`
+    )
   }
   if (nutritionSummary?.dailyAverages?.calories) {
     summarySentences.push(
@@ -2316,6 +2393,7 @@ export async function POST(request: NextRequest) {
     healthLogs,
     healthJournalEntries,
     moodJournalEntries,
+    medicalImageAnalyses,
     exerciseLogs,
     exerciseEntries,
   ] = await Promise.all([
@@ -2389,6 +2467,22 @@ export async function POST(request: NextRequest) {
         console.warn('[weekly-report] Failed to load mood journal entries', error)
         return []
       }),
+    prisma.medicalImageAnalysis
+      .findMany({
+        where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
+        orderBy: { createdAt: 'desc' },
+        take: 20,
+        select: {
+          summary: true,
+          analysisText: true,
+          analysisData: true,
+          createdAt: true,
+        },
+      })
+      .catch((error) => {
+        console.warn('[weekly-report] Failed to load medical image analyses', error)
+        return []
+      }),
     prisma.exerciseLog
       .findMany({
         where: { userId, createdAt: { gte: periodStart, lte: periodEnd } },
@@ -2420,6 +2514,7 @@ export async function POST(request: NextRequest) {
     waterLogs,
     healthLogs,
     healthJournalEntries,
+    medicalImageAnalyses,
     exerciseLogs,
     exerciseEntries,
   }
@@ -2706,6 +2801,15 @@ export async function POST(request: NextRequest) {
     })),
     timezone
   )
+  const medicalImageSummary = buildMedicalImageSummary(
+    (user.medicalImageAnalyses || []).map((entry: any) => ({
+      summary: entry?.summary || null,
+      analysisText: entry?.analysisText || null,
+      analysisData: entry?.analysisData || null,
+      createdAt: entry?.createdAt ? new Date(entry.createdAt) : new Date(),
+    })),
+    timezone
+  )
 
   const checkinSummary = buildCheckinSummary(checkinRows || [])
   const exerciseSummary = buildExerciseSummary(user.exerciseLogs || [], user.exerciseEntries || [])
@@ -2728,6 +2832,7 @@ export async function POST(request: NextRequest) {
   symptomAnalyses?.forEach((s) => stamp(s.createdAt))
   labReports?.forEach((r) => stamp(r.createdAt))
   talkToAiMessages?.forEach((m) => stamp(m.createdAt))
+  user.medicalImageAnalyses?.forEach((scan) => stamp(scan.createdAt))
 
   const coverage = {
     daysActive: dataDays.size,
@@ -2740,7 +2845,8 @@ export async function POST(request: NextRequest) {
       (user.exerciseEntries?.length || 0) +
       (moodRows?.length || 0) +
       (symptomAnalyses?.length || 0) +
-      (talkToAiMessages?.length || 0),
+      (talkToAiMessages?.length || 0) +
+      (user.medicalImageAnalyses?.length || 0),
     foodCount: user.foodLogs?.length || 0,
     waterCount: user.waterLogs?.length || 0,
     moodCount: moodRows?.length || 0,
@@ -2750,6 +2856,7 @@ export async function POST(request: NextRequest) {
     exerciseCount: (user.exerciseLogs?.length || 0) + (user.exerciseEntries?.length || 0),
     labCount: labReports?.length || 0,
     talkToAiCount: talkToAiMessages?.length || 0,
+    medicalImageCount: user.medicalImageAnalyses?.length || 0,
     talkToAiUserCount: talkToAiSummary.userMessageCount,
     talkToAiDays: talkToAiSummary.activeDays,
   }
@@ -2943,6 +3050,7 @@ export async function POST(request: NextRequest) {
     exerciseSummary,
     coverage,
     talkToAi: talkToAiSummary,
+    medicalImageSummary,
     journalSummary,
     journalDigest,
     journalEntries: reportJournalEntries.slice(0, 20).map((entry) => ({
@@ -2970,6 +3078,7 @@ export async function POST(request: NextRequest) {
       labs: { reports: coverage.labCount, trends: labTrends.length, highlights: labHighlights.length },
       talkToAi: { userMessages: talkToAiSummary.userMessageCount, days: talkToAiSummary.activeDays },
       journal: { entries: journalSummary.entries, days: journalSummary.daysWithNotes },
+      medicalImages: { entries: medicalImageSummary.entries, days: medicalImageSummary.daysWithScans },
     },
   }
 
@@ -2997,6 +3106,7 @@ export async function POST(request: NextRequest) {
     overlapSignals: reportContext.overlapSignals,
     labHighlights,
     labTrends,
+    medicalImageSummary,
     insightCandidates,
     talkToAiSummary,
     journalEntries: reportContext.journalEntries,
@@ -3070,6 +3180,8 @@ Rules:
 - Do not ask the user what they ate or to log meals. Use the foods already in the data.
 - If journalEntries exist, include at least 2 items that quote the note with date/time and link it to the same day's foods, fluids, exercise, mood, symptoms, or check-ins.
 - If check-in data exists, include at least 1 item that names the goal and ties it to a specific date range or change.
+- If medicalImageSummary exists, include at least 1 item in overview, symptoms, or labs that references the scan date/time and the saved scan summary.
+- Use medical image possibleCauses, redFlags, and nextSteps only as supporting context from the saved scan. Do not present them as a diagnosis.
 - Do not list raw log counts or repeat "you logged X entries" unless it directly supports a pattern or gap.
 - Avoid telling the user to "keep logging" unless a section has no usable data.
 - If sectionSignals show data for a section, include 2-3 items in "working" or "suggested" when there is enough data; otherwise include at least 1.
@@ -3196,6 +3308,7 @@ ${llmPayloadJson}
         talkToAiSummary,
         hydrationSummary,
         nutritionSummary,
+        medicalImageSummary,
         journalSummary,
         moodSummary,
         symptomSummary,
@@ -3234,6 +3347,7 @@ ${llmPayloadJson}
       talkToAiSummary,
       hydrationSummary,
       nutritionSummary,
+      medicalImageSummary,
       journalSummary,
       moodSummary,
       symptomSummary,

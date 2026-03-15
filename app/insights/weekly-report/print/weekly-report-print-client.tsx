@@ -156,6 +156,8 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
   const symptomSummary = (parsedSummary as any)?.symptomSummary
   const exerciseSummary = (parsedSummary as any)?.exerciseSummary
   const talkToAiSummary = (parsedSummary as any)?.talkToAiSummary
+  const medicalImageSummary = (parsedSummary as any)?.medicalImageSummary
+  const journalSummary = (parsedSummary as any)?.journalSummary
   const supplementsList = (parsedSummary as any)?.supplements
   const labTrends = (parsedSummary as any)?.labTrends
 
@@ -168,6 +170,8 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
       { label: 'Check-ins', value: Number(c.checkinCount ?? 0) || 0 },
       { label: 'Symptoms', value: Number(c.symptomCount ?? 0) || 0 },
       { label: 'Exercise', value: Number(c.exerciseCount ?? 0) || 0 },
+      { label: 'Journal notes', value: Number(c.journalCount ?? 0) || 0 },
+      { label: 'Medical scans', value: Number(c.medicalImageCount ?? 0) || 0 },
       { label: 'Lab uploads', value: Number(c.labCount ?? 0) || 0 },
       { label: 'AI chats', value: Number(c.talkToAiCount ?? 0) || 0 },
     ]
@@ -312,9 +316,54 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
               dailyStats={dailyStats}
               symptomSummary={symptomSummary}
               exerciseSummary={exerciseSummary}
+              medicalImageSummary={medicalImageSummary}
+              journalSummary={journalSummary}
             />
           </div>
         </div>
+
+        {Number(medicalImageSummary?.entries ?? 0) > 0 ? (
+          <div className="mt-8 rounded-2xl border border-sky-100 bg-sky-50/40 p-6 print-avoid-break">
+            <h2 className="text-lg font-semibold text-sky-900">Medical image analyser</h2>
+            <p className="mt-2 text-sm text-sky-800">
+              {Number(medicalImageSummary?.entries ?? 0) || 0} saved scans
+              {Number(medicalImageSummary?.daysWithScans ?? 0) > 0 ? ` across ${Number(medicalImageSummary?.daysWithScans ?? 0)} days` : ''}.
+            </p>
+            {Array.isArray(medicalImageSummary?.highlights) && medicalImageSummary.highlights.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {medicalImageSummary.highlights.slice(0, 4).map((item: any, idx: number) => (
+                  <div key={`medical-${idx}`} className="rounded-xl border border-sky-100 bg-white p-4 print-avoid-break">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                      {[item?.date, item?.time].filter(Boolean).join(' • ') || 'Saved scan'}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">
+                      {replaceIsoDates(String(item?.summary || 'Saved medical image scan'))}
+                    </div>
+                    {Array.isArray(item?.possibleCauses) && item.possibleCauses.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {item.possibleCauses.slice(0, 3).map((cause: string, causeIdx: number) => (
+                          <span
+                            key={`${cause}-${causeIdx}`}
+                            className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-900"
+                          >
+                            {cause}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {Array.isArray(item?.nextSteps) && item.nextSteps.length > 0 ? (
+                      <div className="mt-3 space-y-1 text-sm text-slate-700">
+                        {item.nextSteps.slice(0, 2).map((step: string, stepIdx: number) => (
+                          <p key={`medical-step-${idx}-${stepIdx}`}>{step}</p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
+          </div>
+        ) : null}
 
         {Array.isArray(labTrends) && labTrends.length > 0 ? (
           <div className="mt-8 rounded-2xl border border-slate-200 bg-white p-6 print-avoid-break">

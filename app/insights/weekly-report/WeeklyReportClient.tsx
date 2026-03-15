@@ -138,7 +138,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
     return report.report as any
   }, [report])
 
-  const sections = payload?.sections || {}
+  const sections = useMemo(() => payload?.sections || {}, [payload])
   const wins = Array.isArray(payload?.wins) ? payload.wins : []
   const gaps = Array.isArray(payload?.gaps) ? payload.gaps : []
   const keyInsights = useMemo(() => {
@@ -207,6 +207,8 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         exerciseCount?: number
         labCount?: number
         talkToAiCount?: number
+        journalCount?: number
+        medicalImageCount?: number
       }
     | undefined
   const hydrationSummary = (parsedSummary as any)?.hydrationSummary as
@@ -234,6 +236,27 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   const exerciseSummary = (parsedSummary as any)?.exerciseSummary as any
   const supplementsList = (parsedSummary as any)?.supplements as
     | Array<{ name?: string; dosage?: string; timing?: string }>
+    | undefined
+  const medicalImageSummary = (parsedSummary as any)?.medicalImageSummary as
+    | {
+        entries?: number
+        daysWithScans?: number
+        highlights?: Array<{
+          date?: string
+          time?: string
+          summary?: string
+          possibleCauses?: string[]
+          redFlags?: string[]
+          nextSteps?: string[]
+        }>
+      }
+    | undefined
+  const journalSummary = (parsedSummary as any)?.journalSummary as
+    | {
+        entries?: number
+        daysWithNotes?: number
+        highlights?: Array<{ date?: string; time?: string; note?: string }>
+      }
     | undefined
   const labTrends = (parsedSummary as any)?.labTrends as
     | Array<{
@@ -560,6 +583,8 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
     { label: 'Mood entries', value: coverage?.moodCount ?? 0 },
     { label: 'Symptoms', value: coverage?.symptomCount ?? 0 },
     { label: 'Exercise', value: coverage?.exerciseCount ?? 0 },
+    { label: 'Journal notes', value: coverage?.journalCount ?? 0 },
+    { label: 'Medical scans', value: coverage?.medicalImageCount ?? 0 },
     { label: 'Lab uploads', value: coverage?.labCount ?? 0 },
     { label: 'AI chats', value: coverage?.talkToAiCount ?? 0 },
   ]
@@ -734,6 +759,8 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
               dailyStats={dailyStats as any}
               symptomSummary={symptomSummary as any}
               exerciseSummary={exerciseSummary as any}
+              medicalImageSummary={medicalImageSummary as any}
+              journalSummary={journalSummary as any}
             />
           </div>
         </div>
@@ -796,6 +823,49 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                 ))}
               </div>
             )}
+          </div>
+        ) : null}
+
+        {medicalImageSummary?.entries ? (
+          <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/40 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-sky-900">Medical image analyser</h2>
+            <p className="text-sm text-sky-800 mt-2">
+              {medicalImageSummary.entries} saved scan{medicalImageSummary.entries === 1 ? '' : 's'}
+              {medicalImageSummary.daysWithScans ? ` across ${medicalImageSummary.daysWithScans} days` : ''}.
+            </p>
+            {Array.isArray(medicalImageSummary.highlights) && medicalImageSummary.highlights.length > 0 ? (
+              <div className="mt-4 space-y-3">
+                {medicalImageSummary.highlights.slice(0, 3).map((item, idx) => (
+                  <div key={`medical-image-${idx}`} className="rounded-xl border border-sky-100 bg-white p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
+                      {[item.date, item.time].filter(Boolean).join(' • ') || 'Saved scan'}
+                    </div>
+                    <div className="mt-2 text-sm font-semibold text-slate-900">
+                      {replaceIsoDates(item.summary || 'Saved medical image scan')}
+                    </div>
+                    {Array.isArray(item.possibleCauses) && item.possibleCauses.length > 0 ? (
+                      <div className="mt-3 flex flex-wrap gap-2">
+                        {item.possibleCauses.slice(0, 3).map((cause, causeIdx) => (
+                          <span
+                            key={`${cause}-${causeIdx}`}
+                            className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-900"
+                          >
+                            {cause}
+                          </span>
+                        ))}
+                      </div>
+                    ) : null}
+                    {Array.isArray(item.nextSteps) && item.nextSteps.length > 0 ? (
+                      <div className="mt-3 space-y-1 text-sm text-slate-700">
+                        {item.nextSteps.slice(0, 2).map((step, stepIdx) => (
+                          <p key={`medical-step-${idx}-${stepIdx}`}>{step}</p>
+                        ))}
+                      </div>
+                    ) : null}
+                  </div>
+                ))}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
