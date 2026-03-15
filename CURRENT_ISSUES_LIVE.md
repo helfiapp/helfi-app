@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-15 15:48 AEDT
+- What changed: Reduced the live background job load to cut wasteful database checks. Removed the hourly usage/spike/missing-food jobs, slowed weekly health report checks to hourly, and slowed reminder checks to every 15 minutes.
+- Where to see it (page/link): https://helfi.ai
+- What to quickly test: Open Helfi normally and make sure reminders and weekly report access still work as expected. Billing-related background noise should now be lower.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-15 12:09 AEDT
 - What changed: Weekly health report supplements section now fills Suggestions and Things to avoid more usefully. It now adds safer supplement suggestions based on goals, symptoms, hydration, exercise, labs, and the current stack, and it adds caution items like avoiding extra overlapping products.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report

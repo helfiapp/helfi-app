@@ -1,12 +1,15 @@
 const { PrismaClient } = require('@prisma/client')
+const databaseUrl = process.env.DATABASE_URL
 
-const FALLBACK_DB_URL =
-  'postgresql://neondb_owner:npg_6Pwm8JLiQUxb@ep-shiny-silence-a7jm0pec-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require'
+if (!databaseUrl) {
+  console.error('Missing DATABASE_URL. Set it to the live Helfi database before running this script.')
+  process.exit(1)
+}
 
 const prisma = new PrismaClient({
   datasources: {
     db: {
-      url: process.env.DATABASE_URL || FALLBACK_DB_URL,
+      url: databaseUrl,
     },
   },
 })

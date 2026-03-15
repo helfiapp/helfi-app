@@ -42,8 +42,8 @@ Implementation sketch
 
 ## AI Costs & Credit Guidance (Production)
 
-**Database for costs:** `helfi-main-database` (Neon), connection string:  
-`postgresql://neondb_owner:npg_6Pwm8JLiQUxb@ep-shiny-silence-a7jm0pec-pooler.ap-southeast-2.aws.neon.tech/neondb?sslmode=require&channel_binding=require`
+**Database for costs:** `helfi-database` (Neon).  
+Use the live `DATABASE_URL` setting.
 
 ### Current observed average costs (from `AIUsageLog`)
 Rounded per-call costs:
@@ -113,6 +113,6 @@ NODE
    - Then round to a sensible small integer (like the values above).
 
 ### Critical reminders
-- Always use the Neon connection above (helfi-main-database). Ignore any old database strings.
-- Keep `DATABASE_URL` in Vercel pointed to this database (it is).
+- Always use `helfi-database` through `DATABASE_URL`. Ignore any old `helfi-main-database` or `POSTGRES_*` values.
+- Keep `DATABASE_URL` in Vercel pointed to this database.
 - Adjust `CREDIT_COSTS`/deductions in the code to match the credit charges listed here.
