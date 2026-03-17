@@ -40,7 +40,7 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;')
 }
 
-export function extractSummaryPoints(summary?: string | null) {
+function extractSummaryPoints(summary?: string | null) {
   const raw = String(summary || '')
     .replace(/\r/g, ' ')
     .replace(/\s+/g, ' ')
@@ -67,7 +67,7 @@ export function extractSummaryPoints(summary?: string | null) {
     .slice(0, 6)
 }
 
-export function buildWeeklyReportEmail(params: {
+function buildWeeklyReportEmail(params: {
   title: string
   bodyText: string
   periodText: string
