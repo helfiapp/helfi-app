@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-17 11:37 AEDT
+- What changed: Weekly 7-day report email now has a proper designed layout instead of one long text block. The summary is broken into clear week-at-a-glance cards, and a live test email was sent to support@helfi.ai.
+- Where to see it (page/link): https://helfi.ai and inbox for support@helfi.ai
+- What to quickly test: Open the latest weekly report email and check that the summary is clearly spaced, easy to scan, and the button opens the report.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-15 15:48 AEDT
 - What changed: Reduced the live background job load to cut wasteful database checks. Removed the hourly usage/spike/missing-food jobs, slowed weekly health report checks to hourly, and slowed reminder checks to every 15 minutes.
 - Where to see it (page/link): https://helfi.ai
