@@ -973,6 +973,22 @@ Critical note:
 - Root cause for missing countdown was fixed in commit `c6cbdcdc` (timestamp cast fix for weekly state insert query).
 - Do not remove `::timestamptz` casts in weekly state insert.
 
+### 2.7.3 Weekly Report Email Layout Lock (Mar 17, 2026)
+
+**Protected file:**
+- `app/api/reports/weekly/dispatch/route.ts`
+
+**Hard lock:**
+- The new weekly report email layout is now protected.
+- Do not casually restyle, simplify, or collapse it back into one text block.
+- Keep the summary split into clear items/cards so the email stays easy to scan.
+- Keep the proper heading, date pill, button, and clean spacing.
+- If the owner does not explicitly ask for a weekly report email redesign, do not change this block.
+
+**Build protection:**
+- `PROTECTED: WEEKLY_REPORT_EMAIL_LAYOUT` in `app/api/reports/weekly/dispatch/route.ts`
+- If an edit is truly approved, use the matching override env var and then update the protected hash in `scripts/protect-regions.js`.
+
 ### 2.8 Notification Inbox + Profile Badge (Jan 2026 – Locked)
 
 **Protected files:**

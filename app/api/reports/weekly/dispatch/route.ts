@@ -40,6 +40,7 @@ function escapeHtml(value: string) {
     .replace(/'/g, '&#39;')
 }
 
+// PROTECTED: WEEKLY_REPORT_EMAIL_LAYOUT START
 function extractSummaryPoints(summary?: string | null) {
   const raw = String(summary || '')
     .replace(/\r/g, ' ')
@@ -148,6 +149,7 @@ function buildWeeklyReportEmail(params: {
 
   return { html, text }
 }
+// PROTECTED: WEEKLY_REPORT_EMAIL_LAYOUT END
 
 export async function POST(req: NextRequest) {
   try {

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-17 20:04 AEDT
+- What changed: Added a hard lock to the new weekly report email layout so future agents cannot casually change or break it. The build now blocks edits to that email block unless there is an explicit override.
+- Where to see it (page/link): https://helfi.ai and `app/api/reports/weekly/dispatch/route.ts`
+- What to quickly test: Nothing should look different. This is a protection-only deploy. The weekly report email should still look the same, and future unapproved edits to that layout should fail the build.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-17 11:37 AEDT
 - What changed: Weekly 7-day report email now has a proper designed layout instead of one long text block. The summary is broken into clear week-at-a-glance cards, and a live test email was sent to support@helfi.ai.
 - Where to see it (page/link): https://helfi.ai and inbox for support@helfi.ai

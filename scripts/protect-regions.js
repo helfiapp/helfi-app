@@ -288,6 +288,14 @@ function main() {
     description: 'Weekly report status API self-heal logic',
   });
   checkProtectedRegion({
+    filePath: path.join(__dirname, '..', 'app', 'api', 'reports', 'weekly', 'dispatch', 'route.ts'),
+    startMarker: 'PROTECTED: WEEKLY_REPORT_EMAIL_LAYOUT START',
+    endMarker: 'PROTECTED: WEEKLY_REPORT_EMAIL_LAYOUT END',
+    expectedHash: '2fdfd7b28b4dc7c95fbbe1ef21b5f29a702bdde384571cc3caad9a26da86af41',
+    allowEnvVar: 'ALLOW_WEEKLY_REPORT_EMAIL_LAYOUT_EDIT',
+    description: 'Weekly report email layout block',
+  });
+  checkProtectedRegion({
     filePath: path.join(__dirname, '..', 'lib', 'weekly-health-report.ts'),
     startMarker: 'PROTECTED: WEEKLY_STATE_INSERT_CASTS START',
     endMarker: 'PROTECTED: WEEKLY_STATE_INSERT_CASTS END',
