@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-20 14:28 AEDT
+- What changed: Fixed the lab report upload flow so normal unlocked PDFs are no longer blocked by password-only consent rules. Password-protected PDFs still keep the extra password and consent checks.
+- Where to see it (page/link): https://helfi.ai/lab-reports
+- What to quickly test: Upload a normal unlocked PDF and make sure it processes. Then upload a password-protected PDF and make sure it still asks for the password and the extra consent.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-17 20:04 AEDT
 - What changed: Added a hard lock to the new weekly report email layout so future agents cannot casually change or break it. The build now blocks edits to that email block unless there is an explicit override.
 - Where to see it (page/link): https://helfi.ai and `app/api/reports/weekly/dispatch/route.ts`
