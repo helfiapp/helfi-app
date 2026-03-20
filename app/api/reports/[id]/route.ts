@@ -42,6 +42,15 @@ export async function DELETE(
     }
 
     await prisma.$transaction(async (tx) => {
+      await tx.auditEvent.updateMany({
+        where: { reportId: report.id },
+        data: { reportId: null },
+      })
+
+      await tx.labResult.deleteMany({
+        where: { reportId: report.id },
+      })
+
       await tx.report.delete({
         where: { id: report.id },
       })
@@ -51,7 +60,7 @@ export async function DELETE(
       })
 
       if (remainingReports === 0) {
-        await tx.consentRecord.delete({
+        await tx.consentRecord.deleteMany({
           where: { id: report.consentRecordId },
         })
       }

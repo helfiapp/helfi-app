@@ -8116,7 +8116,8 @@ function BloodResultsStep({
     setDeleteError('')
 
     try {
-      let failedMessage = ''
+      const failedMessages: string[] = []
+      const deletedReportIds: string[] = []
 
       for (const reportId of selectedReportIds) {
         const response = await fetch(`/api/reports/${reportId}`, {
@@ -8125,15 +8126,27 @@ function BloodResultsStep({
 
         if (!response.ok) {
           const data = await response.json().catch(() => null)
-          failedMessage = data?.error || 'Some reports could not be deleted.'
-          break
+          failedMessages.push(data?.error || 'Some reports could not be deleted.')
+          continue
         }
+
+        deletedReportIds.push(reportId)
       }
 
       await loadHistory()
 
-      if (failedMessage) {
-        setDeleteError(failedMessage)
+      if (deletedReportIds.length > 0) {
+        setSelectedReportIds((current) =>
+          current.filter((reportId) => !deletedReportIds.includes(reportId))
+        )
+      }
+
+      if (failedMessages.length > 0) {
+        setDeleteError(
+          failedMessages.length === 1 && deletedReportIds.length === 0
+            ? failedMessages[0]
+            : 'Some selected reports could not be deleted. Any failed ones are still ticked below.'
+        )
       } else {
         setSelectedReportIds([])
       }
@@ -8248,7 +8261,7 @@ function BloodResultsStep({
                 ) : null}
               </div>
               <p className="text-xs text-gray-500">
-                Tick the reports you want to permanently delete, then press delete.
+                Tick only the reports you want to permanently delete. Ticking a box marks it for deletion only.
               </p>
               {deleteError ? (
                 <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
