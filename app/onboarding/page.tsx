@@ -7962,7 +7962,10 @@ function BloodResultsStep({
   const [notes, setNotes] = useState(initial?.bloodResults?.notes || initial?.notes || '')
   const [skipped, setSkipped] = useState(initial?.bloodResults?.skipped || initial?.skipped || false)
   const [reports, setReports] = useState<Array<{ id: string; originalFileName: string; status: string; createdAt: string; processingError?: string | null }>>([])
+  const [selectedReportIds, setSelectedReportIds] = useState<string[]>([])
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
+  const [isDeletingReports, setIsDeletingReports] = useState(false)
+  const [deleteError, setDeleteError] = useState('')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [showUpdatePopup, setShowUpdatePopup] = useState(false)
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false)
@@ -8011,6 +8014,12 @@ function BloodResultsStep({
       })
     }
   }, [notes, skipped, reports, onPartialSave, initial])
+
+  useEffect(() => {
+    setSelectedReportIds((current) =>
+      current.filter((reportId) => reports.some((report) => report.id === reportId))
+    )
+  }, [reports])
 
   useEffect(() => {
     window.addEventListener('beforeunload', beforeUnloadHandler)
@@ -8076,6 +8085,64 @@ function BloodResultsStep({
       setSkipped(true)
       onNext({ bloodResults: { skipped: true, reportIds: [], notes: '' } })
     }, triggerPopup)
+  }
+
+  const toggleReportSelection = (reportId: string) => {
+    setSelectedReportIds((current) =>
+      current.includes(reportId)
+        ? current.filter((id) => id !== reportId)
+        : [...current, reportId]
+    )
+  }
+
+  const handleClearReportSelection = () => {
+    setSelectedReportIds([])
+  }
+
+  const handleDeleteSelectedReports = async () => {
+    if (selectedReportIds.length === 0 || isDeletingReports) {
+      return
+    }
+
+    const confirmed = window.confirm(
+      `Delete ${selectedReportIds.length} selected report${selectedReportIds.length === 1 ? '' : 's'}? This cannot be undone.`
+    )
+
+    if (!confirmed) {
+      return
+    }
+
+    setIsDeletingReports(true)
+    setDeleteError('')
+
+    try {
+      let failedMessage = ''
+
+      for (const reportId of selectedReportIds) {
+        const response = await fetch(`/api/reports/${reportId}`, {
+          method: 'DELETE',
+        })
+
+        if (!response.ok) {
+          const data = await response.json().catch(() => null)
+          failedMessage = data?.error || 'Some reports could not be deleted.'
+          break
+        }
+      }
+
+      await loadHistory()
+
+      if (failedMessage) {
+        setDeleteError(failedMessage)
+      } else {
+        setSelectedReportIds([])
+      }
+    } catch (error) {
+      console.error('Failed to delete selected reports', error)
+      setDeleteError('We could not delete the selected reports. Please try again.')
+    } finally {
+      setIsDeletingReports(false)
+    }
   }
 
   return (
@@ -8157,14 +8224,55 @@ function BloodResultsStep({
           ) : reports.length === 0 ? (
             <div className="text-sm text-gray-500">No reports uploaded yet.</div>
           ) : (
-            <div className="space-y-2">
+            <div className="space-y-3">
+              <div className="flex flex-wrap items-center gap-2">
+                <button
+                  type="button"
+                  onClick={handleDeleteSelectedReports}
+                  disabled={selectedReportIds.length === 0 || isDeletingReports}
+                  className="rounded-lg bg-rose-600 px-3 py-1.5 text-xs font-medium text-white disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDeletingReports
+                    ? 'Deleting...'
+                    : `Delete selected${selectedReportIds.length > 0 ? ` (${selectedReportIds.length})` : ''}`}
+                </button>
+                {selectedReportIds.length > 0 ? (
+                  <button
+                    type="button"
+                    onClick={handleClearReportSelection}
+                    disabled={isDeletingReports}
+                    className="rounded-lg border border-gray-300 px-3 py-1.5 text-xs font-medium text-gray-700 disabled:cursor-not-allowed disabled:opacity-50"
+                  >
+                    Clear selection
+                  </button>
+                ) : null}
+              </div>
+              <p className="text-xs text-gray-500">
+                Tick the reports you want to permanently delete, then press delete.
+              </p>
+              {deleteError ? (
+                <div className="rounded-lg border border-rose-200 bg-rose-50 px-3 py-2 text-xs text-rose-700">
+                  {deleteError}
+                </div>
+              ) : null}
               {reports.map((item) => (
-                <div key={item.id} className="flex items-center justify-between rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
-                  <div>
+                <div key={item.id} className="flex items-start gap-3 rounded-lg border border-gray-200 bg-gray-50 px-3 py-2">
+                  <input
+                    type="checkbox"
+                    checked={selectedReportIds.includes(item.id)}
+                    onChange={() => toggleReportSelection(item.id)}
+                    disabled={item.status === 'PROCESSING' || isDeletingReports}
+                    className="mt-1 h-4 w-4 rounded border-gray-300 text-rose-600 focus:ring-rose-500"
+                    aria-label={`Select report ${item.originalFileName || item.id}`}
+                  />
+                  <div className="min-w-0">
                     <div className="text-sm font-medium text-gray-800">{item.originalFileName || 'Lab report'}</div>
                     <div className="text-xs text-gray-500">
                       {new Date(item.createdAt).toLocaleDateString()} • {item.status || 'PENDING'}
                     </div>
+                    {item.status === 'PROCESSING' ? (
+                      <div className="text-xs text-amber-600">This report is still processing and cannot be deleted yet.</div>
+                    ) : null}
                     {item.processingError ? (
                       <div className="text-xs text-rose-600">Needs attention: {item.processingError}</div>
                     ) : null}
