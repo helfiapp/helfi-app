@@ -59,8 +59,11 @@ export async function POST(
       );
     }
 
-    // Verify consent
-    if (!report.consentRecord.decryptionConsent || !report.consentRecord.passwordConsent) {
+    // Only password-protected PDFs require the decryption/password consent pair.
+    if (
+      report.isPasswordProtected &&
+      (!report.consentRecord.decryptionConsent || !report.consentRecord.passwordConsent)
+    ) {
       return NextResponse.json(
         { error: 'Consent not granted' },
         { status: 403 }
