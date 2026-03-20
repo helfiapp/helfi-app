@@ -14,7 +14,7 @@ module.exports = {
   },
   // Session preservation during development and deployment
   experimental: {
-    serverComponentsExternalPackages: ['prisma'],
+    serverComponentsExternalPackages: ['prisma', '@napi-rs/canvas'],
     // Improve session stability during hot reloads
     esmExternals: 'loose',
   },

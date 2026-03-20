@@ -14,14 +14,33 @@ let PDFDocumentProxy: any;
 
 // Dynamic import to handle server-side vs client-side
 if (typeof window === 'undefined') {
+  try {
+    const canvas = require('@napi-rs/canvas');
+
+    if (!globalThis.DOMMatrix && canvas.DOMMatrix) {
+      globalThis.DOMMatrix = canvas.DOMMatrix;
+    }
+
+    if (!globalThis.ImageData && canvas.ImageData) {
+      globalThis.ImageData = canvas.ImageData;
+    }
+
+    if (!globalThis.Path2D && canvas.Path2D) {
+      globalThis.Path2D = canvas.Path2D;
+    }
+  } catch (error) {
+    console.warn('[pdf-processor] Failed to load @napi-rs/canvas polyfills:', error);
+  }
+
   // Server-side: Use pdfjs-dist without worker (synchronous mode)
   // This avoids DOMMatrix issues
   const pdfjs = require('pdfjs-dist/legacy/build/pdf.mjs');
+  const pdfjsWorker = require('pdfjs-dist/legacy/build/pdf.worker.mjs');
   pdfjsLib = pdfjs;
   getDocument = pdfjs.getDocument;
-  
-  // Disable worker for server-side (use synchronous rendering)
-  pdfjsLib.GlobalWorkerOptions.workerSrc = '';
+
+  // Wire up the worker explicitly so Node can use the bundled main-thread fallback.
+  (globalThis as any).pdfjsWorker ||= pdfjsWorker;
 } else {
   // Client-side: Use standard pdfjs-dist
   pdfjsLib = require('pdfjs-dist');
@@ -56,7 +75,7 @@ export async function loadPDF(
   password?: string
 ): Promise<PDFDocumentProxyType> {
   const loadingTask = getDocument({
-    data: pdfBuffer,
+    data: new Uint8Array(pdfBuffer),
     password: password,
     useWorkerFetch: false, // Disable worker fetch for server-side
     isEvalSupported: false, // Disable eval for security
@@ -264,4 +283,3 @@ export async function processPDF(
     pageCount,
   };
 }
-
