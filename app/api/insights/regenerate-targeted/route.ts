@@ -19,6 +19,7 @@ import { getCachedIssueSection } from '@/lib/insights/issue-engine'
 
 // Keep runtime bounded so users get a faster response if regeneration is slow.
 export const maxDuration = 45
+const TARGETED_INSIGHTS_EMERGENCY_PAUSED = true
 
 const VALID_CHANGE_TYPES = [
   'supplements',
@@ -250,6 +251,21 @@ export async function POST(request: NextRequest) {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    if (TARGETED_INSIGHTS_EMERGENCY_PAUSED) {
+      console.error('[insights.regenerate-targeted] emergency pause active', {
+        userId: session.user.id,
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          paused: true,
+          message:
+            'Insights updates are temporarily paused while we stop a runaway usage issue. Your saved health data is safe.',
+        },
+        { status: 503 }
+      )
     }
 
     const body = await request.json().catch(() => ({}))
