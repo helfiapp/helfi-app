@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-21 13:14 AEDT
+- What changed: Added a server-side same-state stop for web Insights refreshes so unchanged saved data no longer reruns paid Insights work. Also made failed refresh attempts unlock properly for valid retries, covered hidden background section rebuild paths, and stopped unchanged supplements refreshes from looking like they were still running.
+- Where to see it (page/link): https://helfi.ai/onboarding, https://helfi.ai/insights, and issue sections such as https://helfi.ai/insights/issues/general-health/supplements
+- What to quickly test: Make one real onboarding change and confirm Insights updates once. Try the same update again without changing anything and confirm no paid rerun happens. Open an Insights issue page again without changes and confirm it does not quietly start another refresh.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-21 12:17 AEDT
 - What changed: Fixed the real cause of the OpenAI spend spike in web onboarding by stopping server-hydrated supplements and medications from being treated like fresh edits, then added server-side AI safety brakes so repeat Insights refreshes and other web AI routes get paused before usage can run away again.
 - Where to see it (page/link): https://helfi.ai/onboarding and the web-only AI upload routes `/api/insights/regenerate-targeted`, `/api/health-journal/extract-media`, and `/api/mood/journal/extract-media`
