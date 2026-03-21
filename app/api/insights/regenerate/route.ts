@@ -9,7 +9,13 @@ import { randomUUID } from 'crypto'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 import { tryOpenCircuit } from '@/lib/safety-circuit'
-import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
+import {
+  checkTargetedRefreshState,
+  clearTargetedRefreshState,
+  completeTargetedRefreshState,
+  recordTargetedRefreshState,
+} from '@/lib/insights/targeted-refresh-idempotency'
+import { CURRENT_PIPELINE_VERSION } from '@/lib/insights/issue-engine'
 
 const FULL_INSIGHTS_COOLDOWN_MINUTES = 2
 
@@ -35,6 +41,9 @@ export async function POST(request: NextRequest) {
       ],
       affectedSections: ['full'],
       targetIssueSlugs: [],
+      mode: 'latest',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
+      intent: 'full-insights',
     })
     if (!refreshState.guardReady) {
       return NextResponse.json(
@@ -94,11 +103,15 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const runId = randomUUID()
+
     try {
       await recordTargetedRefreshState({
         userId,
         scope: refreshState.scope,
         payloadHash: refreshState.payloadHash,
+        runId,
+        status: 'pending',
       })
     } catch (error) {
       console.error('Failed to save full insights guard state before refresh:', error)
@@ -120,7 +133,6 @@ export async function POST(request: NextRequest) {
     }
 
     if (!allowViaFreeUse) {
-      // Check if user has credits
       const cm = new CreditManager(userId)
       const hasCredits = await cm.checkCredits('INSIGHTS_GENERATION')
       
@@ -131,34 +143,12 @@ export async function POST(request: NextRequest) {
           message: 'You need credits to regenerate insights. Please purchase credits or subscribe.'
         }, { status: 402 })
       }
-
-      // Charge credits for insights regeneration
-      const costCents = CREDIT_COSTS.INSIGHTS_GENERATION
-      const charged = await cm.chargeCents(costCents)
-      
-      if (!charged) {
-        await clearRefreshGuard()
-        return NextResponse.json({ 
-          error: 'Failed to charge credits',
-          message: 'Unable to process payment. Please try again.'
-        }, { status: 402 })
-      }
-    } else {
-      await consumeFreeCredit(userId, 'INSIGHTS_UPDATE')
     }
-
-    // Update monthly counter
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        monthlyInsightsGenerationUsed: { increment: 1 },
-      } as any,
-    })
 
     // Trigger FULL regeneration for all issues (not just quick cache)
     // Start quick regeneration first, then full regeneration
-    const runId = randomUUID()
-    setImmediate(async () => {
+    const waitUntil = (globalThis as any).waitUntil || ((promise: Promise<unknown>) => promise.catch(() => {}))
+    const backgroundRefresh = (async () => {
       try {
         console.log('🚀 Starting FULL insights regeneration for user:', userId)
         
@@ -167,18 +157,42 @@ export async function POST(request: NextRequest) {
           { runId, feature: 'insights:regenerate', meta: { userId } },
           () => precomputeIssueSectionsForUser(userId, { concurrency: 2 })
         )
+
+        if (!allowViaFreeUse) {
+          const charged = await new CreditManager(userId).chargeCents(CREDIT_COSTS.INSIGHTS_GENERATION)
+          if (!charged) {
+            console.error('❌ FULL insights regeneration completed but credits could not be charged')
+          }
+        } else {
+          await consumeFreeCredit(userId, 'INSIGHTS_UPDATE')
+        }
+
+        await prisma.user.update({
+          where: { id: userId },
+          data: {
+            monthlyInsightsGenerationUsed: { increment: 1 },
+          } as any,
+        })
+
+        await completeTargetedRefreshState({
+          userId,
+          scope: refreshState.scope,
+          payloadHash: refreshState.payloadHash,
+          runId,
+        })
         
         console.log('✅ FULL insights regeneration complete for user:', userId)
       } catch (error) {
         await clearRefreshGuard()
         console.error('❌ FULL insights regeneration failed:', error)
       }
-    })
+    })()
+    waitUntil(backgroundRefresh)
 
     return NextResponse.json({ 
       success: true,
       message: 'Insights regeneration started. This may take a few minutes.',
-      creditsCharged: allowViaFreeUse ? 0 : CREDIT_COSTS.INSIGHTS_GENERATION
+      creditsCharged: 0
     }, { status: 202 }) // 202 Accepted - processing in background
 
   } catch (error) {

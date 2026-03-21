@@ -39,10 +39,15 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { ISSUE_SECTION_ORDER, type IssueSectionKey, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
+import { ISSUE_SECTION_ORDER, type IssueSectionKey, CURRENT_PIPELINE_VERSION } from '@/lib/insights/issue-engine'
 import { getIssueSection } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
-import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
+import {
+  checkTargetedRefreshState,
+  clearTargetedRefreshState,
+  completeTargetedRefreshState,
+  recordTargetedRefreshState,
+} from '@/lib/insights/targeted-refresh-idempotency'
 
 // Lightweight fingerprint generator (mirrors logic in regeneration-service)
 function createDataFingerprint(data: any): string {
@@ -115,6 +120,9 @@ export async function POST(
       changeTypes: [],
       affectedSections: sections,
       targetIssueSlugs: [context.params.slug],
+      mode: 'latest',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
+      intent: 'regenerate-all',
     })
     if (!refreshState.guardReady) {
       return NextResponse.json({
@@ -138,6 +146,7 @@ export async function POST(
         userId: session.user.id,
         scope: refreshState.scope,
         payloadHash: refreshState.payloadHash,
+        status: 'pending',
       })
     } catch (error) {
       console.warn('[insights.api] Failed to lock regenerate-all safely', error)
@@ -214,15 +223,11 @@ export async function POST(
           `, session.user.id, context.params.slug, section, fingerprint)
           
           console.log(`[insights.api] ✅ Regenerated and marked ${section} as fresh`)
+          return true
         } else {
           throw new Error(`No result returned for ${section}`)
         }
       } catch (error) {
-        await clearTargetedRefreshState({
-          userId: session.user.id,
-          scope: refreshState.scope,
-          payloadHash: refreshState.payloadHash,
-        })
         console.error(`[insights.api] ❌ Failed to regenerate ${section}:`, error)
         // Mark as stale on error
         try {
@@ -231,12 +236,27 @@ export async function POST(
             WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
           `, session.user.id, context.params.slug, section)
         } catch {}
+        return false
       }
     })
     
     // ⚠️ CRITICAL: Promise.all with waitUntil ensures all sections regenerate in parallel
     // while Vercel waits for completion. DO NOT change this pattern.
-    const allRegenerations = Promise.all(regenerationPromises)
+    const allRegenerations = Promise.all(regenerationPromises).then(async (results) => {
+      if (results.every(Boolean)) {
+        await completeTargetedRefreshState({
+          userId: session.user.id,
+          scope: refreshState.scope,
+          payloadHash: refreshState.payloadHash,
+        })
+      } else {
+        await clearTargetedRefreshState({
+          userId: session.user.id,
+          scope: refreshState.scope,
+          payloadHash: refreshState.payloadHash,
+        })
+      }
+    })
     waitUntil(allRegenerations) // ⚠️ DO NOT REMOVE - this prevents Vercel from killing the function
     allRegenerations.catch((error) => {
       console.error('[insights.api] Regeneration error:', error)

@@ -7,10 +7,16 @@ import {
   ISSUE_SECTION_ORDER,
   type IssueSectionKey,
   type ReportMode,
+  CURRENT_PIPELINE_VERSION,
 } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
 import { precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
-import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
+import {
+  checkTargetedRefreshState,
+  clearTargetedRefreshState,
+  completeTargetedRefreshState,
+  recordTargetedRefreshState,
+} from '@/lib/insights/targeted-refresh-idempotency'
 
 interface PrefetchBody {
   sections?: IssueSectionKey[]
@@ -60,6 +66,10 @@ export async function POST(request: Request, context: { params: { slug: string }
     changeTypes: [],
     affectedSections: targetSections,
     targetIssueSlugs: targetSlugs,
+    mode,
+    range: body.range,
+    pipelineVersion: CURRENT_PIPELINE_VERSION,
+    intent: forceAll ? 'prefetch-all-quick' : 'prefetch-quick',
   })
 
   if (!refreshState.guardReady) {
@@ -90,6 +100,7 @@ export async function POST(request: Request, context: { params: { slug: string }
       userId: session.user.id,
       scope: refreshState.scope,
       payloadHash: refreshState.payloadHash,
+      status: 'pending',
     })
   } catch {
     return NextResponse.json({
@@ -110,6 +121,11 @@ export async function POST(request: Request, context: { params: { slug: string }
     } else {
       await precomputeQuickSectionsForUser(session.user.id, { slugs: [context.params.slug], sections: targetSections, concurrency })
     }
+    await completeTargetedRefreshState({
+      userId: session.user.id,
+      scope: refreshState.scope,
+      payloadHash: refreshState.payloadHash,
+    })
   } catch {
     await clearTargetedRefreshState({
       userId: session.user.id,

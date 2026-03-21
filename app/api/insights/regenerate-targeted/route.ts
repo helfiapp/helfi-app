@@ -15,10 +15,15 @@ import type { RunContext } from '@/lib/run-context'
 import { getInsightsLlmStatus } from '@/lib/insights/llm'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
-import { getCachedIssueSection } from '@/lib/insights/issue-engine'
+import { CURRENT_PIPELINE_VERSION, getCachedIssueSection } from '@/lib/insights/issue-engine'
 import { tryOpenCircuit } from '@/lib/safety-circuit'
 import { isAiSafetyError } from '@/lib/ai-safety'
-import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
+import {
+  checkTargetedRefreshState,
+  clearTargetedRefreshState,
+  completeTargetedRefreshState,
+  recordTargetedRefreshState,
+} from '@/lib/insights/targeted-refresh-idempotency'
 
 // Keep runtime bounded so users get a faster response if regeneration is slow.
 export const maxDuration = 45
@@ -373,6 +378,9 @@ export async function POST(request: NextRequest) {
       changeTypes: effectiveChangeTypes,
       affectedSections: affectedUnique,
       targetIssueSlugs,
+      mode: 'latest',
+      pipelineVersion: CURRENT_PIPELINE_VERSION,
+      intent: 'targeted-paid',
     })
     if (!refreshState.guardReady) {
       console.warn('[insights.regenerate-targeted] refresh guard unavailable', {
@@ -402,6 +410,7 @@ export async function POST(request: NextRequest) {
         affectedSections: affectedUnique,
         targetIssueSlugs,
         hitCount: refreshState.hitCount,
+        matchState: refreshState.matchState,
       })
       return NextResponse.json(
         {
@@ -452,6 +461,7 @@ export async function POST(request: NextRequest) {
         scope: refreshState.scope,
         payloadHash: refreshState.payloadHash,
         runId,
+        status: 'pending',
       })
     } catch (error) {
       console.error('[insights.regenerate-targeted] failed to save guard state before refresh', {
@@ -744,6 +754,14 @@ export async function POST(request: NextRequest) {
 
     if ('noChargeReason' in chargeResult.body && chargeResult.body.noChargeReason) {
       await clearRefreshGuard()
+    }
+    if (!('noChargeReason' in chargeResult.body && chargeResult.body.noChargeReason)) {
+      await completeTargetedRefreshState({
+        userId: session.user.id,
+        scope: refreshState.scope,
+        payloadHash: refreshState.payloadHash,
+        runId,
+      })
     }
 
     return NextResponse.json(

@@ -4,7 +4,13 @@ import { authOptions } from '@/lib/auth'
 import { isHealthSetupComplete } from '@/lib/health-setup-completion'
 import { getServerSession } from 'next-auth'
 import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick, generateDegradedSectionQuickStrict, evaluateFocusItemsForIssue } from './llm'
-import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from './targeted-refresh-idempotency'
+import { tryOpenCircuit } from '@/lib/safety-circuit'
+import {
+  checkTargetedRefreshState,
+  clearTargetedRefreshState,
+  completeTargetedRefreshState,
+  recordTargetedRefreshState,
+} from './targeted-refresh-idempotency'
 
 const LANDING_PAYLOAD_TTL_MS = 30 * 1000
 const landingPayloadCache = new Map<
@@ -165,7 +171,7 @@ interface NutritionSignals {
 const RATING_SCALE_DEFAULT = 6
 const SECTION_CACHE_TTL_MS = 1000 * 60 * 15
 const DEGRADED_CACHE_TTL_MS = 1000 * 60 * 2
-const CURRENT_PIPELINE_VERSION = 'v11'
+export const CURRENT_PIPELINE_VERSION = 'v11'
 const FORCE_QUICK_FIRST = process.env.INSIGHTS_FORCE_QUICK_FIRST === 'true'
 const PAUSE_HEAVY = process.env.INSIGHTS_PAUSE_HEAVY === 'true'
 
@@ -2011,6 +2017,15 @@ function encodeRange(range?: { from?: string; to?: string }) {
   return `${from}..${to}`
 }
 
+function decodeRange(rangeKey: string): { from?: string; to?: string } | undefined {
+  if (!rangeKey) return undefined
+  const [fromRaw, toRaw] = rangeKey.split('..')
+  const from = fromRaw || undefined
+  const to = toRaw || undefined
+  if (!from && !to) return undefined
+  return { from, to }
+}
+
 async function runWithConcurrency<T>(items: T[], limit: number, task: (item: T) => Promise<void>) {
   const active = new Set<Promise<void>>()
   for (const item of items) {
@@ -2092,6 +2107,7 @@ async function computeIssueSection(
 ): Promise<IssueSectionResult | null> {
   const t0 = Date.now()
   const rangeKey = _rangeKey
+  const range = decodeRange(rangeKey)
   const cached = await readSectionCache(userId, slug, section, mode, rangeKey)
   if (cached) {
     const extrasIn = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
@@ -2453,22 +2469,30 @@ async function computeIssueSection(
         changeTypes: [],
         affectedSections: [section],
         targetIssueSlugs: [slug],
+        mode,
+        range,
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
+        intent: 'section-auto-upgrade',
       })
 
       if (backgroundRefreshState.guardReady && !backgroundRefreshState.shouldSkip) {
-        try {
-          await recordTargetedRefreshState({
-            userId,
-            scope: backgroundRefreshState.scope,
-            payloadHash: backgroundRefreshState.payloadHash,
-          })
-
+        const claimedAutoUpgrade = await tryOpenCircuit({
+          scope: `insights-auto-upgrade:${userId}:${slug}:${section}:${mode}:${rangeKey}`,
+          minutes: 2,
+          reason: 'Temporary cooldown to stop duplicate background section upgrades.',
+        })
+        if (claimedAutoUpgrade) {
           setImmediate(async () => {
             try {
               const context = await loadUserInsightContext(userId)
-              const full = await buildIssueSectionWithContext(context, slug, section, { mode, range: undefined, force: false })
+              const full = await buildIssueSectionWithContext(context, slug, section, { mode, range, force: false })
               if (full && shouldCacheSectionResult(full)) {
                 await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: full })
+                await completeTargetedRefreshState({
+                  userId,
+                  scope: backgroundRefreshState.scope,
+                  payloadHash: backgroundRefreshState.payloadHash,
+                })
               } else {
                 await clearTargetedRefreshState({
                   userId,
@@ -2485,7 +2509,7 @@ async function computeIssueSection(
               console.warn('[insights.build] background upgrade failed', e)
             }
           })
-        } catch {}
+        }
       }
     }
     return quick
@@ -2497,6 +2521,10 @@ async function computeIssueSection(
     changeTypes: [],
     affectedSections: [section],
     targetIssueSlugs: [slug],
+    mode,
+    range,
+    pipelineVersion: CURRENT_PIPELINE_VERSION,
+    intent: 'section-fallback',
   })
 
   if (fallbackRefreshState.guardReady && fallbackRefreshState.shouldSkip && cached) {
@@ -2521,6 +2549,7 @@ async function computeIssueSection(
         userId,
         scope: fallbackRefreshState.scope,
         payloadHash: fallbackRefreshState.payloadHash,
+        status: 'pending',
       })
       fallbackGuardLocked = true
     } catch {}
@@ -2532,7 +2561,7 @@ async function computeIssueSection(
     const context = await loadUserInsightContext(userId)
     built = await buildIssueSectionWithContext(context, slug, section, {
       mode,
-      range: undefined,
+      range,
       force: false,
     })
   } catch (error) {
@@ -2588,6 +2617,13 @@ async function computeIssueSection(
   } catch {}
   if (shouldCacheSectionResult(built)) {
     await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: built })
+  }
+  if (fallbackGuardLocked) {
+    await completeTargetedRefreshState({
+      userId,
+      scope: fallbackRefreshState.scope,
+      payloadHash: fallbackRefreshState.payloadHash,
+    })
   }
   return built
 }

@@ -9,6 +9,10 @@ type CheckTargetedRefreshStateInput = {
   changeTypes: ChangeType[]
   affectedSections: string[]
   targetIssueSlugs: string[]
+  mode?: string
+  range?: { from?: string; to?: string }
+  pipelineVersion?: string | null
+  intent?: string
 }
 
 type CheckTargetedRefreshStateResult = {
@@ -17,9 +21,11 @@ type CheckTargetedRefreshStateResult = {
   payloadHash: string
   scope: string
   hitCount: number
+  matchState: 'pending' | 'completed' | null
 }
 
 let refreshStateReady = false
+const PENDING_REFRESH_TTL_MS = 1000 * 60 * 10
 
 const normalizeText = (value: unknown) => String(value || '').trim().toLowerCase()
 
@@ -38,6 +44,11 @@ const normalizeDateString = (value: unknown): string => {
   const date = new Date(String(value))
   return Number.isNaN(date.getTime()) ? normalizeText(value) : date.toISOString()
 }
+
+const normalizeRange = (range: CheckTargetedRefreshStateInput['range']) => ({
+  from: normalizeDateString(range?.from),
+  to: normalizeDateString(range?.to),
+})
 
 const normalizeRoundedNumberString = (value: unknown): string => {
   if (value === null || value === undefined || value === '') return ''
@@ -152,6 +163,12 @@ async function ensureRefreshStateTable() {
     await prisma.$executeRawUnsafe(
       'CREATE INDEX IF NOT EXISTS insights_refresh_state_updated_idx ON "InsightsRefreshState" ("updatedAt" DESC)'
     ).catch(() => {})
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "InsightsRefreshState" ADD COLUMN IF NOT EXISTS "status" TEXT NOT NULL DEFAULT \'completed\''
+    ).catch(() => {})
+    await prisma.$executeRawUnsafe(
+      'ALTER TABLE "InsightsRefreshState" ADD COLUMN IF NOT EXISTS "startedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW()'
+    ).catch(() => {})
     refreshStateReady = true
   } catch (error) {
     console.warn('[targeted-refresh-idempotency] Failed to ensure table', error)
@@ -175,6 +192,11 @@ async function buildPayloadHash(input: CheckTargetedRefreshStateInput) {
     const targetIssueSlugs = Array.from(
       new Set(input.targetIssueSlugs.map((item) => toIssueSlug(String(item || ''))).filter(Boolean))
     ).sort()
+    const mode = normalizeText(input.mode || 'latest') || 'latest'
+    const range = normalizeRange(input.range)
+    const pipelineVersion = normalizeText(input.pipelineVersion || '')
+    const intent = normalizeText(input.intent || 'default') || 'default'
+    const rangeKey = [range.from || 'none', range.to || 'none'].join('|')
 
     const user = await prisma.user.findUnique({
       where: { id: safeUserId },
@@ -189,6 +211,7 @@ async function buildPayloadHash(input: CheckTargetedRefreshStateInput) {
           select: {
             name: true,
             category: true,
+            currentRating: true,
           },
         },
         supplements: {
@@ -222,6 +245,21 @@ async function buildPayloadHash(input: CheckTargetedRefreshStateInput) {
           orderBy: { createdAt: 'desc' },
           take: 300,
         },
+        exerciseLogs: {
+          where: {
+            createdAt: {
+              gte: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000),
+            },
+          },
+          select: {
+            type: true,
+            duration: true,
+            intensity: true,
+            createdAt: true,
+          },
+          orderBy: { createdAt: 'desc' },
+          take: 300,
+        },
       },
     })
 
@@ -233,7 +271,12 @@ async function buildPayloadHash(input: CheckTargetedRefreshStateInput) {
     const visibleGoalSlugs = sortByJson(
       user.healthGoals
         .filter((goal) => !goal.name.startsWith('__'))
-        .map((goal) => ({ slug: toIssueSlug(goal.name), name: normalizeText(goal.name) }))
+        .map((goal) => ({
+          slug: toIssueSlug(goal.name),
+          name: normalizeText(goal.name),
+          category: normalizeText(goal.category),
+          currentRating: normalizeNumber(goal.currentRating),
+        }))
         .filter((goal) => goal.slug)
     )
     const selectedIssueSlugs = sortByJson(
@@ -356,6 +399,15 @@ async function buildPayloadHash(input: CheckTargetedRefreshStateInput) {
       }))
     )
 
+    const exerciseLogs = sortByJson(
+      user.exerciseLogs.map((log) => ({
+        type: normalizeText(log.type),
+        duration: normalizeNumber(log.duration),
+        intensity: normalizeText(log.intensity),
+        createdAt: normalizeDateString(log.createdAt),
+      }))
+    )
+
     const isFullRefresh = affectedSections.includes('full')
     const includeProfile = isFullRefresh || affectedSections.some((section) => section === 'supplements' || section === 'medications')
     const includeHealthSituations = isFullRefresh || affectedSections.some((section) => section === 'supplements' || section === 'medications')
@@ -364,11 +416,19 @@ async function buildPayloadHash(input: CheckTargetedRefreshStateInput) {
     const includeBloodResults = isFullRefresh || affectedSections.includes('labs')
     const includeFood = isFullRefresh || affectedSections.includes('nutrition')
 
+    const includeIssueSummaryState = isFullRefresh || targetIssueSlugs.length > 0
+
     const payload = {
-      version: 1,
+      version: 2,
       changeTypes,
       affectedSections,
       targetIssueSlugs,
+      request: {
+        mode,
+        range,
+        pipelineVersion,
+        intent,
+      },
       data: {
         profile: includeProfile ? profile : undefined,
         supplements: includeSupplements ? supplements : undefined,
@@ -382,14 +442,23 @@ async function buildPayloadHash(input: CheckTargetedRefreshStateInput) {
                 todaysFoods,
               }
             : undefined,
-        visibleGoals: isFullRefresh ? visibleGoalSlugs : undefined,
-        selectedIssues: isFullRefresh ? selectedIssueSlugs : undefined,
+        exercise: isFullRefresh ? { exerciseLogs } : undefined,
+        visibleGoals: includeIssueSummaryState ? visibleGoalSlugs : undefined,
+        selectedIssues: includeIssueSummaryState ? selectedIssueSlugs : undefined,
       },
     }
 
     return {
       payloadHash: hashPayload(payload),
-      scope: ['targeted-insights', affectedSections.join('|') || 'none', targetIssueSlugs.join('|') || 'general-health'].join('::'),
+      scope: [
+        'targeted-insights',
+        affectedSections.join('|') || 'none',
+        targetIssueSlugs.join('|') || 'general-health',
+        mode,
+        rangeKey,
+        pipelineVersion || 'current',
+        intent,
+      ].join('::'),
     }
   } catch (error) {
     console.warn('[targeted-refresh-idempotency] Failed to build payload hash', error)
@@ -402,19 +471,37 @@ export async function checkTargetedRefreshState(
 ): Promise<CheckTargetedRefreshStateResult> {
   const { payloadHash, scope } = await buildPayloadHash(input)
   if (!payloadHash || !scope) {
-    return { guardReady: false, shouldSkip: false, payloadHash, scope, hitCount: 0 }
+    return { guardReady: false, shouldSkip: false, payloadHash, scope, hitCount: 0, matchState: null }
   }
 
   try {
     await ensureRefreshStateTable()
 
-    const rows: Array<{ payloadHash: string; hitCount: number }> = await prisma.$queryRawUnsafe(
-      'SELECT "payloadHash", "hitCount" FROM "InsightsRefreshState" WHERE "userId" = $1 AND "scope" = $2',
+    const rows: Array<{ payloadHash: string; hitCount: number; status: string | null; startedAt: Date | null }> = await prisma.$queryRawUnsafe(
+      'SELECT "payloadHash", "hitCount", "status", "startedAt" FROM "InsightsRefreshState" WHERE "userId" = $1 AND "scope" = $2',
       input.userId,
       scope
     )
     const existing = rows?.[0]
     if (existing?.payloadHash === payloadHash) {
+      const matchState = existing.status === 'pending' ? 'pending' : 'completed'
+      const pendingStartedAt = existing.startedAt ? new Date(existing.startedAt).getTime() : 0
+      if (matchState === 'pending' && pendingStartedAt > 0 && Date.now() - pendingStartedAt > PENDING_REFRESH_TTL_MS) {
+        await prisma.$queryRawUnsafe(
+          'DELETE FROM "InsightsRefreshState" WHERE "userId" = $1 AND "scope" = $2 AND "payloadHash" = $3',
+          input.userId,
+          scope,
+          payloadHash
+        )
+        return {
+          guardReady: true,
+          shouldSkip: false,
+          payloadHash,
+          scope,
+          hitCount: 1,
+          matchState: null,
+        }
+      }
       const nextHitCount = Number(existing.hitCount || 0) + 1
       await prisma.$queryRawUnsafe(
         'UPDATE "InsightsRefreshState" SET "hitCount" = $1, "updatedAt" = NOW() WHERE "userId" = $2 AND "scope" = $3',
@@ -428,17 +515,52 @@ export async function checkTargetedRefreshState(
         payloadHash,
         scope,
         hitCount: nextHitCount,
+        matchState,
       }
     }
   } catch (error) {
     console.warn('[targeted-refresh-idempotency] Failed to read refresh state', error)
-    return { guardReady: false, shouldSkip: false, payloadHash, scope, hitCount: 0 }
+    return { guardReady: false, shouldSkip: false, payloadHash, scope, hitCount: 0, matchState: null }
   }
 
-  return { guardReady: true, shouldSkip: false, payloadHash, scope, hitCount: 1 }
+  return { guardReady: true, shouldSkip: false, payloadHash, scope, hitCount: 1, matchState: null }
 }
 
 export async function recordTargetedRefreshState(options: {
+  userId: string
+  scope: string
+  payloadHash: string
+  runId?: string | null
+  status?: 'pending' | 'completed'
+}) {
+  if (!options.userId || !options.scope || !options.payloadHash) return
+
+  try {
+    await ensureRefreshStateTable()
+    await prisma.$queryRawUnsafe(
+      `INSERT INTO "InsightsRefreshState" ("userId", "scope", "payloadHash", "lastCompletedAt", "lastRunId", "hitCount", "updatedAt", "status", "startedAt")
+       VALUES ($1, $2, $3, CASE WHEN $5 = 'completed' THEN NOW() ELSE NOW() END, $4, 1, NOW(), $5, NOW())
+       ON CONFLICT ("userId", "scope")
+       DO UPDATE SET "payloadHash" = EXCLUDED."payloadHash",
+                     "lastCompletedAt" = CASE WHEN EXCLUDED."status" = 'completed' THEN EXCLUDED."lastCompletedAt" ELSE "InsightsRefreshState"."lastCompletedAt" END,
+                     "lastRunId" = EXCLUDED."lastRunId",
+                     "hitCount" = 1,
+                     "status" = EXCLUDED."status",
+                     "startedAt" = NOW(),
+                     "updatedAt" = NOW()`,
+      options.userId,
+      options.scope,
+      options.payloadHash,
+      options.runId || null,
+      options.status || 'completed'
+    )
+  } catch (error) {
+    console.warn('[targeted-refresh-idempotency] Failed to record refresh state', error)
+    throw error
+  }
+}
+
+export async function completeTargetedRefreshState(options: {
   userId: string
   scope: string
   payloadHash: string
@@ -449,13 +571,14 @@ export async function recordTargetedRefreshState(options: {
   try {
     await ensureRefreshStateTable()
     await prisma.$queryRawUnsafe(
-      `INSERT INTO "InsightsRefreshState" ("userId", "scope", "payloadHash", "lastCompletedAt", "lastRunId", "hitCount", "updatedAt")
-       VALUES ($1, $2, $3, NOW(), $4, 1, NOW())
+      `INSERT INTO "InsightsRefreshState" ("userId", "scope", "payloadHash", "lastCompletedAt", "lastRunId", "hitCount", "updatedAt", "status", "startedAt")
+       VALUES ($1, $2, $3, NOW(), $4, 1, NOW(), 'completed', NOW())
        ON CONFLICT ("userId", "scope")
        DO UPDATE SET "payloadHash" = EXCLUDED."payloadHash",
-                     "lastCompletedAt" = EXCLUDED."lastCompletedAt",
+                     "lastCompletedAt" = NOW(),
                      "lastRunId" = EXCLUDED."lastRunId",
                      "hitCount" = 1,
+                     "status" = 'completed',
                      "updatedAt" = NOW()`,
       options.userId,
       options.scope,
@@ -463,7 +586,7 @@ export async function recordTargetedRefreshState(options: {
       options.runId || null
     )
   } catch (error) {
-    console.warn('[targeted-refresh-idempotency] Failed to record refresh state', error)
+    console.warn('[targeted-refresh-idempotency] Failed to complete refresh state', error)
     throw error
   }
 }

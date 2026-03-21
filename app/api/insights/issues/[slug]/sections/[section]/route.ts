@@ -1,10 +1,21 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { getIssueSection, ISSUE_SECTION_ORDER, type IssueSectionKey, getCachedIssueSection } from '@/lib/insights/issue-engine'
+import {
+  getIssueSection,
+  ISSUE_SECTION_ORDER,
+  type IssueSectionKey,
+  getCachedIssueSection,
+  CURRENT_PIPELINE_VERSION,
+} from '@/lib/insights/issue-engine'
 import { checkInsightsStatus, getStatusMessage } from '@/lib/insights/regeneration-service'
 import { prisma } from '@/lib/prisma'
-import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
+import {
+  checkTargetedRefreshState,
+  clearTargetedRefreshState,
+  completeTargetedRefreshState,
+  recordTargetedRefreshState,
+} from '@/lib/insights/targeted-refresh-idempotency'
 
 export async function GET(
   _request: Request,
@@ -110,6 +121,10 @@ export async function POST(
         changeTypes: [],
         affectedSections: [sectionParam],
         targetIssueSlugs: [context.params.slug],
+        mode,
+        range,
+        pipelineVersion: CURRENT_PIPELINE_VERSION,
+        intent: 'section-force-refresh',
       })
 
       if (!refreshState.guardReady) {
@@ -141,6 +156,7 @@ export async function POST(
           userId: session.user.id,
           scope: refreshState.scope,
           payloadHash: refreshState.payloadHash,
+          status: 'pending',
         })
       } catch (error) {
         console.warn('[insights.api] Failed to lock section refresh safely', error)
@@ -165,7 +181,7 @@ export async function POST(
       
       // Start regeneration in background (non-blocking)
       // Return immediately so user sees progress bar
-      setTimeout(async () => {
+      const backgroundRefresh = (async () => {
         try {
           const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
             mode,
@@ -174,6 +190,11 @@ export async function POST(
           })
           // Mark as fresh after completion
           if (result) {
+            await completeTargetedRefreshState({
+              userId: session.user.id,
+              scope: refreshState.scope,
+              payloadHash: refreshState.payloadHash,
+            })
             try {
               await prisma.$executeRawUnsafe(`
                 INSERT INTO "InsightsMetadata" ("userId", "issueSlug", "section", "status", "dataFingerprint", "lastGeneratedAt", "updatedAt")
@@ -212,7 +233,9 @@ export async function POST(
             `, session.user.id, context.params.slug, sectionParam)
           } catch {}
         }
-      })
+      })()
+      const waitUntil = (globalThis as any).waitUntil || ((promise: Promise<unknown>) => promise.catch(() => {}))
+      waitUntil(backgroundRefresh)
       
       // Return immediately with current cached result (if available) or empty response
       const quickResult = await getIssueSection(session.user.id, context.params.slug, sectionParam, {

@@ -10,6 +10,7 @@
 - ✅ **Mar 21, 2026 spend-safety rule:** when Health Setup re-hydrates supplements or medications from server data, that hydration must not count as a fresh local edit. If hydration triggers auto-save again, it can loop into repeated paid Insights refreshes.
 - ✅ **Mar 21, 2026 spend-safety rule:** `/api/insights/regenerate-targeted` must keep a server-side cooldown and AI safety stop so one broken client loop cannot create runaway usage.
 - ✅ **Mar 21, 2026 spend-safety rule:** paid Insights refresh routes must refuse the same unchanged saved server state. If the user has not made a real saved change, `/api/insights/regenerate-targeted` and `/api/insights/regenerate` must not run again or charge again.
+- ✅ **Mar 21, 2026 spend-safety rule:** do not let quick cache warming or background section upgrades share the exact same same-state lock as a real paid refresh. The server must tell those paths apart so a lightweight warm-up cannot block a genuine user-triggered refresh.
 - ✅ **Insights LLM** is enabled (`ENABLE_INSIGHTS_LLM=true`).
 - 🚩 **Current live issue:** targeted regen intermittently returns `504 Gateway Timeout` (seen 6 Dec 2025 on Hair Loss). Do not claim success until sections show fresh data. When debugging, capture the `runId` and full response from `POST /api/insights/regenerate-targeted`.
 - 🚩 **Imperative task:** Implement per-step regeneration to always call the model (no cache reuse) and charge tokens every time for that step’s change types—no extra approval needed, but keep all guard rails intact.
