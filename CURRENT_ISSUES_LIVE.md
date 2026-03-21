@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-21 13:50 AEDT
+- What changed: Hardened the web Insights same-state safety rules so paid refreshes only run for real saved changes, quick warm-up paths no longer block real refreshes, failed background work no longer leaves a false finished lock behind, and full Insights now charges only after the refresh actually succeeds.
+- Where to see it (page/link): https://helfi.ai/onboarding, https://helfi.ai/insights, and issue sections such as https://helfi.ai/insights/issues/general-health/supplements
+- What to quickly test: Make one real onboarding change and confirm Insights updates once. Repeat the same request without changing anything and confirm it does not rerun or charge. Force-open an issue section again after no changes and confirm it keeps the current result instead of starting another paid refresh.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-21 13:14 AEDT
 - What changed: Added a server-side same-state stop for web Insights refreshes so unchanged saved data no longer reruns paid Insights work. Also made failed refresh attempts unlock properly for valid retries, covered hidden background section rebuild paths, and stopped unchanged supplements refreshes from looking like they were still running.
 - Where to see it (page/link): https://helfi.ai/onboarding, https://helfi.ai/insights, and issue sections such as https://helfi.ai/insights/issues/general-health/supplements
