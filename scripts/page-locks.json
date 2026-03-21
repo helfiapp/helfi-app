@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-20T07:04:38.000Z",
+  "generatedAt": "2026-03-21T01:04:50.317Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -115,7 +115,7 @@
     "app/notifications/page.tsx": "6a10926fef3bae803d135c7ceeaf9eb0246f25c59014ae5a02ae5dfa5a9e5722",
     "app/notifications/quiet-hours/page.tsx": "40a1cf111988ca95d5689c3195c56af9f82247ee75024c8ed051ecab43845c8f",
     "app/notifications/reminders/page.tsx": "1d7a8256c90d4e16039c92d3b4137e59155c8cce79b5460fe86a2225bb9e6853",
-    "app/onboarding/page.tsx": "2bcbae5981f3d095ab9c13d26322d5991e927d4ddb4073272ea942bd9376ef88",
+    "app/onboarding/page.tsx": "06133a50e83ece4b5e120c12854bd1c9ca6c64234f0765880c8f82eb17299342",
     "app/page.tsx": "ee2c3e604b5033f17d85f1f859984a9e5d8d4ff1920b98bb273fe214953a00fc",
     "app/practitioner/page.tsx": "b13223409894c5bc4cae52b37a1b181f9bce72967517f25ca649631276326b58",
     "app/practitioners/[slug]/layout.tsx": "387410273273ad940f5087f68bb1a43c77d83e808886bab627d34a73b44d11f9",
