@@ -42,6 +42,7 @@ import { authOptions } from '@/lib/auth'
 import { ISSUE_SECTION_ORDER, type IssueSectionKey, precomputeQuickSectionsForUser } from '@/lib/insights/issue-engine'
 import { getIssueSection } from '@/lib/insights/issue-engine'
 import { prisma } from '@/lib/prisma'
+import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
 
 // Lightweight fingerprint generator (mirrors logic in regeneration-service)
 function createDataFingerprint(data: any): string {
@@ -109,6 +110,43 @@ export async function POST(
     }
 
     const sections = ISSUE_SECTION_ORDER.filter((s) => s !== 'overview') as IssueSectionKey[]
+    const refreshState = await checkTargetedRefreshState({
+      userId: session.user.id,
+      changeTypes: [],
+      affectedSections: sections,
+      targetIssueSlugs: [context.params.slug],
+    })
+    if (!refreshState.guardReady) {
+      return NextResponse.json({
+        success: false,
+        safetyStop: true,
+        message: 'This refresh was paused because Helfi could not confirm whether anything changed.',
+      }, { status: 429 })
+    }
+
+    if (refreshState.shouldSkip) {
+      return NextResponse.json({
+        success: true,
+        skippedUnchanged: true,
+        sections: 0,
+        message: 'Nothing changed since the last refresh, so Helfi kept the current insights.',
+      }, { status: 200 })
+    }
+
+    try {
+      await recordTargetedRefreshState({
+        userId: session.user.id,
+        scope: refreshState.scope,
+        payloadHash: refreshState.payloadHash,
+      })
+    } catch (error) {
+      console.warn('[insights.api] Failed to lock regenerate-all safely', error)
+      return NextResponse.json({
+        success: false,
+        safetyStop: true,
+        message: 'This refresh was paused because Helfi could not lock it safely.',
+      }, { status: 429 })
+    }
     
     // Mark all sections as generating
     try {
@@ -180,6 +218,11 @@ export async function POST(
           throw new Error(`No result returned for ${section}`)
         }
       } catch (error) {
+        await clearTargetedRefreshState({
+          userId: session.user.id,
+          scope: refreshState.scope,
+          payloadHash: refreshState.payloadHash,
+        })
         console.error(`[insights.api] ❌ Failed to regenerate ${section}:`, error)
         // Mark as stale on error
         try {
@@ -209,4 +252,3 @@ export async function POST(
     return NextResponse.json({ error: 'Failed to start regeneration' }, { status: 500 })
   }
 }
-

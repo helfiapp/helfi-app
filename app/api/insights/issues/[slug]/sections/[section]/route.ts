@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { getIssueSection, ISSUE_SECTION_ORDER, type IssueSectionKey, getCachedIssueSection } from '@/lib/insights/issue-engine'
 import { checkInsightsStatus, getStatusMessage } from '@/lib/insights/regeneration-service'
 import { prisma } from '@/lib/prisma'
+import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
 
 export async function GET(
   _request: Request,
@@ -104,6 +105,51 @@ export async function POST(
 
     // If force refresh requested, skip cache and regenerate
     if (forceRefresh) {
+      const refreshState = await checkTargetedRefreshState({
+        userId: session.user.id,
+        changeTypes: [],
+        affectedSections: [sectionParam],
+        targetIssueSlugs: [context.params.slug],
+      })
+
+      if (!refreshState.guardReady) {
+        return NextResponse.json(
+          { error: 'Safety check paused', message: 'This refresh was paused because Helfi could not confirm whether anything changed.' },
+          { status: 429 }
+        )
+      }
+
+      if (refreshState.shouldSkip) {
+        const quickResult = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+          mode,
+          range,
+          force: false,
+        })
+
+        return NextResponse.json({
+          result: quickResult || null,
+          upgraded: false,
+          forceRefreshed: false,
+          skippedUnchanged: true,
+          generating: false,
+          message: 'Nothing changed since the last refresh, so Helfi kept the current insight.',
+        }, { status: 200 })
+      }
+
+      try {
+        await recordTargetedRefreshState({
+          userId: session.user.id,
+          scope: refreshState.scope,
+          payloadHash: refreshState.payloadHash,
+        })
+      } catch (error) {
+        console.warn('[insights.api] Failed to lock section refresh safely', error)
+        return NextResponse.json(
+          { error: 'Safety check paused', message: 'This refresh was paused because Helfi could not lock it safely.' },
+          { status: 429 }
+        )
+      }
+
       // Mark as generating in background (non-blocking)
       try {
         await prisma.$executeRawUnsafe(`
@@ -138,8 +184,25 @@ export async function POST(
             } catch (error) {
               console.warn('[insights.api] Failed to mark as fresh', error)
             }
+          } else {
+            await clearTargetedRefreshState({
+              userId: session.user.id,
+              scope: refreshState.scope,
+              payloadHash: refreshState.payloadHash,
+            })
+            try {
+              await prisma.$executeRawUnsafe(`
+                UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
+                WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
+              `, session.user.id, context.params.slug, sectionParam)
+            } catch {}
           }
         } catch (error) {
+          await clearTargetedRefreshState({
+            userId: session.user.id,
+            scope: refreshState.scope,
+            payloadHash: refreshState.payloadHash,
+          })
           console.error('[insights.api] Background regeneration failed', error)
           // Mark as stale on error so it can retry
           try {

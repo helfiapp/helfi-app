@@ -18,6 +18,7 @@ import { isSubscriptionActive } from '@/lib/subscription-utils'
 import { getCachedIssueSection } from '@/lib/insights/issue-engine'
 import { tryOpenCircuit } from '@/lib/safety-circuit'
 import { isAiSafetyError } from '@/lib/ai-safety'
+import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from '@/lib/insights/targeted-refresh-idempotency'
 
 // Keep runtime bounded so users get a faster response if regeneration is slow.
 export const maxDuration = 45
@@ -367,6 +368,62 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    const refreshState = await checkTargetedRefreshState({
+      userId: session.user.id,
+      changeTypes: effectiveChangeTypes,
+      affectedSections: affectedUnique,
+      targetIssueSlugs,
+    })
+    if (!refreshState.guardReady) {
+      console.warn('[insights.regenerate-targeted] refresh guard unavailable', {
+        runId,
+        userId: session.user.id,
+        changeTypes: effectiveChangeTypes,
+        affectedSections: affectedUnique,
+        targetIssueSlugs,
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          safetyStop: true,
+          message:
+            'Insights were paused by a safety check because Helfi could not confirm whether anything changed. No credits were used.',
+          runId,
+          llmStatus,
+        },
+        { status: 429 }
+      )
+    }
+    if (refreshState.shouldSkip) {
+      console.log('[insights.regenerate-targeted] skipped unchanged refresh', {
+        runId,
+        userId: session.user.id,
+        changeTypes: effectiveChangeTypes,
+        affectedSections: affectedUnique,
+        targetIssueSlugs,
+        hitCount: refreshState.hitCount,
+      })
+      return NextResponse.json(
+        {
+          success: true,
+          skippedUnchanged: true,
+          message: affectedUnique.includes('nutrition')
+            ? 'No new or changed food diary data was found, so your current nutrition insights were kept. No credits were used.'
+            : 'Nothing changed since your last insights update, so your current insights were kept. No credits were used.',
+          runId,
+          sectionsTriggered: [],
+          affectedSections: affectedUnique,
+          chargedCredits: 0,
+          subscriptionCreditsCharged: 0,
+          topUpCreditsCharged: 0,
+          costCents: 0,
+          usageEvents: 0,
+          llmStatus,
+        },
+        { status: 200 }
+      )
+    }
+
     const cooldownScope = `insights-targeted:${session.user.id}`
     const claimedCooldown = await tryOpenCircuit({
       scope: cooldownScope,
@@ -389,6 +446,32 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    try {
+      await recordTargetedRefreshState({
+        userId: session.user.id,
+        scope: refreshState.scope,
+        payloadHash: refreshState.payloadHash,
+        runId,
+      })
+    } catch (error) {
+      console.error('[insights.regenerate-targeted] failed to save guard state before refresh', {
+        runId,
+        userId: session.user.id,
+        error,
+      })
+      return NextResponse.json(
+        {
+          success: false,
+          safetyStop: true,
+          message:
+            'Insights were paused by a safety check because Helfi could not lock this refresh safely. No credits were used.',
+          runId,
+          llmStatus,
+        },
+        { status: 429 }
+      )
+    }
+
     const runContext: RunContext = {
       runId,
       feature: 'insights:targeted',
@@ -405,6 +488,13 @@ export async function POST(request: NextRequest) {
     })
 
     const preferQuickProfile = effectiveChangeTypes.length === 1 && effectiveChangeTypes[0] === 'profile'
+    const clearRefreshGuard = async () => {
+      await clearTargetedRefreshState({
+        userId: session.user.id,
+        scope: refreshState.scope,
+        payloadHash: refreshState.payloadHash,
+      })
+    }
 
     const finalizeCharge = async (overrideSections?: string[]) => {
       const sectionsForCharge =
@@ -453,6 +543,7 @@ export async function POST(request: NextRequest) {
         : { ...basePlan, capApplied: false }
 
       if (!allowViaFreeUse && !plan.canAfford) {
+        await clearRefreshGuard()
         return {
           success: false as const,
           status: 402 as const,
@@ -471,6 +562,7 @@ export async function POST(request: NextRequest) {
       }
 
       if (costCents === 0 || count === 0) {
+        await clearRefreshGuard()
         console.warn('[insights.regenerate-targeted] no usage recorded - returning no-charge success', {
           runId,
           userId: session.user.id,
@@ -508,6 +600,7 @@ export async function POST(request: NextRequest) {
         if (plan.totalCredits > 0) {
           const chargedOk = await cm.chargeSplitCredits(plan.subscriptionCredits, plan.topUpCredits)
           if (!chargedOk) {
+            await clearRefreshGuard()
             return {
               success: false as const,
               status: 402 as const,
@@ -590,6 +683,7 @@ export async function POST(request: NextRequest) {
       })
     } catch (error) {
       if (isAiSafetyError(error)) {
+        await clearRefreshGuard()
         console.error('[insights.regenerate-targeted] ai safety stop', { runId, error })
         return NextResponse.json(
           {
@@ -604,6 +698,7 @@ export async function POST(request: NextRequest) {
         )
       }
       if (error instanceof ManualRegenerationTimeoutError || (error as any)?.name === 'ManualRegenerationTimeoutError') {
+        await clearRefreshGuard()
         console.warn('[insights.regenerate-targeted] regeneration timed out - returning no-charge fallback', {
           runId,
           userId: session.user.id,
@@ -629,6 +724,7 @@ export async function POST(request: NextRequest) {
           { status: 200 }
         )
       }
+      await clearRefreshGuard()
       console.error('[insights.regenerate-targeted] regeneration failed', { runId, error })
       return NextResponse.json(
         {
@@ -644,6 +740,10 @@ export async function POST(request: NextRequest) {
     const chargeResult = await finalizeCharge(sections)
     if (!chargeResult.success) {
       return NextResponse.json(chargeResult.body, { status: chargeResult.status })
+    }
+
+    if ('noChargeReason' in chargeResult.body && chargeResult.body.noChargeReason) {
+      await clearRefreshGuard()
     }
 
     return NextResponse.json(

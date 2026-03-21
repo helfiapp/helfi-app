@@ -239,9 +239,18 @@ export default function SupplementsShell({ children, initialResult, issueSlug }:
         },
         body: JSON.stringify({ mode, range, force: true }),
       })
+      const data = await response.json().catch(() => null)
       
       if (!response.ok) {
-        throw new Error('Unable to start regeneration right now.')
+        throw new Error(data?.message || 'Unable to start regeneration right now.')
+      }
+
+      if (data?.skippedUnchanged) {
+        if (data.result) {
+          setResult(data.result)
+        }
+        setIsRegenerating(false)
+        return
       }
       
       // Note: We don't wait for completion here - the progress bar will poll for status

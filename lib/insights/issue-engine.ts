@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { isHealthSetupComplete } from '@/lib/health-setup-completion'
 import { getServerSession } from 'next-auth'
 import { generateSectionInsightsFromLLM, generateDegradedSection, generateDegradedSectionQuick, generateDegradedSectionQuickStrict, evaluateFocusItemsForIssue } from './llm'
+import { checkTargetedRefreshState, clearTargetedRefreshState, recordTargetedRefreshState } from './targeted-refresh-idempotency'
 
 const LANDING_PAYLOAD_TTL_MS = 30 * 1000
 const landingPayloadCache = new Map<
@@ -2447,31 +2448,114 @@ async function computeIssueSection(
     } catch {}
     // Background full build (non-blocking)
     if (!PAUSE_HEAVY) {
-      setImmediate(async () => {
-        try {
-          const context = await loadUserInsightContext(userId)
-          const full = await buildIssueSectionWithContext(context, slug, section, { mode, range: undefined, force: false })
-          if (full && shouldCacheSectionResult(full)) {
-            await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: full })
-          }
-        } catch (e) {
-          console.warn('[insights.build] background upgrade failed', e)
-        }
+      const backgroundRefreshState = await checkTargetedRefreshState({
+        userId,
+        changeTypes: [],
+        affectedSections: [section],
+        targetIssueSlugs: [slug],
       })
+
+      if (backgroundRefreshState.guardReady && !backgroundRefreshState.shouldSkip) {
+        try {
+          await recordTargetedRefreshState({
+            userId,
+            scope: backgroundRefreshState.scope,
+            payloadHash: backgroundRefreshState.payloadHash,
+          })
+
+          setImmediate(async () => {
+            try {
+              const context = await loadUserInsightContext(userId)
+              const full = await buildIssueSectionWithContext(context, slug, section, { mode, range: undefined, force: false })
+              if (full && shouldCacheSectionResult(full)) {
+                await upsertSectionCache({ userId, slug, section, mode, rangeKey, result: full })
+              } else {
+                await clearTargetedRefreshState({
+                  userId,
+                  scope: backgroundRefreshState.scope,
+                  payloadHash: backgroundRefreshState.payloadHash,
+                })
+              }
+            } catch (e) {
+              await clearTargetedRefreshState({
+                userId,
+                scope: backgroundRefreshState.scope,
+                payloadHash: backgroundRefreshState.payloadHash,
+              })
+              console.warn('[insights.build] background upgrade failed', e)
+            }
+          })
+        } catch {}
+      }
     }
     return quick
   }
 
   // Fallback to full build if quick path failed
-  console.time(`[insights.build] ${slug}/${section}`)
-  const context = await loadUserInsightContext(userId)
-  const built = await buildIssueSectionWithContext(context, slug, section, {
-    mode,
-    range: undefined,
-    force: false,
+  const fallbackRefreshState = await checkTargetedRefreshState({
+    userId,
+    changeTypes: [],
+    affectedSections: [section],
+    targetIssueSlugs: [slug],
   })
+
+  if (fallbackRefreshState.guardReady && fallbackRefreshState.shouldSkip && cached) {
+    const extrasIn = (cached.result.extras as Record<string, unknown> | undefined) ?? {}
+    return {
+      ...cached.result,
+      extras: {
+        ...extrasIn,
+        cacheHit: true,
+        staleFallback: true,
+        degradedUsed: !!extrasIn['degraded'],
+        firstByteMs: Date.now() - t0,
+        computeMs: 0,
+      },
+    }
+  }
+
+  let fallbackGuardLocked = false
+  if (fallbackRefreshState.guardReady && !fallbackRefreshState.shouldSkip) {
+    try {
+      await recordTargetedRefreshState({
+        userId,
+        scope: fallbackRefreshState.scope,
+        payloadHash: fallbackRefreshState.payloadHash,
+      })
+      fallbackGuardLocked = true
+    } catch {}
+  }
+
+  console.time(`[insights.build] ${slug}/${section}`)
+  let built: IssueSectionResult | null = null
+  try {
+    const context = await loadUserInsightContext(userId)
+    built = await buildIssueSectionWithContext(context, slug, section, {
+      mode,
+      range: undefined,
+      force: false,
+    })
+  } catch (error) {
+    if (fallbackGuardLocked) {
+      await clearTargetedRefreshState({
+        userId,
+        scope: fallbackRefreshState.scope,
+        payloadHash: fallbackRefreshState.payloadHash,
+      })
+    }
+    throw error
+  }
   console.timeEnd(`[insights.build] ${slug}/${section}`)
-  if (!built) return null
+  if (!built) {
+    if (fallbackGuardLocked) {
+      await clearTargetedRefreshState({
+        userId,
+        scope: fallbackRefreshState.scope,
+        payloadHash: fallbackRefreshState.payloadHash,
+      })
+    }
+    return null
+  }
   try {
     const firstByteMs = Date.now() - t0
     const extrasIn = (built.extras as Record<string, unknown> | undefined) ?? {}
