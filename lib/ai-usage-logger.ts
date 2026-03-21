@@ -105,10 +105,11 @@ export async function runChatCompletionWithLogging(
   const mergedContext: UsageContext = {
     ...context,
     feature: context.feature || asyncContext?.feature || 'unknown',
+    userId: context.userId ?? asyncContext?.meta?.userId ?? null,
     runId: context.runId ?? asyncContext?.runId ?? null,
   }
   try {
-    const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, params)
+    const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, params, mergedContext)
     const model = (completion as any)?.model || params?.model || 'unknown'
     logAiUsageEvent({
       ...mergedContext,

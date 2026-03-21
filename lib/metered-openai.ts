@@ -1,8 +1,15 @@
 import OpenAI from 'openai';
 import { costCentsForTokens, estimateTokensFromText } from './cost-meter';
 import { reportCriticalError } from '@/lib/error-reporter';
+import { assertAiUsageAllowed } from '@/lib/ai-safety';
+import { getRunContext } from './run-context';
 
 type CreateParams = Parameters<OpenAI['chat']['completions']['create']>[0];
+type AiCallContext = {
+  feature?: string | null
+  userId?: string | null
+  runId?: string | null
+}
 
 export type CompletionWithCost<T = any> = {
   completion: T;
@@ -38,8 +45,15 @@ function shouldReportCriticalOpenAIError(error: any): boolean {
  */
 export async function chatCompletionWithCost(
   openai: OpenAI,
-  params: CreateParams
+  params: CreateParams,
+  context: AiCallContext = {}
 ): Promise<CompletionWithCost<OpenAI.Chat.Completions.ChatCompletion>> {
+  const asyncContext = getRunContext()
+  const mergedContext: AiCallContext = {
+    feature: context.feature ?? asyncContext?.feature ?? null,
+    userId: context.userId ?? asyncContext?.meta?.userId ?? null,
+    runId: context.runId ?? asyncContext?.runId ?? null,
+  }
   const modelName = String((params as any).model || '').toLowerCase()
   const isGpt5Family = modelName.includes('gpt-5')
   const normalizedParams = (() => {
@@ -56,6 +70,7 @@ export async function chatCompletionWithCost(
     return next
   })()
   try {
+    await assertAiUsageAllowed(mergedContext)
     const completion = await openai.chat.completions.create({
       ...normalizedParams,
       stream: false,
@@ -128,8 +143,6 @@ function extractPromptText(messages: any[]): string {
     return '';
   }
 }
-
-
 
 
 

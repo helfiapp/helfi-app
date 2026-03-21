@@ -83,6 +83,41 @@ export async function openCircuit(options: { scope: string; minutes: number; rea
   }
 }
 
+export async function tryOpenCircuit(options: { scope: string; minutes: number; reason: string }) {
+  const safeScope = String(options.scope || '').trim()
+  if (!safeScope) return false
+
+  const minutesRaw = Number(options.minutes)
+  const minutes = Number.isFinite(minutesRaw) && minutesRaw > 0 ? minutesRaw : 5
+  const reason = String(options.reason || '').trim().slice(0, 500)
+  const openUntil = new Date(Date.now() + minutes * 60 * 1000)
+
+  await ensureCircuitTable()
+
+  try {
+    const rows: Array<{ scope: string }> = await prisma.$queryRawUnsafe(
+      `INSERT INTO SafetyCircuitBreaker (scope, openUntil, openedAt, reason, updatedAt)
+       VALUES ($1, $2, NOW(), $3, NOW())
+       ON CONFLICT (scope)
+       DO UPDATE SET openUntil = EXCLUDED.openUntil,
+                     openedAt = EXCLUDED.openedAt,
+                     reason = EXCLUDED.reason,
+                     updatedAt = NOW()
+       WHERE SafetyCircuitBreaker.openUntil IS NULL OR SafetyCircuitBreaker.openUntil <= NOW()
+       RETURNING scope`,
+      safeScope,
+      openUntil,
+      reason
+    )
+    return rows.length > 0
+  } catch (error) {
+    console.warn('[safety-circuit] Failed to claim circuit (non-blocking)', error)
+    return false
+  } finally {
+    cache.delete(safeScope)
+  }
+}
+
 export async function closeCircuit(scope: string) {
   const safeScope = String(scope || '').trim()
   if (!safeScope) return
@@ -103,4 +138,3 @@ export async function closeCircuit(scope: string) {
     cache.delete(safeScope)
   }
 }
-

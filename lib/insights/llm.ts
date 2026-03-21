@@ -1,6 +1,7 @@
 import { z } from 'zod'
 import { runChatCompletionWithLogging } from '../ai-usage-logger'
 import { getRunContext } from '../run-context'
+import { isAiSafetyError } from '../ai-safety'
 
 const CACHE_TTL_MS = 1000 * 60 * 30
 const INSIGHTS_LLM_ENABLED = (() => {
@@ -624,6 +625,7 @@ Items:\n${JSON.stringify(items, null, 2)}`
         explanation: typeof it.explanation === 'string' ? it.explanation : undefined,
       }))
   } catch (error) {
+    if (isAiSafetyError(error)) throw error
     console.warn('[insights.llm] classifyCandidatesForSection error', error)
     return null
   }
@@ -685,6 +687,7 @@ Items to rewrite:\n${JSON.stringify(items, null, 2)}`,
         .map((it: any) => ({ name: it.name, reason: it.reason }))
       return cleaned
     } catch (error) {
+      if (isAiSafetyError(error)) throw error
       console.warn('[insights.llm] rewriteCandidatesToDomain error', error)
     }
   }
@@ -756,6 +759,7 @@ ${diversityHint}`
       .filter((it: any) => it && typeof it.name === 'string' && typeof it.reason === 'string')
       .map((it: any) => ({ name: it.name, reason: it.reason, protocol: it.protocol ?? null }))
   } catch (error) {
+    if (isAiSafetyError(error)) throw error
     console.warn('[insights.llm] fillMissingItemsForSection error', error)
     return null
   }
@@ -869,6 +873,7 @@ Return JSON:
     }
     return out
   } catch (error) {
+    if (isAiSafetyError(error)) throw error
     console.warn('[insights.llm] evaluateFocusItemsForIssue error', error)
     return null
   }
@@ -1011,6 +1016,7 @@ Counts: suggested≥${minSuggested}, avoid≥${minAvoid}.`
     }
     return out
   } catch (error) {
+    if (isAiSafetyError(error)) throw error
     console.warn('[insights.llm] generateDegradedSection error', error)
     return null
   }
@@ -1082,6 +1088,7 @@ export async function generateDegradedSectionQuick(
       recommendations: [],
     }
   } catch (error) {
+    if (isAiSafetyError(error)) throw error
     console.warn('[insights.llm] generateDegradedSectionQuick error', error)
     return null
   }
@@ -1143,6 +1150,7 @@ export async function generateDegradedSectionQuickStrict(
       recommendations: [],
     }
   } catch (error) {
+    if (isAiSafetyError(error)) throw error
     console.warn('[insights.llm] generateDegradedSectionQuickStrict error', error)
     return null
   }
@@ -1306,6 +1314,7 @@ export async function generateSectionInsightsFromLLM(
         break
       }
     } catch (error) {
+      if (isAiSafetyError(error)) throw error
       console.error('[insights.llm] Failed to fetch LLM output', error)
     }
   }

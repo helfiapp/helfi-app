@@ -16,10 +16,12 @@ import { getInsightsLlmStatus } from '@/lib/insights/llm'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 import { getCachedIssueSection } from '@/lib/insights/issue-engine'
+import { tryOpenCircuit } from '@/lib/safety-circuit'
+import { isAiSafetyError } from '@/lib/ai-safety'
 
 // Keep runtime bounded so users get a faster response if regeneration is slow.
 export const maxDuration = 45
-const TARGETED_INSIGHTS_EMERGENCY_PAUSED = true
+const TARGETED_INSIGHTS_COOLDOWN_MINUTES = 2
 
 const VALID_CHANGE_TYPES = [
   'supplements',
@@ -253,21 +255,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (TARGETED_INSIGHTS_EMERGENCY_PAUSED) {
-      console.error('[insights.regenerate-targeted] emergency pause active', {
-        userId: session.user.id,
-      })
-      return NextResponse.json(
-        {
-          success: false,
-          paused: true,
-          message:
-            'Insights updates are temporarily paused while we stop a runaway usage issue. Your saved health data is safe.',
-        },
-        { status: 503 }
-      )
-    }
-
     const body = await request.json().catch(() => ({}))
     const changeTypesInput: unknown = body?.changeTypes
     const changeTypes = Array.isArray(changeTypesInput)
@@ -377,6 +364,28 @@ export async function POST(request: NextRequest) {
           llmStatus,
         },
         { status: 200 }
+      )
+    }
+
+    const cooldownScope = `insights-targeted:${session.user.id}`
+    const claimedCooldown = await tryOpenCircuit({
+      scope: cooldownScope,
+      minutes: TARGETED_INSIGHTS_COOLDOWN_MINUTES,
+      reason: 'Temporary cooldown to stop duplicate targeted insights refreshes.',
+    })
+    if (!claimedCooldown) {
+      return NextResponse.json(
+        {
+          success: false,
+          cooldown: true,
+          message:
+            'Insights are already updating or were refreshed moments ago. Please wait a couple of minutes before trying again.',
+          runId,
+          sectionsTriggered: [],
+          affectedSections: affectedUnique,
+          llmStatus,
+        },
+        { status: 429 }
       )
     }
 
@@ -580,6 +589,20 @@ export async function POST(request: NextRequest) {
         timeoutMs: NUTRITION_REGEN_TIMEOUT_MS,
       })
     } catch (error) {
+      if (isAiSafetyError(error)) {
+        console.error('[insights.regenerate-targeted] ai safety stop', { runId, error })
+        return NextResponse.json(
+          {
+            success: false,
+            safetyStop: true,
+            message:
+              'Insights were paused by a safety stop because usage started climbing too fast. Your saved data is still safe.',
+            runId,
+            llmStatus,
+          },
+          { status: 429 }
+        )
+      }
       if (error instanceof ManualRegenerationTimeoutError || (error as any)?.name === 'ManualRegenerationTimeoutError') {
         console.warn('[insights.regenerate-targeted] regeneration timed out - returning no-charge fallback', {
           runId,

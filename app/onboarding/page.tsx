@@ -5145,19 +5145,30 @@ function HealthSituationsStep({ onNext, onBack, initial, onPartialSave, onUnsave
 
 function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void, onPartialSave?: (data: any) => void }) {
   const [supplements, setSupplements] = useState(initial?.supplements || []);
+  const skipNextSupplementPartialSaveRef = useRef(false);
   
   // Fix data loading race condition - update supplements when initial data loads
   useEffect(() => {
     if (!initial?.supplements) return;
     setSupplements((prev: any[]) => {
       const next = dedupeItems(initial.supplements);
-      if (!Array.isArray(prev) || prev.length === 0) return next;
+      if (!Array.isArray(prev) || prev.length === 0) {
+        skipNextSupplementPartialSaveRef.current = true;
+        return next;
+      }
       if (next.length < prev.length) return prev;
-      if (!areItemsEquivalent(prev, next)) return next;
+      if (!areItemsEquivalent(prev, next)) {
+        skipNextSupplementPartialSaveRef.current = true;
+        return next;
+      }
       return prev;
     });
   }, [initial?.supplements]);
   useEffect(() => {
+    if (skipNextSupplementPartialSaveRef.current) {
+      skipNextSupplementPartialSaveRef.current = false;
+      return;
+    }
     if (onPartialSave) {
       onPartialSave({ supplements });
     }
@@ -6575,20 +6586,31 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
 
 function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequestAnalysis, onPartialSave }: { onNext: (data: any) => void, onBack: () => void, initial?: any, onNavigateToAnalysis?: (data?: any) => void, onRequestAnalysis?: () => void, onPartialSave?: (data: any) => void }) {
   const [medications, setMedications] = useState(initial?.medications || []);
+  const skipNextMedicationPartialSaveRef = useRef(false);
   
   // Fix data loading race condition - update medications when initial data loads
   useEffect(() => {
     if (!initial?.medications) return;
     setMedications((prev: any[]) => {
       const next = dedupeItems(initial.medications);
-      if (!Array.isArray(prev) || prev.length === 0) return next;
+      if (!Array.isArray(prev) || prev.length === 0) {
+        skipNextMedicationPartialSaveRef.current = true;
+        return next;
+      }
       if (next.length < prev.length) return prev;
-      if (!areItemsEquivalent(prev, next)) return next;
+      if (!areItemsEquivalent(prev, next)) {
+        skipNextMedicationPartialSaveRef.current = true;
+        return next;
+      }
       return prev;
     });
   }, [initial?.medications]);
 
   useEffect(() => {
+    if (skipNextMedicationPartialSaveRef.current) {
+      skipNextMedicationPartialSaveRef.current = false;
+      return;
+    }
     if (!onPartialSave) return;
     onPartialSave({ medications });
   }, [medications, onPartialSave]);

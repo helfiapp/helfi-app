@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import OpenAI from 'openai'
 
 import { authOptions } from '@/lib/auth'
+import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
+import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -35,38 +37,54 @@ async function resolveUserId(): Promise<string | null> {
   return null
 }
 
-const summarizeImage = async (client: OpenAI, file: File) => {
+const summarizeImage = async (client: OpenAI, file: File, userId: string) => {
   const imageBuffer = await file.arrayBuffer()
   const base64 = Buffer.from(imageBuffer).toString('base64')
-  const completion = await client.chat.completions.create({
-    model: process.env.HEALTH_JOURNAL_MEDIA_IMAGE_MODEL || 'gpt-4o-mini',
-    temperature: 0.2,
-    max_tokens: 140,
-    messages: [
-      {
-        role: 'system',
-        content:
-          'You write short practical health journal notes. Be factual and neutral. Keep it under two short sentences.',
-      },
-      {
-        role: 'user',
-        content: [
-          {
-            type: 'text',
-            text:
-              'Summarize useful health context from this photo for a weekly health report. Include visible text if present. Do not include private identifiers.',
-          },
-          {
-            type: 'image_url',
-            image_url: {
-              url: `data:${file.type || 'image/jpeg'};base64,${base64}`,
-              detail: 'low',
+  const completion: any = await runChatCompletionWithLogging(
+    client,
+    {
+      model: process.env.HEALTH_JOURNAL_MEDIA_IMAGE_MODEL || 'gpt-4o-mini',
+      temperature: 0.2,
+      max_tokens: 140,
+      messages: [
+        {
+          role: 'system',
+          content:
+            'You write short practical health journal notes. Be factual and neutral. Keep it under two short sentences.',
+        },
+        {
+          role: 'user',
+          content: [
+            {
+              type: 'text',
+              text:
+                'Summarize useful health context from this photo for a weekly health report. Include visible text if present. Do not include private identifiers.',
             },
-          },
-        ],
+            {
+              type: 'image_url',
+              image_url: {
+                url: `data:${file.type || 'image/jpeg'};base64,${base64}`,
+                detail: 'low',
+              },
+            },
+          ],
+        },
+      ],
+    } as any,
+    {
+      feature: 'health-journal:extract-image',
+      userId,
+      endpoint: '/api/health-journal/extract-media',
+    },
+    {
+      image: {
+        width: null,
+        height: null,
+        bytes: file.size,
+        mime: file.type || null,
       },
-    ],
-  } as any)
+    },
+  )
 
   return trimSummary(
     completion.choices?.[0]?.message?.content || '',
@@ -74,12 +92,25 @@ const summarizeImage = async (client: OpenAI, file: File) => {
   )
 }
 
-const transcribeAudio = async (client: OpenAI, file: File) => {
+const transcribeAudio = async (client: OpenAI, file: File, userId: string) => {
+  const model = process.env.HEALTH_JOURNAL_MEDIA_AUDIO_MODEL || 'gpt-4o-mini-transcribe'
   const response = await client.audio.transcriptions.create({
-    model: process.env.HEALTH_JOURNAL_MEDIA_AUDIO_MODEL || 'gpt-4o-mini-transcribe',
+    model,
     file,
     response_format: 'text',
   } as any)
+
+  await logAiUsageEvent({
+    feature: 'health-journal:extract-audio',
+    userId,
+    endpoint: '/api/health-journal/extract-media',
+    model,
+    promptTokens: 0,
+    completionTokens: 0,
+    costCents: 0,
+    success: true,
+    detail: 'audio transcription',
+  })
 
   const text = typeof response === 'string' ? response : (response as any)?.text || ''
   return trimSummary(text, 'Voice note analyzed for health journal context.')
@@ -134,12 +165,37 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: true, kind, summary: fallback, ai: false })
     }
 
+    await assertAiUsageAllowed({
+      feature: kind === 'image' ? 'health-journal:extract-image' : 'health-journal:extract-audio',
+      userId,
+    })
+
     const summary = kind === 'image'
-      ? await summarizeImage(openai, file)
-      : await transcribeAudio(openai, file)
+      ? await summarizeImage(openai, file, userId)
+      : await transcribeAudio(openai, file, userId)
 
     return NextResponse.json({ success: true, kind, summary, ai: true })
   } catch (error) {
+    if (isAiSafetyError(error)) {
+      return NextResponse.json(
+        { error: 'AI uploads are temporarily paused because usage climbed too fast. Please try again shortly.' },
+        { status: 429 },
+      )
+    }
+    const userId = await resolveUserId().catch(() => null)
+    if (userId) {
+      logAiUsageEvent({
+        feature: 'health-journal:extract-media',
+        userId,
+        endpoint: '/api/health-journal/extract-media',
+        model: 'unknown',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: 0,
+        success: false,
+        errorMessage: error instanceof Error ? error.message : 'unknown_error',
+      }).catch(() => {})
+    }
     console.error('[health-journal] media extraction error', error)
     return NextResponse.json({ error: 'Failed to analyze media' }, { status: 500 })
   }

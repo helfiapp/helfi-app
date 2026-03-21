@@ -71,6 +71,8 @@ If any of the above is touched, agent must read that full section first.
 - Leave the current per-step targeted update buttons as-is; do not change when the popup appears or how it blocks navigation.
 - Auto-update on exit must **re-arm** after new edits. If a user makes more changes later in the same session, background update must still run when they leave.
 - Background insights refresh must also trigger after a successful autosave (debounced) so users see the “Updating insights…” toast even if they stay on the page. Do not remove this fallback.
+- Mar 21, 2026 safety rule: server-hydrated supplements/medications data must **not** be treated as a fresh edit. If hydration writes local step state, the next partial-save must be skipped or it can re-trigger paid Insights refreshes in a loop.
+- Mar 21, 2026 safety rule: targeted Insights refresh must always keep a server-side cooldown plus AI spend stop. Do not remove those brakes unless the owner explicitly approves a replacement and it is tested with live logs first.
 - Pending request for the next agent (do not implement without explicit user approval): force per-step insights regeneration to always call the model and charge tokens (no cache reuse). Only the edited step’s change type should be regenerated; do NOT switch to full “regen all sections,” and keep the current guards/prompt behaviour intact.
 
 Restore steps if background updates stop after the first exit:
