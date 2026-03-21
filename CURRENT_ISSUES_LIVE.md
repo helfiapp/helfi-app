@@ -1,5 +1,40 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-21 12:17 AEDT
+- What changed: Fixed the real cause of the OpenAI spend spike in web onboarding by stopping server-hydrated supplements and medications from being treated like fresh edits, then added server-side AI safety brakes so repeat Insights refreshes and other web AI routes get paused before usage can run away again.
+- Where to see it (page/link): https://helfi.ai/onboarding and the web-only AI upload routes `/api/insights/regenerate-targeted`, `/api/health-journal/extract-media`, and `/api/mood/journal/extract-media`
+- What to quickly test: Make one supplements or medications change in onboarding and confirm it saves normally without repeated Insights bursts. Then try a normal health journal or mood journal image upload and confirm it still works.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-03-21 11:35 AEDT
+- What changed: Emergency web-only pause added to the targeted Insights refresh route so the repeated supplements and medications refresh loop stops hitting OpenAI while the root cause is investigated. Normal health data saving still stays on.
+- Where to see it (page/link): https://helfi.ai/onboarding and Insights refresh actions that use `/api/insights/regenerate-targeted`
+- What to quickly test: Save a health setup change and confirm the save still works, but the Insights refresh now shows a temporary pause message instead of running a new AI refresh.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-03-20 18:09 AEDT
+- What changed: Fixed the blood report delete failure by making the delete route clean up its linked records itself, letting batch delete continue past a single failed item, and clarifying that ticking a box means delete-only.
+- Where to see it (page/link): https://helfi.ai/onboarding?step=9
+- What to quickly test: Tick one or more previous reports and press Delete selected. Confirm completed reports disappear, any failed ones stay ticked with a message, and the page list refreshes.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-03-20 16:07 AEDT
+- What changed: Added a narrow delete flow for previous blood reports in onboarding so reports can be selected and removed safely, while still blocking reports that are still processing.
+- Where to see it (page/link): https://helfi.ai/onboarding?step=9
+- What to quickly test: Upload or use existing reports, tick one or more old reports, press Delete selected, and confirm the list refreshes. Also confirm a processing report cannot be deleted.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-03-20 15:14 AEDT
+- What changed: Fixed the lab report PDF processing crash by wiring the server-side PDF helper and worker correctly, converting the PDF input to the format the parser expects, and explicitly keeping the canvas package in the live server build.
+- Where to see it (page/link): https://helfi.ai/lab-reports and the blood results step in https://helfi.ai/onboarding?step=9
+- What to quickly test: Upload a normal unlocked PDF and make sure it processes. Then upload a password-protected PDF and make sure it asks for the password, processes, and no longer shows the JSON/HTML error.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-20 14:28 AEDT
 - What changed: Fixed the lab report upload flow so normal unlocked PDFs are no longer blocked by password-only consent rules. Password-protected PDFs still keep the extra password and consent checks.
 - Where to see it (page/link): https://helfi.ai/lab-reports
