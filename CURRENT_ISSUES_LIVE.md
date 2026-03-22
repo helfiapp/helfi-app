@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-22 12:07 AEDT
+- What changed: Restored missing legacy custom meals in Food Diary so old custom recipes show again in the Custom tab, stopped the hidden empty-diary reload from hijacking the real manual refresh path, and remembered the last Food Diary add/category tab state in the same browser session.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary -> Add from favorites -> Custom and confirm older custom meals appear again. Switch to Custom, leave Food Diary, come back, and confirm it stays on the same tab/category. On an empty today view, tap refresh and confirm it works straight away.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-21 13:50 AEDT
 - What changed: Hardened the web Insights same-state safety rules so paid refreshes only run for real saved changes, quick warm-up paths no longer block real refreshes, failed background work no longer leaves a false finished lock behind, and full Insights now charges only after the refresh actually succeeds.
 - Where to see it (page/link): https://helfi.ai/onboarding, https://helfi.ai/insights, and issue sections such as https://helfi.ai/insights/issues/general-health/supplements
