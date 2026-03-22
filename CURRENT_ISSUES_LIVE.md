@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-23 00:14 AEDT
+- What changed: Removed the Food Diary banner text under the date selector on the web app so the page no longer says “Take a photo of your meal or snack and let AI analyze it.”
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open the web Food Diary and confirm the banner text is gone and the Add Food Entry button now sits directly under the date selector.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-22 12:31 AEDT
 - What changed: Tightened the Food Diary warm-return behavior so the top energy summary circles stay visible when coming back to the same Food Diary screen, instead of briefly reloading first.
 - Where to see it (page/link): https://helfi.ai/food
