@@ -3179,14 +3179,29 @@ export default function FoodDiary() {
   const filterEntriesForDate = (entries: any[] | null | undefined, targetDate: string) =>
     Array.isArray(entries) ? entries.filter((entry) => entryMatchesDate(entry, targetDate)) : []
   const initialWarmFoods = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : []
+  const initialWarmFoodsForDate = filterEntriesForDate(initialWarmFoods, initialSelectedDate)
+  const hasInitialWarmResumeForSelectedDate =
+    typeof warmDiaryState?.selectedDate === 'string' &&
+    warmDiaryState.selectedDate.length >= 8 &&
+    warmDiaryState.selectedDate === initialSelectedDate
   const initialPersistedFoods = Array.isArray(persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries)
     ? (persistentDiarySnapshot?.byDate?.[initialSelectedDate]?.entries as any[])
     : []
   const initialUserFoodsForDate = filterEntriesForDate((userData as any)?.todaysFoods, initialSelectedDate)
+  const initialSummaryEntriesForDate = (() => {
+    return (
+      initialWarmFoodsForDate.length > 0
+        ? initialWarmFoodsForDate
+        : initialPersistedFoods.length > 0
+        ? initialPersistedFoods
+        : initialUserFoodsForDate
+    )
+  })()
   const hasInitialDiarySnapshotData =
-    initialWarmFoods.length > 0 ||
+    initialWarmFoodsForDate.length > 0 ||
     initialPersistedFoods.length > 0 ||
     initialUserFoodsForDate.length > 0
+  const hasInitialDiaryContinuity = hasInitialDiarySnapshotData || hasInitialWarmResumeForSelectedDate
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [todaysFoods, setTodaysFoods] = useState<any[]>(() => {
     const warm = Array.isArray(warmDiaryState?.todaysFoods) ? warmDiaryState.todaysFoods : null
@@ -3457,11 +3472,11 @@ export default function FoodDiary() {
 
   // New loading state
   const [foodDiaryLoaded, setFoodDiaryLoaded] = useState(() => {
-    if (hasInitialDiarySnapshotData) return true
+    if (hasInitialDiaryContinuity) return true
     return Array.isArray((userData as any)?.todaysFoods)
   })
   const [diaryHydrated, setDiaryHydrated] = useState<boolean>(() => {
-    if (hasInitialDiarySnapshotData) return true
+    if (hasInitialDiaryContinuity) return true
     return false
   })
   const [expandedItemIndex, setExpandedItemIndex] = useState<number | null>(null)
@@ -3860,7 +3875,7 @@ export default function FoodDiary() {
   const latestTodaysFoodsRef = useRef<any[]>([])
   const latestHistoryFoodsRef = useRef<any[] | null>(null)
   const diaryHydrationRef = useRef<Record<string, { hydrated: boolean; verified: boolean }>>(
-    hasInitialDiarySnapshotData && initialSelectedDate
+    hasInitialDiaryContinuity && initialSelectedDate
       ? { [initialSelectedDate]: { hydrated: true, verified: false } }
       : {},
   )
@@ -8785,8 +8800,10 @@ const applyStructuredItems = (
     localSnapshotEntriesForSelectedDate.length > 0 ||
     todaysCacheEntriesForSelectedDate.length > 0
   const summaryReady = useMemo(() => {
+    const isWarmResumeForSelectedDate = hasInitialWarmResumeForSelectedDate && selectedDate === initialSelectedDate
     if (isViewingToday) {
       if (sourceEntries.length > 0) return true
+      if (isWarmResumeForSelectedDate && foodDiaryLoaded) return true
       return (
         isDiaryHydrated(selectedDate) &&
         (
@@ -8795,6 +8812,7 @@ const applyStructuredItems = (
         )
       )
     }
+    if (isWarmResumeForSelectedDate && foodDiaryLoaded) return true
     if (hasCachedEntriesForSelectedDate) return true
     if (historyFoodsDate === selectedDate && Array.isArray(historyFoods)) return true
     if (historyFoodsDate !== selectedDate) return false
@@ -8802,6 +8820,8 @@ const applyStructuredItems = (
   }, [
     isViewingToday,
     selectedDate,
+    initialSelectedDate,
+    hasInitialWarmResumeForSelectedDate,
     sourceEntries.length,
     todayFetchSucceededForSelectedDate,
     foodDiaryLoaded,
@@ -8814,7 +8834,7 @@ const applyStructuredItems = (
   // SEVERE LOCK (Desktop summary continuity):
   // Keep the last stable summary entries visible while the next date is loading.
   // Do not remove this fallback unless guard rails are updated and explicitly approved.
-  const [lastStableSummaryEntries, setLastStableSummaryEntries] = useState<any[]>([])
+  const [lastStableSummaryEntries, setLastStableSummaryEntries] = useState<any[]>(() => initialSummaryEntriesForDate)
   useEffect(() => {
     if (!summaryReady) return
     setLastStableSummaryEntries(sourceEntries)
