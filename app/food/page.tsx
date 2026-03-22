@@ -22025,15 +22025,6 @@ Please add nutritional information manually if needed.`);
           }
         >
         
-        {/* Instruction Text - Hidden during edit mode */}
-        {!isAnalysisRoute && !isEditingDescription && !editingEntry && (
-        <div className="mb-6 text-center">
-          <p className="text-lg text-gray-600 font-normal">
-            📸 Take a photo of your meal or snack and let AI analyze it!
-          </p>
-        </div>
-        )}
-
         {historySaveError && (
           <div className="mb-4 rounded-lg border border-amber-300 bg-amber-50 text-amber-800 px-4 py-3 text-sm flex items-center justify-between gap-3">
             <span className="flex-1">{historySaveError}</span>
