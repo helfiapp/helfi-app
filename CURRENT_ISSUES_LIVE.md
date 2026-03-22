@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-03-22 12:31 AEDT
+- What changed: Tightened the Food Diary warm-return behavior so the top energy summary circles stay visible when coming back to the same Food Diary screen, instead of briefly reloading first.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary, go to another page, come back, and confirm the top energy summary circles are there straight away without that brief reload.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-22 12:07 AEDT
 - What changed: Restored missing legacy custom meals in Food Diary so old custom recipes show again in the Custom tab, stopped the hidden empty-diary reload from hijacking the real manual refresh path, and remembered the last Food Diary add/category tab state in the same browser session.
 - Where to see it (page/link): https://helfi.ai/food
