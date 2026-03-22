@@ -895,6 +895,8 @@ type WarmDiaryState = {
   todaysFoods?: any[]
   historyByDate?: Record<string, any[]>
   expandedCategories?: Record<string, boolean>
+  selectedAddCategory?: string
+  favoritesActiveTab?: 'all' | 'favorites' | 'custom'
 }
 
 const readWarmDiaryState = (): WarmDiaryState | null => {
@@ -3334,7 +3336,12 @@ export default function FoodDiary() {
     })
     return { map: next, changed }
   }
-  const [selectedAddCategory, setSelectedAddCategory] = useState<typeof MEAL_CATEGORY_ORDER[number]>('uncategorized')
+  const [selectedAddCategory, setSelectedAddCategory] = useState<typeof MEAL_CATEGORY_ORDER[number]>(() => {
+    const warmCategory = normalizeCategory(warmDiaryState?.selectedAddCategory || '')
+    return (MEAL_CATEGORY_ORDER.includes(warmCategory as any)
+      ? warmCategory
+      : 'uncategorized') as typeof MEAL_CATEGORY_ORDER[number]
+  })
   const [showCategoryPicker, setShowCategoryPicker] = useState(false)
   const [showAddIngredientModal, setShowAddIngredientModal] = useState<boolean>(false)
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
@@ -3514,7 +3521,10 @@ export default function FoodDiary() {
   const swipeClickBlockRef = useRef<Record<string, boolean>>({})
   const favoriteSwipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const favoriteClickBlockRef = useRef<Record<string, boolean>>({})
-  const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>('all')
+  const [favoritesActiveTab, setFavoritesActiveTab] = useState<'all' | 'favorites' | 'custom'>(() => {
+    const warmTab = warmDiaryState?.favoritesActiveTab
+    return warmTab === 'favorites' || warmTab === 'custom' ? warmTab : 'all'
+  })
   const [favoritesSearch, setFavoritesSearch] = useState('')
   const [favoritesAllServerEntries, setFavoritesAllServerEntries] = useState<any[] | null>(
     () => (initialFavoritesAllSnapshot && initialFavoritesAllSnapshot.length > 0 ? initialFavoritesAllSnapshot : null),
@@ -9109,6 +9119,8 @@ const applyStructuredItems = (
         selectedDate,
         todaysFoods,
         expandedCategories: collapseEmptyCategories(expandedCategories, sourceEntries).map,
+        selectedAddCategory,
+        favoritesActiveTab,
       }
       if (historyForDate.length > 0) {
         payload.historyByDate = { [selectedDate]: historyForDate }
@@ -9117,7 +9129,7 @@ const applyStructuredItems = (
     } catch (err) {
       console.warn('Could not cache warm diary state', err)
     }
-  }, [selectedDate, todaysFoods, historyFoods, expandedCategories])
+  }, [selectedDate, todaysFoods, historyFoods, expandedCategories, selectedAddCategory, favoritesActiveTab])
 
   // Persist a durable snapshot per date to avoid reload flicker across navigations.
   // SEVERE GUARD RAIL: Do not let this write loop depend on snapshot state.
@@ -9240,6 +9252,7 @@ const applyStructuredItems = (
       { fallbackDate: targetDate },
     )
     const hasLocal = localBaseline.length > 0
+    let restoredFromLocal = hasLocal
 
     const applyBaseline = (entries: any[]) => {
       if (!entries || entries.length === 0) return false
@@ -9282,16 +9295,18 @@ const applyStructuredItems = (
         setFoodDiaryLoaded(true)
       } else {
         const loadedFromCache = hydrateFromCache()
+        restoredFromLocal = loadedFromCache
         if (!loadedFromCache) {
           refreshEntriesFromServer()
         }
       }
       markDiaryHydrated(targetDate)
     } else if (hasLocal && !foodDiaryLoaded) {
+      restoredFromLocal = true
       setFoodDiaryLoaded(true)
     }
 
-    if (!isDiaryVerified(targetDate)) {
+    if (!isDiaryVerified(targetDate) && !restoredFromLocal) {
       const holdRemaining = getVerifyMergeHoldRemaining(targetDate)
       if (holdRemaining > 0) {
         scheduleVerifyMergeForDate(targetDate, holdRemaining + 50, () => {
@@ -10229,7 +10244,7 @@ const applyStructuredItems = (
     if (todayServerFetchRef.current[selectedDate]) return
     todayServerFetchRef.current[selectedDate] = true
     todayServerFetchAttemptAtRef.current[selectedDate] = Date.now()
-    refreshEntriesFromServer({ mode: 'manual' })
+    refreshEntriesFromServer({ mode: 'verify' })
   }, [
     isViewingToday,
     selectedDate,
@@ -14740,6 +14755,7 @@ Please add nutritional information manually if needed.`);
     // - usda:12345:1734567890123
     // - openfoodfacts:0123456789:1734567890123
     if (/^(openfoodfacts|usda|fatsecret):[^:]+:\d{9,}$/i.test(id)) return true
+    if (/^ai:\d{9,}:[0-9a-f]+$/i.test(id)) return true
     // Build-a-meal editor assigns local ids like: edit:1734567890123:deadbeef
     if (/^edit:\d{9,}:[0-9a-f]+$/i.test(id)) return true
     return false
@@ -14854,6 +14870,8 @@ Please add nutritional information manually if needed.`);
     if ((fav as any)?.customMeal === true) return true
     const method = String((fav as any)?.method || '').toLowerCase()
     if (method === 'meal-builder' || method === 'combined') return true
+    // Display old builder meals in Custom without silently rewriting server data on load.
+    if (isLegacyMealBuilderFavorite(fav)) return true
     return false
   }
 
