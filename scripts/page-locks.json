@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-22T01:04:00.000Z",
+  "generatedAt": "2026-03-28T00:06:00.000Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -151,7 +151,7 @@
     "components/FeatureUsageDisplay.tsx": "5d79f9a08554f9a3c43b773be6e156105d5e1b484004e56902ddc8bb9dca3a97",
     "components/food/DailyMacroSummary.tsx": "c13d73ba93ac3c0dbf639b35f60df116152b00dcd4b3b73e3a1d3325553fa160",
     "components/food/MissingFoodReport.tsx": "507d0d0178a7eacc7d6d0b397a28caf14d9864e2e923f90c88fe1094e2d0933b",
-    "components/food/RecommendedIngredientCard.tsx": "a9174d8131563517a06857d94484779843bb4e01938288373b02926c506ff4ba",
+    "components/food/RecommendedIngredientCard.tsx": "434bdb9aeed6605f7f61ab989e1a0279dc6bf772c006f5a631bfa6a533c6dc8c",
     "components/food/RollerTimePicker.tsx": "a3322deac0e0cc00277d4e9b23ec31e6b30b6ace63de5c9aee258b986ae5332f",
     "components/HeroCarousel.tsx": "b123bff4a32765bee481c75bf6a033a6db0cc1b970a53137068d6bdb3ed7d4dd",
     "components/InsightMoreInfo.tsx": "689843884c9060c2463b30227e2b8a690da8bd523452507746aabf6c2737d02a",
