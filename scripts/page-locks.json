@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-03-28T00:06:00.000Z",
+  "generatedAt": "2026-04-06T06:52:00.000Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -151,7 +151,7 @@
     "components/FeatureUsageDisplay.tsx": "5d79f9a08554f9a3c43b773be6e156105d5e1b484004e56902ddc8bb9dca3a97",
     "components/food/DailyMacroSummary.tsx": "c13d73ba93ac3c0dbf639b35f60df116152b00dcd4b3b73e3a1d3325553fa160",
     "components/food/MissingFoodReport.tsx": "507d0d0178a7eacc7d6d0b397a28caf14d9864e2e923f90c88fe1094e2d0933b",
-    "components/food/RecommendedIngredientCard.tsx": "434bdb9aeed6605f7f61ab989e1a0279dc6bf772c006f5a631bfa6a533c6dc8c",
+    "components/food/RecommendedIngredientCard.tsx": "bb8abad28ca852c611f44f5ba9844bef64dfe466a566680b96e0dcde3b3f6d0b",
     "components/food/RollerTimePicker.tsx": "a3322deac0e0cc00277d4e9b23ec31e6b30b6ace63de5c9aee258b986ae5332f",
     "components/HeroCarousel.tsx": "b123bff4a32765bee481c75bf6a033a6db0cc1b970a53137068d6bdb3ed7d4dd",
     "components/InsightMoreInfo.tsx": "689843884c9060c2463b30227e2b8a690da8bd523452507746aabf6c2737d02a",
@@ -198,7 +198,7 @@
     "native/src/config.ts": "81cfdb7a722c7b073eff5b1519268f6555fb0867f0737da0318b16810a43c7e6",
     "native/src/config/nativePageRoutes.ts": "5ec02b07d9bf1fbf68a1b219bb50d2cee28ddab54f3378080d47c802766695d9",
     "native/src/content/legal.ts": "074743b2e9abe59d8e1fbf584de80b0291e272f922d72ae168d5e99409e629f5",
-    "native/src/data/produceMeasurements.ts": "9acaaec07e0c8946b9fa5f4f4e6f7baec9bb6cb76f5dbf8116f8997afaf58377",
+    "native/src/data/produceMeasurements.ts": "1c0985f90c573a5e84084497aa08e59354a67f6392c5c7127acf3bbac0470a13",
     "native/src/health/appleHealth.ts": "7693a10e0e0471c5e16ed53274659c9dfdb56a4622cb693352eb4609350ddd1b",
     "native/src/lib/inAppPurchase.ts": "cab83ab9ae0780c458ba287fd3605d8cfcb49c0e6afa5f02edf70d1df8c64eea",
     "native/src/lib/nativeAuthHeaders.ts": "8b6a8a2b33b95d497a4d7bab4fe9003ea91db6a6a3c78bcd80ce63bb6f1dbdf9",
@@ -209,7 +209,7 @@
     "native/src/navigation/MainTabs.tsx": "bdb43d659cc0039458f94066e6b5b3c9bd528f7febc76c637a030a7c4c605e67",
     "native/src/navigation/RootNavigator.tsx": "dec7211b6ae3fdc60e3d3d36175b9cbb58bae86ae3c8c0e4eca7730841b5ce5a",
     "native/src/screens/AccountSettingsScreen.tsx": "3f592e94a1b1252068b44329bc3e4acd42030d72bd0f53462b7cf976e7047b0d",
-    "native/src/screens/AddIngredientScreen.tsx": "0ca0e783970cd9188563f2f7c0abe9be1fa44220ea3d687cd7545bcc5539485e",
+    "native/src/screens/AddIngredientScreen.tsx": "66f74c8ff1db963ff7e593f50eb4522ddf1899387dab771101136df32ee8a33e",
     "native/src/screens/AnimatedSplashScreen.tsx": "e031b5bb187bc228d9b65144757338bc8c793588751948d8044f43d2a50c8682",
     "native/src/screens/BillingScreen.tsx": "42ed0af32fb1dfbc2bea3f8c71549ae8fb32c92e2f35270bd42cde3cc64e53e0",
     "native/src/screens/DailyCheckInScreen.tsx": "fc8e9b6da314e7252505debd13c5724493a06cefbd3d24142d66d0a4d6d0e1e1",
