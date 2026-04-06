@@ -316,14 +316,42 @@ const buildDairySemiSolidUnitGrams = (entry: (typeof DAIRY_SEMI_SOLID_MEASUREMEN
 
 const toUnitValue = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : undefined)
 
+const explicitPieceExtraLarge = (entry: { piece_extra_large_g?: number | null }) =>
+  toUnitValue(entry.piece_extra_large_g ?? null)
+
+const getProducePieceLabel = (unit: BuilderUnit, produceName: string) => {
+  if (/\bwatermelon\b/.test(produceName)) {
+    if (unit === 'piece-small') return '1/8 watermelon'
+    if (unit === 'piece-medium') return '1/4 watermelon'
+    if (unit === 'piece-large') return '1/2 watermelon'
+    if (unit === 'piece-extra-large') return '1 watermelon'
+  }
+  if (unit === 'piece-small') return produceName ? `small ${produceName}` : 'small piece'
+  if (unit === 'piece-medium') return produceName ? `medium ${produceName}` : 'medium piece'
+  if (unit === 'piece-large') return produceName ? `large ${produceName}` : 'large piece'
+  return produceName ? `extra large ${produceName}` : 'extra large piece'
+}
+
 const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): FoodUnitGrams => {
   const small = toUnitValue(entry.piece_small_g)
   const medium = toUnitValue(entry.piece_medium_g)
   const large = toUnitValue(entry.piece_large_g)
-  let extraLarge: number | null = null
-  if (Number.isFinite(Number(large)) && Number.isFinite(Number(medium)) && Number(large) > 0 && Number(medium) > 0) {
+  let extraLarge: number | null = explicitPieceExtraLarge(entry) ?? null
+  if (
+    !Number.isFinite(Number(extraLarge)) &&
+    Number.isFinite(Number(large)) &&
+    Number.isFinite(Number(medium)) &&
+    Number(large) > 0 &&
+    Number(medium) > 0
+  ) {
     extraLarge = Number(large) + (Number(large) - Number(medium))
-  } else if (Number.isFinite(Number(large)) && Number.isFinite(Number(small)) && Number(large) > 0 && Number(small) > 0) {
+  } else if (
+    !Number.isFinite(Number(extraLarge)) &&
+    Number.isFinite(Number(large)) &&
+    Number.isFinite(Number(small)) &&
+    Number(large) > 0 &&
+    Number(small) > 0
+  ) {
     extraLarge = Number(large) + (Number(large) - Number(small)) / 2
   }
   return {
@@ -551,10 +579,10 @@ const formatUnitLabel = (unit: BuilderUnit, name: string, pieceGrams?: number | 
     if (pieceGrams && pieceGrams > 0) return `piece — ${Math.round(pieceGrams * 10) / 10}g`
     return 'piece'
   }
-  if (unit === 'piece-small') return `${produceName ? `small ${produceName}` : 'small piece'} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-small']) * 10) / 10}g`
-  if (unit === 'piece-medium') return `${produceName ? `medium ${produceName}` : 'medium piece'} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-medium']) * 10) / 10}g`
-  if (unit === 'piece-large') return `${produceName ? `large ${produceName}` : 'large piece'} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-large']) * 10) / 10}g`
-  if (unit === 'piece-extra-large') return `${produceName ? `extra large ${produceName}` : 'extra large piece'} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-extra-large']) * 10) / 10}g`
+  if (unit === 'piece-small') return `${getProducePieceLabel(unit, produceName)} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-small']) * 10) / 10}g`
+  if (unit === 'piece-medium') return `${getProducePieceLabel(unit, produceName)} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-medium']) * 10) / 10}g`
+  if (unit === 'piece-large') return `${getProducePieceLabel(unit, produceName)} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-large']) * 10) / 10}g`
+  if (unit === 'piece-extra-large') return `${getProducePieceLabel(unit, produceName)} — ${Math.round((Number(unitValue) || UNIT_GRAMS['piece-extra-large']) * 10) / 10}g`
   return unit
 }
 

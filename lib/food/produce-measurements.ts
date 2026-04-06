@@ -14,6 +14,7 @@ export type ProduceMeasurement = {
   piece_small_g: number | null;
   piece_medium_g: number | null;
   piece_large_g: number | null;
+  piece_extra_large_g?: number | null;
 };
 
 export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
@@ -1492,9 +1493,10 @@ export const PRODUCE_MEASUREMENTS: ProduceMeasurement[] = [
     "quarter_cup_cooked_g": 40,
     "half_cup_cooked_g": 80,
     "three_quarter_cup_cooked_g": 120,
-    "piece_small_g": 400,
-    "piece_medium_g": 700,
-    "piece_large_g": 1000
+    "piece_small_g": 564.8,
+    "piece_medium_g": 1129.5,
+    "piece_large_g": 2259,
+    "piece_extra_large_g": 4518
   },
   {
     "food": "Yuzu",

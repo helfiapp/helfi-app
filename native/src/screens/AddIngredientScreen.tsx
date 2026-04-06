@@ -3,6 +3,7 @@ import * as ImagePicker from 'expo-image-picker'
 import {
   ActivityIndicator,
   Alert,
+  Dimensions,
   Image,
   Modal,
   Pressable,
@@ -23,7 +24,7 @@ import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 
 type SearchKind = 'packaged' | 'single'
-type SearchSource = 'auto' | 'usda' | 'openfoodfacts'
+type SearchSource = 'auto'
 
 type SearchFoodItem = {
   id: string | number
@@ -65,7 +66,6 @@ type AdjustUnit =
   | 'cup'
   | 'pinch'
 type BaseServing = { amount: number; unit: 'g' | 'ml' | 'oz' } | null
-type DynamicServingUnit = { unit: AdjustUnit; label: string; grams: number }
 type ServingOption = {
   id: string
   label?: string
@@ -118,8 +118,22 @@ function safeNumber(value: any) {
   return n
 }
 
+function sameNumber(a: any, b: any) {
+  if (a === null || a === undefined) return b === null || b === undefined
+  if (b === null || b === undefined) return false
+  return Number(a) === Number(b)
+}
+
 function is100gServing(label?: string | null) {
   return /\b100\s*g\b/i.test(String(label || ''))
+}
+
+function parseServingGrams(label?: string | null) {
+  const raw = String(label || '').toLowerCase()
+  const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
+  if (!match) return null
+  const grams = Number(match[1])
+  return Number.isFinite(grams) ? grams : null
 }
 
 function roundTo(value: number, decimals = 2) {
@@ -257,6 +271,23 @@ function safeNum(value: any) {
   return num
 }
 
+function explicitPieceExtraLarge(produce: { piece_extra_large_g?: number | null }) {
+  return safeNum(produce?.piece_extra_large_g)
+}
+
+function producePieceLabel(unit: AdjustUnit, produceName: string) {
+  if (/\bwatermelon\b/.test(produceName)) {
+    if (unit === 'piece-small') return '1/8 watermelon'
+    if (unit === 'piece-medium') return '1/4 watermelon'
+    if (unit === 'piece-large') return '1/2 watermelon'
+    if (unit === 'piece-extra-large') return '1 watermelon'
+  }
+  if (unit === 'piece-small') return produceName ? `small ${produceName}` : 'small piece'
+  if (unit === 'piece-medium') return produceName ? `medium ${produceName}` : 'medium piece'
+  if (unit === 'piece-large') return produceName ? `large ${produceName}` : 'large piece'
+  return produceName ? `extra large ${produceName}` : 'extra large piece'
+}
+
 type ProduceAlias = {
   tokens: string[]
   entryIndex: number
@@ -357,6 +388,8 @@ function getFoodUnitGrams(name: string | null | undefined): FoodUnitGrams {
   const medium = safeNum((produce as any).piece_medium_g)
   const large = safeNum((produce as any).piece_large_g)
   const extraLarge = (() => {
+    const explicit = explicitPieceExtraLarge(produce as any)
+    if (explicit && explicit > 0) return explicit
     if (large && medium) return large + (large - medium)
     if (large && small) return large + (large - small) / 2
     return null
@@ -387,42 +420,6 @@ function resolveUnitGrams(unit: AdjustUnit, foodUnitGrams: FoodUnitGrams) {
   const override = Number(foodUnitGrams?.[unit])
   if (Number.isFinite(override) && override > 0) return override
   return STATIC_UNIT_GRAMS[unit]
-}
-
-function extractServingLabel(option: any) {
-  return String(option?.label || option?.serving_size || '').trim()
-}
-
-function extractServingGrams(option: any) {
-  const direct = Number(option?.grams)
-  if (Number.isFinite(direct) && direct > 0) return direct
-  const fromLabel = extractServingLabel(option).match(/(\d+(?:\.\d+)?)\s*g\b/i)
-  if (fromLabel) {
-    const grams = Number(fromLabel[1])
-    if (Number.isFinite(grams) && grams > 0) return grams
-  }
-  return null
-}
-
-function inferUnitFromServingLabel(label: string): AdjustUnit | null {
-  const lower = label.toLowerCase()
-  const isEgg = /\begg\b/.test(lower)
-  if (/extra\s*large/.test(lower)) return isEgg ? 'egg-extra-large' : 'piece-extra-large'
-  if (/\blarge\b/.test(lower)) return isEgg ? 'egg-large' : 'piece-large'
-  if (/\bmedium\b/.test(lower)) return isEgg ? 'egg-medium' : 'piece-medium'
-  if (/\bsmall\b/.test(lower)) return isEgg ? 'egg-small' : 'piece-small'
-  if (/1\s*\/\s*4/.test(lower) || /\bquarter\b/.test(lower)) return 'quarter-cup'
-  if (/1\s*\/\s*2/.test(lower) || /\bhalf\b/.test(lower)) return 'half-cup'
-  if (/3\s*\/\s*4/.test(lower) || /three[\s-]*quarter/.test(lower)) return 'three-quarter-cup'
-  if (/\bcup\b/.test(lower)) return 'cup'
-  if (/\btsp\b|teaspoon/.test(lower)) return 'tsp'
-  if (/\btbsp\b|tablespoon/.test(lower)) return 'tbsp'
-  if (/\bpinch\b/.test(lower)) return 'pinch'
-  if (/\boz\b|ounce/.test(lower)) return 'oz'
-  if (/\bml\b|millilit/.test(lower)) return 'ml'
-  if (/\bg\b|gram/.test(lower)) return 'g'
-  if (/\bserving\b/.test(lower)) return 'serving'
-  return null
 }
 
 function hasServingOptionMacroData(option: ServingOption) {
@@ -472,6 +469,28 @@ function pickDefaultServingOptionForAdjust(options: ServingOption[]) {
   return byPreference('medium') || byPreference('regular') || byPreference('standard') || options[0] || null
 }
 
+function scoreServingOption(option: ServingOption) {
+  const label = String(option?.label || option?.serving_size || '').toLowerCase()
+  let score = 0
+  if (label.includes('serving')) score += 4
+  if (label.includes('piece') || label.includes('burger') || label.includes('sandwich') || label.includes('slice')) score += 3
+  const grams = Number(option?.grams)
+  if (Number.isFinite(grams)) {
+    if (grams >= 40 && grams <= 400) score += 3
+    if (grams === 100) score -= 6
+  }
+  if (is100gServing(label)) score -= 10
+  return score
+}
+
+function pickBestServingOption(options: ServingOption[]) {
+  if (!Array.isArray(options) || options.length === 0) return null
+  const non100 = options.filter((option) => !is100gServing(option?.serving_size))
+  const pool = non100.length > 0 ? non100 : options
+  const sorted = [...pool].sort((a, b) => scoreServingOption(b) - scoreServingOption(a))
+  return sorted[0] || null
+}
+
 function applyServingOptionToResult(item: SearchFoodItem, option: ServingOption): SearchFoodItem {
   return {
     ...item,
@@ -486,23 +505,15 @@ function applyServingOptionToResult(item: SearchFoodItem, option: ServingOption)
   }
 }
 
-function mapServingOptionsToDynamicUnits(options: any[]): DynamicServingUnit[] {
-  if (!Array.isArray(options) || options.length === 0) return []
-  const seen = new Set<AdjustUnit>()
-  const mapped: DynamicServingUnit[] = []
-
-  for (const option of options) {
-    const label = extractServingLabel(option)
-    const grams = extractServingGrams(option)
-    if (!label || !grams) continue
-    const unit = inferUnitFromServingLabel(label)
-    if (!unit) continue
-    if (seen.has(unit)) continue
-    seen.add(unit)
-    mapped.push({ unit, label: label.replace(/\s*—\s*/g, ' - '), grams })
-  }
-
-  return mapped
+function hasMeaningfulChange(before: SearchFoodItem, after: SearchFoodItem) {
+  if (String(before.serving_size || '') !== String(after.serving_size || '')) return true
+  if (!sameNumber(before.calories ?? before.calories_kcal, after.calories ?? after.calories_kcal)) return true
+  if (!sameNumber(before.protein_g, after.protein_g)) return true
+  if (!sameNumber(before.carbs_g, after.carbs_g)) return true
+  if (!sameNumber(before.fat_g, after.fat_g)) return true
+  if (!sameNumber(before.fiber_g, after.fiber_g)) return true
+  if (!sameNumber(before.sugar_g, after.sugar_g)) return true
+  return false
 }
 
 function convertBaseUnit(value: number, from: 'g' | 'ml' | 'oz', to: 'g' | 'ml' | 'oz') {
@@ -585,7 +596,6 @@ function ingredientSourceLabel(item: SearchFoodItem) {
 function defaultUnitOptions(
   base: BaseServing,
   foodName: string | null | undefined,
-  dynamicUnits: DynamicServingUnit[] = [],
 ): AdjustUnit[] {
   if (!base) return ['g', 'ml', 'oz']
 
@@ -611,33 +621,28 @@ function defaultUnitOptions(
     if (foodUnits['piece-extra-large']) units.push('piece-extra-large')
   }
 
-  for (const entry of dynamicUnits) {
-    if (!entry?.unit) continue
-    if (!units.includes(entry.unit)) units.push(entry.unit)
-  }
-
   return units
 }
 
 function unitLabel(unit: AdjustUnit, foodName: string | null | undefined, foodUnitGrams: FoodUnitGrams) {
   const grams = roundTo(resolveUnitGrams(unit, foodUnitGrams), 1)
-  if (unit === 'quarter-cup') return `1/4 cup - ${grams}g`
-  if (unit === 'half-cup') return `1/2 cup - ${grams}g`
-  if (unit === 'three-quarter-cup') return `3/4 cup - ${grams}g`
-  if (unit === 'tsp') return `tsp - ${grams}g`
-  if (unit === 'tbsp') return `tbsp - ${grams}g`
-  if (unit === 'cup') return `cup - ${grams}g`
-  if (unit === 'pinch') return `pinch - ${grams}g`
-  if (unit === 'egg-small') return `small egg - ${grams}g`
-  if (unit === 'egg-medium') return `medium egg - ${grams}g`
-  if (unit === 'egg-large') return `large egg - ${grams}g`
-  if (unit === 'egg-extra-large') return `extra large egg - ${grams}g`
-  if (unit === 'piece') return `piece - ${grams}g`
+  if (unit === 'quarter-cup') return `1/4 cup — ${grams}g`
+  if (unit === 'half-cup') return `1/2 cup — ${grams}g`
+  if (unit === 'three-quarter-cup') return `3/4 cup — ${grams}g`
+  if (unit === 'tsp') return `tsp — ${grams}g`
+  if (unit === 'tbsp') return `tbsp — ${grams}g`
+  if (unit === 'cup') return `cup — ${grams}g`
+  if (unit === 'pinch') return `pinch — ${grams}g`
+  if (unit === 'egg-small') return `small egg — ${grams}g`
+  if (unit === 'egg-medium') return `medium egg — ${grams}g`
+  if (unit === 'egg-large') return `large egg — ${grams}g`
+  if (unit === 'egg-extra-large') return `extra large egg — ${grams}g`
+  if (unit === 'piece') return `piece — ${grams}g`
   const produceName = getProduceDisplayName(foodName)
-  if (unit === 'piece-small') return `${produceName ? `small ${produceName}` : 'small piece'} - ${grams}g`
-  if (unit === 'piece-medium') return `${produceName ? `medium ${produceName}` : 'medium piece'} - ${grams}g`
-  if (unit === 'piece-large') return `${produceName ? `large ${produceName}` : 'large piece'} - ${grams}g`
-  if (unit === 'piece-extra-large') return `${produceName ? `extra large ${produceName}` : 'extra large piece'} - ${grams}g`
+  if (unit === 'piece-small') return `${producePieceLabel(unit, produceName)} — ${grams}g`
+  if (unit === 'piece-medium') return `${producePieceLabel(unit, produceName)} — ${grams}g`
+  if (unit === 'piece-large') return `${producePieceLabel(unit, produceName)} — ${grams}g`
+  if (unit === 'piece-extra-large') return `${producePieceLabel(unit, produceName)} — ${grams}g`
   return unit
 }
 
@@ -799,7 +804,6 @@ export function AddIngredientScreen() {
 
   const [query, setQuery] = useState('')
   const [kind, setKind] = useState<SearchKind>('packaged')
-  const [sourceChoice, setSourceChoice] = useState<SearchSource>('auto')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState<SearchFoodItem[]>([])
@@ -822,34 +826,23 @@ export function AddIngredientScreen() {
   const [adjustUnit, setAdjustUnit] = useState<AdjustUnit>('g')
   const [adjustBase, setAdjustBase] = useState<BaseServing>(null)
   const [adjustSaving, setAdjustSaving] = useState(false)
-  const [adjustUnitMenuOpen, setAdjustUnitMenuOpen] = useState(false)
-  const [adjustDynamicUnits, setAdjustDynamicUnits] = useState<DynamicServingUnit[]>([])
+  const [adjustOpeningId, setAdjustOpeningId] = useState<string | null>(null)
+  const [adjustPickerMode, setAdjustPickerMode] = useState<'serving' | 'unit' | null>(null)
+  const [adjustDropdownLayout, setAdjustDropdownLayout] = useState<{
+    top: number
+    left: number
+    width: number
+    maxHeight: number
+  } | null>(null)
   const [adjustServingOptions, setAdjustServingOptions] = useState<ServingOption[]>([])
   const [adjustServingId, setAdjustServingId] = useState<string | null>(null)
-  const adjustServingRequestIdRef = useRef(0)
+  const servingOverrideCacheRef = useRef<Map<string, ServingOption>>(new Map())
+  const servingOverridePendingRef = useRef<Set<string>>(new Set())
+  const adjustServingTriggerRef = useRef<any>(null)
+  const adjustUnitTriggerRef = useRef<any>(null)
 
   const adjustFoodUnitGrams = useMemo(() => getFoodUnitGrams(adjustItem?.name || ''), [adjustItem?.name])
-  const adjustDynamicGrams = useMemo(() => {
-    const units: FoodUnitGrams = {}
-    for (const entry of adjustDynamicUnits) {
-      if (!entry?.unit) continue
-      if (!Number.isFinite(Number(entry.grams)) || Number(entry.grams) <= 0) continue
-      units[entry.unit] = Number(entry.grams)
-    }
-    return units
-  }, [adjustDynamicUnits])
-  const mergedAdjustUnitGrams = useMemo(
-    () => ({ ...adjustFoodUnitGrams, ...adjustDynamicGrams }),
-    [adjustFoodUnitGrams, adjustDynamicGrams],
-  )
-  const adjustDynamicUnitLabels = useMemo(() => {
-    const map: Partial<Record<AdjustUnit, string>> = {}
-    for (const entry of adjustDynamicUnits) {
-      if (!entry?.unit || !entry?.label) continue
-      if (!map[entry.unit]) map[entry.unit] = entry.label
-    }
-    return map
-  }, [adjustDynamicUnits])
+  const mergedAdjustUnitGrams = useMemo(() => ({ ...adjustFoodUnitGrams }), [adjustFoodUnitGrams])
 
   const requestIdRef = useRef(0)
   const displayedResults = useMemo(
@@ -906,7 +899,7 @@ export function AddIngredientScreen() {
   ) => {
     const q = String(queryOverride ?? query).trim()
     const nextKind = kindOverride || kind
-    const nextSource = sourceOverride || sourceChoice
+    const nextSource: SearchSource = sourceOverride || 'auto'
 
     if (!q) {
       setResults([])
@@ -924,8 +917,7 @@ export function AddIngredientScreen() {
       const data: any = await res.json().catch(() => ({}))
       let items: SearchFoodItem[] = Array.isArray(data?.items) ? data.items : []
       if (nextKind === 'single') {
-        items = items.filter((entry) => entry?.source === 'usda' || isCustomListItem(entry))
-        items = items.filter((entry) => String(entry?.brand || '').trim().length === 0)
+        items = items.filter((entry) => entry?.source === 'usda' || entry?.source === 'fatsecret' || isCustomListItem(entry))
       }
       return { ok: res.ok, items, error: typeof data?.error === 'string' ? data.error : '' }
     }
@@ -952,7 +944,7 @@ export function AddIngredientScreen() {
         nextKind === 'single' && filtered.length === 0 && searchResult.items.length > 0 ? searchResult.items : filtered
 
       setResults(finalItems)
-      if (finalItems.length === 0) setError(searchResult.error || 'No results yet. Try a different search or switch the source above.')
+      if (finalItems.length === 0) setError(searchResult.error || 'No results yet. Try a different search.')
     } catch {
       if (requestId !== requestIdRef.current) return
       setResults([])
@@ -974,124 +966,124 @@ export function AddIngredientScreen() {
       return
     }
     const timer = setTimeout(() => {
-      void runSearch(q, kind, sourceChoice, { silentEmpty: true })
+      void runSearch(q, kind, 'auto', { silentEmpty: true })
     }, 220)
     return () => clearTimeout(timer)
-  }, [kind, query, sourceChoice, userCountry])
+  }, [kind, query, userCountry])
 
-  const loadAdjustServingOptions = async (item: SearchFoodItem) => {
-    if (!authHeaders) return
-    const requestId = ++adjustServingRequestIdRef.current
+  const loadServingOverride = async (item: SearchFoodItem): Promise<SearchFoodItem | null> => {
+    if (!authHeaders) return null
+    if (!item || item.source !== 'usda') return null
+    if (!is100gServing(item.serving_size)) return null
 
-    const fetchServingOptions = async (source: string, id: string | number) => {
+    const key = `${String(item.source)}:${String(item.id)}`
+    const cached = servingOverrideCacheRef.current.get(key)
+    if (cached) return applyServingOptionToResult(item, cached)
+    if (servingOverridePendingRef.current.has(key)) return null
+
+    servingOverridePendingRef.current.add(key)
+    try {
       const res = await fetch(
-        `${API_BASE_URL}/api/food-data/servings?source=${encodeURIComponent(source)}&id=${encodeURIComponent(String(id))}`,
+        `${API_BASE_URL}/api/food-data/servings?source=${encodeURIComponent(String(item.source))}&id=${encodeURIComponent(String(item.id))}`,
         { headers: authHeaders },
       )
       const data: any = await res.json().catch(() => ({}))
-      if (!res.ok) return []
-      return Array.isArray(data?.options) ? data.options : []
-    }
-
-    try {
-      const primarySource = String(item?.source || (isCustomListItem(item) ? 'custom' : 'usda'))
-      let options = await fetchServingOptions(primarySource, item.id)
-
-      // Custom single foods often have no serving options saved.
-      // In that case, borrow USDA serving options by name.
-      if (options.length === 0 && isCustomListItem(item)) {
-        const searchRes = await fetch(
-          `${API_BASE_URL}/api/food-data?source=usda&kind=single&q=${encodeURIComponent(String(item?.name || ''))}&limit=8`,
-          { headers: authHeaders },
-        )
-        const searchData: any = await searchRes.json().catch(() => ({}))
-        const usdaItems: any[] = Array.isArray(searchData?.items)
-          ? searchData.items.filter((entry: any) => entry?.source === 'usda')
-          : []
-        const usdaCandidate = usdaItems[0]
-        if (usdaCandidate?.id) {
-          options = await fetchServingOptions('usda', usdaCandidate.id)
-        }
-      }
-
-      if (requestId !== adjustServingRequestIdRef.current) return
-      const normalizedOptions = normalizeServingOptionsForAdjust(options)
-      const defaultServingOption = pickDefaultServingOptionForAdjust(normalizedOptions)
-      const resolvedOptions = normalizedOptions.length > 0 ? normalizedOptions : []
-
-      setAdjustServingOptions(resolvedOptions)
-      setAdjustDynamicUnits(mapServingOptionsToDynamicUnits(resolvedOptions))
-
-      if (!defaultServingOption) {
-        setAdjustServingId(null)
-        return
-      }
-
-      setAdjustServingId(defaultServingOption.id)
-      setAdjustItem((prev) => {
-        if (!prev) return prev
-        return {
-          ...applyServingOptionToResult(prev, defaultServingOption),
-          servingOptions: resolvedOptions,
-        }
-      })
-
-      const nextLabel = defaultServingOption.serving_size || defaultServingOption.label || '1 serving'
-      const nextBase = parseServingBase(nextLabel)
-      setAdjustBase(nextBase)
-      setAdjustUnit('serving')
-      setAdjustAmountInput('1')
+      if (!res.ok) return null
+      const options = normalizeServingOptionsForAdjust(data?.options)
+      const best = pickBestServingOption(options)
+      if (!best) return null
+      servingOverrideCacheRef.current.set(key, best)
+      const updated = applyServingOptionToResult(item, best)
+      if (!hasMeaningfulChange(item, updated)) return null
+      return updated
     } catch {
-      if (requestId !== adjustServingRequestIdRef.current) return
-      setAdjustServingOptions([])
-      setAdjustServingId(null)
-      setAdjustDynamicUnits([])
+      return null
+    } finally {
+      servingOverridePendingRef.current.delete(key)
     }
   }
 
-  const openAdjust = (item: SearchFoodItem) => {
-    const caloriesRaw = Number(item.calories ?? item.calories_kcal)
-    const proteinRaw = Number(item.protein_g)
-    const carbsRaw = Number(item.carbs_g)
-    const fatRaw = Number(item.fat_g)
-    const hasCoreNutrition =
-      Number.isFinite(caloriesRaw) &&
-      Number.isFinite(proteinRaw) &&
-      Number.isFinite(carbsRaw) &&
-      Number.isFinite(fatRaw)
+  const openAdjust = async (item: SearchFoodItem) => {
+    const itemKey = `${String(item.source || 'auto')}:${String(item.id)}`
+    setAdjustOpeningId(itemKey)
+    try {
+      const upgraded = await loadServingOverride(item)
+      const resolvedTarget = upgraded || item
+      const resolvedServingOptions = normalizeServingOptionsForAdjust(resolvedTarget.servingOptions)
+      const defaultServingOption = pickDefaultServingOptionForAdjust(resolvedServingOptions)
+      const resolvedItem =
+        defaultServingOption && hasServingOptionMacroData(defaultServingOption)
+          ? applyServingOptionToResult(resolvedTarget, defaultServingOption)
+          : resolvedTarget
 
-    if (!hasCoreNutrition) {
-      Alert.alert('Cannot add this item', 'This result has missing nutrition data. Please pick another one.')
-      return
+      const caloriesRaw = Number(resolvedItem.calories ?? resolvedItem.calories_kcal)
+      const proteinRaw = Number(resolvedItem.protein_g)
+      const carbsRaw = Number(resolvedItem.carbs_g)
+      const fatRaw = Number(resolvedItem.fat_g)
+      const hasCoreNutrition =
+        Number.isFinite(caloriesRaw) &&
+        Number.isFinite(proteinRaw) &&
+        Number.isFinite(carbsRaw) &&
+        Number.isFinite(fatRaw)
+
+      if (!hasCoreNutrition) {
+        Alert.alert('Cannot add this item', 'This result has missing nutrition data. Please pick another one.')
+        return
+      }
+
+      const resolvedServingSize = String(resolvedItem.serving_size || '100 g')
+      const base = parseServingBase(resolvedServingSize) || (() => {
+        const grams = parseServingGrams(resolvedServingSize)
+        return grams && grams > 0 ? { amount: grams, unit: 'g' as const } : { amount: 100, unit: 'g' as const }
+      })()
+
+      setAdjustBase(base)
+      setAdjustServingOptions(resolvedServingOptions)
+      setAdjustServingId(defaultServingOption?.id || null)
+      setAdjustItem({
+        ...resolvedItem,
+        name: String(resolvedItem.name || 'Food'),
+        brand: resolvedItem.brand ?? null,
+        serving_size: resolvedServingSize,
+        servingOptions: resolvedServingOptions.length > 0 ? resolvedServingOptions : null,
+        selectedServingId: defaultServingOption?.id || null,
+        calories: safeNumber(resolvedItem.calories ?? resolvedItem.calories_kcal),
+        protein_g: safeNumber(resolvedItem.protein_g),
+        carbs_g: safeNumber(resolvedItem.carbs_g),
+        fat_g: safeNumber(resolvedItem.fat_g),
+        fiber_g: safeNumber(resolvedItem.fiber_g),
+        sugar_g: safeNumber(resolvedItem.sugar_g),
+      })
+
+      let units = defaultUnitOptions(base, resolvedItem?.name || '')
+      if (resolvedServingOptions.length > 0) {
+        units = units.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz')
+        units = ['serving', ...units]
+      }
+      const nextUnit = resolvedServingOptions.length > 0 ? 'serving' : units[0] || 'g'
+      setAdjustUnit(nextUnit)
+      if (nextUnit === 'serving') {
+        setAdjustAmountInput('1')
+      } else if (base && nextUnit === base.unit) {
+        setAdjustAmountInput(formatAmount(base.amount))
+      } else {
+        setAdjustAmountInput('1')
+      }
+      setAdjustPickerMode(null)
+      setError('')
+    } catch {
+      Alert.alert('Could not open this item', 'Please try again.')
+    } finally {
+      setAdjustOpeningId(null)
     }
+  }
 
-    const existingServingOptions = normalizeServingOptionsForAdjust(item.servingOptions)
-    const defaultServingOption = pickDefaultServingOptionForAdjust(existingServingOptions)
-    const resolvedItem = defaultServingOption ? applyServingOptionToResult(item, defaultServingOption) : item
-    const base = parseServingBase(resolvedItem.serving_size)
-    setAdjustBase(base)
-    setAdjustDynamicUnits([])
+  const resetAdjustState = () => {
     setAdjustServingOptions([])
     setAdjustServingId(null)
-    setAdjustServingOptions(existingServingOptions)
-    setAdjustServingId(defaultServingOption?.id || null)
-    setAdjustItem({
-      ...resolvedItem,
-      servingOptions: existingServingOptions.length > 0 ? existingServingOptions : item.servingOptions,
-    })
-    const units = defaultUnitOptions(base, resolvedItem?.name || '', mapServingOptionsToDynamicUnits(existingServingOptions))
-    const nextUnit = existingServingOptions.length > 0 ? 'serving' : units[0] || 'g'
-    setAdjustUnit(nextUnit)
-    if (nextUnit === 'serving') {
-      setAdjustAmountInput('1')
-    } else if (base && nextUnit === base.unit) {
-      setAdjustAmountInput(formatAmount(base.amount))
-    } else {
-      setAdjustAmountInput('1')
-    }
-    setAdjustUnitMenuOpen(false)
-    void loadAdjustServingOptions(item)
-    setError('')
+    setAdjustPickerMode(null)
+    setAdjustDropdownLayout(null)
+    setAdjustItem(null)
   }
 
   const addAdjustedItem = async () => {
@@ -1159,12 +1151,10 @@ export function AddIngredientScreen() {
         return
       }
 
-      adjustServingRequestIdRef.current += 1
-      setAdjustDynamicUnits([])
       setAdjustServingOptions([])
       setAdjustServingId(null)
       setAdjustItem(null)
-      setAdjustUnitMenuOpen(false)
+      setAdjustPickerMode(null)
       navigation.goBack()
     } catch {
       Alert.alert('Add failed', 'Could not add this ingredient.')
@@ -1352,7 +1342,7 @@ export function AddIngredientScreen() {
   }
 
   const adjustAmount = numberOrZero(adjustAmountInput)
-  let unitOptions = defaultUnitOptions(adjustBase, adjustItem?.name || '', adjustDynamicUnits)
+  let unitOptions = defaultUnitOptions(adjustBase, adjustItem?.name || '')
   if (adjustServingOptions.length > 0) {
     unitOptions = unitOptions.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz')
     unitOptions = ['serving', ...unitOptions]
@@ -1367,13 +1357,12 @@ export function AddIngredientScreen() {
   const adjustServings = computeServings(adjustAmount, safeAdjustUnit, adjustBase, mergedAdjustUnitGrams)
   const servingsForPreview = Number.isFinite(adjustServings) && adjustServings > 0 ? adjustServings : 0
   const useCustomServingLabel = safeAdjustUnit === 'serving' && Math.abs(adjustAmount - 1) > 0.001
-  const unitMenuMaxHeight = Math.min(420, Math.max(220, unitOptions.length * 40 + 8))
   const activeUnitLabel =
     safeAdjustUnit === 'serving'
       ? useCustomServingLabel
         ? 'Custom'
         : selectedServingLabel
-      : adjustDynamicUnitLabels[safeAdjustUnit] || unitLabel(safeAdjustUnit, adjustItem?.name || '', mergedAdjustUnitGrams)
+      : unitLabel(safeAdjustUnit, adjustItem?.name || '', mergedAdjustUnitGrams)
 
   const previewCalories = Math.round(numberOrZero(adjustItem?.calories ?? adjustItem?.calories_kcal) * servingsForPreview)
   const previewProtein = roundTo(numberOrZero(adjustItem?.protein_g) * servingsForPreview, 1)
@@ -1381,6 +1370,102 @@ export function AddIngredientScreen() {
   const previewFat = roundTo(numberOrZero(adjustItem?.fat_g) * servingsForPreview, 1)
   const previewFiber = roundTo(numberOrZero(adjustItem?.fiber_g) * servingsForPreview, 1)
   const previewSugar = roundTo(numberOrZero(adjustItem?.sugar_g) * servingsForPreview, 1)
+
+  const formatAdjustUnitChoiceLabel = (
+    unit: AdjustUnit,
+    servingLabel: string,
+  ) => {
+    if (unit === 'serving') return servingLabel
+    return unitLabel(unit, adjustItem?.name || '', mergedAdjustUnitGrams)
+  }
+
+  const applyAdjustServingOption = (option: ServingOption) => {
+    setAdjustServingId(option.id)
+    setAdjustItem((prev) => {
+      if (!prev) return prev
+      return {
+        ...applyServingOptionToResult(prev, option),
+        servingOptions: adjustServingOptions,
+      }
+    })
+    const nextLabel = option.serving_size || option.label || '1 serving'
+    const nextBase = parseServingBase(nextLabel) || (() => {
+      const grams = parseServingGrams(nextLabel)
+      return grams && grams > 0 ? { amount: grams, unit: 'g' as const } : { amount: 100, unit: 'g' as const }
+    })()
+    setAdjustBase(nextBase)
+    setAdjustUnit('serving')
+    setAdjustAmountInput('1')
+    setAdjustPickerMode(null)
+    setAdjustDropdownLayout(null)
+  }
+
+  const applyAdjustUnitChoice = (unit: AdjustUnit) => {
+    const current = numberOrZero(adjustAmountInput)
+    const isWeightUnit = unit === 'g' || unit === 'ml' || unit === 'oz'
+
+    if (isWeightUnit) {
+      const converted = convertAmountBetweenUnits(
+        current,
+        safeAdjustUnit,
+        unit,
+        adjustBase,
+        mergedAdjustUnitGrams,
+      )
+      if (Number.isFinite(converted) && converted > 0) {
+        setAdjustAmountInput(formatAmount(converted))
+      }
+    } else {
+      setAdjustAmountInput('1')
+    }
+    setAdjustUnit(unit)
+    setAdjustPickerMode(null)
+    setAdjustDropdownLayout(null)
+  }
+
+  const closeAdjustPicker = () => {
+    setAdjustPickerMode(null)
+    setAdjustDropdownLayout(null)
+  }
+
+  const openAdjustPicker = (mode: 'serving' | 'unit') => {
+    if (adjustPickerMode === mode) {
+      closeAdjustPicker()
+      return
+    }
+
+    const triggerRef = mode === 'serving' ? adjustServingTriggerRef : adjustUnitTriggerRef
+    const node = triggerRef.current
+    if (!node || typeof node.measureInWindow !== 'function') {
+      setAdjustPickerMode(mode)
+      setAdjustDropdownLayout(null)
+      return
+    }
+
+    requestAnimationFrame(() => {
+      node.measureInWindow((x: number, y: number, width: number, height: number) => {
+        const screen = Dimensions.get('window')
+        const margin = 16
+        const desiredWidth = mode === 'unit' ? 260 : Math.max(260, width)
+        const dropdownWidth = Math.min(desiredWidth, screen.width - margin * 2)
+        const left = Math.min(Math.max(margin, x + width - dropdownWidth), screen.width - margin - dropdownWidth)
+        const availableBelow = screen.height - (y + height) - margin
+        const availableAbove = y - margin
+        const openUpward = availableBelow < 220 && availableAbove > availableBelow
+        const usableSpace = Math.max(availableBelow, availableAbove)
+        const maxHeight = Math.max(220, usableSpace - 8)
+        const top = openUpward ? Math.max(margin, y - maxHeight - 4) : y + height + 4
+
+        setAdjustDropdownLayout({
+          top,
+          left,
+          width: dropdownWidth,
+          maxHeight,
+        })
+        setAdjustPickerMode(mode)
+      })
+    })
+  }
 
   return (
     <Screen style={{ backgroundColor: '#FFFFFF' }}>
@@ -1475,10 +1560,8 @@ export function AddIngredientScreen() {
             <Pressable
               disabled={loading}
               onPress={() => {
-                const nextSource = sourceChoice === 'usda' ? 'auto' : sourceChoice
                 setKind('packaged')
-                if (nextSource !== sourceChoice) setSourceChoice(nextSource)
-                if (query.trim().length >= 1) void runSearch(query, 'packaged', nextSource)
+                if (query.trim().length >= 1) void runSearch(query, 'packaged')
               }}
               style={({ pressed }) => ({
                 flex: 1,
@@ -1498,10 +1581,8 @@ export function AddIngredientScreen() {
             <Pressable
               disabled={loading}
               onPress={() => {
-                const nextSource = sourceChoice === 'openfoodfacts' ? 'usda' : sourceChoice
                 setKind('single')
-                if (nextSource !== sourceChoice) setSourceChoice(nextSource)
-                if (query.trim().length >= 1) void runSearch(query, 'single', nextSource)
+                if (query.trim().length >= 1) void runSearch(query, 'single')
               }}
               style={({ pressed }) => ({
                 flex: 1,
@@ -1520,40 +1601,6 @@ export function AddIngredientScreen() {
             </Pressable>
           </View>
 
-          <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 12, fontWeight: '700', color: '#4B5563' }}>Source</Text>
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-              {([
-                { key: 'auto', label: 'Best match' },
-                { key: 'usda', label: 'USDA' },
-                { key: 'openfoodfacts', label: 'OpenFoodFacts' },
-              ] as const).map((opt) => (
-                <Pressable
-                  key={opt.key}
-                  disabled={loading}
-                  onPress={() => {
-                    const nextKind = opt.key === 'usda' ? 'single' : opt.key === 'openfoodfacts' ? 'packaged' : kind
-                    setSourceChoice(opt.key)
-                    if (nextKind !== kind) setKind(nextKind)
-                    if (query.trim().length >= 1) void runSearch(query, nextKind, opt.key)
-                  }}
-                  style={({ pressed }) => ({
-                    borderWidth: 1,
-                    borderRadius: 10,
-                    borderColor: sourceChoice === opt.key ? '#111827' : '#E5E7EB',
-                    backgroundColor: sourceChoice === opt.key ? '#111827' : '#FFFFFF',
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                    opacity: loading ? 0.6 : pressed ? 0.9 : 1,
-                  })}
-                >
-                  <Text style={{ fontSize: 12, fontWeight: '700', color: sourceChoice === opt.key ? '#FFFFFF' : '#374151' }}>{opt.label}</Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={{ fontSize: 11, color: '#6B7280' }}>USDA works with Single food. OpenFoodFacts works with Packaged.</Text>
-          </View>
-
           {error ? <Text style={{ color: '#DC2626', fontSize: 13 }}>{error}</Text> : null}
 
           {loading && (
@@ -1564,7 +1611,7 @@ export function AddIngredientScreen() {
           )}
 
           {!loading && !error && displayedResults.length === 0 && query.trim().length > 0 ? (
-            <Text style={{ color: '#6B7280', fontSize: 13 }}>No results yet. Try a different search or switch the source above.</Text>
+            <Text style={{ color: '#6B7280', fontSize: 13 }}>No results yet. Try a different search.</Text>
           ) : null}
 
           {displayedResults.length > 0 && (
@@ -1573,9 +1620,11 @@ export function AddIngredientScreen() {
                 {displayedResults.map((item, index) => (
                   (() => {
                     const display = buildSearchDisplay(item, query)
+                    const itemKey = `${String(item.source || 'auto')}:${String(item.id)}`
+                    const isOpeningAdjust = adjustOpeningId === itemKey
                     return (
                       <View
-                        key={`${String(item.source || 'auto')}:${String(item.id)}:${index}`}
+                        key={`${itemKey}:${index}`}
                         style={{
                           borderWidth: 1,
                           borderColor: '#E5E7EB',
@@ -1601,16 +1650,23 @@ export function AddIngredientScreen() {
                           <Text style={{ marginTop: 4, fontSize: 11, color: '#9CA3AF' }}>Source: {ingredientSourceLabel(item)}</Text>
                         </View>
                         <Pressable
-                          onPress={() => openAdjust(item)}
+                          disabled={isOpeningAdjust}
+                          onPress={() => {
+                            void openAdjust(item)
+                          }}
                           style={({ pressed }) => ({
                             borderRadius: 10,
                             backgroundColor: '#059669',
                             paddingHorizontal: 12,
                             paddingVertical: 9,
-                            opacity: pressed ? 0.9 : 1,
+                            opacity: isOpeningAdjust ? 0.7 : pressed ? 0.9 : 1,
                           })}
                         >
-                          <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Add</Text>
+                          {isOpeningAdjust ? (
+                            <ActivityIndicator size="small" color="#FFFFFF" />
+                          ) : (
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Add</Text>
+                          )}
                         </Pressable>
                       </View>
                     )
@@ -1858,12 +1914,7 @@ export function AddIngredientScreen() {
         presentationStyle="fullScreen"
         onRequestClose={() => {
           if (adjustSaving) return
-          adjustServingRequestIdRef.current += 1
-          setAdjustDynamicUnits([])
-          setAdjustServingOptions([])
-          setAdjustServingId(null)
-          setAdjustUnitMenuOpen(false)
-          setAdjustItem(null)
+          resetAdjustState()
         }}
       >
         <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
@@ -1883,12 +1934,7 @@ export function AddIngredientScreen() {
             <Pressable
               onPress={() => {
                 if (adjustSaving) return
-                adjustServingRequestIdRef.current += 1
-                setAdjustDynamicUnits([])
-                setAdjustServingOptions([])
-                setAdjustServingId(null)
-                setAdjustUnitMenuOpen(false)
-                setAdjustItem(null)
+                resetAdjustState()
               }}
             >
               <Text style={{ fontSize: 22, color: '#9CA3AF' }}>✕</Text>
@@ -1897,7 +1943,7 @@ export function AddIngredientScreen() {
 
           <ScrollView
             keyboardShouldPersistTaps="handled"
-            scrollEnabled={!adjustUnitMenuOpen}
+            scrollEnabled={!adjustPickerMode}
             contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14, gap: 12 }}
           >
             <View>
@@ -1908,41 +1954,27 @@ export function AddIngredientScreen() {
             {adjustServingOptions.length > 0 ? (
               <View>
                 <Text style={{ fontSize: 14, color: '#374151', marginBottom: 6 }}>Base serving size</Text>
-                <View style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 8, overflow: 'hidden' }}>
-                  {adjustServingOptions.map((option, index) => {
-                    const optionLabel = option.label || option.serving_size
-                    const isSelected = adjustServingId === option.id
-                    return (
-                      <Pressable
-                        key={option.id}
-                        onPress={() => {
-                          setAdjustServingId(option.id)
-                          setAdjustItem((prev) => {
-                            if (!prev) return prev
-                            return {
-                              ...applyServingOptionToResult(prev, option),
-                              servingOptions: adjustServingOptions,
-                            }
-                          })
-                          const nextLabel = option.serving_size || option.label || '1 serving'
-                          const nextBase = parseServingBase(nextLabel)
-                          setAdjustBase(nextBase)
-                          setAdjustUnit('serving')
-                          setAdjustAmountInput('1')
-                          setAdjustUnitMenuOpen(false)
-                        }}
-                        style={({ pressed }) => ({
-                          paddingHorizontal: 12,
-                          paddingVertical: 11,
-                          backgroundColor: isSelected ? '#EFF6FF' : pressed ? '#F9FAFB' : '#FFFFFF',
-                          borderTopWidth: index === 0 ? 0 : 1,
-                          borderTopColor: '#E5E7EB',
-                        })}
-                      >
-                        <Text style={{ color: '#111827', fontSize: 15 }}>{optionLabel}</Text>
-                      </Pressable>
-                    )
-                  })}
+                <View ref={adjustServingTriggerRef}>
+                  <Pressable
+                    onPress={() => openAdjustPicker('serving')}
+                    style={({ pressed }) => ({
+                      borderWidth: 1,
+                      borderColor: '#D1D5DB',
+                      borderRadius: 8,
+                      paddingHorizontal: 12,
+                      paddingVertical: 11,
+                      backgroundColor: '#FFFFFF',
+                      flexDirection: 'row',
+                      alignItems: 'center',
+                      justifyContent: 'space-between',
+                      opacity: pressed ? 0.9 : 1,
+                    })}
+                  >
+                    <Text style={{ color: '#111827', fontSize: 15, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                      {selectedServingLabel}
+                    </Text>
+                    <Text style={{ color: '#6B7280' }}>{adjustPickerMode === 'serving' ? '▴' : '▾'}</Text>
+                  </Pressable>
                 </View>
               </View>
             ) : null}
@@ -1952,7 +1984,10 @@ export function AddIngredientScreen() {
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TextInput
                   value={adjustAmountInput}
-                  onChangeText={setAdjustAmountInput}
+                  onChangeText={(text) => {
+                    if (adjustPickerMode) closeAdjustPicker()
+                    setAdjustAmountInput(text)
+                  }}
                   keyboardType="decimal-pad"
                   placeholder="1"
                   placeholderTextColor="#9CA3AF"
@@ -1967,9 +2002,9 @@ export function AddIngredientScreen() {
                     fontSize: 16,
                   }}
                 />
-                <View style={{ width: 120, position: 'relative', zIndex: 40 }}>
+                <View ref={adjustUnitTriggerRef} style={{ width: 120 }}>
                   <Pressable
-                    onPress={() => setAdjustUnitMenuOpen((v) => !v)}
+                    onPress={() => openAdjustPicker('unit')}
                     style={({ pressed }) => ({
                       borderWidth: 1,
                       borderColor: '#D1D5DB',
@@ -1986,77 +2021,8 @@ export function AddIngredientScreen() {
                     <Text style={{ color: '#111827', fontSize: 16 }} numberOfLines={1}>
                       {activeUnitLabel}
                     </Text>
-                    <Text style={{ color: '#6B7280' }}>{adjustUnitMenuOpen ? '▴' : '▾'}</Text>
+                    <Text style={{ color: '#6B7280' }}>{adjustPickerMode === 'unit' ? '▴' : '▾'}</Text>
                   </Pressable>
-                  {adjustUnitMenuOpen ? (
-                    <View
-                      style={{
-                        position: 'absolute',
-                        right: 0,
-                        top: 46,
-                        zIndex: 80,
-                        width: 220,
-                        borderWidth: 1,
-                        borderColor: '#D1D5DB',
-                        borderRadius: 8,
-                        backgroundColor: '#FFFFFF',
-                        maxHeight: unitMenuMaxHeight,
-                        shadowColor: '#000000',
-                        shadowOpacity: 0.16,
-                        shadowRadius: 8,
-                        shadowOffset: { width: 0, height: 4 },
-                        elevation: 6,
-                      }}
-                    >
-                      <ScrollView
-                        nestedScrollEnabled
-                        keyboardShouldPersistTaps="handled"
-                        showsVerticalScrollIndicator={unitOptions.length * 40 + 8 > unitMenuMaxHeight}
-                      >
-                        {unitOptions.map((unit) => (
-                          <Pressable
-                            key={unit}
-                            onPress={() => {
-                              const current = numberOrZero(adjustAmountInput)
-                              const isWeightUnit = unit === 'g' || unit === 'ml' || unit === 'oz'
-
-                              if (isWeightUnit) {
-                                const converted = convertAmountBetweenUnits(
-                                  current,
-                                  safeAdjustUnit,
-                                  unit,
-                                  adjustBase,
-                                  mergedAdjustUnitGrams,
-                                )
-                                if (Number.isFinite(converted) && converted > 0) {
-                                  setAdjustAmountInput(formatAmount(converted))
-                                }
-                              } else {
-                                // For food size units (small/medium/large/etc), use 1 by default
-                                // so nutrition updates immediately when the unit changes.
-                                setAdjustAmountInput('1')
-                              }
-                              setAdjustUnit(unit)
-                              setAdjustUnitMenuOpen(false)
-                            }}
-                            style={({ pressed }) => ({
-                              paddingHorizontal: 10,
-                              paddingVertical: 10,
-                              backgroundColor: safeAdjustUnit === unit ? '#EFF6FF' : pressed ? '#F9FAFB' : '#FFFFFF',
-                            })}
-                          >
-                            <Text style={{ color: '#111827', fontSize: 15 }}>
-                              {unit === 'serving'
-                                ? useCustomServingLabel
-                                  ? 'Custom'
-                                  : selectedServingLabel
-                                : adjustDynamicUnitLabels[unit] || unitLabel(unit, adjustItem?.name || '', mergedAdjustUnitGrams)}
-                            </Text>
-                          </Pressable>
-                        ))}
-                      </ScrollView>
-                    </View>
-                  ) : null}
                 </View>
               </View>
               <Text style={{ marginTop: 6, fontSize: 12, color: '#6B7280' }}>Servings: {formatAmount(servingsForPreview || 1)}</Text>
@@ -2110,12 +2076,7 @@ export function AddIngredientScreen() {
               <Pressable
                 disabled={adjustSaving}
                 onPress={() => {
-                  adjustServingRequestIdRef.current += 1
-                  setAdjustDynamicUnits([])
-                  setAdjustServingOptions([])
-                  setAdjustServingId(null)
-                  setAdjustUnitMenuOpen(false)
-                  setAdjustItem(null)
+                  resetAdjustState()
                 }}
                 style={({ pressed }) => ({
                   borderRadius: 9,
@@ -2132,6 +2093,87 @@ export function AddIngredientScreen() {
             </View>
           </View>
         </SafeAreaView>
+
+        <Modal transparent visible={!!adjustPickerMode} animationType="none" onRequestClose={closeAdjustPicker}>
+          <View style={{ flex: 1 }}>
+            <Pressable
+              onPress={closeAdjustPicker}
+              style={{
+                position: 'absolute',
+                top: 0,
+                right: 0,
+                bottom: 0,
+                left: 0,
+              }}
+            />
+            {adjustPickerMode && adjustDropdownLayout ? (
+              <View
+                style={{
+                  position: 'absolute',
+                  top: adjustDropdownLayout.top,
+                  left: adjustDropdownLayout.left,
+                  width: adjustDropdownLayout.width,
+                  maxHeight: adjustDropdownLayout.maxHeight,
+                  borderWidth: 1,
+                  borderColor: '#D1D5DB',
+                  borderRadius: 8,
+                  backgroundColor: '#FFFFFF',
+                  shadowColor: '#000000',
+                  shadowOpacity: 0.16,
+                  shadowRadius: 8,
+                  shadowOffset: { width: 0, height: 4 },
+                  elevation: 6,
+                  overflow: 'hidden',
+                }}
+              >
+                <ScrollView nestedScrollEnabled keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator>
+                  {adjustPickerMode === 'serving'
+                    ? adjustServingOptions.map((option, index) => {
+                        const optionLabel = option.label || option.serving_size
+                        const isSelected = adjustServingId === option.id
+                        return (
+                          <Pressable
+                            key={`${option.id}-${index}`}
+                            onPress={() => applyAdjustServingOption(option)}
+                            style={({ pressed }) => ({
+                              paddingHorizontal: 12,
+                              paddingVertical: 12,
+                              backgroundColor: isSelected ? '#EFF6FF' : pressed ? '#F9FAFB' : '#FFFFFF',
+                              borderTopWidth: index === 0 ? 0 : 1,
+                              borderTopColor: '#E5E7EB',
+                            })}
+                          >
+                            <Text style={{ color: '#111827', fontSize: 15, fontWeight: isSelected ? '700' : '500' }}>
+                              {optionLabel}
+                            </Text>
+                          </Pressable>
+                        )
+                      })
+                    : unitOptions.map((unit, index) => {
+                        const isSelected = safeAdjustUnit === unit
+                        const unitText = formatAdjustUnitChoiceLabel(
+                          unit,
+                          useCustomServingLabel ? 'Custom' : selectedServingLabel,
+                        )
+                        return (
+                          <Pressable
+                            key={`${unit}-${index}`}
+                            onPress={() => applyAdjustUnitChoice(unit)}
+                            style={({ pressed }) => ({
+                              paddingHorizontal: 10,
+                              paddingVertical: 10,
+                              backgroundColor: isSelected ? '#EFF6FF' : pressed ? '#F9FAFB' : '#FFFFFF',
+                            })}
+                          >
+                            <Text style={{ color: '#111827', fontSize: 15 }}>{unitText}</Text>
+                          </Pressable>
+                        )
+                      })}
+                </ScrollView>
+              </View>
+            ) : null}
+          </View>
+        </Modal>
       </Modal>
     </Screen>
   )

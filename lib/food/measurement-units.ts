@@ -243,6 +243,22 @@ const resolveFoodUnitGrams = (
 
 const toUnitValue = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : undefined)
 
+const explicitPieceExtraLarge = (entry: { piece_extra_large_g?: number | null }) =>
+  toUnitValue(entry.piece_extra_large_g ?? null)
+
+const getProducePieceLabel = (unit: MeasurementUnit, produceName: string) => {
+  if (/\bwatermelon\b/.test(produceName)) {
+    if (unit === 'piece-small') return '1/8 watermelon'
+    if (unit === 'piece-medium') return '1/4 watermelon'
+    if (unit === 'piece-large') return '1/2 watermelon'
+    if (unit === 'piece-extra-large') return '1 watermelon'
+  }
+  if (unit === 'piece-small') return produceName ? `small ${produceName}` : 'small piece'
+  if (unit === 'piece-medium') return produceName ? `medium ${produceName}` : 'medium piece'
+  if (unit === 'piece-large') return produceName ? `large ${produceName}` : 'large piece'
+  return produceName ? `extra large ${produceName}` : 'extra large piece'
+}
+
 const buildDryFoodUnitGrams = (entry: (typeof DRY_FOOD_MEASUREMENTS)[number]): FoodUnitGrams => ({
   pinch: entry.pinch_g,
   tsp: entry.tsp_g,
@@ -268,10 +284,22 @@ const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): Fo
   const small = toUnitValue(entry.piece_small_g)
   const medium = toUnitValue(entry.piece_medium_g)
   const large = toUnitValue(entry.piece_large_g)
-  let extraLarge: number | null = null
-  if (Number.isFinite(Number(large)) && Number.isFinite(Number(medium)) && Number(large) > 0 && Number(medium) > 0) {
+  let extraLarge: number | null = explicitPieceExtraLarge(entry) ?? null
+  if (
+    !Number.isFinite(Number(extraLarge)) &&
+    Number.isFinite(Number(large)) &&
+    Number.isFinite(Number(medium)) &&
+    Number(large) > 0 &&
+    Number(medium) > 0
+  ) {
     extraLarge = Number(large) + (Number(large) - Number(medium))
-  } else if (Number.isFinite(Number(large)) && Number.isFinite(Number(small)) && Number(large) > 0 && Number(small) > 0) {
+  } else if (
+    !Number.isFinite(Number(extraLarge)) &&
+    Number.isFinite(Number(large)) &&
+    Number.isFinite(Number(small)) &&
+    Number(large) > 0 &&
+    Number(small) > 0
+  ) {
     extraLarge = Number(large) + (Number(large) - Number(small)) / 2
   }
   return {
@@ -435,35 +463,23 @@ export const formatUnitLabel = (unit: MeasurementUnit, name?: string | null, pie
   }
   if (unit === 'piece-small') {
     const grams = Number(unitValue)
-    if (Number.isFinite(grams) && grams > 0) {
-      if (produceName) return `small ${produceName} — ${Math.round(grams * 10) / 10}g`
-      return `small piece — ${Math.round(grams * 10) / 10}g`
-    }
-    return produceName ? `small ${produceName}` : 'small piece'
+    if (Number.isFinite(grams) && grams > 0) return `${getProducePieceLabel(unit, produceName)} — ${Math.round(grams * 10) / 10}g`
+    return getProducePieceLabel(unit, produceName)
   }
   if (unit === 'piece-medium') {
     const grams = Number(unitValue)
-    if (Number.isFinite(grams) && grams > 0) {
-      if (produceName) return `medium ${produceName} — ${Math.round(grams * 10) / 10}g`
-      return `medium piece — ${Math.round(grams * 10) / 10}g`
-    }
-    return produceName ? `medium ${produceName}` : 'medium piece'
+    if (Number.isFinite(grams) && grams > 0) return `${getProducePieceLabel(unit, produceName)} — ${Math.round(grams * 10) / 10}g`
+    return getProducePieceLabel(unit, produceName)
   }
   if (unit === 'piece-large') {
     const grams = Number(unitValue)
-    if (Number.isFinite(grams) && grams > 0) {
-      if (produceName) return `large ${produceName} — ${Math.round(grams * 10) / 10}g`
-      return `large piece — ${Math.round(grams * 10) / 10}g`
-    }
-    return produceName ? `large ${produceName}` : 'large piece'
+    if (Number.isFinite(grams) && grams > 0) return `${getProducePieceLabel(unit, produceName)} — ${Math.round(grams * 10) / 10}g`
+    return getProducePieceLabel(unit, produceName)
   }
   if (unit === 'piece-extra-large') {
     const grams = Number(unitValue)
-    if (Number.isFinite(grams) && grams > 0) {
-      if (produceName) return `extra large ${produceName} — ${Math.round(grams * 10) / 10}g`
-      return `extra large piece — ${Math.round(grams * 10) / 10}g`
-    }
-    return produceName ? `extra large ${produceName}` : 'extra large piece'
+    if (Number.isFinite(grams) && grams > 0) return `${getProducePieceLabel(unit, produceName)} — ${Math.round(grams * 10) / 10}g`
+    return getProducePieceLabel(unit, produceName)
   }
   return unit
 }
