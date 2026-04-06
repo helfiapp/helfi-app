@@ -1,5 +1,19 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-04-06 16:57 AEST
+- What changed: Fixed the shared watermelon size data that was making whole-watermelon calories far too low, and aligned the web and native food size conversion logic so both now use the same corrected watermelon sizing.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
+- What to quickly test: Search for watermelon on web or native, open Adjust ingredient, choose the watermelon whole-size option, and confirm the calories are now around 1,355 instead of about 390.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-03-28 18:23 AEDT
+- What changed: Updated the web Recommended meal ingredients so they now use the same ingredient row style as Edit meal, with the same open/close behavior and serving controls.
+- Where to see it (page/link): https://helfi.ai/food/recommended?date=2026-03-23&category=breakfast
+- What to quickly test: Open Food Diary on web, generate a Recommended meal, then open and close ingredient rows and confirm they match the Edit meal ingredient layout and controls.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-03-23 00:14 AEDT
 - What changed: Removed the Food Diary banner text under the date selector on the web app so the page no longer says “Take a photo of your meal or snack and let AI analyze it.”
 - Where to see it (page/link): https://helfi.ai/food
