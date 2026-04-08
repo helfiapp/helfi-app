@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-04-09 01:14 AEST
+- What changed: Fixed Add ingredient on web and native so plain single-food items now use one shared size lookup, and when a bad custom single-food row is found, the adjust screen switches to the matched USDA raw food so the calories and small/medium/large/extra large weights stay together.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
+- What to quickly test: Search for banana or watermelon on web and native, tap Add, then confirm the adjust screen now shows the full size list and the calories match the raw food instead of the bad custom row.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-04-06 16:57 AEST
 - What changed: Fixed the shared watermelon size data that was making whole-watermelon calories far too low, and aligned the web and native food size conversion logic so both now use the same corrected watermelon sizing.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
