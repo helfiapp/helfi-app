@@ -25,6 +25,10 @@ import { theme } from '../ui/theme'
 
 type SearchKind = 'packaged' | 'single'
 type SearchSource = 'auto'
+type DynamicSizeLookup = {
+  unitGrams: FoodUnitGrams | null
+  matchedItem: Partial<SearchFoodItem> | null
+}
 
 type SearchFoodItem = {
   id: string | number
@@ -41,6 +45,7 @@ type SearchFoodItem = {
   fat_g?: number | null
   fiber_g?: number | null
   sugar_g?: number | null
+  unitGrams?: FoodUnitGrams | null
   __custom?: boolean
 }
 
@@ -88,6 +93,7 @@ const MEAL_LABELS: Record<string, string> = {
   snacks: 'Snacks',
   uncategorized: 'Other',
 }
+const CUSTOM_SINGLE_BRAND_DESCRIPTORS = new Set(['', 'chopped', 'cubed', 'diced', 'grated', 'sliced'])
 
 function formatLocalDate(date = new Date()) {
   const y = date.getFullYear()
@@ -276,12 +282,6 @@ function explicitPieceExtraLarge(produce: { piece_extra_large_g?: number | null 
 }
 
 function producePieceLabel(unit: AdjustUnit, produceName: string) {
-  if (/\bwatermelon\b/.test(produceName)) {
-    if (unit === 'piece-small') return '1/8 watermelon'
-    if (unit === 'piece-medium') return '1/4 watermelon'
-    if (unit === 'piece-large') return '1/2 watermelon'
-    if (unit === 'piece-extra-large') return '1 watermelon'
-  }
   if (unit === 'piece-small') return produceName ? `small ${produceName}` : 'small piece'
   if (unit === 'piece-medium') return produceName ? `medium ${produceName}` : 'medium piece'
   if (unit === 'piece-large') return produceName ? `large ${produceName}` : 'large piece'
@@ -409,8 +409,7 @@ function getFoodUnitGrams(name: string | null | undefined): FoodUnitGrams {
 
 function getProduceDisplayName(name: string | null | undefined) {
   const produce = findProduceMeasurement(name)
-  if (!produce) return ''
-  const base = normalizeFoodValue(String(produce.food || '')).trim()
+  const base = normalizeFoodValue(String(produce?.food || name || '')).trim()
   if (!base) return ''
   if (base.includes('garlic')) return 'clove'
   return base
@@ -596,6 +595,7 @@ function ingredientSourceLabel(item: SearchFoodItem) {
 function defaultUnitOptions(
   base: BaseServing,
   foodName: string | null | undefined,
+  foodUnitGramsOverride?: FoodUnitGrams | null,
 ): AdjustUnit[] {
   if (!base) return ['g', 'ml', 'oz']
 
@@ -603,7 +603,10 @@ function defaultUnitOptions(
     return ['g', 'oz', 'egg-small', 'egg-medium', 'egg-large', 'egg-extra-large']
   }
 
-  const foodUnits = getFoodUnitGrams(foodName)
+  const foodUnits = {
+    ...getFoodUnitGrams(foodName),
+    ...(foodUnitGramsOverride || {}),
+  }
   const hasProducePieceUnits =
     (foodUnits['piece-small'] || 0) > 0 ||
     (foodUnits['piece-medium'] || 0) > 0 ||
@@ -838,11 +841,16 @@ export function AddIngredientScreen() {
   const [adjustServingId, setAdjustServingId] = useState<string | null>(null)
   const servingOverrideCacheRef = useRef<Map<string, ServingOption>>(new Map())
   const servingOverridePendingRef = useRef<Set<string>>(new Set())
+  const sizeUnitCacheRef = useRef<Map<string, DynamicSizeLookup>>(new Map())
+  const sizeUnitPendingRef = useRef<Set<string>>(new Set())
   const adjustServingTriggerRef = useRef<any>(null)
   const adjustUnitTriggerRef = useRef<any>(null)
 
   const adjustFoodUnitGrams = useMemo(() => getFoodUnitGrams(adjustItem?.name || ''), [adjustItem?.name])
-  const mergedAdjustUnitGrams = useMemo(() => ({ ...adjustFoodUnitGrams }), [adjustFoodUnitGrams])
+  const mergedAdjustUnitGrams = useMemo(
+    () => ({ ...adjustFoodUnitGrams, ...(adjustItem?.unitGrams || {}) }),
+    [adjustFoodUnitGrams, adjustItem?.unitGrams],
+  )
 
   const requestIdRef = useRef(0)
   const displayedResults = useMemo(
@@ -1003,6 +1011,43 @@ export function AddIngredientScreen() {
     }
   }
 
+  const loadDynamicSizeLookup = async (item: SearchFoodItem): Promise<DynamicSizeLookup | null> => {
+    if (!authHeaders) return null
+    if (!item?.name) return null
+
+    const key = `${String(item.source || 'auto')}:${String(item.id)}:${normalizeSearchToken(item.name)}`
+    const cached = sizeUnitCacheRef.current.get(key)
+    if (cached) return cached
+    if (sizeUnitPendingRef.current.has(key)) return null
+
+    sizeUnitPendingRef.current.add(key)
+    try {
+      const params = new URLSearchParams({
+        name: String(item.name || ''),
+        source: String(item.source || ''),
+        id: String(item.id || ''),
+      })
+      const res = await fetch(`${API_BASE_URL}/api/food-data/size-units?${params.toString()}`, { headers: authHeaders })
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok) return null
+      const raw = data?.unitGrams && typeof data.unitGrams === 'object' ? data.unitGrams : {}
+      const unitGrams = Object.fromEntries(
+        Object.entries(raw).filter(([, value]) => Number.isFinite(Number(value)) && Number(value) > 0),
+      ) as FoodUnitGrams
+      const matchedItem =
+        data?.matchedItem && typeof data.matchedItem === 'object'
+          ? (data.matchedItem as Partial<SearchFoodItem>)
+          : null
+      const lookup = { unitGrams, matchedItem }
+      sizeUnitCacheRef.current.set(key, lookup)
+      return lookup
+    } catch {
+      return null
+    } finally {
+      sizeUnitPendingRef.current.delete(key)
+    }
+  }
+
   const openAdjust = async (item: SearchFoodItem) => {
     const itemKey = `${String(item.source || 'auto')}:${String(item.id)}`
     setAdjustOpeningId(itemKey)
@@ -1015,11 +1060,33 @@ export function AddIngredientScreen() {
         defaultServingOption && hasServingOptionMacroData(defaultServingOption)
           ? applyServingOptionToResult(resolvedTarget, defaultServingOption)
           : resolvedTarget
+      const sizeLookup = await loadDynamicSizeLookup(resolvedItem)
+      const dynamicUnitGrams = sizeLookup?.unitGrams || null
+      const customBrandKey = String(resolvedItem.brand || '').trim().toLowerCase()
+      const shouldUseMatchedItem =
+        resolvedItem.source === 'custom' &&
+        !!sizeLookup?.matchedItem &&
+        Object.keys(dynamicUnitGrams || {}).length > 0 &&
+        CUSTOM_SINGLE_BRAND_DESCRIPTORS.has(customBrandKey)
+      const authoritativeItem: SearchFoodItem = shouldUseMatchedItem
+        ? {
+            ...resolvedItem,
+            source: String(sizeLookup?.matchedItem?.source || 'usda'),
+            id: String(sizeLookup?.matchedItem?.id || resolvedItem.id),
+            calories: safeNumber(sizeLookup?.matchedItem?.calories ?? resolvedItem.calories ?? resolvedItem.calories_kcal),
+            calories_kcal: safeNumber(sizeLookup?.matchedItem?.calories ?? resolvedItem.calories ?? resolvedItem.calories_kcal),
+            protein_g: safeNumber(sizeLookup?.matchedItem?.protein_g ?? resolvedItem.protein_g),
+            carbs_g: safeNumber(sizeLookup?.matchedItem?.carbs_g ?? resolvedItem.carbs_g),
+            fat_g: safeNumber(sizeLookup?.matchedItem?.fat_g ?? resolvedItem.fat_g),
+            fiber_g: safeNumber(sizeLookup?.matchedItem?.fiber_g ?? resolvedItem.fiber_g),
+            sugar_g: safeNumber(sizeLookup?.matchedItem?.sugar_g ?? resolvedItem.sugar_g),
+          }
+        : resolvedItem
 
-      const caloriesRaw = Number(resolvedItem.calories ?? resolvedItem.calories_kcal)
-      const proteinRaw = Number(resolvedItem.protein_g)
-      const carbsRaw = Number(resolvedItem.carbs_g)
-      const fatRaw = Number(resolvedItem.fat_g)
+      const caloriesRaw = Number(authoritativeItem.calories ?? authoritativeItem.calories_kcal)
+      const proteinRaw = Number(authoritativeItem.protein_g)
+      const carbsRaw = Number(authoritativeItem.carbs_g)
+      const fatRaw = Number(authoritativeItem.fat_g)
       const hasCoreNutrition =
         Number.isFinite(caloriesRaw) &&
         Number.isFinite(proteinRaw) &&
@@ -1031,7 +1098,7 @@ export function AddIngredientScreen() {
         return
       }
 
-      const resolvedServingSize = String(resolvedItem.serving_size || '100 g')
+      const resolvedServingSize = String(authoritativeItem.serving_size || '100 g')
       const base = parseServingBase(resolvedServingSize) || (() => {
         const grams = parseServingGrams(resolvedServingSize)
         return grams && grams > 0 ? { amount: grams, unit: 'g' as const } : { amount: 100, unit: 'g' as const }
@@ -1041,21 +1108,27 @@ export function AddIngredientScreen() {
       setAdjustServingOptions(resolvedServingOptions)
       setAdjustServingId(defaultServingOption?.id || null)
       setAdjustItem({
-        ...resolvedItem,
-        name: String(resolvedItem.name || 'Food'),
-        brand: resolvedItem.brand ?? null,
+        ...authoritativeItem,
+        name: String(authoritativeItem.name || 'Food'),
+        brand: authoritativeItem.brand ?? null,
         serving_size: resolvedServingSize,
         servingOptions: resolvedServingOptions.length > 0 ? resolvedServingOptions : null,
         selectedServingId: defaultServingOption?.id || null,
-        calories: safeNumber(resolvedItem.calories ?? resolvedItem.calories_kcal),
-        protein_g: safeNumber(resolvedItem.protein_g),
-        carbs_g: safeNumber(resolvedItem.carbs_g),
-        fat_g: safeNumber(resolvedItem.fat_g),
-        fiber_g: safeNumber(resolvedItem.fiber_g),
-        sugar_g: safeNumber(resolvedItem.sugar_g),
+        calories: safeNumber(authoritativeItem.calories ?? authoritativeItem.calories_kcal),
+        calories_kcal: safeNumber(authoritativeItem.calories ?? authoritativeItem.calories_kcal),
+        protein_g: safeNumber(authoritativeItem.protein_g),
+        carbs_g: safeNumber(authoritativeItem.carbs_g),
+        fat_g: safeNumber(authoritativeItem.fat_g),
+        fiber_g: safeNumber(authoritativeItem.fiber_g),
+        sugar_g: safeNumber(authoritativeItem.sugar_g),
+        unitGrams: dynamicUnitGrams,
       })
 
-      let units = defaultUnitOptions(base, resolvedItem?.name || '')
+      const mergedUnitGrams = {
+        ...getFoodUnitGrams(authoritativeItem?.name || ''),
+        ...(dynamicUnitGrams || {}),
+      }
+      let units = defaultUnitOptions(base, authoritativeItem?.name || '', mergedUnitGrams)
       if (resolvedServingOptions.length > 0) {
         units = units.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz')
         units = ['serving', ...units]
@@ -1342,7 +1415,7 @@ export function AddIngredientScreen() {
   }
 
   const adjustAmount = numberOrZero(adjustAmountInput)
-  let unitOptions = defaultUnitOptions(adjustBase, adjustItem?.name || '')
+  let unitOptions = defaultUnitOptions(adjustBase, adjustItem?.name || '', mergedAdjustUnitGrams)
   if (adjustServingOptions.length > 0) {
     unitOptions = unitOptions.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz')
     unitOptions = ['serving', ...unitOptions]
@@ -1386,6 +1459,7 @@ export function AddIngredientScreen() {
       return {
         ...applyServingOptionToResult(prev, option),
         servingOptions: adjustServingOptions,
+        unitGrams: prev.unitGrams,
       }
     })
     const nextLabel = option.serving_size || option.label || '1 serving'
