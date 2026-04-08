@@ -728,7 +728,7 @@ const mergeFoodUnitGrams = (foodName: string, unitGrams?: DynamicUnitGrams | nul
 })
 
 const getAdjustPieceDisplayName = (name?: string | null) => {
-  const normalized = normalizeFoodValue(String(name || '').trim())
+  const normalized = normalizeSearchToken(String(name || '').trim())
   if (!normalized) return ''
   const descriptorTokens = new Set([
     'raw',
