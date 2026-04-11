@@ -180,6 +180,22 @@ function parseServingBase(servingSize?: string | null): BaseServing {
 
 type FoodUnitGrams = Partial<Record<AdjustUnit, number>>
 
+const DISCRETE_COUNT_UNITS = new Set<AdjustUnit>([
+  'piece',
+  'piece-small',
+  'piece-medium',
+  'piece-large',
+  'piece-extra-large',
+  'egg-small',
+  'egg-medium',
+  'egg-large',
+  'egg-extra-large',
+])
+
+function isDiscreteCountUnit(unit: AdjustUnit | null | undefined) {
+  return !!unit && DISCRETE_COUNT_UNITS.has(unit)
+}
+
 const STATIC_UNIT_GRAMS: Record<AdjustUnit, number> = {
   serving: 100,
   g: 1,
@@ -1490,7 +1506,9 @@ export function AddIngredientScreen() {
         setAdjustAmountInput(formatAmount(converted))
       }
     } else {
-      setAdjustAmountInput('1')
+      const keepAmount =
+        isDiscreteCountUnit(safeAdjustUnit) && Number.isFinite(current) && current > 0 ? current : 1
+      setAdjustAmountInput(formatAmount(keepAmount))
     }
     setAdjustUnit(unit)
     setAdjustPickerMode(null)

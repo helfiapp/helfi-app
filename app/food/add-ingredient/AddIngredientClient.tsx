@@ -720,6 +720,22 @@ const ADJUST_UNIT_ORDER: MeasurementUnit[] = [
   'egg-extra-large',
 ]
 
+const DISCRETE_COUNT_UNITS = new Set<MeasurementUnit>([
+  'piece',
+  'piece-small',
+  'piece-medium',
+  'piece-large',
+  'piece-extra-large',
+  'egg-small',
+  'egg-medium',
+  'egg-large',
+  'egg-extra-large',
+  'slice',
+])
+
+const isDiscreteCountUnit = (unit: MeasurementUnit | null | undefined) =>
+  !!unit && DISCRETE_COUNT_UNITS.has(unit)
+
 const hasPositiveUnitGrams = (value: number | null | undefined) => Number.isFinite(Number(value)) && Number(value) > 0
 
 const mergeFoodUnitGrams = (foodName: string, unitGrams?: DynamicUnitGrams | null) => ({
@@ -2237,7 +2253,13 @@ export default function AddIngredientClient() {
                           onChange={(e) => {
                             const nextUnit = e.target.value as MeasurementUnit
                             const currentAmount = Number(adjustAmountInput)
-                            if (Number.isFinite(currentAmount)) {
+                            if (isDiscreteCountUnit(nextUnit)) {
+                              const keepAmount =
+                                isDiscreteCountUnit(safeUnit) && Number.isFinite(currentAmount) && currentAmount > 0
+                                  ? currentAmount
+                                  : 1
+                              setAdjustAmountInput(formatNumber(keepAmount))
+                            } else if (Number.isFinite(currentAmount)) {
                               const foodUnitGrams = mergeFoodUnitGrams(adjustItem.name, adjustItem.unitGrams)
                               const converted = convertAmount(
                                 currentAmount,
