@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-04-11 11:27 AEST
+- What changed: Fixed Add ingredient on web and native so when you switch from grams to whole-food sizes like small, medium, large, or extra large, the amount now starts at 1 instead of changing into a tiny fraction like 0.02.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
+- What to quickly test: Search for watermelon, tap Add, change the unit to extra large watermelon, and confirm the amount shows 1 on helfi.ai instead of 0.02.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-04-09 01:14 AEST
 - What changed: Fixed Add ingredient on web and native so plain single-food items now use one shared size lookup, and when a bad custom single-food row is found, the adjust screen switches to the matched USDA raw food so the calories and small/medium/large/extra large weights stay together.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
