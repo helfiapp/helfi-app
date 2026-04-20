@@ -2246,7 +2246,7 @@ export default function AddIngredientClient() {
                           })()}
                           value={adjustAmountInput}
                           onChange={(e) => setAdjustAmountInput(e.target.value)}
-                          className="flex-1 min-w-0 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-20 sm:w-24 flex-none px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                         <select
                           value={safeUnit}
@@ -2274,7 +2274,7 @@ export default function AddIngredientClient() {
                             }
                             setAdjustUnit(nextUnit)
                           }}
-                          className="w-28 sm:w-36 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="flex-1 min-w-0 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         >
                           {unitOptions.map((unit) => (
                             <option key={unit} value={unit}>
