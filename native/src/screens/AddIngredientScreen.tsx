@@ -2084,7 +2084,7 @@ export function AddIngredientScreen() {
                   placeholder="1"
                   placeholderTextColor="#9CA3AF"
                   style={{
-                    flex: 1,
+                    width: 92,
                     borderWidth: 1,
                     borderColor: '#D1D5DB',
                     borderRadius: 8,
@@ -2094,7 +2094,7 @@ export function AddIngredientScreen() {
                     fontSize: 16,
                   }}
                 />
-                <View ref={adjustUnitTriggerRef} style={{ width: 120 }}>
+                <View ref={adjustUnitTriggerRef} style={{ flex: 1 }}>
                   <Pressable
                     onPress={() => openAdjustPicker('unit')}
                     style={({ pressed }) => ({
@@ -2110,7 +2110,7 @@ export function AddIngredientScreen() {
                       opacity: pressed ? 0.9 : 1,
                     })}
                   >
-                    <Text style={{ color: '#111827', fontSize: 16 }} numberOfLines={1}>
+                    <Text style={{ color: '#111827', fontSize: 15, flex: 1, marginRight: 8 }} numberOfLines={1}>
                       {activeUnitLabel}
                     </Text>
                     <Text style={{ color: '#6B7280' }}>{adjustPickerMode === 'unit' ? '▴' : '▾'}</Text>
