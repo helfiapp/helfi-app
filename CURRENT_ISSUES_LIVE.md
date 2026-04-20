@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-04-20 10:50 AEST
+- What changed: Reduced the desktop Add ingredient amount box width so the unit dropdown/button has more room and long labels like extra large watermelon are visible properly.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
+- What to quickly test: Search for watermelon on desktop, tap Add, and confirm the full extra large watermelon label can be seen in the unit control.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-04-11 11:27 AEST
 - What changed: Fixed Add ingredient on web and native so when you switch from grams to whole-food sizes like small, medium, large, or extra large, the amount now starts at 1 instead of changing into a tiny fraction like 0.02.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
