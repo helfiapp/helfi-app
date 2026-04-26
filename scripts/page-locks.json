@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-04-06T06:52:00.000Z",
+  "generatedAt": "2026-04-26T01:42:38.185Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -209,7 +209,7 @@
     "native/src/navigation/MainTabs.tsx": "bdb43d659cc0039458f94066e6b5b3c9bd528f7febc76c637a030a7c4c605e67",
     "native/src/navigation/RootNavigator.tsx": "dec7211b6ae3fdc60e3d3d36175b9cbb58bae86ae3c8c0e4eca7730841b5ce5a",
     "native/src/screens/AccountSettingsScreen.tsx": "3f592e94a1b1252068b44329bc3e4acd42030d72bd0f53462b7cf976e7047b0d",
-    "native/src/screens/AddIngredientScreen.tsx": "66f74c8ff1db963ff7e593f50eb4522ddf1899387dab771101136df32ee8a33e",
+    "native/src/screens/AddIngredientScreen.tsx": "70587194562d4267f890236f8ef47d06f757c7766efcc30755d648058a402957",
     "native/src/screens/AnimatedSplashScreen.tsx": "e031b5bb187bc228d9b65144757338bc8c793588751948d8044f43d2a50c8682",
     "native/src/screens/BillingScreen.tsx": "42ed0af32fb1dfbc2bea3f8c71549ae8fb32c92e2f35270bd42cde3cc64e53e0",
     "native/src/screens/DailyCheckInScreen.tsx": "fc8e9b6da314e7252505debd13c5724493a06cefbd3d24142d66d0a4d6d0e1e1",
@@ -243,7 +243,7 @@
     "native/src/screens/SmartHealthCoachScreen.tsx": "53a03c768796866babb6eca52b53c2f3cac99071a9e2883c9a186230c04054d9",
     "native/src/screens/SupportScreen.tsx": "043f7551c578d58e20ca88e32880237ec739c146d6697a075676954e9f84a84e",
     "native/src/screens/TermsScreen.tsx": "737a142cc43ea34a779e599d9f3a51b215820e9143c2282efc9bc94ffbc006c6",
-    "native/src/screens/TrackCaloriesScreen.tsx": "2f8c8e6a8254c586c9c14a74b2049a64c54de1aa15b2072c492592aaaf5ed730",
+    "native/src/screens/TrackCaloriesScreen.tsx": "8750a5e872f48d1a3fb13a2c6bd657ee0bea64988c712fdbc6631842b60e3c7a",
     "native/src/screens/WaterIntakeScreen.tsx": "2eb5000b029804dff9efa96c8e33b237358105f230631bd6a7f3db3969eb648b",
     "native/src/state/AppModeContext.tsx": "fb83067336327a5c7a108e91b8e3d86300ebe1142ee51d3c066127f26233d4f2",
     "native/src/ui/HelfiButton.tsx": "661d82067a8996cfd32a55f74e60aea0fdbfefb20c407ca7de2cb5fac75517ee",

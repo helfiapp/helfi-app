@@ -15,6 +15,19 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 
 After reading this file, also read `PROJECT_STATUS.md` for the current state of the project.
 
+## Native App Test Login
+
+When working on the native phone app, agents must keep the app logged in to the same test account so the owner does not need to log in again after restarts.
+
+Use the local native test account for iPhone and Android native app testing:
+- Email/password are stored only on this Mac in `.env.local` as `NATIVE_TEST_EMAIL` and `NATIVE_TEST_PASSWORD`.
+- Do not commit or copy the password into public docs, app data, tickets, or deploy notes.
+
+Important:
+- This is a throwaway test account provided by the owner.
+- Do not ask the owner to log in manually unless the login itself is broken.
+- After restarting the native app, visually check the simulator/emulator and confirm the app is actually open and logged in before saying it is done.
+
 ## Agent Coordination (REQUIRED - To Avoid Conflicts)
 
 We have had problems with multiple agents working at the same time and deploying at random times.

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-04-26 11:43 AEST
+- What changed: Cleaned up project drift by removing old duplicate Codex worktrees, documenting the local native test-login process without exposing the password in public docs, and refreshing the native lock snapshot so the saved native app baseline passes its guard check.
+- Where to see it (page/link): Internal project cleanup only; no visible app page changed.
+- What to quickly test: Confirm `npm run check:page-locks`, `npm --prefix native run check:page-locks`, and `./scripts/check-deployment-status.sh` all pass.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-04-20 10:50 AEST
 - What changed: Reduced the desktop Add ingredient amount box width so the unit dropdown/button has more room and long labels like extra large watermelon are visible properly.
 - Where to see it (page/link): https://helfi.ai/food/add-ingredient?date=2026-03-23&category=breakfast
