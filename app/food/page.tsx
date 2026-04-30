@@ -27733,13 +27733,20 @@ Please add nutritional information manually if needed.`);
                       const swipeOffset = entrySwipeOffsets[entryKey] || 0
                       const isMenuOpen = swipeMenuEntry === entryKey
                       const isWaterEntry = Boolean(food?.__water)
+                      const foodMethod = String(food?.method || food?.nutrition?.__origin || food?.total?.__origin || '').toLowerCase()
+                      const isBuilderFoodEntry =
+                        !isWaterEntry &&
+                        (foodMethod === 'meal-builder' ||
+                          foodMethod === 'combined' ||
+                          Boolean(food?.nutrition?.__importRecipe || food?.total?.__importRecipe) ||
+                          (Array.isArray(food?.items) && food.items.length > 1))
                       const drinkMeta = !isWaterEntry ? getDrinkMetaFromEntry(food) : null
                       const baseEntryLabel = food?.description || food?.label || 'Meal'
                       const resolvedFavorite = isWaterEntry ? null : resolveFavoriteForEntry(food, baseEntryLabel)
                       const favoriteLabel = resolvedFavorite?.favorite ? favoriteDisplayLabel(resolvedFavorite.favorite) : ''
                       const singleItemForDrink =
                         !isWaterEntry && Array.isArray(food?.items) && food.items.length === 1 ? food.items[0] : null
-                      const drinkLiquidHint = !isWaterEntry
+                      const drinkLiquidHint = !isWaterEntry && !isBuilderFoodEntry
                         ? singleItemForDrink
                           ? isLikelyLiquidFood(
                               String(singleItemForDrink?.name || drinkMeta?.type || ''),
@@ -27766,6 +27773,7 @@ Please add nutritional information manually if needed.`);
                       // 3) `isDrinkEntry` true whenever explicit drink metadata exists
                       const isDrinkEntry =
                         !isWaterEntry &&
+                        !isBuilderFoodEntry &&
                         (hasExplicitDrinkMeta || (!forceFoodIconForFavorite && Boolean(drinkLiquidHint)))
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
                       const entryCaloriesValue =
