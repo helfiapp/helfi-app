@@ -42,6 +42,8 @@ import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets'
 import { normalizeImageForAi, resolveImageContentType } from '@/lib/ai-image-normalize';
 // NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
 
+export const maxDuration = 120;
+
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
 function parseItemsJsonRelaxed(raw: string): any | null {
   try {
@@ -522,17 +524,33 @@ const itemsCanCreateCards = (items: any[] | null | undefined): boolean => {
 const estimatedGuessMacrosForName = (nameRaw: string) => {
   const name = (nameRaw || '').toLowerCase();
   // Defaults are conservative single-portion estimates.
+  if (name.includes('egg')) return { calories: 70, protein_g: 6, carbs_g: 0.5, fat_g: 5 };
+  if (name.includes('tofu')) return { calories: 140, protein_g: 16, carbs_g: 4, fat_g: 8 };
   if (name.includes('chicken')) return { calories: 220, protein_g: 32, carbs_g: 0, fat_g: 8 };
   if (name.includes('beef') || name.includes('steak')) return { calories: 250, protein_g: 30, carbs_g: 0, fat_g: 14 };
   if (name.includes('pork')) return { calories: 240, protein_g: 27, carbs_g: 0, fat_g: 14 };
   if (name.includes('salmon') || name.includes('fish')) return { calories: 220, protein_g: 25, carbs_g: 0, fat_g: 13 };
+  if (name.includes('avocado')) return { calories: 120, protein_g: 1.5, carbs_g: 6, fat_g: 11 };
+  if (name.includes('edamame')) return { calories: 95, protein_g: 9, carbs_g: 7, fat_g: 4 };
+  if (name.includes('corn')) return { calories: 80, protein_g: 3, carbs_g: 18, fat_g: 1 };
+  if (name.includes('cucumber')) return { calories: 10, protein_g: 0.5, carbs_g: 2, fat_g: 0 };
+  if (name.includes('cabbage')) return { calories: 20, protein_g: 1, carbs_g: 5, fat_g: 0 };
+  if (name.includes('lettuce') || name.includes('greens') || name.includes('salad leaves')) return { calories: 15, protein_g: 1, carbs_g: 3, fat_g: 0 };
+  if (name.includes('tomato')) return { calories: 20, protein_g: 1, carbs_g: 4, fat_g: 0 };
+  if (name.includes('pasta')) return { calories: 250, protein_g: 9, carbs_g: 50, fat_g: 2 };
+  if (name.includes('rice')) return { calories: 200, protein_g: 4, carbs_g: 44, fat_g: 0.5 };
+  if (name.includes('fries') || name.includes('chips')) return { calories: 320, protein_g: 4, carbs_g: 42, fat_g: 15 };
+  if (name.includes('burger')) return { calories: 520, protein_g: 25, carbs_g: 45, fat_g: 28 };
+  if (name.includes('wing')) return { calories: 110, protein_g: 9, carbs_g: 4, fat_g: 7 };
+  if (name.includes('tiramisu')) return { calories: 380, protein_g: 7, carbs_g: 45, fat_g: 18 };
+  if (name.includes('cake') || name.includes('dessert')) return { calories: 360, protein_g: 5, carbs_g: 45, fat_g: 18 };
+  if (name.includes('dressing') || name.includes('sauce')) return { calories: 80, protein_g: 0, carbs_g: 3, fat_g: 8 };
   if (name.includes('potato')) return { calories: 150, protein_g: 3, carbs_g: 32, fat_g: 3 };
   if (name.includes('sweet potato')) return { calories: 140, protein_g: 3, carbs_g: 33, fat_g: 0.5 };
   if (name.includes('peas')) return { calories: 70, protein_g: 4, carbs_g: 12, fat_g: 0.5 };
   if (name.includes('broccoli')) return { calories: 35, protein_g: 2.5, carbs_g: 7, fat_g: 0.5 };
   if (name.includes('carrot')) return { calories: 45, protein_g: 1, carbs_g: 10, fat_g: 0.2 };
   if (name.includes('mushroom')) return { calories: 20, protein_g: 3, carbs_g: 3, fat_g: 0.3 };
-  if (name.includes('rice')) return { calories: 200, protein_g: 4, carbs_g: 44, fat_g: 0.5 };
   if (name.includes('bread') || name.includes('bun')) return { calories: 150, protein_g: 5, carbs_g: 28, fat_g: 3 };
   // Fallback generic side.
   return { calories: 90, protein_g: 2, carbs_g: 12, fat_g: 3 };
@@ -738,6 +756,66 @@ const buildComponentBoundSchema = (components: string[]) => ({
     },
   },
   strict: true,
+});
+
+const buildCardReadyItemsSchema = () => ({
+  name: 'card_ready_food_items',
+  strict: true,
+  schema: {
+    type: 'object',
+    additionalProperties: false,
+    required: ['items', 'total'],
+    properties: {
+      items: {
+        type: 'array',
+        minItems: 1,
+        maxItems: 12,
+        items: {
+          type: 'object',
+          additionalProperties: false,
+          required: [
+            'name',
+            'brand',
+            'serving_size',
+            'servings',
+            'calories',
+            'protein_g',
+            'carbs_g',
+            'fat_g',
+            'fiber_g',
+            'sugar_g',
+            'isGuess',
+          ],
+          properties: {
+            name: { type: 'string' },
+            brand: { type: ['string', 'null'] },
+            serving_size: { type: 'string' },
+            servings: { type: 'number' },
+            calories: { type: 'number' },
+            protein_g: { type: 'number' },
+            carbs_g: { type: 'number' },
+            fat_g: { type: 'number' },
+            fiber_g: { type: 'number' },
+            sugar_g: { type: 'number' },
+            isGuess: { type: 'boolean' },
+          },
+        },
+      },
+      total: {
+        type: 'object',
+        additionalProperties: false,
+        required: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'],
+        properties: {
+          calories: { type: 'number' },
+          protein_g: { type: 'number' },
+          carbs_g: { type: 'number' },
+          fat_g: { type: 'number' },
+          fiber_g: { type: 'number' },
+          sugar_g: { type: 'number' },
+        },
+      },
+    },
+  },
 });
 
 const extractComponentsFromDelimitedText = (raw: string | null | undefined): string[] => {
@@ -2244,6 +2322,60 @@ const buildMultiComponentFallback = (
   const synthesizedTotal =
     total && typeof total === 'object' ? total : computeTotalsFromItems(items) || null;
   return { items, total: synthesizedTotal };
+};
+
+const buildCardReadyEmergencyFallback = (
+  names: string[],
+  analysis: string | null | undefined,
+  total: any | null | undefined,
+): { items: any[]; total: any | null } => {
+  const candidates = dedupeComponentList(
+    normalizeComponentList([
+      ...names,
+      ...inferComponentsFromAnalysis(analysis),
+      ...splitAnalysisIntoComponents(analysis),
+    ]),
+  )
+    .filter((name) => !isGenericPlaceholderName(name))
+    .slice(0, 10);
+
+  const fallbackNames = candidates.length > 0 ? candidates : ['Visible food'];
+  const totalCalories = Number(total?.calories ?? NaN);
+  const useTotalSplit = Number.isFinite(totalCalories) && totalCalories >= 50;
+  const splitCount = fallbackNames.length;
+
+  const items = fallbackNames.map((name) => {
+    const estimate = estimatedGuessMacrosForName(name);
+    if (useTotalSplit) {
+      const scale = Math.max(0.25, totalCalories / splitCount / Math.max(estimate.calories, 1));
+      return {
+        name,
+        brand: null,
+        serving_size: 'estimated serving',
+        servings: 1,
+        calories: Math.round(estimate.calories * scale),
+        protein_g: Math.round(estimate.protein_g * scale * 10) / 10,
+        carbs_g: Math.round(estimate.carbs_g * scale * 10) / 10,
+        fat_g: Math.round(estimate.fat_g * scale * 10) / 10,
+        fiber_g: 0,
+        sugar_g: 0,
+        isGuess: true,
+      };
+    }
+
+    return {
+      name,
+      brand: null,
+      serving_size: 'estimated serving',
+      servings: 1,
+      ...estimate,
+      fiber_g: 0,
+      sugar_g: 0,
+      isGuess: true,
+    };
+  });
+
+  return { items, total: computeTotalsFromItems(items) || null };
 };
 
 // Initialize OpenAI client only when API key is available
@@ -4566,7 +4698,10 @@ CRITICAL REQUIREMENTS:
           (analysisTextForFollowUp || resp.analysis || '');
         const repair = await chatCompletionWithCost(openai, {
           model: 'gpt-4o',
-          response_format: { type: 'json_object' } as any,
+          response_format: {
+            type: 'json_schema',
+            json_schema: buildCardReadyItemsSchema(),
+          } as any,
           messages: [
             {
               role: 'user',
@@ -4606,6 +4741,31 @@ CRITICAL REQUIREMENTS:
         }
       } catch (repairErr) {
         console.warn('Final card-ready image repair failed (non-fatal):', repairErr);
+      }
+    }
+
+    if (
+      isImageAnalysis &&
+      wantStructured &&
+      !packagedMode &&
+      !labelScan &&
+      !itemsCanCreateCards(resp.items)
+    ) {
+      const fallbackNames = [
+        ...listedComponents,
+        ...(Array.isArray(resp.items) ? resp.items.map((item: any) => String(item?.name || '')) : []),
+      ];
+      const fallback = buildCardReadyEmergencyFallback(
+        fallbackNames,
+        analysisTextForFollowUp || resp.analysis || analysis,
+        resp.total,
+      );
+      if (itemsCanCreateCards(fallback.items)) {
+        resp.items = fallback.items;
+        resp.total = fallback.total || computeTotalsFromItems(resp.items) || resp.total || null;
+        itemsSource = itemsSource === 'none' ? 'card_ready_emergency_fallback' : `${itemsSource}+card_ready_emergency_fallback`;
+        itemsQuality = 'weak';
+        console.warn('⚠️ Analyzer: used emergency estimated ingredient cards after AI repair missed card data.');
       }
     }
 
