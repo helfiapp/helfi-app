@@ -4576,7 +4576,7 @@ CRITICAL REQUIREMENTS:
               ],
             },
           ],
-          max_tokens: 900,
+          max_tokens: 1600,
           temperature: 0,
         } as any);
 
