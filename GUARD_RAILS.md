@@ -1981,6 +1981,8 @@ for a change.
   - Food photo analysis defaults to `gpt-4o` for speed and accuracy. Do not revert image analysis to `gpt-5.2` by default.
   - Packaged/label OCR keeps `gpt-5.2` for per‑serve accuracy; do not downgrade label scans.
   - The component‑bound vision follow‑up must remain: one ingredient card per listed component, no summary card, no uniform “100 g” defaults.
+  - Any future GPT model test or comparison must preserve this flow: photo upload -> AI analysis -> structured `items` -> ingredient cards. Do not ship a model change unless repeated food photo tests prove `items` are returned every time.
+  - Use `scripts/canary-food-analyzer.js` with `CANARY_IMAGE_PATH` when checking real food photos. The canary must fail if the API response cannot create ingredient cards.
 - **Do not undo the discrete-portion fix (Nov 22, 2025):**
   - `app/food/page.tsx` now *scales macros instead of servings* for discrete items when the label states multiple pieces (e.g., “3 large eggs”, “4 slices bacon”). Servings stays at `1` to avoid “3 servings of 3 eggs”, while calories/macros are multiplied by the labeled count. **Leave this logic intact** unless the user explicitly requests a different design.
 - **Pieces only when explicitly counted (Dec 2025 – locked):**

@@ -39,6 +39,7 @@ import { capMaxTokensToBudget, costCentsEstimateFromText, estimateTokensFromText
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets';
+import { normalizeImageForAi, resolveImageContentType } from '@/lib/ai-image-normalize';
 // NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
 
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
@@ -498,6 +499,23 @@ const validateStructuredItems = (items: any[]): boolean => {
   const realisticCount = items.filter(isRealisticItem).length;
   // Accept single realistic item (single-food meal) or multi-item meals with at least two realistic items
   return realisticCount >= 1;
+};
+
+const hasCardReadyNutrition = (item: any): boolean => {
+  if (!item || typeof item !== 'object') return false;
+  const name = String(item?.name || '').trim();
+  const servingSize = String(item?.serving_size || '').trim();
+  if (!name || !servingSize) return false;
+  return ['calories', 'protein_g', 'carbs_g', 'fat_g'].every((key) => {
+    const value = Number(item?.[key]);
+    return Number.isFinite(value);
+  });
+};
+
+const itemsCanCreateCards = (items: any[] | null | undefined): boolean => {
+  if (!Array.isArray(items) || items.length === 0) return false;
+  if (looksLikeSingleGenericItem(items) || looksLikeMultiIngredientSummary(items)) return false;
+  return items.every(hasCardReadyNutrition);
 };
 
 // Very small heuristic map to seed guessed macros when the AI misses structured items.
@@ -2612,17 +2630,23 @@ CRITICAL REQUIREMENTS:
 
       // Convert image to base64
       console.log('🔄 Converting image to base64...');
-      const imageBuffer = await imageFile.arrayBuffer();
-      const imageBase64 = Buffer.from(imageBuffer).toString('base64');
-      imageMeta = getImageMetadata(imageBuffer);
-      imageDataUrl = `data:${imageFile.type};base64,${imageBase64}`;
-      const baseHash = crypto.createHash('sha256').update(Buffer.from(imageBuffer)).digest('hex');
+      const originalImageBuffer = Buffer.from(await imageFile.arrayBuffer());
+      const resolvedImageType = resolveImageContentType(imageFile.type, imageFile.name, originalImageBuffer);
+      const normalizedImage = await normalizeImageForAi(originalImageBuffer, resolvedImageType);
+      const imageBase64 = normalizedImage.buffer.toString('base64');
+      imageMeta = getImageMetadata(normalizedImage.buffer);
+      imageDataUrl = `data:${normalizedImage.mimeType};base64,${imageBase64}`;
+      const baseHash = crypto.createHash('sha256').update(originalImageBuffer).digest('hex');
       imageHash = forceFresh ? `${baseHash}-${Date.now()}` : baseHash;
-      imageBytes = imageBuffer.byteLength;
-      imageMime = imageFile.type || null;
+      imageBytes = normalizedImage.buffer.byteLength;
+      imageMime = normalizedImage.mimeType || null;
       
       console.log('✅ Image conversion complete:', {
-        bufferSize: imageBuffer.byteLength,
+        originalMime: imageFile.type || null,
+        resolvedMime: resolvedImageType,
+        aiMime: normalizedImage.mimeType,
+        aiConverted: normalizedImage.converted,
+        bufferSize: normalizedImage.buffer.byteLength,
         base64Length: imageBase64.length,
         dataUrlPrefix: imageDataUrl.substring(0, 50) + '...',
         imageHash
@@ -4515,6 +4539,91 @@ CRITICAL REQUIREMENTS:
           console.warn('Consistency repair failed (non-fatal):', repairErr);
         }
       }
+    }
+
+    // Non-negotiable card guard: image analysis must return real, editable
+    // ingredient cards. If earlier passes still produced no card-ready items,
+    // ask the vision model one final time for strict structured items.
+    if (
+      isImageAnalysis &&
+      wantStructured &&
+      !packagedMode &&
+      !labelScan &&
+      !itemsCanCreateCards(resp.items)
+    ) {
+      try {
+        console.warn('⚠️ Analyzer: running final card-ready image repair.');
+        const repairPrompt =
+          'Return JSON only with this exact shape:\n' +
+          '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}\n' +
+          '- This is for editable ingredient cards in a food diary.\n' +
+          '- Return every distinct visible food/component as its own item.\n' +
+          '- Do not return one summary card for a bowl, plate, platter, meal, salad, sandwich, or dish.\n' +
+          '- Every item must have a clear name, serving_size, and numeric calories, protein_g, carbs_g, and fat_g.\n' +
+          '- Use realistic visible portions. If uncertain, set isGuess true, but still provide conservative nutrition numbers.\n' +
+          '- Include small visible components like egg, tofu/chicken, corn, edamame, cucumber, cabbage, tomato, avocado, sauce, or dressing.\n' +
+          '\nEarlier analysis text:\n' +
+          (analysisTextForFollowUp || resp.analysis || '');
+        const repair = await chatCompletionWithCost(openai, {
+          model: 'gpt-4o',
+          response_format: { type: 'json_object' } as any,
+          messages: [
+            {
+              role: 'user',
+              content: [
+                { type: 'text', text: repairPrompt },
+                { type: 'image_url', image_url: { url: imageDataUrl, detail: 'high' } },
+              ],
+            },
+          ],
+          max_tokens: 900,
+          temperature: 0,
+        } as any);
+
+        totalCostCents += repair.costCents;
+        const text = repair.completion.choices?.[0]?.message?.content?.trim() || '';
+        const cleaned = text.replace(/```json/gi, '').replace(/```/g, '').trim();
+        const parsed = cleaned ? parseItemsJsonRelaxed(cleaned) : null;
+        const items = parsed
+          ? sanitizeStructuredItems(
+              Array.isArray(parsed)
+                ? parsed
+                : Array.isArray((parsed as any).items)
+                ? (parsed as any).items
+                : [],
+            )
+          : [];
+        const total =
+          parsed && !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
+            ? (parsed as any).total
+            : null;
+        if (itemsCanCreateCards(items)) {
+          resp.items = items;
+          resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
+          itemsSource = itemsSource === 'none' ? 'card_ready_image_repair' : `${itemsSource}+card_ready_image_repair`;
+          itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
+          console.log('✅ Final card-ready image repair produced items:', resp.items.length);
+        }
+      } catch (repairErr) {
+        console.warn('Final card-ready image repair failed (non-fatal):', repairErr);
+      }
+    }
+
+    if (
+      isImageAnalysis &&
+      wantStructured &&
+      !packagedMode &&
+      !labelScan &&
+      !itemsCanCreateCards(resp.items)
+    ) {
+      console.error('❌ Image analysis finished without card-ready items. Refusing to return a fake summary card.');
+      return NextResponse.json(
+        {
+          error: 'Food analysis could not create ingredient cards. Please try the photo again.',
+          code: 'CARD_READY_ITEMS_MISSING',
+        },
+        { status: 502 },
+      );
     }
 
     // Packaged mode: skip secondary OpenAI per-serving extraction to keep one API call per analysis.

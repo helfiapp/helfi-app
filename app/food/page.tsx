@@ -3215,6 +3215,9 @@ export default function FoodDiary() {
   const [showPhotoOptions, setShowPhotoOptions] = useState(false)
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [analysisPhase, setAnalysisPhase] = useState<'idle' | 'preparing' | 'analyzing' | 'building'>('idle')
+  const [analysisStartedAt, setAnalysisStartedAt] = useState<number | null>(null)
+  const [analysisElapsedSeconds, setAnalysisElapsedSeconds] = useState(0)
+  const [lastAnalysisDurationSeconds, setLastAnalysisDurationSeconds] = useState<number | null>(null)
   const [isSavingEntry, setIsSavingEntry] = useState(false)
   const [isDiaryMutating, setIsDiaryMutating] = useState(false)
   const [analysisMode, setAnalysisMode] = useState<'auto' | 'packaged' | 'meal'>('auto')
@@ -3494,6 +3497,16 @@ export default function FoodDiary() {
   const photoRefreshAttemptedRef = useRef<Record<string, boolean>>({})
   const healthCheckPromptedRef = useRef<Set<string>>(new Set())
   const healthCheckPromptedLoadedRef = useRef(false)
+
+  useEffect(() => {
+    if (!isAnalyzing || !analysisStartedAt) return
+    const tick = () => {
+      setAnalysisElapsedSeconds(Math.max(0, Math.floor((Date.now() - analysisStartedAt) / 1000)))
+    }
+    tick()
+    const timer = window.setInterval(tick, 1000)
+    return () => window.clearInterval(timer)
+  }, [isAnalyzing, analysisStartedAt])
 
   const [foodImagesLoading, setFoodImagesLoading] = useState<{[key: string]: boolean}>({})
   const [expandedEntries, setExpandedEntries] = useState<{[key: string]: boolean}>({})
@@ -7880,6 +7893,7 @@ const applyStructuredItems = (
   let finalTotal = sanitizeNutritionTotals(totalFromApi)
   const allowTextFallback = options?.allowTextFallback ?? true
   const isPackagedAnalysis = analysisMode === 'packaged'
+  const isPhotoAnalysis = Boolean(photoPreview)
   const barcodeTag = options?.barcodeTag
   const analysisSeq = options?.analysisSeq ?? null
   const autoMatchEnabled = options?.autoMatchEnabled ?? false
@@ -7986,7 +8000,11 @@ const applyStructuredItems = (
   const fallbackExistingItems =
     existingItemsFromState.length > 0 ? existingItemsFromState : existingItemsFromEditingEntry
 
-  const filteredItems = stripGenericPlateItems(estimatedItems, analysisText)
+  const cardReadyEstimatedItems =
+    isPhotoAnalysis && !isPackagedAnalysis
+      ? estimatedItems.filter((item: any) => hasMacroData(item))
+      : estimatedItems
+  const filteredItems = stripGenericPlateItems(cardReadyEstimatedItems, analysisText)
   const fallbackItemName = analysisText ? extractBaseMealDescription(analysisText) : ''
   const fallbackItem = {
     name: fallbackItemName || 'Meal',
@@ -8003,9 +8021,9 @@ const applyStructuredItems = (
   }
   const itemsToUseRaw = (() => {
     if (filteredItems.length > 0) return filteredItems
-    if (estimatedItems.length > 0) return estimatedItems
+    if (cardReadyEstimatedItems.length > 0) return cardReadyEstimatedItems
     if (fallbackExistingItems.length > 0) return fallbackExistingItems
-    if (analysisText && allowTextFallback) return [fallbackItem]
+    if (analysisText && allowTextFallback && !isPhotoAnalysis) return [fallbackItem]
     return []
   })()
   const itemsToUse = itemsToUseRaw.map((it: any) => {
@@ -10882,7 +10900,8 @@ const applyStructuredItems = (
   };
 
 
-  const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp']);
+  const FOOD_IMAGE_ACCEPT = 'image/*,.avif,.webp,.web'
+  const SUPPORTED_IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/avif']);
   const isSupportedImageType = (type: string) => SUPPORTED_IMAGE_TYPES.has(type);
 
   const compressImage = (
@@ -10891,6 +10910,7 @@ const applyStructuredItems = (
     quality: number = 0.5,
     maxBytes: number = 900 * 1024,
   ): Promise<File> => {
+    if (file.type === 'image/avif') return Promise.resolve(file);
     if (file.size <= maxBytes && isSupportedImageType(file.type)) return Promise.resolve(file);
     return new Promise((resolve, reject) => {
       const canvas = document.createElement('canvas');
@@ -11709,6 +11729,14 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     return `${trimmedBase}\nUser feedback: ${trimmedComment}`
   }
 
+  const formatAnalysisTime = (seconds: number | null) => {
+    const safeSeconds = Math.max(0, Math.round(Number(seconds || 0)))
+    const minutes = Math.floor(safeSeconds / 60)
+    const remainder = safeSeconds % 60
+    if (minutes <= 0) return `${remainder}s`
+    return `${minutes}m ${String(remainder).padStart(2, '0')}s`
+  }
+
   const analyzePhoto = async (
     fileOverride?: File,
     options?: {
@@ -11721,6 +11749,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     const isFeedbackRescan = Boolean(options?.feedbackRescan)
     const fileToAnalyze = fileOverride || photoFile
     if (!fileToAnalyze) return;
+    const startedAt = Date.now()
 
     const previousSnapshot = isFeedbackRescan
       ? {
@@ -11733,6 +11762,9 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     setShowAnalysisModeModal(false);
     setIsAnalyzing(true);
     setAnalysisPhase('preparing');
+    setAnalysisStartedAt(startedAt);
+    setAnalysisElapsedSeconds(0);
+    setLastAnalysisDurationSeconds(null);
 
     // Desktop UX: auto-scroll to the top so the user can see the analysis UI/progress immediately.
     try {
@@ -11912,6 +11944,9 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
           autoMatchEnabled: true,
           preserveExplicitCountsFrom: previousSnapshot?.items,
         });
+        if (!Array.isArray(applied?.items) || applied.items.length === 0) {
+          throw new Error('AI did not create ingredient cards for this photo.')
+        }
         if (isFeedbackRescan && previousSnapshot?.totals && applied?.total) {
           const prevCalories = Number(previousSnapshot.totals.calories ?? 0)
           const nextCalories = Number(applied.total.calories ?? 0)
@@ -11986,6 +12021,8 @@ Meanwhile, you can describe your food manually:
         showQuickToast('Rescan failed. Keeping your current results.')
       }
     } finally {
+      setLastAnalysisDurationSeconds(Math.max(1, Math.round((Date.now() - startedAt) / 1000)));
+      setAnalysisStartedAt(null);
       setIsAnalyzing(false);
       setAnalysisPhase('idle');
     }
@@ -21701,7 +21738,7 @@ Please add nutritional information manually if needed.`);
                     Add Image
                     <input
                       type="file"
-                      accept="image/*"
+                      accept={FOOD_IMAGE_ACCEPT}
                       className="hidden"
                       onChange={(e) => {
                         handlePhotoUpload(e)
@@ -22301,7 +22338,7 @@ Please add nutritional information manually if needed.`);
         <input
           ref={selectPhotoInputRef}
           type="file"
-          accept="image/*"
+          accept={FOOD_IMAGE_ACCEPT}
           className="hidden"
           onChange={(e) => {
             handlePhotoUpload(e);
@@ -22311,7 +22348,7 @@ Please add nutritional information manually if needed.`);
         <input
           ref={replacePhotoInputRef}
           type="file"
-          accept="image/*"
+          accept={FOOD_IMAGE_ACCEPT}
           className="hidden"
           onChange={handleReplacePhotoUpload}
         />
@@ -22573,6 +22610,13 @@ Please add nutritional information manually if needed.`);
                 </div>
                 {/* Always-visible 3-step tracker so progress feels clear even when AI is slow */}
                 <div className="mb-4">
+                  {(isAnalyzing || lastAnalysisDurationSeconds !== null) && (
+                    <div className="mb-3 rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-semibold text-emerald-800">
+                      {isAnalyzing
+                        ? `Analyzing for ${formatAnalysisTime(analysisElapsedSeconds)}`
+                        : `Analysis took ${formatAnalysisTime(lastAnalysisDurationSeconds)}`}
+                    </div>
+                  )}
                   <div className="flex flex-col sm:flex-row items-center justify-center gap-2 sm:gap-4 text-[11px] sm:text-xs">
                     {[
                       { key: 'preparing' as const, label: 'Step 1 · Preparing photo' },
@@ -22695,7 +22739,7 @@ Please add nutritional information manually if needed.`);
                       📷 Change Photo
                       <input
                         type="file"
-                        accept="image/*"
+                        accept={FOOD_IMAGE_ACCEPT}
                         onChange={(e) => {
                           handlePhotoUpload(e);
                           setShowAddFood(true); // 🔥 FIX: Ensure photo processing UI stays visible
@@ -22711,6 +22755,9 @@ Please add nutritional information manually if needed.`);
                         setPendingPhotoPicker(false);
                         setIsAnalyzing(false);
                         setAnalysisPhase('idle');
+                        setAnalysisStartedAt(null);
+                        setAnalysisElapsedSeconds(0);
+                        setLastAnalysisDurationSeconds(null);
                         // Keep the edit panel visible when removing a photo during edit flows (e.g., Add Ingredient path)
                         if (editingEntry) {
                           setShowAddFood(true);
@@ -22853,7 +22900,7 @@ Please add nutritional information manually if needed.`);
                           <input
                             ref={editPhotoInputRef}
                             type="file"
-                            accept="image/*"
+                            accept={FOOD_IMAGE_ACCEPT}
                             className="hidden"
                             onChange={async (e) => {
                               await handlePhotoUpload(e)
