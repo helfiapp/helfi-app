@@ -5074,6 +5074,13 @@ export default function FoodDiary() {
       .replace(/\s+/g, ' ')
       .trim()
 
+  const isSodaDrinkDbQuery = (value: string) => {
+    const q = normalizeDbQuery(value)
+    if (!q) return false
+    if (/\b(baking soda|bicarbonate|sodium bicarbonate)\b/.test(q)) return false
+    return /\b(carbonated soda|soft drink|cola|soda drink|soda water|sparkling drink)\b/.test(q) || q === 'soda'
+  }
+
   const scoreDbMatch = (query: string, candidateName: string) => {
     const q = normalizeDbQuery(query)
     const name = normalizeDbQuery(candidateName)
@@ -5334,6 +5341,7 @@ export default function FoodDiary() {
             ? 'egg whole'
             : baseQuery
         if (!query || query.length < 2) return
+        if (isSodaDrinkDbQuery(query)) return
 
         const itemMissingCoreMacros = coreMacrosMissing(item)
 
@@ -22813,7 +22821,7 @@ Please add nutritional information manually if needed.`);
                     When editing an entry, clicking the image lets you change the photo. */}
                 {photoPreview && (
                   <div
-                    className={`p-4 border-b border-gray-100 flex justify-center ${
+                    className={`p-4 border-b border-gray-100 flex flex-col items-center ${
                       editingEntry ? 'lg:hidden' : ''
                     }`}
                   >
@@ -22911,6 +22919,11 @@ Please add nutritional information manually if needed.`);
                         </>
                       )}
                     </div>
+                    {!editingEntry && lastAnalysisDurationSeconds !== null && (
+                      <div className="mt-3 w-full max-w-sm rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-center text-sm font-semibold text-emerald-800">
+                        Analysis completed in {formatAnalysisTime(lastAnalysisDurationSeconds)}. Nutrition is an estimate.
+                      </div>
+                    )}
                   </div>
                 )}
 

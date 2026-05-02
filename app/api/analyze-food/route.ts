@@ -524,6 +524,7 @@ const itemsCanCreateCards = (items: any[] | null | undefined): boolean => {
 const estimatedGuessMacrosForName = (nameRaw: string) => {
   const name = (nameRaw || '').toLowerCase();
   // Defaults are conservative single-portion estimates.
+  if (/\b(carbonated soda|soft drink|cola|soda drink|soda water)\b/.test(name)) return { calories: 140, protein_g: 0, carbs_g: 35, fat_g: 0 };
   if (name.includes('egg')) return { calories: 70, protein_g: 6, carbs_g: 0.5, fat_g: 5 };
   if (name.includes('tofu')) return { calories: 140, protein_g: 16, carbs_g: 4, fat_g: 8 };
   if (name.includes('chicken')) return { calories: 220, protein_g: 32, carbs_g: 0, fat_g: 8 };
@@ -554,6 +555,13 @@ const estimatedGuessMacrosForName = (nameRaw: string) => {
   if (name.includes('bread') || name.includes('bun')) return { calories: 150, protein_g: 5, carbs_g: 28, fat_g: 3 };
   // Fallback generic side.
   return { calories: 90, protein_g: 2, carbs_g: 12, fat_g: 3 };
+};
+
+const isSodaDrinkQuery = (value: string | null | undefined): boolean => {
+  const normalized = normalizeComponentName(String(value || ''));
+  if (!normalized) return false;
+  if (/\b(baking soda|bicarbonate|sodium bicarbonate)\b/.test(normalized)) return false;
+  return /\b(carbonated soda|soft drink|cola|soda drink|soda water|sparkling drink)\b/.test(normalized) || normalized === 'soda';
 };
 
 // Pull likely components from the AI's prose description to add missing guessed items.
@@ -1374,6 +1382,18 @@ const enrichItemsWithFatSecretIfMissing = async (items: any[]): Promise<{ items:
 
     // Only attempt enrichment when we truly lack data
     if (!query || (!macrosMissing && !caloriesMissingOrZero)) {
+      enriched.push(next);
+      continue;
+    }
+
+    if (isSodaDrinkQuery(query)) {
+      const estimate = estimatedGuessMacrosForName(query);
+      if (caloriesMissingOrZero) next.calories = estimate.calories;
+      if (!Number.isFinite(protein) || protein === 0) next.protein_g = estimate.protein_g;
+      if (!Number.isFinite(carbs) || carbs === 0) next.carbs_g = estimate.carbs_g;
+      if (!Number.isFinite(fat) || fat === 0) next.fat_g = estimate.fat_g;
+      if (!next.serving_size) next.serving_size = '1 cup';
+      changed = true;
       enriched.push(next);
       continue;
     }
