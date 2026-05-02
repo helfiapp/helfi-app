@@ -1,5 +1,33 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-02 12:46 AEST
+- What changed: Fixed food photo analysis so soda/cola drinks are not matched as baking soda, and the result screen now keeps showing how long the analysis took.
+- Where to see it (page/link): https://helfi.ai/food/analysis
+- What to quickly test: Upload the burger/fries/drink image; it should not create a baking soda card, and the finished result should show the analysis time under the photo.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-05-02 02:24 AEST
+- What changed: Fixed live food photo analysis so it keeps producing ingredient cards, added a final estimated-card backup, and added a visible analysis timer.
+- Where to see it (page/link): https://helfi.ai/food/analysis
+- What to quickly test: Upload a food photo; the timer should count up and ingredient cards should appear with calories and macros.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-04-30 20:27 AEST
+- What changed: Fixed the web Food Diary so imported recipe meals, including soup recipes, stay displayed as food entries instead of being mistaken for water/drink entries.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary and confirm the imported Lamb Shawarma Chickpea Soup entry shows as a food/recipe-style meal, not a water/drink entry.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 2026-04-28 01:31 AEST
+- What changed: Replaced the old shared OpenAI key with a new live-only key, redeployed helfi.ai onto that new key, and turned off OpenAI key access for local and test use on this Mac so background local activity cannot keep draining API credits.
+- Where to see it (page/link): https://helfi.ai and OpenAI API key settings for the Helfi organization.
+- What to quickly test: Open helfi.ai and confirm the site still loads, then check OpenAI API keys and confirm only HELFI LIVE WEB is active.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-04-26 11:43 AEST
 - What changed: Cleaned up project drift by removing old duplicate Codex worktrees, documenting the local native test-login process without exposing the password in public docs, and refreshing the native lock snapshot so the saved native app baseline passes its guard check.
 - Where to see it (page/link): Internal project cleanup only; no visible app page changed.
