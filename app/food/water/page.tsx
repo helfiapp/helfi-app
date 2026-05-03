@@ -117,6 +117,20 @@ function formatAmount(entry: WaterEntry) {
   return `${formatNumber(entry.amount)} ${unit}`
 }
 
+function sweetenedDrinkCaloriesFromLabel(label: string | null | undefined) {
+  const text = String(label || '').toLowerCase()
+  const match = text.match(/\b(sugar|honey)\b[^\d]*(\d+(?:\.\d+)?)\s*(g|tsp|tbsp)\b/i)
+  if (!match) return null
+  const type = match[1] === 'honey' ? 'honey' : 'sugar'
+  const amount = Number(match[2])
+  const unit = match[3] as SugarUnit
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const grams = type === 'honey' ? honeyToGrams(amount, unit) : sugarToGrams(amount, unit)
+  const macros = sweetenerToMacros(grams, type)
+  const calories = Math.round(macros.calories)
+  return calories > 0 ? calories : null
+}
+
 function formatMl(ml: number | null | undefined) {
   const value = Number(ml ?? 0)
   if (!Number.isFinite(value) || value <= 0) return '0 ml'
@@ -1190,6 +1204,8 @@ export default function WaterIntakePage() {
                   entries.map((entry) => {
                     const label = normalizeLabel(entry.label)
                     const drinkConfig = resolveDrinkConfig(label)
+                    const sweetenerCalories = sweetenedDrinkCaloriesFromLabel(label)
+                    const amountLabel = formatAmount(entry)
                     const icon = drinkConfig?.icon || '/mobile-assets/MOBILE%20ICONS/WATER.png'
                     const accent =
                       (drinkConfig?.id || '').toLowerCase() === 'coffee'
@@ -1211,7 +1227,9 @@ export default function WaterIntakePage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="text-sm font-bold text-[#111711] dark:text-white">{formatAmount(entry)}</p>
+                          <p className="text-sm font-bold text-[#111711] dark:text-white">
+                            {sweetenerCalories ? `${sweetenerCalories} kcal • ${amountLabel}` : amountLabel}
+                          </p>
                           <button
                             type="button"
                             onClick={() => openTimeEditor(entry)}
