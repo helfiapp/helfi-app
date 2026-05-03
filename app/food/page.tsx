@@ -737,6 +737,20 @@ const getWaterIconSrc = (label?: string | null) => {
   return WATER_ICON_BY_LABEL[key] ?? WATER_ICON_BY_LABEL.water
 }
 
+const getSweetenedWaterCalories = (label?: string | null) => {
+  const text = String(label || '').toLowerCase()
+  const match = text.match(/\b(sugar|honey)\b[^\d]*(\d+(?:\.\d+)?)\s*(g|tsp|tbsp)\b/i)
+  if (!match) return null
+  const type = match[1] === 'honey' ? 'honey' : 'sugar'
+  const amount = Number(match[2])
+  const unit = normalizeSweetenerUnit(match[3])
+  if (!unit || !Number.isFinite(amount) || amount <= 0) return null
+  const grams = sweetenerToGrams(type, amount, unit)
+  const macros = sweetenerToMacros(type, grams)
+  const calories = Math.round(Number(macros.calories) || 0)
+  return calories > 0 ? calories : null
+}
+
 const isInlineImageSrc = (src: string | null | undefined) =>
   typeof src === 'string' && (src.startsWith('data:') || src.startsWith('blob:'))
 
@@ -27838,8 +27852,13 @@ Please add nutritional information manually if needed.`);
                         !isBuilderFoodEntry &&
                         (hasExplicitDrinkMeta || (!forceFoodIconForFavorite && Boolean(drinkLiquidHint)))
                       const entryTotals = isWaterEntry ? null : getEntryTotals(food)
+                      const waterCaloriesValue = isWaterEntry ? getSweetenedWaterCalories(food?.label || food?.description) : null
                       const entryCaloriesValue =
-                        !isWaterEntry && Number.isFinite(Number(entryTotals?.calories)) ? Number(entryTotals?.calories) : null
+                        isWaterEntry
+                          ? waterCaloriesValue
+                          : Number.isFinite(Number(entryTotals?.calories))
+                          ? Number(entryTotals?.calories)
+                          : null
                       const entryCaloriesLabel =
                         entryCaloriesValue === null ? null : `${formatEnergyNumber(entryCaloriesValue, energyUnit)} ${energyUnit}`
                       const waterLabel = isWaterEntry ? String(food?.label || 'Water') : null
