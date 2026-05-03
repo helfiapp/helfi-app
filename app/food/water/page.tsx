@@ -1122,7 +1122,7 @@ export default function WaterIntakePage() {
                 <div className="flex gap-3">
                   <div className="flex-1 relative">
                     <input
-                      className="w-full h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg px-4 text-base focus:ring-[#62b763] focus:border-[#62b763] dark:text-white"
+                      className="w-full h-12 bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-800 rounded-lg pl-4 pr-24 text-base focus:ring-[#62b763] focus:border-[#62b763] dark:text-white"
                       placeholder="0"
                       type="number"
                       inputMode="decimal"
@@ -1136,7 +1136,7 @@ export default function WaterIntakePage() {
                         e.currentTarget.select()
                       }}
                     />
-                    <div ref={customUnitRef} className="absolute right-2 top-2">
+                    <div ref={customUnitRef} className="absolute right-8 top-2">
                       <button
                         type="button"
                         onClick={() => setShowCustomUnitPicker((prev) => !prev)}
