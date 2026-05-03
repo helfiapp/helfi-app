@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-03 11:37 AEST
+- What changed: Fixed the web Food Diary drink list so newest drinks show first, coffee with honey uses the coffee icon, and sweetened drink rows always show calories when sugar or honey adds calories.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Open Food Diary and check Coffee with honey or Coffee with sugar. The newest drink should be first, the icon should be coffee, and the row should show kcal when honey or sugar is included.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-02 12:46 AEST
 - What changed: Fixed food photo analysis so soda/cola drinks are not matched as baking soda, and the result screen now keeps showing how long the analysis took.
 - Where to see it (page/link): https://helfi.ai/food/analysis
