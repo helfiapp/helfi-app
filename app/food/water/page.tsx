@@ -1227,7 +1227,7 @@ export default function WaterIntakePage() {
                           </div>
                         </div>
                         <div className="flex items-center gap-4">
-                          <p className="text-sm font-bold text-[#111711] dark:text-white">
+                          <p className="whitespace-nowrap text-right text-sm font-bold text-[#111711] dark:text-white">
                             {sweetenerCalories ? `${sweetenerCalories} kcal • ${amountLabel}` : amountLabel}
                           </p>
                           <button
