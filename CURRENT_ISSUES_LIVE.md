@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-03 11:57 AEST
+- What changed: Deployed the web recipe/photo upload support so Import Recipe, Add Ingredient, and Build a Meal can accept AVIF and WebP-style image uploads, with AVIF converted safely before AI analysis.
+- Where to see it (page/link): https://helfi.ai/food/import-recipe and https://helfi.ai/food/build-meal
+- What to quickly test: Open Import Recipe, choose the photo option, and confirm AVIF/WebP-style recipe photos can be selected and imported.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-03 11:37 AEST
 - What changed: Fixed the web Food Diary drink list so newest drinks show first, coffee with honey uses the coffee icon, and sweetened drink rows always show calories when sugar or honey adds calories.
 - Where to see it (page/link): https://helfi.ai/food
