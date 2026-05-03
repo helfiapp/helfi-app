@@ -723,7 +723,9 @@ const normalizeWaterLabel = (label?: string | null) => {
   const withoutParens = raw.replace(/\([^)]*\)/g, '')
   const withoutSugarHints = withoutParens
     .replace(/\bwith\s+sugar\b/g, '')
+    .replace(/\bwith\s+honey\b/g, '')
     .replace(/\bcontains\s+sugar\b/g, '')
+    .replace(/\bcontains\s+honey\b/g, '')
     .replace(/\bsugar[-\s]?free\b/g, '')
     .replace(/\bno\s+sugar\b/g, '')
     .replace(/\bwith\s+no\s+sugar\b/g, '')
@@ -29194,7 +29196,7 @@ Please add nutritional information manually if needed.`);
                               ) : (
                                 visibleEntries
                                   .slice()
-                                  .sort((a: any, b: any) => (extractEntryTimestampMs(a) || 0) - (extractEntryTimestampMs(b) || 0))
+                                  .sort((a: any, b: any) => (extractEntryTimestampMs(b) || 0) - (extractEntryTimestampMs(a) || 0))
                                   .map((food) => renderEntryCard(food))
                               )}
                             </div>
