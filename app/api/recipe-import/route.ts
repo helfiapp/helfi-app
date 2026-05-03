@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { CreditManager } from '@/lib/credit-system'
 import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
+import { normalizeImageForAi, resolveImageContentType } from '@/lib/ai-image-normalize'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -638,12 +639,19 @@ export async function POST(request: NextRequest) {
       let firstImageMeta: { width: number | null; height: number | null; bytes: number | null; mime: string | null } | null = null
 
       for (const f of files) {
-        const ab = await f.arrayBuffer()
-        const bytes = Buffer.from(ab)
-        const mime = String((f as any).type || 'image/jpeg')
-        const dataUrl = `data:${mime};base64,${bytes.toString('base64')}`
+        const bytes = Buffer.from(await f.arrayBuffer())
+        const resolvedMime = resolveImageContentType((f as any).type || '', (f as any).name || '', bytes)
+        const normalizedImage = await normalizeImageForAi(bytes, resolvedMime)
+        const dataUrl = `data:${normalizedImage.mimeType};base64,${normalizedImage.buffer.toString('base64')}`
         images.push({ type: 'image_url', image_url: { url: dataUrl, detail: 'high' } })
-        if (!firstImageMeta) firstImageMeta = { width: null, height: null, bytes: bytes.length, mime }
+        if (!firstImageMeta) {
+          firstImageMeta = {
+            width: null,
+            height: null,
+            bytes: normalizedImage.buffer.length,
+            mime: normalizedImage.mimeType,
+          }
+        }
       }
 
       const completion = await runChatCompletionWithLogging(

@@ -13,6 +13,8 @@ import { applyFoodNameOverride, createFoodNameOverrideIndex } from '@/lib/food/f
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
 
+const FOOD_IMAGE_ACCEPT = 'image/*,.avif,.webp,.web'
+
 type NormalizedFoodItem = {
   source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
   id: string
@@ -6814,7 +6816,7 @@ export default function MealBuilderClient() {
             <input
               ref={photoInputRef}
               type="file"
-              accept="image/*"
+              accept={FOOD_IMAGE_ACCEPT}
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]

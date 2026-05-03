@@ -20,6 +20,8 @@ type RecipeImportDraft = ImportedRecipe & {
   createdAt: number
 }
 
+const FOOD_IMAGE_ACCEPT = 'image/*,.avif,.webp,.web'
+
 const isValidHttpUrl = (value: string) => {
   try {
     const u = new URL(value)
@@ -304,7 +306,7 @@ export default function ImportRecipeClient() {
                 <input
                   ref={cameraInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={FOOD_IMAGE_ACCEPT}
                   capture="environment"
                   className="hidden"
                   onChange={(e) => {
@@ -316,7 +318,7 @@ export default function ImportRecipeClient() {
                 <input
                   ref={libraryInputRef}
                   type="file"
-                  accept="image/*"
+                  accept={FOOD_IMAGE_ACCEPT}
                   multiple
                   className="hidden"
                   onChange={(e) => {

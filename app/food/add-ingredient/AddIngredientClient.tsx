@@ -23,6 +23,8 @@ type DynamicSizeLookup = {
   matchedItem: Partial<NormalizedFoodItem> | null
 }
 
+const FOOD_IMAGE_ACCEPT = 'image/*,.avif,.webp,.web'
+
 type NormalizedFoodItem = {
   source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
   id: string
@@ -2092,7 +2094,7 @@ export default function AddIngredientClient() {
             <input
               ref={photoInputRef}
               type="file"
-              accept="image/*"
+              accept={FOOD_IMAGE_ACCEPT}
               className="hidden"
               onChange={(e) => {
                 const f = e.target.files?.[0]
