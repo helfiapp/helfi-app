@@ -499,9 +499,17 @@ function buildMedicationGuidance(context: any): ReportSectionBucket {
   }
 
   if (medications.length) {
+    bucket.working.push({
+      name: 'Medication timing is captured',
+      reason: `Your medication list includes timing information, which makes the weekly report more useful than a plain medicine list.\nThat timing can be compared with erection quality, libido, energy, digestion, mood, symptoms, and exercise recovery.`,
+    })
     bucket.suggested.push({
       name: 'Medication review focus',
       reason: `You have ${medications.length} medication(s) listed, so the useful next step is not adding more guesses.\nReview timing, side effects, and goal changes with your prescriber, especially if erections, libido, digestion, energy, or mood changed this week.`,
+    })
+    bucket.suggested.push({
+      name: 'Compare dose timing with daily patterns',
+      reason: `Your report also has food, hydration, exercise, mood, symptom, and check-in data.\nCompare medication timing with the best and worst days before deciding whether the medicine itself is the issue.`,
     })
   }
 
@@ -519,7 +527,460 @@ function buildMedicationGuidance(context: any): ReportSectionBucket {
     })
   }
 
+  if (medications.length) {
+    bucket.avoid.push({
+      name: 'Mixing medication changes with supplement changes',
+      reason: `Your account has ${medications.length} medication(s) and ${supplements.length} supplement(s) listed.\nAvoid changing medication timing and adding new supplements in the same week, because the report will not know what caused the change.`,
+    })
+  }
+
   return bucket
+}
+
+function pushReportItem(
+  bucket: ReportItem[],
+  name: string,
+  reason: string,
+  max = 4
+) {
+  const cleanName = String(name || '').trim()
+  const cleanReason = String(reason || '').trim()
+  if (!cleanName || !cleanReason) return
+  const key = canonicalizeNameForMatch(cleanName) || cleanName.toLowerCase()
+  if (bucket.some((item) => (canonicalizeNameForMatch(String(item?.name || '')) || String(item?.name || '').toLowerCase()) === key)) return
+  if (bucket.length >= max) return
+  bucket.push({ name: cleanName, reason: cleanReason })
+}
+
+function enrichReportSections(
+  sections: Record<ReportSectionKey, ReportSectionBucket>,
+  context: any
+): Record<ReportSectionKey, ReportSectionBucket> {
+  const next = buildDefaultSections()
+  for (const key of REPORT_SECTIONS) {
+    next[key] = {
+      working: Array.isArray(sections?.[key]?.working) ? [...sections[key].working] : [],
+      suggested: Array.isArray(sections?.[key]?.suggested) ? [...sections[key].suggested] : [],
+      avoid: Array.isArray(sections?.[key]?.avoid) ? [...sections[key].avoid] : [],
+    }
+  }
+
+  const coverage = context?.coverage || {}
+  const nutritionSummary = context?.nutritionSummary || {}
+  const hydrationSummary = context?.hydrationSummary || {}
+  const exerciseSummary = context?.exerciseSummary || {}
+  const moodSummary = context?.moodSummary || {}
+  const symptomSummary = context?.symptomSummary || {}
+  const checkinSummary = context?.checkinSummary || {}
+  const dataFlags = context?.dataFlags || {}
+  const correlationSignals = context?.correlationSignals || {}
+  const trendSignals = Array.isArray(context?.trendSignals) ? context.trendSignals : []
+  const riskFlags = Array.isArray(context?.riskFlags) ? context.riskFlags : []
+  const foodHighlights = context?.foodHighlights || {}
+  const mealTimingSummary = context?.mealTimingSummary || {}
+  const supplements = Array.isArray(context?.supplements) ? context.supplements : []
+  const medications = Array.isArray(context?.medications) ? context.medications : []
+  const labHighlights = Array.isArray(context?.labs?.highlights) ? context.labs.highlights : []
+  const labTrends = Array.isArray(context?.labTrends) ? context.labTrends : []
+  const journalSummary = context?.journalSummary || {}
+
+  const goals = extractNamedValues(context?.goals).filter(Boolean)
+  const issues = extractNamedValues(context?.issues).filter(Boolean)
+  const focus = goals[0] || issues[0] || 'your current health goals'
+  const topFoods = Array.isArray(nutritionSummary?.topFoods) ? nutritionSummary.topFoods.map((item: any) => String(item?.name || '').trim()).filter(Boolean) : []
+  const topDrinks = Array.isArray(hydrationSummary?.topDrinks) ? hydrationSummary.topDrinks.map((item: any) => String(item?.label || item?.name || '').trim()).filter(Boolean) : []
+  const topSymptoms = Array.isArray(symptomSummary?.topSymptoms) ? symptomSummary.topSymptoms.map((item: any) => String(item?.name || '').trim()).filter(Boolean) : []
+  const topActivities = Array.isArray(exerciseSummary?.topActivities) ? exerciseSummary.topActivities.map((item: any) => String(item?.name || '').trim()).filter(Boolean) : []
+
+  pushReportItem(
+    next.overview.working,
+    'Strong weekly data signal',
+    `${coverage.daysActive || 0} active day(s) and ${coverage.totalEvents || 0} total entries gave this report enough signal to compare habits with ${focus}.\nThis is the right foundation for a useful weekly health report.`,
+    4
+  )
+  if (goals.length) {
+    pushReportItem(
+      next.overview.working,
+      'Goals are clear enough to personalize',
+      `Your current goals include ${goals.slice(0, 4).join(', ')}.\nThat lets the report connect food, supplements, medications, mood, symptoms, and exercise to the outcomes you actually care about.`,
+      4
+    )
+  }
+  if (Array.isArray(checkinSummary?.goals) && checkinSummary.goals.length) {
+    pushReportItem(
+      next.overview.working,
+      'Check-ins connect habits to outcomes',
+      `${checkinSummary.goals.length} goal check-in area(s) were available this week.\nThose scores help show whether current routines are lining up with energy, libido, digestion, mood, or recovery.`,
+      4
+    )
+  }
+  pushReportItem(
+    next.overview.suggested,
+    'Pick the strongest pattern for next week',
+    `This report has ${coverage.foodCount || 0} food entries, ${coverage.waterCount || 0} water entries, and ${coverage.exerciseCount || 0} exercise entries.\nChoose one pattern from those areas to repeat for 7 days so the next comparison is cleaner.`,
+    4
+  )
+  pushReportItem(
+    next.overview.suggested,
+    'Use symptoms and mood as the scoreboard',
+    `Mood entries (${coverage.moodCount || 0}) and symptom entries (${coverage.symptomCount || 0}) are the clearest feedback signals.\nCompare them against food, hydration, supplements, medications, and exercise timing before changing the whole routine.`,
+    4
+  )
+  pushReportItem(
+    next.overview.avoid,
+    'Changing too many things at once',
+    `This report is comparing many inputs at the same time: food, fluids, supplements, medications, movement, mood, symptoms, and check-ins.\nAvoid changing several big things in one week, because it makes the next report much harder to trust.`,
+    4
+  )
+  if (supplements.length >= 6) {
+    pushReportItem(
+      next.overview.avoid,
+      'Adding more to an already large stack',
+      `Your current supplement list has ${supplements.length} item(s).\nAvoid adding more products until the report can show which current items line up with better energy, libido, digestion, mood, symptoms, or recovery.`,
+      4
+    )
+  }
+
+  if (nutritionSummary?.daysWithLogs || coverage.foodCount) {
+    if (topFoods.length) {
+      pushReportItem(
+        next.nutrition.working,
+        'Real food pattern captured',
+        `Top logged foods this week included ${topFoods.slice(0, 5).join(', ')}.\nThat gives the report real meals to compare with energy, digestion, bowel movements, mood, and symptoms.`,
+        4
+      )
+    }
+    if (nutritionSummary?.dailyAverages?.protein_g) {
+      pushReportItem(
+        next.nutrition.working,
+        'Protein baseline is visible',
+        `Average protein was about ${nutritionSummary.dailyAverages.protein_g}g per day.\nThat matters for recovery, libido support, hunger, and steady energy.`,
+        4
+      )
+    }
+    if (nutritionSummary?.dailyAverages?.fiber_g) {
+      pushReportItem(
+        next.nutrition.working,
+        'Fiber can now be compared with digestion',
+        `Average fiber was about ${nutritionSummary.dailyAverages.fiber_g}g per day.\nThat gives the report a bowel-movement and digestion signal to compare next week.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.nutrition.suggested,
+      'Make one meal a clear protein anchor',
+      `Food logs show ${coverage.foodCount || 0} entries across ${nutritionSummary.daysWithLogs || 0} day(s).\nChoose one meal each day with an obvious protein source so energy, hunger, libido, and recovery patterns are easier to read.`,
+      4
+    )
+    pushReportItem(
+      next.nutrition.suggested,
+      'Pair digestion goals with fiber and fluids',
+      `Bowel Movements is one of the saved goals, and average fiber was ${nutritionSummary?.dailyAverages?.fiber_g || 0}g while water averaged ${hydrationSummary?.dailyAverageMl || 0} ml.\nUse those two numbers together instead of judging digestion from food alone.`,
+      4
+    )
+    if ((dataFlags.sugarSpikes || []).length) {
+      pushReportItem(
+        next.nutrition.avoid,
+        'Stacking sugar on symptom-heavy days',
+        `Sugar was higher on ${(dataFlags.sugarSpikes || []).map((d: any) => d.date).slice(0, 3).join(', ')}.\nAvoid making those days your normal pattern until you compare them with energy, headaches, mood, and digestion.`,
+        4
+      )
+    }
+    if ((dataFlags.sodiumSpikes || []).length) {
+      pushReportItem(
+        next.nutrition.avoid,
+        'Letting salty meals sit without water balance',
+        `Sodium was highest on ${(dataFlags.sodiumSpikes || []).map((d: any) => d.date).slice(0, 3).join(', ')}.\nAvoid judging headaches, energy, or recovery on those days without also looking at water intake.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.nutrition.avoid,
+      'Judging food from calories only',
+      `The report has calories plus protein, carbs, fat, fiber, sugar, sodium, and actual food names.\nAvoid focusing only on calories, because digestion, libido, energy, and recovery often depend on the full pattern.`,
+      4
+    )
+  }
+
+  if (hydrationSummary?.daysWithLogs || coverage.waterCount) {
+    pushReportItem(
+      next.hydration.working,
+      'Hydration was tracked often enough to compare',
+      `${coverage.waterCount || 0} drink entries were logged across ${hydrationSummary.daysWithLogs || 0} day(s), averaging about ${hydrationSummary.dailyAverageMl || 0} ml per day.\nThat is useful for reading energy, headaches, bowel movements, and recovery.`,
+      4
+    )
+    if (topDrinks.length) {
+      pushReportItem(
+        next.hydration.working,
+        'Drink types are visible',
+        `Common drinks included ${topDrinks.slice(0, 4).join(', ')}.\nThat helps separate plain water patterns from coffee, tea, mineral water, or sweet drinks.`,
+        4
+      )
+    }
+    if (correlationSignals.hydrationMood) {
+      pushReportItem(
+        next.hydration.working,
+        'Water has a mood comparison signal',
+        `Mood averaged ${correlationSignals.hydrationMood.highAvg} on higher-water days vs ${correlationSignals.hydrationMood.lowAvg} on lower-water days.\nThat makes hydration worth keeping steady next week.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.hydration.suggested,
+      'Front-load water earlier',
+      `Average water was ${hydrationSummary.dailyAverageMl || 0} ml per day.\nTry getting the first bottle in earlier so headaches, energy, bowel movements, and training feel easier to compare.`,
+      4
+    )
+    if ((dataFlags.lowHydrationDays || []).length) {
+      pushReportItem(
+        next.hydration.suggested,
+        'Fix the lowest-water days first',
+        `Lower-water days showed up on ${(dataFlags.lowHydrationDays || []).map((d: any) => d.date).slice(0, 3).join(', ')}.\nImproving those days will tell more than adding extra water on already good days.`,
+        4
+      )
+      pushReportItem(
+        next.hydration.avoid,
+        'Letting low-water days explain every symptom',
+        `Low-water days can affect energy, headaches, digestion, and recovery.\nAvoid blaming supplements, medications, or food changes until water is steadier on those low days.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.hydration.avoid,
+      'Counting sweet drinks as the whole hydration plan',
+      `The report can see drink names, not just total fluid.\nAvoid relying on sweet drinks, coffee, or tea as the whole hydration base if headaches, energy, or digestion are the goal.`,
+      4
+    )
+  }
+
+  if (exerciseSummary?.sessions || coverage.exerciseCount) {
+    pushReportItem(
+      next.exercise.working,
+      'Movement routine is active',
+      `${exerciseSummary.sessions || coverage.exerciseCount || 0} session(s) and about ${exerciseSummary.totalMinutes || 0} total minute(s) were logged this week.\nThat is useful support for energy, libido, mood, recovery, and sleep quality.`,
+      4
+    )
+    if (topActivities.length) {
+      pushReportItem(
+        next.exercise.working,
+        'Training variety is visible',
+        `Logged activity included ${topActivities.slice(0, 4).join(', ')}.\nThat gives the report enough variety to compare strength, cardio, walking, and recovery days.`,
+        4
+      )
+    }
+    if (correlationSignals.exerciseMood) {
+      pushReportItem(
+        next.exercise.working,
+        'Movement lines up with mood',
+        `Mood averaged ${correlationSignals.exerciseMood.highAvg} on higher-movement days vs ${correlationSignals.exerciseMood.lowAvg} on lower-movement days.\nThat is a useful reason to protect short movement sessions.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.exercise.suggested,
+      'Protect recovery after harder sessions',
+      `This week included about ${exerciseSummary.totalMinutes || 0} movement minute(s).\nMatch harder sessions with enough water, protein, and magnesium-style recovery support before adding more intensity.`,
+      4
+    )
+    pushReportItem(
+      next.exercise.suggested,
+      'Keep at least one easy movement day',
+      `Energy, libido, sleep quality, and recovery are saved goals.\nUse one easy walk or mobility day to see whether symptoms and mood improve without extra training stress.`,
+      4
+    )
+    if ((dataFlags.lowActivityDays || []).length) {
+      pushReportItem(
+        next.exercise.avoid,
+        'All-or-nothing movement weeks',
+        `Movement dropped on ${(dataFlags.lowActivityDays || []).map((d: any) => d.date).slice(0, 3).join(', ')}.\nAvoid making exercise either hard or nothing; short easy sessions give the report a cleaner signal.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.exercise.avoid,
+      'Adding intensity while recovery signals are unclear',
+      `The report is also watching water, protein, mood, symptoms, and sleep-quality goals.\nAvoid increasing training load if those recovery signals are moving the wrong way.`,
+      4
+    )
+  }
+
+  if (moodSummary?.entries || coverage.moodCount) {
+    pushReportItem(
+      next.mood.working,
+      'Mood was tracked enough to compare',
+      `${coverage.moodCount || moodSummary.entries || 0} mood entry/entries were available this week, with an average around ${moodSummary.averageMood ?? 'not set'}.\nThat helps judge whether food, hydration, exercise, supplements, and medication timing are helping or hurting.`,
+      4
+    )
+    const moodTrend = trendSignals.find((item: any) => String(item?.metric || '').toLowerCase() === 'mood')
+    if (moodTrend) {
+      pushReportItem(
+        next.mood.working,
+        'Mood trend is measurable',
+        `Mood moved from ${moodTrend.firstAvg} to ${moodTrend.secondAvg} across the week.\nThat gives next week a clear comparison point.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.mood.suggested,
+      'Compare mood with water and movement first',
+      `The same week has ${coverage.waterCount || 0} water entries and ${coverage.exerciseCount || 0} exercise entries.\nCheck those before assuming mood changes came from supplements or medications.`,
+      4
+    )
+    if ((dataFlags.lowMoodDays || []).length) {
+      pushReportItem(
+        next.mood.suggested,
+        'Look at the lowest mood days',
+        `Lower-mood days showed on ${(dataFlags.lowMoodDays || []).map((d: any) => d.date).slice(0, 3).join(', ')}.\nCompare those days with food timing, sugar, water, exercise, and medication timing.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.mood.avoid,
+      'Treating one low mood day as the whole story',
+      `This report has a 7-day mood pattern, not just one day.\nAvoid changing supplements or medications from one low score without checking the surrounding food, sleep-quality goal, water, and exercise pattern.`,
+      4
+    )
+  }
+
+  if (symptomSummary?.entries || coverage.symptomCount) {
+    pushReportItem(
+      next.symptoms.working,
+      'Symptoms were captured for pattern finding',
+      `${coverage.symptomCount || symptomSummary.entries || 0} symptom entry/entries were available this week.\nThat gives the report something real to compare against food, hydration, mood, medication timing, and supplement changes.`,
+      4
+    )
+    if (topSymptoms.length) {
+      pushReportItem(
+        next.symptoms.working,
+        'Top symptoms are visible',
+        `Common symptoms included ${topSymptoms.slice(0, 4).join(', ')}.\nThat helps focus the report on the symptoms that actually repeated.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.symptoms.suggested,
+      'Compare symptoms with same-day meals',
+      `Food logs include ${coverage.foodCount || 0} entries this week.\nUse same-day food, fluids, and meal timing to check whether symptoms repeat after similar patterns.`,
+      4
+    )
+    pushReportItem(
+      next.symptoms.suggested,
+      'Use hydration as a first filter',
+      `Water averaged about ${hydrationSummary.dailyAverageMl || 0} ml per day.\nBefore blaming a supplement or medication, compare symptom-heavy days with lower-water days.`,
+      4
+    )
+    if ((dataFlags.symptomHeavyDays || []).length) {
+      pushReportItem(
+        next.symptoms.avoid,
+        'Ignoring symptom-heavy days',
+        `Symptoms were heavier on ${(dataFlags.symptomHeavyDays || []).map((d: any) => d.date).slice(0, 3).join(', ')}.\nAvoid treating those as random; they are the best days to compare against sugar, late meals, water, and stress.`,
+        4
+      )
+    }
+    if (correlationSignals.sugarSymptoms) {
+      pushReportItem(
+        next.symptoms.avoid,
+        'Repeating higher-sugar symptom days',
+        `Symptoms averaged ${correlationSignals.sugarSymptoms.highAvg} on higher-sugar days vs ${correlationSignals.sugarSymptoms.lowAvg} on lower-sugar days.\nAvoid repeating the higher-sugar pattern until the symptom link is clearer.`,
+        4
+      )
+    }
+  }
+
+  if (journalSummary?.entries || mealTimingSummary?.lateMealDays?.length || mealTimingSummary?.lateSnackDays?.length || coverage.checkinCount) {
+    pushReportItem(
+      next.lifestyle.working,
+      'Lifestyle notes and check-ins add context',
+      `${coverage.checkinCount || 0} check-in entry/entries and ${journalSummary.entries || 0} journal note(s) were available.\nThat gives the report context beyond food, supplements, and medications.`,
+      4
+    )
+    if (mealTimingSummary?.lateMealDays?.length) {
+      pushReportItem(
+        next.lifestyle.avoid,
+        'Late meals on repeat',
+        `Late meals showed up on ${mealTimingSummary.lateMealDays.slice(0, 3).join(', ')}.\nAvoid repeating that pattern if sleep quality, digestion, morning energy, or symptoms are worse afterward.`,
+        4
+      )
+    }
+    if (mealTimingSummary?.lateSnackDays?.length) {
+      pushReportItem(
+        next.lifestyle.avoid,
+        'Late snacks without checking next day',
+        `Late snacks showed up on ${mealTimingSummary.lateSnackDays.slice(0, 3).join(', ')}.\nAvoid judging sleep quality or morning energy without checking whether those snack nights were different.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.lifestyle.suggested,
+      'Keep evening routine steady for one week',
+      `Sleep Quality and Energy are saved goals.\nKeep meal timing, caffeine, fluids, and magnesium timing steadier for 7 days so the next report can spot what changes.`,
+      4
+    )
+    pushReportItem(
+      next.lifestyle.suggested,
+      'Add one short note on unusual days',
+      `${journalSummary.entries || 0} journal note(s) were available this week.\nA short note on headache, digestion, libido, or low-energy days will make next week’s report much sharper.`,
+      4
+    )
+    pushReportItem(
+      next.lifestyle.avoid,
+      'Moving bedtime, meals, and supplements together',
+      `The report is trying to compare sleep quality, energy, digestion, libido, and recovery.\nAvoid changing bedtime, late food, and supplement timing all at once.`,
+      4
+    )
+  }
+
+  if (labHighlights.length || labTrends.length || coverage.labCount) {
+    if (labHighlights.length) {
+      pushReportItem(
+        next.labs.working,
+        'Lab highlights are available',
+        `${labHighlights.length} lab highlight(s) were available for this report.\nThat gives supplement and medication advice a stronger safety check than symptoms alone.`,
+        4
+      )
+    }
+    if (labTrends.length) {
+      pushReportItem(
+        next.labs.working,
+        'Lab movement can be compared',
+        `${labTrends[0]?.name || 'A marker'} moved ${labTrends[0]?.direction || 'across results'} compared with the prior result.\nTrend direction matters more than one isolated number.`,
+        4
+      )
+    }
+    pushReportItem(
+      next.labs.suggested,
+      'Use labs before adding high-dose nutrients',
+      `${supplements.length} supplement(s) are listed in the current stack.\nUse lab data before adding high-dose vitamin D, iron, zinc, B vitamins, or hormone-focused products.`,
+      4
+    )
+    pushReportItem(
+      next.labs.avoid,
+      'Guessing from labs without a clinician',
+      `Lab data can change supplement and medication decisions.\nAvoid changing medication or high-dose supplement plans from a lab note without a clinician review.`,
+      4
+    )
+  }
+
+  if (riskFlags.length) {
+    for (const flag of riskFlags.slice(0, 3)) {
+      pushReportItem(next.overview.avoid, String(flag?.name || 'Risk flag'), String(flag?.reason || ''), 4)
+    }
+  }
+
+  const empty = { working: [], suggested: [], avoid: [] }
+  if (!supplements.length) next.supplements = { ...empty }
+  if (!medications.length) next.medications = { ...empty }
+  if (!(nutritionSummary?.daysWithLogs || coverage.foodCount)) next.nutrition = { ...empty }
+  if (!(hydrationSummary?.daysWithLogs || coverage.waterCount)) next.hydration = { ...empty }
+  if (!(exerciseSummary?.sessions || coverage.exerciseCount)) next.exercise = { ...empty }
+  if (!(moodSummary?.entries || coverage.moodCount)) next.mood = { ...empty }
+  if (!(symptomSummary?.entries || coverage.symptomCount)) next.symptoms = { ...empty }
+  if (!(journalSummary?.entries || mealTimingSummary?.lateMealDays?.length || mealTimingSummary?.lateSnackDays?.length || coverage.checkinCount)) {
+    next.lifestyle = { ...empty }
+  }
+  if (!(labHighlights.length || labTrends.length || coverage.labCount)) next.labs = { ...empty }
+
+  return next
 }
 
 function buildSupplementGuidance(context: any): Pick<ReportSectionBucket, 'suggested' | 'avoid'> {
@@ -706,6 +1167,22 @@ function buildSupplementGuidance(context: any): Pick<ReportSectionBucket, 'sugge
     )
   }
 
+  if (suggested.length < 3 && currentSupplementNames.length >= 6) {
+    addUnique(
+      suggested,
+      'One-at-a-time supplement review',
+      `Your current routine already lists ${currentSupplementNames.length} supplements, including ${formatSupplementNameList(currentSupplementNames, 4)}.\nBefore adding more, pick one current supplement to keep especially consistent for 7 days and compare it with libido, digestion, energy, mood, symptoms, and recovery.`
+    )
+  }
+
+  if (suggested.length < 3 && currentSupplementNames.length >= 4) {
+    addUnique(
+      suggested,
+      'Match timing to the goal',
+      `Your supplement list has enough items that timing matters, not just the product names.\nMatch morning items to energy/libido goals and evening items to sleep/recovery goals so the next report can judge the pattern more clearly.`
+    )
+  }
+
   if (!avoid.length && labHighlights.length) {
     addUnique(
       avoid,
@@ -730,6 +1207,13 @@ function applySupplementGuidance(
   const guidance = buildSupplementGuidance(context)
   const supplementWorking = buildSupplementWorkingItems(context)
   const medicationGuidance = buildMedicationGuidance(context)
+  const mergeBucket = (existing: ReportItem[], additions: ReportItem[], max = 4) => {
+    const merged = Array.isArray(existing) ? [...existing] : []
+    for (const item of additions || []) {
+      pushReportItem(merged, String(item?.name || ''), String(item?.reason || ''), max)
+    }
+    return merged
+  }
 
   if (supplementWorking.length && (!Array.isArray(supplements.working) || supplements.working.length < Math.min(6, supplementWorking.length))) {
     const existing = Array.isArray(supplements.working) ? supplements.working : []
@@ -743,22 +1227,12 @@ function applySupplementGuidance(
     ].slice(0, 10)
   }
 
-  if (!Array.isArray(supplements.suggested) || supplements.suggested.length === 0) {
-    supplements.suggested = guidance.suggested
-  }
-  if (!Array.isArray(supplements.avoid) || supplements.avoid.length === 0) {
-    supplements.avoid = guidance.avoid
-  }
+  supplements.suggested = mergeBucket(supplements.suggested || [], guidance.suggested || [], 4)
+  supplements.avoid = mergeBucket(supplements.avoid || [], guidance.avoid || [], 4)
 
-  if (medicationGuidance.working.length && (!Array.isArray(medications.working) || medications.working.length === 0)) {
-    medications.working = medicationGuidance.working
-  }
-  if (medicationGuidance.suggested.length && (!Array.isArray(medications.suggested) || medications.suggested.length === 0)) {
-    medications.suggested = medicationGuidance.suggested
-  }
-  if (medicationGuidance.avoid.length && (!Array.isArray(medications.avoid) || medications.avoid.length === 0)) {
-    medications.avoid = medicationGuidance.avoid
-  }
+  medications.working = mergeBucket(medications.working || [], medicationGuidance.working || [], 4)
+  medications.suggested = mergeBucket(medications.suggested || [], medicationGuidance.suggested || [], 4)
+  medications.avoid = mergeBucket(medications.avoid || [], medicationGuidance.avoid || [], 4)
 
   next.supplements = supplements
   next.medications = medications
@@ -3761,7 +4235,10 @@ ${llmPayloadJson}
   })
 
   reportPayload.sections = dedupeReportSections(
-    applySupplementGuidance(sanitizeSupplementAndMedicationSections(sections, reportContext), reportContext)
+    enrichReportSections(
+      applySupplementGuidance(sanitizeSupplementAndMedicationSections(sections, reportContext), reportContext),
+      reportContext
+    )
   )
   reportPayload.wins = wins
   reportPayload.gaps = gaps
