@@ -6,6 +6,7 @@ import { useSession } from 'next-auth/react'
 import type { MouseEvent as ReactMouseEvent } from 'react'
 import { ReactNode, useCallback, useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
+import MobileBottomNav from '@/components/MobileBottomNav'
 import UsageMeter from '@/components/UsageMeter'
 import SupportChatWidget from '@/components/support/SupportChatWidget'
 import WeeklyReportReadyModal from '@/components/WeeklyReportReadyModal'
@@ -1003,6 +1004,33 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
     !isPractitionerPortalPath &&
     (!isPublicPage || isOnboardingPath)
 
+  const pagesWithOwnMobileBottomNav = [
+    '/account',
+    '/billing',
+    '/dashboard',
+    '/devices',
+    '/food',
+    '/food/water',
+    '/health-tracking',
+    '/help',
+    '/insights',
+    '/medical-images',
+    '/mood',
+    '/mood/history',
+    '/mood/journal',
+    '/mood/quick',
+    '/more',
+    '/onboarding',
+    '/profile',
+    '/settings',
+    '/symptoms',
+  ]
+  const shouldShowGlobalMobileBottomNav =
+    shouldShowSidebar &&
+    !isChatPage &&
+    !pagesWithOwnMobileBottomNav.includes(pathname) &&
+    !pathname.startsWith('/insights/')
+
   const pullRefreshEnabled = shouldShowSidebar && !isChatPage && !isFoodDiaryPage
   const PULL_REFRESH_ACTIVATE = 60
   const PULL_REFRESH_THRESHOLD = 280
@@ -1327,7 +1355,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
           data-scroll-zone="content"
           className={`md:pl-64 flex flex-col flex-1 relative overflow-x-hidden ${
             isChatPage ? 'overflow-hidden h-[100dvh]' : 'overflow-y-auto'
-          }`}
+          } ${shouldShowGlobalMobileBottomNav ? 'pb-[calc(5rem+env(safe-area-inset-bottom))] md:pb-0' : ''}`}
         >
           {goalSyncNotice && (
             <div className="fixed top-4 right-4 z-50 max-w-xs w-full mx-4 md:mx-0">
@@ -1438,6 +1466,7 @@ export default function LayoutWrapper({ children }: LayoutWrapperProps) {
             </div>
           )}
           {children}
+          {shouldShowGlobalMobileBottomNav && <MobileBottomNav />}
           <SupportChatWidget />
           <WeeklyReportReadyModal />
         </div>

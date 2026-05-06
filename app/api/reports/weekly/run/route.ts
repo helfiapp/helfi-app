@@ -88,9 +88,8 @@ function safeJsonParse(text: string): any | null {
 }
 
 function buildDefaultSections(): Record<ReportSectionKey, ReportSectionBucket> {
-  const section: ReportSectionBucket = { working: [], suggested: [], avoid: [] }
   return REPORT_SECTIONS.reduce((acc, key) => {
-    acc[key] = { ...section }
+    acc[key] = { working: [], suggested: [], avoid: [] }
     return acc
   }, {} as Record<ReportSectionKey, ReportSectionBucket>)
 }
@@ -329,9 +328,15 @@ function formatSupplementNameList(names: string[], max = 3) {
   return visible.join(', ')
 }
 
-function buildSupplementGuidance(context: any): Pick<ReportSectionBucket, 'suggested' | 'avoid'> {
-  const supplements = Array.isArray(context?.supplements) ? context.supplements : []
-  const medications = Array.isArray(context?.medications) ? context.medications : []
+function formatDoseTiming(item: any) {
+  const parts = [
+    String(item?.dosage || '').trim() ? `dose: ${String(item.dosage).trim()}` : '',
+    String(item?.timing || '').trim() ? `timing: ${String(item.timing).trim()}` : '',
+  ].filter(Boolean)
+  return parts.length ? ` (${parts.join(', ')})` : ''
+}
+
+function focusContextFromReport(context: any) {
   const checkinGoals = Array.isArray(context?.checkinSummary?.goals) ? context.checkinSummary.goals : []
   const issueLabels = extractNamedValues(context?.issues)
   const goalLabels = [
@@ -339,8 +344,188 @@ function buildSupplementGuidance(context: any): Pick<ReportSectionBucket, 'sugge
     ...checkinGoals.map((goal: any) => String(goal?.goal || '').trim()).filter(Boolean),
   ]
   const healthSituationText = extractNamedValues(context?.healthSituations).join(' ')
-  const focusLabels = [...goalLabels, ...issueLabels]
-  const focusText = `${focusLabels.join(' ')} ${healthSituationText}`.toLowerCase()
+  const focusLabels = [...goalLabels, ...issueLabels].filter(Boolean)
+  return {
+    goalLabels,
+    issueLabels,
+    focusLabels,
+    focusText: `${focusLabels.join(' ')} ${healthSituationText}`.toLowerCase(),
+  }
+}
+
+function pickFocusLabelFromContext(
+  focusLabels: string[],
+  patterns: RegExp[],
+  fallback: string
+) {
+  return focusLabels.find((label) => patterns.some((pattern) => pattern.test(label.toLowerCase()))) || fallback
+}
+
+function supplementRole(name: string) {
+  const lower = String(name || '').toLowerCase()
+  if (/citrulline|arginine|beet|nitric/.test(lower)) {
+    return {
+      patterns: [/libido/, /erection/, /sexual/, /blood flow/],
+      fallback: 'erections or blood flow',
+      reason: 'it is usually used for blood-flow support',
+    }
+  }
+  if (/maca|tongkat|fadogia|tribulus/.test(lower)) {
+    return {
+      patterns: [/libido/, /sexual/, /testosterone/, /energy/],
+      fallback: 'libido or energy',
+      reason: 'it is usually taken for libido, hormone, or energy support',
+    }
+  }
+  if (/magnesium|glycinate|taurate|threonate/.test(lower)) {
+    return {
+      patterns: [/sleep/, /stress/, /mood/, /recovery/, /muscle/],
+      fallback: 'sleep, stress, mood, or recovery',
+      reason: 'it may support relaxation, muscle function, and recovery',
+    }
+  }
+  if (/creatine/.test(lower)) {
+    return {
+      patterns: [/strength/, /muscle/, /training/, /exercise/, /energy/, /recovery/],
+      fallback: 'training, energy, or recovery',
+      reason: 'it may support strength output, training capacity, and recovery',
+    }
+  }
+  if (/omega|fish oil|epa|dha/.test(lower)) {
+    return {
+      patterns: [/mood/, /inflammation/, /heart/, /recovery/, /brain/],
+      fallback: 'mood, recovery, or heart health',
+      reason: 'it may support inflammation balance, mood, and heart health',
+    }
+  }
+  if (/probiotic|lactobacillus|bifido/.test(lower)) {
+    return {
+      patterns: [/gut/, /digestion/, /bowel/, /bloat/, /constipation/, /diarrh/],
+      fallback: 'digestion or bowel regularity',
+      reason: 'it may support gut balance and bowel regularity',
+    }
+  }
+  if (/psyllium|fiber|fibre|inulin/.test(lower)) {
+    return {
+      patterns: [/gut/, /digestion/, /bowel/, /constipation/, /cholesterol/],
+      fallback: 'digestion or bowel regularity',
+      reason: 'it may support fiber intake and bowel regularity',
+    }
+  }
+  if (/zinc/.test(lower)) {
+    return {
+      patterns: [/libido/, /testosterone/, /immune/, /skin/, /recovery/],
+      fallback: 'immune, libido, or recovery support',
+      reason: 'it is commonly used for immune, hormone, and recovery support',
+    }
+  }
+  if (/vitamin\s*d|\bd-?3\b/.test(lower)) {
+    return {
+      patterns: [/immune/, /mood/, /bone/, /testosterone/, /energy/],
+      fallback: 'immune, mood, bone, or energy support',
+      reason: 'it may support immune, bone, mood, and hormone-related health',
+    }
+  }
+  if (/b12|methylcobalamin|b complex|folate/.test(lower)) {
+    return {
+      patterns: [/energy/, /fatigue/, /mood/, /brain fog/, /focus/],
+      fallback: 'energy, mood, or focus',
+      reason: 'it may support energy metabolism and nervous-system function',
+    }
+  }
+  if (/collagen|gelatin/.test(lower)) {
+    return {
+      patterns: [/joint/, /skin/, /recovery/, /injury/],
+      fallback: 'skin, joints, or recovery',
+      reason: 'it may support connective tissue, skin, and joint goals',
+    }
+  }
+  if (/coq10|ubiquinol|ubiquinone/.test(lower)) {
+    return {
+      patterns: [/energy/, /heart/, /recovery/, /fatigue/],
+      fallback: 'energy, heart health, or recovery',
+      reason: 'it may support cellular energy and heart-related goals',
+    }
+  }
+  return null
+}
+
+function buildSupplementWorkingItems(context: any): ReportItem[] {
+  const supplements = Array.isArray(context?.supplements) ? context.supplements : []
+  const { focusLabels } = focusContextFromReport(context)
+  return supplements.slice(0, 10).map((item: any) => {
+    const name = String(item?.name || '').trim()
+    const role = supplementRole(name)
+    const focus = role ? pickFocusLabelFromContext(focusLabels, role.patterns, role.fallback) : (focusLabels[0] || 'your current goals')
+    const why = role
+      ? `${name}${formatDoseTiming(item)} matches ${focus} because ${role.reason}.`
+      : `${name}${formatDoseTiming(item)} is part of your current stack, so it should be reviewed against ${focus}.`
+    return {
+      name,
+      reason: `${why}\nKeep this item steady while comparing erections, libido, digestion, energy, recovery, mood, symptoms, and weekly food/fluid patterns.`,
+    }
+  }).filter((item: ReportItem) => item.name)
+}
+
+function buildMedicationGuidance(context: any): ReportSectionBucket {
+  const medications = Array.isArray(context?.medications) ? context.medications : []
+  const supplements = Array.isArray(context?.supplements) ? context.supplements : []
+  const { focusLabels, focusText } = focusContextFromReport(context)
+  const bucket: ReportSectionBucket = { working: [], suggested: [], avoid: [] }
+  const currentSupplementNames: string[] = supplements.map((item: any) => String(item?.name || '').trim()).filter(Boolean)
+
+  const hasBloodFlowMed = medications.some((item: any) =>
+    /tadalafil|sildenafil|vardenafil|avanafil|nitrate|nitroglycerin/i.test(String(item?.name || ''))
+  )
+  const hasBloodFlowSupplement = currentSupplementNames.some((name) =>
+    /citrulline|arginine|beet|nitric/i.test(name)
+  )
+  const libidoFocus = /libido|erection|sexual|testosterone|blood flow/.test(focusText)
+
+  for (const item of medications.slice(0, 10)) {
+    const name = String(item?.name || '').trim()
+    if (!name) continue
+    const lower = name.toLowerCase()
+    let focus = focusLabels[0] || 'your current goals'
+    let reason = `${name}${formatDoseTiming(item)} is listed in your current medication routine.`
+    if (/tadalafil|sildenafil|vardenafil|avanafil/.test(lower)) {
+      focus = pickFocusLabelFromContext(focusLabels, [/libido/, /erection/, /sexual/, /blood flow/], 'erection or libido support')
+      reason = `${name}${formatDoseTiming(item)} matches ${focus} because it is commonly used for erection blood-flow support.`
+    }
+    bucket.working.push({
+      name,
+      reason: `${reason}\nKeep dose and timing consistent, and compare it with libido, erection quality, energy, recovery, mood, and symptom notes before changing anything.`,
+    })
+  }
+
+  if (medications.length) {
+    bucket.suggested.push({
+      name: 'Medication review focus',
+      reason: `You have ${medications.length} medication(s) listed, so the useful next step is not adding more guesses.\nReview timing, side effects, and goal changes with your prescriber, especially if erections, libido, digestion, energy, or mood changed this week.`,
+    })
+  }
+
+  if (hasBloodFlowMed) {
+    bucket.avoid.push({
+      name: 'Nitrates or extra blood-flow products without review',
+      reason: `${formatSupplementNameList(medications.map((item: any) => String(item?.name || '').trim()), 4)} affects blood-flow planning.\nDo not combine erection medicines with nitrates, and check before adding strong blood-flow supplements${hasBloodFlowSupplement ? ` like ${formatSupplementNameList(currentSupplementNames.filter((name: string) => /citrulline|arginine|beet|nitric/i.test(name)), 3)}` : ''}.`,
+    })
+  }
+
+  if (libidoFocus && medications.length) {
+    bucket.avoid.push({
+      name: 'Changing dose based on one week',
+      reason: `Your goals mention libido or erections, and this report only covers 7 days.\nAvoid changing medication dose from one weekly pattern unless your prescriber tells you to.`,
+    })
+  }
+
+  return bucket
+}
+
+function buildSupplementGuidance(context: any): Pick<ReportSectionBucket, 'suggested' | 'avoid'> {
+  const supplements = Array.isArray(context?.supplements) ? context.supplements : []
+  const medications = Array.isArray(context?.medications) ? context.medications : []
+  const { goalLabels, issueLabels, focusLabels, focusText } = focusContextFromReport(context)
   const knownSupplements = buildKnownNameSet(supplements)
   const lowHydrationDays = Array.isArray(context?.dataFlags?.lowHydrationDays) ? context.dataFlags.lowHydrationDays : []
   const lowMoodDays = Array.isArray(context?.dataFlags?.lowMoodDays) ? context.dataFlags.lowMoodDays : []
@@ -384,6 +569,14 @@ function buildSupplementGuidance(context: any): Pick<ReportSectionBucket, 'sugge
       suggested,
       'L-Citrulline',
       `Your goals mention ${focus}, and your current stack already includes ${formatSupplementNameList(currentSupplementNames)}.\nL-Citrulline is one to review if you want a more targeted option that is not already in the stack.`
+    )
+  }
+
+  if (libidoFocus && onVascularMedication) {
+    addUnique(
+      avoid,
+      'Extra blood-flow supplements without review',
+      `Your goals mention ${pickFocusLabel([/libido/, /erection/, /sexual/, /testosterone/], 'libido or erections')}, and your medication list includes a blood-flow medicine.\nSteer away from adding L-Citrulline, arginine, beetroot, or similar products unless your prescriber says it fits.`
     )
   }
 
@@ -533,7 +726,22 @@ function applySupplementGuidance(
 ): Record<ReportSectionKey, ReportSectionBucket> {
   const next = { ...sections }
   const supplements = next.supplements || { working: [], suggested: [], avoid: [] }
+  const medications = next.medications || { working: [], suggested: [], avoid: [] }
   const guidance = buildSupplementGuidance(context)
+  const supplementWorking = buildSupplementWorkingItems(context)
+  const medicationGuidance = buildMedicationGuidance(context)
+
+  if (supplementWorking.length && (!Array.isArray(supplements.working) || supplements.working.length < Math.min(6, supplementWorking.length))) {
+    const existing = Array.isArray(supplements.working) ? supplements.working : []
+    const existingNames = new Set(existing.map((item) => canonicalizeNameForMatch(String(item?.name || ''))).filter(Boolean))
+    supplements.working = [
+      ...existing,
+      ...supplementWorking.filter((item) => {
+        const key = canonicalizeNameForMatch(String(item?.name || ''))
+        return key && !existingNames.has(key)
+      }),
+    ].slice(0, 10)
+  }
 
   if (!Array.isArray(supplements.suggested) || supplements.suggested.length === 0) {
     supplements.suggested = guidance.suggested
@@ -542,7 +750,18 @@ function applySupplementGuidance(
     supplements.avoid = guidance.avoid
   }
 
+  if (medicationGuidance.working.length && (!Array.isArray(medications.working) || medications.working.length === 0)) {
+    medications.working = medicationGuidance.working
+  }
+  if (medicationGuidance.suggested.length && (!Array.isArray(medications.suggested) || medications.suggested.length === 0)) {
+    medications.suggested = medicationGuidance.suggested
+  }
+  if (medicationGuidance.avoid.length && (!Array.isArray(medications.avoid) || medications.avoid.length === 0)) {
+    medications.avoid = medicationGuidance.avoid
+  }
+
   next.supplements = supplements
+  next.medications = medications
   return next
 }
 
@@ -2422,16 +2641,10 @@ function buildFallbackReport(context: any) {
     })
   }
   if (supplements.length && !sections.supplements.working.length) {
-    sections.supplements.working = supplements.slice(0, 6).map((s: any) => ({
-      name: s.name,
-      reason: 'Listed in your current routine.',
-    }))
+    sections.supplements.working = buildSupplementWorkingItems(context).slice(0, 10)
   }
   if (medications.length && !sections.medications.working.length) {
-    sections.medications.working = medications.slice(0, 6).map((m: any) => ({
-      name: m.name,
-      reason: 'Listed in your current routine.',
-    }))
+    sections.medications = buildMedicationGuidance(context)
   }
   if (!sections.overview.working.length && checkinSummary?.goals?.length) {
     const topGoals = checkinSummary.goals.map((g: any) => g.goal).filter(Boolean).slice(0, 2)
@@ -3433,9 +3646,14 @@ Rules:
   - Do NOT put medications in the Supplements section. If an item is in medications JSON, it must go in the Medications section (or be omitted if unclear).
   - Do NOT “suggest” or “avoid” a supplement the user already takes (as listed in the supplements JSON). If they already take it, it can only appear in supplements.working.
   - Do not repeat the same supplement across working/suggested/avoid. Pick the single best bucket.
+  - Supplements.working must explain the user's current supplement stack, not just list it. Tie each useful current supplement to goals/issues such as erections, libido, bowel movements, digestion, energy, mood, or recovery when those goals/issues exist in JSON.
   - If the JSON includes 6+ supplements, include at least 6 supplement items across supplements.working + supplements.suggested (unless the JSON is missing supplement names).
   - For each supplement item you include: use the exact supplement name from JSON, mention dosage/timing if provided, and tie it to at least one named goal/issue from JSON when possible.
   - If a supplement name is unclear (brand blend / unknown ingredients), say you can’t connect it confidently yet and avoid guessing ingredients.
+- Medications section rules:
+  - Medications.working must explain why each current medication may matter for the user's named goals/issues.
+  - Do not suggest new prescription medicines. Use Medications.suggested for review questions, timing checks, side effects, and clinician discussion points.
+  - Medications.avoid should include safety cautions, overlap cautions, or "do not change dose without prescriber" items when relevant.
 - Use insightCandidates, correlationSignals, trendSignals, and riskFlags as your primary signals when available.
 - Use nutritionSummary.topFoods, foodHighlights, and dailyStats.topFoods to name actual foods (not just calories).
 - Do not ask the user what they ate or to log meals. Use the foods already in the data.

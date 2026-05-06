@@ -1,7 +1,12 @@
 import React from 'react'
+import { View } from 'react-native'
+import type { NavigatorScreenParams } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 
 import { MainTabs } from './MainTabs'
+import type { MainTabParamList } from './MainTabs'
+import { NativeBottomNav } from './NativeBottomNav'
+import type { NativeBottomNavKey } from './NativeBottomNav'
 import { DailyCheckInScreen } from '../screens/DailyCheckInScreen'
 import { HealthSetupScreen } from '../screens/HealthSetupScreen'
 import { MoodTrackerScreen } from '../screens/MoodTrackerScreen'
@@ -34,7 +39,7 @@ import { ListYourPracticeStartScreen } from '../screens/ListYourPracticeStartScr
 import { NativeWebToolScreen } from '../screens/NativeWebToolScreen'
 
 export type MainStackParamList = {
-  Tabs: undefined
+  Tabs: NavigatorScreenParams<MainTabParamList> | undefined
   Profile: undefined
   ProfilePhoto: undefined
   AccountSettings: undefined
@@ -85,24 +90,81 @@ export type MainStackParamList = {
 
 const Stack = createNativeStackNavigator<MainStackParamList>()
 
+function withBottomNav<P extends object>(
+  Component: React.ComponentType<P>,
+  active?: NativeBottomNavKey
+) {
+  return function ScreenWithBottomNav(props: P) {
+    return (
+      <View style={{ flex: 1 }}>
+        <View style={{ flex: 1 }}>
+          <Component {...props} />
+        </View>
+        <NativeBottomNav active={active} />
+      </View>
+    )
+  }
+}
+
+const ProfileWithBottomNav = withBottomNav(ProfileScreen, 'More')
+const ProfilePhotoWithBottomNav = withBottomNav(ProfilePhotoScreen, 'More')
+const AccountSettingsWithBottomNav = withBottomNav(AccountSettingsScreen, 'Settings')
+const BillingWithBottomNav = withBottomNav(BillingScreen, 'Settings')
+const NotificationsWithBottomNav = withBottomNav(NotificationsScreen, 'Settings')
+const NotificationInboxWithBottomNav = withBottomNav(NotificationInboxScreen, 'Settings')
+const NotificationsAiInsightsWithBottomNav = withBottomNav(NotificationsAiInsightsScreen, 'Settings')
+const SmartHealthCoachWithBottomNav = withBottomNav(SmartHealthCoachScreen, 'Insights')
+const NotificationsQuietHoursWithBottomNav = withBottomNav(NotificationsQuietHoursScreen, 'Settings')
+const NotificationsAccountSecurityWithBottomNav = withBottomNav(NotificationsAccountSecurityScreen, 'Settings')
+const PrivacySettingsWithBottomNav = withBottomNav(PrivacySettingsScreen, 'Settings')
+const SupportWithBottomNav = withBottomNav(SupportScreen, 'More')
+const HealthSetupWithBottomNav = withBottomNav(HealthSetupScreen, 'More')
+const RemindersWithBottomNav = withBottomNav(RemindersScreen, 'Settings')
+const DailyCheckInWithBottomNav = withBottomNav(DailyCheckInScreen, 'More')
+const MoodTrackerWithBottomNav = withBottomNav(MoodTrackerScreen, 'More')
+const TrackCaloriesWithBottomNav = withBottomNav(TrackCaloriesScreen, 'Food')
+const AddIngredientWithBottomNav = withBottomNav(AddIngredientScreen, 'Food')
+const WaterIntakeWithBottomNav = withBottomNav(WaterIntakeScreen, 'Food')
+const FoodDiarySettingsWithBottomNav = withBottomNav(FoodDiarySettingsScreen, 'Settings')
+
+function activeTabForNativeWebPath(path: string): NativeBottomNavKey {
+  if (path === '/dashboard') return 'Dashboard'
+  if (path.startsWith('/insights')) return 'Insights'
+  if (path.startsWith('/food')) return 'Food'
+  if (path.startsWith('/settings') || path.startsWith('/notifications')) return 'Settings'
+  return 'More'
+}
+
+function NativeWebToolWithBottomNav(props: React.ComponentProps<typeof NativeWebToolScreen>) {
+  const path = String(props.route?.params?.path || '')
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <NativeWebToolScreen {...props} />
+      </View>
+      <NativeBottomNav active={activeTabForNativeWebPath(path)} />
+    </View>
+  )
+}
+
 export function MainNavigator() {
   return (
     <Stack.Navigator>
       <Stack.Screen name="Tabs" component={MainTabs} options={{ headerShown: false }} />
-      <Stack.Screen name="Profile" component={ProfileScreen} options={{ title: 'Profile', headerTitleAlign: 'center', headerBackTitle: '' }} />
+      <Stack.Screen name="Profile" component={ProfileWithBottomNav} options={{ title: 'Profile', headerTitleAlign: 'center', headerBackTitle: '' }} />
       <Stack.Screen
         name="AccountSettings"
-        component={AccountSettingsScreen}
+        component={AccountSettingsWithBottomNav}
         options={{ title: 'Account Settings', headerTitleAlign: 'center', headerBackTitle: '' }}
       />
       <Stack.Screen
         name="ProfilePhoto"
-        component={ProfilePhotoScreen}
+        component={ProfilePhotoWithBottomNav}
         options={{ title: 'Profile Picture', headerTitleAlign: 'center', headerBackTitle: '' }}
       />
       <Stack.Screen
         name="Billing"
-        component={BillingScreen}
+        component={BillingWithBottomNav}
         options={{
           title: 'Subscription & Billing',
           headerTitleAlign: 'center',
@@ -111,7 +173,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="Notifications"
-        component={NotificationsScreen}
+        component={NotificationsWithBottomNav}
         options={{
           title: 'Notifications',
           headerTitleAlign: 'center',
@@ -121,7 +183,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="NotificationsInbox"
-        component={NotificationInboxScreen}
+        component={NotificationInboxWithBottomNav}
         options={{
           title: 'Notifications',
           headerTitleAlign: 'center',
@@ -130,7 +192,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="NotificationsAIInsights"
-        component={NotificationsAiInsightsScreen}
+        component={NotificationsAiInsightsWithBottomNav}
         options={{
           title: 'Smart Health Coach',
           headerTitleAlign: 'center',
@@ -139,7 +201,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="SmartHealthCoach"
-        component={SmartHealthCoachScreen}
+        component={SmartHealthCoachWithBottomNav}
         options={{
           title: 'Smart Health Coach',
           headerTitleAlign: 'center',
@@ -148,7 +210,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="NotificationsQuietHours"
-        component={NotificationsQuietHoursScreen}
+        component={NotificationsQuietHoursWithBottomNav}
         options={{
           title: 'Quiet hours',
           headerTitleAlign: 'center',
@@ -157,7 +219,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="NotificationsAccountSecurity"
-        component={NotificationsAccountSecurityScreen}
+        component={NotificationsAccountSecurityWithBottomNav}
         options={{
           title: 'Account & security',
           headerTitleAlign: 'center',
@@ -166,7 +228,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="PrivacySettings"
-        component={PrivacySettingsScreen}
+        component={PrivacySettingsWithBottomNav}
         options={{
           title: 'Privacy Settings',
           headerTitleAlign: 'center',
@@ -175,17 +237,17 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="Support"
-        component={SupportScreen}
+        component={SupportWithBottomNav}
         options={{
           title: 'Help & Support',
           headerTitleAlign: 'center',
           headerBackTitle: '',
         }}
       />
-      <Stack.Screen name="HealthSetup" component={HealthSetupScreen} options={{ title: 'Health Intake' }} />
+      <Stack.Screen name="HealthSetup" component={HealthSetupWithBottomNav} options={{ title: 'Health Intake' }} />
       <Stack.Screen
         name="Reminders"
-        component={RemindersScreen}
+        component={RemindersWithBottomNav}
         options={{
           title: 'Reminders',
           headerTitleAlign: 'center',
@@ -193,11 +255,11 @@ export function MainNavigator() {
           headerBackTitle: '',
         }}
       />
-      <Stack.Screen name="DailyCheckIn" component={DailyCheckInScreen} options={{ title: "Today's Check-in" }} />
-      <Stack.Screen name="MoodTracker" component={MoodTrackerScreen} options={{ title: 'Mood Tracker' }} />
+      <Stack.Screen name="DailyCheckIn" component={DailyCheckInWithBottomNav} options={{ title: "Today's Check-in" }} />
+      <Stack.Screen name="MoodTracker" component={MoodTrackerWithBottomNav} options={{ title: 'Mood Tracker' }} />
       <Stack.Screen
         name="TrackCalories"
-        component={TrackCaloriesScreen}
+        component={TrackCaloriesWithBottomNav}
         options={{
           title: 'Track Calories',
           headerTitleAlign: 'center',
@@ -206,14 +268,14 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="AddIngredient"
-        component={AddIngredientScreen}
+        component={AddIngredientWithBottomNav}
         options={{
           headerShown: false,
         }}
       />
       <Stack.Screen
         name="FoodAnalysis"
-        component={TrackCaloriesScreen}
+        component={TrackCaloriesWithBottomNav}
         options={{
           title: 'Food Analysis',
           headerTitleAlign: 'center',
@@ -222,7 +284,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="WaterIntake"
-        component={WaterIntakeScreen}
+        component={WaterIntakeWithBottomNav}
         options={{
           title: 'Water Intake',
           headerTitleAlign: 'center',
@@ -231,7 +293,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="FoodDiarySettings"
-        component={FoodDiarySettingsScreen}
+        component={FoodDiarySettingsWithBottomNav}
         options={{
           title: 'Food Diary',
           headerTitleAlign: 'center',
@@ -313,7 +375,7 @@ export function MainNavigator() {
       />
       <Stack.Screen
         name="NativeWebTool"
-        component={NativeWebToolScreen}
+        component={NativeWebToolWithBottomNav}
         options={({ route }) => ({
           title: String(route?.params?.title || 'Page'),
           headerTitleAlign: 'center',
