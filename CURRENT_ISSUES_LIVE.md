@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-06 20:10 AEST
+- What changed: Deployed the weekly 7-day report mobile redesign, stronger charts, bottom report navigation, smarter Supplements and Medications intelligence, hidden empty detail sections, previous-report comparisons, and the mobile bottom navigation updates left by the previous agent.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report
+- What to quickly test: Open the latest 7-day report, go to Details > Supplements and Medications, and confirm What’s working is no longer blank when the account has supplement or medication data. Also check Charts and the mobile bottom navigation.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-03 11:57 AEST
 - What changed: Deployed the web recipe/photo upload support so Import Recipe, Add Ingredient, and Build a Meal can accept AVIF and WebP-style image uploads, with AVIF converted safely before AI analysis.
 - Where to see it (page/link): https://helfi.ai/food/import-recipe and https://helfi.ai/food/build-meal
