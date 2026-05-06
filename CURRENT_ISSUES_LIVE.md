@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-06 19:55 AEST
+- What changed: Deployed the Health Insights 7-day report mobile redesign, including separate Summary/Charts/Insights/Details report tabs, collapsible chart cards, improved calorie visuals, and previous-week comparison support.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report
+- What to quickly test: Open the weekly report on mobile, switch between Summary, Charts, Insights, and Details, and confirm each tab starts at the top and Charts has expandable cards.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-03 11:57 AEST
 - What changed: Deployed the web recipe/photo upload support so Import Recipe, Add Ingredient, and Build a Meal can accept AVIF and WebP-style image uploads, with AVIF converted safely before AI analysis.
 - Where to see it (page/link): https://helfi.ai/food/import-recipe and https://helfi.ai/food/build-meal
