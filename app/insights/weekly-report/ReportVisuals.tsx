@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo } from 'react'
+import { useMemo, type ReactNode } from 'react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -87,6 +87,13 @@ type JournalSummary = {
   }>
 }
 
+type PreviousSummary = {
+  periodLabel?: string
+  nutritionSummary?: NutritionSummary
+  hydrationSummary?: HydrationSummary
+  dailyStats?: DailyStat[]
+}
+
 function toDateKey(value?: string | null) {
   const raw = String(value || '').trim()
   if (!raw) return null
@@ -114,28 +121,61 @@ function listDaysInclusive(startKey: string, endKey: string) {
 function shortDayLabel(dateKey: string) {
   const d = new Date(`${dateKey}T00:00:00Z`)
   if (Number.isNaN(d.getTime())) return dateKey
-  return new Intl.DateTimeFormat(undefined, { weekday: 'short' }).format(d)
+  return new Intl.DateTimeFormat('en-AU', { weekday: 'short' }).format(d)
 }
 
 function niceDateLabel(dateKey: string) {
   const d = new Date(`${dateKey}T00:00:00Z`)
   if (Number.isNaN(d.getTime())) return dateKey
-  return new Intl.DateTimeFormat(undefined, { weekday: 'short', day: '2-digit', month: 'short' }).format(d)
+  return new Intl.DateTimeFormat('en-AU', { weekday: 'short', day: '2-digit', month: 'short' }).format(d)
+}
+
+function compactDateLabel(dateKey: string) {
+  const d = new Date(`${dateKey}T00:00:00Z`)
+  if (Number.isNaN(d.getTime())) return dateKey
+  return new Intl.DateTimeFormat('en-AU', { day: '2-digit', month: 'short' }).format(d)
 }
 
 function cardClassName(variant: 'neutral' | 'mint' | 'sky' | 'amber' | 'rose' = 'neutral') {
-  if (variant === 'mint') return 'rounded-2xl border border-emerald-100 bg-emerald-50/50 p-5 shadow-sm'
-  if (variant === 'sky') return 'rounded-2xl border border-sky-100 bg-sky-50/60 p-5 shadow-sm'
-  if (variant === 'amber') return 'rounded-2xl border border-amber-100 bg-amber-50/60 p-5 shadow-sm'
-  if (variant === 'rose') return 'rounded-2xl border border-rose-100 bg-rose-50/60 p-5 shadow-sm'
-  return 'rounded-2xl border border-gray-200 bg-white p-5 shadow-sm'
+  if (variant === 'mint') return 'min-w-0 rounded-3xl border border-emerald-100 bg-gradient-to-br from-emerald-50 to-white p-5 shadow-sm'
+  if (variant === 'sky') return 'min-w-0 rounded-3xl border border-sky-100 bg-gradient-to-br from-sky-50 to-white p-5 shadow-sm'
+  if (variant === 'amber') return 'min-w-0 rounded-3xl border border-amber-100 bg-gradient-to-br from-amber-50 to-white p-5 shadow-sm'
+  if (variant === 'rose') return 'min-w-0 rounded-3xl border border-rose-100 bg-gradient-to-br from-rose-50 to-white p-5 shadow-sm'
+  return 'min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm'
 }
 
 function EmptyChart({ message }: { message: string }) {
   return (
-    <div className="flex h-[180px] items-center justify-center rounded-xl border border-dashed border-gray-200 bg-white/70 p-4 text-center text-sm text-gray-600">
+    <div className="flex h-[180px] items-center justify-center rounded-2xl border border-dashed border-slate-200 bg-white/80 p-4 text-center text-sm leading-6 text-slate-600">
       {message}
     </div>
+  )
+}
+
+function ChartDisclosure({
+  title,
+  eyebrow,
+  summary,
+  children,
+}: {
+  title: string
+  eyebrow: string
+  summary: string
+  children: ReactNode
+}) {
+  return (
+    <details className="group min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <summary className="flex cursor-pointer list-none items-center gap-3">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-xl font-semibold text-helfi-green group-open:hidden">+</span>
+        <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-xl font-semibold text-slate-600 group-open:grid">-</span>
+        <div className="min-w-0 pr-2">
+          <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{eyebrow}</div>
+          <div className="mt-1 text-lg font-semibold text-slate-900">{title}</div>
+          <div className="mt-1 text-sm leading-6 text-slate-600">{summary}</div>
+        </div>
+      </summary>
+      <div className="mt-4">{children}</div>
+    </details>
   )
 }
 
@@ -150,6 +190,7 @@ export default function ReportVisuals(props: {
   exerciseSummary?: { topActivities?: Array<{ name?: string; count?: number }> }
   medicalImageSummary?: MedicalImageSummary
   journalSummary?: JournalSummary
+  previousSummary?: PreviousSummary | null
 }) {
   const periodStartKey = toDateKey(props.periodStart) || ''
   const periodEndKey = toDateKey(props.periodEnd) || ''
@@ -220,6 +261,54 @@ export default function ReportVisuals(props: {
   const exerciseSeries = useMemo(() => {
     return days.map((d) => Number(dailyByKey.get(d)?.exerciseMinutes ?? 0) || 0)
   }, [days, dailyByKey])
+
+  const calorieStats = useMemo(() => {
+    const values = caloriesSeries
+      .map((value, index) => ({ value, day: days[index] || '' }))
+      .filter((row) => row.value > 0)
+
+    if (!values.length) {
+      return { average: 0, highest: null as null | { value: number; day: string }, lowest: null as null | { value: number; day: string }, swing: 0 }
+    }
+
+    const total = values.reduce((sum, row) => sum + row.value, 0)
+    const highest = values.reduce((best, row) => (row.value > best.value ? row : best), values[0])
+    const lowest = values.reduce((best, row) => (row.value < best.value ? row : best), values[0])
+
+    return {
+      average: Math.round(total / values.length),
+      highest,
+      lowest,
+      swing: Math.round(highest.value - lowest.value),
+    }
+  }, [caloriesSeries, days])
+
+  const previousCaloriesAverage = Number(props.previousSummary?.nutritionSummary?.dailyAverages?.calories ?? 0) || 0
+  const calorieAverageChange = calorieStats.average && previousCaloriesAverage ? calorieStats.average - previousCaloriesAverage : 0
+  const calorieAverageChangeLabel =
+    calorieAverageChange === 0
+      ? 'No change from previous report'
+      : `${Math.abs(calorieAverageChange).toLocaleString()} cal ${calorieAverageChange > 0 ? 'higher' : 'lower'} than previous report`
+
+  const calorieRhythm = useMemo(() => {
+    const values = caloriesSeries.filter((value) => value > 0)
+    const max = Math.max(1, ...values)
+    const min = Math.min(...values, max)
+    const spread = Math.max(1, max - min)
+
+    return days.map((day, index) => {
+      const value = Number(caloriesSeries[index] ?? 0) || 0
+      const lift = value > 0 ? 34 + Math.round(((value - min) / spread) * 58) : 0
+      return {
+        day,
+        label: shortDayLabel(day).slice(0, 3),
+        value,
+        height: lift,
+        isHighest: calorieStats.highest?.day === day,
+        isLowest: calorieStats.lowest?.day === day,
+      }
+    })
+  }, [calorieStats.highest?.day, calorieStats.lowest?.day, caloriesSeries, days])
 
   const macroDonut = useMemo(() => {
     const avg = props.nutritionSummary?.dailyAverages || {}
@@ -341,8 +430,12 @@ export default function ReportVisuals(props: {
   return (
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-2">
-        <div className={cardClassName('neutral')}>
-          <div className="flex items-start justify-between gap-4">
+        <ChartDisclosure
+          eyebrow="Your week"
+          title="Quick snapshot"
+          summary={`${props.coverage?.daysActive ?? 0} active days and ${props.coverage?.totalEvents ?? 0} total entries.`}
+        >
+          <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Your week</div>
               <div className="mt-1 text-lg font-semibold text-slate-900">Quick snapshot</div>
@@ -350,16 +443,16 @@ export default function ReportVisuals(props: {
                 {props.coverage?.daysActive ?? 0} active days • {props.coverage?.totalEvents ?? 0} total entries
               </div>
             </div>
-            <div className="rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-right">
+            <div className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-3 py-2 text-left sm:w-auto sm:text-right">
               <div className="text-xs text-slate-500">Period</div>
-              <div className="text-sm font-semibold text-slate-900">
-                {periodStartKey} → {periodEndKey}
+              <div className="text-sm font-semibold text-slate-900 sm:whitespace-nowrap">
+                {compactDateLabel(periodStartKey)} to {compactDateLabel(periodEndKey)}
               </div>
             </div>
           </div>
 
           {coverageDonut.total > 0 ? (
-            <div className="mt-4 h-[220px]">
+            <div className="mt-4 h-[220px] min-w-0">
               <Doughnut
                 data={{
                   labels: coverageDonut.labels,
@@ -380,9 +473,13 @@ export default function ReportVisuals(props: {
               <EmptyChart message="Not enough activity yet to show a breakdown. As soon as you log a few things, this will light up." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
 
-        <div className={cardClassName('mint')}>
+        <ChartDisclosure
+          eyebrow="Nutrition"
+          title="Macro split"
+          summary="Protein, carbs, and fat balance for the week."
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700/80">Nutrition</div>
@@ -395,7 +492,7 @@ export default function ReportVisuals(props: {
 
           {macroDonut.total > 0 ? (
             <div className="mt-4 grid gap-4 sm:grid-cols-2 sm:items-center">
-              <div className="h-[220px]">
+              <div className="h-[220px] min-w-0">
                 <Doughnut
                   data={{
                     labels: macroDonut.labels,
@@ -433,9 +530,13 @@ export default function ReportVisuals(props: {
               <EmptyChart message="Not enough nutrition data to calculate macros yet. This will appear once your food logs include nutrition details." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
 
-        <div className={cardClassName('sky')}>
+        <ChartDisclosure
+          eyebrow="Hydration"
+          title="Water per day"
+          summary={`Average: ${Math.round(Number(props.hydrationSummary?.dailyAverageMl ?? 0) || 0)} ml per day.`}
+        >
           <div className="flex items-start justify-between gap-3">
             <div>
               <div className="text-xs font-semibold uppercase tracking-wide text-sky-700/80">Hydration</div>
@@ -447,7 +548,7 @@ export default function ReportVisuals(props: {
           </div>
 
           {days.length && hasAnyWater ? (
-            <div className="mt-4 h-[220px]">
+            <div className="mt-4 h-[220px] min-w-0">
               <Bar
                 data={{
                   labels: days.map(shortDayLabel),
@@ -481,44 +582,123 @@ export default function ReportVisuals(props: {
               ))}
             </div>
           )}
-        </div>
+        </ChartDisclosure>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-2">
-        <div className={cardClassName('amber')}>
-          <div className="text-xs font-semibold uppercase tracking-wide text-amber-700/80">Calories</div>
-          <div className="mt-1 text-lg font-semibold text-amber-950">Food energy</div>
-          <div className="mt-1 text-sm text-amber-900/80">Daily calories (approx.)</div>
+        <ChartDisclosure
+          eyebrow="Calories"
+          title="Food energy"
+          summary={previousCaloriesAverage > 0 ? calorieAverageChangeLabel : 'Daily calories, with the biggest changes highlighted.'}
+        >
+          <div>
+            <div>
+              <div className="text-xs font-semibold uppercase tracking-wide text-amber-700/80">Calories</div>
+              <div className="mt-1 text-lg font-semibold text-amber-950">Food energy</div>
+              <div className="mt-1 text-sm text-amber-900/80">Daily calories, with the biggest changes highlighted.</div>
+            </div>
+          </div>
+
+          {calorieStats.average > 0 && (
+            <div className="mt-4 grid grid-cols-3 gap-2">
+              <div className="rounded-2xl border border-amber-100 bg-white/75 p-3 shadow-sm">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Average</div>
+                <div className="mt-1 text-lg font-bold leading-tight text-amber-950">{calorieStats.average.toLocaleString()}</div>
+                <div className="text-[10px] font-semibold text-amber-800">cal / day</div>
+              </div>
+              <div className="rounded-2xl border border-emerald-100 bg-white/75 p-3 shadow-sm">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-emerald-700">Highest</div>
+                <div className="mt-1 text-lg font-bold leading-tight text-emerald-950">{Math.round(calorieStats.highest?.value ?? 0).toLocaleString()}</div>
+                <div className="text-[10px] font-semibold text-emerald-800">{calorieStats.highest?.day ? shortDayLabel(calorieStats.highest.day).slice(0, 3) : 'No day'}</div>
+              </div>
+              <div className="rounded-2xl border border-rose-100 bg-white/75 p-3 shadow-sm">
+                <div className="text-[10px] font-bold uppercase tracking-wide text-rose-700">Lowest</div>
+                <div className="mt-1 text-lg font-bold leading-tight text-rose-950">{Math.round(calorieStats.lowest?.value ?? 0).toLocaleString()}</div>
+                <div className="text-[10px] font-semibold text-rose-800">{calorieStats.lowest?.day ? shortDayLabel(calorieStats.lowest.day).slice(0, 3) : 'No day'}</div>
+              </div>
+            </div>
+          )}
+
+          {previousCaloriesAverage > 0 && (
+            <div className="mt-3 grid grid-cols-3 gap-2 rounded-2xl border border-amber-100 bg-amber-50/70 p-3">
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-700">This report</div>
+                <div className="mt-1 text-lg font-bold text-amber-950">{calorieStats.average.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Previous</div>
+                <div className="mt-1 text-lg font-bold text-amber-950">{previousCaloriesAverage.toLocaleString()}</div>
+              </div>
+              <div>
+                <div className="text-[10px] font-bold uppercase tracking-wide text-amber-700">Change</div>
+                <div className={`mt-1 text-lg font-bold ${calorieAverageChange > 0 ? 'text-amber-950' : 'text-emerald-800'}`}>
+                  {calorieAverageChange > 0 ? '+' : calorieAverageChange < 0 ? '-' : ''}
+                  {Math.abs(calorieAverageChange).toLocaleString()}
+                </div>
+              </div>
+            </div>
+          )}
+
           {days.length && hasAnyCalories ? (
-            <div className="mt-4 h-[220px]">
-              <Line
-                data={{
-                  labels: days.map(shortDayLabel),
-                  datasets: [
-                    {
-                      data: caloriesSeries,
-                      borderColor: 'rgba(245, 158, 11, 0.9)',
-                      backgroundColor: 'rgba(245, 158, 11, 0.18)',
-                      fill: true,
-                    },
-                  ],
-                }}
-                options={baseLineOptions}
-              />
+            <div className="mt-4 min-w-0 rounded-3xl border border-amber-100 bg-white p-4 shadow-sm">
+              <div>
+                <div>
+                  <div className="text-xs font-semibold uppercase tracking-wide text-amber-700">Energy rhythm</div>
+                  <div className="mt-1 text-sm leading-5 text-amber-900/80">
+                    A simpler view of which days were heavier or lighter.
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-5 grid h-52 grid-cols-7 items-end gap-2 rounded-2xl bg-gradient-to-b from-amber-50 to-white px-3 pb-3 pt-5">
+                {calorieRhythm.map((day) => (
+                  <div key={day.day} className="flex h-full min-w-0 flex-col items-center justify-end gap-2">
+                    <div className="flex h-32 w-full items-end justify-center">
+                      <div
+                        className={`relative w-full max-w-8 rounded-full ${
+                          day.isHighest
+                            ? 'bg-emerald-500 shadow-[0_10px_22px_rgba(16,185,129,0.28)]'
+                            : day.isLowest
+                              ? 'bg-rose-400 shadow-[0_10px_22px_rgba(251,113,133,0.24)]'
+                              : 'bg-amber-400 shadow-[0_10px_22px_rgba(245,158,11,0.20)]'
+                        }`}
+                        style={{ height: `${day.height}%` }}
+                      >
+                        {(day.isHighest || day.isLowest) && (
+                          <span className="absolute -top-6 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full bg-white px-2 py-0.5 text-[10px] font-bold text-slate-800 shadow-sm">
+                            {day.isHighest ? 'High' : 'Low'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+                    <div className="text-[11px] font-bold text-amber-950">{day.label}</div>
+                    <div className="text-[10px] font-semibold text-amber-700">{day.value ? Math.round(day.value).toLocaleString() : '-'}</div>
+                  </div>
+                ))}
+              </div>
+
+              <div className="mt-3 rounded-2xl border border-amber-100 bg-amber-50/70 p-3 text-sm leading-6 text-amber-950">
+                The biggest change was from {calorieStats.lowest?.day ? niceDateLabel(calorieStats.lowest.day) : 'the lowest day'} to{' '}
+                {calorieStats.highest?.day ? niceDateLabel(calorieStats.highest.day) : 'the highest day'}.
+              </div>
             </div>
           ) : (
             <div className="mt-4">
               <EmptyChart message="No calorie data to chart yet. This appears when food logs include calories." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
 
-        <div className={cardClassName('neutral')}>
+        <ChartDisclosure
+          eyebrow="Mood"
+          title="Mood trend"
+          summary="Average mood per day."
+        >
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Mood</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">Mood trend</div>
           <div className="mt-1 text-sm text-slate-600">Average mood per day</div>
           {days.length && hasAnyMood ? (
-            <div className="mt-4 h-[220px]">
+            <div className="mt-4 h-[220px] min-w-0">
               <Line
                 data={{
                   labels: days.map(shortDayLabel),
@@ -546,14 +726,18 @@ export default function ReportVisuals(props: {
               <EmptyChart message="Not enough mood entries to chart a trend yet. Add a few mood check-ins this week." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
 
-        <div className={cardClassName('rose')}>
+        <ChartDisclosure
+          eyebrow="Symptoms"
+          title="Symptom load"
+          summary="How many symptoms showed up each day."
+        >
           <div className="text-xs font-semibold uppercase tracking-wide text-rose-700/80">Symptoms</div>
           <div className="mt-1 text-lg font-semibold text-rose-950">Symptom load</div>
           <div className="mt-1 text-sm text-rose-900/80">How many symptoms showed up each day</div>
           {days.length && hasAnySymptoms ? (
-            <div className="mt-4 h-[220px]">
+            <div className="mt-4 h-[220px] min-w-0">
               <Bar
                 data={{
                   labels: days.map(shortDayLabel),
@@ -573,16 +757,20 @@ export default function ReportVisuals(props: {
               <EmptyChart message="No symptom entries to chart yet. If you run symptom analysis, this will appear." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-2">
-        <div className={cardClassName('neutral')}>
+        <ChartDisclosure
+          eyebrow="Exercise"
+          title="Minutes per day"
+          summary="Total minutes logged."
+        >
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Exercise</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">Minutes per day</div>
           <div className="mt-1 text-sm text-slate-600">Total minutes logged</div>
           {days.length && hasAnyExercise ? (
-            <div className="mt-4 h-[220px]">
+            <div className="mt-4 h-[220px] min-w-0">
               <Bar
                 data={{
                   labels: days.map(shortDayLabel),
@@ -602,9 +790,13 @@ export default function ReportVisuals(props: {
               <EmptyChart message="No exercise entries this week yet. Add a workout to see this chart." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
 
-        <div className={cardClassName('neutral')}>
+        <ChartDisclosure
+          eyebrow="Top foods"
+          title="Most common picks"
+          summary="Based on your logged foods."
+        >
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Top foods</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">Most common picks</div>
           <div className="mt-1 text-sm text-slate-600">Based on your logged foods</div>
@@ -624,9 +816,13 @@ export default function ReportVisuals(props: {
               <EmptyChart message="No food patterns to show yet. Once you log a few meals, your top foods will appear here." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
 
-        <div className={cardClassName('neutral')}>
+        <ChartDisclosure
+          eyebrow="Symptoms"
+          title="What showed up most"
+          summary="Based on symptom analysis."
+        >
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Top symptoms</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">What showed up most</div>
           <div className="mt-1 text-sm text-slate-600">Based on symptom analysis</div>
@@ -660,11 +856,15 @@ export default function ReportVisuals(props: {
               <EmptyChart message="No symptom highlights yet. This fills in once symptom analysis has been used a few times." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
       </div>
 
       <div className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
-        <div className={cardClassName('sky')}>
+        <ChartDisclosure
+          eyebrow="Medical image analyser"
+          title="Saved scan highlights"
+          summary={`${Number(props.medicalImageSummary?.entries ?? 0) || 0} scans across ${Number(props.medicalImageSummary?.daysWithScans ?? 0) || 0} days.`}
+        >
           <div className="text-xs font-semibold uppercase tracking-wide text-sky-700/80">Medical image analyser</div>
           <div className="mt-1 text-lg font-semibold text-sky-950">Saved scan highlights</div>
           <div className="mt-1 text-sm text-sky-900/80">
@@ -698,9 +898,13 @@ export default function ReportVisuals(props: {
               <EmptyChart message="No saved medical image scans this week yet. If you save a scan, a summary will show here." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
 
-        <div className={cardClassName('mint')}>
+        <ChartDisclosure
+          eyebrow="Health journal"
+          title="Recent notes"
+          summary={`${Number(props.journalSummary?.entries ?? 0) || 0} notes across ${Number(props.journalSummary?.daysWithNotes ?? 0) || 0} days.`}
+        >
           <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700/80">Health journal</div>
           <div className="mt-1 text-lg font-semibold text-emerald-950">Recent notes</div>
           <div className="mt-1 text-sm text-emerald-900/80">
@@ -722,7 +926,7 @@ export default function ReportVisuals(props: {
               <EmptyChart message="No health journal notes this week yet. If you add notes, they will show up here." />
             </div>
           )}
-        </div>
+        </ChartDisclosure>
       </div>
     </div>
   )

@@ -21,6 +21,15 @@ const SECTIONS = [
 
 type SectionKey = (typeof SECTIONS)[number]['key']
 
+const REPORT_NAV_ITEMS = [
+  { key: 'summary', label: 'Summary', target: 'summary' },
+  { key: 'visuals', label: 'Charts', target: 'visuals' },
+  { key: 'insights', label: 'Insights', target: 'insights' },
+  { key: 'sections', label: 'Details', target: 'sections' },
+] as const
+
+type ReportNavKey = (typeof REPORT_NAV_ITEMS)[number]['key']
+
 type WeeklyReportClientProps = {
   report: WeeklyReportRecord | null
   reports: WeeklyReportRecord[]
@@ -68,7 +77,7 @@ function formatDateForLocale(value?: string | Date | null) {
   if (!value) return ''
   const date = typeof value === 'string' ? new Date(value) : value
   if (Number.isNaN(date.getTime())) return String(value)
-  return new Intl.DateTimeFormat(undefined, { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+  return new Intl.DateTimeFormat('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
 function formatDateRange(start?: string | null, end?: string | null) {
@@ -95,18 +104,134 @@ function splitIntoPoints(text: string) {
     const normalized = line.replace(/([.!?])\s+(?=[A-Z0-9])/g, '$1|')
     return normalized.split('|')
   })
-  return points.map((line) => line.trim()).filter(Boolean)
+  return points.map((line) => line.replace(/^[-•]\s*/, '').trim()).filter(Boolean)
 }
 
 function splitIntoLines(text: string) {
   const cleaned = replaceIsoDates(text).replace(/\r/g, '').trim()
   if (!cleaned) return []
   const lines = cleaned.split(/\n+/)
-  return lines.map((line) => line.trim()).filter(Boolean)
+  return lines.map((line) => line.replace(/^[-•]\s*/, '').trim()).filter(Boolean)
+}
+
+function clampNumber(value: number, min: number, max: number) {
+  if (!Number.isFinite(value)) return min
+  return Math.min(max, Math.max(min, value))
+}
+
+function formatCompactNumber(value: number | null | undefined) {
+  const amount = Number(value ?? 0)
+  if (!Number.isFinite(amount)) return '0'
+  return new Intl.NumberFormat(undefined, { maximumFractionDigits: 0 }).format(amount)
+}
+
+function toDateKey(value?: string | null) {
+  const raw = String(value || '').trim()
+  if (!raw) return null
+  if (/^\d{4}-\d{2}-\d{2}$/.test(raw)) return raw
+  const d = new Date(raw)
+  if (Number.isNaN(d.getTime())) return null
+  return d.toISOString().slice(0, 10)
+}
+
+function listReportDays(start?: string | null, end?: string | null) {
+  const startKey = toDateKey(start)
+  const endKey = toDateKey(end)
+  if (!startKey || !endKey) return []
+  const days: string[] = []
+  const cursor = new Date(`${startKey}T00:00:00Z`)
+  const last = new Date(`${endKey}T00:00:00Z`)
+  if (Number.isNaN(cursor.getTime()) || Number.isNaN(last.getTime())) return []
+  for (let index = 0; index < 10; index += 1) {
+    const key = cursor.toISOString().slice(0, 10)
+    days.push(key)
+    if (key === endKey) break
+    cursor.setUTCDate(cursor.getUTCDate() + 1)
+  }
+  return days.slice(-7)
+}
+
+function shortDayName(dateKey: string) {
+  const date = new Date(`${dateKey}T00:00:00Z`)
+  if (Number.isNaN(date.getTime())) return dateKey
+  return new Intl.DateTimeFormat('en-AU', { weekday: 'short' }).format(date).slice(0, 3)
+}
+
+function strengthLabel(percent: number) {
+  if (percent >= 85) return 'Excellent'
+  if (percent >= 65) return 'Strong'
+  if (percent >= 40) return 'Building'
+  return 'Early'
+}
+
+function getInsightName(item: any, fallback: string) {
+  return replaceIsoDates(String(item?.name || item?.label || fallback))
+}
+
+function getInsightReason(item: any, fallback: string) {
+  return replaceIsoDates(String(item?.reason || item?.summary || fallback))
+}
+
+function hasBucketItems(section: any) {
+  return ['working', 'suggested', 'avoid'].some((bucket) => Array.isArray(section?.[bucket]) && section[bucket].length > 0)
+}
+
+function extractSectionLabels(input: unknown): string[] {
+  if (!input) return []
+  if (typeof input === 'string') return input.trim() ? [input.trim()] : []
+  if (Array.isArray(input)) return input.flatMap((item) => extractSectionLabels(item))
+  if (typeof input === 'object') {
+    const record = input as Record<string, unknown>
+    const direct = ['name', 'title', 'label', 'goal', 'issue']
+      .map((key) => String(record[key] || '').trim())
+      .filter(Boolean)
+    if (direct.length) return direct
+  }
+  return []
+}
+
+function formatDoseTiming(item: any) {
+  const parts = [
+    String(item?.dosage || '').trim() ? `dose: ${String(item.dosage).trim()}` : '',
+    String(item?.timing || '').trim() ? `timing: ${String(item.timing).trim()}` : '',
+  ].filter(Boolean)
+  return parts.length ? ` (${parts.join(', ')})` : ''
+}
+
+function currentSupplementReason(item: any, labels: string[]) {
+  const name = String(item?.name || 'Supplement').trim()
+  const focusText = labels.join(' ').toLowerCase()
+  const lower = name.toLowerCase()
+  const focus = labels[0] || 'your current goals'
+  if (/citrulline|arginine|beet|nitric/.test(lower)) {
+    return `${name}${formatDoseTiming(item)} may fit erection, libido, or blood-flow goals.\nKeep it steady and compare it with erection quality, energy, recovery, and symptoms before adding similar products.`
+  }
+  if (/probiotic|psyllium|fiber|fibre|inulin|digest/.test(lower)) {
+    return `${name}${formatDoseTiming(item)} may fit digestion or bowel-movement goals${/bowel|digestion|gut|bloat|constipation|diarrh/.test(focusText) ? ' already listed in this report' : ''}.\nKeep it steady and compare it with bloating, bowel movements, food, and hydration patterns.`
+  }
+  if (/magnesium|creatine|omega|fish oil|zinc|vitamin\s*d|b12|coq10|maca|tongkat/.test(lower)) {
+    return `${name}${formatDoseTiming(item)} may fit ${focus}, energy, mood, libido, or recovery support depending on the reason you take it.\nKeep it consistent for the week so the report can compare it with symptoms, mood, exercise, and food/fluid patterns.`
+  }
+  return `${name}${formatDoseTiming(item)} is in your current supplement stack and should be judged against ${focus}.\nKeep it steady for the week so changes in energy, digestion, libido, recovery, mood, and symptoms are easier to read.`
+}
+
+function currentMedicationReason(item: any, labels: string[]) {
+  const name = String(item?.name || 'Medication').trim()
+  const lower = name.toLowerCase()
+  const focus = labels[0] || 'your current goals'
+  if (/tadalafil|sildenafil|vardenafil|avanafil/.test(lower)) {
+    return `${name}${formatDoseTiming(item)} may matter for erection or libido goals because it is commonly used for erection blood-flow support.\nKeep dose and timing consistent, and do not change it without your prescriber.`
+  }
+  return `${name}${formatDoseTiming(item)} is in your current medication list and may matter for ${focus}.\nTrack timing, side effects, symptoms, mood, digestion, energy, and recovery before changing anything with your prescriber.`
+}
+
+function isReportNavKey(value: string | null): value is ReportNavKey {
+  return REPORT_NAV_ITEMS.some((item) => item.key === value)
 }
 
 export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport, reportsEnabled = true }: WeeklyReportClientProps) {
   const [activeTab, setActiveTab] = useState<SectionKey>('overview')
+  const [activeReportNav, setActiveReportNav] = useState<ReportNavKey>('summary')
   const router = useRouter()
   const [manualStatus, setManualStatus] = useState<'idle' | 'running' | 'error'>('idle')
   const [manualMessage, setManualMessage] = useState<string | null>(null)
@@ -119,7 +244,21 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
     try {
       const el = document.getElementById(id)
       if (!el) return
+      if (el instanceof HTMLDetailsElement) {
+        el.open = true
+      }
       el.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } catch {
+      // ignore
+    }
+  }, [])
+
+  useEffect(() => {
+    try {
+      const tab = new URLSearchParams(window.location.search).get('tab')
+      if (isReportNavKey(tab)) {
+        setActiveReportNav(tab)
+      }
     } catch {
       // ignore
     }
@@ -184,6 +323,23 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
     return report.dataSummary as any
   }, [report])
 
+  const previousReport = useMemo(() => {
+    return reports.find((item) => item.id !== report?.id && item.status === 'READY' && item.dataSummary) || null
+  }, [report?.id, reports])
+
+  const previousParsedSummary = useMemo(() => {
+    if (!previousReport?.dataSummary) return null
+    if (typeof previousReport.dataSummary === 'string') {
+      try {
+        return JSON.parse(previousReport.dataSummary)
+      } catch {
+        return null
+      }
+    }
+    if (typeof previousReport.dataSummary !== 'object') return null
+    return previousReport.dataSummary as any
+  }, [previousReport])
+
   const dataWarning = (parsedSummary as any)?.dataWarning as string | null
   const talkToAiSummary = (parsedSummary as any)?.talkToAiSummary as
     | {
@@ -237,6 +393,9 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   const supplementsList = (parsedSummary as any)?.supplements as
     | Array<{ name?: string; dosage?: string; timing?: string }>
     | undefined
+  const medicationsList = (parsedSummary as any)?.medications as
+    | Array<{ name?: string; dosage?: string; timing?: string }>
+    | undefined
   const medicalImageSummary = (parsedSummary as any)?.medicalImageSummary as
     | {
         entries?: number
@@ -251,6 +410,122 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         }>
       }
     | undefined
+
+  const displaySections = useMemo(() => {
+    const labels = [
+      ...extractSectionLabels((parsedSummary as any)?.goals),
+      ...extractSectionLabels((parsedSummary as any)?.issues),
+    ]
+    const next: any = { ...sections }
+    next.supplements = {
+      working: Array.isArray(sections?.supplements?.working) ? [...sections.supplements.working] : [],
+      suggested: Array.isArray(sections?.supplements?.suggested) ? [...sections.supplements.suggested] : [],
+      avoid: Array.isArray(sections?.supplements?.avoid) ? [...sections.supplements.avoid] : [],
+    }
+    next.medications = {
+      working: Array.isArray(sections?.medications?.working) ? [...sections.medications.working] : [],
+      suggested: Array.isArray(sections?.medications?.suggested) ? [...sections.medications.suggested] : [],
+      avoid: Array.isArray(sections?.medications?.avoid) ? [...sections.medications.avoid] : [],
+    }
+
+    if (Array.isArray(supplementsList) && supplementsList.length > 0 && next.supplements.working.length === 0) {
+      next.supplements.working = supplementsList.slice(0, 10).map((item) => ({
+        name: item?.name || 'Supplement',
+        reason: currentSupplementReason(item, labels),
+      }))
+    }
+
+    if (Array.isArray(medicationsList) && medicationsList.length > 0 && next.medications.working.length === 0) {
+      next.medications.working = medicationsList.slice(0, 10).map((item) => ({
+        name: item?.name || 'Medication',
+        reason: currentMedicationReason(item, labels),
+      }))
+    }
+
+    return next
+  }, [medicationsList, parsedSummary, sections, supplementsList])
+
+  const availableSections = useMemo(() => {
+    const signals = (parsedSummary as any)?.sectionSignals || {}
+    return SECTIONS.filter((section) => {
+      if (section.key === 'overview') return true
+      if (hasBucketItems(displaySections?.[section.key])) return true
+      if (section.key === 'supplements') return Array.isArray(supplementsList) && supplementsList.length > 0
+      if (section.key === 'medications') return Array.isArray(medicationsList) && medicationsList.length > 0
+      if (section.key === 'nutrition') {
+        return Boolean(nutritionSummary?.daysWithLogs || nutritionSummary?.entriesWithNutrients || nutritionSummary?.dailyTotals?.length)
+      }
+      if (section.key === 'hydration') {
+        return Boolean(hydrationSummary?.daysWithLogs || hydrationSummary?.entries || hydrationSummary?.dailyTotals?.length)
+      }
+      if (section.key === 'exercise') {
+        return Boolean(exerciseSummary?.sessions || exerciseSummary?.daysActive || coverage?.exerciseCount)
+      }
+      if (section.key === 'mood') {
+        return Boolean((parsedSummary as any)?.moodSummary?.entries || coverage?.moodCount)
+      }
+      if (section.key === 'symptoms') {
+        return Boolean(symptomSummary?.entries || symptomSummary?.uniqueSymptoms || coverage?.symptomCount)
+      }
+      if (section.key === 'labs') {
+        const labs = signals?.labs || {}
+        return Boolean(coverage?.labCount || labs?.reports || labs?.trends || labs?.highlights)
+      }
+      if (section.key === 'lifestyle') {
+        return hasBucketItems(displaySections?.lifestyle)
+      }
+      return false
+    })
+  }, [
+    coverage?.exerciseCount,
+    coverage?.labCount,
+    coverage?.moodCount,
+    coverage?.symptomCount,
+    exerciseSummary?.daysActive,
+    exerciseSummary?.sessions,
+    hydrationSummary?.dailyTotals?.length,
+    hydrationSummary?.daysWithLogs,
+    hydrationSummary?.entries,
+    medicationsList,
+    nutritionSummary?.dailyTotals?.length,
+    nutritionSummary?.daysWithLogs,
+    nutritionSummary?.entriesWithNutrients,
+    parsedSummary,
+    displaySections,
+    supplementsList,
+    symptomSummary?.entries,
+    symptomSummary?.uniqueSymptoms,
+  ])
+
+  useEffect(() => {
+    if (!availableSections.some((section) => section.key === activeTab)) {
+      setActiveTab(availableSections[0]?.key || 'overview')
+    }
+  }, [activeTab, availableSections])
+
+  const detailComparisons = useMemo(() => {
+    const previous = previousParsedSummary as any
+    if (!previous) return []
+    const rows: Array<{ label: string; text: string }> = []
+    const addChange = (label: string, currentRaw: unknown, previousRaw: unknown, unit: string, minChange = 1) => {
+      const current = Number(currentRaw ?? 0)
+      const prior = Number(previousRaw ?? 0)
+      if (!Number.isFinite(current) || !Number.isFinite(prior) || current <= 0 || prior <= 0) return
+      const diff = current - prior
+      if (Math.abs(diff) < minChange) return
+      const rounded = Math.round(Math.abs(diff) * 10) / 10
+      rows.push({
+        label,
+        text: `${rounded.toLocaleString()}${unit ? ` ${unit}` : ''} ${diff > 0 ? 'higher' : 'lower'} than the previous report`,
+      })
+    }
+    addChange('Calories', nutritionSummary?.dailyAverages?.calories, previous?.nutritionSummary?.dailyAverages?.calories, 'kcal/day', 50)
+    addChange('Protein', nutritionSummary?.dailyAverages?.protein_g, previous?.nutritionSummary?.dailyAverages?.protein_g, 'g/day', 5)
+    addChange('Water', hydrationSummary?.dailyAverageMl, previous?.hydrationSummary?.dailyAverageMl, 'ml/day', 150)
+    addChange('Movement', exerciseSummary?.totalMinutes, previous?.exerciseSummary?.totalMinutes, 'min/week', 10)
+    addChange('Mood', (parsedSummary as any)?.moodSummary?.averageMood, previous?.moodSummary?.averageMood, 'points', 0.3)
+    return rows.slice(0, 5)
+  }, [exerciseSummary?.totalMinutes, hydrationSummary?.dailyAverageMl, nutritionSummary?.dailyAverages?.calories, nutritionSummary?.dailyAverages?.protein_g, parsedSummary, previousParsedSummary])
   const journalSummary = (parsedSummary as any)?.journalSummary as
     | {
         entries?: number
@@ -599,9 +874,89 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   const summaryText = report.summary || payload?.summary || 'Summary coming soon.'
   const summaryPoints = splitIntoPoints(summaryText)
   const periodRangeLabel = formatDateRange(report.periodStart, report.periodEnd)
+  const reportDays = listReportDays(report.periodStart, report.periodEnd)
+  const activeDayKeys = new Set<string>()
+  ;(dailyStats || []).forEach((row) => {
+    const key = toDateKey(row?.date)
+    if (!key) return
+    const hasActivity =
+      Number(row?.calories ?? 0) > 0 ||
+      Number(row?.waterMl ?? 0) > 0 ||
+      Number(row?.exerciseMinutes ?? 0) > 0 ||
+      Number(row?.symptomCount ?? 0) > 0 ||
+      typeof row?.moodAvg === 'number'
+    if (hasActivity) activeDayKeys.add(key)
+  })
+  ;(nutritionSummary?.dailyTotals || []).forEach((row) => {
+    const key = toDateKey(row?.date)
+    if (key && Number(row?.calories ?? 0) > 0) activeDayKeys.add(key)
+  })
+  ;(hydrationSummary?.dailyTotals || []).forEach((row) => {
+    const key = toDateKey(row?.date)
+    if (key && Number(row?.totalMl ?? 0) > 0) activeDayKeys.add(key)
+  })
+  const fallbackActiveDays = activeDayKeys.size === 0 ? daysActive : 0
+  const rhythmDays = reportDays.map((day, idx) => ({
+    key: day,
+    label: shortDayName(day),
+    active: activeDayKeys.has(day) || (fallbackActiveDays > 0 && idx >= reportDays.length - fallbackActiveDays),
+  }))
+  const reportStrength = clampNumber(activityPercent, 0, 100)
+  const reportStrengthLabel = strengthLabel(reportStrength)
+  const strongestPattern = wins?.[0]
+  const focusPattern = gaps?.[0] || keyInsights.find((item) => item.label.toLowerCase().includes('avoid'))
+  const suggestedPattern = keyInsights.find((item) => item.label.toLowerCase().includes('suggestion')) || keyInsights[0]
+  const topCoverage = coverageItems
+    .filter((item) => item.value > 0)
+    .sort((a, b) => b.value - a.value)
+    .slice(0, 6)
+  const heroCards = [
+    {
+      label: 'Strongest pattern',
+      title: getInsightName(strongestPattern, topCoverage[0]?.label || 'Keep logging'),
+      body: getInsightReason(
+        strongestPattern,
+        topCoverage[0]
+          ? `${topCoverage[0].label} gave this report the clearest signal this week.`
+          : 'The report becomes more useful as the week fills with food, water, mood, movement, and symptom logs.'
+      ),
+      tone: 'emerald',
+    },
+    {
+      label: 'Best next step',
+      title: getInsightName(suggestedPattern, 'Choose one small action'),
+      body: getInsightReason(
+        suggestedPattern,
+        summaryPoints[0] || 'Pick one simple habit from the report and repeat it for the next 7 days.'
+      ),
+      tone: 'sky',
+    },
+    {
+      label: 'Needs attention',
+      title: getInsightName(focusPattern, dataWarning ? 'Data needs care' : 'Watch the gaps'),
+      body: getInsightReason(
+        focusPattern,
+        dataWarning || 'Any missing logs or repeated symptoms will stand out here as the report gets more history.'
+      ),
+      tone: 'amber',
+    },
+  ]
+  const reportPageClass = (key: ReportNavKey) => (activeReportNav === key ? 'block' : 'hidden md:block')
+  const showReportPage = (key: ReportNavKey) => {
+    setActiveReportNav(key)
+    try {
+      const url = new URL(window.location.href)
+      url.searchParams.set('tab', key)
+      window.history.replaceState(window.history.state, '', `${url.pathname}${url.search}${url.hash}`)
+      window.sessionStorage.setItem('weekly-report-last-tab', key)
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } catch {
+      // ignore
+    }
+  }
 
   return (
-    <div className="min-h-screen bg-gradient-to-b from-white via-slate-50 to-slate-100">
+    <div className="min-h-screen overflow-x-hidden bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_34%,#eef8f4_100%)]">
       {/* Mobile app-style header */}
       <div className="md:hidden sticky top-0 z-40 border-b border-slate-200 bg-white/90 backdrop-blur">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3">
@@ -628,32 +983,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 py-8 pb-28 md:py-10">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="text-3xl font-bold text-slate-900">7-day health report</h1>
-            <p className="text-sm text-slate-600 mt-1">{periodRangeLabel}</p>
-          </div>
-          <div className="flex flex-wrap gap-3">
-          {pdfHref && (
-            <a
-              href={pdfHref}
-              target="_blank"
-              rel="noreferrer"
-                className="hidden md:inline-flex items-center rounded-lg border border-helfi-green px-4 py-2 text-sm font-medium text-helfi-green hover:bg-helfi-green/10"
-              >
-                Save as PDF
-              </a>
-            )}
-            <Link
-              href="/insights"
-              className="hidden md:inline-flex items-center rounded-lg bg-helfi-green px-4 py-2 text-sm font-medium text-white hover:bg-helfi-green/90"
-            >
-              Back to Insights
-            </Link>
-          </div>
-        </div>
-
+      <div className="mx-auto max-w-6xl px-3 py-6 pb-28 sm:px-4 md:py-10">
         {manualMessage && (
           <div className="mt-4 rounded-2xl border border-red-200 bg-red-50 p-3 text-sm text-red-700">
             {manualMessage}
@@ -666,89 +996,173 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </div>
         )}
 
-        <div id="data" className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-            <div>
-              <h2 className="text-lg font-semibold text-gray-900">Data used this week</h2>
-              <p className="text-sm text-gray-600 mt-1">
-                Last 7 days • {daysActive} active days • {coverage?.totalEvents ?? 0} total entries
-              </p>
-            </div>
-            <div className="text-sm font-semibold text-emerald-600">
-              {activityPercent}% activity strength
-            </div>
-          </div>
-          <div className="mt-4 h-3 w-full rounded-full bg-gray-100 overflow-hidden">
-            <div
-              className="h-full rounded-full bg-emerald-400 shadow-[0_0_10px_rgba(16,185,129,0.5)] transition-all duration-500"
-              style={{ width: `${activityPercent}%` }}
-            ></div>
-          </div>
-          <div className="mt-5 grid gap-4 md:grid-cols-2">
-            {coverageItems.map((item) => (
-              <div key={item.label} className="rounded-xl border border-gray-100 bg-gray-50 p-4">
-                <div className="flex items-center justify-between text-sm text-gray-700">
-                  <span>{item.label}</span>
-                  <span className="font-semibold text-gray-900">{item.value}</span>
+        <section className="w-full max-w-full overflow-hidden rounded-3xl border border-emerald-100 bg-white shadow-[0_24px_80px_rgba(15,23,42,0.08)] sm:rounded-[2rem]">
+          <div className="grid w-full max-w-full gap-0 lg:grid-cols-[1.05fr_0.95fr]">
+            <div className="min-w-0 p-5 sm:p-8 lg:p-10">
+              <div className="hidden items-center justify-between md:flex">
+                <button
+                  onClick={() => router.push('/insights')}
+                  className="inline-flex items-center rounded-full border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50"
+                >
+                  Back to Insights
+                </button>
+                {pdfHref && (
+                  <a
+                    href={pdfHref}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center rounded-full border border-emerald-200 bg-emerald-50 px-4 py-2 text-sm font-semibold text-emerald-800 hover:bg-emerald-100"
+                  >
+                    Save as PDF
+                  </a>
+                )}
+              </div>
+
+              <div className="mt-2 md:mt-10">
+                <p className="text-sm font-semibold text-emerald-700">{periodRangeLabel}</p>
+                <h1 className="mt-3 max-w-[21rem] text-3xl font-bold tracking-tight text-slate-950 sm:max-w-2xl sm:text-5xl">
+                  7-day health report
+                </h1>
+                <p className="mt-4 max-w-[21rem] break-words text-base leading-7 text-slate-600 sm:max-w-2xl">
+                  {summaryPoints[0] || replaceIsoDates(summaryText)}
+                </p>
+              </div>
+
+              <div className="mt-8 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Active days</div>
+                  <div className="mt-2 text-3xl font-bold text-slate-950">{daysActive}/7</div>
+                  <div className="mt-1 text-sm text-slate-600">Days with useful data</div>
                 </div>
-                <div className="mt-2 h-2 w-full rounded-full bg-white">
+                <div className="rounded-2xl border border-emerald-100 bg-emerald-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-emerald-700">Report strength</div>
+                  <div className="mt-2 text-3xl font-bold text-emerald-950">{reportStrengthLabel}</div>
+                  <div className="mt-1 text-sm text-emerald-800">{reportStrength}% data signal</div>
+                </div>
+                <div className="rounded-2xl border border-sky-100 bg-sky-50 p-4">
+                  <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">Entries used</div>
+                  <div className="mt-2 text-3xl font-bold text-sky-950">{formatCompactNumber(coverage?.totalEvents ?? 0)}</div>
+                  <div className="mt-1 text-sm text-sky-800">Across your week</div>
+                </div>
+              </div>
+            </div>
+
+            <div id="data" className="min-w-0 bg-slate-950 p-5 text-white sm:p-8 lg:p-10">
+              <div className="max-w-[21rem] sm:max-w-none">
+              <div className="flex items-start justify-between gap-4">
+                <div>
+                  <h2 className="text-xl font-semibold">Weekly snapshot</h2>
+                  <p className="mt-2 text-sm leading-6 text-emerald-50/80">
+                    A simple view of how much useful information Helfi had to work with.
+                  </p>
+                </div>
+                <div className="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold text-emerald-100">
+                  {daysActive} days
+                </div>
+              </div>
+
+              <div className="mt-8 flex justify-center">
+                <div
+                  className="relative grid h-48 w-48 place-items-center rounded-full bg-[conic-gradient(#10b981_var(--report-strength),rgba(255,255,255,0.12)_0)] shadow-[0_30px_80px_rgba(16,185,129,0.25)] sm:h-56 sm:w-56"
+                  style={{ ['--report-strength' as any]: `${reportStrength}%` }}
+                >
+                  <div className="absolute inset-5 rounded-full bg-slate-950" />
+                  <div className="relative text-center">
+                    <div className="text-4xl font-bold tracking-tight sm:text-5xl">{reportStrength}</div>
+                    <div className="mt-1 text-sm font-semibold text-emerald-100">out of 100</div>
+                    <div className="mt-2 text-xs text-slate-300">report strength</div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="mt-8 grid grid-cols-7 gap-1 sm:gap-2">
+                {rhythmDays.map((day) => (
                   <div
-                    className="h-full rounded-full bg-emerald-300"
-                    style={{ width: `${Math.round((item.value / maxCoverage) * 100)}%` }}
-                  ></div>
-                </div>
+                    key={day.key}
+                    className={`rounded-xl border px-1 py-2 text-center sm:rounded-2xl sm:px-2 sm:py-3 ${
+                      day.active
+                        ? 'border-emerald-300/40 bg-emerald-300/20 text-emerald-50'
+                        : 'border-white/10 bg-white/5 text-slate-400'
+                    }`}
+                  >
+                    <div className="text-[10px] font-semibold sm:text-xs">{day.label}</div>
+                    <div className={`mx-auto mt-2 h-2 w-2 rounded-full sm:h-2.5 sm:w-2.5 ${day.active ? 'bg-emerald-300' : 'bg-white/20'}`} />
+                  </div>
+                ))}
               </div>
-            ))}
-          </div>
-          {hydrationEntries > 0 && (
-            <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-4">
-              <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm font-semibold text-sky-900">Hydration summary</div>
-                <div className="text-xs text-sky-700">
-                  {hydrationEntries} {hydrationEntries === 1 ? 'entry' : 'entries'} • {hydrationDays} days
-                </div>
-              </div>
-              <div className="mt-2 text-sm text-sky-800">
-                {formatMl(hydrationTotal)} total • {formatMl(hydrationAverage)} per day
-              </div>
-              {hydrationTop.length > 0 && (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {hydrationTop.map((drink, idx) => (
-                    <span
-                      key={`${drink.label || 'drink'}-${idx}`}
-                      className="rounded-full border border-sky-100 bg-white px-3 py-1 text-xs text-sky-800"
-                    >
-                      {(drink.label || 'Drink').toString()} {drink.count ? `• ${drink.count}` : ''}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          )}
-        </div>
 
-        <div id="summary" className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
-          <h2 className="text-lg font-semibold text-gray-900">Weekly summary</h2>
-          {summaryPoints.length > 0 ? (
-            <ul className="mt-2 list-disc space-y-2 pl-5 text-sm text-gray-600">
-              {summaryPoints.map((point, idx) => (
-                <li key={`summary-point-${idx}`}>{point}</li>
+              <div className="mt-8 space-y-3">
+                {topCoverage.length ? (
+                  topCoverage.map((item) => (
+                    <div key={item.label} className="rounded-2xl border border-white/10 bg-white/[0.07] p-4">
+                      <div className="flex items-center justify-between gap-3 text-sm">
+                        <span className="font-semibold text-slate-100">{item.label}</span>
+                        <span className="text-emerald-100">{formatCompactNumber(item.value)}</span>
+                      </div>
+                      <div className="mt-3 h-2 overflow-hidden rounded-full bg-white/10">
+                        <div
+                          className="h-full rounded-full bg-emerald-300"
+                          style={{ width: `${Math.round((item.value / maxCoverage) * 100)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <div className="rounded-2xl border border-white/10 bg-white/[0.07] p-4 text-sm text-slate-300">
+                    Start logging during the week and this snapshot will fill with your strongest data sources.
+                  </div>
+                )}
+              </div>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <div id="summary" className={`mt-6 ${reportPageClass('summary')}`}>
+        <section className="grid gap-4 lg:grid-cols-3">
+          {heroCards.map((card) => (
+            <div
+              key={card.label}
+              className={`rounded-2xl border p-5 shadow-sm ${
+                card.tone === 'emerald'
+                  ? 'border-emerald-100 bg-emerald-50'
+                  : card.tone === 'sky'
+                    ? 'border-sky-100 bg-sky-50'
+                    : 'border-amber-100 bg-amber-50'
+              }`}
+            >
+              <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{card.label}</div>
+              <div className="mt-2 text-lg font-bold text-slate-950">{card.title}</div>
+              <p className="mt-2 text-sm leading-6 text-slate-700">{card.body}</p>
+            </div>
+          ))}
+        </section>
+
+        {summaryPoints.length > 1 && (
+          <div className="mt-6 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-slate-900">What changed this week</h2>
+            <div className="mt-4 grid gap-3 md:grid-cols-3">
+              {summaryPoints.slice(1, 4).map((point, idx) => (
+                <div key={`summary-point-${idx}`} className="rounded-xl border border-slate-100 bg-slate-50 p-4 text-sm leading-6 text-slate-700">
+                  {point}
+                </div>
               ))}
-            </ul>
-          ) : (
-            <p className="text-sm text-gray-600 mt-2">{replaceIsoDates(summaryText)}</p>
-          )}
-        </div>
-
-        <div id="visuals" className="mt-6">
-          <div className="flex items-end justify-between gap-4">
-            <div>
-              <h2 className="text-xl font-semibold text-slate-900">Visual snapshot</h2>
-              <p className="text-sm text-slate-600 mt-1">
-                Simple charts that summarize your last 7 days. They get better as you log more.
-              </p>
             </div>
           </div>
+        )}
+        </div>
+
+        <div id="visuals" className={`mt-6 ${reportPageClass('visuals')}`}>
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-950">Charts</h2>
+              <p className="mt-1 max-w-[21rem] text-sm leading-6 text-slate-600 sm:max-w-none">Open each chart section to compare this week and find what changed.</p>
+            </div>
+          {hydrationEntries > 0 && (
+            <div className="mt-4 inline-flex rounded-full border border-sky-100 bg-sky-50 px-4 py-2 text-sm font-semibold text-sky-900">
+              Hydration: {formatMl(hydrationAverage)} average per day
+            </div>
+          )}
           <div className="mt-4">
             <ReportVisuals
               periodStart={report.periodStart}
@@ -761,12 +1175,30 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
               exerciseSummary={exerciseSummary as any}
               medicalImageSummary={medicalImageSummary as any}
               journalSummary={journalSummary as any}
+              previousSummary={
+                previousParsedSummary
+                  ? {
+                      periodLabel: formatDateRange(previousReport?.periodStart, previousReport?.periodEnd),
+                      nutritionSummary: previousParsedSummary?.nutritionSummary,
+                      hydrationSummary: previousParsedSummary?.hydrationSummary,
+                      dailyStats: previousParsedSummary?.dailyStats,
+                    }
+                  : null
+              }
             />
+          </div>
           </div>
         </div>
 
+        <div id="insights" className={`mt-6 ${reportPageClass('insights')}`}>
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-950">Insights</h2>
+              <p className="mt-1 text-sm text-slate-600">The main takeaways and coaching notes from this report.</p>
+            </div>
+
         {keyInsights.length > 0 && (
-          <div id="insights" className="mt-6 rounded-2xl border border-gray-200 bg-white p-6 shadow-sm">
+          <div className="mt-4 rounded-2xl border border-gray-200 bg-white p-5 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900">Key insights this week</h2>
             <p className="text-sm text-gray-600 mt-2">
               These are the most important signals from your last 7 days.
@@ -933,8 +1365,29 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </div>
         )}
 
-        <div className="mt-8 flex flex-wrap gap-2">
-          {SECTIONS.map((section) => (
+          </div>
+        </div>
+
+        <div id="sections" className={`mt-6 ${reportPageClass('sections')}`}>
+          <div className="rounded-3xl border border-slate-200 bg-white p-4 shadow-sm md:p-6">
+            <div>
+              <h2 className="text-2xl font-bold text-slate-950">Details</h2>
+              <p className="mt-1 text-sm text-slate-600">Deeper notes by health area.</p>
+            </div>
+
+            {detailComparisons.length > 0 ? (
+              <div className="mt-4 grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                {detailComparisons.map((item) => (
+                  <div key={item.label} className="rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                    <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">{item.label}</div>
+                    <div className="mt-1 text-sm font-semibold text-slate-900">{item.text}</div>
+                  </div>
+                ))}
+              </div>
+            ) : null}
+
+        <div className="mt-5 flex flex-wrap gap-2">
+          {availableSections.map((section) => (
             <button
               key={section.key}
               onClick={() => setActiveTab(section.key)}
@@ -974,29 +1427,57 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </div>
         ) : null}
 
-        <div id="sections" className="mt-6 grid gap-6 lg:grid-cols-3">
+        {activeTab === 'medications' && Array.isArray(medicationsList) && medicationsList.length > 0 ? (
+          <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/40 p-6 shadow-sm">
+            <h2 className="text-lg font-semibold text-sky-900">Your medications</h2>
+            <p className="mt-2 text-sm text-sky-800">
+              This is your current medication list. The report text below should connect it to your goals and safety notes.
+            </p>
+            <div className="mt-4 grid gap-3 md:grid-cols-2">
+              {medicationsList.map((m, idx) => (
+                <div key={`${m?.name || 'medication'}-${idx}`} className="rounded-xl border border-sky-100 bg-white p-4">
+                  <div className="font-semibold text-sky-950">{replaceIsoDates(String(m?.name || 'Medication'))}</div>
+                  {(m?.dosage || m?.timing) ? (
+                    <div className="mt-1 text-sm text-sky-900/80">
+                      {m?.dosage ? `Dose: ${m.dosage}` : 'Dose: -'}
+                      {' • '}
+                      {m?.timing ? `Timing: ${m.timing}` : 'Timing: -'}
+                    </div>
+                  ) : (
+                    <div className="mt-1 text-sm text-sky-900/80">Dose/timing not set</div>
+                  )}
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : null}
+
+        <div className="mt-6 grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-1 space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">What's working</h3>
-              <SectionBucket title="working" items={sections?.[activeTab]?.working || []} />
+              <SectionBucket title="working" items={displaySections?.[activeTab]?.working || []} />
             </div>
           </div>
           <div className="lg:col-span-1 space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Suggestions</h3>
-              <SectionBucket title="suggested" items={sections?.[activeTab]?.suggested || []} />
+              <SectionBucket title="suggested" items={displaySections?.[activeTab]?.suggested || []} />
             </div>
           </div>
           <div className="lg:col-span-1 space-y-4">
             <div>
               <h3 className="text-sm font-semibold text-gray-700 mb-2">Things to avoid</h3>
-              <SectionBucket title="avoid" items={sections?.[activeTab]?.avoid || []} />
+              <SectionBucket title="avoid" items={displaySections?.[activeTab]?.avoid || []} />
             </div>
           </div>
         </div>
 
+          </div>
+        </div>
+
         {reports.length > 1 && (
-          <div id="archive" className="mt-10">
+          <div id="archive" className={`mt-10 ${reportPageClass('summary')}`}>
             <h3 className="text-sm font-semibold text-gray-700 mb-3">Previous reports</h3>
             <div className="grid gap-3 md:grid-cols-2">
               {reports.map((item) => (
@@ -1031,32 +1512,25 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       </div>
 
       {/* Mobile app-style bottom nav for the report */}
-      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white/92 backdrop-blur">
+      <div className="md:hidden fixed bottom-0 left-0 right-0 z-40 border-t border-slate-200 bg-white shadow-[0_-12px_32px_rgba(15,23,42,0.10)]">
         <div className="mx-auto flex max-w-6xl items-center justify-between px-3 py-2">
-          <button
-            onClick={() => scrollTo('summary')}
-            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Summary
-          </button>
-          <button
-            onClick={() => scrollTo('visuals')}
-            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Charts
-          </button>
-          <button
-            onClick={() => scrollTo('insights')}
-            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Insights
-          </button>
-          <button
-            onClick={() => scrollTo('sections')}
-            className="flex flex-1 flex-col items-center justify-center rounded-xl px-2 py-2 text-xs font-semibold text-slate-700 hover:bg-slate-50"
-          >
-            Details
-          </button>
+          {REPORT_NAV_ITEMS.map((item) => {
+            const isActive = activeReportNav === item.key
+            return (
+              <button
+                key={item.key}
+                onClick={() => {
+                  showReportPage(item.key)
+                }}
+                aria-current={isActive ? 'page' : undefined}
+                className={`flex flex-1 items-center justify-center px-2 py-3 text-xs font-semibold transition-colors focus-visible:outline-none ${
+                  isActive ? 'text-helfi-green' : 'text-slate-700 hover:text-helfi-green'
+                }`}
+              >
+                {item.label}
+              </button>
+            )
+          })}
         </div>
       </div>
     </div>
