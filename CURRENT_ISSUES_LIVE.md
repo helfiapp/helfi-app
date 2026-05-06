@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-06 20:46 AEST
+- What changed: Strengthened weekly 7-day report generation so data-backed sections get richer multi-item What’s working, Suggestions, and Things to avoid. Also updated the owner demo reports so Supplements, Medications, Nutrition, Hydration, Exercise, Lifestyle, Mood, and Symptoms show fuller detail, while Labs is hidden when there is no lab data.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report?id=codex-demo-weekly-1777968383990&tab=sections
+- What to quickly test: Open Details, check Supplements and Medications first, then Nutrition/Hydration/Exercise/Lifestyle/Mood/Symptoms. Each should show multiple useful items where data exists, and Labs should not appear for this no-labs report.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-06 20:10 AEST
 - What changed: Deployed the weekly 7-day report mobile redesign, stronger charts, bottom report navigation, smarter Supplements and Medications intelligence, hidden empty detail sections, previous-report comparisons, and the mobile bottom navigation updates left by the previous agent.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report
