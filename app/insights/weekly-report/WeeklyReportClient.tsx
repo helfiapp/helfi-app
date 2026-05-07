@@ -3,6 +3,7 @@
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 import type { WeeklyReportRecord } from '@/lib/weekly-health-report'
 import ReportVisuals from './ReportVisuals'
 
@@ -60,6 +61,39 @@ function SectionBucket({ title, items }: { title: string; items: Array<{ name?: 
         </div>
       ))}
     </div>
+  )
+}
+
+function SectionBucketPanel({
+  title,
+  items,
+  bucket,
+}: {
+  title: string
+  items: Array<{ name?: string; reason?: string }>
+  bucket: string
+}) {
+  const itemCount = items?.length || 0
+  const countText = itemCount === 1 ? '1 item' : `${itemCount} items`
+
+  return (
+    <details className="group rounded-2xl border border-slate-200 bg-slate-50 shadow-sm" data-testid={`weekly-report-${bucket}-panel`}>
+      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-white md:px-5 [&::-webkit-details-marker]:hidden">
+        <div>
+          <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
+          <p className="mt-1 text-xs text-slate-500">{countText}</p>
+        </div>
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 group-open:hidden">
+          <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+        </span>
+        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 group-open:flex">
+          <ChevronUpIcon className="h-4 w-4" aria-hidden="true" />
+        </span>
+      </summary>
+      <div className="border-t border-slate-200 bg-white p-4 md:p-5">
+        <SectionBucket title={bucket} items={items || []} />
+      </div>
+    </details>
   )
 }
 
@@ -1452,25 +1486,22 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </div>
         ) : null}
 
-        <div className="mt-6 grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-1 space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">What's working</h3>
-              <SectionBucket title="working" items={displaySections?.[activeTab]?.working || []} />
-            </div>
-          </div>
-          <div className="lg:col-span-1 space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Suggestions</h3>
-              <SectionBucket title="suggested" items={displaySections?.[activeTab]?.suggested || []} />
-            </div>
-          </div>
-          <div className="lg:col-span-1 space-y-4">
-            <div>
-              <h3 className="text-sm font-semibold text-gray-700 mb-2">Things to avoid</h3>
-              <SectionBucket title="avoid" items={displaySections?.[activeTab]?.avoid || []} />
-            </div>
-          </div>
+        <div className="mt-6 space-y-3">
+          <SectionBucketPanel
+            title="What's working"
+            bucket="working"
+            items={displaySections?.[activeTab]?.working || []}
+          />
+          <SectionBucketPanel
+            title="Suggestions"
+            bucket="suggested"
+            items={displaySections?.[activeTab]?.suggested || []}
+          />
+          <SectionBucketPanel
+            title="Things to avoid"
+            bucket="avoid"
+            items={displaySections?.[activeTab]?.avoid || []}
+          />
         </div>
 
           </div>
