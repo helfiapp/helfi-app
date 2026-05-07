@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-08 07:50 AEST
+- What changed: Weekly report Details now hides What's working, Suggestions, and Things to avoid inside separate expandable panels with down/up arrows and item counts.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report?id=codex-demo-weekly-1777968383990&tab=sections#sections
+- What to quickly test: Open Details, choose Supplements, and confirm the three panels start closed. Tap What's working and confirm the supplement cards appear.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-08 07:40 AEST
 - What changed: Refreshed the live database connection after Neon updated the database role, then redeployed the existing live app so Helfi can connect to the database again.
 - Where to see it (page/link): https://helfi.ai/pwa-entry and https://helfi.ai/insights/weekly-report
