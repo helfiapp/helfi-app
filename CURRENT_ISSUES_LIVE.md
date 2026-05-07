@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-08 07:40 AEST
+- What changed: Refreshed the live database connection after Neon updated the database role, then redeployed the existing live app so Helfi can connect to the database again.
+- Where to see it (page/link): https://helfi.ai/pwa-entry and https://helfi.ai/insights/weekly-report
+- What to quickly test: Open Helfi and confirm the application error is gone. Then open the weekly report and confirm the report loads instead of showing digest 2080103834.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-06 19:55 AEST
 - What changed: Deployed the Health Insights 7-day report mobile redesign, including separate Summary/Charts/Insights/Details report tabs, collapsible chart cards, improved calorie visuals, and previous-week comparison support.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report
