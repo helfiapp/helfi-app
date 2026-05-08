@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 2026-05-09 06:53 AEST
+- What changed: Weekly report Details panels are now controlled so What's working, Suggestions, and Things to avoid always start closed, and opening one closes the other two.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report?id=codex-demo-weekly-1777968383990&tab=sections#sections
+- What to quickly test: Open Details, choose Supplements, confirm all three panels are closed, open What's working, then open Suggestions and confirm What's working closes.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-08 07:50 AEST
 - What changed: Weekly report Details now hides What's working, Suggestions, and Things to avoid inside separate expandable panels with down/up arrows and item counts.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report?id=codex-demo-weekly-1777968383990&tab=sections#sections
