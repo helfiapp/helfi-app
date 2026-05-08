@@ -39,6 +39,8 @@ type WeeklyReportClientProps = {
   reportsEnabled?: boolean
 }
 
+type DetailBucket = 'working' | 'suggested' | 'avoid'
+
 function SectionBucket({ title, items }: { title: string; items: Array<{ name?: string; reason?: string }> }) {
   if (!items?.length) {
     return (
@@ -68,32 +70,40 @@ function SectionBucketPanel({
   title,
   items,
   bucket,
+  open,
+  onToggle,
 }: {
   title: string
   items: Array<{ name?: string; reason?: string }>
-  bucket: string
+  bucket: DetailBucket
+  open: boolean
+  onToggle: () => void
 }) {
   const itemCount = items?.length || 0
   const countText = itemCount === 1 ? '1 item' : `${itemCount} items`
 
   return (
-    <details className="group rounded-2xl border border-slate-200 bg-slate-50 shadow-sm" data-testid={`weekly-report-${bucket}-panel`}>
-      <summary className="flex cursor-pointer list-none items-center justify-between gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-white md:px-5 [&::-webkit-details-marker]:hidden">
+    <div className="rounded-2xl border border-slate-200 bg-slate-50 shadow-sm" data-testid={`weekly-report-${bucket}-panel`}>
+      <button
+        type="button"
+        aria-expanded={open}
+        onClick={onToggle}
+        className="flex w-full cursor-pointer items-center justify-between gap-4 rounded-2xl px-4 py-4 text-left transition-colors hover:bg-white md:px-5"
+      >
         <div>
           <h3 className="text-sm font-semibold text-slate-900">{title}</h3>
           <p className="mt-1 text-xs text-slate-500">{countText}</p>
         </div>
-        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 group-open:hidden">
-          <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />
+        <span className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700">
+          {open ? <ChevronUpIcon className="h-4 w-4" aria-hidden="true" /> : <ChevronDownIcon className="h-4 w-4" aria-hidden="true" />}
         </span>
-        <span className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-700 group-open:flex">
-          <ChevronUpIcon className="h-4 w-4" aria-hidden="true" />
-        </span>
-      </summary>
-      <div className="border-t border-slate-200 bg-white p-4 md:p-5">
-        <SectionBucket title={bucket} items={items || []} />
-      </div>
-    </details>
+      </button>
+      {open ? (
+        <div className="border-t border-slate-200 bg-white p-4 md:p-5">
+          <SectionBucket title={bucket} items={items || []} />
+        </div>
+      ) : null}
+    </div>
   )
 }
 
@@ -266,6 +276,7 @@ function isReportNavKey(value: string | null): value is ReportNavKey {
 export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport, reportsEnabled = true }: WeeklyReportClientProps) {
   const [activeTab, setActiveTab] = useState<SectionKey>('overview')
   const [activeReportNav, setActiveReportNav] = useState<ReportNavKey>('summary')
+  const [openDetailBucket, setOpenDetailBucket] = useState<DetailBucket | null>(null)
   const router = useRouter()
   const [manualStatus, setManualStatus] = useState<'idle' | 'running' | 'error'>('idle')
   const [manualMessage, setManualMessage] = useState<string | null>(null)
@@ -536,6 +547,10 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       setActiveTab(availableSections[0]?.key || 'overview')
     }
   }, [activeTab, availableSections])
+
+  useEffect(() => {
+    setOpenDetailBucket(null)
+  }, [activeTab])
 
   const detailComparisons = useMemo(() => {
     const previous = previousParsedSummary as any
@@ -1491,16 +1506,22 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             title="What's working"
             bucket="working"
             items={displaySections?.[activeTab]?.working || []}
+            open={openDetailBucket === 'working'}
+            onToggle={() => setOpenDetailBucket((current) => (current === 'working' ? null : 'working'))}
           />
           <SectionBucketPanel
             title="Suggestions"
             bucket="suggested"
             items={displaySections?.[activeTab]?.suggested || []}
+            open={openDetailBucket === 'suggested'}
+            onToggle={() => setOpenDetailBucket((current) => (current === 'suggested' ? null : 'suggested'))}
           />
           <SectionBucketPanel
             title="Things to avoid"
             bucket="avoid"
             items={displaySections?.[activeTab]?.avoid || []}
+            open={openDetailBucket === 'avoid'}
+            onToggle={() => setOpenDetailBucket((current) => (current === 'avoid' ? null : 'avoid'))}
           />
         </div>
 
