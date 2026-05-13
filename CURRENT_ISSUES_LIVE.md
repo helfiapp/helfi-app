@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 14 May 2026, 03:00 AM AEST
+- What changed: Fixed native Food Diary photo entry routing, native barcode auth, food entry edit metadata preservation, food analysis fallback errors, and rate limit table setup.
+- Where to see it (page/link): Native Food Diary and https://helfi.ai/api/analyze-food, https://helfi.ai/api/barcode/lookup, https://helfi.ai/api/food-log
+- What to quickly test: In the native app as info@sonicweb.com.au, open Food Diary, use Add Food Entry -> Photo Library / Camera, try barcode lookup, and edit an entry without losing saved metadata.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 13 May 2026, 08:36 PM AEST
 - What changed: Fixed Health Setup access rules for native weekly reports. Native login tokens now work with the Health Setup status check, weekly report APIs refuse access until Health Setup is complete, and hidden/internal goal records no longer count as a real setup goal.
 - Where to see it (page/link): https://helfi.ai/api/health-setup-status and native Insights / weekly reports
