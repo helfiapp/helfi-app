@@ -186,7 +186,10 @@ const runGeminiVisionCompletion = async (opts: {
 
   if (!response.ok) {
     const text = await response.text();
-    throw new Error(`Gemini API error (${response.status}): ${text}`);
+    const redacted = text
+      .replace(/api_key:[^'",\s]+/gi, 'api_key:[redacted]')
+      .replace(/key=[^&\s]+/gi, 'key=[redacted]');
+    throw new Error(`Gemini API error (${response.status}): ${redacted}`);
   }
 
   const payload = await response.json();
@@ -3103,7 +3106,12 @@ CRITICAL REQUIREMENTS:
     // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
     // Temperature is set to 0 for maximum consistency between runs on the same meal.
     const envModelRaw = (process.env.OPENAI_FOOD_MODEL || '').trim()
-    const defaultModel = imageDataUrl ? 'gpt-4o' : (envModelRaw || 'gpt-5.2')
+    const hasOpenAIKey = Boolean((process.env.OPENAI_API_KEY || '').trim())
+    const hasGeminiVisionKey = Boolean((process.env.GEMINI_API_KEY || '').trim())
+    const geminiVisionModel = (process.env.GEMINI_FOOD_MODEL || GEMINI_VISION_MODEL_DEFAULT).trim() || GEMINI_VISION_MODEL_DEFAULT
+    const defaultModel = imageDataUrl
+      ? (hasOpenAIKey ? 'gpt-4o' : geminiVisionModel)
+      : (envModelRaw || 'gpt-5.2')
     let model = defaultModel
     try {
       const goal = await prisma.healthGoal.findFirst({
@@ -3122,7 +3130,7 @@ CRITICAL REQUIREMENTS:
     } catch (e) {
       console.warn('Food analyzer model override lookup failed (non-fatal):', e)
     }
-    const useGeminiVision =
+    let useGeminiVision =
       Boolean(imageDataUrl) && !packagedMode && !labelScan && model.startsWith('gemini-')
 
     let maxTokens = feedbackDown ? 800 : 600;
@@ -3229,7 +3237,25 @@ CRITICAL REQUIREMENTS:
       return null;
     };
 
-    const primary = await runCompletion(model);
+    let primary;
+    try {
+      primary = await runCompletion(model);
+    } catch (primaryErr) {
+      const canFallbackVision = Boolean(imageDataUrl) && !packagedMode && !labelScan;
+      const fallbackModel = useGeminiVision ? 'gpt-4o' : geminiVisionModel;
+      const fallbackHasKey = useGeminiVision ? hasOpenAIKey : hasGeminiVisionKey;
+      if (!canFallbackVision || !fallbackHasKey || fallbackModel === model) {
+        throw primaryErr;
+      }
+      console.warn('Primary food vision provider failed; trying fallback provider.', {
+        from: useGeminiVision ? 'Gemini' : 'OpenAI',
+        to: fallbackModel.startsWith('gemini-') ? 'Gemini' : 'OpenAI',
+        reason: primaryErr instanceof Error ? primaryErr.message.slice(0, 180) : String(primaryErr).slice(0, 180),
+      });
+      model = fallbackModel;
+      useGeminiVision = fallbackModel.startsWith('gemini-');
+      primary = await runCompletion(model);
+    }
     let response = primary.completion;
 
     if (imageDataUrl) {
@@ -5095,22 +5121,30 @@ CRITICAL REQUIREMENTS:
     
     // Handle specific OpenAI errors
     if (error instanceof Error) {
+      const errorCode = String((error as any)?.code || (error as any)?.error?.code || '').toLowerCase();
+      const lowerMessage = error.message.toLowerCase();
       console.log('🔍 Error details:', {
         message: error.message,
         name: error.name,
         stack: error.stack?.substring(0, 200)
       });
       
-      if (error.message.includes('insufficient_quota')) {
+      if (errorCode === 'insufficient_quota' || lowerMessage.includes('insufficient quota') || lowerMessage.includes('quota')) {
         return NextResponse.json(
           { error: 'AI service quota exceeded. Please check your billing.' },
           { status: 429 }
         );
       }
-      if (error.message.includes('invalid_api_key')) {
+      if (errorCode === 'invalid_api_key' || lowerMessage.includes('invalid_api_key')) {
         return NextResponse.json(
           { error: 'Invalid AI service key. Please check your configuration.' },
           { status: 401 }
+        );
+      }
+      if (lowerMessage.includes('consumer') && lowerMessage.includes('suspended')) {
+        return NextResponse.json(
+          { error: 'AI photo analysis provider is currently unavailable.' },
+          { status: 503 }
         );
       }
     }

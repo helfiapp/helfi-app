@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { CreditManager } from '@/lib/credit-system'
@@ -631,12 +632,24 @@ export async function GET(req: NextRequest) {
 
   // Require signed-in user for credit charge
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
+  let userEmail = session?.user?.email || null
+  if (!userEmail) {
+    try {
+      const token = await getToken({
+        req,
+        secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+      })
+      if (token?.email) userEmail = String(token.email)
+    } catch (tokenError) {
+      console.error('❌ Barcode lookup JWT auth fallback failed:', tokenError)
+    }
+  }
+  if (!userEmail) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { email: userEmail },
     include: { subscription: true, creditTopUps: true },
   })
 

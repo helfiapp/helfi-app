@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
+import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { reportCriticalError } from '@/lib/error-reporter'
@@ -87,12 +88,24 @@ const buildFriendlyError = (error: unknown) => {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    let userEmail = session?.user?.email || null
+    if (!userEmail) {
+      try {
+        const token = await getToken({
+          req,
+          secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
+        })
+        if (token?.email) userEmail = String(token.email)
+      } catch (tokenError) {
+        console.error('❌ Barcode label JWT auth fallback failed:', tokenError)
+      }
+    }
+    if (!userEmail) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+      where: { email: userEmail },
       select: { id: true },
     })
 
@@ -100,7 +113,12 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    const body = await req.json()
+    let body: any = {}
+    try {
+      body = await req.json()
+    } catch {
+      body = {}
+    }
     const rawBarcode = normalizeText(body?.barcode)
     if (!rawBarcode) {
       return NextResponse.json({ error: 'Missing barcode' }, { status: 400 })
@@ -228,7 +246,7 @@ export async function POST(req: NextRequest) {
         source: 'barcode-label-save',
         error: saveError,
         userId: user.id,
-        userEmail: session.user.email,
+        userEmail,
         details: { barcode, step: 'barcodeProduct' },
         recipientEmail: SUPPORT_ALERT_EMAIL,
       })
@@ -274,7 +292,7 @@ export async function POST(req: NextRequest) {
           source: 'barcode-label-save-fallback',
           error: fallbackError,
           userId: user.id,
-          userEmail: session.user.email,
+          userEmail,
           details: { barcode, step: 'foodLibraryItem' },
           recipientEmail: SUPPORT_ALERT_EMAIL,
         })

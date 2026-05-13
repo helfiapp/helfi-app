@@ -159,6 +159,7 @@ type SearchFoodItem = {
   servings?: number | null
   servingOptions?: SearchFoodServingOption[] | null
   selectedServingId?: string | null
+  barcode?: string | null
   __custom?: boolean
   quantity_g?: number | null
   calories?: number | null
@@ -2042,7 +2043,9 @@ export function TrackCaloriesScreen() {
       items?: any[] | null
       nutrition?: Record<string, any> | null
       total?: Record<string, any> | null
+      imageUrl?: string | null
       createdAt?: string | null
+      allowDuplicate?: boolean
     }) => {
       if (!authHeaders) return false
       const name = String(payload.name || '').trim()
@@ -2059,12 +2062,13 @@ export function TrackCaloriesScreen() {
       const descriptionRaw = String(payload.description || '').trim()
       const description = descriptionRaw || name
       const nutritionPayload = payload.nutrition ? { ...payload.nutrition } : totals
-      const totalPayload = payload.total ? { ...payload.total } : totals
+      const totalPayload = payload.total ? { ...payload.total } : payload.nutrition ? { ...nutritionPayload } : totals
 
       const res = await fetch(`${API_BASE_URL}/api/food-log`, {
         method: 'POST',
         headers: buildNativeAuthHeaders(session?.token || '', { json: true, includeCookie: true }),
         body: JSON.stringify({
+          name,
           localDate: payload.localDate || selectedDate,
           meal: payload.meal,
           category: payload.meal,
@@ -2072,7 +2076,9 @@ export function TrackCaloriesScreen() {
           nutrition: nutritionPayload,
           total: totalPayload,
           items: Array.isArray(payload.items) ? payload.items : undefined,
+          imageUrl: payload.imageUrl || undefined,
           createdAt: payload.createdAt || undefined,
+          allowDuplicate: payload.allowDuplicate === true,
         }),
       })
       return res.ok
@@ -2182,43 +2188,156 @@ export function TrackCaloriesScreen() {
     closeEntrySwipeMenus()
   }
 
+  const cloneEntryItemsForSave = (entry: FoodEntry, nextName?: string, nextTotals?: Record<string, any>) => {
+    const items = Array.isArray(entry.items) ? JSON.parse(JSON.stringify(entry.items)) : null
+    if (!items || items.length !== 1 || !nextTotals) return items
+    const first = items[0] && typeof items[0] === 'object' ? { ...items[0] } : items[0]
+    if (!first || typeof first !== 'object') return items
+    const name = String(nextName || '').trim()
+    return [
+      {
+        ...first,
+        ...(name ? { name, label: name } : {}),
+        calories: Math.max(0, Math.round(Number(nextTotals.calories) || 0)),
+        protein_g: Math.max(0, round1(Number(nextTotals.protein) || Number(nextTotals.protein_g) || 0)),
+        carbs_g: Math.max(0, round1(Number(nextTotals.carbs) || Number(nextTotals.carbs_g) || 0)),
+        fat_g: Math.max(0, round1(Number(nextTotals.fat) || Number(nextTotals.fat_g) || 0)),
+        fiber_g: Math.max(0, round1(Number(nextTotals.fiber) || Number(nextTotals.fiber_g) || 0)),
+        sugar_g: Math.max(0, round1(Number(nextTotals.sugar) || Number(nextTotals.sugar_g) || 0)),
+      },
+    ]
+  }
+
+  const buildEntryNutritionForSave = (
+    entry: FoodEntry,
+    totals?: {
+      calories: number
+      protein: number
+      carbs: number
+      fat: number
+      fiber?: number
+      sugar?: number
+    },
+  ) => {
+    const existing =
+      entry.raw?.nutrients && typeof entry.raw.nutrients === 'object'
+        ? entry.raw.nutrients
+        : entry.raw?.nutrition && typeof entry.raw.nutrition === 'object'
+        ? entry.raw.nutrition
+        : entry.raw?.total && typeof entry.raw.total === 'object'
+        ? entry.raw.total
+        : entry.nutrients && typeof entry.nutrients === 'object'
+        ? entry.nutrients
+        : {}
+    const source = totals || {
+      calories: readNutrient(entry.nutrients, ['calories', 'calories_kcal']),
+      protein: readNutrient(entry.nutrients, ['protein', 'protein_g']),
+      carbs: readNutrient(entry.nutrients, ['carbs', 'carbs_g']),
+      fat: readNutrient(entry.nutrients, ['fat', 'fat_g']),
+      fiber: readNutrient(entry.nutrients, ['fiber', 'fiber_g']),
+      sugar: readNutrient(entry.nutrients, ['sugar', 'sugar_g']),
+    }
+    const next = {
+      ...existing,
+      calories: Math.max(0, Math.round(Number(source.calories) || 0)),
+      protein: Math.max(0, round1(Number(source.protein) || 0)),
+      carbs: Math.max(0, round1(Number(source.carbs) || 0)),
+      fat: Math.max(0, round1(Number(source.fat) || 0)),
+      fiber: Math.max(0, round1(Number(source.fiber) || 0)),
+      sugar: Math.max(0, round1(Number(source.sugar) || 0)),
+    }
+    return {
+      ...next,
+      calories_kcal: next.calories,
+      protein_g: next.protein,
+      carbs_g: next.carbs,
+      fat_g: next.fat,
+      fiber_g: next.fiber,
+      sugar_g: next.sugar,
+    }
+  }
+
+  const buildExistingEntryPayload = (
+    entry: FoodEntry,
+    meal: string,
+    localDate: string,
+    nameOverride?: string,
+    totalsOverride?: {
+      calories: number
+      protein: number
+      carbs: number
+      fat: number
+      fiber?: number
+      sugar?: number
+    },
+  ) => {
+    const name = String(nameOverride || entry.name || entry.description || 'Food item').trim()
+    const nutrition = buildEntryNutritionForSave(entry, totalsOverride)
+    return {
+      name,
+      meal,
+      calories: numberOrZero(nutrition.calories),
+      protein: numberOrZero(nutrition.protein),
+      carbs: numberOrZero(nutrition.carbs),
+      fat: numberOrZero(nutrition.fat),
+      fiber: numberOrZero(nutrition.fiber),
+      sugar: numberOrZero(nutrition.sugar),
+      description: name,
+      localDate,
+      items: cloneEntryItemsForSave(entry, name, nutrition),
+      nutrition,
+      total: { ...nutrition },
+      imageUrl: typeof entry.raw?.imageUrl === 'string' ? entry.raw.imageUrl : null,
+    }
+  }
+
   const saveEditedEntry = async () => {
     if (!editTarget) return
-    const created = await createFoodEntry({
-      name: editName,
-      meal: editMeal,
+    const nextName = String(editName || editTarget.name || 'Food item').trim()
+    const nextTotals = {
       calories: numberOrZero(editCalories),
       protein: numberOrZero(editProtein),
       carbs: numberOrZero(editCarbs),
       fat: numberOrZero(editFat),
       fiber: numberOrZero(editFiber),
       sugar: numberOrZero(editSugar),
-      description: editTarget.description || '',
+    }
+    const nutrition = buildEntryNutritionForSave(editTarget, nextTotals)
+    const res = await fetch(`${API_BASE_URL}/api/food-log`, {
+      method: 'PUT',
+      headers: buildNativeAuthHeaders(session?.token || '', { json: true, includeCookie: true }),
+      body: JSON.stringify({
+        id: editTarget.id,
+        name: nextName,
+        description: nextName,
+        meal: editMeal,
+        category: editMeal,
+        localDate: editTarget.localDate || selectedDate,
+        nutrition,
+        total: { ...nutrition },
+        items: cloneEntryItemsForSave(editTarget, nextName, nutrition),
+        imageUrl: typeof editTarget.raw?.imageUrl === 'string' ? editTarget.raw.imageUrl : undefined,
+        createdAt: editTarget.createdAt || undefined,
+      }),
     })
-    if (!created) {
+    if (!res.ok) {
       Alert.alert('Save failed', 'Could not save edits.')
       return
     }
 
-    await deleteFoodEntry(editTarget.id)
     setEditModalOpen(false)
     setEditTarget(null)
     await loadAll()
   }
 
   const duplicateEntry = async (entry: FoodEntry, targetDate: string) => {
-    const nutrients = entry.nutrients || {}
     const ok = await createFoodEntry({
-      name: entry.name,
-      meal: String(entry.meal || entry.category || 'uncategorized'),
-      calories: readNutrient(nutrients, ['calories', 'calories_kcal']),
-      protein: readNutrient(nutrients, ['protein', 'protein_g']),
-      carbs: readNutrient(nutrients, ['carbs', 'carbs_g']),
-      fat: readNutrient(nutrients, ['fat', 'fat_g']),
-      fiber: readNutrient(nutrients, ['fiber', 'fiber_g']),
-      sugar: readNutrient(nutrients, ['sugar', 'sugar_g']),
-      description: entry.description || '',
-      localDate: targetDate,
+      ...buildExistingEntryPayload(
+        entry,
+        String(entry.meal || entry.category || 'uncategorized'),
+        targetDate,
+      ),
+      allowDuplicate: true,
     })
 
     if (!ok) {
@@ -2239,20 +2358,15 @@ export function TrackCaloriesScreen() {
     setEntryMenu(null)
     closeEntrySwipeMenus()
     setSaving(true)
-    const nutrients = entry.nutrients || {}
     let count = 0
     for (let i = 0; i < 7; i += 1) {
       const ok = await createFoodEntry({
-        name: entry.name,
-        meal: String(entry.meal || entry.category || 'uncategorized'),
-        calories: readNutrient(nutrients, ['calories', 'calories_kcal']),
-        protein: readNutrient(nutrients, ['protein', 'protein_g']),
-        carbs: readNutrient(nutrients, ['carbs', 'carbs_g']),
-        fat: readNutrient(nutrients, ['fat', 'fat_g']),
-        fiber: readNutrient(nutrients, ['fiber', 'fiber_g']),
-        sugar: readNutrient(nutrients, ['sugar', 'sugar_g']),
-        description: entry.description || '',
-        localDate: shiftDate(selectedDate, i),
+        ...buildExistingEntryPayload(
+          entry,
+          String(entry.meal || entry.category || 'uncategorized'),
+          shiftDate(selectedDate, i),
+        ),
+        allowDuplicate: true,
       })
       if (ok) count += 1
     }
@@ -2264,20 +2378,11 @@ export function TrackCaloriesScreen() {
   const moveEntryToMeal = async () => {
     if (!moveEntryTarget) return
     const entry = moveEntryTarget
-    const nutrients = entry.nutrients || {}
     const nextMeal = moveEntryMeal || String(entry.meal || entry.category || 'uncategorized')
 
     const created = await createFoodEntry({
-      name: entry.name,
-      meal: nextMeal,
-      calories: readNutrient(nutrients, ['calories', 'calories_kcal']),
-      protein: readNutrient(nutrients, ['protein', 'protein_g']),
-      carbs: readNutrient(nutrients, ['carbs', 'carbs_g']),
-      fat: readNutrient(nutrients, ['fat', 'fat_g']),
-      fiber: readNutrient(nutrients, ['fiber', 'fiber_g']),
-      sugar: readNutrient(nutrients, ['sugar', 'sugar_g']),
-      description: entry.description || '',
-      localDate: selectedDate,
+      ...buildExistingEntryPayload(entry, nextMeal, selectedDate),
+      allowDuplicate: true,
     })
 
     if (!created) {
@@ -2309,15 +2414,8 @@ export function TrackCaloriesScreen() {
     for (const entry of copiedEntries) {
       const n = entry.nutrients || {}
       const ok = await createFoodEntry({
-        name: entry.name,
-        meal,
-        calories: readNutrient(n, ['calories', 'calories_kcal']),
-        protein: readNutrient(n, ['protein', 'protein_g']),
-        carbs: readNutrient(n, ['carbs', 'carbs_g']),
-        fat: readNutrient(n, ['fat', 'fat_g']),
-        fiber: readNutrient(n, ['fiber', 'fiber_g']),
-        sugar: readNutrient(n, ['sugar', 'sugar_g']),
-        description: entry.description || 'Pasted item',
+        ...buildExistingEntryPayload(entry, meal, selectedDate),
+        allowDuplicate: true,
       })
       if (ok) count += 1
     }
@@ -2354,16 +2452,8 @@ export function TrackCaloriesScreen() {
     for (const entry of sectionItems) {
       const n = entry.nutrients || {}
       const ok = await createFoodEntry({
-        localDate: today,
-        name: entry.name,
-        meal,
-        calories: readNutrient(n, ['calories', 'calories_kcal']),
-        protein: readNutrient(n, ['protein', 'protein_g']),
-        carbs: readNutrient(n, ['carbs', 'carbs_g']),
-        fat: readNutrient(n, ['fat', 'fat_g']),
-        fiber: readNutrient(n, ['fiber', 'fiber_g']),
-        sugar: readNutrient(n, ['sugar', 'sugar_g']),
-        description: entry.description || 'Copied from past date',
+        ...buildExistingEntryPayload(entry, meal, today),
+        allowDuplicate: true,
       })
       if (ok) count += 1
     }
@@ -2837,6 +2927,8 @@ export function TrackCaloriesScreen() {
       const asset = picked.assets[0]
       const form = new FormData()
       form.append('mealType', favoritesTargetMeal)
+      form.append('analysisMode', 'meal')
+      form.append('forceFresh', '1')
       form.append('image', {
         uri: asset.uri,
         type: asset.mimeType || 'image/jpeg',
@@ -2981,6 +3073,35 @@ export function TrackCaloriesScreen() {
       fiber: fiberBase,
       sugar: sugarBase,
       description: detail,
+      items: [
+        {
+          ...item,
+          name: title,
+          label: title,
+          serving_size: servingText,
+          calories: caloriesBase,
+          protein_g: proteinBase,
+          carbs_g: carbsBase,
+          fat_g: fatBase,
+          fiber_g: fiberBase,
+          sugar_g: sugarBase,
+        },
+      ],
+      nutrition: {
+        ...item,
+        calories: caloriesBase,
+        calories_kcal: caloriesBase,
+        protein: proteinBase,
+        protein_g: proteinBase,
+        carbs: carbsBase,
+        carbs_g: carbsBase,
+        fat: fatBase,
+        fat_g: fatBase,
+        fiber: fiberBase,
+        fiber_g: fiberBase,
+        sugar: sugarBase,
+        sugar_g: sugarBase,
+      },
     })
 
     if (!ok) {
@@ -3062,6 +3183,22 @@ export function TrackCaloriesScreen() {
       fiber: numberOrZero(barcodeFood.fiber_g),
       sugar: numberOrZero(barcodeFood.sugar_g),
       description: `${barcodeFood.serving_size || '1 serving'}${barcodeFood.brand ? ` • ${barcodeFood.brand}` : ''}`,
+      items: [{ ...barcodeFood }],
+      nutrition: {
+        calories: numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal),
+        calories_kcal: numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal),
+        protein: numberOrZero(barcodeFood.protein_g),
+        protein_g: numberOrZero(barcodeFood.protein_g),
+        carbs: numberOrZero(barcodeFood.carbs_g),
+        carbs_g: numberOrZero(barcodeFood.carbs_g),
+        fat: numberOrZero(barcodeFood.fat_g),
+        fat_g: numberOrZero(barcodeFood.fat_g),
+        fiber: numberOrZero(barcodeFood.fiber_g),
+        fiber_g: numberOrZero(barcodeFood.fiber_g),
+        sugar: numberOrZero(barcodeFood.sugar_g),
+        sugar_g: numberOrZero(barcodeFood.sugar_g),
+        __barcode: String(barcodeFood.barcode || barcodeCode || '').trim() || undefined,
+      },
     })
 
     if (!ok) {
@@ -3162,6 +3299,8 @@ export function TrackCaloriesScreen() {
       const asset = picked.assets[0]
       const form = new FormData()
       form.append('mealType', meal)
+      form.append('analysisMode', 'meal')
+      form.append('forceFresh', '1')
       form.append('image', {
         uri: asset.uri,
         type: asset.mimeType || 'image/jpeg',
@@ -3196,6 +3335,22 @@ export function TrackCaloriesScreen() {
             fiber: numberOrZero(item?.fiber_g || item?.fiber),
             sugar: numberOrZero(item?.sugar_g || item?.sugar),
             description: String(item?.serving_size || 'Photo analyzed'),
+            items: [{ ...item }],
+            nutrition: {
+              ...item,
+              calories: numberOrZero(item?.calories || item?.calories_kcal),
+              calories_kcal: numberOrZero(item?.calories || item?.calories_kcal),
+              protein: numberOrZero(item?.protein_g || item?.protein),
+              protein_g: numberOrZero(item?.protein_g || item?.protein),
+              carbs: numberOrZero(item?.carbs_g || item?.carbs),
+              carbs_g: numberOrZero(item?.carbs_g || item?.carbs),
+              fat: numberOrZero(item?.fat_g || item?.fat),
+              fat_g: numberOrZero(item?.fat_g || item?.fat),
+              fiber: numberOrZero(item?.fiber_g || item?.fiber),
+              fiber_g: numberOrZero(item?.fiber_g || item?.fiber),
+              sugar: numberOrZero(item?.sugar_g || item?.sugar),
+              sugar_g: numberOrZero(item?.sugar_g || item?.sugar),
+            },
           })
           if (ok) added += 1
         }
@@ -3215,6 +3370,7 @@ export function TrackCaloriesScreen() {
         fiber: numberOrZero(summary?.fiber || summary?.fiber_g),
         sugar: numberOrZero(summary?.sugar || summary?.sugar_g),
         description: String(summary?.description || 'Photo analyzed'),
+        items: summary?.items && Array.isArray(summary.items) ? summary.items : undefined,
       })
       if (ok) {
         await loadAll()
@@ -3223,6 +3379,14 @@ export function TrackCaloriesScreen() {
       setSaving(false)
       Alert.alert('Analysis failed', 'Could not analyze this image.')
     }
+  }
+
+  const openFoodPhotoPicker = (meal: string, usageMode: 'diary' | 'editor' = 'diary') => {
+    Alert.alert('Add by photo', 'Choose where to get the food photo from.', [
+      { text: 'Camera', onPress: () => void createFromImage('camera', meal, usageMode) },
+      { text: 'Photo Library', onPress: () => void createFromImage('library', meal, usageMode) },
+      { text: 'Cancel', style: 'cancel' },
+    ])
   }
 
   const openRecommended = async (meal: string) => {
@@ -3639,10 +3803,7 @@ export function TrackCaloriesScreen() {
     if (action === 'Photo Library') {
       closeAllAddMenus()
       resetCopyMode()
-      navigation.getParent()?.navigate('FoodAnalysis', {
-        meal,
-        date: selectedDate,
-      })
+      openFoodPhotoPicker(meal)
       return
     }
     if (action === 'Favorites') {
@@ -5690,10 +5851,7 @@ export function TrackCaloriesScreen() {
                 onPress={() => {
                   setIngredientOpen(false)
                   resetCopyMode()
-                  navigation.getParent()?.navigate('FoodAnalysis', {
-                    meal: ingredientTargetMeal,
-                    date: selectedDate,
-                  })
+                  openFoodPhotoPicker(ingredientTargetMeal)
                 }}
                 style={[miniSecondaryButton, { flexBasis: '31%', alignItems: 'center' }]}
               >

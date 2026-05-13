@@ -1213,6 +1213,7 @@ export function AddIngredientScreen() {
         method: 'POST',
         headers: buildNativeAuthHeaders(session?.token || '', { json: true, includeCookie: true }),
         body: JSON.stringify({
+          name: title,
           localDate: selectedDate,
           meal: targetMeal,
           category: targetMeal,
@@ -1233,6 +1234,21 @@ export function AddIngredientScreen() {
             fiber,
             sugar,
           },
+          items: [
+            {
+              ...adjustItem,
+              name: title,
+              label: title,
+              serving_size: servingText,
+              servings,
+              calories,
+              protein_g: protein,
+              carbs_g: carbs,
+              fat_g: fat,
+              fiber_g: fiber,
+              sugar_g: sugar,
+            },
+          ],
         }),
       })
       if (!res.ok) {
@@ -1261,6 +1277,9 @@ export function AddIngredientScreen() {
     fiber?: number
     sugar?: number
     description?: string
+    items?: any[] | null
+    nutrition?: Record<string, any> | null
+    total?: Record<string, any> | null
   }) => {
     if (!session?.token) return false
     const name = String(payload.name || '').trim()
@@ -1276,17 +1295,21 @@ export function AddIngredientScreen() {
     }
     const descriptionRaw = String(payload.description || '').trim()
     const description = descriptionRaw ? `${name}, ${descriptionRaw}` : name
+    const nutritionPayload = payload.nutrition ? { ...payload.nutrition } : totals
+    const totalPayload = payload.total ? { ...payload.total } : payload.nutrition ? { ...nutritionPayload } : totals
 
     const res = await fetch(`${API_BASE_URL}/api/food-log`, {
       method: 'POST',
       headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
       body: JSON.stringify({
+        name,
         localDate: selectedDate,
         meal: targetMeal,
         category: targetMeal,
         description,
-        nutrition: totals,
-        total: totals,
+        nutrition: nutritionPayload,
+        total: totalPayload,
+        items: Array.isArray(payload.items) ? payload.items : undefined,
       }),
     })
     return res.ok
@@ -1369,6 +1392,8 @@ export function AddIngredientScreen() {
 
       const form = new FormData()
       form.append('mealType', targetMeal)
+      form.append('analysisMode', 'meal')
+      form.append('forceFresh', '1')
       form.append('image', {
         uri: asset.uri,
         type: asset.mimeType || 'image/jpeg',
@@ -1401,6 +1426,22 @@ export function AddIngredientScreen() {
             fiber: numberOrZero(item?.fiber_g || item?.fiber),
             sugar: numberOrZero(item?.sugar_g || item?.sugar),
             description: String(item?.serving_size || 'Photo analyzed'),
+            items: [{ ...item }],
+            nutrition: {
+              ...item,
+              calories: numberOrZero(item?.calories || item?.calories_kcal),
+              calories_kcal: numberOrZero(item?.calories || item?.calories_kcal),
+              protein: numberOrZero(item?.protein_g || item?.protein),
+              protein_g: numberOrZero(item?.protein_g || item?.protein),
+              carbs: numberOrZero(item?.carbs_g || item?.carbs),
+              carbs_g: numberOrZero(item?.carbs_g || item?.carbs),
+              fat: numberOrZero(item?.fat_g || item?.fat),
+              fat_g: numberOrZero(item?.fat_g || item?.fat),
+              fiber: numberOrZero(item?.fiber_g || item?.fiber),
+              fiber_g: numberOrZero(item?.fiber_g || item?.fiber),
+              sugar: numberOrZero(item?.sugar_g || item?.sugar),
+              sugar_g: numberOrZero(item?.sugar_g || item?.sugar),
+            },
           })
           if (ok) added += 1
         }
@@ -1419,6 +1460,7 @@ export function AddIngredientScreen() {
         fiber: numberOrZero(summary?.fiber || summary?.fiber_g),
         sugar: numberOrZero(summary?.sugar || summary?.sugar_g),
         description: String(summary?.description || 'Photo analyzed'),
+        items: summary?.items && Array.isArray(summary.items) ? summary.items : undefined,
       })
       if (ok) {
         Alert.alert('Done', 'Item added from photo.')

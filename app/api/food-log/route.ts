@@ -774,7 +774,18 @@ export async function POST(request: NextRequest) {
     console.log('✅ POST /api/food-log - Found user:', { userId, email: userEmail })
 
     const body = await request.json()
-    const { description, nutrition, imageUrl, items, localDate, meal, category, createdAt, allowDuplicate } = body || {}
+    const {
+      name: bodyName,
+      description,
+      nutrition,
+      imageUrl,
+      items,
+      localDate,
+      meal,
+      category,
+      createdAt,
+      allowDuplicate,
+    } = body || {}
     const normalizedDrinkPayload = normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
     const safeNutrition = normalizedDrinkPayload.nutrition
     const safeItems = normalizedDrinkPayload.items
@@ -854,7 +865,7 @@ export async function POST(request: NextRequest) {
       storedImageUrl = await normalizeFoodPhotoInput(user.id, storedImageUrl)
     }
 
-    const name = (description || '')
+    const name = (bodyName || description || '')
       .toString()
       .split('\n')[0]
       .split('Calories:')[0]
@@ -1053,7 +1064,7 @@ export async function PUT(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { id, description, nutrition, imageUrl, items, localDate, meal, category, createdAt } = body || {}
+    const { id, name: bodyName, description, nutrition, imageUrl, items, localDate, meal, category, createdAt } = body || {}
     const normalizedDrinkPayload = normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
     const safeNutrition = normalizedDrinkPayload.nutrition
     const safeItems = normalizedDrinkPayload.items
@@ -1091,12 +1102,17 @@ export async function PUT(request: NextRequest) {
       }
     }
 
-    let storedImageUrl = typeof imageUrl === 'string' ? imageUrl.trim() : ''
+    let storedImageUrl =
+      typeof imageUrl === 'string'
+        ? imageUrl.trim()
+        : typeof existing.imageUrl === 'string'
+        ? existing.imageUrl
+        : ''
     if (storedImageUrl) {
       storedImageUrl = await normalizeFoodPhotoInput(user.id, storedImageUrl)
     }
 
-    const name = (description || existing.description || existing.name || '')
+    const name = (bodyName || description || existing.description || existing.name || '')
       .toString()
       .split('\n')[0]
       .split('Calories:')[0]

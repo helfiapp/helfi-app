@@ -18,17 +18,24 @@ const ensureRateLimitTable = async () => {
     await rateLimitInitPromise
     return
   }
-  rateLimitInitPromise = prisma.$executeRawUnsafe(`
-    CREATE TABLE IF NOT EXISTS "RateLimitBucket" (
-      "scope" TEXT NOT NULL,
-      "rateKey" TEXT NOT NULL,
-      "windowStart" BIGINT NOT NULL,
-      "count" INTEGER NOT NULL DEFAULT 0,
-      "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
-      PRIMARY KEY ("scope", "rateKey", "windowStart")
-    );
-    CREATE INDEX IF NOT EXISTS "RateLimitBucket_updatedAt_idx" ON "RateLimitBucket" ("updatedAt");
-  `)
+  rateLimitInitPromise = Promise.resolve()
+    .then(() =>
+      prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "RateLimitBucket" (
+          "scope" TEXT NOT NULL,
+          "rateKey" TEXT NOT NULL,
+          "windowStart" BIGINT NOT NULL,
+          "count" INTEGER NOT NULL DEFAULT 0,
+          "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+          PRIMARY KEY ("scope", "rateKey", "windowStart")
+        )
+      `),
+    )
+    .then(() =>
+      prisma.$executeRawUnsafe(
+        'CREATE INDEX IF NOT EXISTS "RateLimitBucket_updatedAt_idx" ON "RateLimitBucket" ("updatedAt")',
+      ),
+    )
     .then(() => {
       rateLimitTableReady = true
     })
