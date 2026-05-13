@@ -3039,6 +3039,7 @@ CRITICAL REQUIREMENTS:
     // Billing is now stable again – enforce credit checks for Food Analysis.
     // This controls wallet pre-checks and charges; free credits are consumed first.
     const BILLING_ENFORCED = true;
+    const analysisChargeCents = isReanalysis ? CREDIT_COSTS.FOOD_REANALYSIS : CREDIT_COSTS.FOOD_ANALYSIS;
 
     // Allow if: Premium subscription OR has purchased credits OR has free credits remaining
     let allowViaFreeUse = false;
@@ -3110,7 +3111,7 @@ CRITICAL REQUIREMENTS:
     const hasGeminiVisionKey = Boolean((process.env.GEMINI_API_KEY || '').trim())
     const geminiVisionModel = (process.env.GEMINI_FOOD_MODEL || GEMINI_VISION_MODEL_DEFAULT).trim() || GEMINI_VISION_MODEL_DEFAULT
     const defaultModel = imageDataUrl
-      ? (hasOpenAIKey ? 'gpt-4o' : geminiVisionModel)
+      ? (hasGeminiVisionKey ? geminiVisionModel : 'gpt-4o')
       : (envModelRaw || 'gpt-5.2')
     let model = defaultModel
     try {
@@ -3160,23 +3161,7 @@ CRITICAL REQUIREMENTS:
       maxTokens = cappedMaxTokens;
     }
 
-    // Pre-charge a minimal credit immediately upon analysis start (skip for free trial
-    // or when billing checks are disabled)
-    let prechargedCents = 0;
-    if (BILLING_ENFORCED && !allowViaFreeUse) {
-      try {
-        const cm = new CreditManager(currentUser.id);
-        const immediate = CREDIT_COSTS.FOOD_ANALYSIS; // fixed price upfront
-        const okPre = await cm.chargeCents(immediate);
-        if (!okPre) {
-          return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
-        }
-        prechargedCents = immediate;
-      } catch (e) {
-        console.warn('Immediate pre-charge failed:', e);
-        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
-      }
-    }
+    // Charge only after analysis succeeds. Failed provider calls must not use credits.
 
     console.log('🤖 Calling food analysis model:', {
       provider: useGeminiVision ? 'Gemini' : 'OpenAI',
@@ -3404,26 +3389,6 @@ CRITICAL REQUIREMENTS:
       analysis = `${analysis}\n${fallbackLine}`;
       console.log('ℹ️ Nutrition line missing; appended static fallback to avoid extra AI calls');
     }
-    
-    // Note: Charging happens after health compatibility check to include all costs
-
-    // Consume free credit if this was a free use
-    if (allowViaFreeUse) {
-      await consumeFreeCredit(currentUser.id, isReanalysis ? 'FOOD_REANALYSIS' : 'FOOD_ANALYSIS');
-    }
-    // Update counters (for all users, not just premium)
-    await prisma.user.update({
-      where: { id: currentUser.id },
-      data: ( isReanalysis ? {
-        dailyFoodReanalysisUsed: { increment: 1 },
-        totalAnalysisCount: { increment: 1 },
-      } : {
-        dailyFoodAnalysisUsed: { increment: 1 },
-        totalFoodAnalysisCount: { increment: 1 },
-        totalAnalysisCount: { increment: 1 },
-        monthlyFoodAnalysisUsed: { increment: 1 },
-      } ) as any
-    });
     
     console.log('=== FOOD ANALYZER DEBUG END ===');
 
@@ -5017,13 +4982,17 @@ CRITICAL REQUIREMENTS:
       console.warn('⚠️ Diet compatibility section skipped due to error:', dietError)
     }
 
-    // Fixed per-use price is charged upfront; no remainder charge here.
-    // Skip if allowed via free use OR when billing checks are disabled.
-    if (BILLING_ENFORCED && !allowViaFreeUse) {
+    // Fixed per-use price. Charge only after a successful analysis is ready.
+    // Failed provider calls or failed parsing must not use credits.
+    if (allowViaFreeUse) {
+      const consumed = await consumeFreeCredit(currentUser.id, isReanalysis ? 'FOOD_REANALYSIS' : 'FOOD_ANALYSIS');
+      if (!consumed) {
+        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+      }
+    } else if (BILLING_ENFORCED) {
       try {
         const cm = new CreditManager(currentUser.id);
-        const remainder = 0;
-        const ok = await cm.chargeCents(remainder);
+        const ok = await cm.chargeCents(analysisChargeCents);
         if (!ok) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
         }
@@ -5032,6 +5001,20 @@ CRITICAL REQUIREMENTS:
         return NextResponse.json({ error: 'Billing error' }, { status: 402 });
       }
     }
+
+    // Update counters only after the analysis and charge/free-use step succeed.
+    await prisma.user.update({
+      where: { id: currentUser.id },
+      data: ( isReanalysis ? {
+        dailyFoodReanalysisUsed: { increment: 1 },
+        totalAnalysisCount: { increment: 1 },
+      } : {
+        dailyFoodAnalysisUsed: { increment: 1 },
+        totalFoodAnalysisCount: { increment: 1 },
+        totalAnalysisCount: { increment: 1 },
+        monthlyFoodAnalysisUsed: { increment: 1 },
+      } ) as any
+    });
 
     if (packagedMode && Array.isArray(resp.items) && resp.items.length > 0) {
       const packagedReview = sanitizePackagedLabelItems(resp.items);
