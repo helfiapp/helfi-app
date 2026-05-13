@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 13 May 2026, 06:43 PM AEST
+- What changed: Fixed weekly report authentication so the native app can turn weekly reports on for the standard test account. Also recorded that agents should test with info@sonicweb.com.au.
+- Where to see it (page/link): Settings / Weekly health reports, and https://helfi.ai/insights/weekly-report
+- What to quickly test: Log in as info@sonicweb.com.au and turn on weekly reports.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 2026-05-09 06:53 AEST
 - What changed: Weekly report Details panels are now controlled so What's working, Suggestions, and Things to avoid always start closed, and opening one closes the other two.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report?id=codex-demo-weekly-1777968383990&tab=sections#sections
