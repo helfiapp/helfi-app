@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 13 May 2026, 08:08 PM AEST
+- What changed: Fixed the first native audit blockers for billing and water. Native billing now sends the phone-app login properly, billing history loads, App Store purchase setup works, and native water tracking uses the real water API instead of missing native routes.
+- Where to see it (page/link): Native app Settings -> Subscription & Billing, native Food -> Water Intake, and https://helfi.ai/api/billing/subscription
+- What to quickly test: Open the native app as info@sonicweb.com.au, open Subscription & Billing, confirm the premium plan/history appear, then add and delete a water entry.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 13 May 2026, 06:43 PM AEST
 - What changed: Fixed weekly report authentication so the native app can turn weekly reports on for the standard test account. Also recorded that agents should test with info@sonicweb.com.au.
 - Where to see it (page/link): Settings / Weekly health reports, and https://helfi.ai/insights/weekly-report
