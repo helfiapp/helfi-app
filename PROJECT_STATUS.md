@@ -5,6 +5,11 @@ start helping without the owner needing to copy/paste lots of background.
 
 Last updated: Feb 7, 2026
 
+## Critical OpenAI Key Warning
+- Do not export, copy, print, or use `OPENAI_API_KEY` from agent scripts or terminal commands.
+- The local key is only for the actual Helfi app UI/server during owner-approved AI feature testing.
+- If the local OpenAI key blocker fires, stop and do not bypass it.
+
 ## What Helfi Is Right Now
 - The main product is a website (web app).
 - There is also a phone app codebase started in `native/` (React Native), but it is not published to the App Store or Google Play yet.

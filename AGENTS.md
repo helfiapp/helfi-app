@@ -6,6 +6,14 @@ Start here:
 
 Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 
+## OPENAI API Key Warning (Critical)
+
+- Do not export, copy, print, or use `OPENAI_API_KEY` from any agent script or terminal command.
+- The local key is only for the real Helfi app UI/server when testing actual Helfi AI features.
+- Do not run direct OpenAI scripts, direct API calls, billing checks, or one-off canaries with the live key.
+- If `scripts/assert-no-local-openai-key.js` blocks you, stop. Do not bypass it.
+- Never paste the key into chat, Linear, logs, tickets, docs, or screenshots.
+
 ## Communication Rules
 
 1. The owner is not a developer or coder. Always respond in simple, easy-to-understand English and avoid technical language.

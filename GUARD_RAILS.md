@@ -3010,7 +3010,28 @@ Last stable deployment: `d1b55505` (2026-02-16)
    - inbox does not show it immediately,
    - completing check-in/mood prevents it from showing later.
 
-## 8. Rules for Future Modifications
+## 8. Local OpenAI Spend Lock (May 2026 - LOCKED)
+
+**Goal:**
+- Local agents and local test runs must not spend the live Helfi OpenAI balance.
+
+**Must keep:**
+- The local app may keep `OPENAI_API_KEY` inside `.env.local` for owner-approved feature testing.
+- `OPENAI_API_KEY` must not be exported into the agent/terminal environment.
+- `npm run build` must run `scripts/assert-no-local-openai-key.js` before building.
+- The live Vercel app may still use its production key.
+
+**Do not do without owner approval:**
+- Do not export the live OpenAI key into the shell.
+- Do not remove the local OpenAI key blocker.
+- Do not run direct command-line OpenAI scripts against the live key.
+- Do not copy, print, log, paste, screenshot, or send the OpenAI key anywhere.
+- Do not bypass `scripts/assert-no-local-openai-key.js`.
+
+**If local AI testing is needed:**
+- Test through the actual Helfi app UI, not direct scripts or agent-side calls.
+
+## 9. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:
 
