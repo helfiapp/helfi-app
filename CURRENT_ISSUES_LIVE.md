@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 14 May 2026, 09:10 AM AEST
+- What changed: Food Analyzer now uses OpenAI only, Gemini has been removed from the food analysis system and Vercel settings, local agent OpenAI key protection has been added, and the previous native/TestFlight app changes have been saved to Git so they stop appearing as mystery dirty files.
+- Where to see it (page/link): https://helfi.ai/api/analyze-food and the native Food Diary photo analysis flow.
+- What to quickly test: In the native app, open Food Diary -> Add Food Entry -> Meal -> Photo Library or Camera, then confirm analysis completes now that OpenAI credit has been topped up.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 14 May 2026, 03:00 AM AEST
 - What changed: Fixed native Food Diary photo entry routing, native barcode auth, food entry edit metadata preservation, food analysis fallback errors, and rate limit table setup.
 - Where to see it (page/link): Native Food Diary and https://helfi.ai/api/analyze-food, https://helfi.ai/api/barcode/lookup, https://helfi.ai/api/food-log
