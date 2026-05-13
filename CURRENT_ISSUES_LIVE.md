@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 13 May 2026, 08:36 PM AEST
+- What changed: Fixed Health Setup access rules for native weekly reports. Native login tokens now work with the Health Setup status check, weekly report APIs refuse access until Health Setup is complete, and hidden/internal goal records no longer count as a real setup goal.
+- Where to see it (page/link): https://helfi.ai/api/health-setup-status and native Insights / weekly reports
+- What to quickly test: Log in as info@sonicweb.com.au, confirm Health Setup status loads, then confirm weekly reports still load because that account has completed Health Setup.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 13 May 2026, 08:08 PM AEST
 - What changed: Fixed the first native audit blockers for billing and water. Native billing now sends the phone-app login properly, billing history loads, App Store purchase setup works, and native water tracking uses the real water API instead of missing native routes.
 - Where to see it (page/link): Native app Settings -> Subscription & Billing, native Food -> Water Intake, and https://helfi.ai/api/billing/subscription
