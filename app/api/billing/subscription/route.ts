@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
@@ -23,11 +24,30 @@ async function clearStripeSubscriptionIdForUser(userId: string) {
   }
 }
 
+async function getBillingUser(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
+  if (sessionEmail) {
+    return prisma.user.findUnique({
+      where: { email: sessionEmail },
+      select: { id: true, email: true, name: true },
+    })
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (!nativeUserId) return null
+
+  return prisma.user.findUnique({
+    where: { id: nativeUserId },
+    select: { id: true, email: true, name: true },
+  })
+}
+
 // GET /api/billing/subscription - Get current subscription status
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    const authUser = await getBillingUser(request)
+    if (!authUser?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -44,10 +64,7 @@ export async function GET(request: NextRequest) {
     // Fetch user and subscription separately to avoid Prisma client issues
     let user
     try {
-      user = await prisma.user.findUnique({
-        where: { email: session.user.email.toLowerCase() },
-        select: { id: true, email: true, name: true }
-      })
+      user = authUser
     } catch (error) {
       console.error('Error fetching user:', error)
       return NextResponse.json({ 
@@ -128,7 +145,7 @@ export async function GET(request: NextRequest) {
       // Try to find Stripe subscription by customer email
       try {
         const customers = await stripe.customers.list({
-          email: session.user.email.toLowerCase(),
+          email: user.email.toLowerCase(),
           limit: 1
         })
         
@@ -229,22 +246,13 @@ export async function GET(request: NextRequest) {
 // POST /api/billing/subscription - Cancel, upgrade, or downgrade subscription
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    const user = await getBillingUser(request)
+    if (!user?.email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const body = await request.json()
     const { action, newPlan } = body // action: 'cancel' | 'upgrade' | 'downgrade', newPlan: 'plan_20_monthly' | etc.
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email.toLowerCase() },
-      select: { id: true }
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
 
     // Fetch subscription using raw SQL to avoid Prisma schema issues
     let dbSubscription
@@ -294,7 +302,7 @@ export async function POST(request: NextRequest) {
       // Try to find by customer email
       try {
         const customers = await stripe.customers.list({
-          email: session.user.email.toLowerCase(),
+          email: user.email.toLowerCase(),
           limit: 1
         })
         

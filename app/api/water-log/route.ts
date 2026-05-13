@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { Prisma } from '@prisma/client'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 
@@ -104,10 +105,21 @@ async function ensureWaterLogColumns() {
   }
 }
 
-export async function GET(req: NextRequest) {
+async function getWaterLogUser(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
+  if (sessionEmail) {
+    return prisma.user.findUnique({ where: { email: sessionEmail } })
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (!nativeUserId) return undefined
+  return prisma.user.findUnique({ where: { id: nativeUserId } })
+}
+
+export async function GET(req: NextRequest) {
+  const user = await getWaterLogUser(req)
+  if (user === undefined) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
@@ -152,9 +164,8 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getWaterLogUser(req)
+  if (user === undefined) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({} as any))

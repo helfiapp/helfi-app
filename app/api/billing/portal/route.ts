@@ -1,12 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
+import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
+
+async function getBillingEmail(req: NextRequest): Promise<string | null> {
+  const session = await getServerSession(authOptions)
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
+  if (sessionEmail) return sessionEmail
+
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (!nativeUserId) return null
+
+  const user = await prisma.user.findUnique({
+    where: { id: nativeUserId },
+    select: { email: true },
+  })
+  return String(user?.email || '').trim().toLowerCase() || null
+}
 
 export async function POST(req: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    const email = await getBillingEmail(req)
+    if (!email) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -16,8 +33,6 @@ export async function POST(req: NextRequest) {
     }
 
     const stripe = new Stripe(secretKey, { apiVersion: '2024-06-20' })
-    const email = session.user.email.toLowerCase()
-
     // Find Stripe customer by email
     const customers = await stripe.customers.list({ email, limit: 1 })
     if (!customers.data.length) {

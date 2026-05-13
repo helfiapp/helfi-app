@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 
@@ -66,10 +67,21 @@ function toMl(amount: number, unit: string): number {
   return Math.round(amount * factor * 10) / 10
 }
 
-export async function DELETE(_req: NextRequest, context: { params: { id?: string } }) {
+async function getWaterLogUser(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
+  if (sessionEmail) {
+    return prisma.user.findUnique({ where: { email: sessionEmail } })
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (!nativeUserId) return undefined
+  return prisma.user.findUnique({ where: { id: nativeUserId } })
+}
+
+export async function DELETE(_req: NextRequest, context: { params: { id?: string } }) {
+  const user = await getWaterLogUser(_req)
+  if (user === undefined) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const id = String(context?.params?.id || '').trim()
@@ -90,9 +102,8 @@ export async function DELETE(_req: NextRequest, context: { params: { id?: string
 }
 
 export async function PATCH(req: NextRequest, context: { params: { id?: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getWaterLogUser(req)
+  if (user === undefined) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const id = String(context?.params?.id || '').trim()

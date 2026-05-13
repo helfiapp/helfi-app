@@ -231,7 +231,7 @@ export function WaterIntakeScreen() {
 
     try {
       setLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/native-water-log?localDate=${selectedDate}`, {
+      const res = await fetch(`${API_BASE_URL}/api/water-log?localDate=${selectedDate}`, {
         headers: authHeaders,
       })
       const data: any = await res.json().catch(() => ({}))
@@ -289,19 +289,19 @@ export function WaterIntakeScreen() {
   }) => {
     if (!session?.token) return
 
-    await fetch(`${API_BASE_URL}/api/native-food-log`, {
+    await fetch(`${API_BASE_URL}/api/food-log`, {
       method: 'POST',
-      headers: buildNativeAuthHeaders(session.token, { json: true }),
+      headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
       body: JSON.stringify({
         localDate: selectedDate,
         meal: 'uncategorized',
         name: params.label,
+        description: params.label,
         calories: Math.max(0, params.calories),
         protein: 0,
         carbs: Math.max(0, params.carbs),
         fat: 0,
-        description: params.waterLogId ? `Water log ${params.waterLogId}` : 'Water page drink',
-        nutrients: {
+        nutrition: {
           calories: Math.max(0, params.calories),
           protein: 0,
           carbs: Math.max(0, params.carbs),
@@ -309,6 +309,18 @@ export function WaterIntakeScreen() {
           fiber: 0,
           sugar: Math.max(0, params.sugar),
         },
+        items: [
+          {
+            name: params.label,
+            calories: Math.max(0, params.calories),
+            protein_g: 0,
+            carbs_g: Math.max(0, params.carbs),
+            fat_g: 0,
+            fiber_g: 0,
+            sugar_g: Math.max(0, params.sugar),
+            waterLogId: params.waterLogId || null,
+          },
+        ],
       }),
     })
   }
@@ -316,7 +328,7 @@ export function WaterIntakeScreen() {
   const addEntry = async (amount: number, unit: 'ml' | 'l' | 'oz', label?: string) => {
     if (!session?.token) return null
 
-    const res = await fetch(`${API_BASE_URL}/api/native-water-log`, {
+    const res = await fetch(`${API_BASE_URL}/api/water-log`, {
       method: 'POST',
       headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
       body: JSON.stringify({
@@ -526,7 +538,7 @@ export function WaterIntakeScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 28 }}>
         <View style={cardStyle}>
-          <Text style={{ fontSize: 30, fontWeight: '900', color: theme.colors.text }}>Water Intake</Text>
+          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Water Intake</Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable onPress={() => setSelectedDate((prev) => shiftDate(prev, -1))} style={pillButton}>

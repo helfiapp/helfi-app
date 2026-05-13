@@ -1850,7 +1850,7 @@ export function TrackCaloriesScreen() {
         headers: authHeaders,
         },
       )
-      const waterPromise = fetch(`${API_BASE_URL}/api/native-water-log?localDate=${selectedDate}`, {
+      const waterPromise = fetch(`${API_BASE_URL}/api/water-log?localDate=${selectedDate}`, {
         headers: authHeaders,
       })
       const exercisePromise = fetch(`${API_BASE_URL}/api/exercise-entries?date=${selectedDate}`, {
@@ -3765,7 +3765,7 @@ export function TrackCaloriesScreen() {
         <View style={{ backgroundColor: '#F2F4F6', borderBottomWidth: 1, borderBottomColor: '#DFE3EA', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <View style={{ width: 42 }} />
-            <Text style={{ flex: 1, textAlign: 'center', color: '#111827', fontSize: 46/2, fontWeight: '900' }}>Food Diary</Text>
+            <Text style={{ flex: 1, textAlign: 'center', color: '#111827', fontSize: 21, fontWeight: '900' }}>Food Diary</Text>
             <Pressable
               onPress={() => setProfileMenuOpen((v) => !v)}
               style={{

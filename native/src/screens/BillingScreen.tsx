@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { runNativePurchase, type NativePurchaseCode } from '../lib/inAppPurchase'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -27,6 +29,15 @@ type SubscriptionData = {
 
 type RangeKey = '7d' | '1m' | '2m' | '6m' | 'all' | 'custom'
 
+type BillingHistoryItem = {
+  id: string
+  title: string
+  subtitle: string
+  amountText: string
+  status: string
+  occurredAt: string
+}
+
 const defaultCredits: CreditState = {
   loading: true,
   error: '',
@@ -38,9 +49,9 @@ const defaultCredits: CreditState = {
 
 const creditDisplayList = [
   { label: 'Food photo analysis', key: 'foodAnalysis', credits: 10 },
-  { label: 'Symptom analysis', key: 'symptomAnalysis', credits: 6 },
-  { label: 'Medical image analysis', key: 'medicalImageAnalysis', credits: 8 },
-  { label: 'Insights generation', key: 'insightsGeneration', credits: 8 },
+  { label: 'Symptom analysis', key: 'symptomAnalysis', credits: 1 },
+  { label: 'Medical image analysis', key: 'medicalImageAnalysis', credits: 2 },
+  { label: 'Insights generation', key: 'insightsGeneration', credits: 7 },
   { label: 'Talk to Helfi chat', key: 'chatLight', credits: 10 },
 ]
 
@@ -62,6 +73,16 @@ function toDateInputValue(d: Date) {
   const mm = String(d.getMonth() + 1).padStart(2, '0')
   const dd = String(d.getDate()).padStart(2, '0')
   return `${yyyy}-${mm}-${dd}`
+}
+
+function formatHistoryDate(value: string) {
+  const date = new Date(value)
+  if (Number.isNaN(date.getTime())) return ''
+  return date.toLocaleDateString(undefined, {
+    day: 'numeric',
+    month: 'short',
+    year: 'numeric',
+  })
 }
 
 function ActionButton({
@@ -144,7 +165,7 @@ function PlanCard({
       </View>
 
       <View style={{ marginTop: 14 }}>
-        <ActionButton label={loading ? 'Redirecting...' : buttonLabel} onPress={onPress} disabled={loading} kind={dark ? 'dark' : 'primary'} />
+        <ActionButton label={loading ? 'Processing...' : buttonLabel} onPress={onPress} disabled={loading} kind={dark ? 'dark' : 'primary'} />
       </View>
     </View>
   )
@@ -176,7 +197,7 @@ function TopUpCard({
       <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text }}>{title}</Text>
       <Text style={{ marginTop: 6, color: theme.colors.muted }}>{desc}</Text>
       <View style={{ marginTop: 12 }}>
-        <ActionButton label={loading ? 'Redirecting...' : buttonLabel} onPress={onPress} disabled={loading} kind="primary" />
+        <ActionButton label={loading ? 'Processing...' : buttonLabel} onPress={onPress} disabled={loading} kind="primary" />
       </View>
     </View>
   )
@@ -199,13 +220,13 @@ export function BillingScreen() {
   const [usageStats, setUsageStats] = useState<Record<string, number> | null>(null)
   const [usageStatsLoading, setUsageStatsLoading] = useState(false)
   const [usageStatsError, setUsageStatsError] = useState('')
+  const [billingHistory, setBillingHistory] = useState<BillingHistoryItem[]>([])
+  const [billingHistoryLoading, setBillingHistoryLoading] = useState(false)
+  const [billingHistoryError, setBillingHistoryError] = useState('')
 
   const authHeaders = useMemo(() => {
     if (!session?.token) return null
-    return {
-      authorization: `Bearer ${session.token}`,
-      'cache-control': 'no-store',
-    }
+    return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [session?.token])
 
   const fetchCreditStatus = useCallback(async () => {
@@ -251,10 +272,28 @@ export function BillingScreen() {
     setLoadingSubscription(false)
   }, [authHeaders, mode])
 
+  const fetchBillingHistory = useCallback(async () => {
+    if (mode !== 'signedIn' || !authHeaders) {
+      setBillingHistory([])
+      setBillingHistoryLoading(false)
+      return
+    }
+
+    setBillingHistoryLoading(true)
+    setBillingHistoryError('')
+    const res = await fetch(`${API_BASE_URL}/api/native-billing/history`, { headers: authHeaders })
+    const data: any = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || 'Could not load billing history')
+    }
+    setBillingHistory(Array.isArray(data?.history) ? data.history : [])
+    setBillingHistoryLoading(false)
+  }, [authHeaders, mode])
+
   const loadBillingData = useCallback(async () => {
     try {
       setCredits((prev) => ({ ...prev, loading: true, error: '' }))
-      await Promise.all([fetchCreditStatus(), fetchSubscription()])
+      await Promise.all([fetchCreditStatus(), fetchSubscription(), fetchBillingHistory()])
     } catch (error: any) {
       setCredits((prev) => ({
         ...prev,
@@ -262,8 +301,10 @@ export function BillingScreen() {
         error: error?.message || 'Could not load billing.',
       }))
       setLoadingSubscription(false)
+      setBillingHistoryLoading(false)
+      setBillingHistoryError(error?.message || 'Could not load billing history.')
     }
-  }, [fetchCreditStatus, fetchSubscription])
+  }, [fetchBillingHistory, fetchCreditStatus, fetchSubscription])
 
   useFocusEffect(
     useCallback(() => {
@@ -328,28 +369,24 @@ export function BillingScreen() {
     }
   }
 
-  const startCheckout = async (plan: string) => {
+  const startCheckout = async (plan: NativePurchaseCode) => {
     try {
-      if (mode !== 'signedIn' || !authHeaders) {
+      if (mode !== 'signedIn' || !session?.token) {
         Alert.alert('Not signed in', 'Please log in again and try.')
         return
       }
       setIsCreatingCheckout(plan)
-      const res = await fetch(`${API_BASE_URL}/api/billing/create-checkout-session`, {
-        method: 'POST',
-        headers: {
-          ...authHeaders,
-          'content-type': 'application/json',
-        },
-        body: JSON.stringify({ plan, quantity: 1 }),
+      const kind = plan.startsWith('credits_') ? 'topup' : 'subscription'
+      const result = await runNativePurchase({
+        code: plan,
+        kind,
+        token: session.token,
       })
-      const data: any = await res.json().catch(() => ({}))
-      if (!res.ok || !data?.url) {
-        throw new Error(data?.message || data?.error || 'Could not start checkout')
-      }
-      await openExternalUrl(String(data.url))
+      Alert.alert('Purchase complete', result.message)
+      await loadBillingData()
     } catch (error: any) {
-      Alert.alert('Checkout error', error?.message || 'Please try again.')
+      const storeName = Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Google Play' : 'store'
+      Alert.alert(`${storeName} purchase error`, error?.message || 'Please try again.')
     } finally {
       setIsCreatingCheckout(null)
     }
@@ -477,7 +514,7 @@ export function BillingScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text }}>Subscription & Billing</Text>
+          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Subscription & Billing</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>Matches your web account billing.</Text>
 
           {credits.loading ? (
@@ -652,11 +689,42 @@ export function BillingScreen() {
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
           <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Billing History</Text>
-          <View style={{ marginTop: 16, alignItems: 'center' }}>
-            <Text style={{ color: theme.colors.muted }}>No billing history available.</Text>
-            <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 12 }}>
-              Your billing history will appear after your first payment.
-            </Text>
+          <View style={{ marginTop: 16, gap: 10 }}>
+            {billingHistoryLoading ? <Text style={{ color: theme.colors.muted }}>Loading...</Text> : null}
+            {!billingHistoryLoading && !!billingHistoryError ? <Text style={{ color: '#B91C1C' }}>{billingHistoryError}</Text> : null}
+            {!billingHistoryLoading && !billingHistoryError && billingHistory.length === 0 ? (
+              <View style={{ alignItems: 'center' }}>
+                <Text style={{ color: theme.colors.muted }}>No billing history available.</Text>
+                <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 12 }}>
+                  Your billing history will appear after your first payment.
+                </Text>
+              </View>
+            ) : null}
+            {!billingHistoryLoading && !billingHistoryError
+              ? billingHistory.map((item) => (
+                  <View
+                    key={item.id}
+                    style={{
+                      borderWidth: 1,
+                      borderColor: theme.colors.border,
+                      borderRadius: 12,
+                      paddingHorizontal: 12,
+                      paddingVertical: 10,
+                      gap: 4,
+                    }}
+                  >
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+                      <Text style={{ color: theme.colors.text, fontWeight: '800', flex: 1 }}>{item.title}</Text>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>{item.amountText}</Text>
+                    </View>
+                    <Text style={{ color: theme.colors.muted }}>{item.subtitle}</Text>
+                    <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
+                      {item.status}
+                      {formatHistoryDate(item.occurredAt) ? ` - ${formatHistoryDate(item.occurredAt)}` : ''}
+                    </Text>
+                  </View>
+                ))
+              : null}
           </View>
         </View>
 
