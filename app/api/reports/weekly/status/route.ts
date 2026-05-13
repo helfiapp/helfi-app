@@ -3,7 +3,8 @@ import type { NextRequest } from 'next/server'
 import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
 import { prisma } from '@/lib/prisma'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
-import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
+import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@/lib/weekly-report-request-auth'
+import { isHealthSetupComplete } from '@/lib/health-setup-completion'
 
 export async function GET(request: NextRequest) {
   const requestUser = await getWeeklyReportRequestUser(request)
@@ -16,6 +17,25 @@ export async function GET(request: NextRequest) {
     getWeeklyReportState(requestUser.id),
     getLatestWeeklyReport(requestUser.id),
   ])
+  const healthSetupComplete = await isWeeklyReportHealthSetupComplete(requestUser.id)
+  if (!healthSetupComplete) {
+    return NextResponse.json({
+      healthSetupComplete: false,
+      reportId: null,
+      status: null,
+      reportReady: false,
+      reportLocked: false,
+      showPopup: false,
+      summary: null,
+      periodStart: null,
+      periodEnd: null,
+      dataSummary: null,
+      nextReportDueAt: null,
+      lastReportAt: state?.lastReportAt ?? null,
+      reportsEnabled: false,
+      reportsEnabledAt: state?.reportsEnabledAt ?? null,
+    })
+  }
 
   // PROTECTED: WEEKLY_STATUS_SELF_HEAL START
   if (!state?.nextReportDueAt) {
@@ -37,37 +57,18 @@ export async function GET(request: NextRequest) {
     })
 
     if (user) {
+      const eligible = isHealthSetupComplete({
+        gender: user.gender,
+        weight: user.weight,
+        height: user.height,
+        goals: user.healthGoals,
+      })
       const hasActivePlan = isSubscriptionActive(user.subscription ?? null, new Date())
-      if (hasActivePlan || isOwnerTestAccount) {
+      if ((hasActivePlan || isOwnerTestAccount) && eligible) {
         await setWeeklyReportsEnabled(session.user.id, true, { scheduleFrom: new Date() })
         state = await getWeeklyReportState(session.user.id)
       }
 
-      const hasBasicProfile = !!(user.gender && user.weight && user.height)
-      const visibleGoals = user.healthGoals.filter((goal) => !goal.name.startsWith('__'))
-      const selectedRecord = user.healthGoals.find((goal) => goal.name === '__SELECTED_ISSUES__')
-      let hasSelectedIssues = false
-      if (selectedRecord?.category) {
-        try {
-          const parsed = JSON.parse(selectedRecord.category)
-          hasSelectedIssues = Array.isArray(parsed) && parsed.filter(Boolean).length > 0
-        } catch {
-          hasSelectedIssues = false
-        }
-      }
-
-      let hasCheckinIssues = false
-      try {
-        const rows: Array<{ count: number }> = await prisma.$queryRawUnsafe(
-          'SELECT COUNT(*)::int AS count FROM CheckinIssues WHERE userid = $1',
-          session.user.id
-        )
-        hasCheckinIssues = (rows?.[0]?.count || 0) > 0
-      } catch {
-        hasCheckinIssues = false
-      }
-
-      const eligible = hasBasicProfile && (visibleGoals.length > 0 || hasSelectedIssues || hasCheckinIssues)
       if (!state?.nextReportDueAt && eligible) {
         await markWeeklyReportOnboardingComplete(session.user.id)
         state = await getWeeklyReportState(session.user.id)
@@ -89,6 +90,7 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({
     reportId: latest?.id ?? null,
+    healthSetupComplete: true,
     status: latest?.status ?? null,
     reportReady,
     reportLocked,

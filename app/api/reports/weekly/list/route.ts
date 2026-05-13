@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 import { listWeeklyReports } from '@/lib/weekly-health-report'
-import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
+import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@/lib/weekly-report-request-auth'
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
@@ -16,7 +16,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
+  const healthSetupComplete = await isWeeklyReportHealthSetupComplete(requestUser.id)
+  if (!healthSetupComplete) {
+    return NextResponse.json({ error: 'health_setup_required', enabled: false, reports: [] }, { status: 403 })
+  }
+
   const reports = await listWeeklyReports(requestUser.id, 50)
 
-  return NextResponse.json({ enabled: true, reports, preview }, { status: 200 })
+  return NextResponse.json({ enabled: true, healthSetupComplete: true, reports, preview }, { status: 200 })
 }

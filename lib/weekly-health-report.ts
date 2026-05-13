@@ -520,17 +520,6 @@ export async function backfillWeeklyReportState(limit = 50) {
              SELECT 1 FROM "HealthGoal" g
              WHERE g."userId" = u.id AND g.name NOT LIKE '\\_\\_%' ESCAPE '\\'
            )
-           OR EXISTS (
-             SELECT 1 FROM "HealthGoal" g
-             WHERE g."userId" = u.id
-               AND g.name = '__SELECTED_ISSUES__'
-               AND g.category IS NOT NULL
-               AND btrim(g.category) NOT IN ('', '[]', 'null')
-           )
-           OR EXISTS (
-             SELECT 1 FROM CheckinIssues ci
-             WHERE ci.userid = u.id
-           )
          )
          AND NOT EXISTS (
            SELECT 1 FROM WeeklyHealthReportState s WHERE s.userId = u.id

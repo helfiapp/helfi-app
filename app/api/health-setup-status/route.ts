@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { countVisibleHealthGoals, hasBasicProfileData, isHealthSetupComplete } from '@/lib/health-setup-completion'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 
 // ⚠️ HEALTH SETUP GUARD RAIL
@@ -18,14 +19,10 @@ import { prisma } from '@/lib/prisma'
 // so that the UI can decide when to show reminders without loading the full
 // onboarding payload.
 
-export async function GET() {
-  try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({
+async function getHealthSetupStatusUser(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (session?.user?.email) {
+    return prisma.user.findUnique({
       where: { email: session.user.email },
       include: {
         healthGoals: {
@@ -41,9 +38,52 @@ export async function GET() {
         },
       },
     })
+  }
 
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (!nativeUserId) return null
+
+  return prisma.user.findUnique({
+    where: { id: nativeUserId },
+    include: {
+      healthGoals: {
+        select: {
+          name: true,
+        },
+      },
+      supplements: {
+        select: { id: true },
+      },
+      medications: {
+        select: { id: true },
+      },
+    },
+  })
+}
+
+async function getHealthSetupWriteUser(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (session?.user?.email) {
+    return prisma.user.findUnique({
+      where: { email: session.user.email },
+      select: { id: true },
+    })
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (!nativeUserId) return null
+
+  return prisma.user.findUnique({
+    where: { id: nativeUserId },
+    select: { id: true },
+  })
+}
+
+export async function GET(request: NextRequest) {
+  try {
+    const user = await getHealthSetupStatusUser(request)
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const hasBasicProfile = hasBasicProfileData(user)
@@ -76,22 +116,13 @@ export async function GET() {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
+    const user = await getHealthSetupWriteUser(request)
+    if (!user) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
     const body = await request.json().catch(() => ({}))
     const disableReminder = body?.disableReminder === true
-
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
-      select: { id: true },
-    })
-
-    if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
 
     if (disableReminder) {
       const existing = await prisma.healthGoal.findFirst({
@@ -126,4 +157,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
 }
-

@@ -283,7 +283,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'api', 'reports', 'weekly', 'status', 'route.ts'),
     startMarker: 'PROTECTED: WEEKLY_STATUS_SELF_HEAL START',
     endMarker: 'PROTECTED: WEEKLY_STATUS_SELF_HEAL END',
-    expectedHash: '871126610c699c2db7d4e55bc77f9b1340ed06f7537013d0b5d76dd5c8e9f07f',
+    expectedHash: '95cca3bdf20a44134b6a1f73c10e49523ae8c26d9002fd579d6a205d0007e994',
     allowEnvVar: 'ALLOW_WEEKLY_STATUS_SELF_HEAL_EDIT',
     description: 'Weekly report status API self-heal logic',
   });

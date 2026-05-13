@@ -955,6 +955,7 @@ This lock exists because repeated regressions created contradictory states on `/
 
 **State-heal rule:**
 - If weekly report state row is missing for a paid active user, the app must recreate report state (enabled + next due date) before rendering final Insights report card state.
+- The state-heal rule must still require completed Health Setup using the shared rule: basic profile plus at least one real `HealthGoal` whose name does not start with `__`. Do not count `__SELECTED_ISSUES__`, old hidden/internal records, or `CheckinIssues` as enough to schedule reports.
 
 **Regression reference:**
 - Commit `d8155c57` introduced a split-state UI path (`reportsEnabled` warning + `canUseReportActions` action fallback), which can show mixed signals.

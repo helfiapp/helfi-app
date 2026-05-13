@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
+import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@/lib/weekly-report-request-auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
@@ -3227,6 +3227,11 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date()
+  const healthSetupComplete = await isWeeklyReportHealthSetupComplete(userId)
+  if (!healthSetupComplete) {
+    return NextResponse.json({ status: 'skipped', reason: 'health_setup_required' }, { status: 403 })
+  }
+
   let state = await getWeeklyReportState(userId)
   if (!state?.reportsEnabled && isManualTrigger && allowManual) {
     await setWeeklyReportsEnabled(userId, true, { scheduleFrom: now })
