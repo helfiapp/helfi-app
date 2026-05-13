@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
 
 const buildBaseUrl = (request: NextRequest) => {
   const envBase =
@@ -16,12 +15,12 @@ const buildBaseUrl = (request: NextRequest) => {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const requestUser = await getWeeklyReportRequestUser(request)
+  if (!requestUser?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const userId = session.user.id
+  const userId = requestUser.id
   const schedulerSecret = process.env.SCHEDULER_SECRET || ''
   const baseUrl = buildBaseUrl(request)
   if (!baseUrl) {

@@ -21,6 +21,7 @@ When working on the native phone app, agents must keep the app logged in to the 
 
 Use the local native test account for iPhone and Android native app testing:
 - Email/password are stored only on this Mac in `.env.local` as `NATIVE_TEST_EMAIL` and `NATIVE_TEST_PASSWORD`.
+- The standard test email is `info@sonicweb.com.au`; use this account for normal web and native user testing.
 - Do not commit or copy the password into public docs, app data, tickets, or deploy notes.
 
 Important:

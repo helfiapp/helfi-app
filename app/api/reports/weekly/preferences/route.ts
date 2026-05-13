@@ -1,16 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { CreditManager } from '@/lib/credit-system'
 import { getWeeklyReportState, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
+import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
 
-export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const requestUser = await getWeeklyReportRequestUser(request)
+  if (!requestUser?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  const state = await getWeeklyReportState(session.user.id)
+  const state = await getWeeklyReportState(requestUser.id)
   return NextResponse.json({
     reportsEnabled: state?.reportsEnabled ?? false,
     reportsEnabledAt: state?.reportsEnabledAt ?? null,
@@ -20,8 +19,8 @@ export async function GET() {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const requestUser = await getWeeklyReportRequestUser(request)
+  if (!requestUser?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -34,7 +33,7 @@ export async function POST(request: NextRequest) {
   if (enabled) {
     // Enforce paid access: require either a premium plan or available credits.
     // Soft-allow if wallet lookup fails to avoid blocking paid users.
-    const cm = new CreditManager(session.user.id)
+    const cm = new CreditManager(requestUser.id)
     const wallet = await cm.getWalletStatus().catch(() => null)
     const totalAvailable = wallet?.totalAvailableCents ?? 0
     const hasCredits = Number.isFinite(totalAvailable) && totalAvailable > 0
@@ -44,7 +43,7 @@ export async function POST(request: NextRequest) {
     }
   }
 
-  const state = await setWeeklyReportsEnabled(session.user.id, enabled, {
+  const state = await setWeeklyReportsEnabled(requestUser.id, enabled, {
     scheduleFrom: new Date(),
   })
 

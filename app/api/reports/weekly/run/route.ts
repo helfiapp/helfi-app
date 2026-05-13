@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
 import OpenAI from 'openai'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
@@ -3201,18 +3200,18 @@ export async function POST(request: NextRequest) {
   let allowManual = false
   let userId = typeof body?.userId === 'string' ? body.userId : ''
   if (isManualTrigger) {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const requestUser = await getWeeklyReportRequestUser(request)
+    if (!requestUser?.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
-    const sessionEmail = String(session.user.email || '').toLowerCase()
+    const sessionEmail = String(requestUser.email || '').toLowerCase()
     if (!sessionEmail || sessionEmail !== MANUAL_REPORT_EMAIL) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
     if (!userId) {
-      userId = session.user.id
+      userId = requestUser.id
     }
-    if (userId !== session.user.id) {
+    if (userId !== requestUser.id) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     allowManual = true

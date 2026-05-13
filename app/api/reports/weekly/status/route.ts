@@ -1,19 +1,20 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import type { NextRequest } from 'next/server'
 import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
 import { prisma } from '@/lib/prisma'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
 
-export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+export async function GET(request: NextRequest) {
+  const requestUser = await getWeeklyReportRequestUser(request)
+  if (!requestUser?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  const session = { user: requestUser }
 
   let [state, latest] = await Promise.all([
-    getWeeklyReportState(session.user.id),
-    getLatestWeeklyReport(session.user.id),
+    getWeeklyReportState(requestUser.id),
+    getLatestWeeklyReport(requestUser.id),
   ])
 
   // PROTECTED: WEEKLY_STATUS_SELF_HEAL START

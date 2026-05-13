@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import type { NextRequest } from 'next/server'
 import { updateWeeklyReportNotification } from '@/lib/weekly-health-report'
+import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
 
-export async function POST(request: Request) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+export async function POST(request: NextRequest) {
+  const requestUser = await getWeeklyReportRequestUser(request)
+  if (!requestUser?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -21,7 +21,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
   }
 
-  const updated = await updateWeeklyReportNotification(session.user.id, reportId, action as any)
+  const updated = await updateWeeklyReportNotification(requestUser.id, reportId, action as any)
   if (!updated) {
     return NextResponse.json({ error: 'Report not found' }, { status: 404 })
   }
