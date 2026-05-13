@@ -16,27 +16,27 @@ const items: Array<{
   {
     key: 'Dashboard',
     label: 'Dashboard',
-    icon: (color) => <Feather name="grid" color={color} size={22} />,
+    icon: (color) => <Feather name="grid" color={color} size={21} />,
   },
   {
     key: 'Insights',
     label: 'Insights',
-    icon: (color) => <MaterialCommunityIcons name="lightbulb-outline" color={color} size={24} />,
+    icon: (color) => <MaterialCommunityIcons name="lightbulb-outline" color={color} size={23} />,
   },
   {
     key: 'Food',
     label: 'Food',
-    icon: (color) => <Feather name="shopping-bag" color={color} size={22} />,
+    icon: (color) => <Feather name="shopping-bag" color={color} size={21} />,
   },
   {
     key: 'More',
     label: 'More',
-    icon: (color) => <Feather name="more-vertical" color={color} size={22} />,
+    icon: (color) => <Feather name="more-vertical" color={color} size={21} />,
   },
   {
     key: 'Settings',
     label: 'Settings',
-    icon: (color) => <Feather name="settings" color={color} size={22} />,
+    icon: (color) => <Feather name="settings" color={color} size={21} />,
   },
 ]
 
@@ -56,9 +56,9 @@ export function NativeBottomNav({ active }: { active?: NativeBottomNavKey }) {
         borderTopWidth: 1,
         borderTopColor: theme.colors.border,
         backgroundColor: theme.colors.card,
-        paddingTop: 6,
-        paddingBottom: Math.max(insets.bottom, 6),
-        paddingHorizontal: 8,
+        paddingTop: 4,
+        paddingBottom: Math.max(insets.bottom - 8, 4),
+        paddingHorizontal: 16,
       }}
     >
       {items.map((item) => {
@@ -83,7 +83,7 @@ export function NativeBottomNav({ active }: { active?: NativeBottomNavKey }) {
               style={{
                 marginTop: 2,
                 color,
-                fontSize: 11,
+                fontSize: theme.fontSize.navLabel,
                 fontWeight: isActive ? '900' : '700',
               }}
             >

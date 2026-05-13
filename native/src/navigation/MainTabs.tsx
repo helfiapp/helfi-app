@@ -12,8 +12,8 @@ import { theme } from '../ui/theme'
 
 export type MainTabParamList = {
   Dashboard: undefined
-  Food: undefined
   Insights: undefined
+  Food: undefined
   More: undefined
   Settings: undefined
 }
@@ -27,10 +27,16 @@ export function MainTabs() {
       screenOptions={{
         headerStyle: { backgroundColor: theme.colors.card },
         headerTitleStyle: { color: theme.colors.text },
-        tabBarStyle: { backgroundColor: theme.colors.card, borderTopColor: theme.colors.border },
+        tabBarStyle: {
+          backgroundColor: theme.colors.card,
+          borderTopColor: theme.colors.border,
+          paddingHorizontal: 14,
+          paddingTop: 2,
+          paddingBottom: 0,
+        },
         tabBarActiveTintColor: theme.colors.primary,
         tabBarInactiveTintColor: theme.colors.muted,
-        tabBarLabelStyle: { fontWeight: '800' },
+        tabBarLabelStyle: { fontWeight: '800', fontSize: theme.fontSize.navLabel },
       }}
     >
       <Tab.Screen
@@ -42,19 +48,19 @@ export function MainTabs() {
         }}
       />
       <Tab.Screen
+        name="Insights"
+        component={InsightsScreen}
+        options={{
+          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="lightbulb-outline" color={color} size={size} />,
+        }}
+      />
+      <Tab.Screen
         name="Food"
         component={TrackCaloriesScreen}
         options={{
           headerShown: false,
           // Match the web app bottom nav icon (bag) more closely.
           tabBarIcon: ({ color, size }) => <Feather name="shopping-bag" color={color} size={size} />,
-        }}
-      />
-      <Tab.Screen
-        name="Insights"
-        component={InsightsScreen}
-        options={{
-          tabBarIcon: ({ color, size }) => <MaterialCommunityIcons name="lightbulb-outline" color={color} size={size} />,
         }}
       />
       <Tab.Screen

@@ -64,6 +64,10 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
             Reach people searching for trusted care. You get 2 months free, then it is $4.95/month (USD). No card is
             needed to start. Your free period begins only after your listing is approved.
           </Text>
+          <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+            This is separate from your personal Helfi health account. You can use this app as a normal member and still
+            create a practitioner listing if that applies to you.
+          </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <Pressable
               onPress={() => navigation.navigate('ListYourPracticeStart')}

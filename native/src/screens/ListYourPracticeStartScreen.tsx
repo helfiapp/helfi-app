@@ -62,6 +62,9 @@ export function ListYourPracticeStartScreen({ navigation }: { navigation: any })
             Create an account to manage your listing, subscriptions, and boosts. If you already have an account, just
             sign in.
           </Text>
+          <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+            Your practitioner account is separate from your personal Helfi member account.
+          </Text>
         </View>
 
         <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 10 }}>

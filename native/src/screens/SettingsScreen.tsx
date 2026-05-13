@@ -4,6 +4,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Feather } from '@expo/vector-icons'
 
 import { API_BASE_URL } from '../config'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
@@ -29,7 +30,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
         padding: 14,
       }}
     >
-      <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '900', marginBottom: 12 }}>{title}</Text>
+      <Text style={{ color: theme.colors.text, fontSize: theme.fontSize.sectionTitle, fontWeight: '900', marginBottom: 12 }}>{title}</Text>
       {children}
     </View>
   )
@@ -144,9 +145,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
       setWeeklyReportsLoading(true)
       try {
         const res = await fetch(`${API_BASE_URL}/api/reports/weekly/preferences`, {
-          headers: {
-            authorization: `Bearer ${session.token}`,
-          },
+          headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
         })
         const data = await res.json().catch(() => ({} as any))
         if (!res.ok) {
@@ -199,10 +198,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/reports/weekly/preferences`, {
         method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.token}`,
-        },
+        headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
         body: JSON.stringify({ enabled: nextValue }),
       })
       const data = await res.json().catch(() => ({} as any))

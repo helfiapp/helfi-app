@@ -240,7 +240,7 @@ export function DashboardScreen() {
         return
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/native-health-setup-status`, {
+      const res = await fetch(`${API_BASE_URL}/api/health-setup-status`, {
         headers: {
           authorization: `Bearer ${session.token}`,
           'x-native-token': session.token,
@@ -821,10 +821,10 @@ export function DashboardScreen() {
           <Text style={{ fontSize: 18, fontWeight: '800', color: theme.colors.text }}>Dashboard</Text>
 
           {/* Keep this to two lines on phone */}
-          <Text style={{ marginTop: 14, fontSize: 32, fontWeight: '900', color: theme.colors.text, textAlign: 'center', lineHeight: 36 }}>
+          <Text style={{ marginTop: 14, fontSize: theme.fontSize.heroTitle, fontWeight: '900', color: theme.colors.text, textAlign: 'center', lineHeight: 32 }}>
             Welcome to Your
           </Text>
-          <Text style={{ fontSize: 32, fontWeight: '900', color: theme.colors.primary, textAlign: 'center', lineHeight: 36 }}>
+          <Text style={{ fontSize: theme.fontSize.heroTitle, fontWeight: '900', color: theme.colors.primary, textAlign: 'center', lineHeight: 32 }}>
             Health Dashboard
           </Text>
 
@@ -835,7 +835,7 @@ export function DashboardScreen() {
 
         <View style={{ marginTop: 22 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Daily Tools</Text>
+            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>Daily Tools</Text>
 
             <Pressable onPress={goToMore}>
               <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>See all</Text>
@@ -886,7 +886,7 @@ export function DashboardScreen() {
         {/* Next sections (Dashboard continues below Daily Tools) */}
         <View style={{ marginTop: theme.spacing.xl }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>My Health</Text>
+            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>My Health</Text>
             <Pressable onPress={goToMore}>
               <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>See all</Text>
             </Pressable>
@@ -923,7 +923,7 @@ export function DashboardScreen() {
         </View>
 
         <View style={{ marginTop: theme.spacing.xl }}>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Connect Your Devices</Text>
+          <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>Connect Your Devices</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted, lineHeight: 20 }}>
             Sync activity and sleep data from your favorite wearables.
           </Text>

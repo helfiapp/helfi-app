@@ -16,6 +16,13 @@ export const theme = {
     lg: 24,
     xl: 32,
   },
+  fontSize: {
+    pageTitle: 24,
+    heroTitle: 28,
+    sectionTitle: 19,
+    cardTitle: 17,
+    navLabel: 10,
+  },
   radius: {
     sm: 10,
     md: 14,

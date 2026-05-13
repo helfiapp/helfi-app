@@ -17,6 +17,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
+import * as ImageManipulator from 'expo-image-manipulator'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { API_BASE_URL } from '../config'
@@ -203,7 +204,7 @@ const MEALS = [
   { key: 'lunch', label: 'Lunch' },
   { key: 'dinner', label: 'Dinner' },
   { key: 'snacks', label: 'Snacks' },
-  { key: 'uncategorized', label: 'Uncategorized' },
+  { key: 'uncategorized', label: 'Other' },
 ] as const
 
 const DEFAULT_TARGETS = {
@@ -258,6 +259,33 @@ function formatDateLabel(raw: string) {
   const d = parseLocalDate(raw)
   if (Number.isNaN(d.getTime())) return raw
   return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+}
+
+async function prepareFoodPhotoForUpload(asset: ImagePicker.ImagePickerAsset) {
+  const fallbackName = asset.fileName || `food-${Date.now()}.jpg`
+  try {
+    const resizedWidth = asset.width && asset.width > 1800 ? 1800 : undefined
+    const prepared = await ImageManipulator.manipulateAsync(
+      asset.uri,
+      resizedWidth ? [{ resize: { width: resizedWidth } }] : [],
+      {
+        compress: 0.82,
+        format: ImageManipulator.SaveFormat.JPEG,
+      },
+    )
+    const baseName = fallbackName.replace(/\.[^.]+$/, '') || `food-${Date.now()}`
+    return {
+      uri: prepared.uri,
+      type: 'image/jpeg',
+      name: `${baseName}.jpg`,
+    }
+  } catch {
+    return {
+      uri: asset.uri,
+      type: asset.mimeType || 'image/jpeg',
+      name: fallbackName,
+    }
+  }
 }
 
 function normalizeWaterLabel(label?: string | null) {
@@ -2925,15 +2953,15 @@ export function TrackCaloriesScreen() {
       if (picked.canceled || !picked.assets?.[0]?.uri) return
 
       const asset = picked.assets[0]
+      const photo = await prepareFoodPhotoForUpload(asset)
       const form = new FormData()
       form.append('mealType', favoritesTargetMeal)
+      form.append('foodType', 'meal')
       form.append('analysisMode', 'meal')
       form.append('forceFresh', '1')
-      form.append('image', {
-        uri: asset.uri,
-        type: asset.mimeType || 'image/jpeg',
-        name: asset.fileName || 'food.jpg',
-      } as any)
+      form.append('returnItems', 'true')
+      form.append('multi', 'true')
+      form.append('image', photo as any)
 
       setFavoriteEditPhotoLoading(true)
       const res = await fetch(`${API_BASE_URL}/api/analyze-food`, {
@@ -3297,15 +3325,15 @@ export function TrackCaloriesScreen() {
       if (picked.canceled || !picked.assets?.[0]?.uri) return
 
       const asset = picked.assets[0]
+      const photo = await prepareFoodPhotoForUpload(asset)
       const form = new FormData()
       form.append('mealType', meal)
+      form.append('foodType', 'meal')
       form.append('analysisMode', 'meal')
       form.append('forceFresh', '1')
-      form.append('image', {
-        uri: asset.uri,
-        type: asset.mimeType || 'image/jpeg',
-        name: asset.fileName || 'food.jpg',
-      } as any)
+      form.append('returnItems', 'true')
+      form.append('multi', 'true')
+      form.append('image', photo as any)
 
       setSaving(true)
       const res = await fetch(`${API_BASE_URL}/api/analyze-food`, {
@@ -3957,7 +3985,7 @@ export function TrackCaloriesScreen() {
             </Pressable>
             <Pressable onPress={() => setShowDatePicker(true)} style={dateCenterPill}>
               <Text style={{ color: '#111827', fontSize: 16, fontWeight: '900' }}>
-                {formatDateLabel(selectedDate)} <Text style={{ color: '#6B7280', fontWeight: '500' }}>{parseLocalDate(selectedDate).getFullYear()}</Text>
+                {formatDateLabel(selectedDate)}
               </Text>
             </Pressable>
             <Pressable onPress={() => setSelectedDate((prev) => shiftDate(prev, 1))} style={dateArrowCircle}>
@@ -4114,7 +4142,9 @@ export function TrackCaloriesScreen() {
             style={{ borderRadius: 24, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', padding: 14 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ color: '#1F2937', fontSize: 20/1.4, fontWeight: '900' }}>Energy summary</Text>
+              <Text style={{ color: '#1F2937', fontSize: 20/1.4, fontWeight: '900' }}>
+                {isToday(selectedDate) ? "Today's energy summary" : 'Energy summary'}
+              </Text>
               <View style={{ marginLeft: 'auto', flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 999, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
                 <Pressable onPress={() => setEnergyUnit('kcal')} style={[energyTogglePill, energyUnit === 'kcal' && energyTogglePillActive]}>
                   <Text style={[energyToggleText, energyUnit === 'kcal' && energyToggleTextActive]}>kcal</Text>
@@ -4214,7 +4244,9 @@ export function TrackCaloriesScreen() {
         </View>
 
         <View style={{ marginTop: 18, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
-          <Text style={{ color: '#111827', fontSize: 44 / 2, fontWeight: '900' }}>Meals</Text>
+          <Text style={{ color: '#111827', fontSize: 44 / 2, fontWeight: '900' }}>
+            {isToday(selectedDate) ? "Today's Meals" : 'Meals'}
+          </Text>
           <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
             <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 999, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
               <Pressable onPress={() => setEnergyUnit('kcal')} style={[energyTogglePill, energyUnit === 'kcal' && energyTogglePillActive]}>

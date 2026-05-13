@@ -40,11 +40,10 @@ export function NativeWebToolScreen({ route }: { route: any }) {
 
   const hasNativeToken = String(session?.token || '').trim().length > 0
 
-  const injectedAuthScript = useMemo(() => {
+  const injectedSetupScript = useMemo(() => {
     const token = String(session?.token || '')
       .trim()
       .replace(/^"+|"+$/g, '')
-    if (!token) return undefined
 
     const escaped = token
       .replace(/\\/g, '\\\\')
@@ -53,6 +52,10 @@ export function NativeWebToolScreen({ route }: { route: any }) {
     return `
       (function() {
         try {
+          var style = document.createElement('style');
+          style.id = 'helfi-native-webview-polish';
+          style.textContent = 'nav.fixed.bottom-0{display:none!important;}body{padding-bottom:0!important;}';
+          document.head.appendChild(style);
           var t = '${escaped}';
           if (!t) return true;
           var maxAge = 60 * 60 * 24 * 30;
@@ -119,7 +122,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
         ) : (
           <WebView
             source={source}
-            injectedJavaScriptBeforeContentLoaded={injectedAuthScript}
+            injectedJavaScriptBeforeContentLoaded={injectedSetupScript}
             onLoadStart={() => {
               setLoading(true)
               setFailed(false)

@@ -15,8 +15,12 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.helfi.app",
+      "buildNumber": "4",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Helfi to use your camera so you can take a photo for analysis.",
+        "NSHealthShareUsageDescription": "Allow Helfi to read selected Apple Health data, such as steps, distance, and active calories, so it can show your daily activity in your health dashboard.",
+        "NSHealthUpdateUsageDescription": "Allow Helfi to write selected health data to Apple Health if you choose to sync activity data from the app.",
+        "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow Helfi to access your photos so you can attach images to mood journal entries.",
         "NSPhotoLibraryAddUsageDescription": "Allow Helfi to save or manage selected journal photos when needed."
       }

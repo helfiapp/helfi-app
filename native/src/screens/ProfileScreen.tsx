@@ -333,7 +333,7 @@ export function ProfileScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg, padding: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text }}>Profile Information</Text>
+          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Profile Information</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>This is your native app profile page.</Text>
 
           <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 16 }}>
