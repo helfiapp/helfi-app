@@ -1,5 +1,10 @@
 #!/usr/bin/env node
 
+if (process.env.VERCEL || process.env.VERCEL_ENV || process.env.VERCEL_URL) {
+  console.log('Agent/terminal OpenAI key check skipped on Vercel.')
+  process.exit(0)
+}
+
 if (String(process.env.OPENAI_API_KEY || '').trim()) {
   console.error('STOP: OPENAI_API_KEY is available to this terminal/agent process.')
   console.error('Agents must not use the live Helfi OpenAI key.')
