@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 15 May 2026, 07:14 AM AEST
+- What changed: Native iOS Billing screen now uses Apple in-app purchases for iOS subscription switches, opens Apple subscription management on iOS, and shows Restore purchases. TestFlight build 5 was uploaded separately for iPhone testing.
+- Where to see it (page/link): Native app Settings -> Subscription & Billing, plus source deployed at https://helfi.ai
+- What to quickly test: Install TestFlight build 5 on iPhone, open Subscription & Billing, confirm Restore purchases is visible, then test Apple sandbox subscriptions and top-ups on the real iPhone.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 14 May 2026, 09:10 AM AEST
 - What changed: Food Analyzer now uses OpenAI only, Gemini has been removed from the food analysis system and Vercel settings, local agent OpenAI key protection has been added, and the previous native/TestFlight app changes have been saved to Git so they stop appearing as mystery dirty files.
 - Where to see it (page/link): https://helfi.ai/api/analyze-food and the native Food Diary photo analysis flow.
