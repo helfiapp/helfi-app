@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Tex
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
-import { runNativePurchase, type NativePurchaseCode } from '../lib/inAppPurchase'
+import { restoreNativePurchases, runNativePurchase, type NativeBillingCatalogProduct, type NativePurchaseCode } from '../lib/inAppPurchase'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -213,6 +213,8 @@ export function BillingScreen() {
   const [isCreatingPortalSession, setIsCreatingPortalSession] = useState(false)
   const [isManagingSubscription, setIsManagingSubscription] = useState(false)
   const [isCreatingCheckout, setIsCreatingCheckout] = useState<string | null>(null)
+  const [isRestoringPurchases, setIsRestoringPurchases] = useState(false)
+  const [nativeProducts, setNativeProducts] = useState<NativeBillingCatalogProduct[]>([])
 
   const [usageRange, setUsageRange] = useState<RangeKey>('7d')
   const [usageStart, setUsageStart] = useState('')
@@ -290,10 +292,32 @@ export function BillingScreen() {
     setBillingHistoryLoading(false)
   }, [authHeaders, mode])
 
+  const fetchNativeCatalog = useCallback(async () => {
+    if (mode !== 'signedIn' || !authHeaders) {
+      setNativeProducts([])
+      return []
+    }
+
+    const res = await fetch(`${API_BASE_URL}/api/native-billing/catalog`, { headers: authHeaders })
+    const data: any = await res.json().catch(() => ({}))
+    if (!res.ok) {
+      throw new Error(data?.message || data?.error || 'Could not load store products')
+    }
+
+    const products = Array.isArray(data?.products) ? (data.products as NativeBillingCatalogProduct[]) : []
+    setNativeProducts(products)
+    return products
+  }, [authHeaders, mode])
+
   const loadBillingData = useCallback(async () => {
     try {
       setCredits((prev) => ({ ...prev, loading: true, error: '' }))
-      await Promise.all([fetchCreditStatus(), fetchSubscription(), fetchBillingHistory()])
+      await Promise.all([
+        fetchCreditStatus(),
+        fetchSubscription(),
+        fetchBillingHistory(),
+        fetchNativeCatalog().catch(() => []),
+      ])
     } catch (error: any) {
       setCredits((prev) => ({
         ...prev,
@@ -304,7 +328,7 @@ export function BillingScreen() {
       setBillingHistoryLoading(false)
       setBillingHistoryError(error?.message || 'Could not load billing history.')
     }
-  }, [fetchBillingHistory, fetchCreditStatus, fetchSubscription])
+  }, [fetchBillingHistory, fetchCreditStatus, fetchNativeCatalog, fetchSubscription])
 
   useFocusEffect(
     useCallback(() => {
@@ -399,6 +423,10 @@ export function BillingScreen() {
         return
       }
       setIsCreatingPortalSession(true)
+      if (Platform.OS === 'ios') {
+        await openExternalUrl('itms-apps://apps.apple.com/account/subscriptions')
+        return
+      }
       const res = await fetch(`${API_BASE_URL}/api/billing/portal`, {
         method: 'POST',
         headers: authHeaders,
@@ -419,6 +447,10 @@ export function BillingScreen() {
     try {
       if (mode !== 'signedIn' || !authHeaders) {
         Alert.alert('Not signed in', 'Please log in again and try.')
+        return
+      }
+      if (Platform.OS === 'ios') {
+        await startCheckout(newPlan as NativePurchaseCode)
         return
       }
       setIsManagingSubscription(true)
@@ -479,6 +511,18 @@ export function BillingScreen() {
   }
 
   const handleCancelSubscription = () => {
+    if (Platform.OS === 'ios') {
+      Alert.alert(
+        'Cancel in App Store',
+        'Use Apple subscription settings to cancel this plan.',
+        [
+          { text: 'Not now', style: 'cancel' },
+          { text: 'Open App Store', onPress: () => void handleManagePortal() },
+        ],
+      )
+      return
+    }
+
     Alert.alert(
       'Cancel Subscription',
       'Are you sure you want to cancel? It will stay active until the end of your current billing period.',
@@ -487,6 +531,28 @@ export function BillingScreen() {
         { text: 'Yes, Cancel', style: 'destructive', onPress: () => void confirmCancelSubscription() },
       ],
     )
+  }
+
+  const handleRestorePurchases = async () => {
+    try {
+      if (mode !== 'signedIn' || !session?.token) {
+        Alert.alert('Not signed in', 'Please log in again and try.')
+        return
+      }
+      setIsRestoringPurchases(true)
+      const products = nativeProducts.length > 0 ? nativeProducts : await fetchNativeCatalog()
+      const result = await restoreNativePurchases({
+        token: session.token,
+        products,
+      })
+      Alert.alert('Restore purchases', result.message)
+      await loadBillingData()
+    } catch (error: any) {
+      const storeName = Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Google Play' : 'store'
+      Alert.alert(`${storeName} restore error`, error?.message || 'Please try again.')
+    } finally {
+      setIsRestoringPurchases(false)
+    }
   }
 
   const currentPrice = Number(subscription?.monthlyPriceCents || 0)
@@ -599,10 +665,17 @@ export function BillingScreen() {
 
             <View style={{ marginTop: 12, gap: 10 }}>
               <ActionButton
-                label={isCreatingPortalSession ? 'Opening portal...' : 'Manage subscription'}
+                label={isCreatingPortalSession ? 'Opening...' : Platform.OS === 'ios' ? 'Manage in App Store' : 'Manage subscription'}
                 onPress={handleManagePortal}
                 disabled={isCreatingPortalSession}
                 kind="primary"
+              />
+
+              <ActionButton
+                label={isRestoringPurchases ? 'Restoring...' : 'Restore purchases'}
+                onPress={handleRestorePurchases}
+                disabled={isRestoringPurchases}
+                kind="secondary"
               />
 
               {!subscription.stripeCancelAtPeriodEnd ? (
