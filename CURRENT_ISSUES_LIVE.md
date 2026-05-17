@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 18 May 2026, 06:35 AM AEST
+- What changed: Added the missing Apple app-specific shared secret to Vercel production and redeployed live so TestFlight Apple sandbox receipts can be verified.
+- Where to see it (page/link): Native TestFlight app Settings -> Subscription & Billing, plus server at https://helfi.ai
+- What to quickly test: In TestFlight build 6, retry the $5 / 250 credit top-up first. It should complete without the Apple receipt verification 21004 error.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 15 May 2026, 07:14 AM AEST
 - What changed: Native iOS Billing screen now uses Apple in-app purchases for iOS subscription switches, opens Apple subscription management on iOS, and shows Restore purchases. TestFlight build 5 was uploaded separately for iPhone testing.
 - Where to see it (page/link): Native app Settings -> Subscription & Billing, plus source deployed at https://helfi.ai
