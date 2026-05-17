@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 18 May 2026, 07:24 AM AEST
+- What changed: Admin user subscription removal now updates the admin screen immediately and the admin user-management API is forced fresh so it does not show stale subscription data.
+- Where to see it (page/link): https://helfi.ai/admin-panel and individual admin user pages.
+- What to quickly test: In the admin panel, remove a test user's admin-granted subscription and confirm the same page immediately changes to No Subscription / Upgrade to premium without leaving the page.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 18 May 2026, 09:58 AM AEST
 - What changed: Fixed native Apple top-ups saving 100x too many credits and corrected the billing history display so top-ups show their real price instead of treating credits as dollars. Also corrected the bad sandbox Apple top-ups on info@sonicweb.com.au from 175,000 credits to 1,750 credits.
 - Where to see it (page/link): Native TestFlight app Settings -> Subscription & Billing
