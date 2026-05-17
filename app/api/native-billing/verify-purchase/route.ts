@@ -412,7 +412,7 @@ export async function POST(request: NextRequest) {
         await prisma.creditTopUp.create({
           data: {
             userId: user.id,
-            amountCents: product.credits * 100,
+            amountCents: product.credits,
             usedCents: 0,
             purchasedAt,
             expiresAt,
@@ -539,7 +539,7 @@ export async function POST(request: NextRequest) {
       await prisma.creditTopUp.create({
         data: {
           userId: user.id,
-          amountCents: product.credits * 100,
+          amountCents: product.credits,
           usedCents: 0,
           purchasedAt,
           expiresAt,

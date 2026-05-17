@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
+import { getNativeBillingCatalog } from '@/lib/native-billing/catalog'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -25,6 +26,22 @@ type BillingHistoryItem = {
 
 function centsToDollars(cents: number): string {
   return `$${(Math.max(0, cents) / 100).toFixed(2)}`
+}
+
+function normalizeTopUpCredits(value: number): number {
+  const credits = Math.floor(Math.max(0, value))
+  if (credits === 25000 || credits === 50000 || credits === 100000) {
+    return Math.floor(credits / 100)
+  }
+  return credits
+}
+
+function topUpPriceText(credits: number): string {
+  const normalizedCredits = normalizeTopUpCredits(credits)
+  const product = getNativeBillingCatalog().products.find(
+    (item) => item.kind === 'topup' && item.credits === normalizedCredits,
+  )
+  return product ? centsToDollars(product.priceCents) : `${normalizedCredits.toLocaleString()} credits`
 }
 
 function sourceLabel(source: string): string {
@@ -110,7 +127,7 @@ export async function GET(request: NextRequest) {
 
     for (const topUp of topUps) {
       const amountCents = Number(topUp.amountCents || 0)
-      const credits = Math.floor(Math.max(0, amountCents) / 100)
+      const credits = normalizeTopUpCredits(amountCents)
       const remaining = Math.max(0, amountCents - Number(topUp.usedCents || 0))
       const expired = topUp.expiresAt <= now
       const status = expired ? 'Expired' : remaining <= 0 ? 'Used' : 'Available'
@@ -120,7 +137,7 @@ export async function GET(request: NextRequest) {
         type: 'topup',
         title: 'Credit top-up',
         subtitle: `${credits.toLocaleString()} credits • ${sourceLabel(String(topUp.source || ''))}`,
-        amountText: centsToDollars(amountCents),
+        amountText: topUpPriceText(amountCents),
         status,
         occurredAt: topUp.purchasedAt.toISOString(),
       })
