@@ -56,6 +56,7 @@ export default function AdminUserPage() {
         limit: '1',
       })
       const response = await fetch(`/api/admin/user-management?${params.toString()}`, {
+        cache: 'no-store',
         headers: { Authorization: `Bearer ${adminToken}` },
       })
       if (response.ok) {
@@ -101,6 +102,16 @@ export default function AdminUserPage() {
       })
       const result = await response.json()
       if (response.ok) {
+        if (action === 'deactivate') {
+          setUser((current) =>
+            current
+              ? {
+                  ...current,
+                  subscription: null,
+                }
+              : current,
+          )
+        }
         await loadUser()
         if (action === 'refund_latest_payment') {
           const amountCents = typeof result?.refundedAmountCents === 'number' ? result.refundedAmountCents : null

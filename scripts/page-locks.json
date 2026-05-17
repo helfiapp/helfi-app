@@ -3,10 +3,10 @@
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
-    "app/admin-panel/page.tsx": "8bb6bdb806a551119ee3280cfa42f7be4bfb471da9f543b03f2d8070d120cf62",
+    "app/admin-panel/page.tsx": "dcd928c069a5ae7676c926a6643be832c859b2a95886a8add6655fcbd3b24dc8",
     "app/admin-panel/qr-login/page.tsx": "f6bbb3786474136d0a419421d7f05e149f434f4b69ec40097c574918aa13f236",
     "app/admin-panel/tickets/[id]/page.tsx": "023f92352ba48f0b80a0ed4ca407eb110b1c5d9975fd95669071a68ce37c9bd2",
-    "app/admin-panel/user/[userId]/page.tsx": "d450c3d79762c8f730c7dd71a9650180d3f0ca6474e52e9e44d5f972a5273ca5",
+    "app/admin-panel/user/[userId]/page.tsx": "077b0b63bb76e0c1af65035abd4b2fd4e3c145ff85d98ff9dab1082a5c89361d",
     "app/affiliate/apply/page.tsx": "2e17547a7a2cd00cd6bda3a7e890ddb4dbdbf8a2afa39a345f8e7ecf762a06d6",
     "app/affiliate/page.tsx": "95b208aa68891f806bdd19112ff1d174705cbe84c9014f2c1320064894a3d25e",
     "app/affiliate/terms/layout.tsx": "0cb144f7bd482300c5f406c7b186c1f3321442eb36c5b279af196ad6bfe9a42e",

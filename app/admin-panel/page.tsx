@@ -1116,6 +1116,7 @@ https://www.helfi.ai`)
       })
       
       const response = await fetch(`/api/admin/user-management?${params}`, {
+        cache: 'no-store',
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -1163,6 +1164,18 @@ https://www.helfi.ai`)
       const result = await response.json()
 
       if (response.ok) {
+        if (action === 'deactivate') {
+          setManagedUsers((prev) =>
+            prev.map((user) =>
+              user.id === userId
+                ? {
+                    ...user,
+                    subscription: null,
+                  }
+                : user,
+            ),
+          )
+        }
         // Reload the user list to show updated data
         await loadUserManagement(userSearch, userFilter, currentPage)
         if (action === 'refund_latest_payment') {
