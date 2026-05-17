@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 18 May 2026, 09:58 AM AEST
+- What changed: Fixed native Apple top-ups saving 100x too many credits and corrected the billing history display so top-ups show their real price instead of treating credits as dollars. Also corrected the bad sandbox Apple top-ups on info@sonicweb.com.au from 175,000 credits to 1,750 credits.
+- Where to see it (page/link): Native TestFlight app Settings -> Subscription & Billing
+- What to quickly test: Force close and reopen the TestFlight app, then confirm credits remaining is around the normal subscription balance plus 1,750 top-up credits, and billing history shows $5 / $10 / $20 for the 250 / 500 / 1,000 credit top-ups.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 18 May 2026, 06:35 AM AEST
 - What changed: Added the missing Apple app-specific shared secret to Vercel production and redeployed live so TestFlight Apple sandbox receipts can be verified.
 - Where to see it (page/link): Native TestFlight app Settings -> Subscription & Billing, plus server at https://helfi.ai
