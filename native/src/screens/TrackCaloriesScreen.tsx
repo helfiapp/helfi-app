@@ -4243,11 +4243,11 @@ export function TrackCaloriesScreen() {
           </View>
         </View>
 
-        <View style={{ marginTop: 18, paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ marginTop: 18, paddingHorizontal: 16, gap: 10 }}>
           <Text style={{ color: '#111827', fontSize: 44 / 2, fontWeight: '900' }}>
             {isToday(selectedDate) ? "Today's Meals" : 'Meals'}
           </Text>
-          <View style={{ marginLeft: 'auto', flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <View style={{ flexDirection: 'row', backgroundColor: '#F3F4F6', borderRadius: 999, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
               <Pressable onPress={() => setEnergyUnit('kcal')} style={[energyTogglePill, energyUnit === 'kcal' && energyTogglePillActive]}>
                 <Text style={[energyToggleText, energyUnit === 'kcal' && energyToggleTextActive]}>kcal</Text>
@@ -4256,7 +4256,7 @@ export function TrackCaloriesScreen() {
                 <Text style={[energyToggleText, energyUnit === 'kj' && energyToggleTextActive]}>kJ</Text>
               </Pressable>
             </View>
-            <Pressable onPress={openAskAIChat} style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8 }}>
+            <Pressable onPress={openAskAIChat} style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, flexShrink: 0 }}>
               <Text style={{ color: '#fff', fontWeight: '900' }}>Ask AI</Text>
             </Pressable>
           </View>

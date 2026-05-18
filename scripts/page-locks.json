@@ -245,7 +245,7 @@
     "native/src/screens/SmartHealthCoachScreen.tsx": "53a03c768796866babb6eca52b53c2f3cac99071a9e2883c9a186230c04054d9",
     "native/src/screens/SupportScreen.tsx": "043f7551c578d58e20ca88e32880237ec739c146d6697a075676954e9f84a84e",
     "native/src/screens/TermsScreen.tsx": "737a142cc43ea34a779e599d9f3a51b215820e9143c2282efc9bc94ffbc006c6",
-    "native/src/screens/TrackCaloriesScreen.tsx": "8750a5e872f48d1a3fb13a2c6bd657ee0bea64988c712fdbc6631842b60e3c7a",
+    "native/src/screens/TrackCaloriesScreen.tsx": "4b4db86a88e6b8bf6ed4b0f0e7b2f7416d7990d640bf56651139198155054439",
     "native/src/screens/WaterIntakeScreen.tsx": "2eb5000b029804dff9efa96c8e33b237358105f230631bd6a7f3db3969eb648b",
     "native/src/state/AppModeContext.tsx": "fb83067336327a5c7a108e91b8e3d86300ebe1142ee51d3c066127f26233d4f2",
     "native/src/ui/HelfiButton.tsx": "661d82067a8996cfd32a55f74e60aea0fdbfefb20c407ca7de2cb5fac75517ee",
