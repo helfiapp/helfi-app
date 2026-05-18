@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 19 May 2026, 02:05 AM AEST
+- What changed: Apple native subscriptions are now saved with their Apple source, the admin user page can show Apple App Store subscriptions instead of treating them as admin-granted access, and the native iPhone billing code now uses Apple's in-app subscription management screen. The existing $10 sandbox subscription on info@sonicweb.com.au was marked as Apple in the database.
+- Where to see it (page/link): https://helfi.ai/admin-panel user management, native TestFlight app Settings -> Subscription & Billing after a new TestFlight build is uploaded.
+- What to quickly test: In admin, open info@sonicweb.com.au and confirm Billing source shows Apple App Store. After the next TestFlight build, tap Manage in App Store and confirm Apple shows the sandbox subscription management sheet.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 18 May 2026, 07:24 AM AEST
 - What changed: Admin user subscription removal now updates the admin screen immediately and the admin user-management API is forced fresh so it does not show stale subscription data.
 - Where to see it (page/link): https://helfi.ai/admin-panel and individual admin user pages.
