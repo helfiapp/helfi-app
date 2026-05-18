@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
+import { ensureSubscriptionStoreColumns } from '@/lib/native-billing/subscription-store'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
 
@@ -80,8 +81,10 @@ export async function GET(request: NextRequest) {
     // Fetch subscription using raw SQL to avoid Prisma schema issues with stripeSubscriptionId column
     let subscription
     try {
+      await ensureSubscriptionStoreColumns()
       const subscriptionResult: any[] = await prisma.$queryRawUnsafe(
-        `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate"
+        `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate",
+                source, "storeProductId", "storeTransactionId", "storeOriginalTransactionId"
          FROM "Subscription"
          WHERE "userId" = $1
          LIMIT 1`,
@@ -162,7 +165,7 @@ export async function GET(request: NextRequest) {
             // Update database with Stripe subscription ID (only if column exists) - use raw SQL
             try {
               await prisma.$executeRawUnsafe(
-                `UPDATE "Subscription" SET "stripeSubscriptionId" = $1 WHERE "userId" = $2`,
+                `UPDATE "Subscription" SET "stripeSubscriptionId" = $1, source = 'stripe' WHERE "userId" = $2`,
                 stripeSubscription.id,
                 user.id
               )
@@ -215,6 +218,10 @@ export async function GET(request: NextRequest) {
         startDate: subscription.startDate?.toISOString() || subscription.startDate,
         endDate: subscription.endDate?.toISOString() || subscription.endDate || null,
         stripeSubscriptionId,
+        source: subscription.source || (stripeSubscriptionId ? 'stripe' : null),
+        storeProductId: subscription.storeProductId || null,
+        storeTransactionId: subscription.storeTransactionId || null,
+        storeOriginalTransactionId: subscription.storeOriginalTransactionId || null,
         stripeStatus: stripeSubscription?.status,
         stripeCancelAtPeriodEnd: stripeSubscription?.cancel_at_period_end,
         stripeCurrentPeriodEnd: stripeSubscription?.current_period_end ? new Date(stripeSubscription.current_period_end * 1000).toISOString() : null,
@@ -257,8 +264,10 @@ export async function POST(request: NextRequest) {
     // Fetch subscription using raw SQL to avoid Prisma schema issues
     let dbSubscription
     try {
+      await ensureSubscriptionStoreColumns()
       const subscriptionResult: any[] = await prisma.$queryRawUnsafe(
-        `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate"
+        `SELECT id, "userId", plan, "monthlyPriceCents", "startDate", "endDate",
+                source, "storeProductId", "storeTransactionId", "storeOriginalTransactionId"
          FROM "Subscription"
          WHERE "userId" = $1
          LIMIT 1`,
@@ -319,7 +328,7 @@ export async function POST(request: NextRequest) {
             // Update database (only if column exists) - use raw SQL
             try {
               await prisma.$executeRawUnsafe(
-                `UPDATE "Subscription" SET "stripeSubscriptionId" = $1 WHERE "userId" = $2`,
+                `UPDATE "Subscription" SET "stripeSubscriptionId" = $1, source = 'stripe' WHERE "userId" = $2`,
                 stripeSubscriptionId,
                 user.id
               )

@@ -3,7 +3,7 @@ import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Tex
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
-import { restoreNativePurchases, runNativePurchase, type NativeBillingCatalogProduct, type NativePurchaseCode } from '../lib/inAppPurchase'
+import { openNativeSubscriptionManagement, restoreNativePurchases, runNativePurchase, type NativeBillingCatalogProduct, type NativePurchaseCode } from '../lib/inAppPurchase'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -25,6 +25,7 @@ type SubscriptionData = {
   monthlyPriceCents: number | null
   stripeCancelAtPeriodEnd?: boolean
   stripeCurrentPeriodEnd?: string | null
+  source?: string | null
 }
 
 type RangeKey = '7d' | '1m' | '2m' | '6m' | 'all' | 'custom'
@@ -424,7 +425,23 @@ export function BillingScreen() {
       }
       setIsCreatingPortalSession(true)
       if (Platform.OS === 'ios') {
-        await openExternalUrl('itms-apps://apps.apple.com/account/subscriptions')
+        try {
+          await openNativeSubscriptionManagement()
+          const products = nativeProducts.length > 0 ? nativeProducts : await fetchNativeCatalog()
+          if (session?.token) {
+            await restoreNativePurchases({
+              token: session.token,
+              products,
+            }).catch(() => null)
+          }
+          await loadBillingData()
+        } catch (error: any) {
+          Alert.alert(
+            'Apple subscription settings',
+            error?.message ||
+              'Open iPhone Settings, go to Developer, then Sandbox Apple Account to manage TestFlight sandbox subscriptions.',
+          )
+        }
         return
       }
       const res = await fetch(`${API_BASE_URL}/api/billing/portal`, {
@@ -644,6 +661,11 @@ export function BillingScreen() {
                   {subscription.tier}
                   {subscription.credits > 0 ? ` - ${subscription.credits.toLocaleString()} credits/month` : ''}
                 </Text>
+                {subscription.source ? (
+                  <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 12 }}>
+                    Billed through {subscription.source === 'apple_iap' ? 'Apple App Store' : subscription.source === 'google_iap' ? 'Google Play' : subscription.source === 'stripe' ? 'Stripe' : 'Helfi'}
+                  </Text>
+                ) : null}
               </View>
               <View>
                 <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'right' }}>Status</Text>

@@ -538,6 +538,10 @@ model Subscription {
   plan                Plan      @default(PREMIUM)
   monthlyPriceCents   Int? // Track subscription tier: 2000 ($20), 3000 ($30), 5000 ($50)
   stripeSubscriptionId String? // Stripe subscription ID for managing Stripe subscriptions
+  source              String? // apple_iap, google_iap, stripe, or admin
+  storeProductId      String?
+  storeTransactionId  String?
+  storeOriginalTransactionId String?
   startDate           DateTime  @default(now())
   endDate             DateTime?
   user                User      @relation(fields: [userId], references: [id], onDelete: Cascade)

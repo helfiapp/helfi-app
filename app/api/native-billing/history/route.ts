@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { getNativeBillingCatalog } from '@/lib/native-billing/catalog'
+import { ensureSubscriptionStoreColumns, subscriptionSourceLabel } from '@/lib/native-billing/subscription-store'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -84,6 +85,7 @@ export async function GET(request: NextRequest) {
     }
 
     const [subscription, topUps] = await Promise.all([
+      ensureSubscriptionStoreColumns().then(() =>
       prisma.subscription.findUnique({
         where: { userId: user.id },
         select: {
@@ -91,8 +93,9 @@ export async function GET(request: NextRequest) {
           monthlyPriceCents: true,
           startDate: true,
           endDate: true,
+          source: true,
         },
-      }),
+      })),
       prisma.creditTopUp.findMany({
         where: { userId: user.id },
         select: {
@@ -118,7 +121,9 @@ export async function GET(request: NextRequest) {
         id: `subscription-${subscription.id}`,
         type: 'subscription',
         title: 'Monthly subscription',
-        subtitle: amountCents > 0 ? `${centsToDollars(amountCents)} per month` : 'Premium subscription',
+        subtitle: amountCents > 0
+          ? `${centsToDollars(amountCents)} per month • ${subscriptionSourceLabel(subscription.source)}`
+          : `Premium subscription • ${subscriptionSourceLabel(subscription.source)}`,
         amountText: amountCents > 0 ? centsToDollars(amountCents) : 'Premium',
         status: isActive ? 'Active' : 'Ended',
         occurredAt: subscription.startDate.toISOString(),

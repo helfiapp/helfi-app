@@ -414,3 +414,32 @@ export async function restoreNativePurchases(opts: {
     await IAP.endConnection().catch(() => {})
   }
 }
+
+export async function openNativeSubscriptionManagement(): Promise<PurchaseResult> {
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
+    throw new Error('Subscription management is only available on iPhone and Android.')
+  }
+
+  await IAP.initConnection()
+  try {
+    if (Platform.OS === 'ios') {
+      if (typeof (IAP as any).showManageSubscriptionsIOS === 'function') {
+        await (IAP as any).showManageSubscriptionsIOS()
+        return { message: 'Subscription management closed.' }
+      }
+      if (typeof (IAP as any).deepLinkToSubscriptionsIOS === 'function') {
+        await (IAP as any).deepLinkToSubscriptionsIOS()
+        return { message: 'Subscription management opened.' }
+      }
+    }
+
+    if (typeof (IAP as any).deepLinkToSubscriptions === 'function') {
+      await (IAP as any).deepLinkToSubscriptions()
+      return { message: 'Subscription management opened.' }
+    }
+
+    throw new Error('Subscription management is not available on this device.')
+  } finally {
+    await IAP.endConnection().catch(() => {})
+  }
+}

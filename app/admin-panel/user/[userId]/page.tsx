@@ -27,7 +27,19 @@ type AdminUser = {
     startDate?: string | null
     endDate?: string | null
     stripeSubscriptionId?: string | null
+    source?: string | null
+    storeProductId?: string | null
+    storeTransactionId?: string | null
+    storeOriginalTransactionId?: string | null
   } | null
+}
+
+function subscriptionSourceLabel(source?: string | null) {
+  if (source === 'apple_iap') return 'Apple App Store'
+  if (source === 'google_iap') return 'Google Play'
+  if (source === 'stripe') return 'Stripe'
+  if (source === 'admin') return 'Admin'
+  return 'Not recorded'
 }
 
 export default function AdminUserPage() {
@@ -162,11 +174,24 @@ export default function AdminUserPage() {
   const isPermanentAccess =
     !!user?.subscription?.endDate && new Date(user.subscription.endDate).getFullYear() > 2050
   const hasStripeSubscription = !!user?.subscription?.stripeSubscriptionId
-  const isPaidPremium = isPremium && hasStripeSubscription
-  const isAdminGrantedPremium = isPremium && !hasStripeSubscription
+  const isApplePremium = isPremium && user?.subscription?.source === 'apple_iap'
+  const isGooglePremium = isPremium && user?.subscription?.source === 'google_iap'
+  const isPaidPremium = isPremium && (hasStripeSubscription || isApplePremium || isGooglePremium)
+  const isStripePaidPremium = isPremium && hasStripeSubscription
+  const isAdminGrantedPremium = isPremium && !hasStripeSubscription && !isApplePremium && !isGooglePremium
 
   const accessLabel = useMemo(() => {
     if (!user?.subscription) return 'No Subscription'
+    if (user.subscription.source === 'apple_iap') {
+      return user.subscription.endDate
+        ? `Apple App Store subscription until ${new Date(user.subscription.endDate).toLocaleDateString()}`
+        : 'Apple App Store subscription'
+    }
+    if (user.subscription.source === 'google_iap') {
+      return user.subscription.endDate
+        ? `Google Play subscription until ${new Date(user.subscription.endDate).toLocaleDateString()}`
+        : 'Google Play subscription'
+    }
     if (user.subscription.plan === 'PREMIUM' && !user.subscription.stripeSubscriptionId) {
       if (user.subscription.endDate) {
         const endDate = new Date(user.subscription.endDate)
@@ -299,7 +324,7 @@ export default function AdminUserPage() {
                   )}
                   {isPaidPremium && (
                     <span className="px-3 py-1 rounded-full text-xs font-semibold bg-blue-100 text-blue-700">
-                      Paid
+                      {isApplePremium ? 'Apple paid' : isGooglePremium ? 'Google paid' : 'Paid'}
                     </span>
                   )}
                   {isAdminGrantedPremium && (
@@ -320,9 +345,9 @@ export default function AdminUserPage() {
                   <div className="text-sm font-semibold text-slate-900">{accessLabel}</div>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-4">
-                  <div className="text-xs text-slate-500">Member Since</div>
+                  <div className="text-xs text-slate-500">Billing source</div>
                   <div className="text-sm font-semibold text-slate-900">
-                    {new Date(user.createdAt).toLocaleDateString()}
+                    {subscriptionSourceLabel(user.subscription?.source)}
                   </div>
                 </div>
                 <div className="bg-slate-50 rounded-xl p-4">
@@ -556,7 +581,7 @@ export default function AdminUserPage() {
 
                 <div className="bg-white border border-slate-200 rounded-2xl shadow-sm p-6">
                   <h2 className="text-lg font-semibold text-slate-900 mb-3">Refunds</h2>
-                  {isPaidPremium ? (
+                  {isStripePaidPremium ? (
                     <>
                       <p className="text-sm text-slate-600 mb-4">
                         Refund the most recent payment. Access and credits are removed automatically.
@@ -585,6 +610,14 @@ export default function AdminUserPage() {
                         Refund latest payment
                       </button>
                     </>
+                  ) : isApplePremium ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      Apple purchases are managed in the App Store sandbox account. Refunds are not handled from this admin panel.
+                    </div>
+                  ) : isGooglePremium ? (
+                    <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+                      Google Play purchases are managed in Google Play. Refunds are not handled from this admin panel.
+                    </div>
                   ) : (
                     <div className="rounded-lg border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-600">
                       No refund available. This account has admin-granted access and no paid Stripe charge.

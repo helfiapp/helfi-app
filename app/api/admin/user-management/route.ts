@@ -3,6 +3,7 @@ import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { CreditManager } from '@/lib/credit-system'
 import { revokeUserSessions } from '@/lib/session-revocation'
+import { ensureSubscriptionStoreColumns } from '@/lib/native-billing/subscription-store'
 import Stripe from 'stripe'
 import bcrypt from 'bcryptjs'
 
@@ -61,6 +62,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get users with pagination
+    await ensureSubscriptionStoreColumns()
     const users = await prisma.user.findMany({
       where,
       select: {
@@ -82,7 +84,19 @@ export async function GET(request: NextRequest) {
         monthlyInsightsGenerationUsed: true,
         monthlyMedicalImageAnalysisUsed: true,
         monthlySymptomAnalysisUsed: true,
-        subscription: { select: { plan: true, monthlyPriceCents: true, endDate: true, startDate: true, stripeSubscriptionId: true } },
+        subscription: {
+          select: {
+            plan: true,
+            monthlyPriceCents: true,
+            endDate: true,
+            startDate: true,
+            stripeSubscriptionId: true,
+            source: true,
+            storeProductId: true,
+            storeTransactionId: true,
+            storeOriginalTransactionId: true,
+          },
+        },
         creditTopUps: {
           where: {
             expiresAt: { gt: new Date() }
@@ -154,6 +168,8 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { action, userId, data } = body
 
+    await ensureSubscriptionStoreColumns()
+
     switch (action) {
       case 'sync_stripe_subscription': {
         const targetEmail = data?.email?.toLowerCase()
@@ -194,6 +210,10 @@ export async function POST(request: NextRequest) {
               plan: 'PREMIUM',
               monthlyPriceCents: amountCents,
               stripeSubscriptionId: sub.id,
+              source: 'stripe',
+              storeProductId: sub.items.data[0]?.price?.id || null,
+              storeTransactionId: sub.id,
+              storeOriginalTransactionId: sub.id,
               startDate: currentPeriodStart,
               endDate: currentPeriodEnd
             } as any,
@@ -202,6 +222,10 @@ export async function POST(request: NextRequest) {
               plan: 'PREMIUM',
               monthlyPriceCents: amountCents,
               stripeSubscriptionId: sub.id,
+              source: 'stripe',
+              storeProductId: sub.items.data[0]?.price?.id || null,
+              storeTransactionId: sub.id,
+              storeOriginalTransactionId: sub.id,
               startDate: currentPeriodStart,
               endDate: currentPeriodEnd
             } as any
@@ -255,12 +279,20 @@ export async function POST(request: NextRequest) {
             plan: 'PREMIUM',
             monthlyPriceCents: 2000, // Default to $20 tier
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           },
           create: { 
             userId, 
             plan: 'PREMIUM',
             monthlyPriceCents: 2000,
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           }
         })
         // Update daily credits for premium
@@ -326,6 +358,10 @@ export async function POST(request: NextRequest) {
             // Reset startDate if tier changed or if subscription didn't exist
             startDate: newStartDate,
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           },
           create: { 
             userId, 
@@ -333,6 +369,10 @@ export async function POST(request: NextRequest) {
             monthlyPriceCents: priceCents,
             startDate: newStartDate,
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           }
         })
         
@@ -381,6 +421,10 @@ export async function POST(request: NextRequest) {
             endDate: endDate,
             monthlyPriceCents: 2000, // Default to $20 tier
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           },
           create: { 
             userId, 
@@ -388,6 +432,10 @@ export async function POST(request: NextRequest) {
             endDate: endDate,
             monthlyPriceCents: 2000,
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           }
         })
         break
@@ -409,6 +457,10 @@ export async function POST(request: NextRequest) {
             endDate: trialEndDate,
             monthlyPriceCents: monthlyPriceCents,
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           },
           create: { 
             userId, 
@@ -416,6 +468,10 @@ export async function POST(request: NextRequest) {
             endDate: trialEndDate,
             monthlyPriceCents: monthlyPriceCents,
             stripeSubscriptionId: null,
+            source: 'admin',
+            storeProductId: null,
+            storeTransactionId: null,
+            storeOriginalTransactionId: null,
           }
         })
         break

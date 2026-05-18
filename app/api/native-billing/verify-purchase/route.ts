@@ -6,6 +6,7 @@ import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { getNativeBillingProductByCode, type NativeBillingProductCode } from '@/lib/native-billing/catalog'
+import { ensureSubscriptionStoreColumns } from '@/lib/native-billing/subscription-store'
 
 type BillingUser = {
   id: string
@@ -61,7 +62,13 @@ async function upsertSubscriptionPreservingStartDate(opts: {
   monthlyPriceCents: number
   startDateHint?: Date | null
   endDate?: Date | null
+  source: 'apple_iap' | 'google_iap'
+  storeProductId: string
+  storeTransactionId?: string | null
+  storeOriginalTransactionId?: string | null
 }) {
+  await ensureSubscriptionStoreColumns()
+
   const existing = await prisma.subscription.findUnique({
     where: { userId: opts.userId },
     select: { startDate: true },
@@ -72,15 +79,25 @@ async function upsertSubscriptionPreservingStartDate(opts: {
   await prisma.subscription.upsert({
     where: { userId: opts.userId },
     update: {
+      plan: 'PREMIUM',
       monthlyPriceCents: opts.monthlyPriceCents,
       startDate,
       endDate: opts.endDate || null,
+      source: opts.source,
+      storeProductId: opts.storeProductId || null,
+      storeTransactionId: opts.storeTransactionId || null,
+      storeOriginalTransactionId: opts.storeOriginalTransactionId || null,
     },
     create: {
       userId: opts.userId,
+      plan: 'PREMIUM',
       monthlyPriceCents: opts.monthlyPriceCents,
       startDate,
       endDate: opts.endDate || null,
+      source: opts.source,
+      storeProductId: opts.storeProductId || null,
+      storeTransactionId: opts.storeTransactionId || null,
+      storeOriginalTransactionId: opts.storeOriginalTransactionId || null,
     },
   })
 }
@@ -439,6 +456,10 @@ export async function POST(request: NextRequest) {
         monthlyPriceCents: product.priceCents,
         startDateHint,
         endDate,
+        source: 'google_iap',
+        storeProductId: expectedProductId,
+        storeTransactionId: String(sub.orderId || purchaseToken),
+        storeOriginalTransactionId: String(sub.orderId || purchaseToken),
       })
 
       return NextResponse.json({
@@ -456,6 +477,7 @@ export async function POST(request: NextRequest) {
     }
 
     let finalTransactionId = ''
+    let finalOriginalTransactionId = ''
     let purchaseDateMs = 0
     let expiresDateMs = 0
 
@@ -472,6 +494,7 @@ export async function POST(request: NextRequest) {
           )
         }
         finalTransactionId = String(info?.transactionId || info?.originalTransactionId || transactionId).trim()
+        finalOriginalTransactionId = String(info?.originalTransactionId || finalTransactionId || '').trim()
         purchaseDateMs = Number(info?.purchaseDate || 0)
         expiresDateMs = Number(info?.expiresDate || 0)
       } else if (!receiptData) {
@@ -513,6 +536,7 @@ export async function POST(request: NextRequest) {
       finalTransactionId = String(
         transactionId || purchase.transaction_id || purchase.original_transaction_id || '',
       ).trim()
+      finalOriginalTransactionId = String(purchase.original_transaction_id || finalTransactionId || '').trim()
       purchaseDateMs = Number(purchase.purchase_date_ms || 0)
       expiresDateMs = Number(purchase.expires_date_ms || 0)
     }
@@ -565,6 +589,10 @@ export async function POST(request: NextRequest) {
       monthlyPriceCents: product.priceCents,
       startDateHint,
       endDate,
+      source: 'apple_iap',
+      storeProductId: expectedProductId,
+      storeTransactionId: finalTransactionId,
+      storeOriginalTransactionId: finalOriginalTransactionId || finalTransactionId,
     })
 
     return NextResponse.json({
