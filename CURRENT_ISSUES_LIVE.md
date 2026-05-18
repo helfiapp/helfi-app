@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 19 May 2026, 02:37 AM AEST
+- What changed: Native iPhone build 7 was uploaded to App Store Connect/TestFlight processing. It includes the Apple subscription/admin display changes and the Food Diary Ask AI button layout fix. The live web deployment was also verified after pushing the native commits.
+- Where to see it (page/link): TestFlight build 7 when Apple finishes processing, plus https://helfi.ai/admin-panel user management.
+- What to quickly test: Install TestFlight build 7, open Food Diary and confirm the Ask AI button stays inside the screen. Then open Settings -> Subscription & Billing and test the Apple subscription manage/cancel flow on the real iPhone.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 19 May 2026, 02:05 AM AEST
 - What changed: Apple native subscriptions are now saved with their Apple source, the admin user page can show Apple App Store subscriptions instead of treating them as admin-granted access, and the native iPhone billing code now uses Apple's in-app subscription management screen. The existing $10 sandbox subscription on info@sonicweb.com.au was marked as Apple in the database.
 - Where to see it (page/link): https://helfi.ai/admin-panel user management, native TestFlight app Settings -> Subscription & Billing after a new TestFlight build is uploaded.
