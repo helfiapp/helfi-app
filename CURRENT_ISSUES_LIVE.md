@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 25 May 2026, 08:47 PM AEST
+- What changed: Native billing cancellation notice was changed from yellow/brown to a cleaner neutral panel, and native iOS build number was bumped to 8 for TestFlight.
+- Where to see it (page/link): Native TestFlight build 8, Settings -> Subscription & Billing.
+- What to quickly test: Install build 8 after Apple finishes processing, open Billing, and confirm the cancellation notice looks clean and professional.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 25 May 2026, 08:06 PM AEST
 - What changed: Apple subscription status checks now include the required Apple Bundle ID and use the current StoreKit server endpoints, so Apple cancellations are read correctly by Helfi.
 - Where to see it (page/link): Native TestFlight app Settings -> Subscription & Billing, and https://helfi.ai/api/billing/subscription.
