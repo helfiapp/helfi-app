@@ -23,6 +23,22 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 
 After reading this file, also read `PROJECT_STATUS.md` for the current state of the project.
 
+## Computer, Browser, and Email Access
+
+The owner has given agents permission to use the currently open browser, Apple Mail, and browser-based Gmail accounts for Helfi work and testing.
+
+Browser rules:
+- Do not open a separate browser app for normal testing.
+- Use the browser that is already open.
+- It is OK to open a new tab in that same browser when needed.
+- Agents may use logged-in browser sessions for Helfi, Linear, App Store Connect, Gmail, and related project checks.
+
+Email rules:
+- Agents may read/search Apple Mail for project-related emails and status checks.
+- Agents may read/search Gmail accounts that are already open in the browser for project-related emails and status checks.
+- Never delete, archive, move, mark, reply to, forward, or send emails unless the owner explicitly asks for that exact action.
+- Never print passwords, one-time codes, reset links, or secret values from emails. Summarize only the status or relevant non-secret details.
+
 ## Native App Test Login
 
 When working on the native phone app, agents must keep the app logged in to the same test account so the owner does not need to log in again after restarts.
