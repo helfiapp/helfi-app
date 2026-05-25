@@ -680,8 +680,22 @@ export function BillingScreen() {
             ) : null}
 
             {subscription.stripeCancelAtPeriodEnd ? (
-              <View style={{ marginTop: 10, padding: 10, borderRadius: 10, backgroundColor: '#FEFCE8', borderWidth: 1, borderColor: '#FDE68A' }}>
-                <Text style={{ color: '#92400E', fontWeight: '700' }}>Your subscription will be canceled at the end of this billing period.</Text>
+              <View
+                style={{
+                  marginTop: 10,
+                  padding: 12,
+                  borderRadius: 8,
+                  backgroundColor: '#F8FAFC',
+                  borderWidth: 1,
+                  borderColor: '#D7DEE8',
+                  borderLeftWidth: 4,
+                  borderLeftColor: theme.colors.primary,
+                }}
+              >
+                <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Cancellation scheduled</Text>
+                <Text style={{ marginTop: 4, color: theme.colors.muted, lineHeight: 20 }}>
+                  Your subscription remains active until the end of this billing period.
+                </Text>
               </View>
             ) : null}
 
