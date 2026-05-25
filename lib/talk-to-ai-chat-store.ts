@@ -88,6 +88,32 @@ export async function listThreads(userId: string, context?: string): Promise<Cha
   }))
 }
 
+export async function getThreadForUser(userId: string, threadId: string): Promise<ChatThread | null> {
+  await ensureTalkToAITables()
+  const rows: Array<{
+    id: string
+    title: string | null
+    chargedOnce: boolean
+    context: string | null
+    createdAt: Date
+    updatedAt: Date
+  }> = await prisma.$queryRawUnsafe(
+    'SELECT "id","title","chargedOnce","context","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "id" = $1 AND "userId" = $2 LIMIT 1',
+    threadId,
+    userId
+  )
+  const row = rows[0]
+  if (!row) return null
+  return {
+    id: row.id,
+    title: row.title,
+    chargedOnce: Boolean(row.chargedOnce),
+    context: normalizeChatContext(row.context),
+    createdAt: row.createdAt.toISOString(),
+    updatedAt: row.updatedAt.toISOString(),
+  }
+}
+
 export async function getThreadChargeStatus(threadId: string): Promise<boolean> {
   await ensureTalkToAITables()
   const rows: Array<{ chargedOnce: boolean }> = await prisma.$queryRawUnsafe(

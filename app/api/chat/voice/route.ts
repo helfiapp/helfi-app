@@ -14,6 +14,7 @@ import {
   createThread,
   updateThreadTitle,
   listThreads,
+  getThreadForUser,
   getThreadChargeStatus,
   markThreadCharged,
   normalizeChatContext,
@@ -1168,6 +1169,10 @@ export async function GET(req: NextRequest) {
     const threadId = url.searchParams.get('threadId')
     
     if (threadId) {
+      const thread = await getThreadForUser(session.user.id, threadId)
+      if (!thread) {
+        return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
+      }
       // Get specific thread messages
       const messages = await listMessages(threadId, 60)
       return NextResponse.json({ threadId, messages }, { status: 200 })
@@ -1218,14 +1223,11 @@ export async function POST(req: NextRequest) {
     await ensureTalkToAITables()
     let chatContext = normalizeChatContext(body?.entryContext ?? body?.context)
     if (body.threadId) {
-      const rows: Array<{ context: string | null }> = await prisma.$queryRawUnsafe(
-        'SELECT "context" FROM "TalkToAIChatThread" WHERE "id" = $1 AND "userId" = $2',
-        body.threadId,
-        session.user.id
-      )
-      if (rows[0]?.context) {
-        chatContext = normalizeChatContext(rows[0].context)
+      const thread = await getThreadForUser(session.user.id, String(body.threadId))
+      if (!thread) {
+        return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
       }
+      chatContext = normalizeChatContext(thread.context)
     }
     const isFoodChat = chatContext === 'food'
     let threadId: string

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-04T04:17:12.858Z",
+  "generatedAt": "2026-05-25T23:07:22.916Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -194,7 +194,7 @@
     "components/SolidMacroRing.tsx": "c3c6e3f07fafd237fa4dcd498b024ac48e48c2ebd23a64c924aab253590fedaa",
     "components/support/SupportChatWidget.tsx": "2f6316a0cfdd832bb7e71d4de51a18cf2a2e84aba575262e291d646ec84165f5",
     "components/UsageMeter.tsx": "692f428bfe4f3329664cd30013c8db10aa9ecac9b5b81630a84c30717343c50e",
-    "components/VoiceChat.tsx": "07fbf4ec2d6263a866e42cad6aabecaccca7c601d5c1bca46b705193a1702861",
+    "components/VoiceChat.tsx": "5927146ca0a6e1c4f330380e85b5bac35f5859e7f9a1ec872b6569f8a40bff8e",
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
     "native/src/config.ts": "81cfdb7a722c7b073eff5b1519268f6555fb0867f0737da0318b16810a43c7e6",
     "native/src/config/nativePageRoutes.ts": "5ec02b07d9bf1fbf68a1b219bb50d2cee28ddab54f3378080d47c802766695d9",

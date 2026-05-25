@@ -15,6 +15,7 @@ import {
   updateThreadTitle,
   updateThreadFoodContext,
   listThreads,
+  getThreadForUser,
   getThreadChargeStatus,
   markThreadCharged,
   normalizeChatContext,
@@ -171,6 +172,10 @@ export async function POST(req: NextRequest) {
       const thread = await createThread(session.user.id, undefined, chatContext)
       threadId = thread.id
     } else if (incomingThreadId) {
+      const thread = await getThreadForUser(session.user.id, incomingThreadId)
+      if (!thread) {
+        return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
+      }
       threadId = incomingThreadId
     } else {
       const threads = await listThreads(session.user.id, chatContext)

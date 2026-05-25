@@ -775,6 +775,10 @@ export default function VoiceChat({
   const [dynamicExampleQuestions, setDynamicExampleQuestions] = useState<string[] | null>(null)
   const storageKey = useMemo(() => `helfi:chat:talk:${entryContext}`, [entryContext])
   const archivedKey = useMemo(() => `helfi:chat:talk:${entryContext}:archived`, [entryContext])
+  const isNativeWebView = useMemo(() => {
+    if (!isClient || typeof window === 'undefined') return false
+    return new URLSearchParams(window.location.search).get('helfiNative') === '1'
+  }, [isClient])
   const threadsUrl = useMemo(
     () => (entryContext === 'food' ? '/api/chat/threads?context=food' : '/api/chat/threads'),
     [entryContext]
@@ -1915,7 +1919,7 @@ export default function VoiceChat({
       if (onCostEstimate) onCostEstimate(estimatedCost)
 
       const url = `/api/chat/voice`
-      const wantsStream = entryContext !== 'food'
+      const wantsStream = entryContext !== 'food' && !isNativeWebView
       const clientMessageId =
         typeof crypto !== 'undefined' && typeof crypto.randomUUID === 'function'
           ? crypto.randomUUID()
@@ -1923,9 +1927,12 @@ export default function VoiceChat({
       const { localDate, tzOffsetMin } = buildLocalDatePayload()
       let requestedThreadId = currentThreadId || undefined
       let requestNewThread = !currentThreadId
-      const sendVoiceRequest = () =>
-        fetch(url, {
+      const sendVoiceRequest = () => {
+        const controller = new AbortController()
+        const timeout = window.setTimeout(() => controller.abort(), isNativeWebView ? 90000 : 120000)
+        return fetch(url, {
           method: 'POST',
+          signal: controller.signal,
           headers: {
             'Content-Type': 'application/json',
             Accept: wantsStream ? 'text/event-stream' : 'application/json',
@@ -1941,7 +1948,8 @@ export default function VoiceChat({
             ...(foodContextOverride ? { foodContextOverride } : {}),
             ...context,
           }),
-        })
+        }).finally(() => window.clearTimeout(timeout))
+      }
 
       let res: Response
       try {
@@ -2189,7 +2197,15 @@ export default function VoiceChat({
         await refreshThreadsFromServer()
       }
     } catch (err: any) {
-      const raw = err?.message || 'Something went wrong'
+      const recovered = await recoverAssistantMessage()
+      if (recovered) {
+        setError(null)
+        return
+      }
+      const raw =
+        err?.name === 'AbortError'
+          ? 'Talk to Helfi took too long to reply. Please try again.'
+          : err?.message || 'Something went wrong'
       const safeMessage =
         raw.toLowerCase().includes('prisma') || raw.toLowerCase().includes('transaction')
           ? 'Something went wrong. Please try again.'
