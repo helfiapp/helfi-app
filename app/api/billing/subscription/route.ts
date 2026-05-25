@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { getServerSession } from 'next-auth'
+import { createSign } from 'crypto'
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
@@ -42,6 +43,125 @@ async function getBillingUser(request: NextRequest) {
     where: { id: nativeUserId },
     select: { id: true, email: true, name: true },
   })
+}
+
+type AppleApiCredentials = {
+  issuerId: string
+  keyId: string
+  privateKey: string
+}
+
+type AppleSubscriptionState = {
+  autoRenewStatus: number | null
+  expiresDate: Date | null
+}
+
+function base64Url(input: string | Buffer): string {
+  const raw = Buffer.isBuffer(input) ? input : Buffer.from(input)
+  return raw
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function decodeBase64UrlJSON(value: string): any {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+  return JSON.parse(Buffer.from(padded, 'base64').toString('utf8'))
+}
+
+function parseAppleJwsPayload(value: string): any {
+  const parts = String(value || '').split('.')
+  if (parts.length < 2) return null
+  return decodeBase64UrlJSON(parts[1])
+}
+
+function getAppleApiCredentials(): AppleApiCredentials | null {
+  const issuerId = String(process.env.APPLE_IAP_ISSUER_ID || '').trim()
+  const keyId = String(process.env.APPLE_IAP_KEY_ID || '').trim()
+  const privateKey = String(process.env.APPLE_IAP_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim()
+  if (!issuerId || !keyId || !privateKey) return null
+  return { issuerId, keyId, privateKey }
+}
+
+function createAppleAppStoreApiToken(credentials: AppleApiCredentials): string {
+  const now = Math.floor(Date.now() / 1000)
+  const unsignedToken = `${base64Url(JSON.stringify({
+    alg: 'ES256',
+    kid: credentials.keyId,
+    typ: 'JWT',
+  }))}.${base64Url(JSON.stringify({
+    iss: credentials.issuerId,
+    iat: now,
+    exp: now + 60 * 5,
+    aud: 'appstoreconnect-v1',
+  }))}`
+  const signer = createSign('SHA256')
+  signer.update(unsignedToken)
+  signer.end()
+  const signature = signer.sign({ key: credentials.privateKey, dsaEncoding: 'ieee-p1363' })
+  return `${unsignedToken}.${base64Url(signature)}`
+}
+
+async function fetchAppleSubscriptionState(subscription: any): Promise<AppleSubscriptionState | null> {
+  const source = String(subscription?.source || '')
+  const transactionId = String(subscription?.storeOriginalTransactionId || subscription?.storeTransactionId || '').trim()
+  const storeProductId = String(subscription?.storeProductId || '').trim()
+  if (source !== 'apple_iap' || !transactionId) return null
+
+  const credentials = getAppleApiCredentials()
+  if (!credentials) return null
+
+  const token = createAppleAppStoreApiToken(credentials)
+  const encodedTransactionId = encodeURIComponent(transactionId)
+  const urls = [
+    `https://api.storekit.itunes.apple.com/inApps/v1/subscriptions/${encodedTransactionId}`,
+    `https://api.storekit-sandbox.itunes.apple.com/inApps/v1/subscriptions/${encodedTransactionId}`,
+  ]
+
+  for (const url of urls) {
+    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } })
+    const data: any = await res.json().catch(() => ({}))
+    if (!res.ok) continue
+
+    const groups = Array.isArray(data?.data) ? data.data : []
+    const transactions = groups.flatMap((group: any) =>
+      Array.isArray(group?.lastTransactions) ? group.lastTransactions : [],
+    )
+
+    const candidates = transactions
+      .map((item: any) => {
+        const transactionInfo = parseAppleJwsPayload(String(item?.signedTransactionInfo || '')) || {}
+        const renewalInfo = parseAppleJwsPayload(String(item?.signedRenewalInfo || '')) || {}
+        return {
+          status: Number(item?.status || item?.rawStatus || 0) || null,
+          productId: String(transactionInfo?.productId || renewalInfo?.productId || ''),
+          expiresDateMs: Number(transactionInfo?.expiresDate || 0),
+          autoRenewStatus:
+            renewalInfo?.autoRenewStatus === 0 || renewalInfo?.autoRenewStatus === 1
+              ? Number(renewalInfo.autoRenewStatus)
+              : null,
+        }
+      })
+      .filter((item: any) => !storeProductId || item.productId === storeProductId)
+      .sort((a: any, b: any) => Number(b.expiresDateMs || 0) - Number(a.expiresDateMs || 0))
+
+    const current = candidates[0]
+    if (!current) continue
+
+    const expiresDate =
+      Number.isFinite(current.expiresDateMs) && current.expiresDateMs > 0
+        ? new Date(current.expiresDateMs)
+        : null
+
+    return {
+      autoRenewStatus: current.autoRenewStatus,
+      expiresDate,
+    }
+  }
+
+  return null
 }
 
 // GET /api/billing/subscription - Get current subscription status
@@ -124,10 +244,26 @@ export async function GET(request: NextRequest) {
       })
     }
 
+    let appleSubscriptionState: AppleSubscriptionState | null = null
+    try {
+      appleSubscriptionState = await fetchAppleSubscriptionState(subscription)
+      if (appleSubscriptionState?.expiresDate) {
+        subscription.endDate = appleSubscriptionState.expiresDate
+        await prisma.$executeRawUnsafe(
+          `UPDATE "Subscription" SET "endDate" = $1 WHERE "userId" = $2`,
+          appleSubscriptionState.expiresDate,
+          user.id,
+        )
+      }
+    } catch (error: any) {
+      console.error('Error fetching Apple subscription status:', error?.message || error)
+    }
+
     // Check if subscription is active
     const now = new Date()
     const endDate = subscription.endDate ? new Date(subscription.endDate) : null
     const isActive = !endDate || endDate > now
+    const appleCancelAtPeriodEnd = appleSubscriptionState?.autoRenewStatus === 0
 
     // Get Stripe subscription details if available
     let stripeSubscription = null
@@ -181,6 +317,13 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    const currentPeriodEnd =
+      stripeSubscription?.current_period_end
+        ? new Date(stripeSubscription.current_period_end * 1000).toISOString()
+        : endDate
+          ? endDate.toISOString()
+          : null
+
     // Determine plan tier name
     const currentTier = subscription.monthlyPriceCents
     let tierName = 'Premium'
@@ -223,8 +366,10 @@ export async function GET(request: NextRequest) {
         storeTransactionId: subscription.storeTransactionId || null,
         storeOriginalTransactionId: subscription.storeOriginalTransactionId || null,
         stripeStatus: stripeSubscription?.status,
-        stripeCancelAtPeriodEnd: stripeSubscription?.cancel_at_period_end,
-        stripeCurrentPeriodEnd: stripeSubscription?.current_period_end ? new Date(stripeSubscription.current_period_end * 1000).toISOString() : null,
+        stripeCancelAtPeriodEnd: Boolean(stripeSubscription?.cancel_at_period_end || appleCancelAtPeriodEnd),
+        stripeCurrentPeriodEnd: currentPeriodEnd,
+        storeCancelAtPeriodEnd: appleCancelAtPeriodEnd,
+        storeAutoRenewStatus: appleSubscriptionState?.autoRenewStatus ?? null,
         isStripeManaged: !!stripeSubscription
       }
     })
