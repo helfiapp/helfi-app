@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 25 May 2026, 08:06 PM AEST
+- What changed: Apple subscription status checks now include the required Apple Bundle ID and use the current StoreKit server endpoints, so Apple cancellations are read correctly by Helfi.
+- Where to see it (page/link): Native TestFlight app Settings -> Subscription & Billing, and https://helfi.ai/api/billing/subscription.
+- What to quickly test: Reopen Billing in TestFlight as info@sonicweb.com.au and confirm the $10 Apple subscription shows as cancelling at period end instead of showing the red Cancel Subscription button.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 19 May 2026, 02:37 AM AEST
 - What changed: Native iPhone build 7 was uploaded to App Store Connect/TestFlight processing. It includes the Apple subscription/admin display changes and the Food Diary Ask AI button layout fix. The live web deployment was also verified after pushing the native commits.
 - Where to see it (page/link): TestFlight build 7 when Apple finishes processing, plus https://helfi.ai/admin-panel user management.
