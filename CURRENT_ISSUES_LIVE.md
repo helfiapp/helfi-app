@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 26 May 2026, 09:22 AM AEST
+- What changed: Fixed iOS Talk to Helfi so the native app uses the live non-streaming chat reply flow instead of getting stuck on typing, and cleaned up the chat health-context query.
+- Where to see it (page/link): Native iOS app -> More -> Talk to Helfi, live server at https://helfi.ai.
+- What to quickly test: Open Talk to Helfi in the iOS app, send a short dummy message, and confirm a Helfi reply appears instead of endless typing.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 25 May 2026, 08:47 PM AEST
 - What changed: Native billing cancellation notice was changed from yellow/brown to a cleaner neutral panel, and native iOS build number was bumped to 8 for TestFlight.
 - Where to see it (page/link): Native TestFlight build 8, Settings -> Subscription & Billing.
