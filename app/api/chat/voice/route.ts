@@ -191,8 +191,8 @@ async function loadFullUserContext(userId: string) {
         },
       },
     }),
-    prisma.$queryRawUnsafe<Array<{ id: string; name: string; polarity: string; slug: string }>>(
-      'SELECT id, name, polarity, slug FROM "CheckinIssues" WHERE "userId" = $1',
+    prisma.$queryRawUnsafe<Array<{ id: string; name: string; polarity: string; slug: string | null }>>(
+      'SELECT id, name, polarity, NULL::text AS slug FROM CheckinIssues WHERE userId = $1',
       userId
     ).catch(() => []),
   ])
