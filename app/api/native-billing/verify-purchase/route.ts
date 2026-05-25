@@ -33,6 +33,7 @@ type AppleApiCredentials = {
   issuerId: string
   keyId: string
   privateKey: string
+  bundleId: string
 }
 
 type GoogleProductPurchase = {
@@ -182,17 +183,26 @@ async function verifyAppleTransactionById(transactionId: string) {
   const encodedTransactionId = encodeURIComponent(transactionId)
   const urls = [
     `https://api.storekit.itunes.apple.com/inApps/v1/transactions/${encodedTransactionId}`,
+    `https://api.storekit.apple.com/inApps/v1/transactions/${encodedTransactionId}`,
     `https://api.storekit-sandbox.itunes.apple.com/inApps/v1/transactions/${encodedTransactionId}`,
+    `https://api.storekit-sandbox.apple.com/inApps/v1/transactions/${encodedTransactionId}`,
   ]
 
   let lastError = 'Apple transaction lookup failed.'
   for (const url of urls) {
-    const res = await fetch(url, {
-      headers: {
-        authorization: `Bearer ${token}`,
-      },
-    })
-    const data: any = await res.json().catch(() => ({}))
+    let res: Response
+    let data: any
+    try {
+      res = await fetch(url, {
+        headers: {
+          authorization: `Bearer ${token}`,
+        },
+      })
+      data = await res.json().catch(() => ({}))
+    } catch (error: any) {
+      lastError = error?.message || 'Apple transaction lookup request failed.'
+      continue
+    }
     if (!res.ok) {
       const detail = String(data?.errorMessage || data?.errorCode || '').trim()
       if (detail) lastError = detail
@@ -233,8 +243,9 @@ function getAppleApiCredentials(): AppleApiCredentials | null {
   const keyId = String(process.env.APPLE_IAP_KEY_ID || '').trim()
   const privateKeyRaw = String(process.env.APPLE_IAP_PRIVATE_KEY || '').trim()
   const privateKey = normalizeApplePrivateKey(privateKeyRaw)
-  if (!issuerId || !keyId || !privateKey) return null
-  return { issuerId, keyId, privateKey }
+  const bundleId = String(process.env.APPLE_IAP_BUNDLE_ID || '').trim()
+  if (!issuerId || !keyId || !privateKey || !bundleId) return null
+  return { issuerId, keyId, privateKey, bundleId }
 }
 
 function createAppleAppStoreApiToken(credentials: AppleApiCredentials): string {
@@ -249,6 +260,7 @@ function createAppleAppStoreApiToken(credentials: AppleApiCredentials): string {
     iat: now,
     exp: now + 60 * 5,
     aud: 'appstoreconnect-v1',
+    bid: credentials.bundleId,
   }
 
   const unsignedToken = `${base64Url(JSON.stringify(header))}.${base64Url(JSON.stringify(payload))}`

@@ -49,6 +49,7 @@ type AppleApiCredentials = {
   issuerId: string
   keyId: string
   privateKey: string
+  bundleId: string
 }
 
 type AppleSubscriptionState = {
@@ -81,8 +82,9 @@ function getAppleApiCredentials(): AppleApiCredentials | null {
   const issuerId = String(process.env.APPLE_IAP_ISSUER_ID || '').trim()
   const keyId = String(process.env.APPLE_IAP_KEY_ID || '').trim()
   const privateKey = String(process.env.APPLE_IAP_PRIVATE_KEY || '').replace(/\\n/g, '\n').trim()
-  if (!issuerId || !keyId || !privateKey) return null
-  return { issuerId, keyId, privateKey }
+  const bundleId = String(process.env.APPLE_IAP_BUNDLE_ID || '').trim()
+  if (!issuerId || !keyId || !privateKey || !bundleId) return null
+  return { issuerId, keyId, privateKey, bundleId }
 }
 
 function createAppleAppStoreApiToken(credentials: AppleApiCredentials): string {
@@ -96,6 +98,7 @@ function createAppleAppStoreApiToken(credentials: AppleApiCredentials): string {
     iat: now,
     exp: now + 60 * 5,
     aud: 'appstoreconnect-v1',
+    bid: credentials.bundleId,
   }))}`
   const signer = createSign('SHA256')
   signer.update(unsignedToken)
@@ -117,13 +120,32 @@ async function fetchAppleSubscriptionState(subscription: any): Promise<AppleSubs
   const encodedTransactionId = encodeURIComponent(transactionId)
   const urls = [
     `https://api.storekit.itunes.apple.com/inApps/v1/subscriptions/${encodedTransactionId}`,
+    `https://api.storekit.apple.com/inApps/v1/subscriptions/${encodedTransactionId}`,
     `https://api.storekit-sandbox.itunes.apple.com/inApps/v1/subscriptions/${encodedTransactionId}`,
+    `https://api.storekit-sandbox.apple.com/inApps/v1/subscriptions/${encodedTransactionId}`,
   ]
 
   for (const url of urls) {
-    const res = await fetch(url, { headers: { authorization: `Bearer ${token}` } })
-    const data: any = await res.json().catch(() => ({}))
-    if (!res.ok) continue
+    let res: Response
+    let data: any
+    try {
+      res = await fetch(url, { headers: { authorization: `Bearer ${token}` } })
+      data = await res.json().catch(() => ({}))
+    } catch (error: any) {
+      console.warn('Apple subscription status request failed:', {
+        host: new URL(url).host,
+        message: error?.message || 'request failed',
+      })
+      continue
+    }
+    if (!res.ok) {
+      console.warn('Apple subscription status returned non-OK:', {
+        host: new URL(url).host,
+        status: res.status,
+        errorCode: data?.errorCode || null,
+      })
+      continue
+    }
 
     const groups = Array.isArray(data?.data) ? data.data : []
     const transactions = groups.flatMap((group: any) =>
