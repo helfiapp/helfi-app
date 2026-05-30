@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 03:49 AM AEST
+- What changed: Fixed native iPhone Chat History so it opens the chat list/history view instead of the blank Talk to Helfi start screen.
+- Where to see it (page/link): Native iPhone app -> More -> Chat History.
+- What to quickly test: Open Chat History and confirm the chat list opens first; if there are no chats, it should say no chats yet instead of showing the normal new-message prompt.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 03:40 AM AEST
 - What changed: Fixed weekly Insights report dates so if a latest report is ready but the stored next due date is in the past, Helfi moves the next due date forward before showing it.
 - Where to see it (page/link): https://helfi.ai/insights and native iPhone app -> Insights.
