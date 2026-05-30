@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 05:51 AM AEST
+- What changed: Cleaned up the leftover local handover fixes after reviewing them properly. This includes safer native account switching, native billing/usage fixes, correct credit-cost wording, dark-mode/native display fixes, favourites action button labels, and refreshed safety locks.
+- Where to see it (page/link): https://helfi.ai, native iPhone app account switching, Billing, Symptom Analysis, Medical Image Analysis, Food Diary favourites, and dark mode screens.
+- What to quickly test: On iPhone, switch accounts and confirm old account data/history does not appear; check Billing usage/credit costs; check Symptom Analysis says 1 credit and Medical Image Analysis says 2 credits; check dark mode and Food Diary favourites buttons are readable.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 03:49 AM AEST
 - What changed: Fixed native iPhone Chat History so it opens the chat list/history view instead of the blank Talk to Helfi start screen.
 - Where to see it (page/link): Native iPhone app -> More -> Chat History.
