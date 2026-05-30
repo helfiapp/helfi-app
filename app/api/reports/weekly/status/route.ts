@@ -1,6 +1,12 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
-import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
+import {
+  ensureReadyWeeklyReportNextDueInFuture,
+  getLatestWeeklyReport,
+  getWeeklyReportState,
+  markWeeklyReportOnboardingComplete,
+  setWeeklyReportsEnabled,
+} from '@/lib/weekly-health-report'
 import { prisma } from '@/lib/prisma'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@/lib/weekly-report-request-auth'
@@ -79,6 +85,7 @@ export async function GET(request: NextRequest) {
 
   const reportReady = latest?.status === 'READY'
   const reportLocked = latest?.status === 'LOCKED'
+  state = await ensureReadyWeeklyReportNextDueInFuture(requestUser.id, state, latest)
   const now = Date.now()
   const lastShownAt = latest?.lastShownAt ? new Date(latest.lastShownAt).getTime() : 0
   const shouldShowPopup = Boolean(

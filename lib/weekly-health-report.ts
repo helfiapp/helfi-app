@@ -202,6 +202,24 @@ export function getNextDueAt(fromDate: Date) {
   return new Date(fromDate.getTime() + REPORT_PERIOD_DAYS * 24 * 60 * 60 * 1000)
 }
 
+export async function ensureReadyWeeklyReportNextDueInFuture(
+  userId: string,
+  state: WeeklyReportState | null,
+  latestReport: Pick<WeeklyReportRecord, 'status'> | null | undefined,
+  now = new Date()
+): Promise<WeeklyReportState | null> {
+  const hasReadyReport = latestReport?.status === 'READY' || latestReport?.status === 'LOCKED'
+  if (!state?.nextReportDueAt || !hasReadyReport) return state
+
+  const dueAt = new Date(state.nextReportDueAt)
+  if (Number.isNaN(dueAt.getTime()) || dueAt.getTime() > now.getTime()) return state
+
+  return upsertWeeklyReportState(userId, {
+    nextReportDueAt: getNextDueAt(now).toISOString(),
+    lastStatus: state.lastStatus ?? latestReport.status,
+  })
+}
+
 export async function getWeeklyReportState(userId: string): Promise<WeeklyReportState | null> {
   await ensureWeeklyReportTables()
   try {

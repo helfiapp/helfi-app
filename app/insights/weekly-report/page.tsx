@@ -2,6 +2,7 @@ import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import {
+  ensureReadyWeeklyReportNextDueInFuture,
   getLatestWeeklyReport,
   getWeeklyReportById,
   getWeeklyReportState,
@@ -22,11 +23,12 @@ export default async function WeeklyReportPage({ searchParams }: WeeklyReportPag
   }
 
   const reportId = typeof searchParams?.id === 'string' ? searchParams?.id : ''
-  const [report, reports, state] = await Promise.all([
+  const [report, reports, stateRaw] = await Promise.all([
     reportId ? getWeeklyReportById(session.user.id, reportId) : getLatestWeeklyReport(session.user.id),
     listWeeklyReports(session.user.id, 50),
     getWeeklyReportState(session.user.id),
   ])
+  const state = await ensureReadyWeeklyReportNextDueInFuture(session.user.id, stateRaw, report)
   const canManualReport = String(session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
   const reportsEnabled =
     Boolean(state?.reportsEnabled) ||

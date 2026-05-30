@@ -3,7 +3,13 @@ import Link from 'next/link'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
-import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
+import {
+  ensureReadyWeeklyReportNextDueInFuture,
+  getLatestWeeklyReport,
+  getWeeklyReportState,
+  markWeeklyReportOnboardingComplete,
+  setWeeklyReportsEnabled,
+} from '@/lib/weekly-health-report'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 import { isHealthSetupComplete } from '@/lib/health-setup-completion'
 import { prisma } from '@/lib/prisma'
@@ -112,6 +118,7 @@ export default async function InsightsPage() {
   // PROTECTED: INSIGHTS_WEEKLY_STATE_SELF_HEAL END
 
   const latestReport = await getLatestWeeklyReport(session.user.id)
+  weeklyState = await ensureReadyWeeklyReportNextDueInFuture(session.user.id, weeklyState, latestReport)
   const reportReady = latestReport?.status === 'READY'
   const reportLocked = latestReport?.status === 'LOCKED'
   const reportsEnabled =

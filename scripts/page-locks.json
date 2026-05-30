@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-30T17:27:00.000Z",
+  "generatedAt": "2026-05-30T17:36:00.000Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -78,12 +78,12 @@
     "app/insights/issues/[issueSlug]/supplements/working/page.tsx": "1f8c57ecda9f914b8bb884d88afcbf1f3fa9ef5f7296864cb824882785c178f4",
     "app/insights/loading.tsx": "8437d67851a77ceb9a2d2268a37a9ffe58c8e6b2dffb73a09ba9bbf24e13c974",
     "app/insights/nutrition/page.tsx": "fe59d251ee948e45230d301c04581013a3175fb6cf798a71534775d574887519",
-    "app/insights/page.tsx": "45659ed04c1426c5faf297f892e433c69ef341a3daa324c690a8f88b88012f3d",
+    "app/insights/page.tsx": "84d4c1b537a62e8c37853f2d4c96a6606f3c001ddfeae5515521061595e799b0",
     "app/insights/safety/page.tsx": "6daefe7f9343c5189a90eb56e7893af4f0b6be6c8e02ed894390edb349b31139",
     "app/insights/sleep/page.tsx": "9d2f6249432eca35d532f99f78871e9b74a66e2335c093c4e45fb475d406e139",
     "app/insights/supplements/[name]/page.tsx": "d4049a6c402ca05e9faf72e18aa9a27b016c39a8a24b1187f885f8f3cbf853c9",
     "app/insights/supplements/page.tsx": "a1296bd3842134ec97e33d59f3ed5d00c77acf455d9a1e80157ab9ca7a197699",
-    "app/insights/weekly-report/page.tsx": "71233302269d7561b932f6aaec78ea4b3d52f5ae3c15656e5c9dba1eac48a7f0",
+    "app/insights/weekly-report/page.tsx": "eab2b332db4d805eace67d5164e85a83b18d69de14d10b2d63200b6f4eaa0cfb",
     "app/insights/weekly-report/print/page.tsx": "24b27c8e88e7e677a0b3c4e70cdf251728eeef1b0eb44a7f46a98b61eca9d74f",
     "app/lab-reports/page.tsx": "712c2bfa940852dcf2388196186ee35de14837dc6280b02d53151f87d4f3d5a2",
     "app/layout.tsx": "71efb5d1c6004b055997a3b1aaf37727610c4e07dfb4817cf3dd7ae71182c194",
