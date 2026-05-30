@@ -333,6 +333,30 @@ function numberOrZero(value: any) {
   return n
 }
 
+function analyzedFoodLabelLooksBad(value: any) {
+  const text = String(value || '').toLowerCase()
+  return (
+    /\b(no|not)\s+(visible\s+)?food\b/.test(text) ||
+    /\bnot\s+(a\s+)?food\b/.test(text) ||
+    /\bnon[-\s]?food\b/.test(text) ||
+    /\b(cannot|can't|could not|unable to)\s+(identify|detect|find)\s+(any\s+)?food\b/.test(text)
+  )
+}
+
+function analyzedFoodHasNutrition(value: any) {
+  const calories = numberOrZero(value?.calories ?? value?.calories_kcal)
+  const protein = numberOrZero(value?.protein_g ?? value?.protein)
+  const carbs = numberOrZero(value?.carbs_g ?? value?.carbs)
+  const fat = numberOrZero(value?.fat_g ?? value?.fat)
+  return calories > 5 || protein > 0.2 || carbs > 0.2 || fat > 0.2
+}
+
+function isUsableAnalyzedFood(value: any) {
+  if (!value || typeof value !== 'object') return false
+  const label = `${String(value?.name || '')} ${String(value?.serving_size || value?.description || '')}`
+  return !analyzedFoodLabelLooksBad(label) && analyzedFoodHasNutrition(value)
+}
+
 function readNutrient(n: Nutrients | null | undefined, keys: Array<keyof Nutrients>) {
   for (const key of keys) {
     const value = Number((n || {})[key])
@@ -2976,13 +3000,17 @@ export function TrackCaloriesScreen() {
         return
       }
 
-      const foundItems = Array.isArray(data?.items) ? data.items : []
+      const foundItems = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
       if (foundItems.length > 0) {
         appendItemsToFavoriteEditor(foundItems.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)))
         return
       }
 
       const summary = data?.food || data || {}
+      if (!isUsableAnalyzedFood(summary)) {
+        Alert.alert('No food detected', 'Please try again with a clear photo of food.')
+        return
+      }
       appendItemsToFavoriteEditor([
         buildFavoriteAdjustItemFromSearchFood({
           id: `photo-${Date.now()}`,
@@ -3349,7 +3377,7 @@ export function TrackCaloriesScreen() {
         return
       }
 
-      const items = Array.isArray(data?.items) ? data.items : []
+      const items = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
       if (items.length > 0) {
         let added = 0
         for (const item of items) {
@@ -3388,6 +3416,10 @@ export function TrackCaloriesScreen() {
       }
 
       const summary = data?.food || data || {}
+      if (!isUsableAnalyzedFood(summary)) {
+        Alert.alert('No food detected', 'Please try again with a clear photo of food.')
+        return
+      }
       const ok = await createFoodEntry({
         name: String(summary?.name || 'Photo analyzed meal'),
         meal,

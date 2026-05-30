@@ -408,6 +408,48 @@ const itemsCanCreateCards = (items: any[] | null | undefined): boolean => {
   return items.every(hasCardReadyNutrition);
 };
 
+const textLooksLikeNoFood = (value: any): boolean => {
+  const text = String(value || '').toLowerCase();
+  if (!text) return false;
+  return (
+    /\b(no|not)\s+(visible\s+)?food\b/.test(text) ||
+    /\bnot\s+(a\s+)?food\b/.test(text) ||
+    /\bnon[-\s]?food\b/.test(text) ||
+    /\b(cannot|can't|could not|unable to)\s+(identify|detect|find)\s+(any\s+)?food\b/.test(text) ||
+    /\bno\s+edible\s+(item|items|food)\b/.test(text)
+  );
+};
+
+const itemLooksLikeNoFood = (item: any): boolean => {
+  const label = `${String(item?.name || '')} ${String(item?.serving_size || '')}`.toLowerCase();
+  return textLooksLikeNoFood(label);
+};
+
+const resultHasMeaningfulNutrition = (resp: any): boolean => {
+  const items = Array.isArray(resp?.items) ? resp.items : [];
+  if (validateStructuredItems(items)) return true;
+
+  const total = resp?.total && typeof resp.total === 'object' ? resp.total : computeTotalsFromItems(items);
+  if (!total) return false;
+  const calories = Number(total?.calories);
+  const protein = Number(total?.protein_g ?? total?.protein);
+  const carbs = Number(total?.carbs_g ?? total?.carbs);
+  const fat = Number(total?.fat_g ?? total?.fat);
+  return (
+    (Number.isFinite(calories) && calories > 5) ||
+    (Number.isFinite(protein) && protein > 0.2) ||
+    (Number.isFinite(carbs) && carbs > 0.2) ||
+    (Number.isFinite(fat) && fat > 0.2)
+  );
+};
+
+const analysisShouldNotChargeOrSave = (resp: any, analysisText: string): boolean => {
+  const items = Array.isArray(resp?.items) ? resp.items : [];
+  const explicitlyNoFood = textLooksLikeNoFood(analysisText) || items.some(itemLooksLikeNoFood);
+  if (!explicitlyNoFood) return false;
+  return !resultHasMeaningfulNutrition(resp);
+};
+
 // Very small heuristic map to seed guessed macros when the AI misses structured items.
 const estimatedGuessMacrosForName = (nameRaw: string) => {
   const name = (nameRaw || '').toLowerCase();
@@ -3078,11 +3120,13 @@ CRITICAL REQUIREMENTS:
       return null;
     };
 
+    let primaryUsageEvent: any = null;
+
     const primary = await runCompletion(model);
     let response = primary.completion;
 
     if (imageDataUrl) {
-      logAiUsageEvent({
+      primaryUsageEvent = {
         feature: isReanalysis ? 'food:image-reanalysis' : 'food:image-analysis',
         userId: currentUser.id || null,
         userLabel: currentUser.email || null,
@@ -3099,9 +3143,9 @@ CRITICAL REQUIREMENTS:
         },
         endpoint: '/api/analyze-food',
         success: true,
-      }).catch(() => {});
+      };
     } else {
-      logAiUsageEvent({
+      primaryUsageEvent = {
         feature: isReanalysis ? 'food:text-reanalysis' : 'food:text-analysis',
         userId: currentUser.id || null,
         userLabel: currentUser.email || null,
@@ -3112,7 +3156,7 @@ CRITICAL REQUIREMENTS:
         costCents: primary.costCents,
         endpoint: '/api/analyze-food',
         success: true,
-      }).catch(() => {});
+      };
     }
 
     console.log('📋 Model Response:', {
@@ -4570,6 +4614,28 @@ CRITICAL REQUIREMENTS:
       console.log('ℹ️ Packaged mode active; secondary per-serving OpenAI call disabled to reduce usage.');
     }
 
+    if (
+      isImageAnalysis &&
+      !packagedMode &&
+      !labelScan &&
+      analysisShouldNotChargeOrSave(resp, analysisTextForFollowUp || resp.analysis || analysis)
+    ) {
+      if (primaryUsageEvent) {
+        logAiUsageEvent({
+          ...primaryUsageEvent,
+          success: false,
+          errorMessage: 'NO_FOOD_DETECTED',
+        }).catch(() => {});
+      }
+      return NextResponse.json(
+        {
+          error: 'No food could be detected in that photo. Please try again with a clear food photo.',
+          code: 'NO_FOOD_DETECTED',
+        },
+        { status: 422 },
+      );
+    }
+
     // NOTE: USDA/FatSecret database enhancement removed from AI photo analysis flow
     // These databases are still available via /api/food-data for manual ingredient lookup
     // The AI analysis works better without database interference - it provides accurate
@@ -4783,6 +4849,10 @@ CRITICAL REQUIREMENTS:
         monthlyFoodAnalysisUsed: { increment: 1 },
       } ) as any
     });
+
+    if (primaryUsageEvent) {
+      logAiUsageEvent(primaryUsageEvent).catch(() => {});
+    }
 
     if (packagedMode && Array.isArray(resp.items) && resp.items.length > 0) {
       const packagedReview = sanitizePackagedLabelItems(resp.items);
