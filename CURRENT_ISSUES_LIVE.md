@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 02:54 AM AEST
+- What changed: Fixed native iPhone Food Diary credit/AI usage display so Food Diary shows the current monthly food-analysis count and Add Ingredient keeps the already-loaded credit balance instead of briefly showing a dash.
+- Where to see it (page/link): Native iPhone app -> Food Diary -> Add Food Entry -> Add ingredient.
+- What to quickly test: Open Food Diary, confirm the AI usage line says this month, then open Add ingredient and confirm credits do not briefly change to a dash.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 02:45 AM AEST
 - What changed: Fixed the native iPhone Food Diary daily USED calories so it matches the visible meal entries instead of recalculating a higher number from macros.
 - Where to see it (page/link): Native iPhone app -> Food Diary -> Today's energy summary.
