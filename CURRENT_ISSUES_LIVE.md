@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 30 May 2026, 04:49 PM AEST
+- What changed: Fixed Talk to Helfi so a failed first AI reply attempt falls back safely instead of leaving chat stuck, and made newer AI model requests use safer settings.
+- Where to see it (page/link): https://helfi.ai/chat and native iPhone app -> More -> Talk to Helfi.
+- What to quickly test: Send a short dummy Talk to Helfi message and confirm a reply appears instead of endless waiting.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 26 May 2026, 09:22 AM AEST
 - What changed: Fixed iOS Talk to Helfi so the native app uses the live non-streaming chat reply flow instead of getting stuck on typing, and cleaned up the chat health-context query.
 - Where to see it (page/link): Native iOS app -> More -> Talk to Helfi, live server at https://helfi.ai.
