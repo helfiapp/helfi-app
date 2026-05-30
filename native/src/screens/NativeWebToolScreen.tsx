@@ -1,8 +1,10 @@
 import React, { useMemo, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
+import { useNavigation } from '@react-navigation/native'
 
 import { WebView } from 'react-native-webview'
 
+import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
 import { buildNativeWebSource } from '../lib/openNativeWebPath'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -23,12 +25,43 @@ function isAllowedInAppUrl(rawUrl: string): boolean {
   }
 }
 
+function pathForNativePage(path: string) {
+  try {
+    const parsed = new URL(path, 'https://helfi.ai')
+    return parsed.pathname
+  } catch {
+    return String(path || '').split('?')[0] || '/'
+  }
+}
+
+function titleForNativeWebUrl(rawUrl: string, fallback: string) {
+  let pathname = ''
+  try {
+    pathname = new URL(String(rawUrl || ''), 'https://helfi.ai').pathname
+  } catch {
+    pathname = String(rawUrl || '').split('?')[0] || ''
+  }
+
+  if (pathname === '/dashboard') return 'Dashboard'
+  if (pathname === '/more') return 'More'
+
+  const pages = Object.values(NATIVE_WEB_PAGES)
+    .map((page) => ({ ...page, pathname: pathForNativePage(page.path) }))
+    .filter((page) => page.pathname && page.pathname !== '/chat')
+    .sort((a, b) => b.pathname.length - a.pathname.length)
+
+  const match = pages.find((page) => pathname === page.pathname || pathname.startsWith(`${page.pathname}/`))
+  return match?.title || fallback || 'Page'
+}
+
 export function NativeWebToolScreen({ route }: { route: any }) {
+  const navigation = useNavigation<any>()
   const { session } = useAppMode()
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
 
   const requestedPath = String(route?.params?.path || '/dashboard')
+  const requestedTitle = String(route?.params?.title || 'Page')
   const source = useMemo(
     () =>
       buildNativeWebSource({
@@ -54,7 +87,8 @@ export function NativeWebToolScreen({ route }: { route: any }) {
         try {
           var style = document.createElement('style');
           style.id = 'helfi-native-webview-polish';
-          style.textContent = 'nav.fixed.bottom-0{display:none!important;}body{padding-bottom:0!important;}';
+          document.documentElement.setAttribute('data-helfi-native-webview', '1');
+          style.textContent = 'html[data-helfi-native-webview] nav.fixed.bottom-0,html[data-helfi-native-webview] nav.md\\\\:hidden.fixed.bottom-0,html[data-helfi-native-webview] div.md\\\\:hidden.fixed.bottom-0,html[data-helfi-native-webview] div.fixed.bottom-0.left-0.right-0.z-40{display:none!important;}html[data-helfi-native-webview] body{padding-bottom:0!important;}';
           document.head.appendChild(style);
           var t = '${escaped}';
           if (!t) return true;
@@ -126,6 +160,10 @@ export function NativeWebToolScreen({ route }: { route: any }) {
             onLoadStart={() => {
               setLoading(true)
               setFailed(false)
+            }}
+            onNavigationStateChange={(state) => {
+              const nextTitle = titleForNativeWebUrl(String(state?.url || ''), requestedTitle)
+              navigation.setOptions({ title: nextTitle })
             }}
             onLoadEnd={() => setLoading(false)}
             onError={() => {
