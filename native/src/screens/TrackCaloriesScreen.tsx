@@ -3045,6 +3045,8 @@ export function TrackCaloriesScreen() {
     navigation.getParent()?.navigate('AddIngredient', {
       meal,
       date: selectedDate,
+      creditsRemaining,
+      creditsPercentUsed,
     })
     setSectionMenuMeal(null)
   }

@@ -61,6 +61,8 @@ export type MainStackParamList = {
     | {
         meal?: string
         date?: string
+        creditsRemaining?: number | null
+        creditsPercentUsed?: number | null
       }
     | undefined
   FoodAnalysis: undefined

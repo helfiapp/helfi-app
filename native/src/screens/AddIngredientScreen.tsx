@@ -827,8 +827,16 @@ export function AddIngredientScreen() {
   const [error, setError] = useState('')
   const [results, setResults] = useState<SearchFoodItem[]>([])
   const [userCountry, setUserCountry] = useState('')
-  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null)
-  const [creditsPercentUsed, setCreditsPercentUsed] = useState(0)
+  const initialCreditsRemainingRaw = route.params?.creditsRemaining
+  const initialCreditsRemaining =
+    initialCreditsRemainingRaw == null ? NaN : Number(initialCreditsRemainingRaw)
+  const initialCreditsPercentUsed = Number(route.params?.creditsPercentUsed)
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(
+    Number.isFinite(initialCreditsRemaining) ? Math.max(0, Math.round(initialCreditsRemaining)) : null,
+  )
+  const [creditsPercentUsed, setCreditsPercentUsed] = useState(
+    Number.isFinite(initialCreditsPercentUsed) ? Math.max(0, Math.min(100, initialCreditsPercentUsed)) : 0,
+  )
   const [photoLoading, setPhotoLoading] = useState(false)
   const [photoPreviewUri, setPhotoPreviewUri] = useState<string | null>(null)
   const [missingReportOpen, setMissingReportOpen] = useState(false)

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { CREDIT_COSTS } from '@/lib/credit-system'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
@@ -15,34 +16,22 @@ import { logServerCall } from '@/lib/server-call-tracker'
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
 
-export async function GET(_req: NextRequest) {
-  let debugStage = 'start'
-  try {
-    const url = new URL(_req.url)
-    const featureParam = (url.searchParams.get('feature') || '').trim()
-    // Authentication: rely on standard session (same as usage‑breakdown).
-    debugStage = 'resolve-session'
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    debugStage = 'load-user'
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email },
+async function getFeatureUsageUser(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
+  if (sessionEmail) {
+    return prisma.user.findUnique({
+      where: { email: sessionEmail },
       select: {
         id: true,
-        // Monthly per‑feature counters
         monthlySymptomAnalysisUsed: true,
         monthlyFoodAnalysisUsed: true,
         monthlyMedicalImageAnalysisUsed: true,
         monthlyInteractionAnalysisUsed: true,
         monthlyInsightsGenerationUsed: true,
-        // Lifetime counters (for back‑filling old usage)
         totalAnalysisCount: true,
         totalFoodAnalysisCount: true,
         totalInteractionAnalysisCount: true,
-        // Wallet usage + subscription (for context only)
         walletMonthlyUsedCents: true,
         subscription: {
           select: {
@@ -52,9 +41,46 @@ export async function GET(_req: NextRequest) {
         },
       },
     })
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (!nativeUserId) return null
+
+  return prisma.user.findUnique({
+    where: { id: nativeUserId },
+    select: {
+      id: true,
+      monthlySymptomAnalysisUsed: true,
+      monthlyFoodAnalysisUsed: true,
+      monthlyMedicalImageAnalysisUsed: true,
+      monthlyInteractionAnalysisUsed: true,
+      monthlyInsightsGenerationUsed: true,
+      totalAnalysisCount: true,
+      totalFoodAnalysisCount: true,
+      totalInteractionAnalysisCount: true,
+      walletMonthlyUsedCents: true,
+      subscription: {
+        select: {
+          plan: true,
+          endDate: true,
+        },
+      },
+    },
+  })
+}
+
+export async function GET(_req: NextRequest) {
+  let debugStage = 'start'
+  try {
+    const url = new URL(_req.url)
+    const featureParam = (url.searchParams.get('feature') || '').trim()
+    debugStage = 'resolve-session'
+
+    debugStage = 'load-user'
+    const user = await getFeatureUsageUser(_req)
 
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     if (featureParam) {
@@ -71,9 +97,6 @@ export async function GET(_req: NextRequest) {
 
     debugStage = 'prepare-counts'
     const foodMonthly = user.monthlyFoodAnalysisUsed || 0
-    const foodLifetime = user.totalFoodAnalysisCount || 0
-    const foodLabel: 'monthly' | 'total' = foodMonthly > 0 ? 'monthly' : 'total'
-    const actualFoodUsage = foodLabel === 'monthly' ? foodMonthly : foodLifetime
 
     const symptomMonthly = user.monthlySymptomAnalysisUsed || 0
     const symptomAnalysisLifetime = Math.max(
@@ -112,9 +135,9 @@ export async function GET(_req: NextRequest) {
         label: symptomLabel,
       },
       foodAnalysis: {
-        count: actualFoodUsage,
+        count: foodMonthly,
         costPerUse: CREDIT_COSTS.FOOD_ANALYSIS,
-        label: foodLabel,
+        label: 'monthly',
       },
       interactionAnalysis: {
         count: interactionMonthly > 0 ? interactionMonthly : interactionLifetime,
