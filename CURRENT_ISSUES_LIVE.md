@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 03:23 AM AEST
+- What changed: Fixed native iPhone Health Intake so completed users open the saved review/edit page instead of restarting at the first question, and the Dashboard Health Setup card now matches the real setup state.
+- Where to see it (page/link): Native iPhone app -> Dashboard -> Health Setup, and More -> Health Intake.
+- What to quickly test: With a completed health profile, open Health Intake and confirm it opens the Review step; check Dashboard no longer says Health Setup is required when it is complete.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 03:14 AM AEST
 - What changed: Fixed native iPhone embedded web tools so the web page bottom menu is hidden inside the app, and the top title updates when the embedded page changes.
 - Where to see it (page/link): Native iPhone app -> More -> Health Intake / Symptom Analysis / other embedded tools.
