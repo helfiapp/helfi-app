@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 03:32 AM AEST
+- What changed: Fixed web Insights so it checks Health Setup fresh before showing any real insights, preventing stale cached data from unlocking Insights when setup is incomplete.
+- Where to see it (page/link): https://helfi.ai/insights
+- What to quickly test: With an incomplete Health Setup account, open Insights and confirm it shows the “Finish your Health Setup” lock screen instead of real insights.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 03:23 AM AEST
 - What changed: Fixed native iPhone Health Intake so completed users open the saved review/edit page instead of restarting at the first question, and the Dashboard Health Setup card now matches the real setup state.
 - Where to see it (page/link): Native iPhone app -> Dashboard -> Health Setup, and More -> Health Intake.
