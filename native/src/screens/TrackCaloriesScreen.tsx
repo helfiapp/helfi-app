@@ -6626,7 +6626,7 @@ const modalBackdrop = {
 
 const modalCard = {
   width: '100%' as const,
-  backgroundColor: '#fff',
+  backgroundColor: theme.colors.card,
   borderRadius: 14,
   borderWidth: 1,
   borderColor: theme.colors.border,
@@ -6635,7 +6635,7 @@ const modalCard = {
 
 const modalCardLarge = {
   width: '100%' as const,
-  backgroundColor: '#fff',
+  backgroundColor: theme.colors.card,
   borderRadius: 14,
   borderWidth: 1,
   borderColor: theme.colors.border,

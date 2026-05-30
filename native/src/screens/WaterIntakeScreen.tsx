@@ -624,16 +624,16 @@ export function WaterIntakeScreen() {
                       borderRadius: 10,
                       paddingHorizontal: 12,
                       paddingVertical: 10,
-                      backgroundColor: selected ? '#E8F5EB' : '#FBFDFC',
+                      backgroundColor: selected ? theme.colors.primary : theme.colors.card,
                       minWidth: 78,
                       alignItems: 'center',
                     },
                   ]}
                 >
-                  <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontWeight: '900' }}>
+                  <Text style={{ color: selected ? theme.colors.primaryText : theme.colors.text, fontWeight: '900' }}>
                     {formatNumber(preset.amount)}
                   </Text>
-                  <Text style={{ color: selected ? theme.colors.primary : theme.colors.muted, fontSize: 11 }}>
+                  <Text style={{ color: selected ? theme.colors.primaryText : theme.colors.muted, fontSize: 11 }}>
                     {preset.unit === 'l' ? 'L' : preset.unit}
                   </Text>
                 </Pressable>
@@ -918,7 +918,7 @@ const modalBackdrop = {
 
 const modalCard = {
   width: '100%' as const,
-  backgroundColor: '#fff',
+  backgroundColor: theme.colors.card,
   borderRadius: 14,
   borderWidth: 1,
   borderColor: theme.colors.border,
@@ -927,7 +927,7 @@ const modalCard = {
 
 const modalCardLarge = {
   width: '100%' as const,
-  backgroundColor: '#fff',
+  backgroundColor: theme.colors.card,
   borderRadius: 14,
   borderWidth: 1,
   borderColor: theme.colors.border,

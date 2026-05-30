@@ -17,7 +17,7 @@ export default function App() {
     <SafeAreaProvider>
       <AppModeProvider>
         <RootNavigator />
-        <StatusBar style="dark" />
+        <StatusBar style="auto" />
       </AppModeProvider>
     </SafeAreaProvider>
   )
