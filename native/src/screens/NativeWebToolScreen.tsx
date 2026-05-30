@@ -62,22 +62,33 @@ export function NativeWebToolScreen({ route }: { route: any }) {
 
   const requestedPath = String(route?.params?.path || '/dashboard')
   const requestedTitle = String(route?.params?.title || 'Page')
+  const webViewKey = `${session?.user?.id || 'signed-out'}:${requestedPath}`
+  const requestedPathWithFreshLoad = useMemo(() => {
+    const joiner = requestedPath.includes('?') ? '&' : '?'
+    return `${requestedPath}${joiner}nativeLoad=${Date.now()}`
+  }, [requestedPath, session?.token])
   const source = useMemo(
     () =>
       buildNativeWebSource({
         token: session?.token,
-        path: requestedPath,
+        path: requestedPathWithFreshLoad,
       }),
-    [requestedPath, session?.token],
+    [requestedPathWithFreshLoad, session?.token],
   )
 
   const hasNativeToken = String(session?.token || '').trim().length > 0
 
   const injectedSetupScript = useMemo(() => {
+    const userId = String(session?.user?.id || 'signed-out')
+      .trim()
+      .replace(/^"+|"+$/g, '')
     const token = String(session?.token || '')
       .trim()
       .replace(/^"+|"+$/g, '')
 
+    const escapedUserId = userId
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
     const escaped = token
       .replace(/\\/g, '\\\\')
       .replace(/'/g, "\\'")
@@ -90,8 +101,22 @@ export function NativeWebToolScreen({ route }: { route: any }) {
           document.documentElement.setAttribute('data-helfi-native-webview', '1');
           style.textContent = 'html[data-helfi-native-webview] nav.fixed.bottom-0,html[data-helfi-native-webview] nav.md\\\\:hidden.fixed.bottom-0,html[data-helfi-native-webview] div.md\\\\:hidden.fixed.bottom-0,html[data-helfi-native-webview] div.fixed.bottom-0.left-0.right-0.z-40{display:none!important;}html[data-helfi-native-webview] body{padding-bottom:0!important;}';
           document.head.appendChild(style);
+          try {
+            var userMarker = 'helfi:native-webview-user-id';
+            var currentUserId = '${escapedUserId}';
+            if (window.localStorage.getItem(userMarker) !== currentUserId) {
+              window.sessionStorage.clear();
+              window.localStorage.clear();
+              window.localStorage.setItem(userMarker, currentUserId);
+            }
+          } catch (e) {}
           var t = '${escaped}';
           if (!t) return true;
+          var names = ['next-auth.session-token', '__Secure-next-auth.session-token', 'authjs.session-token', '__Secure-authjs.session-token'];
+          names.forEach(function(name) {
+            document.cookie = name + '=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax';
+            document.cookie = name + '=; path=/; domain=.helfi.ai; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax';
+          });
           var maxAge = 60 * 60 * 24 * 30;
           var base = '; path=/; secure; samesite=lax; max-age=' + maxAge;
           document.cookie = 'next-auth.session-token=' + t + base;
@@ -155,6 +180,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
           </View>
         ) : (
           <WebView
+            key={webViewKey}
             source={source}
             injectedJavaScriptBeforeContentLoaded={injectedSetupScript}
             onLoadStart={() => {
@@ -196,6 +222,8 @@ export function NativeWebToolScreen({ route }: { route: any }) {
             }}
             sharedCookiesEnabled
             thirdPartyCookiesEnabled
+            incognito
+            cacheEnabled={false}
             setSupportMultipleWindows={false}
             javaScriptEnabled
             domStorageEnabled

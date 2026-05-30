@@ -14,14 +14,14 @@ export type RootStackParamList = {
 const Stack = createNativeStackNavigator<RootStackParamList>()
 
 export function RootNavigator() {
-  const { hydrated, mode } = useAppMode()
+  const { hydrated, mode, session } = useAppMode()
 
   // Don't mount the navigator until we've loaded session state.
   // If we render a navigator with zero screens, React Navigation will crash.
   if (!hydrated) return null
 
   return (
-    <NavigationContainer>
+    <NavigationContainer key={`${mode}:${session?.user?.id || 'signed-out'}`}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {mode === 'signedOut' ? <Stack.Screen name="Auth" component={AuthNavigator} /> : <Stack.Screen name="Main" component={MainNavigator} />}
       </Stack.Navigator>

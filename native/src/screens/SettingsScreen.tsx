@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native'
+import { Alert, Appearance, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Feather } from '@expo/vector-icons'
 
@@ -95,7 +95,11 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           AsyncStorage.getItem(STORAGE_KEYS.dataAnalytics),
         ])
 
-        if (savedDark !== null) setDarkMode(savedDark === 'true')
+        if (savedDark !== null) {
+          const shouldUseDarkMode = savedDark === 'true'
+          setDarkMode(shouldUseDarkMode)
+          Appearance.setColorScheme(shouldUseDarkMode ? 'dark' : 'light')
+        }
         if (savedHaptics !== null) setHapticsEnabled(savedHaptics === 'true')
         if (savedVisibility === 'private' || savedVisibility === 'public' || savedVisibility === 'friends') {
           setProfileVisibility(savedVisibility)
@@ -113,6 +117,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 
   useEffect(() => {
     if (!localLoaded) return
+    Appearance.setColorScheme(darkMode ? 'dark' : 'light')
     void AsyncStorage.setItem(STORAGE_KEYS.darkMode, darkMode ? 'true' : 'false')
   }, [darkMode, localLoaded])
 

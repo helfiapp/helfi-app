@@ -5070,22 +5070,22 @@ export function TrackCaloriesScreen() {
             <Text style={{ color: '#6B7280', marginTop: 4 }}>What would you like to do?</Text>
 
             <View style={{ marginTop: 14, gap: 10 }}>
-              <Pressable onPress={() => favoriteActionItem && void addFavoriteToDiary(favoriteActionItem)} style={primaryButton}>
-                <Text style={primaryButtonText}>Add to diary</Text>
+              <Pressable onPress={() => favoriteActionItem && void addFavoriteToDiary(favoriteActionItem)} style={favoriteActionPrimaryButton}>
+                <Text style={favoriteActionPrimaryText}>Add to diary</Text>
               </Pressable>
-              <Pressable onPress={() => favoriteActionItem && openFavoritePreview(favoriteActionItem)} style={secondaryButton}>
-                <Text style={secondaryButtonText}>Preview</Text>
+              <Pressable onPress={() => favoriteActionItem && openFavoritePreview(favoriteActionItem)} style={favoriteActionSecondaryButton}>
+                <Text style={favoriteActionSecondaryText}>Preview</Text>
               </Pressable>
-              <Pressable onPress={() => favoriteActionItem && openFavoriteAdjust(favoriteActionItem)} style={secondaryButton}>
-                <Text style={secondaryButtonText}>Change portion</Text>
+              <Pressable onPress={() => favoriteActionItem && openFavoriteAdjust(favoriteActionItem)} style={favoriteActionSecondaryButton}>
+                <Text style={favoriteActionSecondaryText}>Change portion</Text>
               </Pressable>
               {favoriteActionItem && buildFavoriteAdjustItems(favoriteActionItem).length > 1 ? (
-                <Pressable onPress={() => void shareFavoriteItem(favoriteActionItem)} style={primaryButton}>
-                  <Text style={primaryButtonText}>Share meal</Text>
+                <Pressable onPress={() => void shareFavoriteItem(favoriteActionItem)} style={favoriteActionPrimaryButton}>
+                  <Text style={favoriteActionPrimaryText}>Share meal</Text>
                 </Pressable>
               ) : null}
-              <Pressable onPress={() => setFavoriteActionItem(null)} style={secondaryButton}>
-                <Text style={secondaryButtonText}>Cancel</Text>
+              <Pressable onPress={() => setFavoriteActionItem(null)} style={favoriteActionSecondaryButton}>
+                <Text style={favoriteActionSecondaryText}>Cancel</Text>
               </Pressable>
             </View>
           </View>
@@ -6717,6 +6717,40 @@ const secondaryButton = {
 const secondaryButtonText = {
   color: theme.colors.text,
   fontWeight: '800' as const,
+}
+
+const favoriteActionPrimaryButton = {
+  minHeight: 46,
+  borderRadius: 10,
+  backgroundColor: theme.colors.primary,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+}
+
+const favoriteActionPrimaryText = {
+  color: theme.colors.primaryText,
+  fontWeight: '900' as const,
+  fontSize: 15,
+}
+
+const favoriteActionSecondaryButton = {
+  minHeight: 46,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: theme.colors.border,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 14,
+  paddingVertical: 12,
+  backgroundColor: theme.colors.card,
+}
+
+const favoriteActionSecondaryText = {
+  color: theme.colors.text,
+  fontWeight: '800' as const,
+  fontSize: 15,
 }
 
 const miniPrimaryButton = {

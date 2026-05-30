@@ -3,9 +3,9 @@ import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/re
 
 export const CREDIT_DISPLAY = {
   foodAnalysis: 10,
-  symptomAnalysis: 6,
-  medicalImageAnalysis: 8,
-  insightsGeneration: 8,
+  symptomAnalysis: 1,
+  medicalImageAnalysis: 2,
+  insightsGeneration: 7,
   chatLight: 10,
   aiMealRecommendation: AI_MEAL_RECOMMENDATION_CREDITS,
   recipeImportUrl: RECIPE_IMPORT_URL_CREDITS,

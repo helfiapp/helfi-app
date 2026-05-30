@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 
 export const dynamic = 'force-dynamic'
@@ -97,9 +98,28 @@ function getRangeFromRequest(req: NextRequest): { key: RangeKey; start: Date | n
   return { error: 'Invalid range. Use range=7d|1m|2m|6m|all|custom.' }
 }
 
-export async function GET(req: NextRequest) {
+async function getUsageUserId(req: NextRequest): Promise<string | null> {
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) return nativeUserId
+
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  if (typeof session?.user?.id === 'string' && session.user.id) return session.user.id
+
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
+  if (sessionEmail) {
+    const user = await prisma.user.findUnique({
+      where: { email: sessionEmail },
+      select: { id: true },
+    })
+    if (user?.id) return user.id
+  }
+
+  return null
+}
+
+export async function GET(req: NextRequest) {
+  const userId = await getUsageUserId(req)
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -109,7 +129,7 @@ export async function GET(req: NextRequest) {
   }
 
   const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
+    where: { id: userId },
     select: {
       totalFoodAnalysisCount: true,
       monthlyFoodAnalysisUsed: true,
@@ -117,7 +137,7 @@ export async function GET(req: NextRequest) {
   })
 
   const where: any = {
-    userId: session.user.id,
+    userId,
     success: true,
   }
   if (range.start && range.end) {
@@ -141,7 +161,7 @@ export async function GET(req: NextRequest) {
   // Food "times used" should match what the user experiences (including cached results),
   // not just the number of AI calls. The most reliable proxy we have today is FoodLog
   // creation count in the selected time window.
-  const foodLogWhere: any = { userId: session.user.id }
+  const foodLogWhere: any = { userId }
   if (range.start && range.end) {
     foodLogWhere.createdAt = { gte: range.start, lte: range.end }
   } else if (range.start) {
@@ -153,7 +173,7 @@ export async function GET(req: NextRequest) {
   foodLogWhere.OR = [{ nutrients: { not: null } }, { items: { not: null } }, { imageUrl: { not: null } }]
   const foodLogCount = await prisma.foodLog.count({ where: foodLogWhere }).catch(async () => {
     // Fallback: count all food logs if JSON filtering isn't supported on this DB version.
-    const fallbackWhere: any = { userId: session.user.id }
+    const fallbackWhere: any = { userId }
     if (foodLogWhere.createdAt) fallbackWhere.createdAt = foodLogWhere.createdAt
     return prisma.foodLog.count({ where: fallbackWhere })
   })

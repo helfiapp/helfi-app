@@ -29,12 +29,34 @@ const AppModeContext = createContext<AppModeContextValue | null>(null)
 
 const AUTH_SESSION_KEY = 'helfi_auth_session_v1'
 const REMEMBER_ME_HOURS = 24
+const KEEP_ON_SIGN_OUT_KEYS = new Set(['helfi_has_seen_splash_v1'])
 
 type StoredAuthSession = {
   mode: AppMode
   expiresAt: number
   token: string
   user: NativeAuthUser
+}
+
+async function clearStoredAccountData() {
+  try {
+    const keys = await AsyncStorage.getAllKeys()
+    const accountKeys = keys.filter((key) => {
+      if (key === AUTH_SESSION_KEY || KEEP_ON_SIGN_OUT_KEYS.has(key)) return false
+      return (
+        key.startsWith('helfi_') ||
+        key.startsWith('helfi:') ||
+        key.startsWith('quietHours') ||
+        key === 'profileVisibility' ||
+        key === 'dataAnalytics'
+      )
+    })
+    if (accountKeys.length) {
+      await AsyncStorage.multiRemove(accountKeys)
+    }
+  } catch {
+    // Best effort only. The auth session still clears below.
+  }
 }
 
 export function AppModeProvider({ children }: { children: React.ReactNode }) {
@@ -58,6 +80,7 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
 
         if (Date.now() > stored.expiresAt) {
           await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+          await clearStoredAccountData()
           return
         }
 
@@ -69,6 +92,7 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
         // If storage is corrupted, just fall back to signed out.
         try {
           await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+          await clearStoredAccountData()
         } catch {}
       }
     }
@@ -83,6 +107,8 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   }, [])
 
   const signIn = async ({ rememberMe, session }: { rememberMe: boolean; session: NativeAuthSession }) => {
+    await clearStoredAccountData()
+
     setMode('signedIn')
     setSession(session)
 
@@ -114,6 +140,7 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
     setSession(null)
     try {
       await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+      await clearStoredAccountData()
     } catch {}
   }
 

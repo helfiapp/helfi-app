@@ -1,10 +1,10 @@
 import React from 'react'
-import { Pressable, Text, View } from 'react-native'
+import { Pressable, Text, useColorScheme, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
-import { theme } from '../ui/theme'
+import { getThemeColors, theme } from '../ui/theme'
 
 export type NativeBottomNavKey = 'Dashboard' | 'Insights' | 'Food' | 'More' | 'Settings'
 
@@ -43,6 +43,7 @@ const items: Array<{
 export function NativeBottomNav({ active }: { active?: NativeBottomNavKey }) {
   const navigation = useNavigation<any>()
   const insets = useSafeAreaInsets()
+  const colors = getThemeColors(useColorScheme())
 
   const goToTab = (screen: NativeBottomNavKey) => {
     navigation.navigate('Tabs', { screen })
@@ -54,8 +55,8 @@ export function NativeBottomNav({ active }: { active?: NativeBottomNavKey }) {
         flexDirection: 'row',
         alignItems: 'center',
         borderTopWidth: 1,
-        borderTopColor: theme.colors.border,
-        backgroundColor: theme.colors.card,
+        borderTopColor: colors.border,
+        backgroundColor: colors.card,
         paddingTop: 4,
         paddingBottom: Math.max(insets.bottom - 8, 4),
         paddingHorizontal: 16,
@@ -63,7 +64,7 @@ export function NativeBottomNav({ active }: { active?: NativeBottomNavKey }) {
     >
       {items.map((item) => {
         const isActive = active === item.key
-        const color = isActive ? theme.colors.primary : theme.colors.muted
+        const color = isActive ? colors.primary : colors.muted
 
         return (
           <Pressable

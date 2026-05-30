@@ -1,4 +1,5 @@
 import React from 'react'
+import { useColorScheme } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
@@ -8,7 +9,7 @@ import { InsightsScreen } from '../screens/InsightsScreen'
 import { MoreScreen } from '../screens/MoreScreen'
 import { SettingsScreen } from '../screens/SettingsScreen'
 import { TrackCaloriesScreen } from '../screens/TrackCaloriesScreen'
-import { theme } from '../ui/theme'
+import { getThemeColors, theme } from '../ui/theme'
 
 export type MainTabParamList = {
   Dashboard: undefined
@@ -21,21 +22,23 @@ export type MainTabParamList = {
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
 export function MainTabs() {
+  const colors = getThemeColors(useColorScheme())
+
   return (
     <Tab.Navigator
       initialRouteName="Food"
       screenOptions={{
-        headerStyle: { backgroundColor: theme.colors.card },
-        headerTitleStyle: { color: theme.colors.text },
+        headerStyle: { backgroundColor: colors.card },
+        headerTitleStyle: { color: colors.text },
         tabBarStyle: {
-          backgroundColor: theme.colors.card,
-          borderTopColor: theme.colors.border,
+          backgroundColor: colors.card,
+          borderTopColor: colors.border,
           paddingHorizontal: 14,
           paddingTop: 2,
           paddingBottom: 0,
         },
-        tabBarActiveTintColor: theme.colors.primary,
-        tabBarInactiveTintColor: theme.colors.muted,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontWeight: '800', fontSize: theme.fontSize.navLabel },
       }}
     >

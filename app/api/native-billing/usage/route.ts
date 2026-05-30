@@ -68,6 +68,15 @@ function getRangeFromRequest(req: NextRequest): { key: RangeKey; start: Date | n
 }
 
 async function getBillingUser(request: NextRequest): Promise<BillingUser | null> {
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (nativeUserId) {
+    const user = await prisma.user.findUnique({
+      where: { id: nativeUserId },
+      select: { id: true, email: true },
+    })
+    if (user?.id && user?.email) return user
+  }
+
   const session = await getServerSession(authOptions)
   const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
   if (sessionEmail) {
@@ -78,15 +87,7 @@ async function getBillingUser(request: NextRequest): Promise<BillingUser | null>
     if (user?.id && user?.email) return user
   }
 
-  const nativeUserId = await getUserIdFromNativeAuth(request)
-  if (!nativeUserId) return null
-
-  const user = await prisma.user.findUnique({
-    where: { id: nativeUserId },
-    select: { id: true, email: true },
-  })
-  if (!user?.id || !user?.email) return null
-  return user
+  return null
 }
 
 export async function GET(request: NextRequest) {
@@ -120,6 +121,29 @@ export async function GET(request: NextRequest) {
         scanId: true,
         runId: true,
       },
+    })
+
+    const billingUser = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: {
+        totalFoodAnalysisCount: true,
+        monthlyFoodAnalysisUsed: true,
+      },
+    })
+
+    const foodLogWhere: any = { userId: user.id }
+    if (range.start && range.end) {
+      foodLogWhere.createdAt = { gte: range.start, lte: range.end }
+    } else if (range.start) {
+      foodLogWhere.createdAt = { gte: range.start }
+    } else if (range.end) {
+      foodLogWhere.createdAt = { lte: range.end }
+    }
+    foodLogWhere.OR = [{ nutrients: { not: null } }, { items: { not: null } }, { imageUrl: { not: null } }]
+    const foodLogCount = await prisma.foodLog.count({ where: foodLogWhere }).catch(async () => {
+      const fallbackWhere: any = { userId: user.id }
+      if (foodLogWhere.createdAt) fallbackWhere.createdAt = foodLogWhere.createdAt
+      return prisma.foodLog.count({ where: fallbackWhere })
     })
 
     const foodActionIds = new Set<string>()
@@ -172,7 +196,15 @@ export async function GET(request: NextRequest) {
         end: range.end ? range.end.toISOString() : null,
       },
       usage: {
-        foodAnalysis: foodActionIds.size,
+        foodAnalysis:
+          range.key === 'all'
+            ? Math.max(
+                Number(foodLogCount || 0),
+                Number(billingUser?.totalFoodAnalysisCount || 0),
+                Number(billingUser?.monthlyFoodAnalysisUsed || 0),
+                Number(foodActionIds.size || 0)
+              )
+            : Math.max(Number(foodLogCount || 0), Number(foodActionIds.size || 0)),
         symptomAnalysis,
         medicalImageAnalysis,
         insightsGeneration: insightsRunIds.size + insightsLanding,

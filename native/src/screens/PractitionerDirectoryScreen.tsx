@@ -2,6 +2,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  Keyboard,
   Linking,
   Modal,
   Pressable,
@@ -827,7 +828,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
 
   return (
     <Screen>
-      <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
+      <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ gap: 10 }}>
           <Text style={{ fontSize: 28, fontWeight: '900', color: theme.colors.text }}>
             Your health, simplified and within reach.
@@ -906,6 +907,11 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
               onChangeText={setQuery}
               placeholder="Name, symptom, or category"
               autoCapitalize="none"
+              returnKeyType="search"
+              onSubmitEditing={() => {
+                Keyboard.dismiss()
+                void runSearch()
+              }}
               style={{
                 borderWidth: 1,
                 borderColor: theme.colors.border,
@@ -946,6 +952,11 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 value={locationQuery}
                 onChangeText={setLocationQuery}
                 placeholder="City or suburb"
+                returnKeyType="search"
+                onSubmitEditing={() => {
+                  Keyboard.dismiss()
+                  void handleLocationSearch()
+                }}
                 style={{
                   flex: 1,
                   borderWidth: 1,
@@ -961,6 +972,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
               />
               <Pressable
                 onPress={() => {
+                  Keyboard.dismiss()
                   void handleLocationSearch()
                 }}
                 style={{
@@ -1064,6 +1076,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
 
             <Pressable
               onPress={() => {
+                Keyboard.dismiss()
                 void runSearch()
               }}
               style={{
