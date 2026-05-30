@@ -904,10 +904,10 @@ export function DashboardScreen() {
 
             <WideActionCard
               title="Health Setup"
-              subtitle="Required to unlock daily check-ins and reports."
+              subtitle={healthSetupComplete ? 'Review or update your saved health profile.' : 'Required to unlock daily check-ins and reports.'}
               icon={<Feather name="clipboard" size={18} color="#4F86E6" />}
               accentColor="#4F86E6"
-              actionLabel="Continue"
+              actionLabel={healthSetupComplete ? 'Review' : 'Continue'}
               onPress={goToHealthSetup}
             />
 
