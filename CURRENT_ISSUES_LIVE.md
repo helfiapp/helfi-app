@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 02:45 AM AEST
+- What changed: Fixed the native iPhone Food Diary daily USED calories so it matches the visible meal entries instead of recalculating a higher number from macros.
+- Where to see it (page/link): Native iPhone app -> Food Diary -> Today's energy summary.
+- What to quickly test: Add 100g Walnuts to Breakfast and confirm the USED calories match the visible Breakfast total unless another food item is clearly shown.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 02:36 AM AEST
 - What changed: Fixed the Food Diary photo-analysis failure path so “no food”/failed photo results do not charge credits, do not count usage, and are not saved as bad diary entries.
 - Where to see it (page/link): Native iPhone app -> Food Diary -> Add Food Entry -> Photo Library / Camera; live server at https://helfi.ai/api/analyze-food.
