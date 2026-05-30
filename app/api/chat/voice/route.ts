@@ -1158,6 +1158,54 @@ const ensureFoodMealOptionsPayload = async (params: {
 }
 // PROTECTED: FOOD_CHAT_STRUCTURED_MEAL_PAYLOAD_ENFORCER END
 
+const uniqueModels = (...models: Array<string | null | undefined>) =>
+  Array.from(new Set(models.map((modelName) => String(modelName || '').trim()).filter(Boolean)))
+
+const runVoiceCompletionWithFallback = async (params: {
+  openai: OpenAI
+  model: string
+  fallbackModel: string
+  messages: any[]
+  maxTokens: number
+}) => {
+  let lastError: any = null
+  let lastWrapped: Awaited<ReturnType<typeof chatCompletionWithCost>> | null = null
+  let lastModel = ''
+
+  for (const modelName of uniqueModels(params.model, params.fallbackModel, 'gpt-4o')) {
+    try {
+      const wrapped = await chatCompletionWithCost(params.openai, {
+        model: modelName,
+        messages: params.messages,
+        max_tokens: params.maxTokens,
+        temperature: 0.3,
+      } as any)
+      lastWrapped = wrapped
+      lastModel = modelName
+      const assistantMessage = extractAssistantContent(wrapped.completion.choices?.[0]?.message)
+      if (assistantMessage) {
+        return { wrapped, assistantMessage, usedModel: modelName }
+      }
+    } catch (error: any) {
+      lastError = error
+      console.warn('[voice-chat] model failed, trying fallback', {
+        model: modelName,
+        message: String(error?.message || error || ''),
+      })
+    }
+  }
+
+  if (lastWrapped) {
+    return {
+      wrapped: lastWrapped,
+      assistantMessage: 'I apologize, but I could not generate a response.',
+      usedModel: lastModel || params.fallbackModel || params.model,
+    }
+  }
+
+  throw lastError || new Error('AI response failed')
+}
+
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
@@ -1381,32 +1429,16 @@ export async function POST(req: NextRequest) {
     const maxTokens = isFoodChat ? 900 : 500
 
     if (wantsStream) {
-      let usedModel = model
-      let wrapped = await chatCompletionWithCost(openai, {
+      const completionResult = await runVoiceCompletionWithFallback({
+        openai,
         model,
+        fallbackModel,
         messages: chatMessages,
-        max_tokens: maxTokens,
-        temperature: 0.3,
-      } as any)
-
-      let assistantMessage = extractAssistantContent(wrapped.completion.choices?.[0]?.message)
-      if (!assistantMessage) {
-        const retry = await chatCompletionWithCost(openai, {
-          model: fallbackModel,
-          messages: chatMessages,
-          max_tokens: maxTokens,
-          temperature: 0.3,
-        } as any)
-        const retryMessage = extractAssistantContent(retry.completion.choices?.[0]?.message)
-        if (retryMessage) {
-          wrapped = retry
-          assistantMessage = retryMessage
-          usedModel = fallbackModel
-        }
-      }
-      if (!assistantMessage) {
-        assistantMessage = 'I apologize, but I could not generate a response.'
-      }
+        maxTokens,
+      })
+      const wrapped = completionResult.wrapped
+      const usedModel = completionResult.usedModel
+      let assistantMessage = completionResult.assistantMessage
       let structuredExtraCostCents = 0
       const chargedCents = shouldCharge ? (allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS) : 0
       if (shouldCharge) {
@@ -1488,15 +1520,15 @@ export async function POST(req: NextRequest) {
       })
     } else {
       // Non-streaming
-      let usedModel = model
-      let wrapped = await chatCompletionWithCost(openai, {
+      const completionResult = await runVoiceCompletionWithFallback({
+        openai,
         model,
+        fallbackModel,
         messages: chatMessages,
-        max_tokens: maxTokens,
-        temperature: 0.3,
+        maxTokens,
       })
-
-      const apiCostCents = wrapped.costCents * 2
+      const wrapped = completionResult.wrapped
+      const usedModel = completionResult.usedModel
       const chargedCents = shouldCharge ? (allowViaFreeUse ? 0 : VOICE_CHAT_COST_CENTS) : 0
       if (shouldCharge) {
         if (!allowViaFreeUse) {
@@ -1517,24 +1549,7 @@ export async function POST(req: NextRequest) {
         await markThreadCharged(threadId)
       }
 
-      let assistantMessage = extractAssistantContent(wrapped.completion.choices?.[0]?.message)
-      if (!assistantMessage) {
-        const retry = await chatCompletionWithCost(openai, {
-          model: fallbackModel,
-          messages: chatMessages,
-          max_tokens: maxTokens,
-          temperature: 0.3,
-        })
-        const retryMessage = extractAssistantContent(retry.completion.choices?.[0]?.message)
-        if (retryMessage) {
-          wrapped = retry
-          assistantMessage = retryMessage
-          usedModel = fallbackModel
-        }
-      }
-      if (!assistantMessage) {
-        assistantMessage = 'I apologize, but I could not generate a response.'
-      }
+      let assistantMessage = completionResult.assistantMessage
       let structuredExtraCostCents = 0
       // PROTECTED: FOOD_CHAT_MEAL_PAYLOAD_ENRICH_NON_STREAM START
       if (isFoodChat && assistantMessage) {

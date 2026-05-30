@@ -62,6 +62,7 @@ export async function chatCompletionWithCost(
     const maxCompletionTokens = Number((params as any).max_completion_tokens)
     const next: any = { ...params }
     delete next.max_tokens
+    delete next.temperature
     if (Number.isFinite(maxCompletionTokens) && maxCompletionTokens > 0) {
       next.max_completion_tokens = maxCompletionTokens
     } else if (Number.isFinite(maxTokens) && maxTokens > 0) {
@@ -143,6 +144,5 @@ function extractPromptText(messages: any[]): string {
     return '';
   }
 }
-
 
 
