@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 03:14 AM AEST
+- What changed: Fixed native iPhone embedded web tools so the web page bottom menu is hidden inside the app, and the top title updates when the embedded page changes.
+- Where to see it (page/link): Native iPhone app -> More -> Health Intake / Symptom Analysis / other embedded tools.
+- What to quickly test: Open Health Intake, tap through to another embedded tool, and confirm there is only one bottom menu and the top title matches the page.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 03:03 AM AEST
 - What changed: Fixed native iPhone dark-mode readability for Food Diary-related controls by making Water Intake quick-add boxes, Food Diary barcode/modal cards, and the native status bar use dark-mode-safe colors.
 - Where to see it (page/link): Native iPhone app -> Food Diary -> Add Food Entry -> Log Water Intake / Barcode Scanner.
