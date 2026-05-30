@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 03:40 AM AEST
+- What changed: Fixed weekly Insights report dates so if a latest report is ready but the stored next due date is in the past, Helfi moves the next due date forward before showing it.
+- Where to see it (page/link): https://helfi.ai/insights and native iPhone app -> Insights.
+- What to quickly test: Open Insights with a ready weekly report and confirm “Next report due” is not an old date.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 03:32 AM AEST
 - What changed: Fixed web Insights so it checks Health Setup fresh before showing any real insights, preventing stale cached data from unlocking Insights when setup is incomplete.
 - Where to see it (page/link): https://helfi.ai/insights
