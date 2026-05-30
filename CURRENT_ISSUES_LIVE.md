@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 03:03 AM AEST
+- What changed: Fixed native iPhone dark-mode readability for Food Diary-related controls by making Water Intake quick-add boxes, Food Diary barcode/modal cards, and the native status bar use dark-mode-safe colors.
+- Where to see it (page/link): Native iPhone app -> Food Diary -> Add Food Entry -> Log Water Intake / Barcode Scanner.
+- What to quickly test: Turn on dark mode, open Water Intake quick add and Barcode Scanner, and confirm button labels are clearly readable.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 02:54 AM AEST
 - What changed: Fixed native iPhone Food Diary credit/AI usage display so Food Diary shows the current monthly food-analysis count and Add Ingredient keeps the already-loaded credit balance instead of briefly showing a dash.
 - Where to see it (page/link): Native iPhone app -> Food Diary -> Add Food Entry -> Add ingredient.
