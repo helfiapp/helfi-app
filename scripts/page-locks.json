@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-30T17:36:00.000Z",
+  "generatedAt": "2026-05-30T17:44:00.000Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -21,7 +21,7 @@
     "app/auth/verify/page.tsx": "4484741c404ec0a4c8f49f5a25e3796fdf552890d44e4cad90aef39ed9e172a8",
     "app/billing/page.tsx": "457eb1dc8da5e2e2ab855db7a92785c5c00443cc9201d60af243215138aed8b1",
     "app/chat-log/page.tsx": "5d54b26075055e317bb3c49807be770b2e31421d86c75ddaacc698ebdebdcc5b",
-    "app/chat/page.tsx": "90ac98b0fee3be166d3775f88d3de0bd9d46bff0766b1844f723671301023a24",
+    "app/chat/page.tsx": "e3fd7f9eca1ce655b5ab4d3a9269c9c5cb18b790f6904d6b1622f145087e92ae",
     "app/check-in/history/page.tsx": "c1830f4526aedd27903a78bebece13d3c3298bea3e84c5899a1cef61ad026e77",
     "app/check-in/page.tsx": "86e99a2ec36f60f24dea1d02d7a3818c2e59d104db285ce175a596c978dc2b97",
     "app/dashboard/page.tsx": "9818c214811b847947f1636842f55851b89e9690cd793674ca52775c38ebeac7",
@@ -194,10 +194,10 @@
     "components/SolidMacroRing.tsx": "c3c6e3f07fafd237fa4dcd498b024ac48e48c2ebd23a64c924aab253590fedaa",
     "components/support/SupportChatWidget.tsx": "2f6316a0cfdd832bb7e71d4de51a18cf2a2e84aba575262e291d646ec84165f5",
     "components/UsageMeter.tsx": "692f428bfe4f3329664cd30013c8db10aa9ecac9b5b81630a84c30717343c50e",
-    "components/VoiceChat.tsx": "5927146ca0a6e1c4f330380e85b5bac35f5859e7f9a1ec872b6569f8a40bff8e",
+    "components/VoiceChat.tsx": "1b943f30f1b5eee1045ba0e0c9353d12e5f14ce34bb83333864689aa069af431",
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
     "native/src/config.ts": "81cfdb7a722c7b073eff5b1519268f6555fb0867f0737da0318b16810a43c7e6",
-    "native/src/config/nativePageRoutes.ts": "5ec02b07d9bf1fbf68a1b219bb50d2cee28ddab54f3378080d47c802766695d9",
+    "native/src/config/nativePageRoutes.ts": "b39f96f9faec2bc5e76e821f74ed957b0e62c1c495093b7586acc3f02d343a59",
     "native/src/content/legal.ts": "074743b2e9abe59d8e1fbf584de80b0291e272f922d72ae168d5e99409e629f5",
     "native/src/data/produceMeasurements.ts": "1c0985f90c573a5e84084497aa08e59354a67f6392c5c7127acf3bbac0470a13",
     "native/src/health/appleHealth.ts": "7693a10e0e0471c5e16ed53274659c9dfdb56a4622cb693352eb4609350ddd1b",

@@ -8,6 +8,7 @@ function ChatPageContent() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const isFood = searchParams.get('context') === 'food'
+  const openHistory = searchParams.get('history') === '1'
   const selectedDate = searchParams.get('date') || ''
   const entryContext = isFood ? 'food' : 'general'
   const handleExit = () => {
@@ -18,6 +19,7 @@ function ChatPageContent() {
       className="flex-1"
       entryContext={entryContext}
       selectedDate={selectedDate}
+      openHistoryOnLoad={openHistory}
       onExit={isFood ? handleExit : undefined}
     />
   )

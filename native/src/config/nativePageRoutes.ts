@@ -32,7 +32,7 @@ export const NATIVE_WEB_PAGES: Record<NativeWebPageKey, NativeWebPageRoute> = {
   },
   chatHistory: {
     title: 'Chat History',
-    path: '/chat',
+    path: '/chat?history=1',
   },
   healthJournal: {
     title: 'Health Journal',

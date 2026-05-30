@@ -29,6 +29,7 @@ interface VoiceChatProps {
   hideExpandToggle?: boolean
   entryContext?: 'general' | 'food'
   selectedDate?: string
+  openHistoryOnLoad?: boolean
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -722,6 +723,7 @@ export default function VoiceChat({
   hideExpandToggle = false,
   entryContext = 'general',
   selectedDate,
+  openHistoryOnLoad = false,
 }: VoiceChatProps) {
   const router = useRouter()
   const VOICE_CHAT_COST_CREDITS = 10
@@ -751,7 +753,7 @@ export default function VoiceChat({
   const [hasSpeechRecognition, setHasSpeechRecognition] = useState(false)
   const [threads, setThreads] = useState<ChatThread[]>([])
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null)
-  const [threadsOpen, setThreadsOpen] = useState(false)
+  const [threadsOpen, setThreadsOpen] = useState(openHistoryOnLoad)
   const [expanded, setExpanded] = useState(startExpanded)
   const [isClient, setIsClient] = useState(false)
   const [actionThreadId, setActionThreadId] = useState<string | null>(null)
@@ -785,6 +787,7 @@ export default function VoiceChat({
   )
   const hasHealthTipContext = !!context?.healthTipSummary
   const isFoodEntry = entryContext === 'food'
+  const historyMode = openHistoryOnLoad && !isFoodEntry
   const healthTipTitle = context?.healthTipTitle
   const healthTipCategory = context?.healthTipCategory
   const healthTipSuggestedQuestions = context?.healthTipSuggestedQuestions
@@ -1023,6 +1026,10 @@ export default function VoiceChat({
     }
     loadThreads()
   }, [currentThreadId, isFoodEntry, threadsUrl])
+
+  useEffect(() => {
+    if (historyMode) setThreadsOpen(true)
+  }, [historyMode])
 
   async function loadThreadMessages(threadId: string) {
     try {
@@ -2768,7 +2775,7 @@ export default function VoiceChat({
           </button>
         </div>
         <div className="flex-1 text-center">
-          <div className="text-[16px] md:text-sm font-semibold text-gray-900">Talk to Helfi</div>
+          <div className="text-[16px] md:text-sm font-semibold text-gray-900">{historyMode ? 'Chat History' : 'Talk to Helfi'}</div>
           <div className="text-[11px] text-gray-400 hidden md:block truncate">{currentThreadTitle}</div>
         </div>
         <div className="flex items-center gap-2">
