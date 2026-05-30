@@ -1384,6 +1384,10 @@ export function TrackCaloriesScreen() {
   }, [totals.fat, totals.healthyFat, totals.satFat])
 
   const usedKcal = useMemo(() => {
+    if (Number.isFinite(totals.calories) && totals.calories > 0) {
+      return Math.max(0, Math.round(totals.calories))
+    }
+
     const macroCalories = totals.protein * 4 + totals.carbs * 4 + totals.fat * 9
     if (Number.isFinite(macroCalories) && macroCalories > 0) {
       return Math.max(0, Math.round(macroCalories))
