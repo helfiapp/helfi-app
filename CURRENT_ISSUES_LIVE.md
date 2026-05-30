@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 31 May 2026, 02:36 AM AEST
+- What changed: Fixed the Food Diary photo-analysis failure path so “no food”/failed photo results do not charge credits, do not count usage, and are not saved as bad diary entries.
+- Where to see it (page/link): Native iPhone app -> Food Diary -> Add Food Entry -> Photo Library / Camera; live server at https://helfi.ai/api/analyze-food.
+- What to quickly test: Deny camera permission or use a non-food image and confirm credits/usage do not change and no “not food” diary entry is created.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 30 May 2026, 04:49 PM AEST
 - What changed: Fixed Talk to Helfi so a failed first AI reply attempt falls back safely instead of leaving chat stuck, and made newer AI model requests use safer settings.
 - Where to see it (page/link): https://helfi.ai/chat and native iPhone app -> More -> Talk to Helfi.
