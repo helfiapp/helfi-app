@@ -5,8 +5,34 @@ import { authOptions } from '@/lib/auth'
 import { getIssueLandingPayload } from '@/lib/insights/issue-engine'
 import { getLatestWeeklyReport, getWeeklyReportState, markWeeklyReportOnboardingComplete, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { isHealthSetupComplete } from '@/lib/health-setup-completion'
 import { prisma } from '@/lib/prisma'
 import InsightsLandingClient from './InsightLandingClient'
+
+async function getFreshOnboardingComplete(userId: string) {
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: {
+      gender: true,
+      weight: true,
+      height: true,
+      healthGoals: {
+        select: {
+          name: true,
+        },
+      },
+    },
+  })
+
+  if (!user) return false
+
+  return isHealthSetupComplete({
+    gender: user.gender,
+    weight: user.weight,
+    height: user.height,
+    goals: user.healthGoals,
+  })
+}
 
 export default async function InsightsPage() {
   const session = await getServerSession(authOptions)
@@ -14,7 +40,7 @@ export default async function InsightsPage() {
     redirect('/auth/signin')
   }
 
-  const payload = await getIssueLandingPayload(session.user.id)
+  const onboardingComplete = await getFreshOnboardingComplete(session.user.id)
 
   // ⚠️ HEALTH SETUP GUARD RAIL
   // If Health Setup is not complete, Insights MUST remain fully locked.
@@ -24,7 +50,7 @@ export default async function InsightsPage() {
   // with incomplete Health Setup.
   // If Health Setup is not complete, completely gate the Insights section and
   // guide the user back to onboarding instead of showing empty insights.
-  if (!payload.onboardingComplete) {
+  if (!onboardingComplete) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gradient-to-b from-white to-helfi-green-light/10 dark:from-gray-900 dark:to-gray-900 px-4">
         <div className="max-w-md w-full bg-white dark:bg-gray-800 rounded-2xl shadow-xl p-6 text-center">
@@ -56,6 +82,8 @@ export default async function InsightsPage() {
       </div>
     )
   }
+
+  const payload = await getIssueLandingPayload(session.user.id)
 
   // PROTECTED: INSIGHTS_WEEKLY_STATE_SELF_HEAL START
   let weeklyState = await getWeeklyReportState(session.user.id)
@@ -102,7 +130,7 @@ export default async function InsightsPage() {
       }}
       issues={payload.issues}
       generatedAt={payload.generatedAt}
-      onboardingComplete={payload.onboardingComplete}
+      onboardingComplete={onboardingComplete}
       dataNeeds={payload.dataNeeds}
       initialWeeklyStatus={{
         reportReady,

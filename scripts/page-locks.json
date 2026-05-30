@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-25T23:07:22.916Z",
+  "generatedAt": "2026-05-30T17:27:00.000Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -78,7 +78,7 @@
     "app/insights/issues/[issueSlug]/supplements/working/page.tsx": "1f8c57ecda9f914b8bb884d88afcbf1f3fa9ef5f7296864cb824882785c178f4",
     "app/insights/loading.tsx": "8437d67851a77ceb9a2d2268a37a9ffe58c8e6b2dffb73a09ba9bbf24e13c974",
     "app/insights/nutrition/page.tsx": "fe59d251ee948e45230d301c04581013a3175fb6cf798a71534775d574887519",
-    "app/insights/page.tsx": "e83580f72a8ee4e7f763f2796e381ccb882f7d19c0f8cd191cd6e7482b94d378",
+    "app/insights/page.tsx": "45659ed04c1426c5faf297f892e433c69ef341a3daa324c690a8f88b88012f3d",
     "app/insights/safety/page.tsx": "6daefe7f9343c5189a90eb56e7893af4f0b6be6c8e02ed894390edb349b31139",
     "app/insights/sleep/page.tsx": "9d2f6249432eca35d532f99f78871e9b74a66e2335c093c4e45fb475d406e139",
     "app/insights/supplements/[name]/page.tsx": "d4049a6c402ca05e9faf72e18aa9a27b016c39a8a24b1187f885f8f3cbf853c9",
