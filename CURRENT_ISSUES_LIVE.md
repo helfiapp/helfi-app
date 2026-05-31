@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 1 June 2026, 03:00 AM AEST
+- What changed: Fixed the native iPhone Billing screen so free-plan users can restore previous App Store purchases before choosing a plan.
+- Where to see it (page/link): Native iPhone app -> Settings -> Subscription & Billing -> Previous purchases.
+- What to quickly test: Open Billing on a free account and tap Restore purchases; it should show a clear result and not crash.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 1 June 2026, 02:36 AM AEST
 - What changed: Fixed the native iPhone Practitioner Directory dark mode fields so typed search/location text is readable.
 - Where to see it (page/link): Native iPhone app -> More -> Find a Practitioner.
