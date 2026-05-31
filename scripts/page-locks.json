@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-30T17:44:00.000Z",
+  "generatedAt": "2026-05-31T16:03:29.969Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -219,7 +219,7 @@
     "native/src/screens/FoodDiarySettingsScreen.tsx": "85656955d4235fd504c0b5c2b11d93a1f9f4220468838f6090c2a6636f81d28d",
     "native/src/screens/FoodScreen.tsx": "3c16bb79db956431ccf8e8d618b6b3f4ac3dd1c9b482e6f19468bc2df93621e6",
     "native/src/screens/HealthSetupScreen.tsx": "69e9adaa420a14b38092c4f0329feeb269f03684586bd0cb4ef9ea6837a7b2db",
-    "native/src/screens/InsightsScreen.tsx": "765b4e05902d8193faec6bac8691b2d8350ac89b07aeeb1e56dd7a3678057256",
+    "native/src/screens/InsightsScreen.tsx": "6b2289c1532b1eb44b8de4b0b70a36d2890041fe56d4d460b85dac4ae0d3db97",
     "native/src/screens/ListYourPracticeScreen.tsx": "7dcf8036b7f2b363753c2ba6f4067ef246de75a97fff7441ac591e885cc77d15",
     "native/src/screens/ListYourPracticeStartScreen.tsx": "5973f6fec772e38625e07d95e7eaca1988b1db680deca19bc0c2b4a4fb8e3c9d",
     "native/src/screens/LoginScreen.tsx": "0f6434dc816f53805d4b5b5d06175608b77afb374d550263ad17025d324f766a",

@@ -126,6 +126,20 @@ function formatDateForLocale(value?: string | Date | number | null) {
   return new Intl.DateTimeFormat('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
 }
 
+const WEEKLY_REPORT_PERIOD_MS = 7 * 24 * 60 * 60 * 1000
+
+function getDisplayNextReportDueAt(status: any) {
+  const raw = status?.nextReportDueAt
+  if (!raw) return null
+  const dueAt = new Date(raw)
+  if (Number.isNaN(dueAt.getTime())) return raw
+
+  const latestReportReady = status?.reportReady === true || status?.reportLocked === true
+  if (!latestReportReady || dueAt.getTime() > Date.now()) return raw
+
+  return new Date(Date.now() + WEEKLY_REPORT_PERIOD_MS).toISOString()
+}
+
 function formatDateRange(start?: string | null, end?: string | null) {
   const startText = formatDateForLocale(start)
   const endText = formatDateForLocale(end)
@@ -948,7 +962,8 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     )
   }
 
-  const reportAccessActive = Boolean(weeklyStatus?.reportsEnabled || weeklyStatus?.reportReady || weeklyStatus?.reportLocked || weeklyStatus?.nextReportDueAt || reports.length)
+  const displayNextReportDueAt = getDisplayNextReportDueAt(weeklyStatus)
+  const reportAccessActive = Boolean(weeklyStatus?.reportsEnabled || weeklyStatus?.reportReady || weeklyStatus?.reportLocked || displayNextReportDueAt || reports.length)
   const canManualReport = String(session?.user?.email || '').toLowerCase() === 'info@sonicweb.com.au'
 
   if (healthSetupComplete === false) {
@@ -1010,11 +1025,11 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         {reportAccessActive && weeklyStatus?.reportLocked ? (
           <Text style={{ color: '#B45309', fontWeight: '800', marginTop: 12 }}>Your latest report is ready, but needs a subscription or top-up credits to unlock.</Text>
         ) : null}
-        {reportAccessActive && weeklyStatus?.nextReportDueAt ? (
+        {reportAccessActive && displayNextReportDueAt ? (
           <View style={{ marginTop: 14, gap: 7 }}>
             <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' }}>Current cycle progress</Text>
             <ProgressBar percent={weeklyStatus?.reportReady ? 100 : 60} />
-            <Text style={{ color: theme.colors.muted }}>Next report due {formatDateForLocale(weeklyStatus.nextReportDueAt)}</Text>
+            <Text style={{ color: theme.colors.muted }}>Next report due {formatDateForLocale(displayNextReportDueAt)}</Text>
           </View>
         ) : null}
 
@@ -1082,7 +1097,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         <Card>
           <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>No report yet</Text>
           <Text style={{ color: theme.colors.muted, marginTop: 6, lineHeight: 20 }}>Your weekly report will appear here once your first 7 days of data are complete.</Text>
-          {weeklyStatus?.nextReportDueAt ? <Text style={{ color: theme.colors.muted, marginTop: 10 }}>Next report due: {formatDateForLocale(weeklyStatus.nextReportDueAt)}</Text> : null}
+          {displayNextReportDueAt ? <Text style={{ color: theme.colors.muted, marginTop: 10 }}>Next report due: {formatDateForLocale(displayNextReportDueAt)}</Text> : null}
         </Card>
       )}
     </View>
