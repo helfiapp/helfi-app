@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 1 June 2026, 02:36 AM AEST
+- What changed: Fixed the native iPhone Practitioner Directory dark mode fields so typed search/location text is readable.
+- Where to see it (page/link): Native iPhone app -> More -> Find a Practitioner.
+- What to quickly test: Turn on dark mode, open Find a Practitioner, type a location, and confirm the field text is readable.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 1 June 2026, 02:17 AM AEST
 - What changed: Fixed the native iPhone Insights screen so “Next report due” no longer shows an old date when the latest weekly report is already ready.
 - Where to see it (page/link): Native iPhone app -> Insights.
