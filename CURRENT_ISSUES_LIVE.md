@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 1 June 2026, 03:17 AM AEST
+- What changed: Prepared the native iPhone app for the next Apple/TestFlight package by updating the tracked native build number from 8 to 9. No app features changed.
+- Where to see it (page/link): Native iPhone app build config / next TestFlight package.
+- What to quickly test: Confirm the next iPhone archive/export reports version 1.0.0 build 9 before uploading to TestFlight.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 1 June 2026, 03:00 AM AEST
 - What changed: Fixed the native iPhone Billing screen so free-plan users can restore previous App Store purchases before choosing a plan.
 - Where to see it (page/link): Native iPhone app -> Settings -> Subscription & Billing -> Previous purchases.
