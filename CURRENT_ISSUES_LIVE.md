@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 1 June 2026, 02:17 AM AEST
+- What changed: Fixed the native iPhone Insights screen so “Next report due” no longer shows an old date when the latest weekly report is already ready.
+- Where to see it (page/link): Native iPhone app -> Insights.
+- What to quickly test: Open Insights and confirm the next report due date is in the future.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 31 May 2026, 05:51 AM AEST
 - What changed: Cleaned up the leftover local handover fixes after reviewing them properly. This includes safer native account switching, native billing/usage fixes, correct credit-cost wording, dark-mode/native display fixes, favourites action button labels, and refreshed safety locks.
 - Where to see it (page/link): https://helfi.ai, native iPhone app account switching, Billing, Symptom Analysis, Medical Image Analysis, Food Diary favourites, and dark mode screens.
