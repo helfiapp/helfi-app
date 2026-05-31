@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.helfi.app",
-      "buildNumber": "8",
+      "buildNumber": "9",
       "infoPlist": {
         "NSCameraUsageDescription": "Allow Helfi to use your camera so you can take a photo for analysis.",
         "NSHealthShareUsageDescription": "Allow Helfi to read selected Apple Health data, such as steps, distance, and active calories, so it can show your daily activity in your health dashboard.",
