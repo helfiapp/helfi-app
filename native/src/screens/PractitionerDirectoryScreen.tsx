@@ -906,6 +906,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
               value={query}
               onChangeText={setQuery}
               placeholder="Name, symptom, or category"
+              placeholderTextColor={theme.colors.muted}
               autoCapitalize="none"
               returnKeyType="search"
               onSubmitEditing={() => {
@@ -918,7 +919,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 borderRadius: theme.radius.md,
                 paddingHorizontal: 12,
                 paddingVertical: 12,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.colors.bg,
                 color: theme.colors.text,
                 fontSize: 14,
                 fontWeight: '600',
@@ -952,6 +953,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 value={locationQuery}
                 onChangeText={setLocationQuery}
                 placeholder="City or suburb"
+                placeholderTextColor={theme.colors.muted}
                 returnKeyType="search"
                 onSubmitEditing={() => {
                   Keyboard.dismiss()
@@ -964,7 +966,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                   borderRadius: theme.radius.md,
                   paddingHorizontal: 12,
                   paddingVertical: 12,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: theme.colors.bg,
                   color: theme.colors.text,
                   fontSize: 14,
                   fontWeight: '600',
@@ -999,7 +1001,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                   borderWidth: 1,
                   borderColor: theme.colors.border,
                   borderRadius: theme.radius.md,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: theme.colors.bg,
                 }}
               >
                 {locationResults.map((item) => (
@@ -1039,7 +1041,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                   borderRadius: 16,
                   paddingVertical: 10,
                   paddingHorizontal: 12,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: theme.colors.bg,
                   minWidth: 96,
                   flexDirection: 'row',
                   alignItems: 'center',
@@ -1139,7 +1141,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
             <Pressable
               onPress={() => {}}
               style={{
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.colors.card,
                 borderTopLeftRadius: 20,
                 borderTopRightRadius: 20,
                 paddingHorizontal: 14,
@@ -1177,7 +1179,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                         paddingVertical: 12,
                         paddingHorizontal: 4,
                         borderBottomWidth: 1,
-                        borderBottomColor: '#EEF2F7',
+                        borderBottomColor: theme.colors.border,
                         flexDirection: 'row',
                         alignItems: 'center',
                         justifyContent: 'space-between',
