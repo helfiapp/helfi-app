@@ -759,6 +759,21 @@ export function BillingScreen() {
           </View>
         ) : null}
 
+        {!loadingSubscription && !hasActiveSubscription ? (
+          <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
+            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Previous purchases</Text>
+            <Text style={{ marginTop: 6, marginBottom: 12, color: theme.colors.muted }}>
+              Restore subscriptions or credits bought with this {Platform.OS === 'ios' ? 'Apple ID' : Platform.OS === 'android' ? 'Google Play account' : 'store account'}.
+            </Text>
+            <ActionButton
+              label={isRestoringPurchases ? 'Restoring...' : 'Restore purchases'}
+              onPress={handleRestorePurchases}
+              disabled={isRestoringPurchases}
+              kind="secondary"
+            />
+          </View>
+        ) : null}
+
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
           <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Plans</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>Choose a monthly subscription plan.</Text>

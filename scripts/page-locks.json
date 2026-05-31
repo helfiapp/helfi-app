@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-31T16:31:44.493Z",
+  "generatedAt": "2026-05-31T16:54:52.230Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -213,7 +213,7 @@
     "native/src/screens/AccountSettingsScreen.tsx": "3f592e94a1b1252068b44329bc3e4acd42030d72bd0f53462b7cf976e7047b0d",
     "native/src/screens/AddIngredientScreen.tsx": "7daa9cfad19a30bd424aba7a435295a2493da3bf18e064c211950209944795a5",
     "native/src/screens/AnimatedSplashScreen.tsx": "e031b5bb187bc228d9b65144757338bc8c793588751948d8044f43d2a50c8682",
-    "native/src/screens/BillingScreen.tsx": "5d3fc1a400796f726ff75c7af901fc18c0e4cdf53cee27af0713e76959906478",
+    "native/src/screens/BillingScreen.tsx": "8a859ee18a172ee84216f4158d65e5e627bffde4111f847c1fc59b539bb7691d",
     "native/src/screens/DailyCheckInScreen.tsx": "fc8e9b6da314e7252505debd13c5724493a06cefbd3d24142d66d0a4d6d0e1e1",
     "native/src/screens/DashboardScreen.tsx": "f41686ddb8c42eddefa4d7cb1137bd0443a280195d3610e1ed07568ce2ef80aa",
     "native/src/screens/FoodDiarySettingsScreen.tsx": "85656955d4235fd504c0b5c2b11d93a1f9f4220468838f6090c2a6636f81d28d",
