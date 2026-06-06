@@ -21,7 +21,7 @@ export default function PrivacyPage() {
       <div className="max-w-4xl mx-auto p-8 bg-white mt-8 rounded-lg shadow-sm">
         <div className="prose prose-lg max-w-none">
           <h1 className="text-4xl font-bold text-center mb-2 text-gray-900">Helfi Privacy Policy</h1>
-          <p className="text-center text-gray-600 text-lg">Last updated: January 15, 2026</p>
+          <p className="text-center text-gray-600 text-lg">Last updated: June 6, 2026</p>
           <p className="text-center text-sm text-gray-500 mb-8">
             Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)
           </p>
@@ -63,8 +63,8 @@ export default function PrivacyPage() {
               <div>
                 <h3 className="text-xl font-semibold text-gray-800 mb-3">c. Data from Wearables & Third-Party Integrations (with your permission):</h3>
                 <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
-                  <li>Apple Health, Google Fit, Garmin Connect, Withings, etc.</li>
-                  <li>Steps, heart rate, distance, sleep, calories, etc.</li>
+                  <li>Supported connected services, such as Fitbit, Garmin Connect, Apple Health, Google Fit, or similar services, if you choose to connect them</li>
+                  <li>Health and fitness data from connected services, such as steps, heart rate, distance, sleep, calories, or similar metrics</li>
                 </ul>
               </div>
 
@@ -97,7 +97,7 @@ export default function PrivacyPage() {
                 <li>Provide and personalize the App's features</li>
                 <li>Deliver AI-generated reports and symptom analysis</li>
                 <li>Parse, normalize, display, and analyze laboratory test results for your personal use</li>
-                <li>Improve app functionality and AI accuracy through anonymized training data</li>
+                <li>Improve app functionality using aggregated or de-identified information where allowed, and only in line with your choices and applicable law</li>
                 <li>Process payments and manage subscriptions</li>
                 <li>Send reminders, updates, and relevant notifications</li>
                 <li>Respond to support requests and inquiries</li>
@@ -111,7 +111,8 @@ export default function PrivacyPage() {
                 We do not sell your personal data. We only share it as follows:
               </div>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
-                <li><strong>Service Providers:</strong> For hosting, analytics, payment processing, and technical support</li>
+                <li><strong>Service Providers:</strong> For hosting, analytics, AI processing, payment processing, email delivery, file storage, and technical support</li>
+                <li><strong>No health-data advertising sale:</strong> We do not sell your personal health data or share it for targeted advertising.</li>
                 <li><strong>Legal Requirements:</strong> If required by law, court order, or regulatory request</li>
                 <li><strong>Business Transfers:</strong> If Helfi is involved in a merger, acquisition, or sale of assets, your data may be transferred</li>
                 <li><strong>With Consent:</strong> We may share data if you provide explicit permission</li>
@@ -162,7 +163,7 @@ export default function PrivacyPage() {
                 </ul>
               </div>
               <p className="text-gray-700 leading-relaxed mt-4">
-                <strong>Breach notification:</strong> If a breach occurs that may cause harm, Helfi will notify affected users and authorities per the Australian Notifiable Data Breaches scheme.
+                <strong>Breach notification:</strong> If a breach occurs that may cause harm, Helfi will notify affected users and authorities as required by the Australian Notifiable Data Breaches scheme and other applicable breach-notification laws.
               </p>
             </section>
 
@@ -186,7 +187,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">6. International Users</h2>
               <p className="text-gray-700 leading-relaxed">
-                We are based in Australia but serve users worldwide. Your information may be processed in countries with different data protection laws. By using the App, you consent to this transfer and processing.
+                We are based in Australia but serve users worldwide. Your information may be processed in countries with different data protection laws. We use service providers in multiple countries and handle international transfers in line with applicable law.
               </p>
             </section>
 
@@ -222,7 +223,7 @@ export default function PrivacyPage() {
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">9. Cookies & Tracking Technologies</h2>
               <p className="text-gray-700 leading-relaxed">
-                We may use cookies or similar technologies for app functionality, usage analytics, and performance tracking. You can disable tracking through your device settings.
+                We may use cookies or similar technologies for app functionality, usage analytics, and performance measurement. You can adjust available cookie, analytics, and tracking settings through the App, your browser, or your device settings.
               </p>
             </section>
 
@@ -239,7 +240,7 @@ export default function PrivacyPage() {
                 <p className="mb-2">For questions about this Privacy Policy or your personal data, contact:</p>
                 <p><strong>Email:</strong> <a href="mailto:support@helfi.ai" className="text-green-600 hover:text-green-800 font-medium">support@helfi.ai</a></p>
                 <p><strong>Company:</strong> Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)</p>
-                <p><strong>Mailing Address:</strong> [Insert Business Address Here]</p>
+                <p><strong>Privacy contact:</strong> <a href="mailto:support@helfi.ai" className="text-green-600 hover:text-green-800 font-medium">support@helfi.ai</a></p>
               </div>
             </section>
           </div>

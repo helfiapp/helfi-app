@@ -24,7 +24,7 @@ export type LegalDoc = {
 
 export const termsOfUse: LegalDoc = {
   title: 'Helfi Terms of Use',
-  lastUpdated: 'January 15, 2026',
+  lastUpdated: 'June 6, 2026',
   companyLine: 'Operated by Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)',
   intro: [
     'By accessing or using the Helfi app, website, or related services ("Helfi", "we", "us", or "our"), you ("user", "you") agree to be bound by these Terms of Use and our Privacy Policy. Please read them carefully before using the platform.',
@@ -72,7 +72,7 @@ export const termsOfUse: LegalDoc = {
       title: '4. Content & Data Usage',
       bullets: [
         'By uploading information, images, or descriptions (e.g., supplement bottles, symptoms), you grant us a non-exclusive, royalty-free, worldwide license to use that data for the purpose of providing and improving our services.',
-        'Helfi uses machine learning and artificial intelligence. Uploaded data may be used anonymously to enhance algorithm performance.',
+        'Helfi uses machine learning and artificial intelligence. We may use aggregated or de-identified information to improve the service where allowed, and only in line with your choices, our Privacy Policy, and applicable law.',
         'We do not sell personal data to third parties. For full data handling terms, refer to our Privacy Policy.',
       ],
     },
@@ -83,7 +83,7 @@ export const termsOfUse: LegalDoc = {
       ],
       bullets: [
         'If your PDF is password-protected and you choose to supply the password, you expressly authorize Helfi to use that password once to decrypt and process the file. We do not store your password.',
-        'You may choose whether Helfi retains an encrypted copy of your original PDF; by default, we delete the original file after extraction.',
+        'Helfi permanently deletes the original PDF after extraction. Only the extracted structured lab data is retained for your reports.',
         'We may refuse processing of unreadable or corrupted files.',
         'Structured lab data (analyte names, values, units, reference ranges, collection dates, accession numbers, and laboratory names) is extracted and encrypted at rest using industry-standard encryption.',
       ],
@@ -91,7 +91,7 @@ export const termsOfUse: LegalDoc = {
     {
       title: '5. Security & Encryption',
       paragraphs: [
-        'Helfi uses industry-standard encryption to protect sensitive information in transit and at rest. Structured data is encrypted using per-record keys, and retained originals are encrypted with managed key services. If a breach occurs that may cause harm, Helfi will notify affected users and authorities per applicable law.',
+        'Helfi uses industry-standard encryption to protect sensitive information in transit and at rest. Structured data is encrypted using per-record keys. Original uploaded media and documents are temporary processing files and are deleted after extraction. If a breach occurs that may cause harm, Helfi will notify affected users and authorities as required by applicable law.',
       ],
     },
     {
@@ -187,7 +187,7 @@ export const termsOfUse: LegalDoc = {
 
 export const privacyPolicy: LegalDoc = {
   title: 'Helfi Privacy Policy',
-  lastUpdated: 'January 15, 2026',
+  lastUpdated: 'June 6, 2026',
   companyLine: 'Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)',
   intro: [
     'This Privacy Policy explains how Helfi ("we," "us," or "our") collects, uses, discloses, and protects your information when you use our mobile application and associated services (collectively, the "App").',
@@ -214,7 +214,10 @@ export const privacyPolicy: LegalDoc = {
         },
         {
           title: 'c. Data from Wearables & Third-Party Integrations (with your permission):',
-          bullets: ['Apple Health, Google Fit, Garmin Connect, Withings, etc.', 'Steps, heart rate, distance, sleep, calories, etc.'],
+          bullets: [
+            'Supported connected services, such as Fitbit, Garmin Connect, Apple Health, Google Fit, or similar services, if you choose to connect them',
+            'Health and fitness data from connected services, such as steps, heart rate, distance, sleep, calories, or similar metrics',
+          ],
         },
         {
           title: 'd. Practitioner directory information (for practitioners):',
@@ -232,7 +235,7 @@ export const privacyPolicy: LegalDoc = {
           ],
           bullets: [
             'The password is never stored, logged, or reused.',
-            'Once extraction is complete, the structured data is securely stored in encrypted form and the original file is deleted unless you choose to retain an encrypted copy for your records.',
+            'Once extraction is complete, the structured data is securely stored in encrypted form and the original file is deleted.',
           ],
         },
       ],
@@ -244,7 +247,7 @@ export const privacyPolicy: LegalDoc = {
         "Provide and personalize the App's features",
         'Deliver AI-generated reports and symptom analysis',
         'Parse, normalize, display, and analyze laboratory test results for your personal use',
-        'Improve app functionality and AI accuracy through anonymized training data',
+        'Improve app functionality using aggregated or de-identified information where allowed, and only in line with your choices and applicable law',
         'Process payments and manage subscriptions',
         'Send reminders, updates, and relevant notifications',
         'Respond to support requests and inquiries',
@@ -255,7 +258,8 @@ export const privacyPolicy: LegalDoc = {
       title: '3. How We Share Your Data',
       paragraphs: ['We do not sell your personal data. We only share it as follows:'],
       bullets: [
-        'Service Providers: For hosting, analytics, payment processing, and technical support',
+        'Service Providers: For hosting, analytics, AI processing, payment processing, email delivery, file storage, and technical support',
+        'No health-data advertising sale: We do not sell your personal health data or share it for targeted advertising.',
         'Legal Requirements: If required by law, court order, or regulatory request',
         'Business Transfers: If Helfi is involved in a merger, acquisition, or sale of assets, your data may be transferred',
         'With Consent: We may share data if you provide explicit permission',
@@ -280,7 +284,7 @@ export const privacyPolicy: LegalDoc = {
         'Structured health data is encrypted at the field level with unique per-record encryption keys, ensuring that each piece of data has its own encryption key.',
         'Data encryption keys are protected using envelope encryption, where keys are encrypted with a master key stored securely in environment variables.',
         'We maintain strict access controls — only authorised personnel can access sensitive data, and all access is logged and audited.',
-        'Breach notification: If a breach occurs that may cause harm, Helfi will notify affected users and authorities per the Australian Notifiable Data Breaches scheme.',
+        'Breach notification: If a breach occurs that may cause harm, Helfi will notify affected users and authorities as required by the Australian Notifiable Data Breaches scheme and other applicable breach-notification laws.',
       ],
     },
     {
@@ -297,13 +301,13 @@ export const privacyPolicy: LegalDoc = {
     {
       title: '6. International Users',
       paragraphs: [
-        'We are based in Australia but serve users worldwide. Your information may be processed in countries with different data protection laws. By using the App, you consent to this transfer and processing.',
+        'We are based in Australia but serve users worldwide. Your information may be processed in countries with different data protection laws. We use service providers in multiple countries and handle international transfers in line with applicable law.',
       ],
     },
     {
       title: '7. Data Retention and Deletion',
       paragraphs: [
-        'By default, Helfi deletes original uploaded documents (such as PDFs) immediately after extraction. If you opt to retain a copy, it remains encrypted and accessible only through your authenticated account.',
+        'Helfi deletes original uploaded media and documents (such as photos, voice notes, and PDFs) after extraction. Only structured health data needed for reports is retained.',
       ],
       bullets: [
         'Structured health data is retained until you delete your account or request deletion.',
@@ -320,7 +324,7 @@ export const privacyPolicy: LegalDoc = {
     {
       title: '9. Cookies & Tracking Technologies',
       paragraphs: [
-        'We may use cookies or similar technologies for app functionality, usage analytics, and performance tracking. You can disable tracking through your device settings.',
+        'We may use cookies or similar technologies for app functionality, usage analytics, and performance measurement. You can adjust available cookie, analytics, and tracking settings through the App, your browser, or your device settings.',
       ],
     },
     {
@@ -334,7 +338,7 @@ export const privacyPolicy: LegalDoc = {
       bullets: [
         'Email: support@helfi.ai',
         'Company: Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)',
-        'Mailing Address: [Insert Business Address Here]',
+        'Privacy contact: support@helfi.ai',
       ],
     },
   ],
@@ -342,4 +346,3 @@ export const privacyPolicy: LegalDoc = {
   contactEmail: 'support@helfi.ai',
   extraContactLines: ['For questions or concerns about your privacy, please contact us at: support@helfi.ai'],
 }
-

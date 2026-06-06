@@ -21,7 +21,7 @@ export default function TermsPage() {
       <div className="max-w-4xl mx-auto p-8 bg-white mt-8 rounded-lg shadow-sm">
         <div className="prose prose-lg max-w-none">
           <h1 className="text-4xl font-bold text-center mb-2 text-gray-900">Helfi Terms of Use</h1>
-          <p className="text-center text-gray-600 text-lg">Last updated: January 15, 2026</p>
+          <p className="text-center text-gray-600 text-lg">Last updated: June 6, 2026</p>
           <p className="text-center text-sm text-gray-500 mb-8">
             Operated by Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)
           </p>
@@ -91,7 +91,7 @@ export default function TermsPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">4. Content & Data Usage</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>By uploading information, images, or descriptions (e.g., supplement bottles, symptoms), you grant us a non-exclusive, royalty-free, worldwide license to use that data for the purpose of providing and improving our services.</li>
-                <li>Helfi uses machine learning and artificial intelligence. Uploaded data may be used anonymously to enhance algorithm performance.</li>
+                <li>Helfi uses machine learning and artificial intelligence. We may use aggregated or de-identified information to improve the service where allowed, and only in line with your choices, our Privacy Policy, and applicable law.</li>
                 <li>We do not sell personal data to third parties. For full data handling terms, refer to our Privacy Policy.</li>
               </ul>
             </section>

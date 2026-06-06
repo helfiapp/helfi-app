@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-06T01:46:00.463Z",
+  "generatedAt": "2026-06-06T03:55:12.079Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -125,7 +125,7 @@
     "app/practitioners/layout.tsx": "1100e3f17b72c055b151bb037946bb5a0c74f2c7bf7acd73ed49a401a8910206",
     "app/practitioners/page.tsx": "5075de88b40b5dfe3348ad040a768792a63e65d276a0388d438d4d2ba2f835f8",
     "app/privacy/layout.tsx": "90c906ccbcc2011697f7941000e4f7fcfd86b3dbbd52d26f1a765594fa3f9771",
-    "app/privacy/page.tsx": "7c9c4a39cb49793f96b8cf9105b4af48d330464db46d31d4dfc2e7cd5b9b4865",
+    "app/privacy/page.tsx": "d1bd0d2cb588dec44fd3c9c5b4afb7a7349c9a75e1bfa0161eabcd50cff0e0ea",
     "app/profile/image/page.tsx": "1dbe0ba14de64baab0b4faeda6dcf209eb0ef01d79e7aba9128c0a5ca128c484",
     "app/profile/page.tsx": "19e8b6469fa31671202a45b0253444f31c5686fd500cd023dbada15f57461728",
     "app/public-home/page.tsx": "f6739c6d6dcf13d07da70d81cd19f686d7a8ba388dbbf379d5da20de68059639",
@@ -137,7 +137,7 @@
     "app/symptoms/history/page.tsx": "5e089fa51327eff79c74d33a91ec37df576510ee9a75695f79d16636f4d77377",
     "app/symptoms/page.tsx": "667496aad31b5f1a45109d6978f608e23311d786328173205bc27cf860af8701",
     "app/terms/layout.tsx": "f8314ea94ab361446e63fe12106ef682829564a8ab8c6838c2b2d916acf03534",
-    "app/terms/page.tsx": "4c79d59b22ad38cb1a8d2ac545896d2c55717664973a09b0f601e61420311b33",
+    "app/terms/page.tsx": "fe19d866f7cb5122c14b8e5a523dd06f5f473b4bd62c09f29b51da83022a9ab9",
     "app/test-interactions/page.tsx": "4810a145fd85fa903ee38bc3b1c4955afaa4243210a186d3260382f9324ba30d",
     "components/chat/ChatRichText.tsx": "9b7d081e3d67052ed61fa7a68893a5f7b32ef52a9e4701159d3f89bc8371efb7",
     "components/ConfirmationModal.tsx": "1e3b0a74de645a1116f24fc15c6dae1ad34c65cf57a8a2622effde40b6616269",
@@ -198,7 +198,7 @@
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
     "native/src/config.ts": "81cfdb7a722c7b073eff5b1519268f6555fb0867f0737da0318b16810a43c7e6",
     "native/src/config/nativePageRoutes.ts": "b39f96f9faec2bc5e76e821f74ed957b0e62c1c495093b7586acc3f02d343a59",
-    "native/src/content/legal.ts": "074743b2e9abe59d8e1fbf584de80b0291e272f922d72ae168d5e99409e629f5",
+    "native/src/content/legal.ts": "b4027c5f249b8d6c9b77c43e627e17a308c530e3f101d7dbda759653f3914017",
     "native/src/data/produceMeasurements.ts": "1c0985f90c573a5e84084497aa08e59354a67f6392c5c7127acf3bbac0470a13",
     "native/src/health/appleHealth.ts": "7693a10e0e0471c5e16ed53274659c9dfdb56a4622cb693352eb4609350ddd1b",
     "native/src/lib/inAppPurchase.ts": "1e6139b951e923df7fe0532e466b948dbf20b27a5465ae79d19863e69d04e4cf",
