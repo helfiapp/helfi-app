@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-05-31T16:54:52.230Z",
+  "generatedAt": "2026-06-06T01:46:00.463Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -225,7 +225,7 @@
     "native/src/screens/LoginScreen.tsx": "0f6434dc816f53805d4b5b5d06175608b77afb374d550263ad17025d324f766a",
     "native/src/screens/MoodTrackerScreen.tsx": "85822f4898c677ed6df61e1425b792990a8bacb7a01339e43f4fd1d07252980f",
     "native/src/screens/MoreScreen.tsx": "393d7626d20dc3651c8d88ee70f7dd3aa05bf8c981fdf5fb10da89a2886decea",
-    "native/src/screens/NativeWebToolScreen.tsx": "8bcb170f1e4b6f7a090c9ef1ea5ff038ba28852b95cd0923152b6434127b3420",
+    "native/src/screens/NativeWebToolScreen.tsx": "84b45fa9cd0df047f8d4c5e0c3115edd93bf2393ceca11771a1cd8dc6b05dce3",
     "native/src/screens/NotificationInboxScreen.tsx": "91bbbb95f33dacf90e71402b9bb845e69ba8bb7ca063af5c56bc4a27315db3e1",
     "native/src/screens/NotificationsAccountSecurityScreen.tsx": "7204b24972ee3e81875be0fc065cd1e7b848907638bfee32dcf3ab7c3fca6a22",
     "native/src/screens/NotificationsAiInsightsScreen.tsx": "fa6aa52fd39af0b45f98f459bfacf371504e5110006c317904f7462a411e9151",

@@ -19,6 +19,11 @@ export const CREDIT_COSTS = {
 
 export type FeatureType = keyof typeof CREDIT_COSTS;
 
+const CREDIT_CHARGE_TRANSACTION_OPTIONS = {
+  maxWait: 10000,
+  timeout: 20000,
+} as const;
+
 export interface CreditStatus {
   hasCredits: boolean;
   dailyCreditsRemaining: number;
@@ -354,7 +359,7 @@ export class CreditManager {
       }
 
       return toCharge <= 0;
-    });
+    }, CREDIT_CHARGE_TRANSACTION_OPTIONS);
   }
 
   /**
@@ -426,7 +431,7 @@ export class CreditManager {
       }
 
       return true;
-    });
+    }, CREDIT_CHARGE_TRANSACTION_OPTIONS);
   }
 
   // Check if user has enough credits for a feature

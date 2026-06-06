@@ -95,12 +95,32 @@ export function NativeWebToolScreen({ route }: { route: any }) {
 
     return `
       (function() {
+        function applyNativeWebviewPolish() {
+          try {
+            document.documentElement.setAttribute('data-helfi-native-webview', '1');
+            var style = document.getElementById('helfi-native-webview-polish');
+            if (!style) {
+              style = document.createElement('style');
+              style.id = 'helfi-native-webview-polish';
+              (document.head || document.documentElement).appendChild(style);
+            }
+            style.textContent = [
+              'html[data-helfi-native-webview] nav.fixed.bottom-0',
+              'html[data-helfi-native-webview] nav.md\\\\:hidden.fixed.bottom-0',
+              'html[data-helfi-native-webview] div.md\\\\:hidden.fixed.bottom-0',
+              'html[data-helfi-native-webview] div.fixed.bottom-0.left-0.right-0.z-40',
+              'html[data-helfi-native-webview] [data-mobile-bottom-nav]',
+              'html[data-helfi-native-webview] [data-bottom-nav]'
+            ].join(',') + '{display:none!important;}html[data-helfi-native-webview] body{padding-bottom:0!important;}';
+          } catch (e) {}
+        }
         try {
-          var style = document.createElement('style');
-          style.id = 'helfi-native-webview-polish';
-          document.documentElement.setAttribute('data-helfi-native-webview', '1');
-          style.textContent = 'html[data-helfi-native-webview] nav.fixed.bottom-0,html[data-helfi-native-webview] nav.md\\\\:hidden.fixed.bottom-0,html[data-helfi-native-webview] div.md\\\\:hidden.fixed.bottom-0,html[data-helfi-native-webview] div.fixed.bottom-0.left-0.right-0.z-40{display:none!important;}html[data-helfi-native-webview] body{padding-bottom:0!important;}';
-          document.head.appendChild(style);
+          applyNativeWebviewPolish();
+          if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', applyNativeWebviewPolish);
+          }
+          setTimeout(applyNativeWebviewPolish, 250);
+          setTimeout(applyNativeWebviewPolish, 1000);
           try {
             var userMarker = 'helfi:native-webview-user-id';
             var currentUserId = '${escapedUserId}';
