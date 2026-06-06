@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 6 June 2026, 2:00 PM AEST
+- What changed: Updated health, medical, AI, privacy, and lab-report wording on the public Privacy Policy and Terms pages; removed unfinished placeholder address text; aligned the native legal text for the next native build.
+- Where to see it (page/link): https://helfi.ai/privacy and https://helfi.ai/terms
+- What to quickly test: Open Privacy Policy and Terms and confirm they show “Last updated: June 6, 2026”, no placeholder mailing address, and clearer wording about health data, AI use, service providers, and lab report deletion.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 6 June 2026, 11:50 AM AEST
 - What changed: Fixed two iOS submission blockers: Talk to Helfi now has more time to complete the credit step, and native More tools no longer show a duplicate bottom menu.
 - Where to see it (page/link): https://helfi.ai/chat and native iPhone app -> More -> Health Journal / Symptom Analysis.
