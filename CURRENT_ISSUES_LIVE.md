@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 6 June 2026, 11:50 AM AEST
+- What changed: Fixed two iOS submission blockers: Talk to Helfi now has more time to complete the credit step, and native More tools no longer show a duplicate bottom menu.
+- Where to see it (page/link): https://helfi.ai/chat and native iPhone app -> More -> Health Journal / Symptom Analysis.
+- What to quickly test: Send a short Talk to Helfi message, then open Health Journal and Symptom Analysis in the iPhone app and confirm there is only one bottom menu.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 1 June 2026, 03:17 AM AEST
 - What changed: Prepared the native iPhone app for the next Apple/TestFlight package by updating the tracked native build number from 8 to 9. No app features changed.
 - Where to see it (page/link): Native iPhone app build config / next TestFlight package.
