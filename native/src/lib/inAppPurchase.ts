@@ -2,6 +2,7 @@ import { Platform } from 'react-native'
 import * as IAP from 'react-native-iap'
 
 import { API_BASE_URL } from '../config'
+import { readFreshAffiliateAttribution } from './affiliateAttribution'
 
 export type NativePurchaseCode =
   | 'plan_10_monthly'
@@ -184,6 +185,7 @@ export async function runNativePurchase(opts: {
 
   const platform = getPlatform()
   const headers = buildAuthHeaders(opts.token)
+  const affiliateAttribution = await readFreshAffiliateAttribution()
 
   const prepareRes = await fetch(`${API_BASE_URL}/api/native-billing/prepare-purchase`, {
     method: 'POST',
@@ -288,6 +290,7 @@ export async function runNativePurchase(opts: {
         code: opts.code,
         receiptData,
         transactionId: String(purchase?.transactionId || purchase?.id || ''),
+        affiliateAttribution,
       }
     } else {
       const purchaseToken = String(purchase?.purchaseToken || '')
@@ -299,6 +302,7 @@ export async function runNativePurchase(opts: {
         code: opts.code,
         purchaseToken,
         transactionId: String(purchase?.transactionId || purchase?.id || ''),
+        affiliateAttribution,
       }
     }
 

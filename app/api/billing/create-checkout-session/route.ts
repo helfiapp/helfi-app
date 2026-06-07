@@ -66,10 +66,19 @@ export async function POST(request: NextRequest) {
     const customerEmail = session?.user?.email || undefined
 
     const affiliateCookie = getAffiliateCookieData(request)
-    const hasFreshAffiliateAttribution =
+    let hasFreshAffiliateAttribution =
       affiliateCookie && isAffiliateAttributionFresh(affiliateCookie.clickedAtMs)
         ? true
         : false
+    if (hasFreshAffiliateAttribution && customerEmail) {
+      const referringAffiliate = await prisma.affiliate.findUnique({
+        where: { code: affiliateCookie!.code.toLowerCase() },
+        select: { user: { select: { email: true } } },
+      })
+      if (referringAffiliate?.user?.email?.toLowerCase() === customerEmail.toLowerCase()) {
+        hasFreshAffiliateAttribution = false
+      }
+    }
     const baseMetadata: Record<string, string> = {}
     if (hasFreshAffiliateAttribution) {
       baseMetadata.helfi_aff_code = affiliateCookie!.code

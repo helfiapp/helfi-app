@@ -393,7 +393,13 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
         </div>
 
         {!hideMobileCtas && (
-          <div className="md:hidden flex items-center space-x-3">
+          <div className="md:hidden flex items-center gap-2 flex-wrap justify-end">
+            <Link
+              href="/affiliate/apply"
+              className="text-sm font-semibold text-helfi-green hover:text-green-700"
+            >
+              Affiliate
+            </Link>
             {status === 'authenticated' ? (
               <Link
                 href="/dashboard"

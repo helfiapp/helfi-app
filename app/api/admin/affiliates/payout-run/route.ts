@@ -24,8 +24,8 @@ type PayableCommission = {
 export async function POST(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   const admin = extractAdminFromHeaders(authHeader)
-  const schedulerSecret = process.env.SCHEDULER_SECRET
-  const isScheduler = !!(schedulerSecret && authHeader === `Bearer ${schedulerSecret}`)
+  const schedulerSecrets = [process.env.CRON_SECRET, process.env.SCHEDULER_SECRET].filter(Boolean)
+  const isScheduler = schedulerSecrets.some(secret => authHeader === `Bearer ${secret}`)
   if (!admin && !isScheduler) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
@@ -142,7 +142,43 @@ export async function POST(request: NextRequest) {
   let totalCents = 0
 
   for (const payout of toPay) {
+    let reservedPayoutId: string | null = null
     try {
+      const reservation = await prisma.$transaction(async tx => {
+        const payoutRecord = await tx.affiliatePayout.create({
+          data: {
+            payoutRunId: run.id,
+            affiliateId: payout.affiliateId,
+            currency,
+            amountCents: payout.totalCents,
+            stripeTransferId: `pending:${run.id}:${payout.affiliateId}`,
+          },
+          select: { id: true },
+        })
+
+        const updated = await tx.affiliateCommission.updateMany({
+          where: {
+            id: { in: payout.commissionIds },
+            status: 'PENDING',
+            payoutId: null,
+          },
+          data: { payoutId: payoutRecord.id },
+        })
+
+        if (updated.count !== payout.commissionIds.length) {
+          await tx.affiliatePayout.delete({ where: { id: payoutRecord.id } })
+          return null
+        }
+
+        return payoutRecord
+      })
+
+      if (!reservation) {
+        failures.push({ affiliateCode: payout.code, reason: 'commissions_already_reserved' })
+        continue
+      }
+      reservedPayoutId = reservation.id
+
       const transfer = await stripe.transfers.create(
         {
           amount: payout.totalCents,
@@ -155,33 +191,30 @@ export async function POST(request: NextRequest) {
             helfi_affiliate_code: payout.code,
           },
         },
-        { idempotencyKey: `affiliate_payout_run:${run.id}:affiliate:${payout.affiliateId}` }
+        { idempotencyKey: `affiliate_payout:${reservedPayoutId}` }
       )
 
-      const created = await prisma.$transaction(async tx => {
-        const payoutRecord = await tx.affiliatePayout.create({
-          data: {
-            payoutRunId: run.id,
-            affiliateId: payout.affiliateId,
-            currency,
-            amountCents: payout.totalCents,
-            stripeTransferId: transfer.id,
-          },
-          select: { id: true },
+      await prisma.$transaction(async tx => {
+        await tx.affiliatePayout.update({
+          where: { id: reservedPayoutId! },
+          data: { stripeTransferId: transfer.id },
         })
-
         await tx.affiliateCommission.updateMany({
-          where: { id: { in: payout.commissionIds } },
-          data: { status: 'PAID', paidAt: now, payoutId: payoutRecord.id },
+          where: {
+            id: { in: payout.commissionIds },
+            payoutId: reservedPayoutId,
+            status: 'PENDING',
+          },
+          data: { status: 'PAID', paidAt: now },
         })
-
-        return payoutRecord
       })
 
       results.push({ affiliateCode: payout.code, amountCents: payout.totalCents, transferId: transfer.id })
       totalCents += payout.totalCents
-      void created
     } catch (e: any) {
+      if (reservedPayoutId) {
+        await prisma.affiliatePayout.delete({ where: { id: reservedPayoutId } }).catch(() => {})
+      }
       failures.push({ affiliateCode: payout.code, reason: e?.message || 'transfer_failed' })
     }
   }

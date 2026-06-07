@@ -4,12 +4,14 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 export async function GET(request: NextRequest) {
-  const vercelCronHeader = request.headers.get('x-vercel-cron')
-  const isVercelCron = vercelCronHeader !== null
   const authHeader = request.headers.get('authorization')
-  const expected = process.env.SCHEDULER_SECRET
+  const expected = process.env.CRON_SECRET || process.env.SCHEDULER_SECRET
 
-  if (!(isVercelCron || (expected && authHeader === `Bearer ${expected}`))) {
+  if (!expected) {
+    return NextResponse.json({ error: 'Scheduler secret is not configured' }, { status: 500 })
+  }
+
+  if (authHeader !== `Bearer ${expected}`) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 

@@ -12,11 +12,15 @@
       "resizeMode": "cover",
       "backgroundColor": "#F7FAF9"
     },
-    "ios": {
-      "supportsTablet": true,
-      "bundleIdentifier": "ai.helfi.app",
-      "buildNumber": "11",
-      "infoPlist": {
+      "ios": {
+        "supportsTablet": true,
+        "bundleIdentifier": "ai.helfi.app",
+        "buildNumber": "11",
+        "associatedDomains": [
+          "applinks:helfi.ai",
+          "applinks:www.helfi.ai"
+        ],
+        "infoPlist": {
         "NSCameraUsageDescription": "Allow Helfi to use your camera so you can take a photo for analysis.",
         "NSHealthShareUsageDescription": "Allow Helfi to read selected Apple Health data, such as steps, distance, and active calories, so it can show your daily activity in your health dashboard.",
         "NSHealthUpdateUsageDescription": "Allow Helfi to write selected health data to Apple Health if you choose to sync activity data from the app.",

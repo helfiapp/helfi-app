@@ -18,9 +18,17 @@ const SUBSCRIBER_MILESTONE_INTERVAL = 20
 
 async function getBalanceTransactionForPaymentIntent(paymentIntentId: string) {
   const pi = await stripe.paymentIntents.retrieve(paymentIntentId, {
-    expand: ['charges.data.balance_transaction'],
+    expand: ['latest_charge.balance_transaction', 'charges.data.balance_transaction'],
   })
-  const charge = (pi as any)?.charges?.data?.[0] as Stripe.Charge | undefined
+  let charge = (pi as any)?.latest_charge as Stripe.Charge | undefined
+  if (typeof (pi as any)?.latest_charge === 'string') {
+    charge = await stripe.charges.retrieve(String((pi as any).latest_charge), {
+      expand: ['balance_transaction'],
+    })
+  }
+  if (!charge) {
+    charge = (pi as any)?.charges?.data?.[0] as Stripe.Charge | undefined
+  }
   const balanceTx = (charge as any)?.balance_transaction as Stripe.BalanceTransaction | undefined
   return { charge, balanceTx }
 }
@@ -513,7 +521,7 @@ export async function POST(request: NextRequest) {
 
         const affiliate = await prisma.affiliate.findUnique({
           where: { code: String(affCode).toLowerCase() },
-          select: { id: true, status: true },
+          select: { id: true, status: true, userId: true },
         })
         if (!affiliate || affiliate.status !== 'ACTIVE') break
 
@@ -552,6 +560,7 @@ export async function POST(request: NextRequest) {
         const referredUser = customerEmail
           ? await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } }).catch(() => null)
           : null
+        if (referredUser?.id && referredUser.id === affiliate.userId) break
 
         const conversion = await prisma.affiliateConversion
           .create({
@@ -700,7 +709,7 @@ export async function POST(request: NextRequest) {
 
           const affiliate = await prisma.affiliate.findUnique({
             where: { code: String(affCode).toLowerCase() },
-            select: { id: true, status: true },
+            select: { id: true, status: true, userId: true },
           })
           if (!affiliate || affiliate.status !== 'ACTIVE') break
 
@@ -730,6 +739,7 @@ export async function POST(request: NextRequest) {
           const referredUser = customerEmail
             ? await prisma.user.findUnique({ where: { email: customerEmail }, select: { id: true } }).catch(() => null)
             : null
+          if (referredUser?.id && referredUser.id === affiliate.userId) break
 
           const conversion = await prisma.affiliateConversion
             .create({

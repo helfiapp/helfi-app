@@ -1143,7 +1143,7 @@ export default function SplashPage() {
               Affiliate program
             </p>
             <h2 className="text-4xl font-bold text-helfi-black mb-6">
-              Earn recurring revenue by sharing Helfi
+              Earn by sharing Helfi
             </h2>
             <p className="text-lg text-gray-600 mb-6 leading-relaxed">
               Partner with Helfi and get paid for every qualified referral. The program is built

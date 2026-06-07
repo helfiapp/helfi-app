@@ -26,6 +26,7 @@ type AffiliateMeResponse =
         conversionsByType: Record<string, number>
         commissionTotalsByStatus: Record<string, number>
         payableNowCents: number
+        payableNowByCurrency?: Record<string, number>
       }
       events: Array<{
         occurredAt: string
@@ -45,6 +46,12 @@ function formatMoney(cents: number, currency: string) {
   } catch {
     return `${amount.toFixed(2)} ${currency.toUpperCase()}`
   }
+}
+
+function formatCurrencyTotals(totals: Record<string, number> | undefined, fallbackCents: number) {
+  const entries = Object.entries(totals || {}).filter(([, cents]) => Number(cents || 0) > 0)
+  if (!entries.length) return formatMoney(fallbackCents || 0, 'usd')
+  return entries.map(([currency, cents]) => formatMoney(Number(cents || 0), currency)).join(' / ')
 }
 
 export default function AffiliateDashboardPage() {
@@ -146,23 +153,37 @@ export default function AffiliateDashboardPage() {
 
         {!loading && !error && data && 'affiliate' in data && data.affiliate && (
           <>
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-                <div>
-                  <div className="text-sm text-gray-500">Your referral link</div>
-                  <div className="mt-1 font-mono text-sm break-all">{fullReferralUrl}</div>
-                  <div className="mt-2 text-xs text-gray-500">Last-click attribution, 30-day window.</div>
-                </div>
-                <div className="flex gap-2">
-                  <button onClick={copyLink} className="px-3 py-2 rounded-lg border text-sm hover:bg-gray-50">
-                    Copy
-                  </button>
-                  <a href={fullReferralUrl} className="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm" target="_blank" rel="noreferrer">
-                    Open
-                  </a>
+            {data.affiliate.status !== 'ACTIVE' && (
+              <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 text-amber-900">
+                <h2 className="text-lg font-semibold">Affiliate account paused</h2>
+                <p className="mt-2 text-sm">
+                  Your referral link and payout setup are paused. Please contact support if you think this is a mistake.
+                </p>
+                <Link href="/support" className="inline-flex mt-4 text-sm font-semibold underline">
+                  Contact Support
+                </Link>
+              </div>
+            )}
+
+            {data.affiliate.status === 'ACTIVE' && (
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+                  <div>
+                    <div className="text-sm text-gray-500">Your referral link</div>
+                    <div className="mt-1 font-mono text-sm break-all">{fullReferralUrl}</div>
+                    <div className="mt-2 text-xs text-gray-500">Last-click attribution, 30-day window.</div>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={copyLink} className="px-3 py-2 rounded-lg border text-sm hover:bg-gray-50">
+                      Copy
+                    </button>
+                    <a href={fullReferralUrl} className="px-3 py-2 rounded-lg bg-gray-900 text-white text-sm" target="_blank" rel="noreferrer">
+                      Open
+                    </a>
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
               <div className="bg-white rounded-xl p-4 shadow-sm">
@@ -181,33 +202,37 @@ export default function AffiliateDashboardPage() {
               </div>
               <div className="bg-white rounded-xl p-4 shadow-sm">
                 <div className="text-xs text-gray-500">Payable Now</div>
-                <div className="text-2xl font-semibold">{formatMoney(data.stats.payableNowCents, 'aud')}</div>
+                <div className="text-2xl font-semibold">
+                  {formatCurrencyTotals(data.stats.payableNowByCurrency, data.stats.payableNowCents)}
+                </div>
               </div>
             </div>
 
-            <div className="bg-white rounded-xl p-6 shadow-sm">
-              <h2 className="text-lg font-semibold text-gray-900">Payout Setup (Stripe Connect)</h2>
-              <p className="text-gray-600 mt-2">
-                Payouts are processed monthly on a Net-30 basis once your payable balance reaches $50 USD.
-              </p>
-              <div className="mt-4 flex items-center gap-3">
-                <div className="text-sm text-gray-700">
-                  Status:{' '}
-                  {data.affiliate.stripeConnectPayoutsEnabled ? (
-                    <span className="text-helfi-green font-semibold">Ready</span>
-                  ) : (
-                    <span className="text-amber-600 font-semibold">Action required</span>
-                  )}
+            {data.affiliate.status === 'ACTIVE' && (
+              <div className="bg-white rounded-xl p-6 shadow-sm">
+                <h2 className="text-lg font-semibold text-gray-900">Payout Setup (Stripe Connect)</h2>
+                <p className="text-gray-600 mt-2">
+                  Payouts are processed monthly on a Net-30 basis once your payable balance reaches $50 USD.
+                </p>
+                <div className="mt-4 flex items-center gap-3">
+                  <div className="text-sm text-gray-700">
+                    Status:{' '}
+                    {data.affiliate.stripeConnectPayoutsEnabled ? (
+                      <span className="text-helfi-green font-semibold">Ready</span>
+                    ) : (
+                      <span className="text-amber-600 font-semibold">Action required</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={startConnectOnboarding}
+                    disabled={connectLoading}
+                    className="px-4 py-2 rounded-lg bg-helfi-green text-white disabled:opacity-50"
+                  >
+                    {connectLoading ? 'Opening…' : 'Set Up Payouts'}
+                  </button>
                 </div>
-                <button
-                  onClick={startConnectOnboarding}
-                  disabled={connectLoading}
-                  className="px-4 py-2 rounded-lg bg-helfi-green text-white disabled:opacity-50"
-                >
-                  {connectLoading ? 'Opening…' : 'Set Up Payouts'}
-                </button>
               </div>
-            </div>
+            )}
 
             <div className="bg-white rounded-xl p-6 shadow-sm">
               <h2 className="text-lg font-semibold text-gray-900">Recent Activity</h2>

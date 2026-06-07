@@ -8,6 +8,7 @@ export const dynamic = 'force-dynamic'
 const REQUIRED_EVENTS = [
   'checkout.session.completed',
   'invoice.paid',
+  'invoice.payment_failed',
   'charge.refunded',
   'charge.dispute.created',
   'account.updated',

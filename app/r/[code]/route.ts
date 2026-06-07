@@ -26,7 +26,7 @@ export async function GET(request: NextRequest, context: { params: { code: strin
 
   const url = new URL(request.url)
   const destination = url.searchParams.get('to') || '/'
-  const destinationPath = destination.startsWith('/') ? destination : '/'
+  const destinationPath = destination.startsWith('/') && !destination.startsWith('//') ? destination : '/'
 
   const affiliate = await prisma.affiliate.findUnique({
     where: { code },

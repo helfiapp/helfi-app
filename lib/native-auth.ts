@@ -24,7 +24,20 @@ function extractNativeToken(req: NextRequest): string {
   }
 
   const match = authHeader.match(/^Bearer\s+(.+)$/i)
-  return (match?.[1] || '').trim().replace(/^"+|"+$/g, '')
+  if (match?.[1]) return match[1].trim().replace(/^"+|"+$/g, '')
+
+  const cookieNames = [
+    'next-auth.session-token',
+    '__Secure-next-auth.session-token',
+    'authjs.session-token',
+    '__Secure-authjs.session-token',
+  ]
+  for (const name of cookieNames) {
+    const value = req.cookies.get(name)?.value
+    if (value) return value.trim().replace(/^"+|"+$/g, '')
+  }
+
+  return ''
 }
 
 export async function getUserIdFromNativeAuth(req: NextRequest): Promise<string | null> {

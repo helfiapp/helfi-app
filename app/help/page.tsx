@@ -132,7 +132,7 @@ export default function Help() {
           <h2 className="text-2xl font-bold text-gray-900 mb-6">How can we help you?</h2>
           
           {/* Quick Actions */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mb-8">
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <div className="p-4 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
               <h3 className="font-semibold text-gray-900 mb-2">Contact Support</h3>
               <p className="text-gray-600 text-sm mb-3">Get personalized help from our team</p>
@@ -146,6 +146,14 @@ export default function Help() {
               <p className="text-gray-600 text-sm mb-3">Find answers to common questions</p>
               <Link href="/faq" className="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
                 View FAQ
+              </Link>
+            </div>
+
+            <div className="p-4 border border-gray-200 rounded-lg hover:border-helfi-green transition-colors">
+              <h3 className="font-semibold text-gray-900 mb-2">Affiliate Program</h3>
+              <p className="text-gray-600 text-sm mb-3">Apply, read terms, or open your portal</p>
+              <Link href="/affiliate/apply" className="inline-block bg-gray-100 text-gray-700 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors">
+                Affiliate Help
               </Link>
             </div>
           </div>

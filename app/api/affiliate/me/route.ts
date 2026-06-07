@@ -45,10 +45,18 @@ export async function GET(request: NextRequest) {
   ])
 
   const now = new Date()
-  const payableSum = await prisma.affiliateCommission.aggregate({
+  const payableByCurrencyRows = await prisma.affiliateCommission.groupBy({
+    by: ['currency'],
     where: { affiliateId: affiliate.id, status: 'PENDING', payableAt: { lte: now } },
     _sum: { commissionCents: true },
   })
+  const payableNowByCurrency = payableByCurrencyRows.reduce(
+    (acc: Record<string, number>, row: any) => {
+      acc[String(row.currency || 'usd').toLowerCase()] = Number(row._sum.commissionCents || 0)
+      return acc
+    },
+    {} as Record<string, number>
+  )
 
   const conversions = await prisma.affiliateConversion.findMany({
     where: { affiliateId: affiliate.id },
@@ -82,7 +90,8 @@ export async function GET(request: NextRequest) {
       },
       {} as Record<string, number>
     ),
-    payableNowCents: Number(payableSum._sum.commissionCents || 0),
+    payableNowCents: Object.values(payableNowByCurrency).reduce((sum, value) => sum + Number(value || 0), 0),
+    payableNowByCurrency,
   }
 
   return NextResponse.json({

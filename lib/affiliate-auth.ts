@@ -3,6 +3,7 @@ import { getToken } from 'next-auth/jwt'
 import type { NextRequest } from 'next/server'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 const SESSION_COOKIE_NAME =
   process.env.NODE_ENV === 'production' ? '__Secure-next-auth.session-token' : 'next-auth.session-token'
@@ -34,6 +35,11 @@ export async function getAffiliateUser(request: NextRequest) {
 
   if (tokenId) {
     return prisma.user.findUnique({ where: { id: tokenId }, select: { id: true, email: true } })
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (nativeUserId) {
+    return prisma.user.findUnique({ where: { id: nativeUserId }, select: { id: true, email: true } })
   }
 
   return null

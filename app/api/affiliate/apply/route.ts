@@ -81,6 +81,22 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ ok: true, alreadyAffiliate: true, affiliate: existingAffiliate })
   }
 
+  const existingApplication = await prisma.affiliateApplication.findFirst({
+    where: {
+      userId: user.id,
+      status: { in: ['PENDING_REVIEW', 'APPROVED'] as any },
+    },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, status: true },
+  })
+  if (existingApplication) {
+    return NextResponse.json({
+      ok: true,
+      status: existingApplication.status,
+      applicationId: existingApplication.id,
+    })
+  }
+
   const ip = getClientIp(request)
   const userAgent = request.headers.get('user-agent')
   const country = request.headers.get('cf-ipcountry') || null

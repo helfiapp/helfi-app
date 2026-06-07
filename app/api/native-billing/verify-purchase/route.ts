@@ -13,6 +13,13 @@ type BillingUser = {
   email: string
 }
 
+type NativeAffiliateAttribution = {
+  code?: string
+  clickId?: string
+  visitorId?: string
+  clickedAtMs?: number
+}
+
 type AppleReceiptEntry = {
   product_id?: string
   transaction_id?: string
@@ -49,6 +56,12 @@ type GoogleSubscriptionPurchase = {
   paymentState?: number
 }
 
+function addDays(date: Date, days: number): Date {
+  const d = new Date(date)
+  d.setUTCDate(d.getUTCDate() + days)
+  return d
+}
+
 function normalizeStoreProductId(value: unknown): string {
   return String(value || '')
     .replace(/\\r/g, '')
@@ -56,6 +69,74 @@ function normalizeStoreProductId(value: unknown): string {
     .replace(/\\t/g, '')
     .replace(/[\r\n\t]/g, '')
     .trim()
+}
+
+async function createNativeAffiliateCommission(opts: {
+  user: BillingUser
+  attribution: NativeAffiliateAttribution | null
+  type: 'SUBSCRIPTION_INITIAL' | 'TOPUP'
+  platform: 'ios' | 'android'
+  transactionId: string
+  amountCents: number
+  occurredAt: Date
+}) {
+  const code = String(opts.attribution?.code || '').trim().toLowerCase()
+  const clickId = String(opts.attribution?.clickId || '').trim()
+  const clickedAtMs = Number(opts.attribution?.clickedAtMs || 0)
+  if (!code || !clickId || !Number.isFinite(clickedAtMs) || clickedAtMs <= 0) return
+  if (!opts.transactionId || opts.amountCents <= 0) return
+
+  const affiliate = await prisma.affiliate.findUnique({
+    where: { code },
+    select: { id: true, status: true, userId: true },
+  })
+  if (!affiliate || affiliate.status !== 'ACTIVE') return
+  if (affiliate.userId === opts.user.id) return
+
+  const click = await prisma.affiliateClick.findUnique({
+    where: { id: clickId },
+    select: { id: true, affiliateId: true, createdAt: true },
+  })
+  if (!click || click.affiliateId !== affiliate.id) return
+
+  const ageMs = opts.occurredAt.getTime() - click.createdAt.getTime()
+  if (ageMs < 0 || ageMs > 30 * 24 * 60 * 60 * 1000) return
+
+  const conversion = await prisma.affiliateConversion
+    .create({
+      data: {
+        affiliateId: affiliate.id,
+        clickId: click.id,
+        referredUserId: opts.user.id,
+        type: opts.type,
+        stripeEventId: `native:${opts.platform}:${opts.transactionId}:${opts.type}`,
+        stripeCheckoutSessionId: null,
+        stripePaymentIntentId: null,
+        stripeChargeId: null,
+        stripeInvoiceId: null,
+        currency: 'usd',
+        amountGrossCents: opts.amountCents,
+        stripeFeeCents: 0,
+        amountNetCents: opts.amountCents,
+        occurredAt: opts.occurredAt,
+      },
+      select: { id: true },
+    })
+    .catch(() => null)
+
+  if (!conversion) return
+
+  await prisma.affiliateCommission.create({
+    data: {
+      affiliateId: affiliate.id,
+      conversionId: conversion.id,
+      status: 'PENDING',
+      currency: 'usd',
+      netRevenueCents: opts.amountCents,
+      commissionCents: Math.floor(opts.amountCents / 2),
+      payableAt: addDays(opts.occurredAt, 30),
+    },
+  }).catch(() => {})
 }
 
 async function upsertSubscriptionPreservingStartDate(opts: {
@@ -395,6 +476,7 @@ export async function POST(request: NextRequest) {
     const receiptData = String(body?.receiptData || '')
     const transactionId = String(body?.transactionId || '')
     const purchaseToken = String(body?.purchaseToken || '')
+    const affiliateAttribution = (body?.affiliateAttribution || null) as NativeAffiliateAttribution | null
 
     if (!platform) {
       return NextResponse.json({ error: 'Invalid platform. Use ios or android.' }, { status: 400 })
@@ -449,6 +531,16 @@ export async function POST(request: NextRequest) {
           },
         })
 
+        await createNativeAffiliateCommission({
+          user,
+          attribution: affiliateAttribution,
+          type: 'TOPUP',
+          platform,
+          transactionId: String(purchase.orderId || purchaseToken),
+          amountCents: product.priceCents,
+          occurredAt: purchasedAt,
+        })
+
         return NextResponse.json({
           ok: true,
           type: 'topup',
@@ -472,6 +564,16 @@ export async function POST(request: NextRequest) {
         storeProductId: expectedProductId,
         storeTransactionId: String(sub.orderId || purchaseToken),
         storeOriginalTransactionId: String(sub.orderId || purchaseToken),
+      })
+
+      await createNativeAffiliateCommission({
+        user,
+        attribution: affiliateAttribution,
+        type: 'SUBSCRIPTION_INITIAL',
+        platform,
+        transactionId: String(sub.orderId || purchaseToken),
+        amountCents: product.priceCents,
+        occurredAt: startDateHint || new Date(),
       })
 
       return NextResponse.json({
@@ -583,6 +685,16 @@ export async function POST(request: NextRequest) {
         },
       })
 
+      await createNativeAffiliateCommission({
+        user,
+        attribution: affiliateAttribution,
+        type: 'TOPUP',
+        platform,
+        transactionId: finalTransactionId,
+        amountCents: product.priceCents,
+        occurredAt: purchasedAt,
+      })
+
       return NextResponse.json({
         ok: true,
         type: 'topup',
@@ -605,6 +717,16 @@ export async function POST(request: NextRequest) {
       storeProductId: expectedProductId,
       storeTransactionId: finalTransactionId,
       storeOriginalTransactionId: finalOriginalTransactionId || finalTransactionId,
+    })
+
+    await createNativeAffiliateCommission({
+      user,
+      attribution: affiliateAttribution,
+      type: 'SUBSCRIPTION_INITIAL',
+      platform,
+      transactionId: finalTransactionId,
+      amountCents: product.priceCents,
+      occurredAt: startDateHint || new Date(),
     })
 
     return NextResponse.json({

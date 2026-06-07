@@ -6,6 +6,8 @@ import { useSession } from 'next-auth/react'
 
 export default function AffiliateApplyPage() {
   const termsVersion = '2025-12-22'
+  const signinHref = '/auth/signin?next=%2Faffiliate%2Fapply'
+  const signupHref = '/auth/signin?mode=signup&next=%2Faffiliate%2Fapply'
   const { data: session, status } = useSession()
   const [loading, setLoading] = useState(true)
   const [applicationStatus, setApplicationStatus] = useState<any>(null)
@@ -94,14 +96,14 @@ export default function AffiliateApplyPage() {
             <Link
               replace
               className="px-5 py-2.5 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-              href="/auth/signin?mode=signup"
+              href={signupHref}
             >
               Create account
             </Link>
             <Link
               replace
               className="px-5 py-2.5 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-              href="/auth/signin"
+              href={signinHref}
             >
               Sign in
             </Link>
@@ -112,6 +114,14 @@ export default function AffiliateApplyPage() {
   }
 
   const alreadyAffiliate = !!applicationStatus?.affiliate
+  const latestApplication = applicationStatus?.application
+  const canShowForm = !alreadyAffiliate && (!latestApplication || latestApplication.status === 'REJECTED')
+  const applicationStatusText =
+    latestApplication?.status === 'APPROVED'
+      ? 'Approved'
+      : latestApplication?.status === 'REJECTED'
+        ? 'Not approved right now'
+        : 'Under review'
 
   return (
     <div className="min-h-screen bg-gray-50 p-6">
@@ -141,23 +151,26 @@ export default function AffiliateApplyPage() {
           </div>
         )}
 
-        {!loading && !error && !alreadyAffiliate && applicationStatus?.application && (
+        {!loading && !error && !alreadyAffiliate && latestApplication && (
           <div className="bg-white rounded-xl p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-gray-900">Application Status</h2>
             <div className="mt-2 text-sm text-gray-700">
-              <div>Status: <span className="font-semibold">{applicationStatus.application.status}</span></div>
-              <div>Risk: <span className="font-semibold">{applicationStatus.application.riskLevel || '—'}</span></div>
-              <div>Recommendation: <span className="font-semibold">{applicationStatus.application.recommendation || '—'}</span></div>
+              Status: <span className="font-semibold">{applicationStatusText}</span>
             </div>
-            <p className="text-gray-600 mt-3">{applicationStatus.application.aiReasoning || 'We’ll review your application and get back to you.'}</p>
+            <p className="text-gray-600 mt-3">
+              {latestApplication.status === 'REJECTED'
+                ? 'This application was not approved. You can update your details and apply again, or contact support if you need help.'
+                : 'We’ll review your application and update this page when it is ready.'}
+            </p>
           </div>
         )}
 
-        {!loading && !error && !alreadyAffiliate && !applicationStatus?.application && (
+        {!loading && !error && canShowForm && (
           <form onSubmit={submit} className="bg-white rounded-xl p-6 shadow-sm space-y-4">
             <div>
-              <label className="block text-sm font-medium text-gray-700">Name</label>
+              <label htmlFor="affiliate-name" className="block text-sm font-medium text-gray-700">Name</label>
               <input
+                id="affiliate-name"
                 value={name}
                 onChange={e => setName(e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2"
@@ -165,8 +178,9 @@ export default function AffiliateApplyPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Website (optional)</label>
+              <label htmlFor="affiliate-website" className="block text-sm font-medium text-gray-700">Website (optional)</label>
               <input
+                id="affiliate-website"
                 value={website}
                 onChange={e => setWebsite(e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2"
@@ -174,8 +188,9 @@ export default function AffiliateApplyPage() {
               />
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Primary promotion channel</label>
+              <label htmlFor="affiliate-primary-channel" className="block text-sm font-medium text-gray-700">Primary promotion channel</label>
               <select
+                id="affiliate-primary-channel"
                 value={primaryChannel}
                 onChange={e => {
                   const next = e.target.value
@@ -198,8 +213,9 @@ export default function AffiliateApplyPage() {
             </div>
             {primaryChannel === 'OTHER' && (
               <div>
-                <label className="block text-sm font-medium text-gray-700">Please specify</label>
+                <label htmlFor="affiliate-primary-channel-other" className="block text-sm font-medium text-gray-700">Please specify</label>
                 <input
+                  id="affiliate-primary-channel-other"
                   value={primaryChannelOther}
                   onChange={e => setPrimaryChannelOther(e.target.value)}
                   className="mt-1 w-full border rounded-lg px-3 py-2"
@@ -210,8 +226,9 @@ export default function AffiliateApplyPage() {
               </div>
             )}
             <div>
-              <label className="block text-sm font-medium text-gray-700">Audience size (optional)</label>
+              <label htmlFor="affiliate-audience-size" className="block text-sm font-medium text-gray-700">Audience size (optional)</label>
               <select
+                id="affiliate-audience-size"
                 value={audienceSize}
                 onChange={e => setAudienceSize(e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2 bg-white"
@@ -226,8 +243,9 @@ export default function AffiliateApplyPage() {
               </select>
             </div>
             <div>
-              <label className="block text-sm font-medium text-gray-700">How will you promote Helfi?</label>
+              <label htmlFor="affiliate-promotion-method" className="block text-sm font-medium text-gray-700">How will you promote Helfi?</label>
               <textarea
+                id="affiliate-promotion-method"
                 value={promotionMethod}
                 onChange={e => setPromotionMethod(e.target.value)}
                 className="mt-1 w-full border rounded-lg px-3 py-2"
@@ -237,8 +255,9 @@ export default function AffiliateApplyPage() {
                 minLength={10}
               />
             </div>
-            <label className="flex items-start gap-3 text-sm text-gray-700">
+            <label htmlFor="affiliate-terms" className="flex items-start gap-3 text-sm text-gray-700">
               <input
+                id="affiliate-terms"
                 type="checkbox"
                 className="mt-1"
                 checked={termsAccepted}
@@ -254,8 +273,8 @@ export default function AffiliateApplyPage() {
               </span>
             </label>
             <div>
-              <label className="block text-sm font-medium text-gray-700">Notes (optional)</label>
-              <textarea value={notes} onChange={e => setNotes(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2" rows={3} />
+              <label htmlFor="affiliate-notes" className="block text-sm font-medium text-gray-700">Notes (optional)</label>
+              <textarea id="affiliate-notes" value={notes} onChange={e => setNotes(e.target.value)} className="mt-1 w-full border rounded-lg px-3 py-2" rows={3} />
             </div>
             <button
               disabled={submitting}
