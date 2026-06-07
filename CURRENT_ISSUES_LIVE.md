@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 8 June 2026, 01:07 AM AEST
+- What changed: Audited the medical practitioner listing flow and fixed the iPhone “List your practice” screen so it matches the live website/backend 3 months free offer.
+- Where to see it (page/link): https://helfi.ai, https://helfi.ai/practitioners, https://helfi.ai/list-your-practice, and native iPhone app -> List your practice in the next native app build.
+- What to quickly test: Open the practitioner pages, confirm listing/search pages load, and confirm the iPhone listing screen says 3 months free.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 8 June 2026, 12:59 AM AEST
 - What changed: Fully audited and fixed the affiliate program across the public website, affiliate web app, payout safety, Stripe attribution, monthly payout cron security, and iPhone affiliate purchase tracking.
 - Where to see it (page/link): https://helfi.ai, https://helfi.ai/affiliate/apply, https://helfi.ai/affiliate, https://helfi.ai/affiliate/terms, and native iPhone affiliate links.
