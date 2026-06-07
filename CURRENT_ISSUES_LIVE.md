@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 8 June 2026, 12:59 AM AEST
+- What changed: Fully audited and fixed the affiliate program across the public website, affiliate web app, payout safety, Stripe attribution, monthly payout cron security, and iPhone affiliate purchase tracking.
+- Where to see it (page/link): https://helfi.ai, https://helfi.ai/affiliate/apply, https://helfi.ai/affiliate, https://helfi.ai/affiliate/terms, and native iPhone affiliate links.
+- What to quickly test: Open the homepage and confirm the Affiliate link is visible, open the affiliate application page and confirm sign-in/sign-up returns to the application, open an affiliate referral link, and confirm iPhone affiliate links can open Helfi instead of only the browser.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 6 June 2026, 2:00 PM AEST
 - What changed: Updated health, medical, AI, privacy, and lab-report wording on the public Privacy Policy and Terms pages; removed unfinished placeholder address text; aligned the native legal text for the next native build.
 - Where to see it (page/link): https://helfi.ai/privacy and https://helfi.ai/terms
