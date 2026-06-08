@@ -1,9 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { practitionerOutreachSeed } from '@/lib/practitioner-outreach-seed'
 
+export const maxDuration = 60
+
 const STATUSES = new Set(['NOT_REVIEWED', 'APPROVED', 'SENT', 'REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'DO_NOT_CONTACT'])
+const SAVE_BATCH_SIZE = 20
 
 function ensureAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -79,9 +83,8 @@ export async function POST(request: NextRequest) {
 
   await ensurePractitionerOutreachSchema()
 
-  let savedCount = 0
-  for (const contact of practitionerOutreachSeed) {
-    const id = crypto.randomUUID()
+  const contacts = practitionerOutreachSeed.map(contact => {
+    const id = randomUUID()
     const email = normalizeEmail(contact.email)
     const name = cleanText(contact.name)
     const practiceName = cleanText(contact.practiceName)
@@ -99,18 +102,41 @@ export async function POST(request: NextRequest) {
     const doNotContactNotice = Boolean(contact.doNotContactNotice)
     const status = cleanStatus(contact.status)
 
-    if (!practiceName || !country || !email) continue
+    if (!practiceName || !country || !email) return null
 
-    await prisma.$executeRaw`
+    return {
+      id,
+      name,
+      email,
+      practiceName,
+      country,
+      category,
+      subcategory,
+      region,
+      city,
+      practitionerType,
+      website,
+      emailType,
+      sourceUrl,
+      relevanceNotes,
+      safetyBasis,
+      doNotContactNotice,
+      status,
+    }
+  }).filter((contact): contact is NonNullable<typeof contact> => Boolean(contact))
+
+  for (let index = 0; index < contacts.length; index += SAVE_BATCH_SIZE) {
+    const batch = contacts.slice(index, index + SAVE_BATCH_SIZE)
+    await Promise.all(batch.map(contact => prisma.$executeRaw`
       INSERT INTO "PractitionerOutreachContact" (
         "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
         "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
         "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
       )
       VALUES (
-        ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${category}, ${subcategory}, ${region}, ${city},
-        ${practitionerType}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
-        ${safetyBasis}, ${doNotContactNotice}, ${status}, false, NOW()
+        ${contact.id}, ${contact.name}, ${contact.email}, ${contact.practiceName}, ${contact.country}, ${contact.category}, ${contact.subcategory}, ${contact.region}, ${contact.city},
+        ${contact.practitionerType}, ${contact.website}, ${contact.emailType}, ${contact.sourceUrl}, ${contact.relevanceNotes},
+        ${contact.safetyBasis}, ${contact.doNotContactNotice}, ${contact.status}, false, NOW()
       )
       ON CONFLICT ("email") WHERE "email" IS NOT NULL DO UPDATE SET
         "name" = EXCLUDED."name",
@@ -133,9 +159,8 @@ export async function POST(request: NextRequest) {
           ELSE EXCLUDED."status"
         END,
         "updatedAt" = NOW()
-    `
-    savedCount += 1
+    `))
   }
 
-  return NextResponse.json({ savedCount })
+  return NextResponse.json({ savedCount: contacts.length })
 }
