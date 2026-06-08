@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 8 June 2026, 03:55 PM AEST
+- What changed: Changed the practitioner listing offer from 3 months free to 6 months free across the public website, practitioner portal messages, emails, backend trial length, and native iPhone listing screen.
+- Where to see it (page/link): https://helfi.ai/list-your-practice, https://helfi.ai/practitioner, and native iPhone app -> List your practice in the next native app build.
+- What to quickly test: Open the list-your-practice page and confirm it says 6 months free; approve a practitioner listing and confirm the trial end is 6 months later.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 8 June 2026, 01:07 AM AEST
 - What changed: Audited the medical practitioner listing flow and fixed the iPhone “List your practice” screen so it matches the live website/backend 3 months free offer.
 - Where to see it (page/link): https://helfi.ai, https://helfi.ai/practitioners, https://helfi.ai/list-your-practice, and native iPhone app -> List your practice in the next native app build.
