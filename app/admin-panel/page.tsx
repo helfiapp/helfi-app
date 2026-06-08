@@ -42,6 +42,8 @@ const PRACTITIONER_REJECTION_REASONS = [
   },
 ]
 
+const PRACTITIONER_OUTREACH_PAGE_SIZE = 50
+
 export default function AdminPanel() {
   const router = useRouter()
   const [isAuthenticated, setIsAuthenticated] = useState(false)
@@ -143,6 +145,7 @@ export default function AdminPanel() {
   // Practitioner outreach states
   const [practitionerOutreachData, setPractitionerOutreachData] = useState<any[]>([])
   const [isLoadingPractitionerOutreach, setIsLoadingPractitionerOutreach] = useState(false)
+  const [practitionerOutreachPage, setPractitionerOutreachPage] = useState(1)
   const [selectedPractitionerOutreachIds, setSelectedPractitionerOutreachIds] = useState<string[]>([])
   const [showPractitionerOutreachForm, setShowPractitionerOutreachForm] = useState(false)
   const [practitionerOutreachForm, setPractitionerOutreachForm] = useState<any>({
@@ -167,6 +170,12 @@ export default function AdminPanel() {
   const [practitionerEmailSubject, setPractitionerEmailSubject] = useState('')
   const [practitionerEmailMessage, setPractitionerEmailMessage] = useState('')
   const [isComposingPractitionerEmail, setIsComposingPractitionerEmail] = useState(false)
+  const practitionerOutreachTotalPages = Math.max(1, Math.ceil(practitionerOutreachData.length / PRACTITIONER_OUTREACH_PAGE_SIZE))
+  const practitionerOutreachPageStart = (Math.min(practitionerOutreachPage, practitionerOutreachTotalPages) - 1) * PRACTITIONER_OUTREACH_PAGE_SIZE
+  const visiblePractitionerOutreachData = practitionerOutreachData.slice(
+    practitionerOutreachPageStart,
+    practitionerOutreachPageStart + PRACTITIONER_OUTREACH_PAGE_SIZE
+  )
 
   // User Management Email states
   const [selectedUserEmails, setSelectedUserEmails] = useState<string[]>([])
@@ -1103,6 +1112,7 @@ https://www.helfi.ai`)
       if (response.ok) {
         const result = await response.json()
         setPractitionerOutreachData(result.contacts || [])
+        setPractitionerOutreachPage(1)
         setSelectedPractitionerOutreachIds(prev => prev.filter(id =>
           result.contacts?.some((entry: any) => entry.id === id)
         ))
@@ -5945,7 +5955,11 @@ The Helfi Team`,
                   <div>
                     <h3 className="text-lg font-semibold text-gray-900">Practitioner Contacts</h3>
                     <p className="text-sm text-gray-600">
-                      {isLoadingPractitionerOutreach ? 'Loading...' : `${practitionerOutreachData.length} contacts`}
+                      {isLoadingPractitionerOutreach
+                        ? 'Loading...'
+                        : practitionerOutreachData.length > PRACTITIONER_OUTREACH_PAGE_SIZE
+                          ? `Showing ${practitionerOutreachPageStart + 1}-${Math.min(practitionerOutreachPageStart + PRACTITIONER_OUTREACH_PAGE_SIZE, practitionerOutreachData.length)} of ${practitionerOutreachData.length} contacts`
+                          : `${practitionerOutreachData.length} contacts`}
                     </p>
                   </div>
                   {practitionerOutreachData.length > 0 && (
@@ -5989,7 +6003,7 @@ The Helfi Team`,
                           </td>
                         </tr>
                       ) : (
-                        practitionerOutreachData.map((entry, index) => (
+                        visiblePractitionerOutreachData.map((entry, index) => (
                           <tr key={entry.id || index} className={selectedPractitionerOutreachIds.includes(entry.id) ? 'bg-emerald-50' : ''}>
                             <td className="px-6 py-4 whitespace-nowrap">
                               <input
@@ -6044,6 +6058,29 @@ The Helfi Team`,
                       )}
                     </tbody>
                   </table>
+                  {practitionerOutreachData.length > PRACTITIONER_OUTREACH_PAGE_SIZE && (
+                    <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
+                      <div className="text-sm text-gray-600">
+                        Page {Math.min(practitionerOutreachPage, practitionerOutreachTotalPages)} of {practitionerOutreachTotalPages}
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          onClick={() => setPractitionerOutreachPage(prev => Math.max(1, prev - 1))}
+                          disabled={practitionerOutreachPage <= 1}
+                          className="px-3 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Previous
+                        </button>
+                        <button
+                          onClick={() => setPractitionerOutreachPage(prev => Math.min(practitionerOutreachTotalPages, prev + 1))}
+                          disabled={practitionerOutreachPage >= practitionerOutreachTotalPages}
+                          className="px-3 py-2 rounded-md border border-gray-300 text-sm text-gray-700 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          Next
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               )}
             </div>
