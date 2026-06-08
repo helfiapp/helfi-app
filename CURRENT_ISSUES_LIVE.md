@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 9 June 2026, 12:45 AM AEST
+- What changed: Expanded the Australia practitioner outreach starter list from a tiny sample to 233 unique public clinic/business contacts, covering every main Helfi practitioner category. All contacts stay NOT_REVIEWED until manually checked and approved.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Australia Starter List
+- What to quickly test: Open Practitioner Outreach, click Load Australia Starter List, confirm hundreds of contacts load, and confirm the list includes all main categories with no emails sent automatically.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 8 June 2026, 04:56 PM AEST
 - What changed: Added an Australia practitioner outreach starter list with one safe public contact for each main Helfi practitioner category, plus category/subcategory storage and a one-click admin loader. Contacts stay NOT_REVIEWED until manually approved.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Australia Starter List
