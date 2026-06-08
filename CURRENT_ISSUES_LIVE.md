@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 8 June 2026, 04:05 PM AEST
+- What changed: Added the practitioner outreach system in the admin panel, including country-organised contact storage, review/approval status, one reusable 6-month-free email template, unsubscribe handling, and one-email-per-minute sending protection.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
+- What to quickly test: Open Admin Panel -> Practitioner Outreach, add a test contact, mark it approved, compose the email, and confirm the system only sends one approved email at a time.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 8 June 2026, 03:55 PM AEST
 - What changed: Changed the practitioner listing offer from 3 months free to 6 months free across the public website, practitioner portal messages, emails, backend trial length, and native iPhone listing screen.
 - Where to see it (page/link): https://helfi.ai/list-your-practice, https://helfi.ai/practitioner, and native iPhone app -> List your practice in the next native app build.
