@@ -147,6 +147,8 @@ export default function AdminPanel() {
   const [showPractitionerOutreachForm, setShowPractitionerOutreachForm] = useState(false)
   const [practitionerOutreachForm, setPractitionerOutreachForm] = useState<any>({
     country: 'Australia',
+    category: '',
+    subcategory: '',
     practiceName: '',
     name: '',
     email: '',
@@ -1111,6 +1113,31 @@ https://www.helfi.ai`)
     setIsLoadingPractitionerOutreach(false)
   }
 
+  const handleInitPractitionerOutreach = async () => {
+    if (!confirm('Load the Australia practitioner starter list? This will add or refresh safe public contacts for review.')) {
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/practitioner-outreach/init', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      const result = await response.json()
+      if (response.ok) {
+        alert(`Saved ${result.savedCount || 0} practitioner contacts for review`)
+        loadPractitionerOutreachData()
+      } else {
+        alert(result.error || 'Failed to load practitioner contacts')
+      }
+    } catch (error) {
+      console.error('Error loading practitioner outreach contacts:', error)
+      alert('Failed to load practitioner contacts. Please try again.')
+    }
+  }
+
   const updatePractitionerOutreachForm = (field: string, value: any) => {
     setPractitionerOutreachForm((prev: any) => ({ ...prev, [field]: value }))
   }
@@ -1118,6 +1145,8 @@ https://www.helfi.ai`)
   const resetPractitionerOutreachForm = () => {
     setPractitionerOutreachForm({
       country: 'Australia',
+      category: '',
+      subcategory: '',
       practiceName: '',
       name: '',
       email: '',
@@ -5697,6 +5726,12 @@ The Helfi Team`,
                 </div>
                 <div className="flex flex-wrap gap-3">
                   <button
+                    onClick={handleInitPractitionerOutreach}
+                    className="bg-amber-100 text-amber-900 px-4 py-2 rounded-lg hover:bg-amber-200 transition-colors"
+                  >
+                    Load Australia Starter List
+                  </button>
+                  <button
                     onClick={() => setShowPractitionerOutreachForm(prev => !prev)}
                     className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
                   >
@@ -5758,6 +5793,18 @@ The Helfi Team`,
                       <option key={country} value={country}>{country}</option>
                     ))}
                   </select>
+                  <input
+                    value={practitionerOutreachForm.category}
+                    onChange={(e) => updatePractitionerOutreachForm('category', e.target.value)}
+                    placeholder="Helfi category"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    value={practitionerOutreachForm.subcategory}
+                    onChange={(e) => updatePractitionerOutreachForm('subcategory', e.target.value)}
+                    placeholder="Helfi subcategory"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
                   <input
                     value={practitionerOutreachForm.region}
                     onChange={(e) => updatePractitionerOutreachForm('region', e.target.value)}
@@ -5925,6 +5972,7 @@ The Helfi Team`,
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Select</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practice</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
@@ -5936,7 +5984,7 @@ The Helfi Team`,
                     <tbody className="bg-white divide-y divide-gray-200">
                       {practitionerOutreachData.length === 0 ? (
                         <tr>
-                          <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                          <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
                             No practitioner outreach contacts yet. Add the first contact above.
                           </td>
                         </tr>
@@ -5957,6 +6005,10 @@ The Helfi Team`,
                               <div className="text-gray-500">{entry.name || '-'}{entry.city ? ` · ${entry.city}` : ''}</div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.country}</td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              <div className="font-medium">{entry.category || '-'}</div>
+                              <div className="text-gray-500">{entry.subcategory || '-'}</div>
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.email || 'Form only'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.practitionerType || entry.emailType || '-'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">

@@ -132,6 +132,8 @@ export async function GET(request: NextRequest) {
           "email" TEXT,
           "practiceName" TEXT NOT NULL,
           "country" TEXT NOT NULL,
+          "category" TEXT,
+          "subcategory" TEXT,
           "region" TEXT,
           "city" TEXT,
           "practitionerType" TEXT,
@@ -151,6 +153,8 @@ export async function GET(request: NextRequest) {
           CONSTRAINT "PractitionerOutreachContact_pkey" PRIMARY KEY ("id")
         );
       `).catch(() => {})
+      await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "category" TEXT`).catch(() => {})
+      await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "subcategory" TEXT`).catch(() => {})
       await prisma.$executeRawUnsafe(`
         UPDATE "PractitionerOutreachContact"
         SET "unsubscribed" = true, "status" = 'UNSUBSCRIBED', "updatedAt" = NOW()

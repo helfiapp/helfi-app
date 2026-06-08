@@ -24,6 +24,8 @@ async function ensurePractitionerOutreachSchema() {
       "email" TEXT,
       "practiceName" TEXT NOT NULL,
       "country" TEXT NOT NULL,
+      "category" TEXT,
+      "subcategory" TEXT,
       "region" TEXT,
       "city" TEXT,
       "practitionerType" TEXT,
@@ -43,6 +45,8 @@ async function ensurePractitionerOutreachSchema() {
       CONSTRAINT "PractitionerOutreachContact_pkey" PRIMARY KEY ("id")
     );
   `)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "category" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "subcategory" TEXT;`)
 }
 
 function escapeHtml(value: unknown) {
@@ -59,6 +63,8 @@ function personalize(template: string, contact: any) {
     .replace(/{name}/g, contact.name || 'there')
     .replace(/{practiceName}/g, contact.practiceName || '')
     .replace(/{country}/g, contact.country || '')
+    .replace(/{category}/g, contact.category || '')
+    .replace(/{subcategory}/g, contact.subcategory || '')
     .replace(/{region}/g, contact.region || '')
     .replace(/{city}/g, contact.city || '')
     .replace(/{practitionerType}/g, contact.practitionerType || '')

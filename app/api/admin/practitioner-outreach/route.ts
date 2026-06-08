@@ -32,6 +32,8 @@ async function ensurePractitionerOutreachSchema() {
       "email" TEXT,
       "practiceName" TEXT NOT NULL,
       "country" TEXT NOT NULL,
+      "category" TEXT,
+      "subcategory" TEXT,
       "region" TEXT,
       "city" TEXT,
       "practitionerType" TEXT,
@@ -51,6 +53,8 @@ async function ensurePractitionerOutreachSchema() {
       CONSTRAINT "PractitionerOutreachContact_pkey" PRIMARY KEY ("id")
     );
   `)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "category" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "subcategory" TEXT;`)
   await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "PractitionerOutreachContact_email_key"
     ON "PractitionerOutreachContact"("email")
@@ -59,6 +63,10 @@ async function ensurePractitionerOutreachSchema() {
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "PractitionerOutreachContact_country_status_idx"
     ON "PractitionerOutreachContact"("country", "status");
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE INDEX IF NOT EXISTS "PractitionerOutreachContact_category_idx"
+    ON "PractitionerOutreachContact"("category", "subcategory");
   `)
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "PractitionerOutreachContact_lastSentAt_idx"
@@ -76,12 +84,12 @@ export async function GET(request: NextRequest) {
 
   const contacts = await prisma.$queryRaw<any[]>`
     SELECT
-      "id", "name", "email", "practiceName", "country", "region", "city",
+      "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
       "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
       "safetyBasis", "doNotContactNotice", "status", "unsubscribed",
       "lastSentAt", "sentCount", "lastError", "createdAt", "updatedAt"
     FROM "PractitionerOutreachContact"
-    ORDER BY "country" ASC, "practiceName" ASC, "name" ASC
+    ORDER BY "country" ASC, "category" ASC, "subcategory" ASC, "practiceName" ASC, "name" ASC
   `
 
   return NextResponse.json({ contacts })
@@ -106,6 +114,8 @@ export async function POST(request: NextRequest) {
 
     const id = crypto.randomUUID()
     const name = cleanText(contact?.name)
+    const category = cleanText(contact?.category)
+    const subcategory = cleanText(contact?.subcategory)
     const region = cleanText(contact?.region)
     const city = cleanText(contact?.city)
     const practitionerType = cleanText(contact?.practitionerType)
@@ -120,12 +130,12 @@ export async function POST(request: NextRequest) {
     if (email) {
       await prisma.$executeRaw`
         INSERT INTO "PractitionerOutreachContact" (
-          "id", "name", "email", "practiceName", "country", "region", "city",
+          "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
           "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
           "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
         )
         VALUES (
-          ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${region}, ${city},
+          ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${category}, ${subcategory}, ${region}, ${city},
           ${practitionerType}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
           ${safetyBasis}, ${doNotContactNotice}, ${status}, false, NOW()
         )
@@ -133,6 +143,8 @@ export async function POST(request: NextRequest) {
           "name" = EXCLUDED."name",
           "practiceName" = EXCLUDED."practiceName",
           "country" = EXCLUDED."country",
+          "category" = EXCLUDED."category",
+          "subcategory" = EXCLUDED."subcategory",
           "region" = EXCLUDED."region",
           "city" = EXCLUDED."city",
           "practitionerType" = EXCLUDED."practitionerType",
@@ -148,12 +160,12 @@ export async function POST(request: NextRequest) {
     } else {
       await prisma.$executeRaw`
         INSERT INTO "PractitionerOutreachContact" (
-          "id", "name", "email", "practiceName", "country", "region", "city",
+          "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
           "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
           "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
         )
         VALUES (
-          ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${region}, ${city},
+          ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${category}, ${subcategory}, ${region}, ${city},
           ${practitionerType}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
           ${safetyBasis}, ${doNotContactNotice}, ${status}, false, NOW()
         )
