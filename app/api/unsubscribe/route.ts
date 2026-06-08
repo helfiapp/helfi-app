@@ -125,6 +125,38 @@ export async function GET(request: NextRequest) {
         data: { unsubscribed: true }
       }).catch(() => {}) // Ignore if Prisma fails
 
+      await prisma.$executeRawUnsafe(`
+        CREATE TABLE IF NOT EXISTS "PractitionerOutreachContact" (
+          "id" TEXT NOT NULL,
+          "name" TEXT,
+          "email" TEXT,
+          "practiceName" TEXT NOT NULL,
+          "country" TEXT NOT NULL,
+          "region" TEXT,
+          "city" TEXT,
+          "practitionerType" TEXT,
+          "website" TEXT,
+          "emailType" TEXT,
+          "sourceUrl" TEXT,
+          "relevanceNotes" TEXT,
+          "safetyBasis" TEXT,
+          "doNotContactNotice" BOOLEAN NOT NULL DEFAULT false,
+          "status" TEXT NOT NULL DEFAULT 'NOT_REVIEWED',
+          "unsubscribed" BOOLEAN NOT NULL DEFAULT false,
+          "lastSentAt" TIMESTAMP(3),
+          "sentCount" INTEGER NOT NULL DEFAULT 0,
+          "lastError" TEXT,
+          "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          "updatedAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+          CONSTRAINT "PractitionerOutreachContact_pkey" PRIMARY KEY ("id")
+        );
+      `).catch(() => {})
+      await prisma.$executeRawUnsafe(`
+        UPDATE "PractitionerOutreachContact"
+        SET "unsubscribed" = true, "status" = 'UNSUBSCRIBED', "updatedAt" = NOW()
+        WHERE LOWER("email") = LOWER('${escapedEmail}')
+      `).catch(() => {})
+
       // Also check if user exists and could track preferences there
       const user = await prisma.user.findUnique({
         where: { email: normalizedEmail }

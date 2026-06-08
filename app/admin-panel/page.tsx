@@ -140,6 +140,32 @@ export default function AdminPanel() {
   const [partnerEmailMessage, setPartnerEmailMessage] = useState('')
   const [isComposingPartnerEmail, setIsComposingPartnerEmail] = useState(false)
 
+  // Practitioner outreach states
+  const [practitionerOutreachData, setPractitionerOutreachData] = useState<any[]>([])
+  const [isLoadingPractitionerOutreach, setIsLoadingPractitionerOutreach] = useState(false)
+  const [selectedPractitionerOutreachIds, setSelectedPractitionerOutreachIds] = useState<string[]>([])
+  const [showPractitionerOutreachForm, setShowPractitionerOutreachForm] = useState(false)
+  const [practitionerOutreachForm, setPractitionerOutreachForm] = useState<any>({
+    country: 'Australia',
+    practiceName: '',
+    name: '',
+    email: '',
+    region: '',
+    city: '',
+    practitionerType: '',
+    website: '',
+    emailType: 'clinic',
+    sourceUrl: '',
+    relevanceNotes: '',
+    safetyBasis: '',
+    doNotContactNotice: false,
+    status: 'NOT_REVIEWED',
+  })
+  const [showPractitionerEmailInterface, setShowPractitionerEmailInterface] = useState(false)
+  const [practitionerEmailSubject, setPractitionerEmailSubject] = useState('')
+  const [practitionerEmailMessage, setPractitionerEmailMessage] = useState('')
+  const [isComposingPractitionerEmail, setIsComposingPractitionerEmail] = useState(false)
+
   // User Management Email states
   const [selectedUserEmails, setSelectedUserEmails] = useState<string[]>([])
   const [showUserEmailInterface, setShowUserEmailInterface] = useState(false)
@@ -1063,6 +1089,232 @@ https://www.helfi.ai`)
     setIsComposingPartnerEmail(false)
   }
 
+  const loadPractitionerOutreachData = async (token?: string) => {
+    setIsLoadingPractitionerOutreach(true)
+    try {
+      const authToken = token || adminToken
+      const response = await fetch('/api/admin/practitioner-outreach', {
+        headers: {
+          'Authorization': `Bearer ${authToken}`
+        }
+      })
+      if (response.ok) {
+        const result = await response.json()
+        setPractitionerOutreachData(result.contacts || [])
+        setSelectedPractitionerOutreachIds(prev => prev.filter(id =>
+          result.contacts?.some((entry: any) => entry.id === id)
+        ))
+      }
+    } catch (error) {
+      console.error('Error loading practitioner outreach contacts:', error)
+    }
+    setIsLoadingPractitionerOutreach(false)
+  }
+
+  const updatePractitionerOutreachForm = (field: string, value: any) => {
+    setPractitionerOutreachForm((prev: any) => ({ ...prev, [field]: value }))
+  }
+
+  const resetPractitionerOutreachForm = () => {
+    setPractitionerOutreachForm({
+      country: 'Australia',
+      practiceName: '',
+      name: '',
+      email: '',
+      region: '',
+      city: '',
+      practitionerType: '',
+      website: '',
+      emailType: 'clinic',
+      sourceUrl: '',
+      relevanceNotes: '',
+      safetyBasis: '',
+      doNotContactNotice: false,
+      status: 'NOT_REVIEWED',
+    })
+  }
+
+  const handleAddPractitionerOutreachContact = async () => {
+    if (!practitionerOutreachForm.practiceName.trim() || !practitionerOutreachForm.country.trim()) {
+      alert('Practice name and country are required')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/practitioner-outreach', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify(practitionerOutreachForm)
+      })
+      const result = await response.json()
+      if (response.ok) {
+        alert(`✅ Saved ${result.savedCount || 0} practitioner contact`)
+        resetPractitionerOutreachForm()
+        setShowPractitionerOutreachForm(false)
+        loadPractitionerOutreachData()
+      } else {
+        alert(result.error || 'Failed to save practitioner contact')
+      }
+    } catch (error) {
+      console.error('Error saving practitioner outreach contact:', error)
+      alert('Failed to save practitioner contact. Please try again.')
+    }
+  }
+
+  const handlePractitionerOutreachSelect = (id: string) => {
+    setSelectedPractitionerOutreachIds(prev =>
+      prev.includes(id) ? prev.filter(item => item !== id) : [...prev, id]
+    )
+  }
+
+  const handlePractitionerOutreachSelectAll = () => {
+    const selectable = practitionerOutreachData
+      .filter(entry => entry.email && !entry.unsubscribed && !entry.doNotContactNotice)
+      .map(entry => entry.id)
+    if (selectedPractitionerOutreachIds.length === selectable.length) {
+      setSelectedPractitionerOutreachIds([])
+    } else {
+      setSelectedPractitionerOutreachIds(selectable)
+    }
+  }
+
+  const handleUpdatePractitionerOutreachStatus = async (status: string) => {
+    if (selectedPractitionerOutreachIds.length === 0) {
+      alert('Please select at least one practitioner contact')
+      return
+    }
+
+    try {
+      const response = await fetch('/api/admin/practitioner-outreach', {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({ ids: selectedPractitionerOutreachIds, status })
+      })
+      const result = await response.json()
+      if (response.ok) {
+        alert(`✅ Updated ${result.updatedCount || 0} practitioner contact${result.updatedCount === 1 ? '' : 's'}`)
+        loadPractitionerOutreachData()
+      } else {
+        alert(result.error || 'Failed to update practitioner contacts')
+      }
+    } catch (error) {
+      console.error('Error updating practitioner outreach status:', error)
+      alert('Failed to update practitioner contacts. Please try again.')
+    }
+  }
+
+  const handleDeletePractitionerOutreachContact = async (entryId: string, label: string) => {
+    if (!confirm(`Delete ${label} from the practitioner outreach list?`)) {
+      return
+    }
+
+    try {
+      const response = await fetch(`/api/admin/practitioner-outreach?id=${entryId}`, {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${adminToken}`
+        }
+      })
+      const result = await response.json()
+      if (response.ok) {
+        setPractitionerOutreachData(prev => prev.filter(entry => entry.id !== entryId))
+        setSelectedPractitionerOutreachIds(prev => prev.filter(id => id !== entryId))
+      } else {
+        alert(result.error || 'Failed to delete practitioner contact')
+      }
+    } catch (error) {
+      console.error('Error deleting practitioner outreach contact:', error)
+      alert('Failed to delete practitioner contact. Please try again.')
+    }
+  }
+
+  const handleStartPractitionerEmail = () => {
+    if (selectedPractitionerOutreachIds.length === 0) {
+      alert('Please select at least one approved practitioner contact')
+      return
+    }
+    setPractitionerEmailSubject('Invitation to list your practice on Helfi')
+    setPractitionerEmailMessage(`Hi {name},
+
+My name is Louie Veleski and I am the founder of Helfi.
+
+Helfi is a health website and app that helps people find practitioners and manage their health information in one place.
+
+We are inviting practitioners to list their practice on Helfi. The listing is currently 6 months free, then USD $4.95 per month if you choose to keep it active. No card is needed to start, and the free period begins only after the listing is approved.
+
+You can see the listing page here:
+https://www.helfi.ai/list-your-practice
+
+Helfi is open to many practitioner types, including doctors, allied health practitioners, nutrition professionals, therapists, coaches, natural health practitioners, and other health or wellness services.
+
+If this is relevant to your practice, you are welcome to create a listing here:
+https://www.helfi.ai/list-your-practice/start
+
+If you are not the right person, feel free to forward this to the person who manages your practice listing or online presence.
+
+Kind regards,
+Louie Veleski
+Founder, Helfi
+https://www.helfi.ai
+
+To stop receiving messages from Helfi, reply with "unsubscribe" and we will not contact you again.`)
+    setShowPractitionerEmailInterface(true)
+  }
+
+  const handleCancelPractitionerEmail = () => {
+    setShowPractitionerEmailInterface(false)
+    setPractitionerEmailSubject('')
+    setPractitionerEmailMessage('')
+    setIsComposingPractitionerEmail(false)
+  }
+
+  const handleSendPractitionerEmail = async () => {
+    if (!practitionerEmailSubject.trim() || !practitionerEmailMessage.trim()) {
+      alert('Please enter both subject and message')
+      return
+    }
+
+    const confirmed = confirm('Send the next approved practitioner outreach email now? The system will only send one email per minute.')
+    if (!confirmed) return
+
+    setIsComposingPractitionerEmail(true)
+
+    try {
+      const response = await fetch('/api/admin/practitioner-outreach/send', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${adminToken}`
+        },
+        body: JSON.stringify({
+          contactIds: selectedPractitionerOutreachIds,
+          subject: practitionerEmailSubject,
+          message: practitionerEmailMessage,
+        })
+      })
+      const result = await response.json()
+      if (response.ok) {
+        alert(`✅ Sent 1 email to ${result.sent?.practiceName || result.sent?.email}. Wait 1 minute before sending the next one.`)
+        loadPractitionerOutreachData()
+      } else if (response.status === 429) {
+        alert(`Please wait ${result.waitSeconds || 60} seconds before sending the next practitioner email.`)
+      } else {
+        alert(result.error || 'Failed to send practitioner email')
+      }
+    } catch (error) {
+      console.error('Error sending practitioner outreach email:', error)
+      alert('Failed to send practitioner email. Please try again.')
+    }
+
+    setIsComposingPractitionerEmail(false)
+  }
+
   const loadUserStats = async (token?: string) => {
     setIsLoadingUsers(true)
     try {
@@ -1562,6 +1814,9 @@ https://www.helfi.ai`)
     if (tabId === 'partner-outreach') {
       loadPartnerOutreachData()
     }
+    if (tabId === 'practitioner-outreach') {
+      loadPractitionerOutreachData()
+    }
     if (tabId === 'practitioners') {
       loadPractitionerEntries(tokenOverride)
     }
@@ -1604,6 +1859,9 @@ https://www.helfi.ai`)
     }
     if (activeTab === 'partner-outreach') {
       loadPartnerOutreachData()
+    }
+    if (activeTab === 'practitioner-outreach') {
+      loadPractitionerOutreachData()
     }
     if (activeTab === 'practitioners') {
       loadPractitionerEntries()
@@ -3239,6 +3497,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     { id: 'insights', label: 'AI Insights', desc: 'AI analysis', icon: '🤖' },
     { id: 'waitlist', label: 'Waitlist', desc: 'Signups', icon: '📧' },
     { id: 'partner-outreach', label: 'Partners', desc: 'Outreach list', icon: '📮' },
+    { id: 'practitioner-outreach', label: 'Practitioner Outreach', desc: 'Invite practices', icon: '📨' },
     { id: 'users', label: 'Users', desc: 'User stats', icon: '👥' },
     { id: 'management', label: 'User Management', desc: 'Manage users', icon: '🛠️' },
     { id: 'templates', label: 'Templates', desc: 'Email templates', icon: '📝' },
@@ -5406,6 +5665,324 @@ The Helfi Team`,
                                 onClick={() => handleDeletePartnerContact(entry.id, entry.email, `${entry.name} (${entry.company})`)}
                                 className="text-red-600 hover:text-red-800 font-medium transition-colors"
                                 title="Delete contact"
+                              >
+                                Delete
+                              </button>
+                            </td>
+                          </tr>
+                        ))
+                      )}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'practitioner-outreach' && (
+          <div className="space-y-6">
+            <div className="bg-white rounded-lg shadow p-6">
+              <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between gap-4">
+                <div>
+                  <h3 className="text-lg font-semibold text-gray-900">Practitioner Outreach</h3>
+                  <p className="text-sm text-gray-600">
+                    Build the list by country, approve safe contacts, then send one email per minute.
+                  </p>
+                  <p className="text-xs text-gray-500 mt-1">
+                    {selectedPractitionerOutreachIds.length > 0
+                      ? `${selectedPractitionerOutreachIds.length} contacts selected`
+                      : 'Select approved contacts before sending'}
+                  </p>
+                </div>
+                <div className="flex flex-wrap gap-3">
+                  <button
+                    onClick={() => setShowPractitionerOutreachForm(prev => !prev)}
+                    className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    {showPractitionerOutreachForm ? 'Close Form' : 'Add Contact'}
+                  </button>
+                  <button
+                    onClick={() => handleUpdatePractitionerOutreachStatus('APPROVED')}
+                    disabled={selectedPractitionerOutreachIds.length === 0}
+                    className="bg-blue-600 text-white px-4 py-2 rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Mark Approved
+                  </button>
+                  <button
+                    onClick={() => handleUpdatePractitionerOutreachStatus('DO_NOT_CONTACT')}
+                    disabled={selectedPractitionerOutreachIds.length === 0}
+                    className="bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Do Not Contact
+                  </button>
+                  <button
+                    onClick={handleStartPractitionerEmail}
+                    disabled={selectedPractitionerOutreachIds.length === 0}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  >
+                    Compose Email
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {showPractitionerOutreachForm && (
+              <div className="bg-white rounded-lg shadow p-6">
+                <h3 className="text-lg font-semibold text-gray-900 mb-4">Add Practitioner Contact</h3>
+                <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  <input
+                    value={practitionerOutreachForm.practiceName}
+                    onChange={(e) => updatePractitionerOutreachForm('practiceName', e.target.value)}
+                    placeholder="Practice name"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    value={practitionerOutreachForm.name}
+                    onChange={(e) => updatePractitionerOutreachForm('name', e.target.value)}
+                    placeholder="Contact name"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    value={practitionerOutreachForm.email}
+                    onChange={(e) => updatePractitionerOutreachForm('email', e.target.value)}
+                    placeholder="Email address"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <select
+                    value={practitionerOutreachForm.country}
+                    onChange={(e) => updatePractitionerOutreachForm('country', e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    {['Australia', 'United States', 'United Kingdom', 'Canada', 'New Zealand', 'Ireland', 'Singapore', 'South Africa'].map(country => (
+                      <option key={country} value={country}>{country}</option>
+                    ))}
+                  </select>
+                  <input
+                    value={practitionerOutreachForm.region}
+                    onChange={(e) => updatePractitionerOutreachForm('region', e.target.value)}
+                    placeholder="State / region"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    value={practitionerOutreachForm.city}
+                    onChange={(e) => updatePractitionerOutreachForm('city', e.target.value)}
+                    placeholder="City"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    value={practitionerOutreachForm.practitionerType}
+                    onChange={(e) => updatePractitionerOutreachForm('practitionerType', e.target.value)}
+                    placeholder="Practitioner type"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
+                    value={practitionerOutreachForm.website}
+                    onChange={(e) => updatePractitionerOutreachForm('website', e.target.value)}
+                    placeholder="Website"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <select
+                    value={practitionerOutreachForm.emailType}
+                    onChange={(e) => updatePractitionerOutreachForm('emailType', e.target.value)}
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  >
+                    <option value="clinic">Clinic</option>
+                    <option value="admin">Admin</option>
+                    <option value="practitioner">Practitioner</option>
+                    <option value="personal">Personal</option>
+                    <option value="form-only">Form only</option>
+                  </select>
+                  <input
+                    value={practitionerOutreachForm.sourceUrl}
+                    onChange={(e) => updatePractitionerOutreachForm('sourceUrl', e.target.value)}
+                    placeholder="Source page URL"
+                    className="px-3 py-2 border border-gray-300 rounded-lg lg:col-span-2"
+                  />
+                  <input
+                    value={practitionerOutreachForm.safetyBasis}
+                    onChange={(e) => updatePractitionerOutreachForm('safetyBasis', e.target.value)}
+                    placeholder="Safety basis"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <textarea
+                    value={practitionerOutreachForm.relevanceNotes}
+                    onChange={(e) => updatePractitionerOutreachForm('relevanceNotes', e.target.value)}
+                    placeholder="Why this invite is relevant"
+                    rows={3}
+                    className="px-3 py-2 border border-gray-300 rounded-lg lg:col-span-2"
+                  />
+                  <label className="flex items-center gap-2 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={practitionerOutreachForm.doNotContactNotice}
+                      onChange={(e) => updatePractitionerOutreachForm('doNotContactNotice', e.target.checked)}
+                      className="h-4 w-4 text-emerald-600 border-gray-300 rounded"
+                    />
+                    Do-not-contact notice found
+                  </label>
+                </div>
+                <div className="mt-4 flex gap-3">
+                  <button
+                    onClick={handleAddPractitionerOutreachContact}
+                    className="bg-emerald-500 text-white px-4 py-2 rounded-lg hover:bg-emerald-600 transition-colors"
+                  >
+                    Save Contact
+                  </button>
+                  <button
+                    onClick={() => {
+                      resetPractitionerOutreachForm()
+                      setShowPractitionerOutreachForm(false)
+                    }}
+                    className="bg-gray-100 text-gray-800 px-4 py-2 rounded-lg hover:bg-gray-200 transition-colors"
+                  >
+                    Cancel
+                  </button>
+                </div>
+              </div>
+            )}
+
+            {showPractitionerEmailInterface && (
+              <div className="bg-gradient-to-r from-emerald-50 to-green-50 border border-emerald-200 rounded-lg p-6">
+                <div className="flex items-center justify-between mb-6">
+                  <div>
+                    <h3 className="text-lg font-semibold text-emerald-900">Compose Practitioner Outreach Email</h3>
+                    <p className="text-sm text-emerald-700">
+                      The system sends one approved contact per click, with a 1-minute lock between sends.
+                    </p>
+                  </div>
+                  <button
+                    onClick={handleCancelPractitionerEmail}
+                    className="text-gray-400 hover:text-gray-600 transition-colors"
+                  >
+                    Close
+                  </button>
+                </div>
+                <div className="space-y-4">
+                  <input
+                    type="text"
+                    value={practitionerEmailSubject}
+                    onChange={(e) => setPractitionerEmailSubject(e.target.value)}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-lg"
+                    placeholder="Subject"
+                  />
+                  <textarea
+                    value={practitionerEmailMessage}
+                    onChange={(e) => setPractitionerEmailMessage(e.target.value)}
+                    rows={16}
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 text-base leading-relaxed"
+                    placeholder="Email content"
+                  />
+                  <div className="flex flex-col sm:flex-row gap-3">
+                    <button
+                      onClick={handleCancelPractitionerEmail}
+                      className="px-6 py-3 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors font-medium"
+                    >
+                      Cancel
+                    </button>
+                    <button
+                      onClick={handleSendPractitionerEmail}
+                      disabled={isComposingPractitionerEmail || !practitionerEmailSubject.trim() || !practitionerEmailMessage.trim()}
+                      className="px-6 py-3 bg-emerald-500 text-white rounded-lg hover:bg-emerald-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed font-medium"
+                    >
+                      {isComposingPractitionerEmail ? 'Sending...' : 'Send Next Approved Email'}
+                    </button>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <div className="bg-white rounded-lg shadow">
+              <div className="px-6 py-4 border-b border-gray-200">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h3 className="text-lg font-semibold text-gray-900">Practitioner Contacts</h3>
+                    <p className="text-sm text-gray-600">
+                      {isLoadingPractitionerOutreach ? 'Loading...' : `${practitionerOutreachData.length} contacts`}
+                    </p>
+                  </div>
+                  {practitionerOutreachData.length > 0 && (
+                    <button
+                      onClick={handlePractitionerOutreachSelectAll}
+                      className="text-sm text-emerald-600 hover:text-emerald-700 font-medium"
+                    >
+                      {selectedPractitionerOutreachIds.length === practitionerOutreachData.filter(entry => entry.email && !entry.unsubscribed && !entry.doNotContactNotice).length ? 'Deselect All' : 'Select All Sendable'}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {isLoadingPractitionerOutreach ? (
+                <div className="flex items-center justify-center py-12">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500"></div>
+                  <span className="ml-3 text-gray-600">Loading practitioner contacts...</span>
+                </div>
+              ) : (
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200">
+                    <thead className="bg-gray-50">
+                      <tr>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Select</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practice</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Source</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="bg-white divide-y divide-gray-200">
+                      {practitionerOutreachData.length === 0 ? (
+                        <tr>
+                          <td colSpan={9} className="px-6 py-4 text-center text-gray-500">
+                            No practitioner outreach contacts yet. Add the first contact above.
+                          </td>
+                        </tr>
+                      ) : (
+                        practitionerOutreachData.map((entry, index) => (
+                          <tr key={entry.id || index} className={selectedPractitionerOutreachIds.includes(entry.id) ? 'bg-emerald-50' : ''}>
+                            <td className="px-6 py-4 whitespace-nowrap">
+                              <input
+                                type="checkbox"
+                                checked={selectedPractitionerOutreachIds.includes(entry.id)}
+                                onChange={() => handlePractitionerOutreachSelect(entry.id)}
+                                className="h-4 w-4 text-emerald-600 focus:ring-emerald-500 border-gray-300 rounded"
+                                disabled={!entry.email || entry.unsubscribed || entry.doNotContactNotice}
+                              />
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-900">
+                              <div className="font-medium">{entry.practiceName}</div>
+                              <div className="text-gray-500">{entry.name || '-'}{entry.city ? ` · ${entry.city}` : ''}</div>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.country}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.email || 'Form only'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.practitionerType || entry.emailType || '-'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${
+                                entry.status === 'APPROVED' ? 'bg-blue-100 text-blue-800' :
+                                entry.status === 'SENT' ? 'bg-emerald-100 text-emerald-800' :
+                                entry.status === 'DO_NOT_CONTACT' || entry.unsubscribed ? 'bg-red-100 text-red-800' :
+                                'bg-gray-100 text-gray-700'
+                              }`}>
+                                {entry.unsubscribed ? 'UNSUBSCRIBED' : entry.status}
+                              </span>
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                              {entry.sentCount || 0}
+                            </td>
+                            <td className="px-6 py-4 text-sm text-gray-500 max-w-xs truncate">
+                              {entry.sourceUrl ? (
+                                <a href={entry.sourceUrl} target="_blank" rel="noreferrer" className="text-emerald-700 hover:underline">
+                                  Source
+                                </a>
+                              ) : '-'}
+                            </td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm">
+                              <button
+                                onClick={() => handleDeletePractitionerOutreachContact(entry.id, entry.practiceName)}
+                                className="text-red-600 hover:text-red-800 font-medium transition-colors"
                               >
                                 Delete
                               </button>
