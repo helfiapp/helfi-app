@@ -32,7 +32,7 @@ export async function POST(request: NextRequest, { params }: { params: { id: str
   }
 
   const now = new Date()
-  const trialEnd = addMonths(now, 3)
+  const trialEnd = addMonths(now, 6)
 
   const subscription = await prisma.practitionerListingSubscription.upsert({
     where: { listingId: listing.id },

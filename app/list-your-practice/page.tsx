@@ -23,7 +23,7 @@ export default async function ListYourPracticePage() {
         url: absoluteUrl('/list-your-practice'),
         name: 'List Your Practice for Free | Practitioner Directory | Helfi',
         description:
-          'Join Helfi’s practitioner directory with 3 months free, then $4.95/month.',
+          'Join Helfi’s practitioner directory with 6 months free, then $4.95/month.',
       },
       {
         '@type': 'Service',
@@ -39,7 +39,7 @@ export default async function ListYourPracticePage() {
           '@type': 'Offer',
           priceCurrency: 'USD',
           price: '4.95',
-          description: '3 months free, then $4.95/month per listing.',
+          description: '6 months free, then $4.95/month per listing.',
           url: absoluteUrl('/list-your-practice'),
         },
       },
@@ -63,7 +63,7 @@ export default async function ListYourPracticePage() {
               </h1>
               <p className="text-lg text-gray-600 mt-4 max-w-3xl">
                 Reach people searching for trusted care in a free practitioner directory. You get{' '}
-                <span className="font-semibold text-gray-900">3 months free</span>, then it is{' '}
+                <span className="font-semibold text-gray-900">6 months free</span>, then it is{' '}
                 <span className="font-semibold text-gray-900">$4.95/month</span> (USD). No card is needed to start.
                 Your free period begins only after your listing is approved.
               </p>
@@ -119,7 +119,7 @@ export default async function ListYourPracticePage() {
               <ol className="space-y-2 text-sm text-gray-600 list-decimal pl-5">
                 <li>Create your listing and submit it.</li>
                 <li>Our system runs an automated review process.</li>
-                <li>If approved, your listing goes live and your free 3 months start.</li>
+                <li>If approved, your listing goes live and your free 6 months start.</li>
                 <li>If flagged, your listing stays hidden until staff approves it.</li>
                 <li>Manage your listing, subscription, and boosts in your dashboard.</li>
               </ol>
@@ -131,7 +131,7 @@ export default async function ListYourPracticePage() {
                 <div>
                   <div className="font-semibold text-gray-900">Listing subscription</div>
                   <div>
-                    <span className="font-semibold text-gray-900">3 months free</span> (starts after approval), then{' '}
+                    <span className="font-semibold text-gray-900">6 months free</span> (starts after approval), then{' '}
                     <span className="font-semibold text-gray-900">$4.95/month</span> per listing.
                   </div>
                 </div>

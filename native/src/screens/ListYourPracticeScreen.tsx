@@ -15,7 +15,7 @@ const WHAT_YOU_GET = [
 const HOW_IT_WORKS = [
   'Create your listing and submit it.',
   'Our system runs an automated review process.',
-  'If approved, your listing goes live and your free 3 months start.',
+  'If approved, your listing goes live and your free 6 months start.',
   'If flagged, your listing stays hidden until staff approves it.',
   'Manage your listing, subscription, and boosts in your dashboard.',
 ]
@@ -61,7 +61,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
             List your practice on Helfi
           </Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-            Reach people searching for trusted care. You get 3 months free, then it is $4.95/month (USD). No card is
+            Reach people searching for trusted care. You get 6 months free, then it is $4.95/month (USD). No card is
             needed to start. Your free period begins only after your listing is approved.
           </Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
@@ -140,7 +140,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
         <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 10 }}>
           <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Pricing (USD)</Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-            Listing subscription: 3 months free (starts after approval), then $4.95/month per listing.
+            Listing subscription: 6 months free (starts after approval), then $4.95/month per listing.
           </Text>
           <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>Boosts (7 days)</Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>

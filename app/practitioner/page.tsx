@@ -398,7 +398,7 @@ export default function PractitionerPage() {
       setSuccess('Subscription started successfully.')
     }
     if (params.get('checkout') === 'cancelled') {
-      setSuccess('Checkout canceled. If your trial has ended, you can claim a one-time extra 3 months free below.')
+      setSuccess('Checkout canceled. If your trial has ended, you can claim a one-time extra 6 months free below.')
     }
     if (params.get('boost') === 'success') {
       setSuccess('Boost purchase confirmed.')
@@ -571,7 +571,7 @@ export default function PractitionerPage() {
       const res = await fetch('/api/practitioner/subscription/winback', { method: 'POST' })
       const data = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(data?.error || 'Could not activate extra trial')
-      setSuccess('One-time extra 3 months free has been activated.')
+      setSuccess('One-time extra 6 months free has been activated.')
       await loadDashboard()
     } catch (err: any) {
       setError(err?.message || 'Could not activate extra trial')
@@ -995,14 +995,14 @@ export default function PractitionerPage() {
             {dashboard?.listing?.winbackEligible && (
               <div className="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 space-y-2">
                 <p className="text-sm text-emerald-900">
-                  Need more time before paying? You can activate a one-time extra 3 months free.
+                  Need more time before paying? You can activate a one-time extra 6 months free.
                 </p>
                 <button
                   onClick={handleClaimExtraTrial}
                   disabled={winbackLoading}
                   className="px-5 py-2.5 rounded-full border border-emerald-300 text-emerald-800 font-semibold hover:border-emerald-500 transition-colors disabled:opacity-60 disabled:cursor-not-allowed"
                 >
-                  {winbackLoading ? 'Activating…' : 'Claim extra 3 months free'}
+                  {winbackLoading ? 'Activating…' : 'Claim extra 6 months free'}
                 </button>
               </div>
             )}

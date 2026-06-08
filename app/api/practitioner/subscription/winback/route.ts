@@ -61,7 +61,7 @@ export async function POST() {
   }
 
   const extensionStart = new Date()
-  const extensionEnd = addMonths(extensionStart, 3)
+  const extensionEnd = addMonths(extensionStart, 6)
 
   await prisma.practitionerListingSubscription.update({
     where: { listingId: listing.id },
@@ -90,7 +90,7 @@ export async function POST() {
 
   return NextResponse.json({
     success: true,
-    message: 'One-time extra 3 months free has been activated.',
+    message: 'One-time extra 6 months free has been activated.',
     trialEndsAt: extensionEnd.toISOString(),
   })
 }
