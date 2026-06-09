@@ -5,6 +5,7 @@ import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
 import { formatChatContent } from '@/lib/chatFormatting'
 import UsageMeter from '@/components/UsageMeter'
+import PractitionerRecommendations from '@/components/PractitionerRecommendations'
 
 interface VoiceChatContext {
   symptoms?: string[]
@@ -876,6 +877,14 @@ export default function VoiceChat({
     () => threads.filter((thread) => archivedThreadIds.includes(thread.id)),
     [threads, archivedThreadIds]
   )
+
+  const issueTextForAssistantMessage = useCallback((messageIndex: number) => {
+    for (let i = messageIndex - 1; i >= 0; i -= 1) {
+      const previous = messages[i]
+      if (previous?.role === 'user') return previous.content
+    }
+    return ''
+  }, [messages])
 
   useEffect(() => {
     setThreads([])
@@ -2963,6 +2972,19 @@ export default function VoiceChat({
                 </div>
               )})}
               {/* PROTECTED: FOOD_CHAT_ASSISTANT_OPTION_RENDER END */}
+
+              {!isFoodEntry && messages[messages.length - 1]?.role === 'assistant' && (
+                <div className="group flex gap-4">
+                  <div className="hidden md:flex h-8 w-8 shrink-0" />
+                  <div className="flex-1">
+                    <PractitionerRecommendations
+                      sourceArea="chat"
+                      issueText={issueTextForAssistantMessage(messages.length - 1)}
+                      compact
+                    />
+                  </div>
+                </div>
+              )}
 
               {loading && (
                 <div className="group flex gap-4">

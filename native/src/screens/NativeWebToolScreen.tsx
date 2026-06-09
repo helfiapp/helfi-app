@@ -202,6 +202,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
           <WebView
             key={webViewKey}
             source={source}
+            geolocationEnabled
             injectedJavaScriptBeforeContentLoaded={injectedSetupScript}
             onLoadStart={() => {
               setLoading(true)

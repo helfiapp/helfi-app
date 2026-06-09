@@ -13,6 +13,7 @@ import MobileMoreMenu from '@/components/MobileMoreMenu';
 import UsageMeter from '@/components/UsageMeter';
 import InsightsProgressBar from '@/components/InsightsProgressBar';
 import LabReportUpload from '@/components/reports/LabReportUpload';
+import PractitionerRecommendations from '@/components/PractitionerRecommendations';
 import { UserIcon, InformationCircleIcon } from '@heroicons/react/24/outline';
 import MaterialSymbol from '@/components/MaterialSymbol';
 import { DIET_CATEGORIES, DIET_OPTIONS, getDietOption, normalizeDietTypes } from '@/lib/diets';
@@ -8375,6 +8376,13 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [statusText, setStatusText] = useState('');
   const [progressStage, setProgressStage] = useState<'idle' | 'saving' | 'redirecting'>('idle');
+  const recommendationIssueText = [
+    Array.isArray(data.goals) ? data.goals.join(', ') : '',
+    Array.isArray(data.healthGoals) ? data.healthGoals.join(', ') : '',
+    data.healthSituations && !data.healthSituations.skipped ? data.healthSituations.healthIssues : '',
+    data.healthSituations && !data.healthSituations.skipped ? data.healthSituations.healthProblems : '',
+    data.healthSituations && !data.healthSituations.skipped ? data.healthSituations.additionalInfo : '',
+  ].filter(Boolean).join('\n');
 
   const uniq = (items: any[] = []) => {
     const seen = new Set<string>();
@@ -8546,6 +8554,11 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
           </div>
         </div>
       )}
+
+      <PractitionerRecommendations
+        sourceArea="onboarding"
+        issueText={recommendationIssueText}
+      />
       
       <div className="flex justify-between">
         <button 

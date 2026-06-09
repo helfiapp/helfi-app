@@ -10,6 +10,7 @@ import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import PageHeader from '@/components/PageHeader'
 import MedicalImageChat from './MedicalImageChat'
+import PractitionerRecommendations from '@/components/PractitionerRecommendations'
 
 type ConfidenceLevel = 'low' | 'medium' | 'high'
 
@@ -590,6 +591,20 @@ export default function MedicalImagesPage() {
                   {analysisResult?.disclaimer ||
                     'This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.'}
                 </div>
+
+                <PractitionerRecommendations
+                  sourceArea="image"
+                  issueText={[
+                    analysisResult?.summary || '',
+                    Array.isArray(analysisResult?.possibleCauses)
+                      ? analysisResult.possibleCauses.map((cause) => cause.name).join(', ')
+                      : '',
+                    Array.isArray(analysisResult?.nextSteps)
+                      ? analysisResult.nextSteps.join(', ')
+                      : '',
+                    analysis || '',
+                  ].filter(Boolean).join('\n')}
+                />
               </div>
             )}
 

@@ -10,6 +10,7 @@ import SymptomChat from './SymptomChat'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
 import PageHeader from '@/components/PageHeader'
+import PractitionerRecommendations from '@/components/PractitionerRecommendations'
 
 type AnalysisResult = {
   success: boolean
@@ -390,6 +391,19 @@ export default function SymptomAnalysisPage() {
               <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
                 {result.disclaimer || 'This is not medical advice. If you have concerning or worsening symptoms, contact a licensed medical professional or emergency services.'}
               </div>
+
+              <PractitionerRecommendations
+                sourceArea="symptom-analysis"
+                issueText={[
+                  selectedSymptoms.join(', '),
+                  duration,
+                  notes,
+                  result.summary || '',
+                  Array.isArray(result.possibleCauses)
+                    ? result.possibleCauses.map((cause) => cause.name).join(', ')
+                    : '',
+                ].filter(Boolean).join('\n')}
+              />
             </div>
           )}
 

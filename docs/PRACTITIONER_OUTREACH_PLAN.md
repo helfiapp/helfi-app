@@ -100,15 +100,26 @@ Use the safest rule by default: only contact public business addresses where the
 
 ## Reusable email template
 
-Subject: Invitation to list your practice on Helfi
+Subject: Helfi can recommend your practice to relevant local users
 
 Hi [Name or Practice Team],
 
 My name is Louie Veleski and I am the founder of Helfi.
 
-Helfi is a health website and app that helps people find practitioners and manage their health information in one place.
+Helfi is a health website and app that helps people manage their health information and find nearby practitioners that may be relevant.
 
-We are inviting practitioners to list their practice on Helfi. The listing is currently 6 months free, then USD $4.95 per month if you choose to keep it active. No card is needed to start, and the free period begins only after the listing is approved.
+Helfi can recommend relevant local practitioners to users when they are actively looking for help with a health issue.
+
+Recommendations are based on:
+- the user's broad health concern
+- practitioner type
+- location and local radius
+- approved listing quality
+- clear website, booking, or contact details
+
+Helfi does not send private user health details to practitioners. The recommendation is only shown to the user inside Helfi when there is a relevant local match.
+
+We are currently inviting practitioners to create an approved Helfi listing. The listing is 6 months free, then USD $4.95 per month if you choose to keep it active. No card is needed to start, and the free period begins only after the listing is approved.
 
 You can see the listing page here:
 https://www.helfi.ai/list-your-practice
@@ -131,7 +142,9 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
 
 Hello,
 
-I am Louie, founder of Helfi. We are inviting practitioners to list their practice on Helfi. It is currently 6 months free, then USD $4.95/month if they choose to keep it active. No card is needed to start.
+I am Louie, founder of Helfi. Helfi can recommend relevant local practitioners to users when they are actively looking for help with a health issue. Matches are based on broad health concern, practitioner type, location, local radius, and approved listing quality.
+
+We are inviting practitioners to create an approved Helfi listing. It is currently 6 months free, then USD $4.95/month if they choose to keep it active. No card is needed to start.
 
 Listing page:
 https://www.helfi.ai/list-your-practice
