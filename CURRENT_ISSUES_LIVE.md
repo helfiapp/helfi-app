@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 11:31 PM AEST
+- What changed: Added the native Helfi voice assistant V1 for the phone app, including the talk button, review-before-save panel, text-only default, optional voice replies, Siri shortcut handoff, live voice command routes, confirmation-only saving, and voice credit tracking.
+- Where to see it (page/link): Helfi iPhone/Android app signed-in screens, plus Siri shortcuts on iPhone. Live backend is on https://helfi.ai.
+- What to quickly test: In the phone app, tap the green talk button, try “Log a 5 km walk”, confirm it drafts first, then save only after pressing Confirm. Also try mood, journal, same breakfast, recipe, and voice reply mode.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 10:21 PM AEST
 - What changed: Added the permanent rule that iOS features must be built as native app experiences, not web-app cards or links shown inside iOS. Practitioner recommendations now hand off to native iOS cards inside the phone app, while the website still shows the web cards.
 - Where to see it (page/link): iOS app Talk to Helfi / symptom / image / health intake flows; web still works at https://helfi.ai/chat, https://helfi.ai/symptoms, https://helfi.ai/medical-images, and https://helfi.ai/onboarding
