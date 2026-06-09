@@ -1103,7 +1103,17 @@ https://www.helfi.ai`)
   const loadPractitionerOutreachData = async (token?: string) => {
     setIsLoadingPractitionerOutreach(true)
     try {
-      const authToken = token || adminToken
+      const authToken = token || adminToken || (() => {
+        try {
+          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || ''
+        } catch {
+          return ''
+        }
+      })()
+      if (!authToken) {
+        setIsLoadingPractitionerOutreach(false)
+        return
+      }
       const response = await fetch('/api/admin/practitioner-outreach', {
         headers: {
           'Authorization': `Bearer ${authToken}`
@@ -1129,16 +1139,23 @@ https://www.helfi.ai`)
     }
 
     try {
+      const authToken = adminToken || (() => {
+        try {
+          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || ''
+        } catch {
+          return ''
+        }
+      })()
       const response = await fetch('/api/admin/practitioner-outreach/init', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${adminToken}`
+          'Authorization': `Bearer ${authToken}`
         }
       })
       const result = await response.json()
       if (response.ok) {
         alert(`Saved ${result.savedCount || 0} practitioner contacts for review`)
-        loadPractitionerOutreachData()
+        loadPractitionerOutreachData(authToken)
       } else {
         alert(result.error || 'Failed to load practitioner contacts')
       }
@@ -1854,7 +1871,7 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
       loadPartnerOutreachData()
     }
     if (tabId === 'practitioner-outreach') {
-      loadPractitionerOutreachData()
+      loadPractitionerOutreachData(tokenOverride)
     }
     if (tabId === 'practitioners') {
       loadPractitionerEntries(tokenOverride)
