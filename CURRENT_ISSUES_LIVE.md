@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 08:10 PM AEST
+- What changed: Added intelligent local practitioner recommendations across onboarding, Talk to Helfi chat, symptom analysis, health image analysis, and iOS/native WebView location support. Recommendations only show for approved/live practitioners that match the health concern and local radius.
+- Where to see it (page/link): https://helfi.ai/onboarding, https://helfi.ai/chat, https://helfi.ai/symptoms, https://helfi.ai/medical-images
+- What to quickly test: Use a health concern with an approved nearby practitioner listing and confirm the “Practitioners near you” section appears. Use a location or concern with no approved local match and confirm nothing appears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 6:12 PM AEST
 - What changed: Fixed duplicate source-link handling so Practitioner Outreach can load older Australia records and the new United States records together. Then loaded the live starter list: 10,743 total contacts, including 10,510 United States and 233 Australia.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
