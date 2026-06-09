@@ -29,6 +29,7 @@ async function ensurePractitionerOutreachSchema() {
       "region" TEXT,
       "city" TEXT,
       "practitionerType" TEXT,
+      "phone" TEXT,
       "website" TEXT,
       "emailType" TEXT,
       "sourceUrl" TEXT,
@@ -47,6 +48,7 @@ async function ensurePractitionerOutreachSchema() {
   `)
   await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "category" TEXT;`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "subcategory" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "phone" TEXT;`)
 }
 
 function escapeHtml(value: unknown) {
@@ -68,6 +70,7 @@ function personalize(template: string, contact: any) {
     .replace(/{region}/g, contact.region || '')
     .replace(/{city}/g, contact.city || '')
     .replace(/{practitionerType}/g, contact.practitionerType || '')
+    .replace(/{phone}/g, contact.phone || '')
 }
 
 function renderBody(message: string) {

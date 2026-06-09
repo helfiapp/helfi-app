@@ -37,6 +37,7 @@ async function ensurePractitionerOutreachSchema() {
       "region" TEXT,
       "city" TEXT,
       "practitionerType" TEXT,
+      "phone" TEXT,
       "website" TEXT,
       "emailType" TEXT,
       "sourceUrl" TEXT,
@@ -55,10 +56,16 @@ async function ensurePractitionerOutreachSchema() {
   `)
   await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "category" TEXT;`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "subcategory" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "phone" TEXT;`)
   await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "PractitionerOutreachContact_email_key"
     ON "PractitionerOutreachContact"("email")
     WHERE "email" IS NOT NULL;
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "PractitionerOutreachContact_sourceUrl_key"
+    ON "PractitionerOutreachContact"("sourceUrl")
+    WHERE "sourceUrl" IS NOT NULL;
   `)
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "PractitionerOutreachContact_country_status_idx"
@@ -85,7 +92,7 @@ export async function GET(request: NextRequest) {
   const contacts = await prisma.$queryRaw<any[]>`
     SELECT
       "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
-      "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
+      "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
       "safetyBasis", "doNotContactNotice", "status", "unsubscribed",
       "lastSentAt", "sentCount", "lastError", "createdAt", "updatedAt"
     FROM "PractitionerOutreachContact"
@@ -119,6 +126,7 @@ export async function POST(request: NextRequest) {
     const region = cleanText(contact?.region)
     const city = cleanText(contact?.city)
     const practitionerType = cleanText(contact?.practitionerType)
+    const phone = cleanText(contact?.phone)
     const website = cleanText(contact?.website)
     const emailType = cleanText(contact?.emailType)
     const sourceUrl = cleanText(contact?.sourceUrl)
@@ -131,12 +139,12 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         INSERT INTO "PractitionerOutreachContact" (
           "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
-          "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
+          "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
           "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
         )
         VALUES (
           ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${category}, ${subcategory}, ${region}, ${city},
-          ${practitionerType}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
+          ${practitionerType}, ${phone}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
           ${safetyBasis}, ${doNotContactNotice}, ${status}, false, NOW()
         )
         ON CONFLICT ("email") WHERE "email" IS NOT NULL DO UPDATE SET
@@ -148,6 +156,7 @@ export async function POST(request: NextRequest) {
           "region" = EXCLUDED."region",
           "city" = EXCLUDED."city",
           "practitionerType" = EXCLUDED."practitionerType",
+          "phone" = EXCLUDED."phone",
           "website" = EXCLUDED."website",
           "emailType" = EXCLUDED."emailType",
           "sourceUrl" = EXCLUDED."sourceUrl",
@@ -161,14 +170,31 @@ export async function POST(request: NextRequest) {
       await prisma.$executeRaw`
         INSERT INTO "PractitionerOutreachContact" (
           "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
-          "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
+          "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
           "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
         )
         VALUES (
           ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${category}, ${subcategory}, ${region}, ${city},
-          ${practitionerType}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
+          ${practitionerType}, ${phone}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
           ${safetyBasis}, ${doNotContactNotice}, ${status}, false, NOW()
         )
+        ON CONFLICT ("sourceUrl") WHERE "sourceUrl" IS NOT NULL DO UPDATE SET
+          "name" = EXCLUDED."name",
+          "practiceName" = EXCLUDED."practiceName",
+          "country" = EXCLUDED."country",
+          "category" = EXCLUDED."category",
+          "subcategory" = EXCLUDED."subcategory",
+          "region" = EXCLUDED."region",
+          "city" = EXCLUDED."city",
+          "practitionerType" = EXCLUDED."practitionerType",
+          "phone" = EXCLUDED."phone",
+          "website" = EXCLUDED."website",
+          "emailType" = EXCLUDED."emailType",
+          "relevanceNotes" = EXCLUDED."relevanceNotes",
+          "safetyBasis" = EXCLUDED."safetyBasis",
+          "doNotContactNotice" = EXCLUDED."doNotContactNotice",
+          "status" = EXCLUDED."status",
+          "updatedAt" = NOW()
       `
     }
     savedCount += 1

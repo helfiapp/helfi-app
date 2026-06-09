@@ -239,6 +239,7 @@ export default function AdminPanel() {
     region: '',
     city: '',
     practitionerType: '',
+    phone: '',
     website: '',
     emailType: 'clinic',
     sourceUrl: '',
@@ -311,6 +312,7 @@ export default function AdminPanel() {
         entry.city,
         entry.region,
         entry.practitionerType,
+        entry.phone,
         entry.subcategory,
       ].some(value => String(value || '').toLowerCase().includes(search))
       return matchesCategory && matchesStatus && matchesSearch
@@ -1292,7 +1294,7 @@ https://www.helfi.ai`)
   }
 
   const handleInitPractitionerOutreach = async () => {
-    if (!confirm('Load the Australia practitioner starter list? This will add or refresh safe public contacts for review.')) {
+    if (!confirm('Load the practitioner outreach starter lists? This will add or refresh safe public contacts for review. No emails will be sent.')) {
       return
     }
 
@@ -1338,6 +1340,7 @@ https://www.helfi.ai`)
       region: '',
       city: '',
       practitionerType: '',
+      phone: '',
       website: '',
       emailType: 'clinic',
       sourceUrl: '',
@@ -1450,21 +1453,25 @@ https://www.helfi.ai`)
       alert('Please select at least one approved practitioner contact')
       return
     }
-    setPractitionerEmailSubject('Invitation to list your practice on Helfi - 6 months free')
+    setPractitionerEmailSubject('Helfi can recommend your practice to relevant local users')
     setPractitionerEmailMessage(`Hi {name},
 
 I'm Louie Veleski, founder of Helfi.
 
-I'm reaching out because we are building a practitioner directory inside Helfi, and I think {practiceName} could be a good fit.
+I'm reaching out because Helfi can recommend relevant local practitioners to users when they are actively looking for help with a health issue, and I think {practiceName} could be a good fit.
 
-Helfi is a health website and app that helps people organise their health information, understand symptoms, track food and lifestyle habits, and find relevant health practitioners.
+Helfi is a health website and app that helps people organise their health information, understand symptoms, track food and lifestyle habits, and find nearby practitioners that may be relevant.
 
-We are currently inviting practitioners and clinics to create a listing with 6 months free. No payment card is needed to start, and the free period begins only after the listing is approved.
+We are currently inviting practitioners and clinics to create an approved Helfi listing with 6 months free. No payment card is needed to start, and the free period begins only after the listing is approved.
 
-A Helfi practitioner listing can help people:
-- find your practice by practitioner type, location, and health need
-- understand what services you offer before they contact you
-- visit your website or contact your practice directly
+Helfi recommendations are based on:
+- the user's broad health concern
+- practitioner type
+- location and local radius
+- approved listing quality
+- clear website, booking, or contact details
+
+Helfi does not send private user health details to practitioners. The recommendation is only shown to the user inside Helfi when there is a relevant local match.
 
 The listing page is here:
 https://www.helfi.ai/list-your-practice
@@ -5939,7 +5946,7 @@ The Helfi Team`,
                     onClick={handleInitPractitionerOutreach}
                     className="bg-amber-100 text-amber-900 px-4 py-2 rounded-lg hover:bg-amber-200 transition-colors"
                   >
-                    Load Australia Starter List
+                    Load Outreach Starter Lists
                   </button>
                   <button
                     onClick={() => setShowPractitionerOutreachForm(prev => !prev)}
@@ -6187,6 +6194,12 @@ The Helfi Team`,
                     className="px-3 py-2 border border-gray-300 rounded-lg"
                   />
                   <input
+                    value={practitionerOutreachForm.phone}
+                    onChange={(e) => updatePractitionerOutreachForm('phone', e.target.value)}
+                    placeholder="Phone"
+                    className="px-3 py-2 border border-gray-300 rounded-lg"
+                  />
+                  <input
                     value={practitionerOutreachForm.website}
                     onChange={(e) => updatePractitionerOutreachForm('website', e.target.value)}
                     placeholder="Website"
@@ -6343,7 +6356,7 @@ The Helfi Team`,
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Practice</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Country</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Category</th>
-                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Email</th>
+                        <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Type</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                         <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Sent</th>
@@ -6381,7 +6394,12 @@ The Helfi Team`,
                               <div className="font-medium">{entry.category || '-'}</div>
                               <div className="text-gray-500">{entry.subcategory || '-'}</div>
                             </td>
-                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">{entry.email || 'Form only'}</td>
+                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900">
+                              <div>{entry.email || entry.phone || 'Manual review'}</div>
+                              {!entry.email && entry.phone && (
+                                <div className="text-xs text-gray-500">Phone/manual</div>
+                              )}
+                            </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{entry.practitionerType || entry.emailType || '-'}</td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm">
                               <span className={`px-2 py-1 rounded-full text-xs font-semibold ${

@@ -2,12 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
-import { practitionerOutreachSeed } from '@/lib/practitioner-outreach-seed'
+import { practitionerOutreachSeed, type PractitionerOutreachSeedEntry } from '@/lib/practitioner-outreach-seed'
+import practitionerOutreachUnitedStatesSeed from '@/data/practitioner-outreach-us-seed.json'
 
 export const maxDuration = 60
 
 const STATUSES = new Set(['NOT_REVIEWED', 'APPROVED', 'SENT', 'REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'DO_NOT_CONTACT'])
-const SAVE_BATCH_SIZE = 20
+const SAVE_BATCH_SIZE = 500
 
 function ensureAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
@@ -42,6 +43,7 @@ async function ensurePractitionerOutreachSchema() {
       "region" TEXT,
       "city" TEXT,
       "practitionerType" TEXT,
+      "phone" TEXT,
       "website" TEXT,
       "emailType" TEXT,
       "sourceUrl" TEXT,
@@ -60,10 +62,16 @@ async function ensurePractitionerOutreachSchema() {
   `)
   await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "category" TEXT;`)
   await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "subcategory" TEXT;`)
+  await prisma.$executeRawUnsafe(`ALTER TABLE "PractitionerOutreachContact" ADD COLUMN IF NOT EXISTS "phone" TEXT;`)
   await prisma.$executeRawUnsafe(`
     CREATE UNIQUE INDEX IF NOT EXISTS "PractitionerOutreachContact_email_key"
     ON "PractitionerOutreachContact"("email")
     WHERE "email" IS NOT NULL;
+  `)
+  await prisma.$executeRawUnsafe(`
+    CREATE UNIQUE INDEX IF NOT EXISTS "PractitionerOutreachContact_sourceUrl_key"
+    ON "PractitionerOutreachContact"("sourceUrl")
+    WHERE "sourceUrl" IS NOT NULL;
   `)
   await prisma.$executeRawUnsafe(`
     CREATE INDEX IF NOT EXISTS "PractitionerOutreachContact_country_status_idx"
@@ -83,7 +91,12 @@ export async function POST(request: NextRequest) {
 
   await ensurePractitionerOutreachSchema()
 
-  const contacts = practitionerOutreachSeed.map(contact => {
+  const allSeedContacts = [
+    ...practitionerOutreachSeed,
+    ...(practitionerOutreachUnitedStatesSeed as PractitionerOutreachSeedEntry[]),
+  ]
+
+  const contacts = allSeedContacts.map(contact => {
     const id = randomUUID()
     const email = normalizeEmail(contact.email)
     const name = cleanText(contact.name)
@@ -94,6 +107,7 @@ export async function POST(request: NextRequest) {
     const region = cleanText(contact.region)
     const city = cleanText(contact.city)
     const practitionerType = cleanText(contact.practitionerType)
+    const phone = cleanText(contact.phone)
     const website = cleanText(contact.website)
     const emailType = cleanText(contact.emailType)
     const sourceUrl = cleanText(contact.sourceUrl)
@@ -102,7 +116,7 @@ export async function POST(request: NextRequest) {
     const doNotContactNotice = Boolean(contact.doNotContactNotice)
     const status = cleanStatus(contact.status)
 
-    if (!practiceName || !country || !email) return null
+    if (!practiceName || !country || (!email && !phone && !sourceUrl)) return null
 
     return {
       id,
@@ -115,6 +129,7 @@ export async function POST(request: NextRequest) {
       region,
       city,
       practitionerType,
+      phone,
       website,
       emailType,
       sourceUrl,
@@ -127,19 +142,44 @@ export async function POST(request: NextRequest) {
 
   for (let index = 0; index < contacts.length; index += SAVE_BATCH_SIZE) {
     const batch = contacts.slice(index, index + SAVE_BATCH_SIZE)
-    await Promise.all(batch.map(contact => prisma.$executeRaw`
+    const batchJson = JSON.stringify(batch)
+    await prisma.$executeRaw`
+      WITH batch AS (
+        SELECT *
+        FROM jsonb_to_recordset(${batchJson}::jsonb) AS contact(
+          "id" TEXT,
+          "name" TEXT,
+          "email" TEXT,
+          "practiceName" TEXT,
+          "country" TEXT,
+          "category" TEXT,
+          "subcategory" TEXT,
+          "region" TEXT,
+          "city" TEXT,
+          "practitionerType" TEXT,
+          "phone" TEXT,
+          "website" TEXT,
+          "emailType" TEXT,
+          "sourceUrl" TEXT,
+          "relevanceNotes" TEXT,
+          "safetyBasis" TEXT,
+          "doNotContactNotice" BOOLEAN,
+          "status" TEXT
+        )
+      )
       INSERT INTO "PractitionerOutreachContact" (
         "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
-        "practitionerType", "website", "emailType", "sourceUrl", "relevanceNotes",
+        "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
         "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
       )
-      VALUES (
-        ${contact.id}, ${contact.name}, ${contact.email}, ${contact.practiceName}, ${contact.country}, ${contact.category}, ${contact.subcategory}, ${contact.region}, ${contact.city},
-        ${contact.practitionerType}, ${contact.website}, ${contact.emailType}, ${contact.sourceUrl}, ${contact.relevanceNotes},
-        ${contact.safetyBasis}, ${contact.doNotContactNotice}, ${contact.status}, false, NOW()
-      )
-      ON CONFLICT ("email") WHERE "email" IS NOT NULL DO UPDATE SET
+      SELECT
+        "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
+        "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
+        "safetyBasis", COALESCE("doNotContactNotice", false), "status", false, NOW()
+      FROM batch
+      ON CONFLICT ("sourceUrl") WHERE "sourceUrl" IS NOT NULL DO UPDATE SET
         "name" = EXCLUDED."name",
+        "email" = COALESCE(EXCLUDED."email", "PractitionerOutreachContact"."email"),
         "practiceName" = EXCLUDED."practiceName",
         "country" = EXCLUDED."country",
         "category" = EXCLUDED."category",
@@ -147,9 +187,9 @@ export async function POST(request: NextRequest) {
         "region" = EXCLUDED."region",
         "city" = EXCLUDED."city",
         "practitionerType" = EXCLUDED."practitionerType",
+        "phone" = EXCLUDED."phone",
         "website" = EXCLUDED."website",
         "emailType" = EXCLUDED."emailType",
-        "sourceUrl" = EXCLUDED."sourceUrl",
         "relevanceNotes" = EXCLUDED."relevanceNotes",
         "safetyBasis" = EXCLUDED."safetyBasis",
         "doNotContactNotice" = EXCLUDED."doNotContactNotice",
@@ -159,7 +199,7 @@ export async function POST(request: NextRequest) {
           ELSE EXCLUDED."status"
         END,
         "updatedAt" = NOW()
-    `))
+    `
   }
 
   return NextResponse.json({ savedCount: contacts.length })

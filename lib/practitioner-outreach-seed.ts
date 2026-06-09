@@ -8,6 +8,7 @@ export type PractitionerOutreachSeedEntry = {
   region?: string
   city?: string
   practitionerType?: string
+  phone?: string
   website?: string
   emailType?: string
   sourceUrl?: string
