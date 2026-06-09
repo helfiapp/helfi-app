@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 12:06 PM AEST
+- What changed: Prepared Practitioner Outreach for multi-country outreach. The admin screen now has country coverage counts, all European countries, Western outreach countries, country/category/status/search filters, practitioner group counts, and safer page-only selection.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
+- What to quickly test: Reload Practitioner Outreach and confirm it auto-loads the 233 contacts, shows Australia (233), shows 1 of 54 prepared countries, shows practitioner group counts, and still pages contacts 50 at a time.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 10:09 AM AEST
 - What changed: Fixed the Practitioner Outreach tab so it automatically loads the 233 contacts after a fresh page reload, instead of showing 0 until Refresh Data is pressed.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
