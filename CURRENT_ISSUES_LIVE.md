@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 5:26 PM AEST
+- What changed: Added a United States practitioner outreach starter list with 10,510 public registry organization records across all 50 states plus DC and all existing Helfi practitioner groups. US records are NOT_REVIEWED and phone/manual-review by default, so no emails are sent automatically.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Outreach Starter Lists
+- What to quickly test: Open Practitioner Outreach, click Load Outreach Starter Lists, confirm United States appears with about 10,510 contacts, and confirm US entries show phone/manual contact details until reviewed.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 12:22 PM AEST
 - What changed: Improved the default Practitioner Outreach email template with warmer copy, a clearer 6 months free offer, listing benefits, the listing links, and unsubscribe wording. No sending rules were changed.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> select a contact -> Compose Email

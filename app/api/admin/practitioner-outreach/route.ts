@@ -3,6 +3,11 @@ import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 
 const STATUSES = new Set(['NOT_REVIEWED', 'APPROVED', 'SENT', 'REPLIED', 'BOUNCED', 'UNSUBSCRIBED', 'DO_NOT_CONTACT'])
+const ALL_COUNTRIES = '__all_countries__'
+const ALL_CATEGORIES = '__all_categories__'
+const ALL_STATUSES = '__all_statuses__'
+const DEFAULT_PAGE_SIZE = 50
+const MAX_PAGE_SIZE = 100
 
 function normalizeEmail(email?: string | null) {
   const trimmed = (email || '').trim().toLowerCase()
@@ -22,6 +27,61 @@ function cleanStatus(value: unknown) {
 function ensureAdmin(request: NextRequest) {
   const authHeader = request.headers.get('authorization')
   return extractAdminFromHeaders(authHeader)
+}
+
+function parsePositiveInteger(value: string | null, fallback: number, max?: number) {
+  const parsed = Number.parseInt(value || '', 10)
+  if (!Number.isFinite(parsed) || parsed < 1) return fallback
+  return max ? Math.min(parsed, max) : parsed
+}
+
+function addParam(params: unknown[], value: unknown) {
+  params.push(value)
+  return `$${params.length}`
+}
+
+function buildContactWhere(searchParams: URLSearchParams, options: { includeCategory?: boolean; includeStatus?: boolean; includeSearch?: boolean } = {}) {
+  const params: unknown[] = []
+  const conditions: string[] = []
+  const country = cleanText(searchParams.get('country'))
+  const category = cleanText(searchParams.get('category'))
+  const status = cleanText(searchParams.get('status'))?.toUpperCase()
+  const search = cleanText(searchParams.get('search'))
+
+  if (country && country !== ALL_COUNTRIES) {
+    conditions.push(`"country" = ${addParam(params, country)}`)
+  }
+
+  if (options.includeCategory !== false && category && category !== ALL_CATEGORIES) {
+    conditions.push(`COALESCE(NULLIF(TRIM("category"), ''), 'Uncategorised') = ${addParam(params, category)}`)
+  }
+
+  if (options.includeStatus !== false && status && status !== ALL_STATUSES && STATUSES.has(status)) {
+    if (status === 'UNSUBSCRIBED') {
+      conditions.push(`("unsubscribed" = true OR "status" = 'UNSUBSCRIBED')`)
+    } else {
+      conditions.push(`"status" = ${addParam(params, status)} AND "unsubscribed" = false`)
+    }
+  }
+
+  if (options.includeSearch !== false && search) {
+    const searchParam = addParam(params, `%${search}%`)
+    conditions.push(`(
+      "practiceName" ILIKE ${searchParam}
+      OR COALESCE("name", '') ILIKE ${searchParam}
+      OR COALESCE("email", '') ILIKE ${searchParam}
+      OR COALESCE("phone", '') ILIKE ${searchParam}
+      OR COALESCE("city", '') ILIKE ${searchParam}
+      OR COALESCE("region", '') ILIKE ${searchParam}
+      OR COALESCE("practitionerType", '') ILIKE ${searchParam}
+      OR COALESCE("subcategory", '') ILIKE ${searchParam}
+    )`)
+  }
+
+  return {
+    whereSql: conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '',
+    params,
+  }
 }
 
 async function ensurePractitionerOutreachSchema() {
@@ -89,17 +149,71 @@ export async function GET(request: NextRequest) {
 
   await ensurePractitionerOutreachSchema()
 
-  const contacts = await prisma.$queryRaw<any[]>`
+  const page = parsePositiveInteger(request.nextUrl.searchParams.get('page'), 1)
+  const pageSize = parsePositiveInteger(request.nextUrl.searchParams.get('pageSize'), DEFAULT_PAGE_SIZE, MAX_PAGE_SIZE)
+  const offset = (page - 1) * pageSize
+  const contactWhere = buildContactWhere(request.nextUrl.searchParams)
+  const categoryWhere = buildContactWhere(request.nextUrl.searchParams, {
+    includeCategory: false,
+    includeStatus: false,
+    includeSearch: false,
+  })
+
+  const contacts = await prisma.$queryRawUnsafe<any[]>(`
     SELECT
       "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
       "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
       "safetyBasis", "doNotContactNotice", "status", "unsubscribed",
       "lastSentAt", "sentCount", "lastError", "createdAt", "updatedAt"
     FROM "PractitionerOutreachContact"
+    ${contactWhere.whereSql}
     ORDER BY "country" ASC, "category" ASC, "subcategory" ASC, "practiceName" ASC, "name" ASC
+    LIMIT ${addParam(contactWhere.params, pageSize)} OFFSET ${addParam(contactWhere.params, offset)}
+  `, ...contactWhere.params)
+
+  const totalRows = await prisma.$queryRawUnsafe<Array<{ count: bigint }>>(
+    `SELECT COUNT(*)::bigint AS count FROM "PractitionerOutreachContact" ${contactWhere.whereSql}`,
+    ...contactWhere.params.slice(0, -2)
+  )
+
+  const totalContactRows = await prisma.$queryRaw<Array<{ count: bigint }>>`
+    SELECT COUNT(*)::bigint AS count FROM "PractitionerOutreachContact"
   `
 
-  return NextResponse.json({ contacts })
+  const countryCountRows = await prisma.$queryRaw<Array<{ country: string; count: bigint }>>`
+    SELECT "country", COUNT(*)::bigint AS count
+    FROM "PractitionerOutreachContact"
+    GROUP BY "country"
+    ORDER BY "country" ASC
+  `
+
+  const categoryCountRows = await prisma.$queryRawUnsafe<Array<{ category: string; count: bigint }>>(`
+    SELECT COALESCE(NULLIF(TRIM("category"), ''), 'Uncategorised') AS category, COUNT(*)::bigint AS count
+    FROM "PractitionerOutreachContact"
+    ${categoryWhere.whereSql}
+    GROUP BY COALESCE(NULLIF(TRIM("category"), ''), 'Uncategorised')
+    ORDER BY category ASC
+  `, ...categoryWhere.params)
+
+  const countryCounts = countryCountRows.reduce((counts: Record<string, number>, row) => {
+    counts[row.country || 'Unknown'] = Number(row.count || 0)
+    return counts
+  }, {})
+
+  const categoryCounts = categoryCountRows.reduce((counts: Record<string, number>, row) => {
+    counts[row.category || 'Uncategorised'] = Number(row.count || 0)
+    return counts
+  }, {})
+
+  return NextResponse.json({
+    contacts,
+    page,
+    pageSize,
+    total: Number(totalRows[0]?.count || 0),
+    totalContacts: Number(totalContactRows[0]?.count || 0),
+    countryCounts,
+    categoryCounts,
+  })
 }
 
 export async function POST(request: NextRequest) {

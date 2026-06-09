@@ -1,9 +1,9 @@
 {
-  "generatedAt": "2026-06-09T07:19:35.046Z",
+  "generatedAt": "2026-06-09T07:42:48.433Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
-    "app/admin-panel/page.tsx": "d60ddbc32cfe067578bcd922a743fb19c6cb8d58276687a7a3e8313a61db8cc0",
+    "app/admin-panel/page.tsx": "8fb88cd3db6a2f149c5767637c564cea481a9af83a138798d914f8d8eb8eca02",
     "app/admin-panel/qr-login/page.tsx": "f6bbb3786474136d0a419421d7f05e149f434f4b69ec40097c574918aa13f236",
     "app/admin-panel/tickets/[id]/page.tsx": "023f92352ba48f0b80a0ed4ca407eb110b1c5d9975fd95669071a68ce37c9bd2",
     "app/admin-panel/user/[userId]/page.tsx": "ce7a31e15f230f880998a930b5566d07553d945a556aa51a1254883aa550d45b",

@@ -223,6 +223,10 @@ export default function AdminPanel() {
   const [practitionerOutreachData, setPractitionerOutreachData] = useState<any[]>([])
   const [isLoadingPractitionerOutreach, setIsLoadingPractitionerOutreach] = useState(false)
   const [practitionerOutreachPage, setPractitionerOutreachPage] = useState(1)
+  const [practitionerOutreachTotal, setPractitionerOutreachTotal] = useState(0)
+  const [practitionerOutreachTotalContacts, setPractitionerOutreachTotalContacts] = useState(0)
+  const [practitionerOutreachCountryCounts, setPractitionerOutreachCountryCounts] = useState<Record<string, number>>({})
+  const [practitionerOutreachCategoryCounts, setPractitionerOutreachCategoryCounts] = useState<Record<string, number>>({})
   const [practitionerOutreachCountryFilter, setPractitionerOutreachCountryFilter] = useState(PRACTITIONER_OUTREACH_ALL_COUNTRIES)
   const [practitionerOutreachCategoryFilter, setPractitionerOutreachCategoryFilter] = useState(PRACTITIONER_OUTREACH_ALL_CATEGORIES)
   const [practitionerOutreachStatusFilter, setPractitionerOutreachStatusFilter] = useState(PRACTITIONER_OUTREACH_ALL_STATUSES)
@@ -254,11 +258,14 @@ export default function AdminPanel() {
   const [isComposingPractitionerEmail, setIsComposingPractitionerEmail] = useState(false)
   const practitionerOutreachDataCountryNames = useMemo(() => {
     return Array.from(new Set(
-      practitionerOutreachData
+      [
+        ...Object.keys(practitionerOutreachCountryCounts),
+        ...practitionerOutreachData
         .map(entry => String(entry.country || '').trim())
-        .filter(Boolean)
+          .filter(Boolean),
+      ]
     )).sort((a, b) => a.localeCompare(b))
-  }, [practitionerOutreachData])
+  }, [practitionerOutreachCountryCounts, practitionerOutreachData])
   const practitionerOutreachKnownCountries = useMemo(() => {
     return new Set(PRACTITIONER_OUTREACH_COUNTRY_GROUPS.flatMap(group => group.countries))
   }, [])
@@ -270,65 +277,22 @@ export default function AdminPanel() {
       ? [...PRACTITIONER_OUTREACH_COUNTRY_GROUPS, { label: 'Other countries already in the list', countries: practitionerOutreachExtraCountries }]
       : PRACTITIONER_OUTREACH_COUNTRY_GROUPS
   }, [practitionerOutreachExtraCountries])
-  const practitionerOutreachCountryCounts = useMemo(() => {
-    return practitionerOutreachData.reduce((counts: Record<string, number>, entry) => {
-      const country = String(entry.country || 'Unknown').trim() || 'Unknown'
-      counts[country] = (counts[country] || 0) + 1
-      return counts
-    }, {})
-  }, [practitionerOutreachData])
   const practitionerOutreachCountryPreparedCount = useMemo(() => {
     return new Set(practitionerOutreachCountryGroups.flatMap(group => group.countries)).size
   }, [practitionerOutreachCountryGroups])
   const practitionerOutreachCountriesWithContacts = useMemo(() => {
     return Object.values(practitionerOutreachCountryCounts).filter(count => count > 0).length
   }, [practitionerOutreachCountryCounts])
-  const practitionerOutreachCountryData = useMemo(() => {
-    return practitionerOutreachCountryFilter === PRACTITIONER_OUTREACH_ALL_COUNTRIES
-      ? practitionerOutreachData
-      : practitionerOutreachData.filter(entry => entry.country === practitionerOutreachCountryFilter)
-  }, [practitionerOutreachCountryFilter, practitionerOutreachData])
-  const practitionerOutreachCategoryCounts = useMemo(() => {
-    return practitionerOutreachCountryData.reduce((counts: Record<string, number>, entry) => {
-      const category = String(entry.category || 'Uncategorised').trim() || 'Uncategorised'
-      counts[category] = (counts[category] || 0) + 1
-      return counts
-    }, {})
-  }, [practitionerOutreachCountryData])
   const practitionerOutreachCategoryOptions = useMemo(() => {
     return Object.keys(practitionerOutreachCategoryCounts).sort((a, b) => a.localeCompare(b))
   }, [practitionerOutreachCategoryCounts])
-  const filteredPractitionerOutreachData = useMemo(() => {
-    const search = practitionerOutreachSearch.trim().toLowerCase()
-    return practitionerOutreachCountryData.filter(entry => {
-      const category = String(entry.category || 'Uncategorised').trim() || 'Uncategorised'
-      const status = entry.unsubscribed ? 'UNSUBSCRIBED' : String(entry.status || 'NOT_REVIEWED')
-      const matchesCategory = practitionerOutreachCategoryFilter === PRACTITIONER_OUTREACH_ALL_CATEGORIES || category === practitionerOutreachCategoryFilter
-      const matchesStatus = practitionerOutreachStatusFilter === PRACTITIONER_OUTREACH_ALL_STATUSES || status === practitionerOutreachStatusFilter
-      const matchesSearch = !search || [
-        entry.practiceName,
-        entry.name,
-        entry.email,
-        entry.city,
-        entry.region,
-        entry.practitionerType,
-        entry.phone,
-        entry.subcategory,
-      ].some(value => String(value || '').toLowerCase().includes(search))
-      return matchesCategory && matchesStatus && matchesSearch
-    })
-  }, [
-    practitionerOutreachCategoryFilter,
-    practitionerOutreachCountryData,
-    practitionerOutreachSearch,
-    practitionerOutreachStatusFilter,
-  ])
-  const practitionerOutreachTotalPages = Math.max(1, Math.ceil(filteredPractitionerOutreachData.length / PRACTITIONER_OUTREACH_PAGE_SIZE))
+  const practitionerOutreachCategoryTotal = useMemo(() => {
+    return Object.values(practitionerOutreachCategoryCounts).reduce((total, count) => total + count, 0)
+  }, [practitionerOutreachCategoryCounts])
+  const filteredPractitionerOutreachData = practitionerOutreachData
+  const practitionerOutreachTotalPages = Math.max(1, Math.ceil(practitionerOutreachTotal / PRACTITIONER_OUTREACH_PAGE_SIZE))
   const practitionerOutreachPageStart = (Math.min(practitionerOutreachPage, practitionerOutreachTotalPages) - 1) * PRACTITIONER_OUTREACH_PAGE_SIZE
-  const visiblePractitionerOutreachData = filteredPractitionerOutreachData.slice(
-    practitionerOutreachPageStart,
-    practitionerOutreachPageStart + PRACTITIONER_OUTREACH_PAGE_SIZE
-  )
+  const visiblePractitionerOutreachData = practitionerOutreachData
   const visiblePractitionerOutreachSendableIds = useMemo(() => {
     return visiblePractitionerOutreachData
       .filter(entry => entry.email && !entry.unsubscribed && !entry.doNotContactNotice)
@@ -1260,7 +1224,7 @@ https://www.helfi.ai`)
     setIsComposingPartnerEmail(false)
   }
 
-  const loadPractitionerOutreachData = async (token?: string) => {
+  const loadPractitionerOutreachData = async (token?: string, pageOverride?: number) => {
     setIsLoadingPractitionerOutreach(true)
     try {
       const authToken = token || adminToken || (() => {
@@ -1274,7 +1238,18 @@ https://www.helfi.ai`)
         setIsLoadingPractitionerOutreach(false)
         return
       }
-      const response = await fetch('/api/admin/practitioner-outreach', {
+      const requestedPage = pageOverride || practitionerOutreachPage
+      const params = new URLSearchParams({
+        page: String(requestedPage),
+        pageSize: String(PRACTITIONER_OUTREACH_PAGE_SIZE),
+        country: practitionerOutreachCountryFilter,
+        category: practitionerOutreachCategoryFilter,
+        status: practitionerOutreachStatusFilter,
+      })
+      if (practitionerOutreachSearch.trim()) {
+        params.set('search', practitionerOutreachSearch.trim())
+      }
+      const response = await fetch(`/api/admin/practitioner-outreach?${params.toString()}`, {
         headers: {
           'Authorization': `Bearer ${authToken}`
         }
@@ -1282,7 +1257,10 @@ https://www.helfi.ai`)
       if (response.ok) {
         const result = await response.json()
         setPractitionerOutreachData(result.contacts || [])
-        setPractitionerOutreachPage(1)
+        setPractitionerOutreachTotal(result.total || 0)
+        setPractitionerOutreachTotalContacts(result.totalContacts || 0)
+        setPractitionerOutreachCountryCounts(result.countryCounts || {})
+        setPractitionerOutreachCategoryCounts(result.categoryCounts || {})
         setSelectedPractitionerOutreachIds(prev => prev.filter(id =>
           result.contacts?.some((entry: any) => entry.id === id)
         ))
@@ -1315,7 +1293,8 @@ https://www.helfi.ai`)
       const result = await response.json()
       if (response.ok) {
         alert(`Saved ${result.savedCount || 0} practitioner contacts for review`)
-        loadPractitionerOutreachData(authToken)
+        setPractitionerOutreachPage(1)
+        loadPractitionerOutreachData(authToken, 1)
       } else {
         alert(result.error || 'Failed to load practitioner contacts')
       }
@@ -1437,8 +1416,8 @@ https://www.helfi.ai`)
       })
       const result = await response.json()
       if (response.ok) {
-        setPractitionerOutreachData(prev => prev.filter(entry => entry.id !== entryId))
         setSelectedPractitionerOutreachIds(prev => prev.filter(id => id !== entryId))
+        loadPractitionerOutreachData()
       } else {
         alert(result.error || 'Failed to delete practitioner contact')
       }
@@ -2061,7 +2040,16 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
     if (activeTab !== 'practitioner-outreach') return
     if (!isAuthenticated) return
     loadPractitionerOutreachData(adminToken)
-  }, [activeTab, adminToken, isAuthenticated])
+  }, [
+    activeTab,
+    adminToken,
+    isAuthenticated,
+    practitionerOutreachCategoryFilter,
+    practitionerOutreachCountryFilter,
+    practitionerOutreachPage,
+    practitionerOutreachSearch,
+    practitionerOutreachStatusFilter,
+  ])
 
   useEffect(() => {
     setPractitionerOutreachPage(1)
@@ -5994,12 +5982,13 @@ The Helfi Team`,
                   <select
                     value={practitionerOutreachCountryFilter}
                     onChange={(e) => {
+                      setPractitionerOutreachPage(1)
                       setPractitionerOutreachCountryFilter(e.target.value)
                       setPractitionerOutreachCategoryFilter(PRACTITIONER_OUTREACH_ALL_CATEGORIES)
                     }}
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   >
-                    <option value={PRACTITIONER_OUTREACH_ALL_COUNTRIES}>All countries ({practitionerOutreachData.length})</option>
+                    <option value={PRACTITIONER_OUTREACH_ALL_COUNTRIES}>All countries ({practitionerOutreachTotalContacts})</option>
                     {practitionerOutreachCountryGroups.map(group => (
                       <optgroup key={group.label} label={group.label}>
                         {group.countries.map(country => (
@@ -6012,10 +6001,13 @@ The Helfi Team`,
                   </select>
                   <select
                     value={practitionerOutreachCategoryFilter}
-                    onChange={(e) => setPractitionerOutreachCategoryFilter(e.target.value)}
+                    onChange={(e) => {
+                      setPractitionerOutreachPage(1)
+                      setPractitionerOutreachCategoryFilter(e.target.value)
+                    }}
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   >
-                    <option value={PRACTITIONER_OUTREACH_ALL_CATEGORIES}>All categories ({practitionerOutreachCountryData.length})</option>
+                    <option value={PRACTITIONER_OUTREACH_ALL_CATEGORIES}>All categories ({practitionerOutreachCategoryTotal})</option>
                     {practitionerOutreachCategoryOptions.map(category => (
                       <option key={category} value={category}>
                         {category} ({practitionerOutreachCategoryCounts[category] || 0})
@@ -6024,7 +6016,10 @@ The Helfi Team`,
                   </select>
                   <select
                     value={practitionerOutreachStatusFilter}
-                    onChange={(e) => setPractitionerOutreachStatusFilter(e.target.value)}
+                    onChange={(e) => {
+                      setPractitionerOutreachPage(1)
+                      setPractitionerOutreachStatusFilter(e.target.value)
+                    }}
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   >
                     <option value={PRACTITIONER_OUTREACH_ALL_STATUSES}>All statuses</option>
@@ -6034,7 +6029,10 @@ The Helfi Team`,
                   </select>
                   <input
                     value={practitionerOutreachSearch}
-                    onChange={(e) => setPractitionerOutreachSearch(e.target.value)}
+                    onChange={(e) => {
+                      setPractitionerOutreachPage(1)
+                      setPractitionerOutreachSearch(e.target.value)
+                    }}
                     placeholder="Search contacts"
                     className="px-3 py-2 border border-gray-300 rounded-lg text-sm"
                   />
@@ -6047,6 +6045,7 @@ The Helfi Team`,
                     <h4 className="text-sm font-semibold text-gray-900">Countries</h4>
                     <button
                       onClick={() => {
+                        setPractitionerOutreachPage(1)
                         setPractitionerOutreachCountryFilter(PRACTITIONER_OUTREACH_ALL_COUNTRIES)
                         setPractitionerOutreachCategoryFilter(PRACTITIONER_OUTREACH_ALL_CATEGORIES)
                       }}
@@ -6067,6 +6066,7 @@ The Helfi Team`,
                               <button
                                 key={country}
                                 onClick={() => {
+                                  setPractitionerOutreachPage(1)
                                   setPractitionerOutreachCountryFilter(country)
                                   setPractitionerOutreachCategoryFilter(PRACTITIONER_OUTREACH_ALL_CATEGORIES)
                                 }}
@@ -6109,7 +6109,10 @@ The Helfi Team`,
                           return (
                             <button
                               key={category}
-                              onClick={() => setPractitionerOutreachCategoryFilter(isSelected ? PRACTITIONER_OUTREACH_ALL_CATEGORIES : category)}
+                              onClick={() => {
+                                setPractitionerOutreachPage(1)
+                                setPractitionerOutreachCategoryFilter(isSelected ? PRACTITIONER_OUTREACH_ALL_CATEGORIES : category)
+                              }}
                               className={`flex items-center justify-between gap-2 px-3 py-2 rounded-md border text-left text-sm transition-colors ${
                                 isSelected
                                   ? 'border-blue-500 bg-blue-50 text-blue-900'
@@ -6323,11 +6326,11 @@ The Helfi Team`,
                     <p className="text-sm text-gray-600">
                       {isLoadingPractitionerOutreach
                         ? 'Loading...'
-                        : filteredPractitionerOutreachData.length > PRACTITIONER_OUTREACH_PAGE_SIZE
-                          ? `Showing ${practitionerOutreachPageStart + 1}-${Math.min(practitionerOutreachPageStart + PRACTITIONER_OUTREACH_PAGE_SIZE, filteredPractitionerOutreachData.length)} of ${filteredPractitionerOutreachData.length} matching contacts`
-                          : `${filteredPractitionerOutreachData.length} matching contacts`}
-                      {practitionerOutreachData.length > 0 && filteredPractitionerOutreachData.length !== practitionerOutreachData.length
-                        ? ` from ${practitionerOutreachData.length} total`
+                        : practitionerOutreachTotal > 0
+                          ? `Showing ${practitionerOutreachPageStart + 1}-${Math.min(practitionerOutreachPageStart + PRACTITIONER_OUTREACH_PAGE_SIZE, practitionerOutreachTotal)} of ${practitionerOutreachTotal} matching contacts`
+                          : '0 matching contacts'}
+                      {practitionerOutreachTotalContacts > 0 && practitionerOutreachTotal !== practitionerOutreachTotalContacts
+                        ? ` from ${practitionerOutreachTotalContacts} total`
                         : ''}
                     </p>
                   </div>
@@ -6368,7 +6371,7 @@ The Helfi Team`,
                       {filteredPractitionerOutreachData.length === 0 ? (
                         <tr>
                           <td colSpan={10} className="px-6 py-4 text-center text-gray-500">
-                            {practitionerOutreachData.length === 0
+                            {practitionerOutreachTotalContacts === 0
                               ? 'No practitioner outreach contacts yet. Add the first contact above.'
                               : 'No contacts match the selected country, group, status, or search.'}
                           </td>
@@ -6434,7 +6437,7 @@ The Helfi Team`,
                       )}
                     </tbody>
                   </table>
-                  {filteredPractitionerOutreachData.length > PRACTITIONER_OUTREACH_PAGE_SIZE && (
+                  {practitionerOutreachTotal > PRACTITIONER_OUTREACH_PAGE_SIZE && (
                     <div className="flex items-center justify-between border-t border-gray-200 px-6 py-4">
                       <div className="text-sm text-gray-600">
                         Page {Math.min(practitionerOutreachPage, practitionerOutreachTotalPages)} of {practitionerOutreachTotalPages}
