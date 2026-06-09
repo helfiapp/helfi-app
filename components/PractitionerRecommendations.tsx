@@ -94,6 +94,36 @@ function formatPlace(item: PractitionerRecommendation) {
   return [item.suburbCity, item.stateRegion, item.country].filter(Boolean).join(', ')
 }
 
+function isNativeRecommendationBridge() {
+  if (typeof window === 'undefined') return false
+  try {
+    const params = new URLSearchParams(window.location.search)
+    return (
+      params.get('helfiNative') === '1' ||
+      document.documentElement.getAttribute('data-helfi-native-webview') === '1' ||
+      Boolean((window as any).ReactNativeWebView?.postMessage)
+    )
+  } catch {
+    return false
+  }
+}
+
+function postNativeRecommendationRequest(issueText: string, sourceArea: Props['sourceArea']) {
+  try {
+    const bridge = (window as any).ReactNativeWebView
+    if (!bridge || typeof bridge.postMessage !== 'function') return
+    bridge.postMessage(
+      JSON.stringify({
+        type: 'helfi:practitionerRecommendationRequest',
+        issueText,
+        sourceArea,
+      })
+    )
+  } catch {
+    // Native bridge is optional; the website still renders normally.
+  }
+}
+
 export default function PractitionerRecommendations({ issueText, sourceArea, className = '', compact = false }: Props) {
   const [results, setResults] = useState<PractitionerRecommendation[]>([])
   const [loaded, setLoaded] = useState(false)
@@ -105,6 +135,12 @@ export default function PractitionerRecommendations({ issueText, sourceArea, cla
     async function load() {
       setLoaded(false)
       setResults([])
+      if (isNativeRecommendationBridge()) {
+        postNativeRecommendationRequest(trimmedIssueText, sourceArea)
+        setLoaded(true)
+        return
+      }
+
       if (!trimmedIssueText) {
         setLoaded(true)
         return

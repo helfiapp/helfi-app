@@ -1,14 +1,41 @@
-import React, { useMemo, useState } from 'react'
-import { ActivityIndicator, Linking, Pressable, Text, View } from 'react-native'
+import React, { useCallback, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { WebView } from 'react-native-webview'
 
+import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
 import { buildNativeWebSource } from '../lib/openNativeWebPath'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+
+const PRACTITIONER_LOCATION_KEY = 'helfi:practitionerLocation'
+
+type NativeRecommendationSource = 'onboarding' | 'chat' | 'image' | 'symptom-analysis'
+
+type NativePractitionerRecommendation = {
+  id: string
+  displayName: string
+  slug: string
+  categoryName: string | null
+  subcategoryName: string | null
+  phone: string | null
+  websiteUrl: string | null
+  suburbCity: string | null
+  stateRegion: string | null
+  country: string | null
+  distanceKm: number | null
+  reason: string
+}
+
+type NativeUserLocation = {
+  lat: number
+  lng: number
+  country?: string | null
+}
 
 function isAllowedInAppUrl(rawUrl: string): boolean {
   const value = String(rawUrl || '').trim()
@@ -54,11 +81,158 @@ function titleForNativeWebUrl(rawUrl: string, fallback: string) {
   return match?.title || fallback || 'Page'
 }
 
+function normalizeToken(token: string | null | undefined): string {
+  return String(token || '')
+    .trim()
+    .replace(/^"+|"+$/g, '')
+}
+
+function buildNativeCookieHeader(token: string): string {
+  return [
+    `next-auth.session-token=${token}`,
+    `authjs.session-token=${token}`,
+    `__Secure-next-auth.session-token=${token}`,
+    `__Secure-authjs.session-token=${token}`,
+  ].join('; ')
+}
+
+async function readSavedPractitionerLocation(): Promise<NativeUserLocation | null> {
+  try {
+    const raw = await AsyncStorage.getItem(PRACTITIONER_LOCATION_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    const lat = Number(parsed?.lat)
+    const lng = Number(parsed?.lng)
+    if (!Number.isFinite(lat) || !Number.isFinite(lng)) return null
+    return {
+      lat,
+      lng,
+      country: typeof parsed?.country === 'string' ? parsed.country : null,
+    }
+  } catch {
+    return null
+  }
+}
+
+function readCurrentNativeLocation(): Promise<NativeUserLocation | null> {
+  const geo = (globalThis as any)?.navigator?.geolocation
+  if (!geo || typeof geo.getCurrentPosition !== 'function') return Promise.resolve(null)
+
+  return new Promise((resolve) => {
+    geo.getCurrentPosition(
+      (position: any) => {
+        const lat = Number(position?.coords?.latitude)
+        const lng = Number(position?.coords?.longitude)
+        if (!Number.isFinite(lat) || !Number.isFinite(lng)) {
+          resolve(null)
+          return
+        }
+        resolve({ lat, lng })
+      },
+      () => resolve(null),
+      { enableHighAccuracy: false, timeout: 5000, maximumAge: 1000 * 60 * 60 },
+    )
+  })
+}
+
+function formatPlace(item: NativePractitionerRecommendation) {
+  return [item.suburbCity, item.stateRegion, item.country].filter(Boolean).join(', ')
+}
+
+function formatDistance(distanceKm: number | null) {
+  if (typeof distanceKm !== 'number' || !Number.isFinite(distanceKm)) return ''
+  return `${distanceKm.toFixed(distanceKm < 10 ? 1 : 0)} km`
+}
+
+function NativePractitionerRecommendationPanel({
+  items,
+  onOpenProfile,
+  onOpenContact,
+}: {
+  items: NativePractitionerRecommendation[]
+  onOpenProfile: (item: NativePractitionerRecommendation) => void
+  onOpenContact: (item: NativePractitionerRecommendation) => void
+}) {
+  if (!items.length) return null
+
+  return (
+    <View
+      style={{
+        borderTopWidth: 1,
+        borderTopColor: '#D8EBDD',
+        backgroundColor: '#F2FBF4',
+        paddingVertical: 12,
+      }}
+    >
+      <View style={{ paddingHorizontal: 14, marginBottom: 8 }}>
+        <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '900' }}>Practitioners near you</Text>
+        <Text style={{ color: theme.colors.muted, marginTop: 3, fontSize: 12 }}>
+          Based on what you shared, these nearby practitioners may be relevant.
+        </Text>
+      </View>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 14, gap: 10 }}>
+        {items.map((item) => {
+          const place = formatPlace(item)
+          const distance = formatDistance(item.distanceKm)
+          const category = [item.subcategoryName, item.categoryName].filter(Boolean).join(' - ')
+          const hasContact = Boolean(item.websiteUrl || item.phone)
+          return (
+            <View
+              key={item.id}
+              style={{
+                width: 270,
+                borderWidth: 1,
+                borderColor: '#CFE8D4',
+                borderRadius: theme.radius.md,
+                backgroundColor: '#FFFFFF',
+                padding: 12,
+                gap: 7,
+              }}
+            >
+              <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 15 }}>{item.displayName}</Text>
+                  {category ? <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 2 }}>{category}</Text> : null}
+                </View>
+                {distance ? (
+                  <View style={{ borderRadius: 999, backgroundColor: '#E4F6E8', paddingHorizontal: 8, paddingVertical: 4 }}>
+                    <Text style={{ color: '#24743A', fontWeight: '900', fontSize: 11 }}>{distance}</Text>
+                  </View>
+                ) : null}
+              </View>
+              {place ? <Text style={{ color: theme.colors.muted, fontSize: 12 }}>{place}</Text> : null}
+              {item.reason ? <Text style={{ color: theme.colors.text, fontSize: 12, lineHeight: 17 }}>{item.reason}</Text> : null}
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 2 }}>
+                <Pressable onPress={() => onOpenProfile(item)}>
+                  <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 13 }}>View profile</Text>
+                </Pressable>
+                {hasContact ? (
+                  <Pressable onPress={() => onOpenContact(item)}>
+                    <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 13 }}>
+                      {item.websiteUrl ? 'Website or booking' : 'Call'}
+                    </Text>
+                  </Pressable>
+                ) : null}
+              </View>
+            </View>
+          )
+        })}
+      </ScrollView>
+      <Text style={{ color: '#3C7550', fontSize: 11, lineHeight: 15, paddingHorizontal: 14, marginTop: 8 }}>
+        These are not diagnoses or referrals. You may want to consider speaking with a qualified practitioner if it feels relevant.
+      </Text>
+    </View>
+  )
+}
+
 export function NativeWebToolScreen({ route }: { route: any }) {
   const navigation = useNavigation<any>()
   const { session } = useAppMode()
   const [loading, setLoading] = useState(true)
   const [failed, setFailed] = useState(false)
+  const [recommendations, setRecommendations] = useState<NativePractitionerRecommendation[]>([])
+  const recommendationRequestRef = useRef(0)
+  const lastRecommendationKeyRef = useRef('')
 
   const requestedPath = String(route?.params?.path || '/dashboard')
   const requestedTitle = String(route?.params?.title || 'Page')
@@ -77,6 +251,79 @@ export function NativeWebToolScreen({ route }: { route: any }) {
   )
 
   const hasNativeToken = String(session?.token || '').trim().length > 0
+
+  const loadNativeRecommendations = useCallback(
+    async (issueText: string, sourceArea: NativeRecommendationSource) => {
+      const trimmedIssue = String(issueText || '').trim()
+      if (!trimmedIssue) {
+        lastRecommendationKeyRef.current = ''
+        setRecommendations([])
+        return
+      }
+
+      const requestKey = `${sourceArea}:${trimmedIssue}`
+      if (lastRecommendationKeyRef.current === requestKey) return
+      lastRecommendationKeyRef.current = requestKey
+      const requestId = recommendationRequestRef.current + 1
+      recommendationRequestRef.current = requestId
+      setRecommendations([])
+
+      const location = (await readSavedPractitionerLocation()) || (await readCurrentNativeLocation())
+      if (!location || recommendationRequestRef.current !== requestId) return
+
+      const token = normalizeToken(session?.token)
+      const headers: Record<string, string> = { 'Content-Type': 'application/json' }
+      if (token) {
+        headers.Authorization = `Bearer ${token}`
+        headers['x-native-token'] = token
+        headers.Cookie = buildNativeCookieHeader(token)
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/practitioners/recommendations`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            issueText: trimmedIssue,
+            sourceArea,
+            lat: location.lat,
+            lng: location.lng,
+            country: location.country || undefined,
+          }),
+        })
+        const data = await res.json().catch(() => ({}))
+        if (recommendationRequestRef.current !== requestId) return
+        setRecommendations(res.ok && Array.isArray(data?.results) ? data.results : [])
+      } catch {
+        if (recommendationRequestRef.current === requestId) setRecommendations([])
+      }
+    },
+    [session?.token],
+  )
+
+  const handleNativeMessage = useCallback(
+    (event: any) => {
+      const raw = String(event?.nativeEvent?.data || '')
+      if (!raw) return
+      try {
+        const data = JSON.parse(raw)
+        if (data?.type !== 'helfi:practitionerRecommendationRequest') return
+        void loadNativeRecommendations(
+          String(data?.issueText || ''),
+          (data?.sourceArea || 'chat') as NativeRecommendationSource,
+        )
+      } catch {
+        // Ignore messages that are not for native practitioner recommendations.
+      }
+    },
+    [loadNativeRecommendations],
+  )
+
+  const openRecommendationContact = useCallback((item: NativePractitionerRecommendation) => {
+    const url = item.websiteUrl || (item.phone ? `tel:${item.phone}` : '')
+    if (!url) return
+    void Linking.openURL(url).catch(() => {})
+  }, [])
 
   const injectedSetupScript = useMemo(() => {
     const userId = String(session?.user?.id || 'signed-out')
@@ -213,6 +460,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
               navigation.setOptions({ title: nextTitle })
             }}
             onLoadEnd={() => setLoading(false)}
+            onMessage={handleNativeMessage}
             onError={() => {
               setLoading(false)
               setFailed(true)
@@ -251,6 +499,11 @@ export function NativeWebToolScreen({ route }: { route: any }) {
             startInLoadingState
           />
         )}
+        <NativePractitionerRecommendationPanel
+          items={recommendations}
+          onOpenProfile={(item) => navigation.navigate('PractitionerProfile', { slug: item.slug, name: item.displayName })}
+          onOpenContact={openRecommendationContact}
+        />
       </View>
     </Screen>
   )

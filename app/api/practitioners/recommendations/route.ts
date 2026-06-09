@@ -2,11 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { getPractitionerRecommendations } from '@/lib/practitioner-recommendations'
 
 async function hasSignedInUser(request: NextRequest) {
   const session = await getServerSession(authOptions)
   if (session?.user?.email) return true
+
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (nativeUserId) return true
 
   const token = await getToken({
     req: request,

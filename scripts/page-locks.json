@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-09T10:06:39.129Z",
+  "generatedAt": "2026-06-09T12:16:44.599Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -187,7 +187,7 @@
     "components/PageHeader.tsx": "0165fbef1be6cdf800f3240a7b32ebdda9d19d354007d75f531b02c9d1697c00",
     "components/practitioner/AppFlowHeader.tsx": "c0a467f7a6047f6cb222af1bbf767631744dea7ec9cbc5d5b60b0f6920fb38e0",
     "components/practitioner/DirectoryMap.tsx": "b1fa7ebf0e2c2ab504a078dd54fd3e05e8340a9d68c976f3a56a01e00bc2f231",
-    "components/PractitionerRecommendations.tsx": "f62120e61d8a665859e4948a38725f0efd36f7bff213a816dee6ddc9d024d91e",
+    "components/PractitionerRecommendations.tsx": "06b8a859894388782d397596e26bae1e05c793ec017dfd6439801a6c52a09b68",
     "components/providers/AuthProvider.tsx": "6ccfa3ee4c4309319946175e0a8695a7a9f80130d90192b21e0a0f2752a145dc",
     "components/providers/UserDataProvider.tsx": "30c6fa6b0016cab7c9b667248c26a7792cf34e440544c127812a1211f5e14457",
     "components/reports/ConsentGate.tsx": "e24784c6295270453f70f2eedade5e696976a0965613e60f40c1844b36132313",
@@ -227,7 +227,7 @@
     "native/src/screens/LoginScreen.tsx": "0f6434dc816f53805d4b5b5d06175608b77afb374d550263ad17025d324f766a",
     "native/src/screens/MoodTrackerScreen.tsx": "85822f4898c677ed6df61e1425b792990a8bacb7a01339e43f4fd1d07252980f",
     "native/src/screens/MoreScreen.tsx": "393d7626d20dc3651c8d88ee70f7dd3aa05bf8c981fdf5fb10da89a2886decea",
-    "native/src/screens/NativeWebToolScreen.tsx": "87463bfce16713656176ba3b9a0724ecd8ba4441222d68a314164a354bee7d62",
+    "native/src/screens/NativeWebToolScreen.tsx": "e629f7ca2aec1c917e5d39ba5c8a36b73fb0fe1fd821dd755f218e8deb25761f",
     "native/src/screens/NotificationInboxScreen.tsx": "91bbbb95f33dacf90e71402b9bb845e69ba8bb7ca063af5c56bc4a27315db3e1",
     "native/src/screens/NotificationsAccountSecurityScreen.tsx": "7204b24972ee3e81875be0fc065cd1e7b848907638bfee32dcf3ab7c3fca6a22",
     "native/src/screens/NotificationsAiInsightsScreen.tsx": "fa6aa52fd39af0b45f98f459bfacf371504e5110006c317904f7462a411e9151",

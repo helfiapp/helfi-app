@@ -36,6 +36,21 @@ Approval rule:
 
 ---
 
+## Native iOS App Parity Rule (Jun 9, 2026)
+
+The iOS app must be built as a real native app experience.
+
+Do not ship iOS features by simply showing web app links, web-only cards, or web-specific feature blocks inside the iOS app.
+
+Rules:
+- The iOS app may share the same data, account, recommendations, results, and backend behaviour as the web app.
+- The iOS app UI itself must be built in the native app code, using native screens/components.
+- When a feature exists on both web and iOS, the behaviour should stay in sync, but the iOS presentation must still be native.
+- If a temporary web view is used during development, it must not be treated as the finished iOS implementation unless the owner explicitly approves that exception.
+- Future agents must not describe a feature as complete on iOS unless it has been checked in the native app UI.
+
+---
+
 ## Food Diary Lock List (Quick View)
 
 Use this as the fast “no-touch without approval” checklist for Food Diary.
