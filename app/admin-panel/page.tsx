@@ -1450,24 +1450,31 @@ https://www.helfi.ai`)
       alert('Please select at least one approved practitioner contact')
       return
     }
-    setPractitionerEmailSubject('Invitation to list your practice on Helfi')
+    setPractitionerEmailSubject('Invitation to list your practice on Helfi - 6 months free')
     setPractitionerEmailMessage(`Hi {name},
 
-My name is Louie Veleski and I am the founder of Helfi.
+I'm Louie Veleski, founder of Helfi.
 
-Helfi is a health website and app that helps people find practitioners and manage their health information in one place.
+I'm reaching out because we are building a practitioner directory inside Helfi, and I think {practiceName} could be a good fit.
 
-We are inviting practitioners to list their practice on Helfi. The listing is currently 6 months free, then USD $4.95 per month if you choose to keep it active. No card is needed to start, and the free period begins only after the listing is approved.
+Helfi is a health website and app that helps people organise their health information, understand symptoms, track food and lifestyle habits, and find relevant health practitioners.
 
-You can see the listing page here:
+We are currently inviting practitioners and clinics to create a listing with 6 months free. No payment card is needed to start, and the free period begins only after the listing is approved.
+
+A Helfi practitioner listing can help people:
+- find your practice by practitioner type, location, and health need
+- understand what services you offer before they contact you
+- visit your website or contact your practice directly
+
+The listing page is here:
 https://www.helfi.ai/list-your-practice
 
-Helfi is open to many practitioner types, including doctors, allied health practitioners, nutrition professionals, therapists, coaches, natural health practitioners, and other health or wellness services.
-
-If this is relevant to your practice, you are welcome to create a listing here:
+You can create a listing here:
 https://www.helfi.ai/list-your-practice/start
 
-If you are not the right person, feel free to forward this to the person who manages your practice listing or online presence.
+It only takes a few minutes to submit, and every listing is reviewed before going live.
+
+If you are not the right person for this, feel free to forward this to whoever manages your practice's website, directory listings, or online presence.
 
 Kind regards,
 Louie Veleski
