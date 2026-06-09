@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 5:45 PM AEST
+- What changed: Fixed Practitioner Outreach so large country lists load 50 contacts at a time instead of loading every contact into the browser. Country and practitioner group counts still show the full totals.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
+- What to quickly test: Open Practitioner Outreach, confirm it loads without going blank, confirm country counts appear, and use Next/Previous to move through the contact list.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 5:26 PM AEST
 - What changed: Added a United States practitioner outreach starter list with 10,510 public registry organization records across all 50 states plus DC and all existing Helfi practitioner groups. US records are NOT_REVIEWED and phone/manual-review by default, so no emails are sent automatically.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Outreach Starter Lists
