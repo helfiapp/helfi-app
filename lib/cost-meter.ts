@@ -25,6 +25,18 @@ const envNumber = (key: string, fallback: number): number => {
 };
 
 const DEFAULT_PRICES: Record<string, ModelPrices> = {
+  // GPT-5.5 standard short-context pricing, checked against OpenAI pricing on 2026-06-09.
+  // Input: $5.00 / 1M tokens; Output: $30.00 / 1M tokens
+  'gpt-5.5': {
+    inputCentsPer1k: envNumber('HELFI_PRICE_GPT55_INPUT_CENTS_PER_1K', 0.5),
+    outputCentsPer1k: envNumber('HELFI_PRICE_GPT55_OUTPUT_CENTS_PER_1K', 3.0),
+  },
+  // GPT-5.5 pro standard short-context pricing.
+  // Input: $30.00 / 1M tokens; Output: $180.00 / 1M tokens
+  'gpt-5.5-pro': {
+    inputCentsPer1k: envNumber('HELFI_PRICE_GPT55_PRO_INPUT_CENTS_PER_1K', 3.0),
+    outputCentsPer1k: envNumber('HELFI_PRICE_GPT55_PRO_OUTPUT_CENTS_PER_1K', 18.0),
+  },
   // GPT-5.2 (per OpenAI pricing page screenshot provided by user)
   // Input: $1.75 / 1M tokens; Output: $14.00 / 1M tokens
   'gpt-5.2': {
@@ -73,6 +85,8 @@ export type TokenUsage = {
 
 function normalizeModelKey(model: string): string {
   const m = (model || '').toLowerCase();
+  if (m.includes('gpt-5.5') && m.includes('pro')) return 'gpt-5.5-pro';
+  if (m.includes('gpt-5.5')) return 'gpt-5.5';
   if (m.includes('gpt-5.2') && m.includes('pro')) return 'gpt-5.2-pro';
   if (m.includes('gpt-5.2')) return 'gpt-5.2';
   if (m.includes('gpt-5-mini') || m.includes('gpt-5 mini')) return 'gpt-5-mini';
@@ -131,6 +145,26 @@ export function costCentsEstimateFromText(
   return costCentsForTokens(model, { promptTokens, completionTokens });
 }
 
+export function estimateTranscriptionCostCents(durationSeconds: number): number {
+  const seconds = Number(durationSeconds);
+  const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 30;
+  const usdPerMinute = envNumber('HELFI_PRICE_GPT4O_MINI_TRANSCRIBE_USD_PER_MINUTE', 0.003);
+  const cents = (safeSeconds / 60) * usdPerMinute * 100;
+  return Math.max(1, Math.ceil(cents * BILLING_MARKUP_MULTIPLIER));
+}
+
+export function estimateTextToSpeechCostCents(text: string): number {
+  const chars = String(text || '').length;
+  if (chars <= 0) return 0;
+  const inputTextTokens = estimateTokensFromText(text);
+  const estimatedSeconds = Math.max(1, Math.ceil(chars / 14));
+  const estimatedAudioTokens = estimatedSeconds * 80;
+  const inputUsdPer1m = envNumber('HELFI_PRICE_GPT4O_MINI_TTS_INPUT_USD_PER_1M', 0.6);
+  const outputUsdPer1m = envNumber('HELFI_PRICE_GPT4O_MINI_TTS_OUTPUT_USD_PER_1M', 12);
+  const usd = (inputTextTokens / 1_000_000) * inputUsdPer1m + (estimatedAudioTokens / 1_000_000) * outputUsdPer1m;
+  return Math.max(1, Math.ceil(usd * 100 * BILLING_MARKUP_MULTIPLIER));
+}
+
 export function capMaxTokensToBudget(
   model: string,
   promptText: string,
@@ -148,7 +182,6 @@ export function capMaxTokensToBudget(
   const maxCompletionTokens = Math.floor((usableBudget / (outputCentsPer1k * markup)) * 1000);
   return Math.max(0, Math.min(desiredMaxTokens, maxCompletionTokens));
 }
-
 
 
 

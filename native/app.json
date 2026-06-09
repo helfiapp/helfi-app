@@ -25,6 +25,7 @@
         "NSHealthShareUsageDescription": "Allow Helfi to read selected Apple Health data, such as steps, distance, and active calories, so it can show your daily activity in your health dashboard.",
         "NSHealthUpdateUsageDescription": "Allow Helfi to write selected health data to Apple Health if you choose to sync activity data from the app.",
         "NSLocationWhenInUseUsageDescription": "Allow Helfi to use your location to show relevant nearby practitioners when matches are available.",
+        "NSMicrophoneUsageDescription": "Allow Helfi to use your microphone when you choose to record a voice command.",
         "ITSAppUsesNonExemptEncryption": false,
         "NSPhotoLibraryUsageDescription": "Allow Helfi to access your photos so you can attach images to mood journal entries.",
         "NSPhotoLibraryAddUsageDescription": "Allow Helfi to save or manage selected journal photos when needed."
@@ -37,7 +38,10 @@
       },
       "edgeToEdgeEnabled": true,
       "predictiveBackGestureEnabled": false,
-      "package": "ai.helfi.app"
+      "package": "ai.helfi.app",
+      "permissions": [
+        "RECORD_AUDIO"
+      ]
     },
     "web": {
       "favicon": "./assets/favicon.png"

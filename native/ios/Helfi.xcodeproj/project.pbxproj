@@ -11,6 +11,7 @@
 		29FE91E71C3D76E0A74AA543 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 035C6036B823F8CC177615D8 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
 		A32A7B1F3175E3C2A022D242 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DDC4D80D0DE9E63FA588AED /* ExpoModulesProvider.swift */; };
+		C0DE00000000000000000002 /* VoiceAssistantIntents.swift in Sources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000001 /* VoiceAssistantIntents.swift */; };
 		B24158480EA125AB14539D14 /* libPods-Helfi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C4AEAA412C18F5A76DDC75BD /* libPods-Helfi.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
 		F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */ = {isa = PBXBuildFile; fileRef = F11748412D0307B40044C1D9 /* AppDelegate.swift */; };
@@ -26,6 +27,7 @@
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Helfi/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C4AEAA412C18F5A76DDC75BD /* libPods-Helfi.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Helfi.a"; sourceTree = BUILT_PRODUCTS_DIR; };
+		C0DE00000000000000000001 /* VoiceAssistantIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VoiceAssistantIntents.swift; path = Helfi/VoiceIntents/VoiceAssistantIntents.swift; sourceTree = "<group>"; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Helfi/AppDelegate.swift; sourceTree = "<group>"; };
 		F11748442D0722820044C1D9 /* Helfi-Bridging-Header.h */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.c.h; name = "Helfi-Bridging-Header.h"; path = "Helfi/Helfi-Bridging-Header.h"; sourceTree = "<group>"; };
@@ -58,6 +60,7 @@
 			isa = PBXGroup;
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
+				C0DE00000000000000000001 /* VoiceAssistantIntents.swift */,
 				F11748442D0722820044C1D9 /* Helfi-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -333,6 +336,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				F11748422D0307B40044C1D9 /* AppDelegate.swift in Sources */,
+				C0DE00000000000000000002 /* VoiceAssistantIntents.swift in Sources */,
 				A32A7B1F3175E3C2A022D242 /* ExpoModulesProvider.swift in Sources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
