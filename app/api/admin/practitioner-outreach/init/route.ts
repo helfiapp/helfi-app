@@ -4,7 +4,6 @@ import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { practitionerOutreachSeed, type PractitionerOutreachSeedEntry } from '@/lib/practitioner-outreach-seed'
 import practitionerOutreachAustraliaOsmSeed from '@/data/practitioner-outreach-australia-osm-seed.json'
-import practitionerOutreachUnitedStatesSeed from '@/data/practitioner-outreach-us-seed.json'
 
 export const maxDuration = 60
 
@@ -96,7 +95,6 @@ export async function POST(request: NextRequest) {
   const allSeedContacts = [
     ...practitionerOutreachSeed,
     ...(practitionerOutreachAustraliaOsmSeed as PractitionerOutreachSeedEntry[]),
-    ...(practitionerOutreachUnitedStatesSeed as PractitionerOutreachSeedEntry[]),
   ]
 
   const contacts = allSeedContacts.map(contact => {

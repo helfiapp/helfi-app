@@ -14,6 +14,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 11:47 PM AEST
+- What changed: Changed Practitioner Outreach to email-qualified contacts only. Removed the phone-only United States records from the live list, added 734 extra public Australia email contacts, and reloaded Australia to 966 total email-ready contacts. Manual admin adds now require an email.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
+- What to quickly test: Open Practitioner Outreach, confirm Australia shows about 966 contacts, confirm United States is 0 until email-qualified US contacts are sourced, and confirm listed contacts have email addresses and NOT_REVIEWED status.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 6:12 PM AEST
 - What changed: Fixed duplicate source-link handling so Practitioner Outreach can load older Australia records and the new United States records together. Then loaded the live starter list: 10,743 total contacts, including 10,510 United States and 233 Australia.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
