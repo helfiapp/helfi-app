@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 10:21 PM AEST
+- What changed: Added the permanent rule that iOS features must be built as native app experiences, not web-app cards or links shown inside iOS. Practitioner recommendations now hand off to native iOS cards inside the phone app, while the website still shows the web cards.
+- Where to see it (page/link): iOS app Talk to Helfi / symptom / image / health intake flows; web still works at https://helfi.ai/chat, https://helfi.ai/symptoms, https://helfi.ai/medical-images, and https://helfi.ai/onboarding
+- What to quickly test: In the iOS app, trigger a health concern that has a real approved nearby practitioner match and confirm the recommendation appears as native iOS cards. If there is no approved nearby match, confirm nothing appears.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 08:10 PM AEST
 - What changed: Added intelligent local practitioner recommendations across onboarding, Talk to Helfi chat, symptom analysis, health image analysis, and iOS/native WebView location support. Recommendations only show for approved/live practitioners that match the health concern and local radius.
 - Where to see it (page/link): https://helfi.ai/onboarding, https://helfi.ai/chat, https://helfi.ai/symptoms, https://helfi.ai/medical-images
