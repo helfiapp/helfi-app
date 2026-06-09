@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 6:12 PM AEST
+- What changed: Fixed duplicate source-link handling so Practitioner Outreach can load older Australia records and the new United States records together. Then loaded the live starter list: 10,743 total contacts, including 10,510 United States and 233 Australia.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
+- What to quickly test: Open Practitioner Outreach, confirm the page loads, select United States, confirm it shows about 10,510 contacts, and confirm rows show phone/manual details with NOT_REVIEWED status.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 5:45 PM AEST
 - What changed: Fixed Practitioner Outreach so large country lists load 50 contacts at a time instead of loading every contact into the browser. Country and practitioner group counts still show the full totals.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
