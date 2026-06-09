@@ -68,8 +68,9 @@ async function ensurePractitionerOutreachSchema() {
     ON "PractitionerOutreachContact"("email")
     WHERE "email" IS NOT NULL;
   `)
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "PractitionerOutreachContact_sourceUrl_key";`)
   await prisma.$executeRawUnsafe(`
-    CREATE UNIQUE INDEX IF NOT EXISTS "PractitionerOutreachContact_sourceUrl_key"
+    CREATE INDEX IF NOT EXISTS "PractitionerOutreachContact_sourceUrl_idx"
     ON "PractitionerOutreachContact"("sourceUrl")
     WHERE "sourceUrl" IS NOT NULL;
   `)
@@ -142,8 +143,12 @@ export async function POST(request: NextRequest) {
 
   for (let index = 0; index < contacts.length; index += SAVE_BATCH_SIZE) {
     const batch = contacts.slice(index, index + SAVE_BATCH_SIZE)
-    const batchJson = JSON.stringify(batch)
-    await prisma.$executeRaw`
+    const emailBatch = batch.filter(contact => contact.email)
+    const sourceOnlyBatch = batch.filter(contact => !contact.email)
+
+    if (emailBatch.length > 0) {
+      const batchJson = JSON.stringify(emailBatch)
+      await prisma.$executeRaw`
       WITH batch AS (
         SELECT *
         FROM jsonb_to_recordset(${batchJson}::jsonb) AS contact(
@@ -177,9 +182,8 @@ export async function POST(request: NextRequest) {
         "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
         "safetyBasis", COALESCE("doNotContactNotice", false), "status", false, NOW()
       FROM batch
-      ON CONFLICT ("sourceUrl") WHERE "sourceUrl" IS NOT NULL DO UPDATE SET
+      ON CONFLICT ("email") WHERE "email" IS NOT NULL DO UPDATE SET
         "name" = EXCLUDED."name",
-        "email" = COALESCE(EXCLUDED."email", "PractitionerOutreachContact"."email"),
         "practiceName" = EXCLUDED."practiceName",
         "country" = EXCLUDED."country",
         "category" = EXCLUDED."category",
@@ -199,7 +203,52 @@ export async function POST(request: NextRequest) {
           ELSE EXCLUDED."status"
         END,
         "updatedAt" = NOW()
-    `
+      `
+    }
+
+    if (sourceOnlyBatch.length > 0) {
+      const batchJson = JSON.stringify(sourceOnlyBatch)
+      await prisma.$executeRaw`
+        WITH batch AS (
+          SELECT *
+          FROM jsonb_to_recordset(${batchJson}::jsonb) AS contact(
+            "id" TEXT,
+            "name" TEXT,
+            "email" TEXT,
+            "practiceName" TEXT,
+            "country" TEXT,
+            "category" TEXT,
+            "subcategory" TEXT,
+            "region" TEXT,
+            "city" TEXT,
+            "practitionerType" TEXT,
+            "phone" TEXT,
+            "website" TEXT,
+            "emailType" TEXT,
+            "sourceUrl" TEXT,
+            "relevanceNotes" TEXT,
+            "safetyBasis" TEXT,
+            "doNotContactNotice" BOOLEAN,
+            "status" TEXT
+          )
+        )
+        INSERT INTO "PractitionerOutreachContact" (
+          "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
+          "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
+          "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
+        )
+        SELECT
+          "id", "name", "email", "practiceName", "country", "category", "subcategory", "region", "city",
+          "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
+          "safetyBasis", COALESCE("doNotContactNotice", false), "status", false, NOW()
+        FROM batch
+        WHERE "sourceUrl" IS NULL OR NOT EXISTS (
+          SELECT 1
+          FROM "PractitionerOutreachContact" existing
+          WHERE existing."sourceUrl" = batch."sourceUrl"
+        )
+      `
+    }
   }
 
   return NextResponse.json({ savedCount: contacts.length })

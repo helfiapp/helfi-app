@@ -122,8 +122,9 @@ async function ensurePractitionerOutreachSchema() {
     ON "PractitionerOutreachContact"("email")
     WHERE "email" IS NOT NULL;
   `)
+  await prisma.$executeRawUnsafe(`DROP INDEX IF EXISTS "PractitionerOutreachContact_sourceUrl_key";`)
   await prisma.$executeRawUnsafe(`
-    CREATE UNIQUE INDEX IF NOT EXISTS "PractitionerOutreachContact_sourceUrl_key"
+    CREATE INDEX IF NOT EXISTS "PractitionerOutreachContact_sourceUrl_idx"
     ON "PractitionerOutreachContact"("sourceUrl")
     WHERE "sourceUrl" IS NOT NULL;
   `)
@@ -287,28 +288,14 @@ export async function POST(request: NextRequest) {
           "practitionerType", "phone", "website", "emailType", "sourceUrl", "relevanceNotes",
           "safetyBasis", "doNotContactNotice", "status", "unsubscribed", "updatedAt"
         )
-        VALUES (
+        SELECT
           ${id}, ${name}, ${email}, ${practiceName}, ${country}, ${category}, ${subcategory}, ${region}, ${city},
           ${practitionerType}, ${phone}, ${website}, ${emailType}, ${sourceUrl}, ${relevanceNotes},
           ${safetyBasis}, ${doNotContactNotice}, ${status}, false, NOW()
+        WHERE ${sourceUrl} IS NULL OR NOT EXISTS (
+          SELECT 1 FROM "PractitionerOutreachContact"
+          WHERE "sourceUrl" = ${sourceUrl}
         )
-        ON CONFLICT ("sourceUrl") WHERE "sourceUrl" IS NOT NULL DO UPDATE SET
-          "name" = EXCLUDED."name",
-          "practiceName" = EXCLUDED."practiceName",
-          "country" = EXCLUDED."country",
-          "category" = EXCLUDED."category",
-          "subcategory" = EXCLUDED."subcategory",
-          "region" = EXCLUDED."region",
-          "city" = EXCLUDED."city",
-          "practitionerType" = EXCLUDED."practitionerType",
-          "phone" = EXCLUDED."phone",
-          "website" = EXCLUDED."website",
-          "emailType" = EXCLUDED."emailType",
-          "relevanceNotes" = EXCLUDED."relevanceNotes",
-          "safetyBasis" = EXCLUDED."safetyBasis",
-          "doNotContactNotice" = EXCLUDED."doNotContactNotice",
-          "status" = EXCLUDED."status",
-          "updatedAt" = NOW()
       `
     }
     savedCount += 1
