@@ -139,13 +139,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           form.append('localDate', todayLocalDate())
           form.append('tzOffsetMin', String(new Date().getTimezoneOffset()))
           form.append('voiceReply', voiceReply ? 'true' : 'false')
-          res = await fetch(`${API_BASE_URL}/api/native/voice-assistant`, {
+          res = await fetch(`${API_BASE_URL}/api/native-voice-assistant`, {
             method: 'POST',
             headers: buildNativeAuthHeaders(session.token),
             body: form,
           })
         } else {
-          res = await fetch(`${API_BASE_URL}/api/native/voice-assistant`, {
+          res = await fetch(`${API_BASE_URL}/api/native-voice-assistant`, {
             method: 'POST',
             headers: buildNativeAuthHeaders(session.token, { json: true }),
             body: JSON.stringify({
@@ -237,7 +237,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     if (!session?.token || !draft?.canConfirm) return
     setConfirming(true)
     try {
-      const res = await fetch(`${API_BASE_URL}/api/native/voice-assistant/confirm`, {
+      const res = await fetch(`${API_BASE_URL}/api/native-voice-assistant-confirm`, {
         method: 'POST',
         headers: buildNativeAuthHeaders(session.token, { json: true }),
         body: JSON.stringify({ draft }),
