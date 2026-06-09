@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 12:22 PM AEST
+- What changed: Improved the default Practitioner Outreach email template with warmer copy, a clearer 6 months free offer, listing benefits, the listing links, and unsubscribe wording. No sending rules were changed.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> select a contact -> Compose Email
+- What to quickly test: Select one contact, click Compose Email, confirm the subject says "Invitation to list your practice on Helfi - 6 months free", and confirm the message includes {name}, {practiceName}, 6 months free, listing links, and unsubscribe wording. Do not press Send unless ready.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 12:06 PM AEST
 - What changed: Prepared Practitioner Outreach for multi-country outreach. The admin screen now has country coverage counts, all European countries, Western outreach countries, country/category/status/search filters, practitioner group counts, and safer page-only selection.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
