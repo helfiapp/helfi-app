@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 10:09 AM AEST
+- What changed: Fixed the Practitioner Outreach tab so it automatically loads the 233 contacts after a fresh page reload, instead of showing 0 until Refresh Data is pressed.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
+- What to quickly test: Reload the existing admin tab and confirm it automatically shows the paged 233-contact list without freezing.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 10:00 AM AEST
 - What changed: Fixed the Practitioner Outreach admin tab freezing by showing the 233 contacts in 50-contact pages with Previous/Next controls.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
