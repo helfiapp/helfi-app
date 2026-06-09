@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 09 June 2026, 10:00 AM AEST
+- What changed: Fixed the Practitioner Outreach admin tab freezing by showing the 233 contacts in 50-contact pages with Previous/Next controls.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach
+- What to quickly test: Reload the existing admin tab, confirm the page shows contacts instead of going blank, and use Next/Previous to move through the list.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 09:39 AM AEST
 - What changed: Fixed the Practitioner Outreach loader so the 233-contact Australia starter list saves in smaller batches instead of timing out.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Australia Starter List
