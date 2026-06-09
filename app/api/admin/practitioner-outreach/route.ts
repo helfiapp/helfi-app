@@ -232,7 +232,7 @@ export async function POST(request: NextRequest) {
     const email = normalizeEmail(contact?.email)
     const practiceName = cleanText(contact?.practiceName || contact?.company)
     const country = cleanText(contact?.country)
-    if (!practiceName || !country) continue
+    if (!practiceName || !country || !email) continue
 
     const id = crypto.randomUUID()
     const name = cleanText(contact?.name)
@@ -340,6 +340,23 @@ export async function DELETE(request: NextRequest) {
   }
 
   await ensurePractitionerOutreachSchema()
+  const cleanupMissingEmail = request.nextUrl.searchParams.get('missingEmail') === 'true'
+  if (cleanupMissingEmail) {
+    const country = cleanText(request.nextUrl.searchParams.get('country'))
+    const deletedRows = country
+      ? await prisma.$executeRaw`
+          DELETE FROM "PractitionerOutreachContact"
+          WHERE "country" = ${country}
+            AND ("email" IS NULL OR TRIM("email") = '')
+        `
+      : await prisma.$executeRaw`
+          DELETE FROM "PractitionerOutreachContact"
+          WHERE "email" IS NULL OR TRIM("email") = ''
+        `
+
+    return NextResponse.json({ deletedCount: Number(deletedRows || 0) })
+  }
+
   const id = request.nextUrl.searchParams.get('id')
   if (!id) {
     return NextResponse.json({ error: 'Contact ID is required' }, { status: 400 })

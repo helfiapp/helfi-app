@@ -1331,8 +1331,8 @@ https://www.helfi.ai`)
   }
 
   const handleAddPractitionerOutreachContact = async () => {
-    if (!practitionerOutreachForm.practiceName.trim() || !practitionerOutreachForm.country.trim()) {
-      alert('Practice name and country are required')
+    if (!practitionerOutreachForm.practiceName.trim() || !practitionerOutreachForm.country.trim() || !practitionerOutreachForm.email.trim()) {
+      alert('Practice name, country, and email are required')
       return
     }
 

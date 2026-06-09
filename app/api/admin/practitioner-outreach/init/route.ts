@@ -3,6 +3,7 @@ import { randomUUID } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { practitionerOutreachSeed, type PractitionerOutreachSeedEntry } from '@/lib/practitioner-outreach-seed'
+import practitionerOutreachAustraliaOsmSeed from '@/data/practitioner-outreach-australia-osm-seed.json'
 import practitionerOutreachUnitedStatesSeed from '@/data/practitioner-outreach-us-seed.json'
 
 export const maxDuration = 60
@@ -94,6 +95,7 @@ export async function POST(request: NextRequest) {
 
   const allSeedContacts = [
     ...practitionerOutreachSeed,
+    ...(practitionerOutreachAustraliaOsmSeed as PractitionerOutreachSeedEntry[]),
     ...(practitionerOutreachUnitedStatesSeed as PractitionerOutreachSeedEntry[]),
   ]
 
@@ -117,7 +119,7 @@ export async function POST(request: NextRequest) {
     const doNotContactNotice = Boolean(contact.doNotContactNotice)
     const status = cleanStatus(contact.status)
 
-    if (!practiceName || !country || (!email && !phone && !sourceUrl)) return null
+    if (!practiceName || !country || !email) return null
 
     return {
       id,
