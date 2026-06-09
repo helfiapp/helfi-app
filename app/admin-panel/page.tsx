@@ -2044,6 +2044,12 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
   }, [activeTab, adminToken, practitionerPage, practitionerPageSize])
 
   useEffect(() => {
+    if (activeTab !== 'practitioner-outreach') return
+    if (!isAuthenticated) return
+    loadPractitionerOutreachData(adminToken)
+  }, [activeTab, adminToken, isAuthenticated])
+
+  useEffect(() => {
     setPractitionerOutreachPage(1)
   }, [
     practitionerOutreachCategoryFilter,
