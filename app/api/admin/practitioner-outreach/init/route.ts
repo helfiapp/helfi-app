@@ -5,6 +5,7 @@ import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { practitionerOutreachSeed, type PractitionerOutreachSeedEntry } from '@/lib/practitioner-outreach-seed'
 import practitionerOutreachAustraliaOsmSeed from '@/data/practitioner-outreach-australia-osm-seed.json'
 import practitionerOutreachUnitedStatesEmailSeed from '@/data/practitioner-outreach-united-states-email-seed.json'
+import practitionerOutreachUnitedKingdomEmailSeed from '@/data/practitioner-outreach-united-kingdom-email-seed.json'
 
 export const maxDuration = 60
 
@@ -97,6 +98,7 @@ export async function POST(request: NextRequest) {
     ...practitionerOutreachSeed,
     ...(practitionerOutreachAustraliaOsmSeed as PractitionerOutreachSeedEntry[]),
     ...(practitionerOutreachUnitedStatesEmailSeed as PractitionerOutreachSeedEntry[]),
+    ...(practitionerOutreachUnitedKingdomEmailSeed as PractitionerOutreachSeedEntry[]),
   ]
 
   const contacts = allSeedContacts.map(contact => {
