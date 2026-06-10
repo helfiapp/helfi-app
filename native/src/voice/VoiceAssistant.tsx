@@ -335,9 +335,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             accessibilityRole="button"
             accessibilityLabel="Talk to Helfi"
             onPress={() => openVoiceAssistant({ source: 'button' })}
-            style={[styles.floatingButton, { bottom: Math.max(92, insets.bottom + 82) }]}
+            style={[styles.floatingButton, { top: Math.max(12, insets.top + 12) }]}
           >
-            <Feather name="mic" size={24} color="#FFFFFF" />
+            <Feather name="mic" size={19} color="#FFFFFF" />
           </Pressable>
 
           <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={closePanel}>
@@ -466,17 +466,17 @@ export function useVoiceAssistant() {
 const styles = StyleSheet.create({
   floatingButton: {
     position: 'absolute',
-    right: 18,
-    width: 58,
-    height: 58,
-    borderRadius: 29,
+    left: 16,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: '#41AD49',
     alignItems: 'center',
     justifyContent: 'center',
     shadowColor: '#000',
-    shadowOpacity: 0.18,
-    shadowRadius: 10,
-    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.16,
+    shadowRadius: 8,
+    shadowOffset: { width: 0, height: 4 },
     elevation: 8,
   },
   panel: { flex: 1, backgroundColor: '#F7FAF9' },

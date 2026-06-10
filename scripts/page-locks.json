@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-10T00:50:31.188Z",
+  "generatedAt": "2026-06-10T01:34:10.470Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -254,6 +254,6 @@
     "native/src/ui/HelfiTextField.tsx": "4e7c45b42f6e5858a689c6a2cca88d903b184800a32b788a7f2d46f4e6172dc3",
     "native/src/ui/Screen.tsx": "085e4c4a81c7bf61a60d4a29e4185fddc17ca49b8b9587fa489480fafed0d375",
     "native/src/ui/theme.ts": "2ad13419cce93504b968e07e6dc4252fcb22804a87ccfec5bd9a3768e11342bd",
-    "native/src/voice/VoiceAssistant.tsx": "c3a5face058884c1aeee0465c9150b6be93bcd984b4b46914522d604d5ca43d4"
+    "native/src/voice/VoiceAssistant.tsx": "ecd926f19aff0087426416980b23cd830d07d9ad4baa1b7652fe7092d8e15cc7"
   }
 }
