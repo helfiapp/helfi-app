@@ -7,6 +7,13 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 10 June 2026, 3:51 PM AEST
+- What changed: Added 2,429 United Kingdom practitioner outreach contacts with public clinic/business email addresses only. All contacts are NOT_REVIEWED and no emails were sent.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Outreach Starter Lists
+- What to quickly test: Open Practitioner Outreach, load starter lists, select United Kingdom, and confirm contacts have email addresses and NOT_REVIEWED status.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 10 June 2026, 12:39 PM AEST
 - What changed: Added 5,026 United States practitioner outreach contacts with public clinic/business email addresses only. All contacts are NOT_REVIEWED and no emails were sent.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Outreach Starter Lists
