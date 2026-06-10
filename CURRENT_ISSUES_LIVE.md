@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 10 June 2026, 11:43 AM AEST
+- What changed: Moved the native Talk to Helfi button to the top-left of signed-in app screens and made it profile-image size. Uploaded TestFlight build 15.
+- Where to see it (page/link): Helfi phone app signed-in screens, backed by https://helfi.ai.
+- What to quickly test: Open the phone app, confirm the green microphone button is top-left and the same size as the profile image, then tap it and confirm the Talk to Helfi panel opens.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 10 June 2026, 11:03 AM AEST
 - What changed: Fixed the native voice assistant simulator/network issue, made Louie’s Breakfast review show before any spoken reply, and split voice playback into its own safer step so audio cannot block the confirm screen.
 - Where to see it (page/link): Helfi phone app Talk to Helfi, backed by https://helfi.ai. TestFlight build 14 was uploaded.
