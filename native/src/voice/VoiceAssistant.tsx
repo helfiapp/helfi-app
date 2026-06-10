@@ -2,6 +2,7 @@ import React, { createContext, useCallback, useContext, useEffect, useMemo, useR
 import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
+import * as FileSystem from 'expo-file-system'
 import { Feather } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
@@ -52,6 +53,16 @@ function todayLocalDate() {
 
 function cleanFavoriteText(value: unknown, max = 160) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+async function playableAudioUri(audioUri: string) {
+  const match = /^data:(audio\/[^;]+);base64,(.+)$/s.exec(audioUri)
+  if (!match) return audioUri
+  const mime = match[1].toLowerCase()
+  const ext = mime.includes('wav') ? 'wav' : mime.includes('mpeg') || mime.includes('mp3') ? 'mp3' : 'm4a'
+  const file = new FileSystem.File(FileSystem.Paths.cache, `helfi-voice-${Date.now()}.${ext}`)
+  file.write(match[2], { encoding: 'base64' })
+  return file.uri
 }
 
 async function loadVoiceFavorites() {
@@ -116,13 +127,40 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       if (!audioUri) return
       try {
         await stopPlayback()
-        const created = await Audio.Sound.createAsync({ uri: audioUri }, { shouldPlay: true })
+        const uri = await playableAudioUri(audioUri)
+        const created = await Audio.Sound.createAsync({ uri }, { shouldPlay: true })
         soundRef.current = created.sound
       } catch {
         // Text is still shown if playback fails.
       }
     },
     [stopPlayback],
+  )
+
+  const requestVoiceReply = useCallback(
+    async (text: string) => {
+      if (!session?.token || !text.trim()) return
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/native-voice-assistant-tts`, {
+          method: 'POST',
+          headers: buildNativeAuthHeaders(session.token, { json: true }),
+          body: JSON.stringify({ text }),
+        })
+        const data: any = await res.json().catch(() => ({}))
+        if (!res.ok) return
+        setChargedCredits((current) => {
+          const extra = Number(data?.chargedCredits)
+          if (!Number.isFinite(extra)) return current
+          return (current || 0) + extra
+        })
+        if (data?.audio) {
+          void playAudio(String(data.audio))
+        }
+      } catch {
+        // The written review stays available even if spoken playback fails.
+      }
+    },
+    [playAudio, session?.token],
   )
 
   const openVoiceAssistant = useCallback((input?: OpenVoiceAssistantInput) => {
@@ -166,7 +204,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           form.append('durationMillis', String(options.durationMillis || 0))
           form.append('localDate', todayLocalDate())
           form.append('tzOffsetMin', String(new Date().getTimezoneOffset()))
-          form.append('voiceReply', voiceReply ? 'true' : 'false')
+          form.append('voiceReply', 'false')
           form.append('favorites', JSON.stringify(favorites))
           res = await fetch(`${API_BASE_URL}/api/native-voice-assistant`, {
             method: 'POST',
@@ -181,7 +219,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               transcript: typedTranscript,
               localDate: todayLocalDate(),
               tzOffsetMin: new Date().getTimezoneOffset(),
-              voiceReply,
+              voiceReply: false,
               favorites,
             }),
           })
@@ -192,10 +230,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           throw new Error(data?.error || 'Helfi could not process that request.')
         }
         setTranscript(String(data?.transcript || typedTranscript || '').trim())
-        setDraft(data?.draft || null)
+        const nextDraft = data?.draft || null
+        setDraft(nextDraft)
         setChargedCredits(Number.isFinite(Number(data?.chargedCredits)) ? Number(data.chargedCredits) : null)
-        if (data?.audio) {
-          await playAudio(String(data.audio))
+        if (voiceReply && nextDraft) {
+          const speechText = nextDraft?.recipe?.text || nextDraft?.confirmationMessage || nextDraft?.summary || ''
+          void requestVoiceReply(String(speechText))
         }
       } catch (error: any) {
         Alert.alert('Try again', error?.message || 'Helfi could not process that request.')
@@ -203,7 +243,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setBusy(false)
       }
     },
-    [playAudio, session?.token, transcript, voiceReply],
+    [requestVoiceReply, session?.token, transcript, voiceReply],
   )
 
   useEffect(() => {
