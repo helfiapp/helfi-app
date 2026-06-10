@@ -27,9 +27,21 @@ type VoiceAction =
   | 'mood'
   | 'journal'
   | 'food_copy_previous'
+  | 'food_favorite'
   | 'food_draft'
   | 'recipe'
   | 'unknown'
+
+type VoiceFoodFavorite = {
+  id?: string | null
+  label: string
+  description?: string | null
+  meal?: string | null
+  nutrition?: any
+  total?: any
+  items?: any
+  raw?: any
+}
 
 type VoiceDraft = {
   action: VoiceAction
@@ -62,6 +74,7 @@ type VoiceDraft = {
     sourceLogIds?: string[]
     entries?: Array<{ name: string; description?: string | null; meal?: string | null }>
     draftText?: string
+    favorite?: VoiceFoodFavorite
   }
   recipe?: {
     text: string
@@ -102,6 +115,118 @@ function shiftLocalDate(localDate: string, deltaDays: number) {
 
 function cleanText(value: unknown, max = 1000) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+function compactFoodMatchText(value: unknown) {
+  return String(value || '')
+    .toLowerCase()
+    .normalize('NFKD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\b(the|a|an|my|me|please|can|you|put|in|add|log|have|had|for|today|to|diary|meal)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function levenshteinDistance(a: string, b: string) {
+  if (a === b) return 0
+  if (!a) return b.length
+  if (!b) return a.length
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  const curr = Array.from({ length: b.length + 1 }, () => 0)
+  for (let i = 1; i <= a.length; i += 1) {
+    curr[0] = i
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      curr[j] = Math.min(curr[j - 1] + 1, prev[j] + 1, prev[j - 1] + cost)
+    }
+    for (let j = 0; j <= b.length; j += 1) prev[j] = curr[j]
+  }
+  return prev[b.length]
+}
+
+function inferMealFromText(text: string, fallback?: string | null) {
+  const normalized = compactFoodMatchText(text)
+  if (/\bbreakfast\b/.test(normalized)) return 'breakfast'
+  if (/\blunch\b/.test(normalized)) return 'lunch'
+  if (/\bdinner\b/.test(normalized)) return 'dinner'
+  if (/\bsnack|snacks\b/.test(normalized)) return 'snacks'
+  return cleanText(fallback || 'uncategorized', 40).toLowerCase() || 'uncategorized'
+}
+
+function normalizeFavoriteInput(raw: any): VoiceFoodFavorite | null {
+  if (!raw || typeof raw !== 'object') return null
+  const label = cleanText(raw.label || raw.name || raw.description || raw.raw?.label || raw.raw?.name, 160)
+  if (!label) return null
+  const description = cleanText(raw.description || raw.raw?.description || label, 500)
+  const meal = cleanText(raw.meal || raw.category || raw.persistedCategory || raw.raw?.meal || raw.raw?.category, 40).toLowerCase()
+  return {
+    id: raw.id ? String(raw.id) : null,
+    label,
+    description: description || label,
+    meal: meal || null,
+    nutrition: raw.nutrition || raw.nutrients || raw.total || raw.raw?.nutrition || raw.raw?.nutrients || raw.raw?.total || null,
+    total: raw.total || raw.nutrition || raw.nutrients || raw.raw?.total || raw.raw?.nutrition || raw.raw?.nutrients || null,
+    items: Array.isArray(raw.items) ? raw.items : Array.isArray(raw.raw?.items) ? raw.raw.items : null,
+    raw,
+  }
+}
+
+function parseFavoritesJson(raw: unknown): VoiceFoodFavorite[] {
+  try {
+    const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw
+    const list = Array.isArray((parsed as any)?.favorites) ? (parsed as any).favorites : Array.isArray(parsed) ? parsed : []
+    return list
+      .map((item: any) => normalizeFavoriteInput(item))
+      .filter((item: VoiceFoodFavorite | null): item is VoiceFoodFavorite => Boolean(item))
+  } catch {
+    return []
+  }
+}
+
+function mergeFavorites(primary: VoiceFoodFavorite[], secondary: VoiceFoodFavorite[]) {
+  const byKey = new Map<string, VoiceFoodFavorite>()
+  ;[...primary, ...secondary].forEach((favorite) => {
+    const key = String(favorite.id || '').trim() || compactFoodMatchText(favorite.label)
+    if (key && !byKey.has(key)) byKey.set(key, favorite)
+  })
+  return Array.from(byKey.values())
+}
+
+async function loadStoredFavorites(userId: string) {
+  const stored = await prisma.healthGoal.findFirst({
+    where: { userId, name: '__FOOD_FAVORITES__' },
+    orderBy: { createdAt: 'desc' },
+    select: { category: true },
+  })
+  return parseFavoritesJson(stored?.category || '')
+}
+
+function findRequestedFavorite(transcript: string, favorites: VoiceFoodFavorite[]) {
+  const request = compactFoodMatchText(transcript)
+  if (!request || favorites.length === 0) return null
+  const requestTokens = request.split(' ').filter((token) => token.length >= 3)
+  const requestCompact = request.replace(/\s+/g, '')
+  let best: { favorite: VoiceFoodFavorite; score: number } | null = null
+
+  for (const favorite of favorites) {
+    const label = compactFoodMatchText(favorite.label || favorite.description || '')
+    if (!label) continue
+    const labelTokens = label.split(' ').filter((token) => token.length >= 3)
+    const labelCompact = label.replace(/\s+/g, '')
+    const tokenMatches = labelTokens.filter((token) =>
+      requestTokens.some((requestToken) => requestToken === token || levenshteinDistance(requestToken, token) <= 1),
+    ).length
+    let score = tokenMatches / Math.max(1, labelTokens.length)
+    if (request.includes(label)) score = Math.max(score, 1)
+    if (requestCompact.includes(labelCompact)) score = Math.max(score, 1)
+    const compactDistance = levenshteinDistance(requestCompact, labelCompact)
+    if (compactDistance <= 2) score = Math.max(score, 0.95)
+    if (score >= 0.72 && (!best || score > best.score)) best = { favorite, score }
+  }
+
+  return best?.favorite || null
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -270,13 +395,44 @@ async function buildFoodCopyDraft(userId: string, localDate: string, meal: strin
   return { sourceDate, rows, entries }
 }
 
+async function buildFavoriteFoodDraft(transcript: string, localDate: string, favorites: VoiceFoodFavorite[]) {
+  const favorite = findRequestedFavorite(transcript, favorites)
+  if (!favorite) return null
+  const meal = inferMealFromText(transcript, favorite.meal)
+  const calories = Math.round(Number((favorite.nutrition as any)?.calories ?? (favorite.total as any)?.calories) || 0)
+  const summary = `${favorite.label}${calories ? `, ${calories} kcal` : ''}`
+  return {
+    action: 'food_favorite' as const,
+    transcript,
+    localDate,
+    summary,
+    confirmationMessage: `I found ${favorite.label} in your favourites. Please confirm before I add it to ${meal}.`,
+    canConfirm: true,
+    food: {
+      meal,
+      entries: [{ name: favorite.label, description: favorite.description || favorite.label, meal }],
+      favorite: {
+        id: favorite.id || null,
+        label: favorite.label,
+        description: favorite.description || favorite.label,
+        meal,
+        nutrition: favorite.nutrition || favorite.total || null,
+        total: favorite.total || favorite.nutrition || null,
+        items: Array.isArray(favorite.items) ? favorite.items : null,
+      },
+    },
+  }
+}
+
 async function speak(openai: OpenAI, text: string, userId: string) {
   const speechText = cleanText(text, 1200)
   if (!speechText) return { audio: null, costCents: 0 }
   const response = await openai.audio.speech.create({
     model: TTS_MODEL,
-    voice: 'marin',
+    voice: process.env.HELFI_VOICE_TTS_VOICE || 'coral',
     input: speechText,
+    instructions:
+      'Speak like a warm, calm health coach. Sound natural and conversational, with gentle energy and smooth pacing. Avoid a robotic or announcer style.',
     response_format: 'mp3',
   } as any)
   const buffer = Buffer.from(await response.arrayBuffer())
@@ -303,13 +459,26 @@ function normalizeMood(value: any) {
   }
 }
 
-async function normalizeDraft(parsed: any, transcript: string, localDate: string, userId: string, openai: OpenAI, tzOffsetMin: number): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
+async function normalizeDraft(
+  parsed: any,
+  transcript: string,
+  localDate: string,
+  userId: string,
+  openai: OpenAI,
+  tzOffsetMin: number,
+  favorites: VoiceFoodFavorite[],
+): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
   const actionRaw = cleanText(parsed?.action, 40).toLowerCase() as VoiceAction
-  const action: VoiceAction = ['exercise', 'mood', 'journal', 'food_copy_previous', 'food_draft', 'recipe'].includes(actionRaw)
+  const action: VoiceAction = ['exercise', 'mood', 'journal', 'food_copy_previous', 'food_favorite', 'food_draft', 'recipe'].includes(actionRaw)
     ? actionRaw
     : 'unknown'
   let aiCostCents = 0
   let usedModel: string | undefined
+
+  const favoriteDraft = await buildFavoriteFoodDraft(transcript, localDate, favorites)
+  if (favoriteDraft && (action === 'food_favorite' || action === 'food_draft' || action === 'unknown')) {
+    return { aiCostCents, draft: favoriteDraft }
+  }
 
   if (action === 'recipe') {
     const requestText = cleanText(parsed?.recipeRequest || transcript, 1000)
@@ -480,9 +649,6 @@ export async function POST(request: NextRequest) {
     const user = await resolveUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-    const openai = getOpenAIClient()
-    if (!openai) return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
-
     const contentType = request.headers.get('content-type') || ''
     let transcript = ''
     let localDate = ''
@@ -490,6 +656,7 @@ export async function POST(request: NextRequest) {
     let wantsVoiceReply = false
     let durationSeconds = 30
     let transcriptionCostCents = 0
+    let clientFavorites: VoiceFoodFavorite[] = []
 
     if (contentType.includes('multipart/form-data')) {
       const form = await request.formData()
@@ -499,11 +666,14 @@ export async function POST(request: NextRequest) {
       if (!Number.isFinite(tzOffsetMin)) tzOffsetMin = new Date().getTimezoneOffset()
       localDate = localDateFromRequest(form.get('localDate'), tzOffsetMin)
       wantsVoiceReply = String(form.get('voiceReply') || '').toLowerCase() === 'true'
+      clientFavorites = parseFavoritesJson(form.get('favorites'))
       const durationMillis = Number(form.get('durationMillis'))
       durationSeconds = Number.isFinite(durationMillis) && durationMillis > 0 ? durationMillis / 1000 : 30
       if (!transcript && file instanceof File) {
         if (!file.type.startsWith('audio/')) return NextResponse.json({ error: 'File must be audio' }, { status: 400 })
         if (file.size > MAX_AUDIO_BYTES) return NextResponse.json({ error: 'Audio must be less than 12MB' }, { status: 400 })
+        const openai = getOpenAIClient()
+        if (!openai) return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
         const transcribed = await transcribeAudio(openai, file, user.id, durationSeconds)
         transcript = transcribed.text
         transcriptionCostCents = transcribed.costCents
@@ -515,6 +685,7 @@ export async function POST(request: NextRequest) {
       if (!Number.isFinite(tzOffsetMin)) tzOffsetMin = new Date().getTimezoneOffset()
       localDate = localDateFromRequest(body?.localDate, tzOffsetMin)
       wantsVoiceReply = Boolean(body?.voiceReply)
+      clientFavorites = parseFavoritesJson(body?.favorites)
     }
 
     if (!transcript) return NextResponse.json({ error: 'No speech found' }, { status: 400 })
@@ -524,8 +695,63 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Insufficient credits', estimatedCost: SIMPLE_MIN_CREDITS, availableCredits: wallet.totalAvailableCents }, { status: 402 })
     }
 
+    const storedFavorites = await loadStoredFavorites(user.id).catch(() => [])
+    const favorites = mergeFavorites(clientFavorites, storedFavorites)
+    const favoriteDraft = await buildFavoriteFoodDraft(transcript, localDate, favorites)
+    if (favoriteDraft) {
+      const draft = favoriteDraft
+      let aiCostCents = transcriptionCostCents
+      let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
+      let audio: string | null = null
+
+      if (wantsVoiceReply) {
+        const openai = getOpenAIClient()
+        if (openai) {
+          const tts = await speak(openai, draft.confirmationMessage, user.id)
+          audio = tts.audio
+          const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
+          chargeCents += voiceCharge
+          aiCostCents += tts.costCents
+        }
+      }
+
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      await logAiUsageEvent({
+        feature: 'voice-assistant:favorite-command',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: audio ? TTS_MODEL : 'favorite-match',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: `charged ${chargeCents} credits; matched saved favorite`,
+      })
+
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft,
+        audio,
+        chargedCredits: chargeCents,
+        voiceReply: Boolean(audio),
+      })
+    }
+
+    const openai = getOpenAIClient()
+    if (!openai) return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
+
     const command = await runJsonCommandModel(openai, transcript, localDate, user.id)
-    const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin)
+    const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin, favorites)
     let draft = normalized.draft
     let aiCostCents = transcriptionCostCents + command.wrapped.costCents + normalized.aiCostCents
     const isRecipe = draft.action === 'recipe'

@@ -198,6 +198,92 @@ async function copyPreviousFood(userId: string, draft: any) {
   }
 }
 
+async function touchStoredFavorite(userId: string, favoriteId: string) {
+  if (!favoriteId) return
+  const stored = await prisma.healthGoal.findFirst({
+    where: { userId, name: '__FOOD_FAVORITES__' },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, category: true },
+  })
+  if (!stored?.id || !stored.category) return
+  let parsed: any
+  try {
+    parsed = JSON.parse(stored.category)
+  } catch {
+    return
+  }
+  const favorites = Array.isArray(parsed?.favorites) ? parsed.favorites : Array.isArray(parsed) ? parsed : []
+  if (!Array.isArray(favorites) || favorites.length === 0) return
+  let changed = false
+  const lastUsedAt = Date.now()
+  const next = favorites.map((favorite: any) => {
+    if (String(favorite?.id || '').trim() !== favoriteId) return favorite
+    changed = true
+    return { ...favorite, lastUsedAt }
+  })
+  if (!changed) return
+  await prisma.healthGoal.update({
+    where: { id: stored.id },
+    data: { category: JSON.stringify({ favorites: next }), currentRating: 0 },
+  })
+}
+
+async function saveFavoriteFood(userId: string, draft: any) {
+  const food = draft?.food || {}
+  const favorite = food?.favorite || {}
+  const label = cleanText(favorite.label || favorite.name || food.entries?.[0]?.name || draft?.summary, 160)
+  if (!label) throw new Error('Favorite food is missing')
+
+  const targetDate = localDate(draft?.localDate)
+  const meal = cleanText(food.meal || favorite.meal || 'uncategorized', 40).toLowerCase() || 'uncategorized'
+  const favoriteId = cleanText(favorite.id, 120)
+  const baseNutrition =
+    favorite.nutrition && typeof favorite.nutrition === 'object'
+      ? { ...favorite.nutrition }
+      : favorite.total && typeof favorite.total === 'object'
+      ? { ...favorite.total }
+      : null
+  const nutrition = baseNutrition
+    ? {
+        ...baseNutrition,
+        ...(favoriteId ? { __favoriteId: favoriteId, __favoriteManualEdit: false } : {}),
+      }
+    : favoriteId
+    ? { __favoriteId: favoriteId, __favoriteManualEdit: false }
+    : null
+  const items = Array.isArray(favorite.items) ? favorite.items : Prisma.JsonNull
+
+  const created = await prisma.foodLog.create({
+    data: {
+      userId,
+      name: label,
+      description: cleanText(favorite.description || label, 500) || label,
+      imageUrl: null,
+      nutrients: nutrition ?? Prisma.JsonNull,
+      items,
+      localDate: targetDate,
+      meal,
+      category: meal,
+    },
+  })
+
+  if (favoriteId) {
+    await touchStoredFavorite(userId, favoriteId).catch(() => {})
+  }
+  triggerBackgroundRegeneration({
+    userId,
+    changeType: 'food',
+    timestamp: new Date(),
+  }).catch(() => {})
+  await deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
+
+  return {
+    kind: 'food',
+    ids: [created.id],
+    message: `${label} added to ${meal}.`,
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await resolveUser(request)
@@ -214,6 +300,7 @@ export async function POST(request: NextRequest) {
     else if (draft.action === 'mood') result = await saveMood(user.id, draft)
     else if (draft.action === 'journal') result = await saveJournal(user.id, draft)
     else if (draft.action === 'food_copy_previous') result = await copyPreviousFood(user.id, draft)
+    else if (draft.action === 'food_favorite') result = await saveFavoriteFood(user.id, draft)
     else return NextResponse.json({ error: 'This action is not supported yet.' }, { status: 400 })
 
     return NextResponse.json({ success: true, result })
@@ -222,4 +309,3 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: error?.message || 'Could not save this voice action' }, { status: 500 })
   }
 }
-

@@ -32,6 +32,7 @@ type VoiceDraft = {
 
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
 const VOICE_REPLY_KEY = 'helfi_voice_reply_enabled_v1'
+const FOOD_FAVORITES_KEY = 'helfi_native_food_favorites_v2'
 
 function audioMimeFromUri(uri: string) {
   const lower = uri.toLowerCase()
@@ -47,6 +48,32 @@ function todayLocalDate() {
   const m = String(now.getMonth() + 1).padStart(2, '0')
   const d = String(now.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+function cleanFavoriteText(value: unknown, max = 160) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+async function loadVoiceFavorites() {
+  try {
+    const raw = await AsyncStorage.getItem(FOOD_FAVORITES_KEY)
+    const parsed = raw ? JSON.parse(raw) : []
+    const list = Array.isArray(parsed) ? parsed : []
+    return list
+      .map((favorite: any) => ({
+        id: cleanFavoriteText(favorite?.id, 120),
+        label: cleanFavoriteText(favorite?.label || favorite?.name || favorite?.description),
+        description: cleanFavoriteText(favorite?.description || favorite?.label || favorite?.name, 500),
+        meal: cleanFavoriteText(favorite?.meal || favorite?.category || favorite?.persistedCategory, 40).toLowerCase(),
+        nutrition: favorite?.nutrition || favorite?.nutrients || favorite?.total || null,
+        total: favorite?.total || favorite?.nutrition || favorite?.nutrients || null,
+        items: Array.isArray(favorite?.items) ? favorite.items : null,
+      }))
+      .filter((favorite: any) => favorite.label)
+      .slice(0, 80)
+  } catch {
+    return []
+  }
 }
 
 export function VoiceAssistantProvider({ children }: { children: React.ReactNode }) {
@@ -131,6 +158,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setChargedCredits(null)
       try {
         let res: Response
+        const favorites = await loadVoiceFavorites()
         if (options?.audioUri) {
           const form = new FormData()
           const name = options.audioUri.split('/').pop() || `helfi-voice-${Date.now()}.m4a`
@@ -139,6 +167,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           form.append('localDate', todayLocalDate())
           form.append('tzOffsetMin', String(new Date().getTimezoneOffset()))
           form.append('voiceReply', voiceReply ? 'true' : 'false')
+          form.append('favorites', JSON.stringify(favorites))
           res = await fetch(`${API_BASE_URL}/api/native-voice-assistant`, {
             method: 'POST',
             headers: buildNativeAuthHeaders(session.token),
@@ -153,6 +182,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               localDate: todayLocalDate(),
               tzOffsetMin: new Date().getTimezoneOffset(),
               voiceReply,
+              favorites,
             }),
           })
         }
