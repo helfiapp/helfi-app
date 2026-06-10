@@ -28,7 +28,13 @@ type VoiceDraft = {
   confirmationMessage: string
   canConfirm: boolean
   recipe?: { text?: string }
-  food?: { entries?: Array<{ name: string; description?: string | null }>; draftText?: string; sourceDate?: string }
+  food?: {
+    entries?: Array<{ name: string; description?: string | null }>
+    draftText?: string
+    sourceDate?: string
+    mealName?: string
+    nutrition?: { calories?: number; protein?: number; carbs?: number; fat?: number }
+  }
 }
 
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
@@ -420,11 +426,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     {draft.food?.entries?.length ? (
                       <View style={styles.entryList}>
                         {draft.food.entries.map((entry, index) => (
-                          <Text key={`${entry.name}-${index}`} style={styles.entryText}>
-                            {index + 1}. {entry.name}
-                          </Text>
+                          <View key={`${entry.name}-${index}`} style={styles.entryRow}>
+                            <Text style={styles.entryText}>
+                              {index + 1}. {entry.name}
+                            </Text>
+                            {entry.description ? <Text style={styles.entrySubtext}>{entry.description}</Text> : null}
+                          </View>
                         ))}
                       </View>
+                    ) : null}
+                    {draft.food?.nutrition?.calories ? (
+                      <Text style={styles.creditText}>
+                        Estimate: {Math.round(Number(draft.food.nutrition.calories) || 0)} kcal
+                      </Text>
                     ) : null}
                     {draft.food?.draftText ? <Text style={styles.message}>{draft.food.draftText}</Text> : null}
                     {chargedCredits !== null && (
@@ -532,8 +546,10 @@ const styles = StyleSheet.create({
   secondaryText: { color: '#226B2C', fontWeight: '900' },
   summary: { color: theme.colors.text, fontWeight: '900', fontSize: 16 },
   message: { color: theme.colors.text, lineHeight: 21 },
-  entryList: { gap: 6, paddingTop: 4 },
+  entryList: { gap: 8, paddingTop: 4 },
+  entryRow: { gap: 2 },
   entryText: { color: theme.colors.text, fontWeight: '700' },
+  entrySubtext: { color: theme.colors.muted, fontSize: 12 },
   creditText: { color: theme.colors.muted, fontWeight: '700' },
   footer: {
     paddingHorizontal: 18,

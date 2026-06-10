@@ -9,6 +9,8 @@ import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { logAiUsageEvent } from '@/lib/ai-usage-logger'
 import { buildFoodDiarySnapshot } from '@/lib/food-diary-context'
 import { estimateTextToSpeechCostCents, estimateTranscriptionCostCents } from '@/lib/cost-meter'
+import { searchLocalFoods, type NormalizedFoodItem } from '@/lib/food-data'
+import { searchCustomFoodMacros } from '@/lib/food/custom-foods'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +31,7 @@ type VoiceAction =
   | 'journal'
   | 'food_copy_previous'
   | 'food_favorite'
+  | 'food_build_meal'
   | 'food_draft'
   | 'recipe'
   | 'unknown'
@@ -71,6 +74,9 @@ type VoiceDraft = {
   }
   food?: {
     meal: string
+    mealName?: string
+    nutrition?: any
+    items?: any[]
     sourceDate?: string
     sourceLogIds?: string[]
     entries?: Array<{ name: string; description?: string | null; meal?: string | null }>
@@ -236,6 +242,217 @@ function clampNumber(value: unknown, min: number, max: number, fallback: number)
   return Math.max(min, Math.min(max, Math.round(n)))
 }
 
+function round1(value: unknown) {
+  const n = Number(value)
+  if (!Number.isFinite(n)) return 0
+  return Math.round(Math.max(0, n) * 10) / 10
+}
+
+function hasCoreNutrition(item: any) {
+  return (
+    Number.isFinite(Number(item?.calories ?? item?.calories_kcal)) &&
+    Number.isFinite(Number(item?.protein_g ?? item?.protein)) &&
+    Number.isFinite(Number(item?.carbs_g ?? item?.carbs)) &&
+    Number.isFinite(Number(item?.fat_g ?? item?.fat))
+  )
+}
+
+function servingGramsFromText(value: unknown) {
+  const text = String(value || '').toLowerCase()
+  const grams = text.match(/(\d+(?:\.\d+)?)\s*g\b/)
+  if (grams) return Number(grams[1])
+  const ml = text.match(/(\d+(?:\.\d+)?)\s*ml\b/)
+  if (ml) return Number(ml[1])
+  return null
+}
+
+function numberFromWords(value: unknown) {
+  const text = String(value || '').toLowerCase().trim()
+  const direct = Number(text)
+  if (Number.isFinite(direct) && direct > 0) return direct
+  const words: Record<string, number> = {
+    one: 1,
+    two: 2,
+    three: 3,
+    four: 4,
+    five: 5,
+    six: 6,
+    seven: 7,
+    eight: 8,
+    nine: 9,
+    ten: 10,
+    half: 0.5,
+  }
+  return words[text] || null
+}
+
+function estimateIngredientGrams(nameRaw: string, quantityRaw: unknown, unitRaw: unknown) {
+  const name = compactFoodMatchText(nameRaw)
+  const unit = compactFoodMatchText(unitRaw)
+  const quantity = numberFromWords(quantityRaw) || 1
+  const explicit = servingGramsFromText(`${quantityRaw || ''} ${unitRaw || ''}`)
+  if (explicit) return explicit
+  if (unit.includes('gram')) return quantity
+  if (unit.includes('kg') || unit.includes('kilogram')) return quantity * 1000
+  if (unit.includes('ml')) return quantity
+  if (unit.includes('cup')) return quantity * 240
+  if (unit.includes('tbsp') || unit.includes('tablespoon')) return quantity * 15
+  if (unit.includes('tsp') || unit.includes('teaspoon')) return quantity * 5
+  if (unit.includes('slice') || name.includes('toast') || name.includes('bread')) return quantity * 35
+  if (unit.includes('egg') || name.includes('egg')) return quantity * 50
+  if (unit.includes('avocado') || name.includes('avocado')) return quantity * 150
+  if (name.includes('yoghurt') || name.includes('yogurt')) return quantity * 170
+  return quantity * 100
+}
+
+function normalizeIngredientRequest(raw: any) {
+  const name = cleanText(raw?.name || raw?.food || raw?.ingredient || raw, 120)
+  if (!name) return null
+  return {
+    name,
+    quantity: raw?.quantity ?? raw?.amount ?? null,
+    unit: cleanText(raw?.unit || raw?.measure, 40) || null,
+    display: cleanText(raw?.display || raw?.text || name, 160) || name,
+  }
+}
+
+function itemCore(item: any, grams: number) {
+  const baseGrams = servingGramsFromText(item?.serving_size) || 100
+  const scale = baseGrams > 0 ? grams / baseGrams : 1
+  const calories = Math.round(Number(item?.calories ?? item?.calories_kcal ?? 0) * scale)
+  const protein = round1(Number(item?.protein_g ?? item?.protein ?? 0) * scale)
+  const carbs = round1(Number(item?.carbs_g ?? item?.carbs ?? 0) * scale)
+  const fat = round1(Number(item?.fat_g ?? item?.fat ?? 0) * scale)
+  const fiber = round1(Number(item?.fiber_g ?? item?.fiber ?? 0) * scale)
+  const sugar = round1(Number(item?.sugar_g ?? item?.sugar ?? 0) * scale)
+  return { calories, protein, carbs, fat, fiber, sugar, grams: Math.round(grams) }
+}
+
+function normalizeFoodItem(item: any): NormalizedFoodItem | null {
+  if (!item?.name) return null
+  return {
+    source: 'usda',
+    id: String(item.id || item.name),
+    name: item.name,
+    brand: item.brand ?? null,
+    serving_size: item.serving_size || '100 g',
+    calories: item.calories ?? null,
+    protein_g: item.protein_g ?? null,
+    carbs_g: item.carbs_g ?? null,
+    fat_g: item.fat_g ?? null,
+    fiber_g: item.fiber_g ?? null,
+    sugar_g: item.sugar_g ?? null,
+  }
+}
+
+async function findFoodIngredient(query: string) {
+  const local = await searchLocalFoods(query, { pageSize: 6, mode: 'prefix-contains' })
+  const localMatch = local.find(hasCoreNutrition)
+  if (localMatch) return localMatch
+
+  const custom = await searchCustomFoodMacros(query, 6, { allowTypo: true }).catch(() => [])
+  const customMatch = custom.map(normalizeFoodItem).find((item): item is NormalizedFoodItem => Boolean(item && hasCoreNutrition(item)))
+  return customMatch || null
+}
+
+async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDate: string) {
+  const parsedIngredients = Array.isArray(parsedFood?.ingredients)
+    ? parsedFood.ingredients.map(normalizeIngredientRequest).filter(Boolean)
+    : []
+  if (parsedIngredients.length === 0) return null
+
+  const meal = cleanText(parsedFood?.meal || inferMealFromText(transcript, 'uncategorized'), 40).toLowerCase() || 'uncategorized'
+  const mealName =
+    cleanText(parsedFood?.mealName || parsedFood?.title, 120) ||
+    `${meal === 'uncategorized' ? 'Meal' : `${meal.charAt(0).toUpperCase()}${meal.slice(1)}`} from voice`
+
+  const resolved = await Promise.all(
+    parsedIngredients.slice(0, 12).map(async (ingredient: any) => {
+      const found = await findFoodIngredient(ingredient.name)
+      if (!found) return { ingredient, found: null }
+      const grams = estimateIngredientGrams(ingredient.name, ingredient.quantity, ingredient.unit)
+      const core = itemCore(found, grams)
+      return {
+        ingredient,
+        found,
+        core,
+        item: {
+          ...found,
+          name: found.name,
+          label: found.name,
+          requestedName: ingredient.name,
+          requestedAmount: ingredient.display,
+          serving_size: `${core.grams} g estimated`,
+          calories: core.calories,
+          calories_kcal: core.calories,
+          protein_g: core.protein,
+          carbs_g: core.carbs,
+          fat_g: core.fat,
+          fiber_g: core.fiber,
+          sugar_g: core.sugar,
+        },
+      }
+    }),
+  )
+
+  const found = resolved.filter((entry) => entry.found && entry.item)
+  if (found.length === 0) return null
+
+  const missing = resolved.filter((entry) => !entry.found).map((entry) => entry.ingredient.name)
+  const totals = found.reduce(
+    (acc, entry: any) => {
+      acc.calories += Number(entry.core.calories) || 0
+      acc.protein += Number(entry.core.protein) || 0
+      acc.carbs += Number(entry.core.carbs) || 0
+      acc.fat += Number(entry.core.fat) || 0
+      acc.fiber += Number(entry.core.fiber) || 0
+      acc.sugar += Number(entry.core.sugar) || 0
+      return acc
+    },
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+  )
+  const nutrition = {
+    calories: Math.round(totals.calories),
+    calories_kcal: Math.round(totals.calories),
+    protein: round1(totals.protein),
+    protein_g: round1(totals.protein),
+    carbs: round1(totals.carbs),
+    carbs_g: round1(totals.carbs),
+    fat: round1(totals.fat),
+    fat_g: round1(totals.fat),
+    fiber: round1(totals.fiber),
+    fiber_g: round1(totals.fiber),
+    sugar: round1(totals.sugar),
+    sugar_g: round1(totals.sugar),
+    __voiceBuiltMeal: true,
+  }
+  const items = found.map((entry: any) => entry.item)
+  const entries = found.map((entry: any) => ({
+    name: entry.ingredient.display || entry.ingredient.name,
+    description: `${entry.found.name} - ${entry.core.grams} g estimated`,
+    meal,
+  }))
+  const ingredientList = entries.map((entry) => entry.name).join(', ')
+  const missingLine = missing.length ? ` I could not find ${missing.join(', ')}, so please check before saving.` : ''
+
+  return {
+    action: 'food_build_meal' as const,
+    transcript,
+    localDate,
+    summary: `${mealName}, ${nutrition.calories} kcal`,
+    confirmationMessage: `I found these ingredients for ${meal}: ${ingredientList}. Please confirm before I add it.${missingLine}`,
+    canConfirm: true,
+    food: {
+      meal,
+      mealName,
+      draftText: ingredientList,
+      entries,
+      items,
+      nutrition,
+    },
+  }
+}
+
 function parseAssistantJson(content: string) {
   const raw = String(content || '').trim()
   if (!raw) return null
@@ -260,14 +477,15 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
         'You quickly understand natural spoken requests for the Helfi health app.',
         'Return compact JSON only. Do not explain.',
         'Never say an action is saved. All save actions are only drafts until the user confirms.',
-        'Allowed action values: exercise, mood, journal, food_copy_previous, food_draft, recipe, unknown.',
+        'Allowed action values: exercise, mood, journal, food_copy_previous, food_build_meal, food_draft, recipe, unknown.',
         'For exercise, infer the exercise name, duration, distance, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
         'For journal, make a short title and journal content.',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
-        'For new meals or foods, including ingredient lists or build-a-meal requests, return food_draft with meal and draftText. Do not silently save uncertain nutrition.',
+        'For new meals or foods with named ingredients, return food_build_meal with meal, mealName, draftText, and ingredients array. The app will find nutrition before confirmation.',
+        'Use food_draft only when the user gives a vague food request without any usable food names.',
         'For recipes, return action recipe and recipeRequest.',
-        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."]},"food":{"meal":"breakfast","draftText":"..."},"recipeRequest":"..."}',
+        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."]},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"recipeRequest":"..."}',
       ].join('\n'),
     },
     {
@@ -471,14 +689,14 @@ async function normalizeDraft(
   favorites: VoiceFoodFavorite[],
 ): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
   const actionRaw = cleanText(parsed?.action, 40).toLowerCase() as VoiceAction
-  const action: VoiceAction = ['exercise', 'mood', 'journal', 'food_copy_previous', 'food_favorite', 'food_draft', 'recipe'].includes(actionRaw)
+  const action: VoiceAction = ['exercise', 'mood', 'journal', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'food_draft', 'recipe'].includes(actionRaw)
     ? actionRaw
     : 'unknown'
   let aiCostCents = 0
   let usedModel: string | undefined
 
   const favoriteDraft = await buildFavoriteFoodDraft(transcript, localDate, favorites)
-  if (favoriteDraft && (action === 'food_favorite' || action === 'food_draft' || action === 'unknown')) {
+  if (favoriteDraft && (action === 'food_favorite' || action === 'food_build_meal' || action === 'food_draft' || action === 'unknown')) {
     return { aiCostCents, draft: favoriteDraft }
   }
 
@@ -617,7 +835,14 @@ async function normalizeDraft(
     }
   }
 
-  if (action === 'food_draft') {
+  if (action === 'food_build_meal' || action === 'food_draft') {
+    const builtMeal = await buildVoiceMealDraft(parsed?.food || {}, transcript, localDate)
+    if (builtMeal) {
+      return { aiCostCents, draft: builtMeal }
+    }
+  }
+
+  if (action === 'food_draft' || action === 'food_build_meal') {
     const draftText = cleanText(parsed?.food?.draftText || transcript, 1200)
     const meal = cleanText(parsed?.food?.meal || inferMealFromText(transcript, 'uncategorized'), 40)
     return {
@@ -627,7 +852,7 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary: 'Food draft ready',
-        confirmationMessage: `I drafted this ${meal || 'food'} request for review: ${draftText}. I need clear nutrition details before saving it.`,
+        confirmationMessage: `I can see the food request, but I could not match enough ingredients yet: ${draftText}. Please try naming the foods one by one.`,
         canConfirm: false,
         food: { meal: meal || 'uncategorized', draftText },
       },

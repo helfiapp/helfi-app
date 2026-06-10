@@ -284,6 +284,48 @@ async function saveFavoriteFood(userId: string, draft: any) {
   }
 }
 
+async function saveBuiltMeal(userId: string, draft: any) {
+  const food = draft?.food || {}
+  const targetDate = localDate(draft?.localDate)
+  const meal = cleanText(food.meal || 'uncategorized', 40).toLowerCase() || 'uncategorized'
+  const name = cleanText(food.mealName || draft?.summary || 'Voice built meal', 160)
+  const items = Array.isArray(food.items) ? food.items : []
+  const nutrition = food.nutrition && typeof food.nutrition === 'object' ? food.nutrition : null
+  if (items.length === 0 || !nutrition) throw new Error('Meal ingredients are missing')
+
+  const description =
+    Array.isArray(food.entries) && food.entries.length > 0
+      ? food.entries.map((entry: any) => cleanText(entry?.name || entry?.description, 120)).filter(Boolean).join(', ')
+      : items.map((item: any) => cleanText(item?.requestedName || item?.name, 120)).filter(Boolean).join(', ')
+
+  const created = await prisma.foodLog.create({
+    data: {
+      userId,
+      name,
+      description: description || name,
+      imageUrl: null,
+      nutrients: nutrition,
+      items,
+      localDate: targetDate,
+      meal,
+      category: meal,
+    },
+  })
+
+  void triggerBackgroundRegeneration({
+    userId,
+    changeType: 'food',
+    timestamp: new Date(),
+  }).catch(() => {})
+  void deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
+
+  return {
+    kind: 'food',
+    ids: [created.id],
+    message: `${name} added to ${meal}.`,
+  }
+}
+
 export async function POST(request: NextRequest) {
   try {
     const user = await resolveUser(request)
@@ -301,6 +343,7 @@ export async function POST(request: NextRequest) {
     else if (draft.action === 'journal') result = await saveJournal(user.id, draft)
     else if (draft.action === 'food_copy_previous') result = await copyPreviousFood(user.id, draft)
     else if (draft.action === 'food_favorite') result = await saveFavoriteFood(user.id, draft)
+    else if (draft.action === 'food_build_meal') result = await saveBuiltMeal(user.id, draft)
     else return NextResponse.json({ error: 'This action is not supported yet.' }, { status: 400 })
 
     return NextResponse.json({ success: true, result })
