@@ -316,6 +316,91 @@ function normalizeIngredientRequest(raw: any) {
   }
 }
 
+function splitIngredientList(value: string) {
+  return String(value || '')
+    .replace(/\band\b/gi, ',')
+    .split(',')
+    .map((part) => cleanText(part.replace(/[.?!]+$/g, ''), 120))
+    .filter(Boolean)
+    .slice(0, 12)
+}
+
+function parseIngredientPhrase(value: string) {
+  const text = cleanText(value, 160)
+  const match = text.match(
+    /^(?:(one|two|three|four|five|six|seven|eight|nine|ten|half|\d+(?:\.\d+)?)\s+)?(?:(cup|cups|slice|slices|egg|eggs|gram|grams|g|kg|ml|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp)\s+(?:of\s+)?)?(.+)$/i,
+  )
+  if (!match) return normalizeIngredientRequest(text)
+  const quantity = match[1] || null
+  const unit = match[2] || null
+  const name = cleanText(match[3] || text, 120)
+  return normalizeIngredientRequest({ name, quantity, unit, display: text })
+}
+
+function tryParseIngredientMealRequest(transcript: string) {
+  const text = cleanText(transcript, 1400)
+  const lower = text.toLowerCase()
+  const asksForFood =
+    /\b(build|make|create|add|log|put|input|record)\b/.test(lower) &&
+    /\b(breakfast|lunch|dinner|snack|meal|food)\b/.test(lower)
+  if (!asksForFood) return null
+
+  const meal = inferMealFromText(text, lower.includes('snack') ? 'snacks' : 'uncategorized')
+  const afterWith = text.match(/\b(?:with|using|including|contains|made of)\b\s+(.+)$/i)?.[1]
+  const afterColon = text.includes(':') ? text.split(':').slice(1).join(':') : ''
+  const listText = cleanText(afterWith || afterColon, 1000)
+  if (!listText) return null
+  const ingredients = splitIngredientList(listText).map(parseIngredientPhrase).filter(Boolean)
+  if (ingredients.length < 2) return null
+  const mealName = meal === 'uncategorized' ? 'Meal' : `${meal.charAt(0).toUpperCase()}${meal.slice(1)}`
+  return {
+    meal,
+    mealName,
+    draftText: ingredients.map((entry: any) => entry.display || entry.name).join(', '),
+    ingredients,
+  }
+}
+
+function scoreFoodMatch(queryRaw: string, item: any) {
+  const query = compactFoodMatchText(queryRaw)
+  const name = compactFoodMatchText(item?.name || '')
+  const brand = compactFoodMatchText(item?.brand || '')
+  const text = `${name} ${brand}`.trim()
+  if (!name) return -1000
+  let score = 0
+  const queryTokens = query.split(' ').filter(Boolean)
+  const nameTokens = name.split(' ').filter(Boolean)
+  if (name === query) score += 100
+  if (nameTokens[0] && queryTokens[0] && nameTokens[0] === queryTokens[0]) score += 30
+  if (queryTokens.every((token) => text.includes(token))) score += 20
+  if (!brand) score += 8
+  if (String(item?.source || '').toLowerCase() === 'custom') score -= 6
+  if (/[A-Z]{4,}/.test(String(item?.name || ''))) score -= 4
+
+  if (query.includes('egg')) {
+    if (name.includes('whole egg') || name === 'egg' || name.startsWith('egg whole')) score += 80
+    if (name.includes('egg white') || name.includes('whites') || name.includes('substitute')) score -= 80
+  }
+  if (query.includes('yoghurt') || query.includes('yogurt')) {
+    if ((name.includes('greek') || name.includes('strained')) && (name.includes('plain') || !brand)) score += 55
+    if (name.includes('blueberry') || name.includes('strawberry') || name.includes('vanilla') || name.includes('honey')) score -= 55
+    if (name.includes('protein')) score -= 15
+  }
+  if (query.includes('avocado')) {
+    if (name === 'avocado' || name.startsWith('avocado raw')) score += 60
+  }
+  if (query.includes('sourdough') || query.includes('toast')) {
+    if (name.includes('sourdough') || name.includes('toasted')) score += 45
+  }
+  return score
+}
+
+function chooseBestFoodMatch(query: string, items: any[]) {
+  return items
+    .filter(hasCoreNutrition)
+    .sort((a, b) => scoreFoodMatch(query, b) - scoreFoodMatch(query, a))[0] || null
+}
+
 function itemCore(item: any, grams: number) {
   const baseGrams = servingGramsFromText(item?.serving_size) || 100
   const scale = baseGrams > 0 ? grams / baseGrams : 1
@@ -346,12 +431,12 @@ function normalizeFoodItem(item: any): NormalizedFoodItem | null {
 }
 
 async function findFoodIngredient(query: string) {
-  const local = await searchLocalFoods(query, { pageSize: 6, mode: 'prefix-contains' })
-  const localMatch = local.find(hasCoreNutrition)
+  const local = await searchLocalFoods(query, { pageSize: 18, mode: 'prefix-contains' })
+  const localMatch = chooseBestFoodMatch(query, local)
   if (localMatch) return localMatch
 
   const custom = await searchCustomFoodMacros(query, 6, { allowTypo: true }).catch(() => [])
-  const customMatch = custom.map(normalizeFoodItem).find((item): item is NormalizedFoodItem => Boolean(item && hasCoreNutrition(item)))
+  const customMatch = chooseBestFoodMatch(query, custom.map(normalizeFoodItem).filter(Boolean))
   return customMatch || null
 }
 
@@ -963,6 +1048,57 @@ export async function POST(request: NextRequest) {
         costCents: chargeCents,
         success: true,
         detail: `charged ${chargeCents} credits; matched saved favorite`,
+      })
+
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft,
+        audio,
+        chargedCredits: chargeCents,
+        voiceReply: Boolean(audio),
+      })
+    }
+
+    const quickMealFood = tryParseIngredientMealRequest(transcript)
+    const quickMealDraft = quickMealFood ? await buildVoiceMealDraft(quickMealFood, transcript, localDate) : null
+    if (quickMealDraft) {
+      const draft = quickMealDraft
+      let aiCostCents = transcriptionCostCents
+      let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
+      let audio: string | null = null
+
+      if (wantsVoiceReply) {
+        const openai = getOpenAIClient()
+        if (openai) {
+          const tts = await speak(openai, draft.confirmationMessage, user.id)
+          audio = tts.audio
+          const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
+          chargeCents += voiceCharge
+          aiCostCents += tts.costCents
+        }
+      }
+
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      await logAiUsageEvent({
+        feature: 'voice-assistant:quick-meal-command',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: audio ? TTS_MODEL : 'food-ingredient-match',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: `charged ${chargeCents} credits; built meal from ingredient search`,
       })
 
       return NextResponse.json({
