@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 10 June 2026, 11:03 AM AEST
+- What changed: Fixed the native voice assistant simulator/network issue, made Louie’s Breakfast review show before any spoken reply, and split voice playback into its own safer step so audio cannot block the confirm screen.
+- Where to see it (page/link): Helfi phone app Talk to Helfi, backed by https://helfi.ai. TestFlight build 14 was uploaded.
+- What to quickly test: In the phone app, use “Can you please put in Louis’ breakfast for today?” and confirm it drafts “Louie’s Breakfast, 315 kcal.” With Voice + text on, confirm the written review appears first and spoken reply follows.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 10 June 2026, 10:07 AM AEST
 - What changed: Fixed the native voice assistant so named saved favourites like “Louie’s Breakfast” are found and drafted for confirmation. Voice replies now use warmer speaking instructions and a warmer voice.
 - Where to see it (page/link): Helfi phone app Talk to Helfi, backed by https://helfi.ai.
