@@ -431,9 +431,12 @@ function normalizeFoodItem(item: any): NormalizedFoodItem | null {
 }
 
 async function findFoodIngredient(query: string) {
-  const local = await searchLocalFoods(query, { pageSize: 18, mode: 'prefix-contains' })
-  const localMatch = chooseBestFoodMatch(query, local)
-  if (localMatch) return localMatch
+  const lookupQueries = compactFoodMatchText(query).includes('egg') ? ['Egg, whole', query] : [query]
+  for (const lookupQuery of lookupQueries) {
+    const local = await searchLocalFoods(lookupQuery, { pageSize: 18, mode: 'prefix-contains' })
+    const localMatch = chooseBestFoodMatch(query, local)
+    if (localMatch) return localMatch
+  }
 
   const custom = await searchCustomFoodMacros(query, 6, { allowTypo: true }).catch(() => [])
   const customMatch = chooseBestFoodMatch(query, custom.map(normalizeFoodItem).filter(Boolean))
