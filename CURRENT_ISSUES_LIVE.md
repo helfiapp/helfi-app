@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 10 June 2026, 12:39 PM AEST
+- What changed: Added 5,026 United States practitioner outreach contacts with public clinic/business email addresses only. All contacts are NOT_REVIEWED and no emails were sent.
+- Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Outreach Starter Lists
+- What to quickly test: Open Practitioner Outreach, load starter lists, select United States, and confirm contacts have email addresses and NOT_REVIEWED status.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 10 June 2026, 11:43 AM AEST
 - What changed: Moved the native Talk to Helfi button to the top-left of signed-in app screens and made it profile-image size. Uploaded TestFlight build 15.
 - Where to see it (page/link): Helfi phone app signed-in screens, backed by https://helfi.ai.
