@@ -426,6 +426,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                         ))}
                       </View>
                     ) : null}
+                    {draft.food?.draftText ? <Text style={styles.message}>{draft.food.draftText}</Text> : null}
                     {chargedCredits !== null && (
                       <Text style={styles.creditText}>Charged: {chargedCredits} credits</Text>
                     )}

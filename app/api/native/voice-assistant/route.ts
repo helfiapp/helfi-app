@@ -619,6 +619,7 @@ async function normalizeDraft(
 
   if (action === 'food_draft') {
     const draftText = cleanText(parsed?.food?.draftText || transcript, 1200)
+    const meal = cleanText(parsed?.food?.meal || inferMealFromText(transcript, 'uncategorized'), 40)
     return {
       aiCostCents,
       draft: {
@@ -626,9 +627,9 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary: 'Food draft ready',
-        confirmationMessage: 'I drafted the food request for review. I need clear nutrition details before saving a new food entry.',
+        confirmationMessage: `I drafted this ${meal || 'food'} request for review: ${draftText}. I need clear nutrition details before saving it.`,
         canConfirm: false,
-        food: { meal: cleanText(parsed?.food?.meal || 'uncategorized', 40), draftText },
+        food: { meal: meal || 'uncategorized', draftText },
       },
     }
   }
