@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 10 June 2026, 10:07 AM AEST
+- What changed: Fixed the native voice assistant so named saved favourites like “Louie’s Breakfast” are found and drafted for confirmation. Voice replies now use warmer speaking instructions and a warmer voice.
+- Where to see it (page/link): Helfi phone app Talk to Helfi, backed by https://helfi.ai.
+- What to quickly test: Say or type “Can you please put in Louis’ breakfast for today?” and confirm it drafts “Louie’s Breakfast, 315 kcal” before saving.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 09 June 2026, 11:31 PM AEST
 - What changed: Added the native Helfi voice assistant V1 for the phone app, including the talk button, review-before-save panel, text-only default, optional voice replies, Siri shortcut handoff, live voice command routes, confirmation-only saving, and voice credit tracking.
 - Where to see it (page/link): Helfi iPhone/Android app signed-in screens, plus Siri shortcuts on iPhone. Live backend is on https://helfi.ai.
