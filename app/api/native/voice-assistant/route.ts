@@ -432,8 +432,35 @@ function normalizeFoodItem(item: any): NormalizedFoodItem | null {
   }
 }
 
+function normalizeLibraryFoodItem(row: any): NormalizedFoodItem | null {
+  if (!row?.name) return null
+  return {
+    source: 'usda',
+    id: String(row.fdcId ?? row.id),
+    name: row.name,
+    brand: row.brand ?? null,
+    serving_size: row.servingSize || '100 g',
+    calories: row.calories ?? null,
+    protein_g: row.proteinG ?? null,
+    carbs_g: row.carbsG ?? null,
+    fat_g: row.fatG ?? null,
+    fiber_g: row.fiberG ?? null,
+    sugar_g: row.sugarG ?? null,
+  }
+}
+
 async function findFoodIngredient(query: string) {
-  const lookupQueries = compactFoodMatchText(query).includes('egg') ? ['Egg, whole', query] : [query]
+  if (compactFoodMatchText(query).includes('egg')) {
+    const wholeEggRows = await prisma.foodLibraryItem.findMany({
+      where: { name: { contains: 'Egg, whole', mode: 'insensitive' } },
+      take: 12,
+      orderBy: { name: 'asc' },
+    })
+    const wholeEggMatch = chooseBestFoodMatch(query, wholeEggRows.map(normalizeLibraryFoodItem).filter(Boolean))
+    if (wholeEggMatch) return wholeEggMatch
+  }
+
+  const lookupQueries = [query]
   for (const lookupQuery of lookupQueries) {
     const local = await searchLocalFoods(lookupQuery, { pageSize: 18, mode: 'prefix-contains' })
     const localMatch = chooseBestFoodMatch(query, local)
