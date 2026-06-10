@@ -378,7 +378,9 @@ function scoreFoodMatch(queryRaw: string, item: any) {
   if (/[A-Z]{4,}/.test(String(item?.name || ''))) score -= 4
 
   if (query.includes('egg')) {
-    if (name.includes('whole egg') || name === 'egg' || name.startsWith('egg whole')) score += 80
+    if (name.startsWith('egg whole')) score += 130
+    else if (name.includes('whole egg') || name === 'egg') score += 80
+    if (name.includes('liquid')) score -= 60
     if (name.includes('egg white') || name.includes('whites') || name.includes('substitute')) score -= 80
   }
   if (query.includes('yoghurt') || query.includes('yogurt')) {
