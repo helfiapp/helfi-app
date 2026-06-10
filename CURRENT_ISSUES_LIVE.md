@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 10 June 2026, 2:18 PM AEST
+- What changed: Improved Talk to Helfi ingredient-meal requests so “build me a breakfast with eggs, toast, avocado and Greek yoghurt” builds a reviewable meal from ingredients instead of asking for nutrition details. It now asks for confirmation before saving.
+- Where to see it (page/link): Helfi phone app Talk to Helfi, backed by https://helfi.ai.
+- What to quickly test: Open Talk to Helfi and type or say “Build me a breakfast with two eggs, sourdough toast, avocado and Greek yoghurt.” Confirm it drafts ingredient items, then saves only after Confirm.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 10 June 2026, 12:39 PM AEST
 - What changed: Added 5,026 United States practitioner outreach contacts with public clinic/business email addresses only. All contacts are NOT_REVIEWED and no emails were sent.
 - Where to see it (page/link): https://helfi.ai/admin-panel -> Practitioner Outreach -> Load Outreach Starter Lists
