@@ -14,6 +14,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const COMMAND_MODEL = process.env.HELFI_VOICE_COMMAND_MODEL || 'gpt-5.5'
+const COMMAND_FAST_MODEL = process.env.HELFI_VOICE_COMMAND_FAST_MODEL || 'gpt-4o-mini'
 const FALLBACK_MODEL = process.env.HELFI_VOICE_COMMAND_FALLBACK_MODEL || 'gpt-5.2'
 const TRANSCRIBE_MODEL = process.env.HELFI_VOICE_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe'
 const TTS_MODEL = process.env.HELFI_VOICE_TTS_MODEL || 'gpt-4o-mini-tts'
@@ -256,15 +257,15 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
     {
       role: 'system' as const,
       content: [
-        'You classify spoken requests for the Helfi health app.',
-        'Return JSON only.',
+        'You quickly understand natural spoken requests for the Helfi health app.',
+        'Return compact JSON only. Do not explain.',
         'Never say an action is saved. All save actions are only drafts until the user confirms.',
         'Allowed action values: exercise, mood, journal, food_copy_previous, food_draft, recipe, unknown.',
-        'For exercise, infer a practical duration if missing. For a 5 km walk, use 60 minutes unless the user gives a time.',
+        'For exercise, infer the exercise name, duration, distance, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
         'For journal, make a short title and journal content.',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
-        'For new foods with uncertain nutrition, return food_draft with canConfirm false.',
+        'For new meals or foods, including ingredient lists or build-a-meal requests, return food_draft with meal and draftText. Do not silently save uncertain nutrition.',
         'For recipes, return action recipe and recipeRequest.',
         'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."]},"food":{"meal":"breakfast","draftText":"..."},"recipeRequest":"..."}',
       ].join('\n'),
@@ -276,14 +277,15 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
   ]
 
   let lastError: any = null
-  for (const model of [COMMAND_MODEL, FALLBACK_MODEL, 'gpt-4o']) {
+  const models = Array.from(new Set([COMMAND_FAST_MODEL, COMMAND_MODEL, FALLBACK_MODEL, 'gpt-4o']))
+  for (const model of models) {
     try {
       const wrapped = await chatCompletionWithCost(
         openai,
         {
           model,
           messages,
-          max_tokens: 700,
+          max_tokens: 420,
           temperature: 0.1,
           response_format: { type: 'json_object' } as any,
         } as any,

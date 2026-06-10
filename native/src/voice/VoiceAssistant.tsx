@@ -270,7 +270,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         shouldDuckAndroid: true,
       })
       const created = new Audio.Recording()
-      await created.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY)
+      await created.prepareToRecordAsync(Audio.RecordingOptionsPresets.LOW_QUALITY)
       await created.startAsync()
       setRecording(created)
       setRecordingStartedAt(Date.now())

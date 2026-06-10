@@ -119,8 +119,8 @@ async function saveMood(userId: string, draft: any) {
     note,
     JSON.stringify({ source: 'native_voice_assistant' }),
   )
-  await deleteNotificationsByType(userId, ['mood_reminder']).catch(() => {})
-  await deleteSmartCoachNotificationsByCategories(userId, ['mood']).catch(() => {})
+  void deleteNotificationsByType(userId, ['mood_reminder']).catch(() => {})
+  void deleteSmartCoachNotificationsByCategories(userId, ['mood']).catch(() => {})
   return { kind: 'mood', id, message: 'Mood saved.' }
 }
 
@@ -189,7 +189,7 @@ async function copyPreviousFood(userId: string, draft: any) {
     changeType: 'food',
     timestamp: new Date(),
   }).catch(() => {})
-  await deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
+  void deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
 
   return {
     kind: 'food',
@@ -268,14 +268,14 @@ async function saveFavoriteFood(userId: string, draft: any) {
   })
 
   if (favoriteId) {
-    await touchStoredFavorite(userId, favoriteId).catch(() => {})
+    void touchStoredFavorite(userId, favoriteId).catch(() => {})
   }
-  triggerBackgroundRegeneration({
+  void triggerBackgroundRegeneration({
     userId,
     changeType: 'food',
     timestamp: new Date(),
   }).catch(() => {})
-  await deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
+  void deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
 
   return {
     kind: 'food',
