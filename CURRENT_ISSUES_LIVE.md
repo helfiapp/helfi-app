@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 11 June 2026, 2:46 PM AEST
+- What changed: Restored the profile icon/menu on the desktop web Talk to Helfi page and added a guard rail so future agents must keep the profile icon on every logged-in web app page.
+- Where to see it (page/link): https://helfi.ai/chat
+- What to quickly test: Open Talk to Helfi on desktop and confirm the profile icon appears in the top-right header. Click it and confirm the profile menu opens.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 10 June 2026, 2:18 PM AEST
 - What changed: Improved Talk to Helfi ingredient-meal requests so “build me a breakfast with eggs, toast, avocado and Greek yoghurt” builds a reviewable meal from ingredients instead of asking for nutrition details. It now asks for confirmation before saving.
 - Where to see it (page/link): Helfi phone app Talk to Helfi, backed by https://helfi.ai.
