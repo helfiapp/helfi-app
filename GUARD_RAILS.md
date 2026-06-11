@@ -36,6 +36,15 @@ Approval rule:
 
 ---
 
+## Web Profile Icon Lock (Jun 11, 2026)
+
+- Every logged-in web app page must show the profile icon/menu in the top-right area.
+- This includes custom full-page tools such as `app/chat/page.tsx` / `components/VoiceChat.tsx`.
+- Do not remove, hide, replace, or redesign the profile icon/menu unless the owner explicitly approves that exact change in writing.
+- If a page uses a custom header instead of `components/PageHeader.tsx`, that custom header must still include the same profile access.
+
+---
+
 ## Native iOS App Parity Rule (Jun 9, 2026)
 
 The iOS app must be built as a real native app experience.

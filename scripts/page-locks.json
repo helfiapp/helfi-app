@@ -195,7 +195,7 @@
     "components/SolidMacroRing.tsx": "c3c6e3f07fafd237fa4dcd498b024ac48e48c2ebd23a64c924aab253590fedaa",
     "components/support/SupportChatWidget.tsx": "2f6316a0cfdd832bb7e71d4de51a18cf2a2e84aba575262e291d646ec84165f5",
     "components/UsageMeter.tsx": "692f428bfe4f3329664cd30013c8db10aa9ecac9b5b81630a84c30717343c50e",
-    "components/VoiceChat.tsx": "53528aa7f89541bc2470271ef8036d7e73e8028ba203e1d8ef54c944014b761e",
+    "components/VoiceChat.tsx": "db9e3d1bee4a808a1c3b18cad3fe9133c43cbbb9bc2d2cc90e245a6b0806d4cc",
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
     "native/src/config.ts": "81cfdb7a722c7b073eff5b1519268f6555fb0867f0737da0318b16810a43c7e6",
     "native/src/config/nativePageRoutes.ts": "b39f96f9faec2bc5e76e821f74ed957b0e62c1c495093b7586acc3f02d343a59",

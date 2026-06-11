@@ -3,9 +3,14 @@
 import { FormEvent, KeyboardEvent, useEffect, useLayoutEffect, useMemo, useRef, useState, useCallback } from 'react'
 import { createPortal } from 'react-dom'
 import { useRouter } from 'next/navigation'
+import { useSession, signOut } from 'next-auth/react'
+import Image from 'next/image'
+import Link from 'next/link'
 import { formatChatContent } from '@/lib/chatFormatting'
 import UsageMeter from '@/components/UsageMeter'
 import PractitionerRecommendations from '@/components/PractitionerRecommendations'
+import { useUserData } from '@/components/providers/UserDataProvider'
+import { UserIcon } from '@heroicons/react/24/outline'
 
 interface VoiceChatContext {
   symptoms?: string[]
@@ -209,6 +214,139 @@ const parseApproxRecipeCaloriesFromText = (text: string): number | null => {
   const value = Number(match[1])
   if (!Number.isFinite(value) || value <= 0) return null
   return value
+}
+
+function VoiceChatProfileMenu() {
+  const { data: session } = useSession()
+  const { profileImage } = useUserData()
+  const [dropdownOpen, setDropdownOpen] = useState(false)
+  const [unreadCount, setUnreadCount] = useState(0)
+
+  const hasProfileImage = !!(profileImage || session?.user?.image)
+  const userImage = (profileImage || session?.user?.image || '') as string
+  const userName = session?.user?.name || 'User'
+
+  const handleSignOut = async () => {
+    if (typeof window !== 'undefined' && session?.user?.id) {
+      localStorage.removeItem(`profileImage_${session.user.id}`)
+      localStorage.removeItem(`cachedProfileImage_${session.user.id}`)
+    }
+    await signOut({ callbackUrl: '/auth/signin' })
+  }
+
+  useEffect(() => {
+    if (!session?.user?.id) return
+    let mounted = true
+    const loadUnread = async () => {
+      try {
+        const res = await fetch('/api/notifications/unread-count', { cache: 'no-store' as any })
+        if (!res.ok) return
+        const data = await res.json().catch(() => ({}))
+        if (!mounted) return
+        const count = typeof data?.count === 'number' ? data.count : 0
+        setUnreadCount(Number.isFinite(count) ? count : 0)
+      } catch {
+        // ignore
+      }
+    }
+
+    loadUnread()
+    const handleRefresh = () => loadUnread()
+    window.addEventListener('focus', handleRefresh)
+    window.addEventListener('notifications:refresh', handleRefresh)
+    return () => {
+      mounted = false
+      window.removeEventListener('focus', handleRefresh)
+      window.removeEventListener('notifications:refresh', handleRefresh)
+    }
+  }, [session?.user?.id])
+
+  if (!session?.user) return null
+
+  return (
+    <div className="relative dropdown-container shrink-0" id="voice-chat-profile-dropdown">
+      <button
+        type="button"
+        onClick={() => setDropdownOpen((value) => !value)}
+        className="flex h-10 w-10 items-center justify-center focus:outline-none"
+        aria-label="Open profile menu"
+      >
+        <div className="relative">
+          {hasProfileImage ? (
+            <Image
+              src={userImage}
+              alt="Profile"
+              width={40}
+              height={40}
+              className="h-10 w-10 rounded-full border-2 border-helfi-green object-cover shadow-sm"
+            />
+          ) : (
+            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-helfi-green shadow-sm">
+              <UserIcon className="h-6 w-6 text-white" aria-hidden="true" />
+            </div>
+          )}
+          {unreadCount > 0 && (
+            <span className="absolute -right-1 -top-1 flex h-[18px] min-w-[18px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-semibold text-white shadow">
+              {unreadCount > 99 ? '99+' : unreadCount}
+            </span>
+          )}
+        </div>
+      </button>
+
+      {dropdownOpen && (
+        <div className="absolute right-0 z-50 mt-2 w-64 rounded-xl border border-gray-100 bg-white py-2 shadow-lg animate-fade-in">
+          <div className="flex items-center border-b border-gray-100 px-4 py-3">
+            {hasProfileImage ? (
+              <Image
+                src={userImage}
+                alt="Profile"
+                width={40}
+                height={40}
+                className="mr-3 h-10 w-10 rounded-full object-cover"
+              />
+            ) : (
+              <div className="mr-3 flex h-10 w-10 items-center justify-center rounded-full bg-helfi-green">
+                <UserIcon className="h-6 w-6 text-white" aria-hidden="true" />
+              </div>
+            )}
+            <div className="min-w-0">
+              <div className="truncate font-semibold text-gray-900">{userName}</div>
+              <div className="truncate text-xs text-gray-500">{session?.user?.email || 'user@email.com'}</div>
+            </div>
+          </div>
+          <Link href="/profile" className="block px-4 py-2 text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+            Profile
+          </Link>
+          <Link href="/account" className="block px-4 py-2 text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+            Account Settings
+          </Link>
+          <Link href="/profile/image" className="block px-4 py-2 text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+            Upload/Change Profile Photo
+          </Link>
+          <Link href="/billing" className="block px-4 py-2 text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+            Subscription & Billing
+          </Link>
+          <Link href="/notifications" className="block px-4 py-2 text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+            Notifications
+          </Link>
+          <Link href="/privacy" className="block px-4 py-2 text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+            Privacy Settings
+          </Link>
+          <Link href="/support" className="block px-4 py-2 text-gray-700 hover:bg-gray-50" onClick={() => setDropdownOpen(false)}>
+            Help & Support
+          </Link>
+          <div className="my-2 border-t border-gray-100" />
+          <button
+            type="button"
+            onClick={handleSignOut}
+            className="block w-full px-4 py-2 text-left font-semibold text-red-600 hover:bg-gray-50"
+          >
+            Logout
+          </button>
+        </div>
+      )}
+    </div>
+  )
 }
 
 const resolveRecipeServingCount = (params: {
@@ -2811,6 +2949,7 @@ export default function VoiceChat({
               </span>
             </button>
           )}
+          <VoiceChatProfileMenu />
         </div>
       </header>
 
