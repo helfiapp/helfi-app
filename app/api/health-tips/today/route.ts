@@ -1,15 +1,26 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 
-export async function GET() {
+async function getHealthTipUser(req: NextRequest) {
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) {
+    return prisma.user.findUnique({ where: { id: nativeUserId } })
+  }
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    return null
   }
 
   const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  return user
+}
+
+export async function GET(req: NextRequest) {
+  const user = await getHealthTipUser(req)
   if (!user) {
     return NextResponse.json({ error: 'User not found' }, { status: 404 })
   }
@@ -124,4 +135,3 @@ export async function GET() {
 
   return NextResponse.json({ tips: tipsWithSuggestions })
 }
-

@@ -1,7 +1,8 @@
 import React from 'react'
-import { View } from 'react-native'
+import { Pressable, Text, View } from 'react-native'
 import type { NavigatorScreenParams } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import { Feather } from '@expo/vector-icons'
 
 import { MainTabs } from './MainTabs'
 import type { MainTabParamList } from './MainTabs'
@@ -37,6 +38,7 @@ import { PractitionerProfileScreen } from '../screens/PractitionerProfileScreen'
 import { ListYourPracticeScreen } from '../screens/ListYourPracticeScreen'
 import { ListYourPracticeStartScreen } from '../screens/ListYourPracticeStartScreen'
 import { NativeWebToolScreen } from '../screens/NativeWebToolScreen'
+import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
 
 export type MainStackParamList = {
   Tabs: NavigatorScreenParams<MainTabParamList> | undefined
@@ -55,8 +57,14 @@ export type MainStackParamList = {
   HealthSetup: undefined
   Reminders: { focus?: 'checkin' | 'mood'; returnToMoodTracker?: boolean } | undefined
   DailyCheckIn: undefined
-  MoodTracker: undefined
-  TrackCalories: undefined
+  MoodTracker: { tab?: 'checkin' | 'history' | 'journal' } | undefined
+  TrackCalories:
+    | {
+        voiceAction?: string
+        voiceMeal?: string
+        voiceActionNonce?: number
+      }
+    | undefined
   AddIngredient:
     | {
         meal?: string
@@ -91,6 +99,29 @@ export type MainStackParamList = {
 }
 
 const Stack = createNativeStackNavigator<MainStackParamList>()
+
+function HeaderBackButton({ navigation }: { navigation: any }) {
+  if (!navigation.canGoBack?.()) return null
+
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel="Back"
+      onPress={() => navigation.goBack()}
+      hitSlop={10}
+      style={({ pressed }) => ({
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 2,
+        paddingRight: 8,
+        opacity: pressed ? 0.65 : 1,
+      })}
+    >
+      <Feather name="chevron-left" size={25} color="#111827" />
+      <Text style={{ color: '#111827', fontSize: 16, fontWeight: '700' }}>Back</Text>
+    </Pressable>
+  )
+}
 
 function withBottomNav<P extends object>(
   Component: React.ComponentType<P>,
@@ -151,7 +182,13 @@ function NativeWebToolWithBottomNav(props: React.ComponentProps<typeof NativeWeb
 
 export function MainNavigator() {
   return (
-    <Stack.Navigator>
+    <Stack.Navigator
+      screenOptions={({ navigation }) => ({
+        headerBackVisible: false,
+        headerLeft: () => <HeaderBackButton navigation={navigation} />,
+        headerRight: () => <VoiceAssistantIconButton size={36} iconSize={18} />,
+      })}
+    >
       <Stack.Screen name="Tabs" component={MainTabs} options={{ headerShown: false }} />
       <Stack.Screen name="Profile" component={ProfileWithBottomNav} options={{ title: 'Profile', headerTitleAlign: 'center', headerBackTitle: '' }} />
       <Stack.Screen

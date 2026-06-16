@@ -1,6 +1,19 @@
 import { prisma } from '@/lib/prisma'
 
+let ensureMoodTablesPromise: Promise<void> | null = null
+
 export async function ensureMoodTables() {
+  if (ensureMoodTablesPromise) return ensureMoodTablesPromise
+
+  ensureMoodTablesPromise = ensureMoodTablesInner().catch((error) => {
+    ensureMoodTablesPromise = null
+    throw error
+  })
+
+  return ensureMoodTablesPromise
+}
+
+async function ensureMoodTablesInner() {
   // Keep Mood Tracker storage isolated to avoid touching Prisma migrations.
   // Uses JSONB for flexible optional context and tags.
   await prisma.$executeRawUnsafe(`

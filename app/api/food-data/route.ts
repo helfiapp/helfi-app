@@ -738,6 +738,7 @@ export async function GET(request: NextRequest) {
         name: item.name,
         brand: item.brand ?? null,
         serving_size: '100 g',
+        servingOptions: Array.isArray(item.servingOptions) && item.servingOptions.length > 0 ? item.servingOptions : null,
         calories: item.calories,
         protein_g: item.protein_g,
         carbs_g: item.carbs_g,
@@ -797,10 +798,10 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Custom list first, then simple foods (foundation + legacy)
-      // Branded/product foods are excluded from single food searches
-      pushGroup(sortedCustom)
+      // Simple USDA foods first, then the custom fallback list.
+      // Branded/product foods are excluded from single food searches.
       pushGroup(sortedMain)
+      pushGroup(sortedCustom)
 
       // If we still don't have enough results, use FatSecret as a fallback.
       // (We still return the Helfi database results first.)
@@ -936,7 +937,7 @@ export async function GET(request: NextRequest) {
     }
 
     const searchUsdaSingleFood = async (value: string) => {
-      const sources = ['usda_foundation', 'usda_sr_legacy', 'usda_branded']
+      const sources = ['usda_foundation', 'usda_sr_legacy']
       const attempt = async (q: string) => {
         if (!q) return []
         return await searchLocalFoods(q, { pageSize: limit, sources })
@@ -955,6 +956,7 @@ export async function GET(request: NextRequest) {
       if (libraryCount < 100000) {
         console.warn(`USDA library looks thin (${libraryCount} rows). Consider re-importing USDA data.`)
       }
+      if (localOnly) return []
       // As a last resort, hit USDA API so users still get results if the local library is empty.
       const remote = await searchUsdaFoods(value, { pageSize: limit, dataType: 'generic' })
       if (remote.length > 0) return remote

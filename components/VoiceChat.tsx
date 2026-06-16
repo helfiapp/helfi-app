@@ -36,6 +36,7 @@ interface VoiceChatProps {
   entryContext?: 'general' | 'food'
   selectedDate?: string
   openHistoryOnLoad?: boolean
+  initialInput?: string
 }
 
 type ChatMessage = { role: 'user' | 'assistant'; content: string }
@@ -863,6 +864,7 @@ export default function VoiceChat({
   entryContext = 'general',
   selectedDate,
   openHistoryOnLoad = false,
+  initialInput = '',
 }: VoiceChatProps) {
   const router = useRouter()
   const VOICE_CHAT_COST_CREDITS = 10
@@ -910,6 +912,7 @@ export default function VoiceChat({
   const barcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const barcodeScannerRef = useRef<{ reader: any; controls: any } | null>(null)
   const inputRef = useRef<string>('')
+  const initialInputAppliedRef = useRef<string>('')
   const sendChatMessageRef = useRef<
     ((messageText: string, options?: { foodContextOverride?: string }) => Promise<void> | void) | null
   >(null)
@@ -1634,6 +1637,13 @@ export default function VoiceChat({
   useEffect(() => {
     inputRef.current = input
   }, [input])
+
+  useEffect(() => {
+    const next = String(initialInput || '').trim()
+    if (!next || initialInputAppliedRef.current === next) return
+    initialInputAppliedRef.current = next
+    setInput((current) => (current.trim() ? current : next))
+  }, [initialInput])
 
   useEffect(() => {
     try {

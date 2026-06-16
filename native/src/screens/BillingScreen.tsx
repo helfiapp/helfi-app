@@ -69,6 +69,9 @@ const topUpCards = [
   { plan: 'credits_1000', title: '$20 (1,000 credits)', desc: 'One-time top-up. Credits valid for 12 months.', buttonLabel: 'Buy $20 Credits' },
 ] as const
 
+const TERMS_URL = 'https://helfi.ai/terms'
+const PRIVACY_URL = 'https://helfi.ai/privacy'
+
 function toDateInputValue(d: Date) {
   const yyyy = d.getFullYear()
   const mm = String(d.getMonth() + 1).padStart(2, '0')
@@ -83,6 +86,12 @@ function formatHistoryDate(value: string) {
     day: 'numeric',
     month: 'short',
     year: 'numeric',
+  })
+}
+
+function openExternalUrl(url: string) {
+  Linking.openURL(url).catch(() => {
+    Alert.alert('Could not open link', 'Please try again.')
   })
 }
 
@@ -776,7 +785,17 @@ export function BillingScreen() {
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
           <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Plans</Text>
-          <Text style={{ marginTop: 6, color: theme.colors.muted }}>Choose a monthly subscription plan.</Text>
+          <Text style={{ marginTop: 6, color: theme.colors.muted }}>
+            Choose a monthly subscription plan. Subscriptions renew monthly until cancelled.
+          </Text>
+          <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+            <Pressable onPress={() => openExternalUrl(TERMS_URL)}>
+              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Terms of Use</Text>
+            </Pressable>
+            <Pressable onPress={() => openExternalUrl(PRIVACY_URL)}>
+              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Privacy Policy</Text>
+            </Pressable>
+          </View>
 
           <View style={{ marginTop: 12, gap: 10 }}>
             {planCards.map((item) => (

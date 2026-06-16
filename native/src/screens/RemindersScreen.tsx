@@ -18,6 +18,7 @@ import { useFocusEffect, useRoute } from '@react-navigation/native'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
 import { API_BASE_URL } from '../config'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -270,11 +271,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
 
   const authHeaders = useMemo(() => {
     if (!session?.token) return null
-    return {
-      Authorization: `Bearer ${session.token}`,
-      'x-native-token': session.token,
-      'cache-control': 'no-store',
-    }
+    return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [session?.token])
 
   const deviceTz = useMemo(() => getDeviceTimezone(), [])

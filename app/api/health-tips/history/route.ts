@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 
 type HealthTipUser = {
@@ -10,6 +11,15 @@ type HealthTipUser = {
 }
 
 async function getHealthTipUser(req: NextRequest): Promise<HealthTipUser | null> {
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) {
+    const nativeUser = await prisma.user.findUnique({
+      where: { id: nativeUserId },
+      select: { id: true, email: true },
+    })
+    if (nativeUser?.id && nativeUser?.email) return nativeUser
+  }
+
   const session = await getServerSession(authOptions)
   const sessionEmail = String(session?.user?.email || '')
     .trim()

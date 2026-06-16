@@ -41,8 +41,10 @@ export default function SymptomAnalysisPage() {
   const [tagsExpanded, setTagsExpanded] = useState<boolean>(false)
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
   const resultRef = useRef<HTMLDivElement | null>(null)
+  const voicePrefillAppliedRef = useRef<string>('')
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [creditRefreshTick, setCreditRefreshTick] = useState<number>(0)
+  const [voicePrefillParams, setVoicePrefillParams] = useState({ symptoms: '', duration: '', notes: '' })
 
   // Progress phases shown while analyzing
   const phases = useMemo(() => [
@@ -79,6 +81,34 @@ export default function SymptomAnalysisPage() {
       return () => {}
     }
   }, [])
+
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    const params = new URLSearchParams(window.location.search)
+    setVoicePrefillParams({
+      symptoms: params.get('voiceSymptoms') || '',
+      duration: params.get('voiceDuration') || '',
+      notes: params.get('voiceNotes') || '',
+    })
+  }, [])
+
+  useEffect(() => {
+    const key = `${voicePrefillParams.symptoms}|${voicePrefillParams.duration}|${voicePrefillParams.notes}`
+    if (!voicePrefillParams.symptoms || voicePrefillAppliedRef.current === key) return
+    voicePrefillAppliedRef.current = key
+
+    const symptoms = voicePrefillParams.symptoms
+      .split(/[,\n]/)
+      .map((item) => item.replace(/[.?!]+$/g, '').trim())
+      .filter(Boolean)
+      .slice(0, 12)
+
+    if (symptoms.length) {
+      setSelectedSymptoms((prev) => Array.from(new Set([...prev, ...symptoms])))
+    }
+    if (voicePrefillParams.duration) setDuration((current) => current || voicePrefillParams.duration)
+    if (voicePrefillParams.notes) setNotes((current) => current || voicePrefillParams.notes)
+  }, [voicePrefillParams])
 
   useEffect(() => {
     const fetchCreditStatus = async () => {
@@ -220,6 +250,28 @@ export default function SymptomAnalysisPage() {
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
             <h1 className="text-xl font-semibold text-gray-900 mb-1">Describe your symptoms</h1>
             <p className="text-sm text-gray-600 mb-4">List symptoms separated by commas (e.g., Headache, Fever). Add duration and any notes.</p>
+
+            <div className="mb-4 text-xs text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
+              <div className="font-semibold text-gray-900 mb-1">Important medical note</div>
+              <p>
+                Helfi is for general health tracking and organisation only. It does not provide medical advice,
+                diagnosis, or treatment. Always seek a doctor's advice in addition to using this app and before
+                making medical decisions.
+              </p>
+            </div>
+
+            <div className="mb-4 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-3">
+              <div className="font-semibold text-gray-900 mb-1">General health sources</div>
+              <p className="mb-2">
+                Helfi uses these public sources as general references. Results are not diagnoses.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><a className="text-helfi-green underline" href="https://medlineplus.gov/symptoms.html" target="_blank" rel="noreferrer">MedlinePlus Symptoms</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/symptom-checker/select-symptom/itt-20009075" target="_blank" rel="noreferrer">Mayo Clinic Symptom Checker</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.nhs.uk/symptoms/" target="_blank" rel="noreferrer">NHS Symptoms A to Z</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.cdc.gov/index.html" target="_blank" rel="noreferrer">CDC Health Topics</a></li>
+              </ul>
+            </div>
 
             <div className="mb-3">
                <label className="block text-sm font-medium text-gray-700 mb-1">Symptoms</label>
@@ -389,7 +441,20 @@ export default function SymptomAnalysisPage() {
               )}
 
               <div className="text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-lg p-3">
-                {result.disclaimer || 'This is not medical advice. If you have concerning or worsening symptoms, contact a licensed medical professional or emergency services.'}
+                {result.disclaimer || 'This is not medical advice. Always seek a doctor’s advice in addition to using this app and before making medical decisions. If you have concerning or worsening symptoms, contact a licensed medical professional or emergency services.'}
+              </div>
+
+              <div className="mt-3 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-3">
+                <div className="font-semibold text-gray-900 mb-1">General health sources</div>
+                <p className="mb-2">
+                  Helfi uses these public sources as general references. Your result is not a diagnosis.
+                </p>
+                <ul className="list-disc list-inside space-y-1">
+                  <li><a className="text-helfi-green underline" href="https://medlineplus.gov/symptoms.html" target="_blank" rel="noreferrer">MedlinePlus Symptoms</a></li>
+                  <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/symptom-checker/select-symptom/itt-20009075" target="_blank" rel="noreferrer">Mayo Clinic Symptom Checker</a></li>
+                  <li><a className="text-helfi-green underline" href="https://www.nhs.uk/symptoms/" target="_blank" rel="noreferrer">NHS Symptoms A to Z</a></li>
+                  <li><a className="text-helfi-green underline" href="https://www.cdc.gov/index.html" target="_blank" rel="noreferrer">CDC Health Topics</a></li>
+                </ul>
               </div>
 
               <PractitionerRecommendations

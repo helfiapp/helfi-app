@@ -5,11 +5,24 @@ import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { deleteNotificationsByType, deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 export const dynamic = 'force-dynamic'
 
 const MOOD_MIN = 1
 const MOOD_MAX = 7
+
+async function getMoodUser(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (session?.user?.email) {
+    return prisma.user.findUnique({ where: { email: session.user.email } })
+  }
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) {
+    return prisma.user.findUnique({ where: { id: nativeUserId } })
+  }
+  return null
+}
 
 function clampInt(value: unknown, min: number, max: number): number | null {
   if (value === null || value === undefined) return null
@@ -144,9 +157,7 @@ async function getPassiveContext(userId: string, localDate: string) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getMoodUser(req)
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
@@ -181,7 +192,7 @@ export async function GET(req: NextRequest) {
   try {
     await ensureMoodTables()
     const rows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT id, localDate, timestamp, mood, tags, note, context
+      `SELECT id, localDate AS "localDate", timestamp, mood, tags, note, context
        FROM MoodEntries
        WHERE userId = $1 AND localDate BETWEEN $2 AND $3
        ORDER BY timestamp DESC`,
@@ -197,9 +208,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getMoodUser(req)
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({} as any))

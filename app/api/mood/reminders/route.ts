@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { publishWithQStash, scheduleAllMoodReminders } from '@/lib/qstash'
@@ -34,14 +35,27 @@ function normalizeTimezone(input: unknown) {
   }
 }
 
-export async function GET() {
+async function getMoodReminderUser(req: NextRequest) {
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) {
+    return prisma.user.findUnique({
+      where: { id: nativeUserId },
+      include: { subscription: true, creditTopUps: true },
+    })
+  }
+
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+  const email = String(session?.user?.email || '').trim().toLowerCase()
+  if (!email) return null
+  return prisma.user.findUnique({
+    where: { email },
     include: { subscription: true, creditTopUps: true },
   })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+}
+
+export async function GET(req: NextRequest) {
+  const user = await getMoodReminderUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   await ensureMoodTables()
   const now = new Date()
@@ -75,13 +89,8 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
-    include: { subscription: true, creditTopUps: true },
-  })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const user = await getMoodReminderUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({} as any))
   const enabled = !!body?.enabled

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { put } from '@vercel/blob'
 import { prisma } from '@/lib/prisma'
 import { buildSignedBlobUrl } from '@/lib/blob-access'
@@ -22,7 +23,7 @@ function sanitizeFilename(name: string) {
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  const userId = session?.user?.id
+  const userId = session?.user?.id || (await getUserIdFromNativeAuth(request))
   if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }

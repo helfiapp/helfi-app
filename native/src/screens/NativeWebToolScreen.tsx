@@ -46,6 +46,8 @@ function isAllowedInAppUrl(rawUrl: string): boolean {
     const parsed = new URL(value)
     const host = String(parsed.hostname || '').toLowerCase()
     if (!host) return false
+    const apiHost = new URL(API_BASE_URL).hostname.toLowerCase()
+    if (host === apiHost || host === 'localhost' || host === '127.0.0.1') return true
     return host === 'helfi.ai' || host.endsWith('.helfi.ai')
   } catch {
     return false
@@ -339,6 +341,9 @@ export function NativeWebToolScreen({ route }: { route: any }) {
     const escaped = token
       .replace(/\\/g, '\\\\')
       .replace(/'/g, "\\'")
+    const escapedTargetPath = requestedPathWithFreshLoad
+      .replace(/\\/g, '\\\\')
+      .replace(/'/g, "\\'")
 
     return `
       (function() {
@@ -379,22 +384,34 @@ export function NativeWebToolScreen({ route }: { route: any }) {
           } catch (e) {}
           var t = '${escaped}';
           if (!t) return true;
+          var targetPath = '${escapedTargetPath}';
           var names = ['next-auth.session-token', '__Secure-next-auth.session-token', 'authjs.session-token', '__Secure-authjs.session-token'];
           names.forEach(function(name) {
             document.cookie = name + '=; path=/; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax';
             document.cookie = name + '=; path=/; domain=.helfi.ai; expires=Thu, 01 Jan 1970 00:00:00 GMT; samesite=lax';
           });
           var maxAge = 60 * 60 * 24 * 30;
-          var base = '; path=/; secure; samesite=lax; max-age=' + maxAge;
+          var securePart = window.location.protocol === 'https:' ? '; secure' : '';
+          var base = '; path=/' + securePart + '; samesite=lax; max-age=' + maxAge;
           document.cookie = 'next-auth.session-token=' + t + base;
           document.cookie = '__Secure-next-auth.session-token=' + t + base;
           document.cookie = 'authjs.session-token=' + t + base;
           document.cookie = '__Secure-authjs.session-token=' + t + base;
+          if (
+            targetPath &&
+            (window.location.pathname === '/login' ||
+              window.location.pathname === '/auth/signin' ||
+              window.location.pathname.indexOf('/auth/') === 0)
+          ) {
+            setTimeout(function() {
+              window.location.replace(targetPath);
+            }, 50);
+          }
         } catch (e) {}
         return true;
       })();
     `
-  }, [session?.token])
+  }, [requestedPathWithFreshLoad, session?.token])
 
   return (
     <Screen>

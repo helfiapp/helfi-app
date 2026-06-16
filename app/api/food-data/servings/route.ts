@@ -2,6 +2,7 @@ export const dynamic = 'force-dynamic'
 
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchFatSecretServingOptions, fetchUsdaServingOptions } from '@/lib/food-data'
+import { buildCustomFoodServingOptions } from '@/lib/food/custom-serving-options'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
@@ -21,7 +22,20 @@ export async function GET(request: NextRequest) {
 
     if (source === 'custom' || id.startsWith('custom:')) {
       const item = await prisma.customFoodItem.findUnique({ where: { id: normalizedId } })
-      const options = Array.isArray(item?.servingOptions) ? item?.servingOptions : []
+      const storedOptions = Array.isArray(item?.servingOptions) ? item.servingOptions : []
+      const options =
+        storedOptions.length > 0 || !item
+          ? storedOptions
+          : buildCustomFoodServingOptions({
+              name: item.name,
+              kind: item.kind,
+              caloriesPer100g: item.caloriesPer100g,
+              proteinPer100g: item.proteinPer100g,
+              carbsPer100g: item.carbsPer100g,
+              fatPer100g: item.fatPer100g,
+              fiberPer100g: item.fiberPer100g,
+              sugarPer100g: item.sugarPer100g,
+            })
       return NextResponse.json({ success: true, source: 'custom', options })
     }
 

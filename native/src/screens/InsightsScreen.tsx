@@ -288,6 +288,9 @@ function PrimaryButton({ label, onPress, disabled }: { label: string; onPress: (
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       style={({ pressed }) => ({
         opacity: disabled ? 0.55 : pressed ? 0.86 : 1,
         backgroundColor: theme.colors.primary,
@@ -307,6 +310,9 @@ function SecondaryButton({ label, onPress, disabled }: { label: string; onPress:
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       style={({ pressed }) => ({
         opacity: disabled ? 0.55 : pressed ? 0.86 : 1,
         backgroundColor: '#FFFFFF',
@@ -724,9 +730,27 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     }
   }
 
-  const openPdf = () => {
+  const openPdf = async () => {
     if (!selectedReport?.id) return
-    void Linking.openURL(`${API_BASE_URL}/insights/weekly-report/print?id=${encodeURIComponent(selectedReport.id)}`)
+    if (!authHeaders) {
+      Alert.alert('PDF', 'Please log in again to open this report.')
+      return
+    }
+
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/weekly/pdf`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ reportId: selectedReport.id }),
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.url) {
+        throw new Error(data?.error || 'Could not open PDF.')
+      }
+      await Linking.openURL(String(data.url))
+    } catch (err: any) {
+      Alert.alert('PDF', String(err?.message || 'Could not open PDF.'))
+    }
   }
 
   const goToStackScreen = (screen: string, params?: any) => {
@@ -1084,7 +1108,13 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Previous reports</Text>
           <View style={{ gap: 10, marginTop: 12 }}>
             {reports.slice(0, 6).map((item) => (
-              <Pressable key={item.id} onPress={() => openReport(item.id)} style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}>
+              <Pressable
+                key={item.id}
+                onPress={() => openReport(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open report ${formatDateRange(item.periodStart, item.periodEnd)}`}
+                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+              >
                 <Card tone="white" style={{ padding: 12 }}>
                   <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{formatDateRange(item.periodStart, item.periodEnd)}</Text>
                   <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 3 }}>Generated {formatDateForLocale(item.createdAt)}</Text>
@@ -1401,10 +1431,11 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           {REPORT_NAV_ITEMS.map((item) => (
             <Pressable
               key={item.key}
-              onPress={() => {
-                setReportNav(item.key)
-                setTimeout(() => scrollRef.current?.scrollTo({ y: 0, animated: true }), 10)
-              }}
+              accessibilityRole="button"
+              accessibilityLabel={item.label}
+              accessibilityState={{ selected: reportNav === item.key }}
+              hitSlop={6}
+              onPress={() => setReportNav(item.key)}
               style={({ pressed }) => ({
                 opacity: pressed ? 0.84 : 1,
                 flexGrow: 1,
@@ -1425,44 +1456,46 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
             </Pressable>
           ))}
         </View>
-        <Card tone="dark">
-          <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900' }}>Weekly snapshot</Text>
-              <Text style={{ color: '#CFFAEA', marginTop: 5, lineHeight: 20 }}>A simple view of how much useful information Helfi had to work with.</Text>
-            </View>
-            <Text style={{ color: '#A7F3D0', fontWeight: '900' }}>{daysActive} days</Text>
-          </View>
-          <View style={{ marginTop: 18, gap: 10 }}>
-            <Text style={{ color: '#FFFFFF', fontSize: 38, fontWeight: '900', textAlign: 'center' }}>{reportStrength}</Text>
-            <Text style={{ color: '#CFFAEA', fontWeight: '800', textAlign: 'center' }}>out of 100 report strength</Text>
-            <ProgressBar percent={reportStrength} color="#10B981" />
-          </View>
-          <View style={{ flexDirection: 'row', gap: 5, marginTop: 18 }}>
-            {days.map((day) => {
-              const active = activeDayKeys.has(day)
-              return (
-                <View key={day} style={{ flex: 1, borderWidth: 1, borderColor: active ? '#6EE7B7' : '#334155', backgroundColor: active ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
-                  <Text style={{ color: active ? '#D1FAE5' : '#94A3B8', fontSize: 10, fontWeight: '900' }}>{shortDayName(day)}</Text>
-                  <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active ? '#6EE7B7' : '#475569', marginTop: 6 }} />
-                </View>
-              )
-            })}
-          </View>
-          <View style={{ gap: 9, marginTop: 18 }}>
-            {topCoverage.length ? topCoverage.map((item) => (
-              <View key={item.label}>
-                <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-                  <Text style={{ color: '#F8FAFC', fontWeight: '800' }}>{item.label}</Text>
-                  <Text style={{ color: '#A7F3D0' }}>{formatCompactNumber(item.value)}</Text>
-                </View>
-                <View style={{ marginTop: 5 }}>
-                  <ProgressBar percent={(item.value / maxCoverage) * 100} color="#6EE7B7" />
-                </View>
+        {reportNav === 'summary' ? (
+          <Card tone="dark">
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: '#FFFFFF', fontSize: 20, fontWeight: '900' }}>Weekly snapshot</Text>
+                <Text style={{ color: '#CFFAEA', marginTop: 5, lineHeight: 20 }}>A simple view of how much useful information Helfi had to work with.</Text>
               </View>
-            )) : <Text style={{ color: '#CBD5E1' }}>Start logging during the week and this snapshot will fill with your strongest data sources.</Text>}
-          </View>
-        </Card>
+              <Text style={{ color: '#A7F3D0', fontWeight: '900' }}>{daysActive} days</Text>
+            </View>
+            <View style={{ marginTop: 18, gap: 10 }}>
+              <Text style={{ color: '#FFFFFF', fontSize: 38, fontWeight: '900', textAlign: 'center' }}>{reportStrength}</Text>
+              <Text style={{ color: '#CFFAEA', fontWeight: '800', textAlign: 'center' }}>out of 100 report strength</Text>
+              <ProgressBar percent={reportStrength} color="#10B981" />
+            </View>
+            <View style={{ flexDirection: 'row', gap: 5, marginTop: 18 }}>
+              {days.map((day) => {
+                const active = activeDayKeys.has(day)
+                return (
+                  <View key={day} style={{ flex: 1, borderWidth: 1, borderColor: active ? '#6EE7B7' : '#334155', backgroundColor: active ? 'rgba(16,185,129,0.25)' : 'rgba(255,255,255,0.06)', borderRadius: 10, paddingVertical: 8, alignItems: 'center' }}>
+                    <Text style={{ color: active ? '#D1FAE5' : '#94A3B8', fontSize: 10, fontWeight: '900' }}>{shortDayName(day)}</Text>
+                    <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: active ? '#6EE7B7' : '#475569', marginTop: 6 }} />
+                  </View>
+                )
+              })}
+            </View>
+            <View style={{ gap: 9, marginTop: 18 }}>
+              {topCoverage.length ? topCoverage.map((item) => (
+                <View key={item.label}>
+                  <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+                    <Text style={{ color: '#F8FAFC', fontWeight: '800' }}>{item.label}</Text>
+                    <Text style={{ color: '#A7F3D0' }}>{formatCompactNumber(item.value)}</Text>
+                  </View>
+                  <View style={{ marginTop: 5 }}>
+                    <ProgressBar percent={(item.value / maxCoverage) * 100} color="#6EE7B7" />
+                  </View>
+                </View>
+              )) : <Text style={{ color: '#CBD5E1' }}>Start logging during the week and this snapshot will fill with your strongest data sources.</Text>}
+            </View>
+          </Card>
+        ) : null}
         {reportNav === 'summary' ? renderSummary() : null}
         {reportNav === 'visuals' ? renderCharts() : null}
         {reportNav === 'insights' ? renderInsights() : null}

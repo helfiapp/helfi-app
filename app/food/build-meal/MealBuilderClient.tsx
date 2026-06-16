@@ -3160,8 +3160,8 @@ export default function MealBuilderClient() {
       .sort((a, b) => {
         const aWords = a.split(' ').filter(Boolean).length
         const bWords = b.split(' ').filter(Boolean).length
-        if (aWords !== bWords) return aWords - bWords
-        return a.length - b.length
+        if (aWords !== bWords) return bWords - aWords
+        return b.length - a.length
       })
       .slice(0, 5)
   }
@@ -3206,6 +3206,31 @@ export default function MealBuilderClient() {
       .split(' ')
       .filter((token) => token.length >= 3 && !RECIPE_LOOKUP_STOPWORDS.has(token) && !/^\d/.test(token))
 
+  const hasConflictingRecipeFoodTokens = (candidate: NormalizedFoodItem, lookup: string) => {
+    const lookupTokens = getRecipeCoreTokens(lookup)
+    const nameTokens = getRecipeCoreTokens(String(candidate?.name || ''))
+    if (lookupTokens.length === 0 || nameTokens.length === 0) return false
+
+    const containsAny = (tokens: string[], values: string[]) => values.some((value) => tokens.includes(value))
+    const foodGroups = [
+      ['chicken', 'turkey', 'duck'],
+      ['tuna', 'salmon', 'cod', 'fish'],
+      ['beef', 'steak'],
+      ['pork', 'bacon', 'ham'],
+      ['tofu', 'tempeh'],
+    ]
+
+    for (const group of foodGroups) {
+      const lookupHasGroup = containsAny(lookupTokens, group)
+      const nameHasGroup = containsAny(nameTokens, group)
+      if (lookupHasGroup && !nameHasGroup && foodGroups.some((other) => other !== group && containsAny(nameTokens, other))) {
+        return true
+      }
+    }
+
+    return false
+  }
+
   const isAcceptableRecipeMacroMatch = (
     candidate: NormalizedFoodItem,
     lookup: string,
@@ -3217,6 +3242,8 @@ export default function MealBuilderClient() {
     const candidateTokens = normalizeRecipeLookupValue(`${candidate?.brand || ''} ${candidate?.name || ''}`)
       .split(' ')
       .filter(Boolean)
+
+    if (hasConflictingRecipeFoodTokens(candidate, lookup)) return false
 
     if (coreTokens.length === 0) {
       const lookupNorm = normalizeRecipeLookupValue(lookup)
@@ -3263,24 +3290,25 @@ export default function MealBuilderClient() {
     return items
   }
 
-  const resolveItemWithMacros = async (lookup: string, options?: { fastImportMode?: boolean }) => {
+  const resolveItemWithMacros = async (lookup: string, options?: { fastImportMode?: boolean; plainSingleOnly?: boolean }) => {
     const lookupKey = normalizeRecipeLookupValue(lookup)
     if (!lookupKey) return null
     const fastImportMode = Boolean(options?.fastImportMode)
-    const cacheKey = `${fastImportMode ? 'fast' : 'full'}:${lookupKey}`
+    const plainSingleOnly = Boolean(options?.plainSingleOnly)
+    const cacheKey = `${plainSingleOnly ? 'plain' : fastImportMode ? 'fast' : 'full'}:${lookupKey}`
     if (importResolveCacheRef.current.has(cacheKey)) {
       return importResolveCacheRef.current.get(cacheKey) || null
     }
 
     const candidates = buildRecipeLookupCandidates(lookup)
     const localAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
-      { kind: 'single', source: 'usda', localOnly: true, timeoutMs: fastImportMode ? 900 : 1800 },
-      { kind: 'single', source: 'auto', localOnly: true, timeoutMs: fastImportMode ? 900 : 1800 },
-      { kind: 'packaged', source: 'auto', localOnly: true, timeoutMs: fastImportMode ? 900 : 1800 },
+      { kind: 'single', source: 'usda', localOnly: true, timeoutMs: fastImportMode ? 2200 : 2600 },
+      { kind: 'single', source: 'auto', localOnly: true, timeoutMs: fastImportMode ? 2200 : 2600 },
+      ...(plainSingleOnly ? [] : [{ kind: 'packaged' as const, source: 'auto', localOnly: true, timeoutMs: fastImportMode ? 1800 : 2400 }]),
     ]
     const remoteAttempts: Array<{ kind: 'single' | 'packaged'; source: string; localOnly?: boolean; timeoutMs: number }> = [
-      { kind: 'single', source: 'auto', timeoutMs: fastImportMode ? 1400 : 2600 },
-      { kind: 'packaged', source: 'auto', timeoutMs: fastImportMode ? 1400 : 2600 },
+      { kind: 'single', source: 'auto', timeoutMs: fastImportMode ? 2400 : 3200 },
+      { kind: 'packaged', source: 'auto', timeoutMs: fastImportMode ? 2200 : 3000 },
     ]
 
     const findBestAcrossAttempts = async (
@@ -3312,6 +3340,7 @@ export default function MealBuilderClient() {
         importResolveCacheRef.current.set(cacheKey, localBest)
         return localBest
       }
+      if (plainSingleOnly) continue
       const remoteBest = await findBestAcrossAttempts(candidate, remoteAttempts)
       if (remoteBest) {
         importResolveCacheRef.current.set(cacheKey, remoteBest)
@@ -3319,7 +3348,7 @@ export default function MealBuilderClient() {
       }
     }
 
-    if (fastImportMode) {
+    if (fastImportMode || plainSingleOnly) {
       importResolveCacheRef.current.set(cacheKey, null)
       return null
     }
@@ -3389,10 +3418,28 @@ export default function MealBuilderClient() {
 
     let draft: any = null
     try {
-      const raw = sessionStorage.getItem('food:recipeImportDraft')
-      if (raw) draft = JSON.parse(raw)
+      const encoded = String(searchParams.get('voiceRecipeDraft') || '').trim()
+      if (encoded) {
+        const normalized = encoded.replace(/-/g, '+').replace(/_/g, '/')
+        const padded = normalized.padEnd(Math.ceil(normalized.length / 4) * 4, '=')
+        const binary = window.atob(padded)
+        const bytes = Uint8Array.from(binary, (char) => char.charCodeAt(0))
+        const decoded = JSON.parse(new TextDecoder().decode(bytes))
+        if (decoded && typeof decoded === 'object') {
+          draft = decoded
+          sessionStorage.setItem('food:recipeImportDraft', JSON.stringify(decoded))
+        }
+      }
     } catch {
       draft = null
+    }
+    if (!draft) {
+      try {
+        const raw = sessionStorage.getItem('food:recipeImportDraft')
+        if (raw) draft = JSON.parse(raw)
+      } catch {
+        draft = null
+      }
     }
     if (!draft || typeof draft !== 'object') {
       setError('Recipe import was not found. Please import again.')
@@ -3663,6 +3710,9 @@ export default function MealBuilderClient() {
       const lines = ingredients.map((l) => String(l || '').trim()).filter(Boolean).slice(0, 60)
       if (lines.length === 0) return
       const fastImportMode = lines.length <= 6
+      const plainSingleOnlyImport =
+        String((normalizedDraft as any)?.source || '').toLowerCase() === 'voice-assistant' ||
+        Boolean(String(searchParams.get('voiceRecipeDraft') || '').trim())
       const prefillItems = Array.isArray((draft as any).prefillItems) ? ((draft as any).prefillItems as any[]) : []
       const seenImportKeys = new Set<string>()
       const seenImportNames = new Set<string>()
@@ -3772,8 +3822,23 @@ export default function MealBuilderClient() {
             }
           }
 
-          const resolved = await resolveItemWithMacros(lookup, { fastImportMode })
+          const resolved = await resolveItemWithMacros(lookup, {
+            fastImportMode,
+            plainSingleOnly: plainSingleOnlyImport,
+          })
           if (!resolved) {
+            if (plainSingleOnlyImport) {
+              processedCount += 1
+              missingCount += 1
+              if (lineKey && !seenImportKeys.has(lineKey)) {
+                seenImportKeys.add(lineKey)
+                if (lineNameKey) seenImportNames.add(lineNameKey)
+                missing.push(line)
+              }
+              setRecipeImportMissing([...missing])
+              publishProgress(currentLine)
+              continue
+            }
             setRecipeImportProgress((prev) => ({
               ...prev,
               current: `Auto-filling ${currentLine}…`,

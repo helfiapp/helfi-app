@@ -425,6 +425,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
   const [results, setResults] = useState<SearchResult[]>([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [hasSearched, setHasSearched] = useState(false)
   const [categoriesLoading, setCategoriesLoading] = useState(true)
   const [locationLoading, setLocationLoading] = useState(false)
   const hydratedRef = useRef(false)
@@ -613,6 +614,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
 
     setLoading(true)
     setError(null)
+    setHasSearched(true)
 
     try {
       const params = new URLSearchParams()
@@ -805,6 +807,15 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
           setRadiusKm(typeof saved?.radiusKm === 'number' ? saved.radiusKm : 10)
           setTelehealthOnly(Boolean(saved?.telehealthOnly))
           setResults(Array.isArray(saved?.results) ? saved.results : [])
+          setHasSearched(
+            Boolean(
+              saved?.categoryId ||
+                saved?.subcategoryId ||
+                saved?.query ||
+                saved?.locationQuery ||
+                (Array.isArray(saved?.results) && saved.results.length > 0)
+            )
+          )
         }
       } catch {
         // Ignore storage failures.
@@ -1246,7 +1257,11 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 padding: 14,
               }}
             >
-              <Text style={{ color: theme.colors.muted }}>No results yet. Try a different search, category, or radius.</Text>
+              <Text style={{ color: theme.colors.muted }}>
+                {hasSearched
+                  ? 'No practitioners found for that search. Try a different category, location, or radius.'
+                  : 'No results yet. Try a search, category, or location.'}
+              </Text>
             </View>
           ) : null}
 

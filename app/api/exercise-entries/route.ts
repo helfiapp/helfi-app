@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { calculateExerciseCalories } from '@/lib/exercise/calories'
 import { getHealthProfileForUser } from '@/lib/exercise/health-profile'
 import { inferMetAndLabel } from '@/lib/exercise/met'
@@ -22,6 +23,13 @@ function makeManualDeviceId() {
   return `manual:${crypto.randomUUID()}`
 }
 
+async function getExerciseUserId(request: NextRequest) {
+  const session = await getServerSession(authOptions)
+  const sessionUserId = typeof session?.user?.id === 'string' ? session.user.id : null
+  if (sessionUserId) return sessionUserId
+  return getUserIdFromNativeAuth(request)
+}
+
 function formatPrismaCreateError(error: any) {
   const code = typeof error?.code === 'string' ? error.code : ''
   const msg = typeof error?.message === 'string' ? error.message : ''
@@ -33,8 +41,8 @@ function formatPrismaCreateError(error: any) {
 }
 
 export async function GET(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const userId = await getExerciseUserId(request)
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -44,7 +52,7 @@ export async function GET(request: NextRequest) {
   }
 
   const entries = await prisma.exerciseEntry.findMany({
-    where: { userId: session.user.id, localDate: date },
+    where: { userId, localDate: date },
     orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
     include: { exerciseType: true },
   })
@@ -57,8 +65,8 @@ export async function POST(request: NextRequest) {
   let stage = 'start'
   try {
     stage = 'session'
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = await getExerciseUserId(request)
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -130,7 +138,7 @@ export async function POST(request: NextRequest) {
     calories = caloriesOverrideRounded
   } else {
     stage = 'health_profile'
-    const health = await getHealthProfileForUser(session.user.id)
+    const health = await getHealthProfileForUser(userId)
     if (!health.weightKg) {
       return NextResponse.json(
         { error: 'Please update your weight in Health Setup to log exercise calories.' },
@@ -151,7 +159,7 @@ export async function POST(request: NextRequest) {
   // Use a unique id for manual entries too. This avoids edge-case failures if
   // the database ever treats NULL deviceIds as non-unique.
   const baseCreateData = {
-    userId: session.user.id,
+    userId,
     localDate: date,
     startTime,
     durationMinutes: inferred.durationMinutes,
@@ -204,7 +212,7 @@ export async function POST(request: NextRequest) {
 
   stage = 'reload_day'
   const entries = await prisma.exerciseEntry.findMany({
-    where: { userId: session.user.id, localDate: date },
+    where: { userId, localDate: date },
     orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
     include: { exerciseType: true },
   })

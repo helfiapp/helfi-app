@@ -6,6 +6,7 @@ import { Feather } from '@expo/vector-icons'
 import { NATIVE_WEB_PAGES, type NativeWebPageRoute } from '../config/nativePageRoutes'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { useVoiceAssistant } from '../voice/VoiceAssistant'
 
 function Row({
   icon,
@@ -51,6 +52,8 @@ function Row({
 }
 
 export function MoreScreen({ navigation }: { navigation: any }) {
+  const { openVoiceAssistant } = useVoiceAssistant()
+
   const openPractitioners = () => {
     const parent = navigation.getParent?.()
     if (parent?.navigate) {
@@ -74,6 +77,9 @@ export function MoreScreen({ navigation }: { navigation: any }) {
       title: page.title,
       path: page.path,
     })
+  }
+  const openMoodTracker = () => {
+    navigation.getParent()?.navigate('MoodTracker', { tab: 'checkin' })
   }
 
   return (
@@ -99,7 +105,7 @@ export function MoreScreen({ navigation }: { navigation: any }) {
         </Text>
 
         <View style={{ gap: 10 }}>
-          <Row icon={<Feather name="mic" size={18} color={theme.colors.muted} />} label="Talk to Helfi" onPress={() => openNativeTool(NATIVE_WEB_PAGES.talkToHelfi)} />
+          <Row icon={<Feather name="mic" size={18} color={theme.colors.muted} />} label="Talk to Helfi" onPress={() => openVoiceAssistant({ source: 'button' })} />
           <Row icon={<Feather name="message-circle" size={18} color={theme.colors.muted} />} label="Chat History" onPress={() => openNativeTool(NATIVE_WEB_PAGES.chatHistory)} />
           <Row icon={<Feather name="book-open" size={18} color={theme.colors.muted} />} label="Health Journal" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthJournal)} />
           <Row icon={<Feather name="bookmark" size={18} color={theme.colors.muted} />} label="Health Coach" onPress={() => navigation.getParent()?.navigate('SmartHealthCoach')} />
@@ -109,7 +115,7 @@ export function MoreScreen({ navigation }: { navigation: any }) {
             label="Today's Check-in"
             onPress={() => openNativeTool(NATIVE_WEB_PAGES.dailyCheckIn)}
           />
-          <Row icon={<Feather name="smile" size={18} color={theme.colors.muted} />} label="Mood Tracker" onPress={() => openNativeTool(NATIVE_WEB_PAGES.moodTracker)} />
+          <Row icon={<Feather name="smile" size={18} color={theme.colors.muted} />} label="Mood Tracker" onPress={openMoodTracker} />
           <Row icon={<Feather name="activity" size={18} color={theme.colors.muted} />} label="Symptom Analysis" onPress={() => openNativeTool(NATIVE_WEB_PAGES.symptomAnalysis)} />
           <Row icon={<Feather name="image" size={18} color={theme.colors.muted} />} label="Medical Image Analyzer" onPress={() => openNativeTool(NATIVE_WEB_PAGES.medicalImageAnalyzer)} />
           <Row icon={<Feather name="clipboard" size={18} color={theme.colors.muted} />} label="Health Intake" onPress={() => navigation.getParent()?.navigate('HealthSetup')} />

@@ -1679,6 +1679,16 @@ The green “+” buttons for each Food Diary category (Breakfast, Lunch, Dinner
 - **Unit default guard (Jan 2026):** Weight units must default to grams for non‑liquid foods even if a serving label uses `ml`; only clear liquids (milk, oil, juice, etc.) should default to `ml`.
 - Any modification to discrete counts, serving labels, or weight seeding requires explicit user approval and must be retested with multi-piece produce (e.g., 6 carrots/zucchinis) to confirm pieces, labels, and weights all reflect the full set.
 
+### 3.10.1 Custom/plain ingredient serving options (Jun 2026 - Locked)
+- **Files:** `lib/food/custom-serving-options.ts`, `lib/food/custom-foods.ts`, `scripts/import-custom-foods.ts`, `scripts/check-custom-food-servings.ts`, `app/api/food-data/servings/route.ts`.
+- Every custom/plain single ingredient must have serving options before it can be treated as ready for app use.
+- Solid foods must have grams and ounces.
+- Liquids must use ml-style options and must not get fruit-size labels.
+- Naturally countable foods must have sensible small/medium/large/extra large choices where data exists, especially banana, apple, orange, avocado, and egg.
+- A single ingredient stays a single food. More than one ingredient is a meal.
+- Do not add branded/product rows to the custom/plain single ingredient list.
+- Keep `npm run check:custom-food-servings` in `prebuild` so future bad rows fail before build.
+
 ### 3.11 Admin Credit Grants & Meter (Jan 2026 – Locked)
 - **Files:** `app/api/admin/user-management/route.ts`, `app/api/credit/status/route.ts`, `lib/credit-system.ts`, `components/UsageMeter.tsx`.
 - Admin “Add Credits” must post to `/api/admin/user-management` and increment `additionalCredits` directly (non-expiring). Do NOT revert to expiring top-ups for admin grants without explicit user approval.
@@ -1806,6 +1816,8 @@ Last stable deployment: `27f72314` (2026-01-30)
 - When reopening a saved recipe in Build a meal edit mode, **Your ingredients** must be one top-level expander section.
 - On reopen/edit, that top-level section must default to collapsed (retracted).
 - This collapse behavior must apply only to reopen/edit mode, not first-time pre-save recipe building.
+- Voice-created recipes must open the normal Build a meal recipe import screen, not a separate voice-only visual.
+- Voice-created recipe ingredients must use plain single-food matching first, with the Helfi custom/plain list before any other source, and must not auto-pick branded/product foods.
 
 **What agents must NOT change without explicit written owner approval:**
 1. Remove photo previews in Import by photo mode.
@@ -1822,6 +1834,7 @@ Last stable deployment: `27f72314` (2026-01-30)
 4. In `route.ts`, restore abbreviated recipe checks (`isAbbreviatedRecipeText` / `isRecipeAbbreviated`) in fallback guard logic.
 5. In `MealBuilderClient`, restore `ingredientsListExpanded` state + top-level `Your ingredients` toggle.
 6. In `MealBuilderClient`, restore reopen/edit auto-collapse logic tied to `sourceLogId` / `editFavoriteId` load completion.
+7. In `MealBuilderClient`, keep voice recipe handoffs on the normal recipe import path and keep voice ingredient matching in plain single-food mode.
 
 Fix commits: `87c947e2`, `86fb626f`, `fb57a433` (2026-02-14)  
 Last stable deployment: `fb57a433` (2026-02-14)

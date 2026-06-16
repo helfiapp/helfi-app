@@ -14,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import * as ImagePicker from 'expo-image-picker'
 
 import { API_BASE_URL } from '../config'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
@@ -183,11 +184,7 @@ export function SupportScreen() {
 
   const authHeaders = useMemo(() => {
     if (!session?.token) return null
-    return {
-      Authorization: `Bearer ${session.token}`,
-      'x-native-token': session.token,
-      'cache-control': 'no-store',
-    }
+    return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [session?.token])
 
   const [loading, setLoading] = useState(true)

@@ -139,6 +139,7 @@ export default function HealthJournalPage() {
   const [selectedAudioInputId, setSelectedAudioInputId] = useState('')
   const [selectedAudioOutputId, setSelectedAudioOutputId] = useState('')
   const [audioSettingsBusy, setAudioSettingsBusy] = useState(false)
+  const [supportsAudioOutputSelection, setSupportsAudioOutputSelection] = useState(false)
 
   const [selectedDate, setSelectedDate] = useState<string>(todayIso)
   const [showDateSheet, setShowDateSheet] = useState(false)
@@ -165,8 +166,10 @@ export default function HealthJournalPage() {
   const desktopDateLabel = isViewingToday ? 'Today' : formatShortDayLabel(selectedDate)
   const mediaProcessing = images.some((item) => item.processing) || audioClips.some((item) => item.processing)
   const entryHasMedia = images.length > 0 || audioClips.length > 0
-  const supportsAudioOutputSelection =
-    typeof window !== 'undefined' && typeof (HTMLMediaElement.prototype as any).setSinkId === 'function'
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    setSupportsAudioOutputSelection(typeof (HTMLMediaElement.prototype as any).setSinkId === 'function')
+  }, [])
   const extractedMediaNotes = [
     ...images.filter((item) => !item.processing && !item.failed).map((item) => item.summary),
     ...audioClips.filter((item) => !item.processing && !item.failed).map((item) => item.summary),

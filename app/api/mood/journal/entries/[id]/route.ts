@@ -4,12 +4,25 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { del } from '@vercel/blob'
 
 export const dynamic = 'force-dynamic'
 
 const MOOD_MEDIA_SCOPE = 'mood-journal'
 const MOOD_MEDIA_URL_TTL_SECONDS = 60 * 60
+
+async function getMoodUser(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (session?.user?.email) {
+    return prisma.user.findUnique({ where: { email: session.user.email } })
+  }
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) {
+    return prisma.user.findUnique({ where: { id: nativeUserId } })
+  }
+  return null
+}
 
 const chunk = <T,>(items: T[], size: number) => {
   const result: T[][] = []
@@ -106,16 +119,14 @@ async function deleteMoodMedia(paths: string[]) {
   }
 }
 
-export async function GET(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+export async function GET(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await getMoodUser(req)
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   try {
     await ensureMoodTables()
     const rows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
+      `SELECT id, localDate AS "localDate", title, content, images, tags, audio, prompt, template, createdAt AS "createdAt", updatedAt AS "updatedAt"
        FROM MoodJournalEntries
        WHERE userId = $1 AND id = $2`,
       user.id,
@@ -137,9 +148,7 @@ export async function GET(_req: NextRequest, { params }: { params: { id: string 
 }
 
 export async function PUT(req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getMoodUser(req)
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({} as any))
@@ -207,10 +216,8 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
   }
 }
 
-export async function DELETE(_req: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+export async function DELETE(req: NextRequest, { params }: { params: { id: string } }) {
+  const user = await getMoodUser(req)
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   try {

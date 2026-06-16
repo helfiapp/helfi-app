@@ -33,7 +33,11 @@ type VoiceAction =
   | 'food_favorite'
   | 'food_build_meal'
   | 'food_draft'
+  | 'water'
   | 'recipe'
+  | 'symptom_analysis'
+  | 'health_question'
+  | 'app_handoff'
   | 'unknown'
 
 type VoiceFoodFavorite = {
@@ -54,6 +58,7 @@ type VoiceDraft = {
   summary: string
   confirmationMessage: string
   canConfirm: boolean
+  autoSave?: boolean
   exercise?: {
     exerciseTypeId: number
     exerciseName: string
@@ -71,6 +76,7 @@ type VoiceDraft = {
     title: string
     content: string
     tags: string[]
+    journalType?: 'mood' | 'health'
   }
   food?: {
     meal: string
@@ -85,6 +91,53 @@ type VoiceDraft = {
   }
   recipe?: {
     text: string
+    importDraft?: any
+  }
+  water?: {
+    amount: number
+    unit: 'ml' | 'l' | 'oz'
+    amountMl: number
+    label: string
+    category?: string | null
+    drinkType?: string | null
+    sweetener?: {
+      type: 'free' | 'sugar' | 'honey'
+      amount?: number | null
+      unit?: 'g' | 'tsp' | 'tbsp' | null
+      grams?: number | null
+    } | null
+  }
+  appTarget?: {
+    title: string
+    path: string
+    buttonLabel?: string
+    nativeTarget?: any
+  }
+}
+
+const SELF_HARM_RISK_PATTERN =
+  /\b(kill myself|hurt myself|hurting myself|harm myself|harming myself|end my life|suicide|suicidal|self[-\s]?harm|do not want to live|don't want to live|want to die|wish i was dead|can't go on|cant go on)\b/i
+
+function hasSelfHarmRisk(value: unknown) {
+  return SELF_HARM_RISK_PATTERN.test(String(value || ''))
+}
+
+function buildSelfHarmSupportDraft(transcript: string, localDate: string): VoiceDraft {
+  const raw = cleanText(transcript, 1200)
+  return {
+    action: 'health_question',
+    transcript: raw,
+    localDate,
+    summary: 'Urgent support',
+    confirmationMessage:
+      'If you might hurt yourself or are in immediate danger, call your local emergency number now. I can open Talk to Helfi with your message ready, but please contact urgent support right away.',
+    canConfirm: false,
+    autoSave: false,
+    appTarget: {
+      title: 'Talk to Helfi',
+      path: `/chat?voicePrompt=${encodeQueryValue(raw, 1200)}`,
+      buttonLabel: 'Open Talk to Helfi',
+    },
   }
 }
 
@@ -124,6 +177,14 @@ function cleanText(value: unknown, max = 1000) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
 
+function encodeQueryValue(value: unknown, max = 1000) {
+  return encodeURIComponent(cleanText(value, max))
+}
+
+function encodeUrlJson(value: any) {
+  return Buffer.from(JSON.stringify(value)).toString('base64url')
+}
+
 function compactFoodMatchText(value: unknown) {
   return String(value || '')
     .toLowerCase()
@@ -134,6 +195,100 @@ function compactFoodMatchText(value: unknown) {
     .replace(/\b(the|a|an|my|me|please|can|you|put|in|add|log|have|had|for|today|to|diary|meal)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim()
+}
+
+const INGREDIENT_LOOKUP_FILLER_WORDS = new Set([
+  'one',
+  'two',
+  'three',
+  'four',
+  'five',
+  'six',
+  'seven',
+  'eight',
+  'nine',
+  'ten',
+  'half',
+  'small',
+  'medium',
+  'large',
+  'extra',
+  'xl',
+  'slice',
+  'slices',
+  'gram',
+  'grams',
+  'g',
+  'kg',
+  'ml',
+  'cup',
+  'cups',
+  'tablespoon',
+  'tablespoons',
+  'tbsp',
+  'teaspoon',
+  'teaspoons',
+  'tsp',
+  'of',
+])
+
+function singularFoodToken(token: string) {
+  if (token.endsWith('ies') && token.length > 4) return `${token.slice(0, -3)}y`
+  if (token.endsWith('es') && token.length > 3 && !/(ses|xes|zes|ches|shes)$/.test(token)) return token.slice(0, -2)
+  if (token.endsWith('s') && token.length > 3 && !token.endsWith('ss')) return token.slice(0, -1)
+  return token
+}
+
+function singularFoodText(value: string) {
+  return compactFoodMatchText(value).split(' ').filter(Boolean).map(singularFoodToken).join(' ')
+}
+
+function stripIngredientLookupModifiers(value: unknown) {
+  const tokens = compactFoodMatchText(value).split(' ').filter(Boolean)
+  return tokens
+    .filter((token) => !/^\d+(?:\.\d+)?$/.test(token))
+    .filter((token) => !INGREDIENT_LOOKUP_FILLER_WORDS.has(token))
+    .join(' ')
+}
+
+function buildIngredientLookupQueries(query: string) {
+  const compactQuery = compactFoodMatchText(query)
+  const strippedQuery = stripIngredientLookupModifiers(query)
+  const queries = new Set<string>()
+  const add = (value: unknown) => {
+    const cleaned = cleanText(value, 120)
+    if (cleaned) queries.add(cleaned)
+  }
+
+  add(strippedQuery)
+  if (strippedQuery.includes('greek yogurt') || strippedQuery.includes('greek yoghurt')) {
+    add('greek yogurt')
+    add('plain greek yogurt')
+    add('greek yoghurt')
+    add('plain greek yoghurt')
+  }
+  if (strippedQuery === 'rice') {
+    add('cooked rice')
+    add('white rice')
+    add('brown rice')
+  }
+  if (strippedQuery === 'coffee') {
+    add('brewed coffee')
+    add('black coffee')
+  }
+  if (strippedQuery.includes('protein shake')) {
+    add('protein shake')
+    add('protein drink')
+  }
+  if (/\b(toast|bread|sourdough)\b/.test(strippedQuery) && !/\bfrench toast\b/.test(strippedQuery)) {
+    add('sourdough toast')
+    add('toasted bread')
+    add('sourdough bread')
+    add('bread')
+  }
+  add(compactQuery)
+  add(query)
+  return Array.from(queries)
 }
 
 function levenshteinDistance(a: string, b: string) {
@@ -160,6 +315,150 @@ function inferMealFromText(text: string, fallback?: string | null) {
   if (/\bdinner\b/.test(normalized)) return 'dinner'
   if (/\bsnack|snacks\b/.test(normalized)) return 'snacks'
   return cleanText(fallback || 'uncategorized', 40).toLowerCase() || 'uncategorized'
+}
+
+function inferTargetMealFromText(text: string, fallback?: string | null) {
+  const match = compactFoodMatchText(text).match(/\b(?:to|for|as|into|in)\s+(?:my\s+)?(breakfast|lunch|dinner|snacks?|snack)\b/)
+  if (match?.[1]) return match[1].startsWith('snack') ? 'snacks' : match[1]
+  return inferMealFromText(text, fallback)
+}
+
+function normalizeWaterUnit(value: string): 'ml' | 'l' | 'oz' | null {
+  const unit = value.toLowerCase()
+  if (unit === 'ml' || unit.includes('millilitre') || unit.includes('milliliter')) return 'ml'
+  if (unit === 'l' || unit.includes('litre') || unit.includes('liter')) return 'l'
+  if (unit === 'oz' || unit.includes('ounce')) return 'oz'
+  return null
+}
+
+function waterAmountToMl(amount: number, unit: 'ml' | 'l' | 'oz') {
+  if (unit === 'l') return Math.round(amount * 1000 * 10) / 10
+  if (unit === 'oz') return Math.round(amount * 29.5735 * 10) / 10
+  return Math.round(amount * 10) / 10
+}
+
+function parseWaterAmount(text: string): { amount: number; unit: 'ml' | 'l' | 'oz'; amountMl: number } | null {
+  const lower = text.toLowerCase()
+  const explicit = lower.match(/\b(\d+(?:\.\d+)?)\s*(ml|millilitres?|milliliters?|l|litres?|liters?|oz|ounces?)\b/)
+  if (explicit) {
+    const amount = Number(explicit[1])
+    const unit = normalizeWaterUnit(explicit[2])
+    if (Number.isFinite(amount) && amount > 0 && unit) return { amount, unit, amountMl: waterAmountToMl(amount, unit) }
+  }
+  if (/\b(glass|cup)\b/.test(lower)) return { amount: 250, unit: 'ml', amountMl: 250 }
+  if (/\b(bottle)\b/.test(lower)) return { amount: 600, unit: 'ml', amountMl: 600 }
+  return null
+}
+
+function inferDrinkType(text: string) {
+  const lower = text.toLowerCase()
+  if (/\bhot chocolate|cocoa\b/.test(lower)) return 'Hot chocolate'
+  if (/\bcoffee|espresso|latte|cappuccino|flat white\b/.test(lower)) return 'Coffee'
+  if (/\btea\b/.test(lower)) return 'Tea'
+  if (/\bjuice\b/.test(lower)) return 'Juice'
+  if (/\bmilk\b/.test(lower)) return 'Milk'
+  if (/\bsoft drink|soda|coke zero|coke|cola|lemonade\b/.test(lower)) return 'Soft drink'
+  if (/\bwater|hydration\b/.test(lower)) return 'Water'
+  return ''
+}
+
+function sweetenerGrams(amount: number, unit: 'g' | 'tsp' | 'tbsp', type: 'sugar' | 'honey') {
+  if (unit === 'g') return amount
+  if (type === 'honey') return unit === 'tbsp' ? amount * 21 : amount * 7
+  return unit === 'tbsp' ? amount * 12 : amount * 4
+}
+
+function parseSweetener(text: string): { type: 'free' | 'sugar' | 'honey'; amount?: number | null; unit?: 'g' | 'tsp' | 'tbsp' | null; grams?: number | null; needsAmount?: boolean } | null {
+  const lower = text.toLowerCase()
+  if (/\b(black|plain|unsweetened|sugar[-\s]?free|no sugar|without sugar|zero)\b/.test(lower)) return { type: 'free' }
+  const sweetType: 'sugar' | 'honey' | null = /\bhoney\b/.test(lower) ? 'honey' : /\bsugar\b/.test(lower) ? 'sugar' : null
+  if (!sweetType) return null
+  const match = lower.match(/\b(\d+(?:\.\d+)?)\s*(g|grams?|tsp|teaspoons?|tbsp|tablespoons?)\s+(?:of\s+)?(?:sugar|honey)\b/)
+  if (!match) return { type: sweetType, needsAmount: true }
+  const amount = Number(match[1])
+  const rawUnit = match[2]
+  const unit: 'g' | 'tsp' | 'tbsp' = rawUnit.startsWith('g') ? 'g' : rawUnit.startsWith('tbsp') || rawUnit.startsWith('tablespoon') ? 'tbsp' : 'tsp'
+  const grams = Number.isFinite(amount) && amount > 0 ? sweetenerGrams(amount, unit, sweetType) : null
+  return { type: sweetType, amount, unit, grams }
+}
+
+function tryParseWaterRequest(transcript: string, localDate: string): VoiceDraft | null {
+  const raw = cleanText(transcript, 800)
+  const lower = raw.toLowerCase()
+  if (!/\b(log|add|record|track)\b/.test(lower)) return null
+  if (!/\b(water|hydration|drink|liquid|coffee|tea|juice|milk|soft drink|soda|coke|cola|hot chocolate)\b/.test(lower)) return null
+
+  const amount = parseWaterAmount(raw)
+  const drinkType = inferDrinkType(raw)
+  const meal = inferMealFromText(raw, 'other')
+  const category = meal === 'uncategorized' ? 'other' : meal
+  if (!amount) {
+    return {
+      action: 'water',
+      transcript: raw,
+      localDate,
+      summary: 'Water amount needed',
+      confirmationMessage: 'How much liquid should I log? For example, say "Log 500 ml water."',
+      canConfirm: false,
+    }
+  }
+  if (!drinkType) {
+    return {
+      action: 'water',
+      transcript: raw,
+      localDate,
+      summary: 'Drink type needed',
+      confirmationMessage: 'What drink should I log?',
+      canConfirm: false,
+    }
+  }
+
+  const sweetener = parseSweetener(raw)
+  const isPlainWater = drinkType === 'Water'
+  if (!isPlainWater && !sweetener) {
+    return {
+      action: 'water',
+      transcript: raw,
+      localDate,
+      summary: `${amount.amount} ${amount.unit} ${drinkType}`,
+      confirmationMessage: `Should I log ${drinkType} as sugar-free, or with sugar or honey?`,
+      canConfirm: false,
+      water: { ...amount, label: drinkType, category, drinkType, sweetener: null },
+    }
+  }
+  if (sweetener?.needsAmount) {
+    return {
+      action: 'water',
+      transcript: raw,
+      localDate,
+      summary: `${amount.amount} ${amount.unit} ${drinkType}`,
+      confirmationMessage: `How much ${sweetener.type} should I add to the ${drinkType}?`,
+      canConfirm: false,
+      water: { ...amount, label: drinkType, category, drinkType, sweetener: null },
+    }
+  }
+
+  const sweetenerLabel =
+    sweetener && sweetener.type !== 'free' && sweetener.amount && sweetener.unit
+      ? ` (${sweetener.type} ${sweetener.amount} ${sweetener.unit})`
+      : ''
+  const label = `${drinkType}${sweetenerLabel}`
+  return {
+    action: 'water',
+    transcript: raw,
+    localDate,
+    summary: `${amount.amount} ${amount.unit} ${label}`,
+    confirmationMessage: `I will log ${amount.amount} ${amount.unit} ${label}.`,
+    canConfirm: true,
+    autoSave: true,
+    water: {
+      ...amount,
+      label,
+      category,
+      drinkType,
+      sweetener: isPlainWater ? null : sweetener || { type: 'free' },
+    },
+  }
 }
 
 function normalizeFavoriteInput(raw: any): VoiceFoodFavorite | null {
@@ -215,7 +514,7 @@ function findRequestedFavorite(transcript: string, favorites: VoiceFoodFavorite[
   if (!request || favorites.length === 0) return null
   const requestTokens = request.split(' ').filter((token) => token.length >= 3)
   const requestCompact = request.replace(/\s+/g, '')
-  let best: { favorite: VoiceFoodFavorite; score: number } | null = null
+  let best: { favorite: VoiceFoodFavorite; score: number; specificity: number } | null = null
 
   for (const favorite of favorites) {
     const label = compactFoodMatchText(favorite.label || favorite.description || '')
@@ -230,10 +529,25 @@ function findRequestedFavorite(transcript: string, favorites: VoiceFoodFavorite[
     if (requestCompact.includes(labelCompact)) score = Math.max(score, 1)
     const compactDistance = levenshteinDistance(requestCompact, labelCompact)
     if (compactDistance <= 2) score = Math.max(score, 0.95)
-    if (score >= 0.72 && (!best || score > best.score)) best = { favorite, score }
+    const specificity = labelTokens.length * 100 + label.length
+    if (score >= 0.72 && (!best || score > best.score || (score === best.score && specificity > best.specificity))) {
+      best = { favorite, score, specificity }
+    }
   }
 
   return best?.favorite || null
+}
+
+function shouldUseFavoriteFood(transcript: string, favorites: VoiceFoodFavorite[]) {
+  const request = compactFoodMatchText(transcript)
+  if (!request || favorites.length === 0) return false
+  if (/\b(favourite|favorite|saved)\b/i.test(transcript)) return true
+  return favorites.some((favorite) => {
+    const label = compactFoodMatchText(favorite.label || favorite.description || '')
+    const labelTokens = label.split(' ').filter(Boolean)
+    if (!label || label.length < 10 || labelTokens.length < 2) return false
+    return request.includes(label)
+  })
 }
 
 function clampNumber(value: unknown, min: number, max: number, fallback: number) {
@@ -298,9 +612,31 @@ function estimateIngredientGrams(nameRaw: string, quantityRaw: unknown, unitRaw:
   if (unit.includes('cup')) return quantity * 240
   if (unit.includes('tbsp') || unit.includes('tablespoon')) return quantity * 15
   if (unit.includes('tsp') || unit.includes('teaspoon')) return quantity * 5
+  if (name.includes('olive oil') || name.includes('cooking oil') || name === 'oil') return quantity * 15
+  if (name.includes('coffee')) return quantity * 240
+  if (name.includes('protein shake') || name.includes('smoothie')) return quantity * 300
   if (unit.includes('slice') || name.includes('toast') || name.includes('bread')) return quantity * 35
-  if (unit.includes('egg') || name.includes('egg')) return quantity * 50
-  if (unit.includes('avocado') || name.includes('avocado')) return quantity * 150
+  if (unit.includes('egg') || name.includes('egg')) {
+    if (name.includes('small')) return quantity * 38
+    if (name.includes('medium')) return quantity * 44
+    if (name.includes('extra large')) return quantity * 56
+    if (name.includes('large')) return quantity * 50
+    return quantity * 50
+  }
+  if (name.includes('banana')) {
+    if (name.includes('small')) return quantity * 100
+    if (name.includes('medium')) return quantity * 120
+    if (name.includes('extra large')) return quantity * 160
+    if (name.includes('large')) return quantity * 140
+    return quantity * 120
+  }
+  if (unit.includes('avocado') || name.includes('avocado')) {
+    if (name.includes('small')) return quantity * 120
+    if (name.includes('medium')) return quantity * 170
+    if (name.includes('extra large')) return quantity * 290
+    if (name.includes('large')) return quantity * 230
+    return quantity * 170
+  }
   if (name.includes('yoghurt') || name.includes('yogurt')) return quantity * 170
   return quantity * 100
 }
@@ -345,10 +681,17 @@ function tryParseIngredientMealRequest(transcript: string) {
     /\b(breakfast|lunch|dinner|snack|meal|food)\b/.test(lower)
   if (!asksForFood) return null
 
-  const meal = inferMealFromText(text, lower.includes('snack') ? 'snacks' : 'uncategorized')
-  const afterWith = text.match(/\b(?:with|using|including|contains|made of)\b\s+(.+)$/i)?.[1]
+  const meal = inferMealFromText(text, lower.includes('snack') || lower.includes('coffee') || lower.includes('drink') ? 'snacks' : 'uncategorized')
+  const withMatch = text.match(/^(.*?)\b(?:with|using|including|contains|made of)\b\s+(.+)$/i)
+  const beforeWith = cleanText(
+    withMatch?.[1]
+      ?.replace(/\b(build|make|create|add|log|put|input|record)\b/gi, ' ')
+      .replace(/\b(me|a|an|my|breakfast|lunch|dinner|snacks?|meal|food)\b/gi, ' '),
+    500,
+  )
+  const afterWith = withMatch?.[2]
   const afterColon = text.includes(':') ? text.split(':').slice(1).join(':') : ''
-  const listText = cleanText(afterWith || afterColon, 1000)
+  const listText = cleanText([beforeWith, afterWith || afterColon].filter(Boolean).join(', '), 1000)
   if (!listText) return null
   const ingredients = splitIngredientList(listText).map(parseIngredientPhrase).filter(Boolean)
   if (ingredients.length < 2) return null
@@ -358,6 +701,296 @@ function tryParseIngredientMealRequest(transcript: string) {
     mealName,
     draftText: ingredients.map((entry: any) => entry.display || entry.name).join(', '),
     ingredients,
+  }
+}
+
+function tryParseDirectFoodRequest(transcript: string) {
+  const text = cleanText(transcript, 1400)
+  const lower = text.toLowerCase()
+  if (!/\b(add|log|put|input|record)\b/.test(lower)) return null
+  if (!/\b(food|meal|breakfast|lunch|dinner|snack|snacks|coffee|banana|shake|smoothie|yogurt|yoghurt|egg|toast|avocado|chicken|rice|milk)\b/.test(lower)) return null
+  if (/\b(favourite|favorite|saved|same|yesterday|previous)\b/.test(lower)) return null
+
+  const meal = inferMealFromText(text, lower.includes('snack') || lower.includes('coffee') || lower.includes('drink') ? 'snacks' : 'uncategorized')
+  const withoutCommand = text
+    .replace(/\b(add|log|put|input|record)\b/gi, ' ')
+    .replace(/\b(as|for)\s+(?:a\s+|an\s+)?(breakfast|lunch|dinner|snacks?|meal)\b/gi, ' ')
+    .replace(/\b(to|into|in)\s+(?:my\s+)?(breakfast|lunch|dinner|snacks?)\b/gi, ' ')
+    .replace(/\b(breakfast|lunch|dinner|snacks?|meal|food)\b/gi, ' ')
+    .replace(/\b(to|in)\s+(my\s+)?(food\s+)?(diary|log)\b/gi, ' ')
+    .replace(/\b(a|an|my|please)\b/gi, ' ')
+  const listText = cleanText(withoutCommand.replace(/\bwith\b/gi, ',').replace(/\band\b/gi, ','), 1000)
+  const ingredients = splitIngredientList(listText).map(parseIngredientPhrase).filter(Boolean)
+  if (ingredients.length === 0) return null
+  const foodWordsInRequest = /\b(coffee|banana|shake|smoothie|yogurt|yoghurt|egg|eggs|toast|avocado|chicken|rice|milk|tea|honey|water|juice|oats?|muffins?|frittata|fritata)\b/.test(listText.toLowerCase())
+  if (ingredients.length === 1 && !foodWordsInRequest) return null
+  const mealName = meal === 'uncategorized' ? 'Food' : `${meal.charAt(0).toUpperCase()}${meal.slice(1)}`
+  return {
+    meal,
+    mealName,
+    draftText: ingredients.map((entry: any) => entry.display || entry.name).join(', '),
+    ingredients,
+  }
+}
+
+function tryParseExerciseRequest(transcript: string) {
+  const raw = cleanText(transcript, 600)
+  const lower = raw.toLowerCase()
+  if (!/\b(log|add|record|track)\b/.test(lower)) return null
+  if (!/\b(walk|run|gym|workout|bike|cycle|ride|exercise)\b/.test(lower)) return null
+  const distanceMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(km|kilometre|kilometer|kilometres|kilometers|mi|mile|miles)\b/)
+  const durationMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|hour|hours|hr|hrs)\b/)
+  const distanceKm = distanceMatch ? Number(distanceMatch[1]) * (distanceMatch[2].startsWith('mi') || distanceMatch[2].startsWith('mile') ? 1.609 : 1) : null
+  const durationRaw = durationMatch ? Number(durationMatch[1]) : null
+  const durationMinutes = durationRaw
+    ? durationRaw * (/hour|hr/.test(durationMatch?.[2] || '') ? 60 : 1)
+    : distanceKm
+    ? lower.includes('run')
+      ? Math.max(10, Math.round(distanceKm * 7))
+      : lower.includes('bike') || lower.includes('cycle') || lower.includes('ride')
+      ? Math.max(10, Math.round(distanceKm * 4))
+      : Math.max(10, Math.round(distanceKm * 12))
+    : lower.includes('gym') || lower.includes('workout')
+    ? 45
+    : 30
+  const name = lower.includes('run')
+    ? 'running'
+    : lower.includes('bike') || lower.includes('cycle') || lower.includes('ride')
+    ? 'cycling'
+    : lower.includes('gym') || lower.includes('workout')
+    ? 'gym'
+    : 'walking'
+  const intensity = lower.includes('hard') || lower.includes('intense')
+    ? 'hard'
+    : lower.includes('easy') || lower.includes('light')
+    ? 'light'
+    : lower.includes('moderate')
+    ? 'moderate'
+    : null
+  return {
+    action: 'exercise',
+    summary: raw,
+    exercise: {
+      name,
+      durationMinutes,
+      distanceKm: distanceKm ? Math.round(distanceKm * 10) / 10 : null,
+      intensity,
+      estimatedDuration: !durationMatch,
+    },
+  }
+}
+
+function tryParseMoodRequest(transcript: string) {
+  const raw = cleanText(transcript, 600)
+  const lower = raw.toLowerCase()
+  if (!/\b(feel|feeling|felt|mood|sad|anxious|anxiety|great|happy|low|stressed|angry|calm)\b/.test(lower)) return null
+  const mood = lower.includes('great') || lower.includes('happy') || lower.includes('good')
+    ? 6
+    : lower.includes('sad') || lower.includes('low')
+    ? 2
+    : lower.includes('anxious') || lower.includes('anxiety') || lower.includes('stressed')
+    ? 3
+    : 4
+  const tags = [
+    lower.includes('sad') || lower.includes('low') ? 'sad' : '',
+    lower.includes('anxious') || lower.includes('anxiety') ? 'anxious' : '',
+    lower.includes('stressed') ? 'stressed' : '',
+    lower.includes('great') || lower.includes('happy') ? 'positive' : '',
+  ].filter(Boolean)
+  return { action: 'mood', mood: { mood, tags, note: raw } }
+}
+
+function tryParseJournalRequest(transcript: string) {
+  const raw = cleanText(transcript, 1200)
+  const lower = raw.toLowerCase()
+  if (!/\b(journal|note|diary)\b/.test(lower)) return null
+  if (/\b(open|show|go to|take me to|use|find)\b/.test(lower)) return null
+  if (!/\b(add|save|record|log|write|journal that|note that|diary that)\b/.test(lower)) return null
+  const journalType = /\bhealth journal\b/.test(lower) ? 'health' : 'mood'
+  const content = cleanText(
+    raw
+      .replace(/^add this to my journal:?\s*/i, '')
+      .replace(/^journal that\s*/i, '')
+      .replace(/^(?:add|save|record|log)\s+(?:a\s+)?(?:mood\s+|health\s+)?(?:journal|note|diary)(?:\s+note)?(?:\s+that)?\s*/i, ''),
+    1200,
+  )
+  if (!content) return null
+  return {
+    action: 'journal',
+    journal: {
+      title: journalType === 'health' ? 'Voice health journal note' : 'Voice journal note',
+      content,
+      tags: [],
+      journalType,
+    },
+  }
+}
+
+function tryParseCopyPreviousRequest(transcript: string) {
+  const raw = cleanText(transcript, 600)
+  const lower = raw.toLowerCase()
+  if (!/\b(add|log|copy|same|repeat)\b/.test(lower)) return null
+  if (!/\b(same|yesterday|previous)\b/.test(lower)) return null
+  if (!/\b(breakfast|lunch|dinner|snack|snacks|meal|food)\b/.test(lower)) return null
+  return {
+    action: 'food_copy_previous',
+    food: {
+      meal: inferMealFromText(raw, 'breakfast'),
+    },
+  }
+}
+
+const RECIPE_PLAIN_INGREDIENTS: Array<{ pattern: RegExp; label: string }> = [
+  { pattern: /\b(chicken breast|chicken)\b/i, label: '150 g chicken breast' },
+  { pattern: /\b(cooked rice|brown rice|white rice|rice)\b/i, label: '120 g cooked rice' },
+  { pattern: /\bavocado\b/i, label: '75 g avocado' },
+  { pattern: /\b(greek yogh?urt|yogh?urt|yogurt)\b/i, label: '170 g plain Greek yogurt' },
+  { pattern: /\b(egg|eggs)\b/i, label: '2 large eggs' },
+  { pattern: /\b(toast|bread|sourdough)\b/i, label: '1 slice sourdough toast' },
+  { pattern: /\b(oats?|rolled oats)\b/i, label: '1 cup rolled oats' },
+  { pattern: /\bblueberr(?:y|ies)\b/i, label: '100 g blueberries' },
+  { pattern: /\bbanana\b/i, label: '1 banana' },
+  { pattern: /\b(salmon)\b/i, label: '150 g salmon' },
+  { pattern: /\b(sweet potato)\b/i, label: '150 g sweet potato' },
+  { pattern: /\b(broccoli)\b/i, label: '100 g broccoli' },
+  { pattern: /\b(spinach)\b/i, label: '75 g spinach' },
+  { pattern: /\b(chickpeas?|chick peas?)\b/i, label: '100 g chickpeas' },
+  { pattern: /\b(olive oil|oil)\b/i, label: '1 tbsp olive oil' },
+]
+
+function requestedRecipeIngredients(transcript: string) {
+  const match = transcript.match(/\b(?:with|using|including|from|made of)\b\s+(.+)$/i)
+  if (!match?.[1]) return []
+  const text = cleanText(match[1].replace(/[.?!]+$/g, ''), 500)
+  const found = RECIPE_PLAIN_INGREDIENTS
+    .map((entry) => {
+      const ingredientMatch = text.match(entry.pattern)
+      return ingredientMatch?.index === undefined ? null : { index: ingredientMatch.index, label: entry.label }
+    })
+    .filter((entry): entry is { index: number; label: string } => Boolean(entry))
+    .sort((a, b) => a.index - b.index)
+  const unique = Array.from(new Set(found.map((entry) => entry.label)))
+  if (unique.length > 0) return unique.slice(0, 10)
+
+  return splitIngredientList(text)
+    .map((part) => parseIngredientPhrase(part))
+    .filter(Boolean)
+    .map((entry: any) => entry.display || entry.name)
+    .slice(0, 10)
+}
+
+function buildQuickRecipeDraft(transcript: string, localDate: string): VoiceDraft | null {
+  const raw = cleanText(transcript, 1000)
+  const lower = raw.toLowerCase()
+  if (!/\b(recipe|meal idea)\b/.test(lower)) return null
+  if (!/\b(create|make|give|suggest|build)\b/.test(lower)) return null
+  const meal = lower.includes('breakfast') ? 'breakfast' : lower.includes('lunch') ? 'lunch' : lower.includes('snack') ? 'snack' : 'dinner'
+  const highProtein = /\b(high protein|high-protein|protein)\b/.test(lower)
+  const lowCalorie = /\b(low calorie|low-calorie|light)\b/.test(lower)
+  const requestedIngredients = requestedRecipeIngredients(raw)
+  const title = requestedIngredients.length
+    ? `${meal.charAt(0).toUpperCase()}${meal.slice(1)} recipe`
+    : `${highProtein ? 'High-protein ' : lowCalorie ? 'Low-calorie ' : ''}${meal} recipe`
+  const ingredients = requestedIngredients.length
+    ? requestedIngredients
+    : meal === 'breakfast'
+    ? highProtein
+      ? ['2 large eggs', '170 g plain Greek yogurt', '1 slice sourdough toast', '75 g avocado']
+      : ['1 cup rolled oats', '170 g plain Greek yogurt', '100 g blueberries', '1 tbsp chia seeds']
+    : meal === 'lunch'
+    ? highProtein
+      ? ['150 g chicken breast', '120 g cooked brown rice', '75 g spinach', '1 tbsp olive oil']
+      : ['120 g cooked brown rice', '100 g chickpeas', '75 g spinach', '1 tbsp olive oil']
+    : meal === 'snack'
+    ? highProtein
+      ? ['1 protein shake', '1 banana']
+      : ['170 g plain Greek yogurt', '100 g berries']
+    : highProtein
+    ? ['150 g chicken breast', '150 g sweet potato', '100 g broccoli', '1 tbsp olive oil']
+    : ['150 g salmon', '150 g potato', '100 g broccoli', '1 tbsp olive oil']
+  const steps = [
+    'Prepare the ingredients.',
+    requestedIngredients.length
+      ? 'Cook any ingredients that need cooking.'
+      : meal === 'breakfast'
+      ? 'Cook or assemble the breakfast ingredients.'
+      : 'Cook the main protein and vegetables until done.',
+    'Combine, season to taste, and serve.',
+  ]
+  const importDraft = {
+    title,
+    source: 'voice-assistant',
+    servings: 1,
+    prepMinutes: 10,
+    cookMinutes: meal === 'snack' ? 0 : 15,
+    ingredients,
+    steps,
+    sourceUrl: null,
+    saveRecipe: false,
+    createdAt: Date.now(),
+  }
+  const params = new URLSearchParams()
+  params.set('date', localDate)
+  params.set('category', meal === 'snack' ? 'snacks' : meal)
+  params.set('recipeImport', '1')
+  params.set('voiceRecipeDraft', encodeUrlJson(importDraft))
+  params.set('t', String(Date.now()))
+  return {
+    action: 'recipe',
+    transcript: raw,
+    localDate,
+    summary: 'Recipe ready in Build a meal',
+    confirmationMessage: 'I created this as a normal Build a meal recipe. Nothing has been saved yet.',
+    canConfirm: false,
+    recipe: { text: '', importDraft },
+    appTarget: {
+      title: 'Build a meal',
+      path: `/food/build-meal?${params.toString()}`,
+      buttonLabel: 'Open Build a meal',
+    },
+  }
+}
+
+function buildRecipeHandoffDraft(transcript: string, localDate: string, recipeText?: string): VoiceDraft {
+  const quick = buildQuickRecipeDraft(`create recipe ${transcript}`, localDate)
+  if (quick) return quick
+  const importDraft = {
+    title: cleanText(transcript, 100) || 'Custom meal recipe',
+    source: 'voice-assistant',
+    servings: 1,
+    prepMinutes: null,
+    cookMinutes: null,
+    ingredients: ['150 g chicken breast', '150 g sweet potato', '100 g broccoli', '1 tbsp olive oil'],
+    steps: recipeText
+      ? String(recipeText)
+          .split('\n')
+          .map((line) => cleanText(line, 220))
+          .filter(Boolean)
+          .slice(0, 12)
+      : ['Prepare the ingredients.', 'Cook until done.', 'Combine, season to taste, and serve.'],
+    sourceUrl: null,
+    saveRecipe: false,
+    createdAt: Date.now(),
+  }
+  const params = new URLSearchParams()
+  params.set('date', localDate)
+  params.set('category', 'dinner')
+  params.set('recipeImport', '1')
+  params.set('voiceRecipeDraft', encodeUrlJson(importDraft))
+  params.set('t', String(Date.now()))
+  return {
+    action: 'recipe',
+    transcript,
+    localDate,
+    summary: 'Recipe ready in Build a meal',
+    confirmationMessage: 'I created this as a normal Build a meal recipe. Nothing has been saved yet.',
+    canConfirm: false,
+    recipe: { text: '', importDraft },
+    appTarget: {
+      title: 'Build a meal',
+      path: `/food/build-meal?${params.toString()}`,
+      buttonLabel: 'Open Build a meal',
+    },
   }
 }
 
@@ -384,23 +1017,63 @@ function scoreFoodMatch(queryRaw: string, item: any) {
     if (name.includes('egg white') || name.includes('whites') || name.includes('substitute')) score -= 80
   }
   if (query.includes('yoghurt') || query.includes('yogurt')) {
-    if ((name.includes('greek') || name.includes('strained')) && (name.includes('plain') || !brand)) score += 55
-    if (name.includes('blueberry') || name.includes('strawberry') || name.includes('vanilla') || name.includes('honey')) score -= 55
+    const asksForPlain = !/\b(blueberry|strawberry|vanilla|honey|lemon|berry|chocolate|flavou?r|sweetened)\b/.test(query)
+    if ((name.includes('greek') || name.includes('strained')) && (name.includes('plain') || !brand)) score += 90
+    if (asksForPlain && name.includes('plain')) score += 70
+    if (asksForPlain && /\b(crunch|flip|cookie|cookies|chocolate|lemon|berry|blueberry|strawberry|vanilla|honey|dessert|bar|dip|spread|flavou?r|sweetened|coconut|almond|maple|cinnamon)\b/.test(name)) score -= 140
     if (name.includes('protein')) score -= 15
   }
   if (query.includes('avocado')) {
     if (name === 'avocado' || name.startsWith('avocado raw')) score += 60
   }
-  if (query.includes('sourdough') || query.includes('toast')) {
-    if (name.includes('sourdough') || name.includes('toasted')) score += 45
+  if (query.includes('rice')) {
+    if (name === 'rice' || name.includes('rice cooked') || name.includes('cooked rice') || name.includes('white rice') || name.includes('brown rice')) score += 130
+    if (name.includes('honey') || name.includes('syrup') || name.includes('cereal') || name.includes('cracker')) score -= 160
+  }
+  if (query.includes('coffee')) {
+    if (name === 'coffee' || name.includes('coffee brewed') || name.includes('brewed coffee') || name.includes('black coffee')) score += 140
+    if (name.includes('creamer') || name.includes('creamers') || name.includes('almond milk') || name.includes('ice cream')) score -= 140
+  }
+  if (query.includes('olive oil') || query === 'oil') {
+    if (name.includes('olive oil') || name.includes('extra virgin olive oil')) score += 130
+    if (name.includes('spray')) score -= 20
+  }
+  if (query.includes('protein shake')) {
+    if (name.includes('protein') && (name.includes('shake') || name.includes('drink'))) score += 120
+    if (name.includes('powder')) score -= 160
+    if (name.includes('bar')) score -= 90
+  }
+  if (/\b(toast|bread|sourdough)\b/.test(query) && !/\bfrench toast\b/.test(query)) {
+    if (name.includes('sourdough')) score += 140
+    if (/\bbread\b/.test(name)) score += 130
+    if (/\btoast\b/.test(name) || /\btoasted\b/.test(name)) score += 60
+    if (/\b(toaster|pastr(?:y|ies)|tart|pop tart|cake|cookie|cereal|cracker|waffle|dessert|muffin)\b/.test(name)) score -= 240
+    if (/\b(apple|blueberry|cherry|strawberry|fruit|frosted|sweetened|syrup)\b/.test(name)) score -= 120
   }
   return score
 }
 
 function chooseBestFoodMatch(query: string, items: any[]) {
-  return items
+  const ranked = items
     .filter(hasCoreNutrition)
-    .sort((a, b) => scoreFoodMatch(query, b) - scoreFoodMatch(query, a))[0] || null
+    .map((item) => ({ item, score: scoreFoodMatch(query, item) }))
+    .sort((a, b) => b.score - a.score)
+  const best = ranked[0]
+  return best && best.score > 12 ? best.item : null
+}
+
+async function findExactCustomPlainFood(lookupQueries: string[]) {
+  for (const lookupQuery of lookupQueries) {
+    const queryName = singularFoodText(lookupQuery)
+    if (!queryName) continue
+    const customRows = await searchCustomFoodMacros(lookupQuery, 20, { allowTypo: false }).catch(() => [])
+    const exact = customRows
+      .map(normalizeFoodItem)
+      .filter(Boolean)
+      .find((item) => singularFoodText(item?.name || '') === queryName)
+    if (exact) return exact
+  }
+  return null
 }
 
 function itemCore(item: any, grams: number) {
@@ -418,11 +1091,12 @@ function itemCore(item: any, grams: number) {
 function normalizeFoodItem(item: any): NormalizedFoodItem | null {
   if (!item?.name) return null
   return {
-    source: 'usda',
+    source: 'custom',
     id: String(item.id || item.name),
     name: item.name,
     brand: item.brand ?? null,
     serving_size: item.serving_size || '100 g',
+    servingOptions: Array.isArray(item.servingOptions) ? item.servingOptions : null,
     calories: item.calories ?? null,
     protein_g: item.protein_g ?? null,
     carbs_g: item.carbs_g ?? null,
@@ -450,9 +1124,16 @@ function normalizeLibraryFoodItem(row: any): NormalizedFoodItem | null {
 }
 
 async function findFoodIngredient(query: string) {
+  const lookupQueries = buildIngredientLookupQueries(query)
+  const exactCustomMatch = await findExactCustomPlainFood(lookupQueries)
+  if (exactCustomMatch) return exactCustomMatch
+
   if (compactFoodMatchText(query).includes('egg')) {
     const wholeEggRows = await prisma.foodLibraryItem.findMany({
-      where: { name: { contains: 'Egg, whole', mode: 'insensitive' } },
+      where: {
+        name: { contains: 'Egg, whole', mode: 'insensitive' },
+        source: { in: ['usda_foundation', 'usda_sr_legacy'] },
+      },
       take: 12,
       orderBy: { name: 'asc' },
     })
@@ -460,16 +1141,23 @@ async function findFoodIngredient(query: string) {
     if (wholeEggMatch) return wholeEggMatch
   }
 
-  const lookupQueries = [query]
   for (const lookupQuery of lookupQueries) {
-    const local = await searchLocalFoods(lookupQuery, { pageSize: 18, mode: 'prefix-contains' })
-    const localMatch = chooseBestFoodMatch(query, local)
+    const local = await searchLocalFoods(lookupQuery, {
+      pageSize: 18,
+      mode: 'prefix-contains',
+      sources: ['usda_foundation', 'usda_sr_legacy'],
+    })
+    const localMatch = chooseBestFoodMatch(lookupQuery, local)
     if (localMatch) return localMatch
   }
 
-  const custom = await searchCustomFoodMacros(query, 6, { allowTypo: true }).catch(() => [])
-  const customMatch = chooseBestFoodMatch(query, custom.map(normalizeFoodItem).filter(Boolean))
-  return customMatch || null
+  for (const lookupQuery of lookupQueries) {
+    const custom = await searchCustomFoodMacros(lookupQuery, 12, { allowTypo: true }).catch(() => [])
+    const customMatch = chooseBestFoodMatch(lookupQuery, custom.map(normalizeFoodItem).filter(Boolean))
+    if (customMatch) return customMatch
+  }
+
+  return null
 }
 
 async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDate: string) {
@@ -551,17 +1239,24 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
   }))
   const ingredientList = entries.map((entry) => entry.name).join(', ')
   const missingLine = missing.length ? ` I could not find ${missing.join(', ')}, so please check before saving.` : ''
+  const isSingleIngredient = items.length === 1
+  const displayName = isSingleIngredient ? entries[0]?.name || items[0]?.name || mealName : mealName
 
   return {
     action: 'food_build_meal' as const,
     transcript,
     localDate,
-    summary: `${mealName}, ${nutrition.calories} kcal`,
-    confirmationMessage: `I found these ingredients for ${meal}: ${ingredientList}. Please confirm before I add it.${missingLine}`,
+    summary: `${displayName}, ${nutrition.calories} kcal`,
+    confirmationMessage: missing.length
+      ? `I found these ingredients for ${meal}: ${ingredientList}.${missingLine}`
+      : isSingleIngredient
+        ? `I found ${displayName} for ${meal}. I will add it now.`
+        : `I found these ingredients for ${meal}: ${ingredientList}. I will add it now.`,
     canConfirm: true,
+    autoSave: missing.length === 0,
     food: {
       meal,
-      mealName,
+      mealName: displayName,
       draftText: ingredientList,
       entries,
       items,
@@ -593,16 +1288,19 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
       content: [
         'You quickly understand natural spoken requests for the Helfi health app.',
         'Return compact JSON only. Do not explain.',
-        'Never say an action is saved. All save actions are only drafts until the user confirms.',
-        'Allowed action values: exercise, mood, journal, food_copy_previous, food_build_meal, food_draft, recipe, unknown.',
+        'For clear low-risk logging requests, prepare a saveable draft. The app may save it automatically and then tell the user it is done.',
+        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_build_meal, food_draft, recipe, symptom_analysis, health_question, app_handoff, unknown.',
         'For exercise, infer the exercise name, duration, distance, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
-        'For journal, make a short title and journal content.',
+        'For journal, make a short title and journal content. If the user says health journal, include journalType "health"; if they say mood journal, include journalType "mood".',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
-        'For new meals or foods with named ingredients, return food_build_meal with meal, mealName, draftText, and ingredients array. The app will find nutrition before confirmation.',
+        'For new meals or foods with named ingredients, return food_build_meal with meal, mealName, draftText, and ingredients array. The app will find nutrition before saving.',
         'Use food_draft only when the user gives a vague food request without any usable food names.',
         'For recipes, return action recipe and recipeRequest.',
-        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."]},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"recipeRequest":"..."}',
+        'For symptom_analysis, use when the user wants symptoms analyzed or describes symptoms and asks what it could be. Extract symptoms, duration, and notes.',
+        'For health_question, use when the user asks health advice, interpretation, supplements, medication, labs, fitness, sleep, or wellbeing questions that are not a save action.',
+        'For app_handoff, use when the user clearly asks to open or use a Helfi app area that is not one of the save actions.',
+        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"symptoms":["headache","fatigue"],"duration":"2 days","notes":"...","recipeRequest":"..."}',
       ].join('\n'),
     },
     {
@@ -667,6 +1365,8 @@ async function findExerciseType(rawName: string) {
     name.includes('walk') ? 'walking' : '',
     name.includes('run') ? 'running' : '',
     name.includes('cycle') || name.includes('bike') ? 'cycling' : '',
+    name.includes('gym') || name.includes('workout') ? 'strength' : '',
+    name.includes('gym') || name.includes('workout') ? 'weight' : '',
   ].filter(Boolean)
   for (const term of searchTerms) {
     const found = await prisma.exerciseType.findFirst({
@@ -733,9 +1433,16 @@ async function buildFoodCopyDraft(userId: string, localDate: string, meal: strin
 }
 
 async function buildFavoriteFoodDraft(transcript: string, localDate: string, favorites: VoiceFoodFavorite[]) {
-  const favorite = findRequestedFavorite(transcript, favorites)
+  let favorite = findRequestedFavorite(transcript, favorites)
+  if (!favorite && /\b(favourite|favorite|saved)\b/i.test(transcript)) {
+    const requestedMeal = inferMealFromText(transcript, '')
+    favorite =
+      favorites.find((item) => compactFoodMatchText(item.meal || '').includes(requestedMeal)) ||
+      favorites.find((item) => compactFoodMatchText(item.label || '').includes(requestedMeal)) ||
+      null
+  }
   if (!favorite) return null
-  const meal = inferMealFromText(transcript, favorite.meal)
+  const meal = inferTargetMealFromText(transcript, favorite.meal)
   const calories = Math.round(Number((favorite.nutrition as any)?.calories ?? (favorite.total as any)?.calories) || 0)
   const summary = `${favorite.label}${calories ? `, ${calories} kcal` : ''}`
   return {
@@ -743,8 +1450,9 @@ async function buildFavoriteFoodDraft(transcript: string, localDate: string, fav
     transcript,
     localDate,
     summary,
-    confirmationMessage: `I found ${favorite.label} in your favourites. Please confirm before I add it to ${meal}.`,
+    confirmationMessage: `I found ${favorite.label} in your favourites. I will add it to ${meal} now.`,
     canConfirm: true,
+    autoSave: true,
     food: {
       meal,
       entries: [{ name: favorite.label, description: favorite.description || favorite.label, meal }],
@@ -796,6 +1504,313 @@ function normalizeMood(value: any) {
   }
 }
 
+function inferNativeWebTarget(parsed: any, transcript: string) {
+  const raw = `${cleanText(parsed?.target || parsed?.area || parsed?.appArea || parsed?.summary, 200)} ${transcript}`.toLowerCase()
+  const openOnly = /\b(open|show|go to|take me to|use)\b/.test(raw)
+  const nativeTarget = (title: string, path: string, buttonLabel: string, native: any) => ({
+    title,
+    path,
+    buttonLabel,
+    nativeTarget: native,
+  })
+  const foodMeal = inferMealFromText(raw, 'breakfast')
+
+  if (/\b(dashboard|home)\b/.test(raw)) {
+    return nativeTarget('Dashboard', '/dashboard', 'Open Dashboard', { type: 'tab', tab: 'Dashboard' })
+  }
+  if (/\b(food diary|calorie tracker|track calories|food log)\b/.test(raw)) {
+    return nativeTarget('Food Diary', '/food', 'Open Food Diary', { type: 'tab', tab: 'Food' })
+  }
+  if (/\b(add food entry|add food|food entry)\b/.test(raw) && openOnly) {
+    return nativeTarget('Add Food Entry', '/food', 'Open Add Food Entry', {
+      type: 'foodAction',
+      action: 'openAddFoodEntry',
+      meal: foodMeal,
+    })
+  }
+  if (/\b(add ingredient|single ingredient|search food)\b/.test(raw) && openOnly) {
+    return nativeTarget('Add Ingredient', '/food', 'Open Add Ingredient', {
+      type: 'stack',
+      route: 'AddIngredient',
+      params: { meal: foodMeal },
+    })
+  }
+  if (/\b(build a meal|build meal|combine ingredients|meal builder)\b/.test(raw) && openOnly) {
+    return nativeTarget('Build a Meal', '/food', 'Open Build a Meal', {
+      type: 'foodAction',
+      action: 'openBuildMeal',
+      meal: foodMeal,
+    })
+  }
+  if (/\b(favorites|favourites|saved foods|saved meals)\b/.test(raw) && openOnly) {
+    return nativeTarget('Favorites', '/food', 'Open Favorites', {
+      type: 'foodAction',
+      action: 'openFavorites',
+      meal: foodMeal,
+    })
+  }
+  if (/\b(import recipe|recipe import)\b/.test(raw) && openOnly) {
+    return nativeTarget('Import Recipe', '/food', 'Open Import Recipe', {
+      type: 'foodAction',
+      action: 'openImportRecipe',
+      meal: foodMeal,
+    })
+  }
+  if (/\b(water|hydration|liquids|drink tracker|water intake)\b/.test(raw) && openOnly) {
+    return nativeTarget('Water Intake', '/food/water', 'Open Water Intake', { type: 'stack', route: 'WaterIntake' })
+  }
+  if (/\b(exercise|workout|activity)\b/.test(raw) && openOnly) {
+    return nativeTarget('Exercise', '/food', 'Open Exercise', {
+      type: 'foodAction',
+      action: 'openExercise',
+      meal: foodMeal,
+    })
+  }
+  if (/\bmood journal\b/.test(raw)) {
+    return nativeTarget('Mood Journal', '/mood/journal', 'Open Mood Journal', { type: 'stack', route: 'MoodTracker', params: { tab: 'journal' } })
+  }
+  if (/\b(mood tracker|mood)\b/.test(raw) && openOnly) {
+    return nativeTarget('Mood Tracker', '/mood', 'Open Mood Tracker', { type: 'stack', route: 'MoodTracker', params: { tab: 'checkin' } })
+  }
+  if (/\b(health journal|journal)\b/.test(raw) && openOnly) {
+    return { title: 'Health Journal', path: '/health-journal', buttonLabel: 'Open Health Journal' }
+  }
+  if (/\b(medical image|medical images|image analyzer|image analyser)\b/.test(raw)) {
+    return { title: 'Medical Image Analyzer', path: '/medical-images', buttonLabel: 'Open Medical Images' }
+  }
+  if (/\b(lab report|lab reports|blood test upload|blood tests)\b/.test(raw)) {
+    return { title: 'Lab Reports', path: '/lab-reports', buttonLabel: 'Open Lab Reports' }
+  }
+  if (/\b(subscription|billing|payment|credits)\b/.test(raw) && openOnly) {
+    return nativeTarget('Billing', '/billing', 'Open Billing', { type: 'stack', route: 'Billing' })
+  }
+  if (/\b(settings|account settings)\b/.test(raw) && openOnly) {
+    return nativeTarget('Settings', '/settings', 'Open Settings', { type: 'tab', tab: 'Settings' })
+  }
+  if (/\b(symptom|symptoms|diagnose|diagnosis|what could this be|red flag|red flags)\b/.test(raw)) {
+    if (openOnly && !/\b(headache|migraine|nausea|vomiting|diarrhea|fever|cough|sore throat|fatigue|dizzy|dizziness|pain|rash|itchy|hives|chest pain|shortness of breath|palpitations|bloating|heartburn|cramps|swelling)\b/.test(raw)) {
+      return { title: 'Symptom Analysis', path: '/symptoms', buttonLabel: 'Open Symptom Analysis' }
+    }
+    const params = new URLSearchParams()
+    params.set('voiceSymptoms', transcript)
+    params.set('voiceNotes', transcript)
+    return { title: 'Symptom Analysis', path: `/symptoms?${params.toString()}`, buttonLabel: 'Open Symptom Analysis' }
+  }
+  if (/\b(chat|talk|ask|question|advice|health|supplement|medication|medicine|sleep|stress|energy|labs?|blood test)\b/.test(raw)) {
+    return { title: 'Talk to Helfi', path: `/chat?voicePrompt=${encodeQueryValue(transcript, 1200)}`, buttonLabel: 'Open Talk to Helfi' }
+  }
+  if (/\b(notification|reminder|reminders)\b/.test(raw)) {
+    return nativeTarget('Reminders', '/notifications/reminders', 'Open Reminders', { type: 'stack', route: 'Reminders' })
+  }
+  if (/\b(practitioner|practitioners|doctor|clinic|specialist)\b/.test(raw)) {
+    return nativeTarget('Practitioners', '/practitioners', 'Open Practitioners', { type: 'stack', route: 'Practitioners' })
+  }
+  if (/\b(insight|insights|coach)\b/.test(raw)) {
+    return nativeTarget('Insights', '/insights', 'Open Insights', { type: 'tab', tab: 'Insights' })
+  }
+  return null
+}
+
+function extractSymptomText(transcript: string) {
+  return cleanText(transcript, 600)
+    .replace(/\b(?:for|since|over)\s+((?:about\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:hour|hours|day|days|week|weeks|month|months)|today|yesterday|this morning|tonight|last night)\b/gi, ' ')
+    .replace(/\b(can you|please|could you|i want you to|i need you to)\b/gi, ' ')
+    .replace(/\b(analyze|analyse|check|look at|review|my|these|symptoms?|for me|what could it be|what is it|what might it be)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function knownSymptomsFromText(transcript: string) {
+  const lower = transcript.toLowerCase()
+  const symptoms = [
+    'headache',
+    'migraine',
+    'nausea',
+    'vomiting',
+    'diarrhea',
+    'fever',
+    'cough',
+    'sore throat',
+    'fatigue',
+    'dizzy',
+    'dizziness',
+    'chest pain',
+    'shortness of breath',
+    'palpitations',
+    'bloating',
+    'heartburn',
+    'anxiety',
+    'insomnia',
+    'rash',
+    'hives',
+    'pain',
+  ]
+  return symptoms.filter((symptom) => lower.includes(symptom)).slice(0, 12)
+}
+
+function buildQuickToolDraft(transcript: string, localDate: string): VoiceDraft | null {
+  const raw = cleanText(transcript, 1200)
+  const lower = raw.toLowerCase()
+  if (hasSelfHarmRisk(raw)) return buildSelfHarmSupportDraft(raw, localDate)
+  const symptomWords =
+    /\b(symptom|symptoms|headache|migraine|nausea|vomiting|diarrhea|fever|cough|sore throat|fatigue|dizzy|dizziness|pain|rash|itchy|hives|chest pain|shortness of breath|palpitations|bloating|heartburn|anxious|anxiety|insomnia|cramps|swelling)\b/
+  const asksForAnalysis = /\b(analyze|analyse|check|review|what could|what might|what is causing|diagnose|red flag)\b/.test(lower)
+  const directTarget = inferNativeWebTarget({}, raw)
+  const explicitOpen = /\b(open|show|go to|take me to|use|find)\b/.test(lower)
+  const asksForInsights = directTarget?.title === 'Insights' && /\b(insight|insights|coach)\b/.test(lower)
+  if (directTarget && (explicitOpen || asksForInsights)) {
+    return {
+      action: 'app_handoff',
+      transcript: raw,
+      localDate,
+      summary: directTarget.title,
+      confirmationMessage: `I can open ${directTarget.title} with your request ready.`,
+      canConfirm: false,
+      appTarget: directTarget,
+    }
+  }
+  if (/\b(journal|note|diary)\b/.test(lower)) return null
+
+  const looksLikeQuestion = /\b(what|why|how|can|could|should|would|is|are|do|does|which)\b/.test(lower) || lower.includes('?')
+  const healthTopic =
+    /\b(health|symptom|supplement|vitamin|magnesium|medication|medicine|tablet|dose|sleep|energy|tired|fatigue|stress|anxiety|mood|blood test|lab|cholesterol|glucose|protein|calories|diet|nutrition|workout|exercise|pain|injury|period|hormone|digestion|gut)\b/
+  const questionShouldGoToChat =
+    looksLikeQuestion &&
+    /\b(medication|medicine|supplement|vitamin|magnesium|cholesterol|blood test|lab|sleep|energy|dose)\b/.test(lower)
+  if (questionShouldGoToChat && healthTopic.test(lower)) {
+    return {
+      action: 'health_question',
+      transcript: raw,
+      localDate,
+      summary: 'Talk to Helfi',
+      confirmationMessage: 'This is a health question. I can open Talk to Helfi with your question ready.',
+      canConfirm: false,
+      appTarget: {
+        title: 'Talk to Helfi',
+        path: `/chat?voicePrompt=${encodeQueryValue(raw, 1200)}`,
+        buttonLabel: 'Open Talk to Helfi',
+      },
+    }
+  }
+
+  const describesSymptoms = /\b(i have|i've got|i feel|feeling|my)\b/.test(lower)
+  if (symptomWords.test(lower) && (asksForAnalysis || describesSymptoms || lower.includes('symptom'))) {
+    const params = new URLSearchParams()
+    const knownSymptoms = knownSymptomsFromText(raw)
+    const symptomText = knownSymptoms.length ? knownSymptoms.join(', ') : extractSymptomText(raw) || raw
+    params.set('voiceSymptoms', symptomText)
+    params.set('voiceNotes', raw)
+    const durationMatch = raw.match(/\b(?:for|since|over)\s+((?:about\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:hour|hours|day|days|week|weeks|month|months)|today|yesterday|this morning|tonight|last night)\b/i)
+    if (durationMatch?.[1]) params.set('voiceDuration', durationMatch[1])
+    return {
+      action: 'symptom_analysis',
+      transcript: raw,
+      localDate,
+      summary: 'Symptom Analysis',
+      confirmationMessage: 'I can open Symptom Analysis with your symptoms filled in. It will not run or charge until you press Analyze.',
+      canConfirm: false,
+      appTarget: {
+        title: 'Symptom Analysis',
+        path: `/symptoms?${params.toString()}`,
+        buttonLabel: 'Open Symptom Analysis',
+      },
+    }
+  }
+
+  if (looksLikeQuestion && healthTopic.test(lower)) {
+    return {
+      action: 'health_question',
+      transcript: raw,
+      localDate,
+      summary: 'Talk to Helfi',
+      confirmationMessage: 'This is a health question. I can open Talk to Helfi with your question ready.',
+      canConfirm: false,
+      appTarget: {
+        title: 'Talk to Helfi',
+        path: `/chat?voicePrompt=${encodeQueryValue(raw, 1200)}`,
+        buttonLabel: 'Open Talk to Helfi',
+      },
+    }
+  }
+
+  return null
+}
+
+function buildQuickClarificationDraft(transcript: string, localDate: string): VoiceDraft | null {
+  const raw = cleanText(transcript, 1200)
+  const lower = raw.toLowerCase()
+  const isLogRequest = /\b(log|add|record|track|put|input|save)\b/.test(lower)
+  if (!isLogRequest) return null
+
+  if (/\b(food|meal|breakfast|lunch|dinner|snacks?)\b/.test(lower)) {
+    return {
+      action: 'food_draft',
+      transcript: raw,
+      localDate,
+      summary: 'Food details needed',
+      confirmationMessage: 'What food should I log, and which meal should it go in?',
+      canConfirm: false,
+    }
+  }
+
+  if (/\b(exercise|workout|walk|run|ride|cycle|gym)\b/.test(lower)) {
+    return {
+      action: 'exercise',
+      transcript: raw,
+      localDate,
+      summary: 'Exercise details needed',
+      confirmationMessage: 'What exercise should I log, and for how long?',
+      canConfirm: false,
+    }
+  }
+
+  if (/\b(water|hydration|drink|liquid)\b/.test(lower)) {
+    return {
+      action: 'water',
+      transcript: raw,
+      localDate,
+      summary: 'Liquid details needed',
+      confirmationMessage: 'What drink and amount should I log?',
+      canConfirm: false,
+    }
+  }
+
+  if (/\b(mood|feel|feeling)\b/.test(lower)) {
+    return {
+      action: 'mood',
+      transcript: raw,
+      localDate,
+      summary: 'Mood details needed',
+      confirmationMessage: 'How are you feeling, and would you like me to add any note?',
+      canConfirm: false,
+    }
+  }
+
+  if (/\b(journal|note|diary)\b/.test(lower)) {
+    return {
+      action: 'journal',
+      transcript: raw,
+      localDate,
+      summary: 'Journal note needed',
+      confirmationMessage: 'What would you like me to write in the journal?',
+      canConfirm: false,
+    }
+  }
+
+  return null
+}
+
+function buildGenericClarificationDraft(transcript: string, localDate: string): VoiceDraft {
+  return {
+    action: 'unknown',
+    transcript: cleanText(transcript, 1200),
+    localDate,
+    summary: 'Please clarify',
+    confirmationMessage: 'I am not sure what to do yet. Please try a clearer request.',
+    canConfirm: false,
+  }
+}
+
 async function normalizeDraft(
   parsed: any,
   transcript: string,
@@ -805,14 +1820,18 @@ async function normalizeDraft(
   tzOffsetMin: number,
   favorites: VoiceFoodFavorite[],
 ): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
+  if (hasSelfHarmRisk(transcript)) {
+    return { aiCostCents: 0, draft: buildSelfHarmSupportDraft(transcript, localDate) }
+  }
+
   const actionRaw = cleanText(parsed?.action, 40).toLowerCase() as VoiceAction
-  const action: VoiceAction = ['exercise', 'mood', 'journal', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'food_draft', 'recipe'].includes(actionRaw)
+  const action: VoiceAction = ['exercise', 'mood', 'journal', 'water', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'food_draft', 'recipe', 'symptom_analysis', 'health_question', 'app_handoff'].includes(actionRaw)
     ? actionRaw
     : 'unknown'
   let aiCostCents = 0
   let usedModel: string | undefined
 
-  const favoriteDraft = await buildFavoriteFoodDraft(transcript, localDate, favorites)
+  const favoriteDraft = shouldUseFavoriteFood(transcript, favorites) ? await buildFavoriteFoodDraft(transcript, localDate, favorites) : null
   if (favoriteDraft && (action === 'food_favorite' || action === 'food_build_meal' || action === 'food_draft' || action === 'unknown')) {
     return { aiCostCents, draft: favoriteDraft }
   }
@@ -825,15 +1844,73 @@ async function normalizeDraft(
     return {
       aiCostCents,
       usedModel,
+      draft: buildRecipeHandoffDraft(requestText, localDate, recipe.text),
+    }
+  }
+
+  if (action === 'symptom_analysis') {
+    const symptoms = Array.isArray(parsed?.symptoms)
+      ? parsed.symptoms.map((item: any) => cleanText(item, 60)).filter(Boolean).slice(0, 12)
+      : []
+    const symptomsText = symptoms.length ? symptoms.join(', ') : transcript
+    const duration = cleanText(parsed?.duration, 120)
+    const notes = cleanText(parsed?.notes || transcript, 800)
+    const params = new URLSearchParams()
+    params.set('voiceSymptoms', symptomsText)
+    if (duration) params.set('voiceDuration', duration)
+    if (notes) params.set('voiceNotes', notes)
+    return {
+      aiCostCents,
       draft: {
-        action: 'recipe',
+        action: 'symptom_analysis',
         transcript,
         localDate,
-        summary: 'Recipe ready',
-        confirmationMessage: 'Here is the recipe. Nothing has been saved.',
+        summary: 'Symptom Analysis',
+        confirmationMessage: 'This sounds like a symptom-analysis request. I can open Symptom Analysis with your symptoms filled in. It will not run or charge until you press Analyze.',
         canConfirm: false,
-        recipe: { text: recipe.text },
+        appTarget: {
+          title: 'Symptom Analysis',
+          path: `/symptoms?${params.toString()}`,
+          buttonLabel: 'Open Symptom Analysis',
+        },
       },
+    }
+  }
+
+  if (action === 'health_question') {
+    return {
+      aiCostCents,
+      draft: {
+        action: 'health_question',
+        transcript,
+        localDate,
+        summary: 'Talk to Helfi',
+        confirmationMessage: 'This is a health question. I can open Talk to Helfi with your question ready.',
+        canConfirm: false,
+        appTarget: {
+          title: 'Talk to Helfi',
+          path: `/chat?voicePrompt=${encodeQueryValue(transcript, 1200)}`,
+          buttonLabel: 'Open Talk to Helfi',
+        },
+      },
+    }
+  }
+
+  if (action === 'app_handoff') {
+    const target = inferNativeWebTarget(parsed, transcript)
+    if (target) {
+      return {
+        aiCostCents,
+        draft: {
+          action: 'app_handoff',
+          transcript,
+          localDate,
+          summary: target.title,
+          confirmationMessage: `I can open ${target.title} with your request ready.`,
+          canConfirm: false,
+          appTarget: target,
+        },
+      }
     }
   }
 
@@ -866,8 +1943,9 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary,
-        confirmationMessage: `I can log ${summary}. ${estimatedDuration ? 'I estimated the time, so please check it before saving.' : 'Please confirm before I save it.'}`,
+        confirmationMessage: `I will log ${summary}.${estimatedDuration ? ' I estimated the time.' : ''}`,
         canConfirm: true,
+        autoSave: true,
         exercise: {
           exerciseTypeId: type.id,
           exerciseName: type.name,
@@ -890,8 +1968,9 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary,
-        confirmationMessage: `I can add this mood entry: ${summary}. Please confirm before I save it.`,
+        confirmationMessage: `I will add this mood entry: ${summary}.`,
         canConfirm: true,
+        autoSave: true,
         mood,
       },
     }
@@ -902,6 +1981,9 @@ async function normalizeDraft(
     const content = cleanText(journal?.content || transcript, 2000)
     const title = cleanText(journal?.title || 'Voice journal note', 120)
     const tags = Array.isArray(journal?.tags) ? journal.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 8) : []
+    const journalTypeRaw = String(journal?.journalType || journal?.type || '').toLowerCase()
+    const journalType = journalTypeRaw === 'health' || /\bhealth journal\b/i.test(transcript) ? 'health' : 'mood'
+    const journalLabel = journalType === 'health' ? 'health journal' : 'journal'
     return {
       aiCostCents,
       draft: {
@@ -909,9 +1991,52 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary: title,
-        confirmationMessage: `I can add this journal note: “${content.slice(0, 160)}${content.length > 160 ? '...' : ''}” Please confirm before I save it.`,
+        confirmationMessage: `I will add this ${journalLabel} note: "${content.slice(0, 160)}${content.length > 160 ? '...' : ''}"`,
         canConfirm: true,
-        journal: { title, content, tags },
+        autoSave: true,
+        journal: { title, content, tags, journalType },
+      },
+    }
+  }
+
+  if (action === 'water') {
+    const water = parsed?.water || {}
+    const amount = Number(water?.amount)
+    const unit = normalizeWaterUnit(String(water?.unit || ''))
+    const drinkType = cleanText(water?.label || water?.drinkType || 'Water', 48) || 'Water'
+    if (!Number.isFinite(amount) || amount <= 0 || !unit) {
+      return {
+        aiCostCents,
+        draft: {
+          action: 'water',
+          transcript,
+          localDate,
+          summary: 'Water amount needed',
+          confirmationMessage: 'How much liquid should I log? For example, say "Log 500 ml water."',
+          canConfirm: false,
+        },
+      }
+    }
+    const amountMl = waterAmountToMl(amount, unit)
+    return {
+      aiCostCents,
+      draft: {
+        action: 'water',
+        transcript,
+        localDate,
+        summary: `${amount} ${unit} ${drinkType}`,
+        confirmationMessage: `I will log ${amount} ${unit} ${drinkType}.`,
+        canConfirm: true,
+        autoSave: true,
+        water: {
+          amount,
+          unit,
+          amountMl,
+          label: drinkType,
+          category: inferMealFromText(transcript, 'other'),
+          drinkType,
+          sweetener: drinkType === 'Water' ? null : { type: 'free' },
+        },
       },
     }
   }
@@ -940,8 +2065,9 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary: `Copy ${copy.rows.length} ${meal} item${copy.rows.length === 1 ? '' : 's'} from yesterday`,
-        confirmationMessage: `I found ${copy.rows.length} ${meal} item${copy.rows.length === 1 ? '' : 's'} from ${copy.sourceDate}. Please confirm before I copy them to today.`,
+        confirmationMessage: `I found ${copy.rows.length} ${meal} item${copy.rows.length === 1 ? '' : 's'} from ${copy.sourceDate}. I will copy them to today.`,
         canConfirm: true,
+        autoSave: true,
         food: {
           meal,
           sourceDate: copy.sourceDate,
@@ -1035,6 +2161,17 @@ export async function POST(request: NextRequest) {
 
     if (!transcript) return NextResponse.json({ error: 'No speech found' }, { status: 400 })
 
+    if (hasSelfHarmRisk(transcript)) {
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft: buildSelfHarmSupportDraft(transcript, localDate),
+        audio: null,
+        chargedCredits: 0,
+        voiceReply: false,
+      })
+    }
+
     const wallet = await new CreditManager(user.id).getWalletStatus()
     if (wallet.totalAvailableCents < SIMPLE_MIN_CREDITS) {
       return NextResponse.json({ error: 'Insufficient credits', estimatedCost: SIMPLE_MIN_CREDITS, availableCredits: wallet.totalAvailableCents }, { status: 402 })
@@ -1042,7 +2179,7 @@ export async function POST(request: NextRequest) {
 
     const storedFavorites = await loadStoredFavorites(user.id).catch(() => [])
     const favorites = mergeFavorites(clientFavorites, storedFavorites)
-    const favoriteDraft = await buildFavoriteFoodDraft(transcript, localDate, favorites)
+    const favoriteDraft = shouldUseFavoriteFood(transcript, favorites) ? await buildFavoriteFoodDraft(transcript, localDate, favorites) : null
     if (favoriteDraft) {
       const draft = favoriteDraft
       let aiCostCents = transcriptionCostCents
@@ -1092,7 +2229,57 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const quickMealFood = tryParseIngredientMealRequest(transcript)
+    const quickWaterDraft = tryParseWaterRequest(transcript, localDate)
+    if (quickWaterDraft) {
+      const draft = quickWaterDraft
+      let aiCostCents = transcriptionCostCents
+      let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
+      let audio: string | null = null
+
+      if (wantsVoiceReply) {
+        const openai = getOpenAIClient()
+        if (openai) {
+          const tts = await speak(openai, draft.confirmationMessage, user.id)
+          audio = tts.audio
+          const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
+          chargeCents += voiceCharge
+          aiCostCents += tts.costCents
+        }
+      }
+
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      await logAiUsageEvent({
+        feature: 'voice-assistant:water-command',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: audio ? TTS_MODEL : 'water-router',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: `charged ${chargeCents} credits; prepared water/liquid log`,
+      })
+
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft,
+        audio,
+        chargedCredits: chargeCents,
+        voiceReply: Boolean(audio),
+      })
+    }
+
+    const quickMealFood = tryParseIngredientMealRequest(transcript) || tryParseDirectFoodRequest(transcript)
     const quickMealDraft = quickMealFood ? await buildVoiceMealDraft(quickMealFood, transcript, localDate) : null
     if (quickMealDraft) {
       const draft = quickMealDraft
@@ -1143,8 +2330,165 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    const quickRecipeDraft = buildQuickRecipeDraft(transcript, localDate)
+    if (quickRecipeDraft) {
+      const draft = quickRecipeDraft
+      const chargeCents = Math.max(SIMPLE_MIN_CREDITS, transcriptionCostCents)
+
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      await logAiUsageEvent({
+        feature: 'voice-assistant:quick-recipe-command',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: 'quick-recipe-router',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: `charged ${chargeCents} credits; prepared quick recipe text`,
+      })
+
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft,
+        audio: null,
+        chargedCredits: chargeCents,
+        voiceReply: false,
+      })
+    }
+
+    const quickToolDraft = buildQuickToolDraft(transcript, localDate)
+    if (quickToolDraft) {
+      const draft = quickToolDraft
+      let aiCostCents = transcriptionCostCents
+      let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
+      let audio: string | null = null
+
+      if (wantsVoiceReply) {
+        const openai = getOpenAIClient()
+        if (openai) {
+          const tts = await speak(openai, draft.confirmationMessage, user.id)
+          audio = tts.audio
+          const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
+          chargeCents += voiceCharge
+          aiCostCents += tts.costCents
+        }
+      }
+
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      await logAiUsageEvent({
+        feature: 'voice-assistant:tool-route',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: audio ? TTS_MODEL : 'tool-router',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: `charged ${chargeCents} credits; opened matching Helfi tool`,
+      })
+
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft,
+        audio,
+        chargedCredits: chargeCents,
+        voiceReply: Boolean(audio),
+      })
+    }
+
+    const quickParsed = tryParseCopyPreviousRequest(transcript) || tryParseJournalRequest(transcript) || tryParseExerciseRequest(transcript) || tryParseMoodRequest(transcript)
+    if (quickParsed) {
+      const normalized = await normalizeDraft(quickParsed, transcript, localDate, user.id, null as any, tzOffsetMin, favorites)
+      const draft = normalized.draft
+      let aiCostCents = transcriptionCostCents
+      let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
+      let audio: string | null = null
+
+      if (wantsVoiceReply) {
+        const openai = getOpenAIClient()
+        if (openai) {
+          const tts = await speak(openai, draft.confirmationMessage, user.id)
+          audio = tts.audio
+          const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
+          chargeCents += voiceCharge
+          aiCostCents += tts.costCents
+        }
+      }
+
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+
+      await logAiUsageEvent({
+        feature: 'voice-assistant:quick-log-command',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: audio ? TTS_MODEL : 'quick-log-router',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: `charged ${chargeCents} credits; prepared quick log draft`,
+      })
+
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft,
+        audio,
+        chargedCredits: chargeCents,
+        voiceReply: Boolean(audio),
+      })
+    }
+
+    const quickClarificationDraft = buildQuickClarificationDraft(transcript, localDate)
+    if (quickClarificationDraft) {
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft: quickClarificationDraft,
+        audio: null,
+        voiceReply: false,
+      })
+    }
+
     const openai = getOpenAIClient()
-    if (!openai) return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
+    if (!openai) {
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft: buildGenericClarificationDraft(transcript, localDate),
+        audio: null,
+        voiceReply: false,
+      })
+    }
 
     const command = await runJsonCommandModel(openai, transcript, localDate, user.id)
     const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin, favorites)

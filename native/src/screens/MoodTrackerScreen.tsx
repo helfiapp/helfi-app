@@ -12,7 +12,8 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
+import type { RouteProp } from '@react-navigation/native'
 import type { NativeStackNavigationProp } from '@react-navigation/native-stack'
 import Svg, { Circle, G, Path, Rect, Text as SvgText } from 'react-native-svg'
 import * as ImagePicker from 'expo-image-picker'
@@ -21,6 +22,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import Slider from '@react-native-community/slider'
 
 import { API_BASE_URL } from '../config'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -392,19 +394,24 @@ function describeArc(cx: number, cy: number, radius: number, startAngle: number,
 
 export function MoodTrackerScreen() {
   const navigation = useNavigation<NativeStackNavigationProp<MainStackParamList>>()
+  const route = useRoute<RouteProp<MainStackParamList, 'MoodTracker'>>()
   const { mode, session } = useAppMode()
   const { width: screenWidth } = useWindowDimensions()
+  const requestedTab = route.params?.tab
+  const initialTab: TabKey = requestedTab === 'history' || requestedTab === 'journal' ? requestedTab : 'checkin'
 
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
-    return {
-      Authorization: `Bearer ${session.token}`,
-      'x-native-token': session.token,
-      'cache-control': 'no-store',
-    }
+    return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [mode, session?.token])
 
-  const [activeTab, setActiveTab] = useState<TabKey>('checkin')
+  const [activeTab, setActiveTab] = useState<TabKey>(initialTab)
+
+  useEffect(() => {
+    if (requestedTab === 'history' || requestedTab === 'journal' || requestedTab === 'checkin') {
+      setActiveTab(requestedTab)
+    }
+  }, [requestedTab])
 
   const [entriesLoading, setEntriesLoading] = useState(true)
   const [entriesSaving, setEntriesSaving] = useState(false)
@@ -478,7 +485,7 @@ export function MoodTrackerScreen() {
     try {
       setEntriesLoading(true)
       const { start, end } = localDateRange(historyPeriod)
-      const res = await fetch(`${API_BASE_URL}/api/native-mood-entries?start=${start}&end=${end}`, {
+      const res = await fetch(`${API_BASE_URL}/api/mood/entries?start=${start}&end=${end}`, {
         headers: authHeaders,
       })
       const data: any = await res.json().catch(() => ({}))
@@ -489,7 +496,7 @@ export function MoodTrackerScreen() {
       const days = historyPeriod === 'day' ? 1 : historyPeriod === 'week' ? 7 : historyPeriod === 'month' ? 30 : 365
       const prevStart = shiftDays(start, -days)
       const prevEnd = shiftDays(start, -1)
-      const prevRes = await fetch(`${API_BASE_URL}/api/native-mood-entries?start=${prevStart}&end=${prevEnd}`, {
+      const prevRes = await fetch(`${API_BASE_URL}/api/mood/entries?start=${prevStart}&end=${prevEnd}`, {
         headers: authHeaders,
       })
       const prevData: any = await prevRes.json().catch(() => ({}))
@@ -547,8 +554,8 @@ export function MoodTrackerScreen() {
       setJournalLoading(true)
       const q = journalSearch.trim()
       const url = q
-        ? `${API_BASE_URL}/api/native-mood-journal-entries?limit=50&q=${encodeURIComponent(q)}`
-        : `${API_BASE_URL}/api/native-mood-journal-entries?limit=50`
+        ? `${API_BASE_URL}/api/mood/journal/entries?limit=50&q=${encodeURIComponent(q)}`
+        : `${API_BASE_URL}/api/mood/journal/entries?limit=50`
       const res = await fetch(url, { headers: authHeaders })
       const data: any = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(String(data?.error || 'Could not load journal entries'))
@@ -585,7 +592,7 @@ export function MoodTrackerScreen() {
 
     try {
       setEntriesSaving(true)
-      const res = await fetch(`${API_BASE_URL}/api/native-mood-entries`, {
+      const res = await fetch(`${API_BASE_URL}/api/mood/entries`, {
         method: 'POST',
         headers: {
           ...authHeaders,
@@ -1223,8 +1230,8 @@ export function MoodTrackerScreen() {
     try {
       setJournalSaving(true)
       const url = editingJournalId
-        ? `${API_BASE_URL}/api/native-mood-journal-entries/${editingJournalId}`
-        : `${API_BASE_URL}/api/native-mood-journal-entries`
+        ? `${API_BASE_URL}/api/mood/journal/entries/${editingJournalId}`
+        : `${API_BASE_URL}/api/mood/journal/entries`
       const method = editingJournalId ? 'PUT' : 'POST'
       const audioToSave = journalAudio.map((item) => item.remoteUri).filter((value): value is string => Boolean(value))
       const res = await fetch(url, {
@@ -1279,7 +1286,7 @@ export function MoodTrackerScreen() {
   const deleteJournalEntry = async (entryId: string) => {
     if (!authHeaders) return
     try {
-      const res = await fetch(`${API_BASE_URL}/api/native-mood-journal-entries/${entryId}`, {
+      const res = await fetch(`${API_BASE_URL}/api/mood/journal/entries/${encodeURIComponent(entryId)}`, {
         method: 'DELETE',
         headers: authHeaders,
       })
@@ -1333,6 +1340,10 @@ export function MoodTrackerScreen() {
             return (
               <Pressable
                 key={tab.key}
+                testID={`mood-tab-${tab.key}`}
+                accessible
+                accessibilityRole="button"
+                accessibilityLabel={`${tab.label} tab`}
                 onPress={() => setActiveTab(tab.key)}
                 style={[styles.tabButton, active ? styles.tabButtonActive : styles.tabButtonInactive]}
               >

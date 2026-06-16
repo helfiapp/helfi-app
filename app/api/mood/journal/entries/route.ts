@@ -5,11 +5,24 @@ import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 export const dynamic = 'force-dynamic'
 
 const MOOD_MEDIA_SCOPE = 'mood-journal'
 const MOOD_MEDIA_URL_TTL_SECONDS = 60 * 60
+
+async function getMoodUser(req: NextRequest) {
+  const session = await getServerSession(authOptions)
+  if (session?.user?.email) {
+    return prisma.user.findUnique({ where: { email: session.user.email } })
+  }
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) {
+    return prisma.user.findUnique({ where: { id: nativeUserId } })
+  }
+  return null
+}
 
 function coerceMediaList(value: unknown): string[] {
   if (Array.isArray(value)) {
@@ -84,9 +97,7 @@ function mapSignedMedia(value: unknown): string[] {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getMoodUser(req)
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
@@ -100,7 +111,7 @@ export async function GET(req: NextRequest) {
     let rows: any[] = []
     if (start && end) {
       rows = await prisma.$queryRawUnsafe(
-        `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
+        `SELECT id, localDate AS "localDate", title, content, images, tags, audio, prompt, template, createdAt AS "createdAt", updatedAt AS "updatedAt"
          FROM MoodJournalEntries
          WHERE userId = $1 AND localDate BETWEEN $2 AND $3
          ORDER BY createdAt DESC`,
@@ -110,7 +121,7 @@ export async function GET(req: NextRequest) {
       )
     } else if (q) {
       rows = await prisma.$queryRawUnsafe(
-        `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
+        `SELECT id, localDate AS "localDate", title, content, images, tags, audio, prompt, template, createdAt AS "createdAt", updatedAt AS "updatedAt"
          FROM MoodJournalEntries
          WHERE userId = $1 AND (title ILIKE $2 OR content ILIKE $2)
          ORDER BY createdAt DESC
@@ -121,7 +132,7 @@ export async function GET(req: NextRequest) {
       )
     } else {
       rows = await prisma.$queryRawUnsafe(
-        `SELECT id, localDate, title, content, images, tags, audio, prompt, template, createdAt, updatedAt
+        `SELECT id, localDate AS "localDate", title, content, images, tags, audio, prompt, template, createdAt AS "createdAt", updatedAt AS "updatedAt"
          FROM MoodJournalEntries
          WHERE userId = $1
          ORDER BY createdAt DESC
@@ -143,9 +154,7 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getMoodUser(req)
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const body = await req.json().catch(() => ({} as any))

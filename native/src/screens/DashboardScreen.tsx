@@ -11,6 +11,7 @@ import { useAppMode } from '../state/AppModeContext'
 import { appleHealthConnectAndReadToday } from '../health/appleHealth'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
 
 function localDateYYYYMMDD(d: Date) {
   const yyyy = d.getFullYear()
@@ -393,7 +394,7 @@ export function DashboardScreen() {
     })
   }
   const goToDailyCheckIn = () => openNativeTool(NATIVE_WEB_PAGES.dailyCheckIn)
-  const goToMoodTracker = () => openNativeTool(NATIVE_WEB_PAGES.moodTracker)
+  const goToMoodTracker = () => navigation.getParent()?.navigate('MoodTracker', { tab: 'checkin' })
   const goToTrackCalories = () => navigation.getParent()?.navigate('TrackCalories')
   const goToWaterIntake = () => navigation.getParent()?.navigate('WaterIntake')
   const goToInsights = () => navigation.navigate('Insights')
@@ -707,7 +708,10 @@ export function DashboardScreen() {
         }}
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-          <Image source={require('../../assets/helfi-logo.png')} style={{ width: 108, height: 36 }} resizeMode="contain" />
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+            <VoiceAssistantIconButton size={36} iconSize={18} />
+            <Image source={require('../../assets/helfi-logo.png')} style={{ width: 108, height: 36 }} resizeMode="contain" />
+          </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.sm }}>
             <Pressable
@@ -925,7 +929,8 @@ export function DashboardScreen() {
         <View style={{ marginTop: theme.spacing.xl }}>
           <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>Connect Your Devices</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted, lineHeight: 20 }}>
-            Sync activity and sleep data from your favorite wearables.
+            Apple Health uses HealthKit to read only the activity data you choose to share, such as steps,
+            walking distance, and active calories.
           </Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -936,9 +941,10 @@ export function DashboardScreen() {
           <View style={{ marginTop: theme.spacing.md, gap: 10 }}>
             {Platform.OS === 'ios' ? (
               <DeviceRow
-                name="Apple Health"
+                name="Apple Health (HealthKit)"
                 icon={<AppleHealthLogo />}
-                rightLabel={appleHealthConnected ? 'Import today' : 'Connect'}
+                detail="Reads selected HealthKit activity data only after you continue and approve Apple's permission screen."
+                rightLabel={appleHealthConnected ? 'Import today' : 'Continue'}
                 rightKind="connect"
                 disabled={appleHealthBusy}
                 onPress={appleHealthConnected ? onAppleHealthImportToday : onAppleHealthConnect}
@@ -1150,6 +1156,7 @@ function SmallActionCard({
 
 function DeviceRow({
   name,
+  detail,
   logo,
   icon,
   rightLabel,
@@ -1158,6 +1165,7 @@ function DeviceRow({
   onPress,
 }: {
   name: string
+  detail?: string
   logo?: ImageSourcePropType
   icon?: React.ReactNode
   rightLabel: string
@@ -1202,9 +1210,16 @@ function DeviceRow({
             <Feather name="watch" size={18} color={theme.colors.muted} />
           )}
         </View>
-        <Text style={{ fontWeight: '900', color: theme.colors.text, fontSize: 16 }} numberOfLines={1}>
-          {name}
-        </Text>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontWeight: '900', color: theme.colors.text, fontSize: 16 }} numberOfLines={1}>
+            {name}
+          </Text>
+          {detail ? (
+            <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12, lineHeight: 16 }}>
+              {detail}
+            </Text>
+          ) : null}
+        </View>
       </View>
 
       <Pressable

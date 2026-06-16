@@ -4,6 +4,7 @@ import fs from 'fs'
 import path from 'path'
 import { buildCustomFoodAliases, buildCustomFoodKey } from '../lib/food/custom-food-import'
 import { loadFastFoodMenuItems } from '../lib/food/fast-food-menus'
+import { buildCustomFoodServingOptions } from '../lib/food/custom-serving-options'
 
 type MacroRow = {
   name: string
@@ -198,6 +199,16 @@ const importRows = async () => {
   }
 
   for (const row of singleRows) {
+    const servingOptions = buildCustomFoodServingOptions({
+      name: row.name,
+      kind: 'SINGLE',
+      caloriesPer100g: row.calories,
+      proteinPer100g: row.protein_g,
+      carbsPer100g: row.carbs_g,
+      fatPer100g: row.fat_g,
+      fiberPer100g: row.fiber_g,
+      sugarPer100g: row.sugar_g,
+    })
     await upsertItem({
       name: row.name,
       brand: row.brand,
@@ -210,7 +221,7 @@ const importRows = async () => {
       fiberPer100g: row.fiber_g,
       sugarPer100g: row.sugar_g,
       aliases: buildCustomFoodAliases(row.name, row.brand),
-      servingOptions: null,
+      servingOptions: servingOptions.length > 0 ? servingOptions : null,
     })
   }
 

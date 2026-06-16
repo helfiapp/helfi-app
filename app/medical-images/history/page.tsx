@@ -23,6 +23,30 @@ type MedicalHistoryItem = {
   imageUrl?: string | null
 }
 
+function SavedScanImage({ imageUrl }: { imageUrl?: string | null }) {
+  const [failed, setFailed] = useState(false)
+
+  if (!imageUrl || failed) {
+    return (
+      <div className="h-36 w-full rounded-lg border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-400 text-center px-3">
+        Image unavailable
+      </div>
+    )
+  }
+
+  return (
+    <Image
+      src={imageUrl}
+      alt="Saved medical scan"
+      width={144}
+      height={144}
+      className="h-36 w-full rounded-lg object-cover border border-gray-100"
+      onError={() => setFailed(true)}
+      unoptimized
+    />
+  )
+}
+
 export default function MedicalImagesHistoryPage() {
   const pathname = usePathname()
   const [historyItems, setHistoryItems] = useState<MedicalHistoryItem[]>([])
@@ -182,19 +206,7 @@ export default function MedicalImagesHistoryPage() {
                   <div key={item.id} className="border border-gray-200 rounded-lg p-4 bg-white">
                     <div className="flex flex-col gap-4 md:flex-row">
                       <div className="w-full md:w-36 flex-shrink-0">
-                        {item.imageUrl ? (
-                          <Image
-                            src={item.imageUrl}
-                            alt="Saved medical scan"
-                            width={144}
-                            height={144}
-                            className="h-36 w-full rounded-lg object-cover border border-gray-100"
-                          />
-                        ) : (
-                          <div className="h-36 w-full rounded-lg border border-dashed border-gray-200 bg-gray-50 flex items-center justify-center text-xs text-gray-400">
-                            No image
-                          </div>
-                        )}
+                        <SavedScanImage imageUrl={item.imageUrl} />
                       </div>
                       <div className="flex-1 space-y-2">
                         <div className="flex items-center justify-between gap-2">

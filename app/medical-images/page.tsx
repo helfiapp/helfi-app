@@ -343,8 +343,22 @@ export default function MedicalImagesPage() {
                 <li>Other visible medical concerns</li>
               </ul>
               <p className="text-xs text-blue-700 mt-3 italic">
-                ⚠️ This tool provides informational analysis only and is not a substitute for professional medical advice, diagnosis, or treatment.
+                This tool provides informational analysis only and is not a substitute for professional medical advice, diagnosis, or treatment.
+                Always seek a doctor's advice in addition to using this app and before making medical decisions.
               </p>
+            </div>
+
+            <div className="mb-4 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-3">
+              <div className="font-semibold text-gray-900 mb-1">General health sources</div>
+              <p className="mb-2">
+                Helfi uses these public sources as general references. Results are not diagnoses.
+              </p>
+              <ul className="list-disc list-inside space-y-1">
+                <li><a className="text-helfi-green underline" href="https://medlineplus.gov/encyclopedia.html" target="_blank" rel="noreferrer">MedlinePlus Medical Encyclopedia</a></li>
+                <li><a className="text-helfi-green underline" href="https://medlineplus.gov/healthtopics.html" target="_blank" rel="noreferrer">MedlinePlus Health Topics</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/diseases-conditions" target="_blank" rel="noreferrer">Mayo Clinic Diseases and Conditions</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.nhs.uk/conditions/" target="_blank" rel="noreferrer">NHS Conditions A to Z</a></li>
+              </ul>
             </div>
 
             {/* Image Upload */}
@@ -589,7 +603,20 @@ export default function MedicalImagesPage() {
                 <div className="mt-2 text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <strong>⚠️ Important:</strong>{' '}
                   {analysisResult?.disclaimer ||
-                    'This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.'}
+                    'This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek a doctor’s advice in addition to using this app and before making medical decisions.'}
+                </div>
+
+                <div className="mt-3 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-3">
+                  <div className="font-semibold text-gray-900 mb-1">General health sources</div>
+                  <p className="mb-2">
+                    Helfi uses these public sources as general references. Your result is not a diagnosis.
+                  </p>
+                  <ul className="list-disc list-inside space-y-1">
+                    <li><a className="text-helfi-green underline" href="https://medlineplus.gov/encyclopedia.html" target="_blank" rel="noreferrer">MedlinePlus Medical Encyclopedia</a></li>
+                    <li><a className="text-helfi-green underline" href="https://medlineplus.gov/healthtopics.html" target="_blank" rel="noreferrer">MedlinePlus Health Topics</a></li>
+                    <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/diseases-conditions" target="_blank" rel="noreferrer">Mayo Clinic Diseases and Conditions</a></li>
+                    <li><a className="text-helfi-green underline" href="https://www.nhs.uk/conditions/" target="_blank" rel="noreferrer">NHS Conditions A to Z</a></li>
+                  </ul>
                 </div>
 
                 <PractitionerRecommendations

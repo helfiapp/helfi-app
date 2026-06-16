@@ -1,14 +1,75 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
+import { createHmac, timingSafeEqual } from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { getWeeklyReportById } from '@/lib/weekly-health-report'
+import { getWeeklyReportRequestUser } from '@/lib/weekly-report-request-auth'
 import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 type SeriesPoint = { date: string; value: number }
+
+const PDF_LINK_TTL_MS = 60 * 1000
+
+function getPdfLinkSecret() {
+  return process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || process.env.JWT_SECRET || ''
+}
+
+function base64UrlEncode(value: string | Buffer) {
+  const buffer = Buffer.isBuffer(value) ? value : Buffer.from(value)
+  return buffer
+    .toString('base64')
+    .replace(/=/g, '')
+    .replace(/\+/g, '-')
+    .replace(/\//g, '_')
+}
+
+function base64UrlDecode(value: string) {
+  const normalized = value.replace(/-/g, '+').replace(/_/g, '/')
+  const padded = normalized + '='.repeat((4 - (normalized.length % 4)) % 4)
+  return Buffer.from(padded, 'base64').toString('utf8')
+}
+
+function signPdfPayload(payload: string) {
+  const secret = getPdfLinkSecret()
+  if (!secret) return ''
+  return base64UrlEncode(createHmac('sha256', secret).update(payload).digest())
+}
+
+function createPdfAccessToken(userId: string, reportId: string) {
+  const payload = base64UrlEncode(JSON.stringify({
+    userId,
+    reportId,
+    expiresAt: Date.now() + PDF_LINK_TTL_MS,
+  }))
+  const signature = signPdfPayload(payload)
+  if (!signature) return ''
+  return `${payload}.${signature}`
+}
+
+function getUserIdFromPdfAccessToken(token: string, reportId: string) {
+  const [payload, signature] = String(token || '').split('.')
+  if (!payload || !signature) return ''
+
+  const expected = signPdfPayload(payload)
+  if (!expected) return ''
+
+  const actualBuffer = Buffer.from(signature)
+  const expectedBuffer = Buffer.from(expected)
+  if (actualBuffer.length !== expectedBuffer.length || !timingSafeEqual(actualBuffer, expectedBuffer)) {
+    return ''
+  }
+
+  try {
+    const parsed = JSON.parse(base64UrlDecode(payload))
+    if (String(parsed?.reportId || '') !== reportId) return ''
+    if (Number(parsed?.expiresAt || 0) < Date.now()) return ''
+    return String(parsed?.userId || '')
+  } catch {
+    return ''
+  }
+}
 
 function parseReportPayload(payload: any) {
   if (!payload) return null
@@ -61,20 +122,16 @@ function formatRange(start: string, end: string) {
 
 export async function GET(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    let userId = session?.user?.id || ''
-    if (!userId && session?.user?.email) {
-      const user = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } })
-      userId = user?.id || ''
-    }
-    if (!userId) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
     const { searchParams } = new URL(request.url)
     const reportId = searchParams.get('reportId')
     if (!reportId) {
       return NextResponse.json({ error: 'Missing reportId' }, { status: 400 })
+    }
+
+    const requestUser = await getWeeklyReportRequestUser(request)
+    const userId = requestUser?.id || getUserIdFromPdfAccessToken(String(searchParams.get('accessToken') || ''), reportId)
+    if (!userId) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const report = await getWeeklyReportById(userId, reportId)
@@ -444,5 +501,43 @@ export async function GET(request: NextRequest) {
   } catch (error) {
     console.error('Weekly report PDF export failed:', error)
     return NextResponse.json({ error: 'Export failed' }, { status: 500 })
+  }
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const requestUser = await getWeeklyReportRequestUser(request)
+    if (!requestUser?.id) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
+    const body = await request.json().catch(() => ({}))
+    const reportId = String(body?.reportId || '').trim()
+    if (!reportId) {
+      return NextResponse.json({ error: 'Missing reportId' }, { status: 400 })
+    }
+
+    const report = await getWeeklyReportById(requestUser.id, reportId)
+    if (!report) {
+      return NextResponse.json({ error: 'Report not found' }, { status: 404 })
+    }
+
+    if (report.status !== 'READY') {
+      return NextResponse.json({ error: 'Report not ready' }, { status: 403 })
+    }
+
+    const accessToken = createPdfAccessToken(requestUser.id, reportId)
+    if (!accessToken) {
+      return NextResponse.json({ error: 'PDF link is not configured' }, { status: 500 })
+    }
+
+    const url = new URL('/api/reports/weekly/pdf', request.url)
+    url.searchParams.set('reportId', reportId)
+    url.searchParams.set('accessToken', accessToken)
+
+    return NextResponse.json({ url: url.toString() })
+  } catch (error) {
+    console.error('Weekly report PDF link failed:', error)
+    return NextResponse.json({ error: 'PDF link failed' }, { status: 500 })
   }
 }

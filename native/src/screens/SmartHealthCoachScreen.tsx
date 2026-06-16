@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -209,11 +210,7 @@ export function SmartHealthCoachScreen({ route, navigation }: { route: any; navi
 
   const authHeaders = useMemo(() => {
     if (!session?.token) return null
-    return {
-      Authorization: `Bearer ${session.token}`,
-      'x-native-token': session.token,
-      'cache-control': 'no-store',
-    }
+    return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [session?.token])
 
   const clearedTipIdsSet = useMemo(() => new Set(clearedTipIds), [clearedTipIds])

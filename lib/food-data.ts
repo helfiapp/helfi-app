@@ -2,11 +2,13 @@ import 'server-only'
 import { prisma } from '@/lib/prisma'
 
 export interface NormalizedFoodItem {
-  source: 'openfoodfacts' | 'usda' | 'fatsecret'
+  source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
   id: string
   name: string
   brand?: string | null
   serving_size?: string | null
+  servingOptions?: any[] | null
+  selectedServingId?: string | null
   calories?: number | null
   protein_g?: number | null
   carbs_g?: number | null
@@ -28,7 +30,7 @@ export interface ServingOption {
   fat_g?: number | null
   fiber_g?: number | null
   sugar_g?: number | null
-  source: 'usda' | 'fatsecret'
+  source: 'usda' | 'fatsecret' | 'custom'
 }
 
 const OPENFOODFACTS_BASE_URL =

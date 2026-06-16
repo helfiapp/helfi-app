@@ -103,7 +103,7 @@ export async function GET(req: NextRequest) {
     await ensureMoodTables()
     const entries: MoodEntryRow[] =
       (await prisma.$queryRawUnsafe(
-        `SELECT localDate, timestamp, mood, context
+        `SELECT localDate AS "localDate", timestamp, mood, context
          FROM MoodEntries
          WHERE userId = $1 AND localDate BETWEEN $2 AND $3
          ORDER BY timestamp ASC`,

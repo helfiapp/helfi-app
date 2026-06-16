@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { TicketCategory, TicketPriority } from '@prisma/client'
 import { buildSupportFeedbackPrompt, processSupportTicketAutoReply, sendSupportFeedbackEmail, sendSupportTranscriptEmail } from '@/lib/support-automation'
@@ -19,11 +20,51 @@ function normalizePriority(value: string | undefined): TicketPriority {
   return allowed.includes(upper as TicketPriority) ? (upper as TicketPriority) : 'MEDIUM'
 }
 
-export async function GET(request: NextRequest) {
+async function getSupportUser(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  const email = session?.user?.email
-  const userId = session?.user?.id
-  if (!email) {
+  const sessionEmail = String(session?.user?.email || '').trim().toLowerCase()
+
+  if (sessionEmail) {
+    const user = await prisma.user.findUnique({
+      where: { email: sessionEmail },
+      select: { id: true, email: true, name: true },
+    })
+
+    return {
+      id: String(session?.user?.id || user?.id || ''),
+      email: sessionEmail,
+      name: String(session?.user?.name || user?.name || ''),
+    }
+  }
+
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (!nativeUserId) return null
+
+  const user = await prisma.user.findUnique({
+    where: { id: nativeUserId },
+    select: { id: true, email: true, name: true },
+  })
+
+  const email = String(user?.email || '').trim().toLowerCase()
+  if (!email) return null
+
+  return {
+    id: user?.id || nativeUserId,
+    email,
+    name: String(user?.name || ''),
+  }
+}
+
+function supportTicketOwnerWhere(user: { id?: string | null; email: string }) {
+  const email = String(user.email || '').trim().toLowerCase()
+  const id = String(user.id || '').trim()
+  if (!id) return { userEmail: email }
+  return { OR: [{ userId: id }, { userEmail: email }] }
+}
+
+export async function GET(request: NextRequest) {
+  const user = await getSupportUser(request)
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -32,7 +73,7 @@ export async function GET(request: NextRequest) {
   const listMode = searchParams.get('list') === '1'
   const ticketIdParam = String(searchParams.get('ticketId') || '').trim()
 
-  const whereClause: any = userId ? { userId } : { userEmail: email }
+  const whereClause: any = supportTicketOwnerWhere(user)
   if (activeOnly) {
     whereClause.status = { notIn: ['RESOLVED', 'CLOSED'] }
   }
@@ -76,12 +117,12 @@ export async function GET(request: NextRequest) {
 }
 
 export async function POST(request: NextRequest) {
-  const session = await getServerSession(authOptions)
-  const email = session?.user?.email
-  const name = session?.user?.name || ''
-  if (!email) {
+  const user = await getSupportUser(request)
+  if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  const email = user.email
+  const name = user.name
 
   const body = await request.json().catch(() => ({}))
   const action = String(body?.action || '').trim()
@@ -103,7 +144,7 @@ export async function POST(request: NextRequest) {
         message,
         userEmail: email,
         userName: name || undefined,
-        userId: session?.user?.id || null,
+        userId: user.id || null,
         status: 'OPEN',
         priority,
         category,
@@ -138,7 +179,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ticket = await prisma.supportTicket.findFirst({
-      where: { id: ticketId, userEmail: email },
+      where: { id: ticketId, ...supportTicketOwnerWhere(user) },
     })
     if (!ticket) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
@@ -186,7 +227,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ticket = await prisma.supportTicket.findFirst({
-      where: { id: ticketId, userEmail: email },
+      where: { id: ticketId, ...supportTicketOwnerWhere(user) },
       include: { responses: { orderBy: { createdAt: 'asc' } } },
     })
     if (!ticket) {
@@ -236,10 +277,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ticket = await prisma.supportTicket.findFirst({
-      where: {
-        id: ticketId,
-        ...(session?.user?.id ? { userId: session.user.id } : { userEmail: email }),
-      },
+      where: { id: ticketId, ...supportTicketOwnerWhere(user) },
     })
     if (!ticket) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
@@ -264,7 +302,7 @@ export async function POST(request: NextRequest) {
     }
 
     const ticket = await prisma.supportTicket.findFirst({
-      where: { id: ticketId, userEmail: email },
+      where: { id: ticketId, ...supportTicketOwnerWhere(user) },
     })
     if (!ticket) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })

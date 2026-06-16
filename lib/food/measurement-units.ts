@@ -1,6 +1,6 @@
-import { PRODUCE_MEASUREMENTS } from '@/lib/food/produce-measurements'
-import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
-import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measurements'
+import { PRODUCE_MEASUREMENTS } from './produce-measurements'
+import { DRY_FOOD_MEASUREMENTS } from './dry-food-measurements'
+import { DAIRY_SEMI_SOLID_MEASUREMENTS } from './dairy-semi-solid-measurements'
 
 export type MeasurementUnit =
   | 'g'
@@ -286,7 +286,7 @@ const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): Fo
   const large = toUnitValue(entry.piece_large_g)
   let extraLarge: number | null = explicitPieceExtraLarge(entry) ?? null
   if (
-    !Number.isFinite(Number(extraLarge)) &&
+    (!Number.isFinite(Number(extraLarge)) || Number(extraLarge) <= 0) &&
     Number.isFinite(Number(large)) &&
     Number.isFinite(Number(medium)) &&
     Number(large) > 0 &&
@@ -294,7 +294,7 @@ const buildProduceUnitGrams = (entry: (typeof PRODUCE_MEASUREMENTS)[number]): Fo
   ) {
     extraLarge = Number(large) + (Number(large) - Number(medium))
   } else if (
-    !Number.isFinite(Number(extraLarge)) &&
+    (!Number.isFinite(Number(extraLarge)) || Number(extraLarge) <= 0) &&
     Number.isFinite(Number(large)) &&
     Number.isFinite(Number(small)) &&
     Number(large) > 0 &&

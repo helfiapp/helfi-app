@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Image,
   Modal,
   Pressable,
@@ -14,7 +15,7 @@ import {
 } from 'react-native'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useFocusEffect, useNavigation } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import * as ImagePicker from 'expo-image-picker'
 import * as ImageManipulator from 'expo-image-manipulator'
@@ -26,6 +27,8 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { useVoiceAssistant } from '../voice/VoiceAssistant'
+import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
 
 type Nutrients = {
   calories?: number | null
@@ -128,14 +131,23 @@ type FavoriteAdjustItem = {
   name: string
   servingLabel: string
   servings: number
+  amountInput: string
+  amountUnit: FavoriteAmountUnit
+  baseAmount: number | null
+  baseUnit: FavoriteBaseUnit | null
   calories: number
   protein: number
   carbs: number
   fat: number
   fiber: number
   sugar: number
+  servingOptions?: SearchFoodServingOption[] | null
+  selectedServingId?: string | null
   raw?: any
 }
+
+type FavoriteBaseUnit = 'g' | 'ml' | 'oz'
+type FavoriteAmountUnit = 'serving' | FavoriteBaseUnit
 
 type SearchFoodSource = 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom' | string
 
@@ -149,6 +161,9 @@ type SearchFoodServingOption = {
   fat_g?: number | null
   fiber_g?: number | null
   sugar_g?: number | null
+  grams?: number | null
+  ml?: number | null
+  unit?: 'g' | 'ml' | 'oz' | string | null
 }
 
 type SearchFoodItem = {
@@ -420,6 +435,457 @@ type EntryTotals = {
 function roundTo(value: number, decimals = 1) {
   const factor = Math.pow(10, decimals)
   return Math.round(value * factor) / factor
+}
+
+function nullableNumber(value: any) {
+  const n = Number(value)
+  return Number.isFinite(n) ? n : null
+}
+
+function hasServingOptionMacroData(option: SearchFoodServingOption) {
+  return (
+    nullableNumber(option?.calories) != null &&
+    nullableNumber(option?.protein_g) != null &&
+    nullableNumber(option?.carbs_g) != null &&
+    nullableNumber(option?.fat_g) != null
+  )
+}
+
+function normalizeFavoriteServingOptions(raw: any): SearchFoodServingOption[] {
+  if (!Array.isArray(raw)) return []
+  return raw
+    .map((option, index) => {
+      const label = typeof option?.label === 'string' ? option.label.trim() : ''
+      const servingSize = typeof option?.serving_size === 'string' ? option.serving_size.trim() : ''
+      const resolvedLabel = (servingSize || label).trim()
+      const id = String(option?.id || resolvedLabel || `serving-${index}`).trim()
+      if (!id || !resolvedLabel) return null
+      return {
+        id,
+        label: label || resolvedLabel,
+        serving_size: resolvedLabel,
+        calories: nullableNumber(option?.calories),
+        protein_g: nullableNumber(option?.protein_g),
+        carbs_g: nullableNumber(option?.carbs_g),
+        fat_g: nullableNumber(option?.fat_g),
+        fiber_g: nullableNumber(option?.fiber_g),
+        sugar_g: nullableNumber(option?.sugar_g),
+        grams: nullableNumber(option?.grams),
+        ml: nullableNumber(option?.ml),
+        unit: typeof option?.unit === 'string' ? option.unit : null,
+      } as SearchFoodServingOption
+    })
+    .filter((option): option is SearchFoodServingOption => Boolean(option && hasServingOptionMacroData(option)))
+}
+
+function servingOptionDisplayLabel(option: SearchFoodServingOption) {
+  return normalizeFavoriteLabel(option?.label || option?.serving_size || 'Serving') || 'Serving'
+}
+
+function findSelectedServingId(
+  options: SearchFoodServingOption[],
+  servingLabel: string,
+  selectedServingId?: string | null,
+) {
+  const selected = String(selectedServingId || '').trim()
+  if (selected && options.some((option) => String(option.id) === selected)) return selected
+  const normalizedLabel = normalizeFavoriteLabel(servingLabel).toLowerCase()
+  const match = options.find((option) => {
+    const optionLabel = normalizeFavoriteLabel(option?.label || option?.serving_size || '').toLowerCase()
+    return optionLabel && normalizedLabel && (optionLabel === normalizedLabel || normalizedLabel.includes(optionLabel))
+  })
+  return match ? String(match.id) : null
+}
+
+function parseServingGramsFromLabel(label?: string | null) {
+  const match = String(label || '').match(/(\d+(?:\.\d+)?)\s*g\b/i)
+  if (!match) return null
+  const grams = Number(match[1])
+  return Number.isFinite(grams) && grams > 0 ? grams : null
+}
+
+function parseServingBaseForFavorite(label?: string | null): { amount: number; unit: FavoriteBaseUnit } | null {
+  const raw = String(label || '').toLowerCase()
+  if (!raw.trim()) return null
+
+  const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
+  if (gramsMatch) {
+    const amount = Number(gramsMatch[1])
+    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'g' }
+  }
+
+  const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/)
+  if (mlMatch) {
+    const amount = Number(mlMatch[1])
+    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'ml' }
+  }
+
+  const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(?:fl\s*)?oz\b/)
+  if (ozMatch) {
+    const amount = Number(ozMatch[1])
+    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'oz' }
+  }
+
+  return null
+}
+
+function servingOptionBase(option: SearchFoodServingOption): { amount: number; unit: FavoriteBaseUnit } | null {
+  const grams = nullableNumber(option?.grams)
+  if (grams && grams > 0) return { amount: grams, unit: 'g' }
+  const ml = nullableNumber(option?.ml)
+  if (ml && ml > 0) return { amount: ml, unit: 'ml' }
+  return parseServingBaseForFavorite(option?.serving_size || option?.label || '')
+}
+
+function buildFallbackFavoriteServingOptions(item: FavoriteAdjustItem): SearchFoodServingOption[] {
+  const base = favoriteBaseForItem(item)
+  const currentLabel = normalizeFavoriteLabel(item.servingLabel || '1 serving') || '1 serving'
+  const safeBaseAmount = base && Number.isFinite(base.amount) && base.amount > 0 ? base.amount : null
+  const macros = {
+    calories: Math.max(0, numberOrZero(item.calories)),
+    protein_g: Math.max(0, numberOrZero(item.protein)),
+    carbs_g: Math.max(0, numberOrZero(item.carbs)),
+    fat_g: Math.max(0, numberOrZero(item.fat)),
+    fiber_g: Math.max(0, numberOrZero(item.fiber)),
+    sugar_g: Math.max(0, numberOrZero(item.sugar)),
+  }
+  const options: SearchFoodServingOption[] = [
+    {
+      id: `current-${item.id}`,
+      label: currentLabel,
+      serving_size: currentLabel,
+      ...macros,
+      grams: base?.unit === 'g' ? base.amount : null,
+      ml: base?.unit === 'ml' ? base.amount : null,
+      unit: base?.unit || null,
+    },
+  ]
+
+  if (base?.unit === 'g' && safeBaseAmount) {
+    ;[100, 1].forEach((grams) => {
+      if (Math.abs(grams - safeBaseAmount) < 0.001) return
+      const scale = grams / safeBaseAmount
+      options.push({
+        id: `fallback-${item.id}-${grams}g`,
+        label: `${grams} g`,
+        serving_size: `${grams} g`,
+        calories: roundTo(macros.calories * scale, 2),
+        protein_g: roundTo(macros.protein_g * scale, 2),
+        carbs_g: roundTo(macros.carbs_g * scale, 2),
+        fat_g: roundTo(macros.fat_g * scale, 2),
+        fiber_g: roundTo(macros.fiber_g * scale, 2),
+        sugar_g: roundTo(macros.sugar_g * scale, 2),
+        grams,
+        ml: null,
+        unit: 'g',
+      })
+    })
+  } else if (base?.unit === 'ml' && safeBaseAmount) {
+    ;[100, 1].forEach((ml) => {
+      if (Math.abs(ml - safeBaseAmount) < 0.001) return
+      const scale = ml / safeBaseAmount
+      options.push({
+        id: `fallback-${item.id}-${ml}ml`,
+        label: `${ml} ml`,
+        serving_size: `${ml} ml`,
+        calories: roundTo(macros.calories * scale, 2),
+        protein_g: roundTo(macros.protein_g * scale, 2),
+        carbs_g: roundTo(macros.carbs_g * scale, 2),
+        fat_g: roundTo(macros.fat_g * scale, 2),
+        fiber_g: roundTo(macros.fiber_g * scale, 2),
+        sugar_g: roundTo(macros.sugar_g * scale, 2),
+        grams: null,
+        ml,
+        unit: 'ml',
+      })
+    })
+  }
+
+  return normalizeFavoriteServingOptions(options)
+}
+
+function normalizeFavoriteAmountUnit(value: any, fallback: FavoriteAmountUnit = 'serving'): FavoriteAmountUnit {
+  const raw = String(value || '').toLowerCase().trim()
+  if (raw === 'g' || raw === 'gram' || raw === 'grams') return 'g'
+  if (raw === 'ml' || raw === 'milliliter' || raw === 'millilitre') return 'ml'
+  if (raw === 'oz' || raw === 'ounce' || raw === 'ounces' || raw === 'fl oz') return 'oz'
+  if (raw === 'serving' || raw === 'servings') return 'serving'
+  return fallback
+}
+
+function formatFavoriteAmount(value: number) {
+  if (!Number.isFinite(value) || value <= 0) return '1'
+  if (Math.abs(value - Math.round(value)) < 0.001) return String(Math.round(value))
+  return String(roundTo(value, 2))
+}
+
+function isOpenMeasurementServing(label?: string | null) {
+  const raw = String(label || '').trim().toLowerCase().replace(/\bestimated\b/g, '').replace(/\s+/g, ' ').trim()
+  return /^\d+(?:\.\d+)?\s*(?:g|grams?|ml|millilit(?:er|re)s?|(?:fl\s*)?oz|ounces?)$/.test(raw)
+}
+
+function convertFavoriteBaseAmount(value: number, from: FavoriteBaseUnit, to: FavoriteBaseUnit) {
+  if (!Number.isFinite(value) || value <= 0) return 0
+  if (from === to) return value
+  if (from === 'oz' && to === 'g') return value * 28.3495
+  if (from === 'g' && to === 'oz') return value / 28.3495
+  if (from === 'oz' && to === 'ml') return value * 29.5735
+  if (from === 'ml' && to === 'oz') return value / 29.5735
+  return value
+}
+
+function favoriteAmountInBase(
+  amount: number,
+  unit: FavoriteAmountUnit,
+  base: { amount: number; unit: FavoriteBaseUnit } | null,
+) {
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return amount
+  if (unit === 'serving') return amount * base.amount
+  return convertFavoriteBaseAmount(amount, unit, base.unit)
+}
+
+function favoriteAmountFromServings(
+  servings: number,
+  unit: FavoriteAmountUnit,
+  base: { amount: number; unit: FavoriteBaseUnit } | null,
+) {
+  const safeServings = Number.isFinite(servings) && servings > 0 ? servings : 1
+  if (unit === 'serving') return safeServings
+  if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return safeServings
+  return convertFavoriteBaseAmount(base.amount * safeServings, base.unit, unit)
+}
+
+function favoriteServingsFromAmount(
+  amount: number,
+  unit: FavoriteAmountUnit,
+  base: { amount: number; unit: FavoriteBaseUnit } | null,
+) {
+  if (!Number.isFinite(amount) || amount <= 0) return 0
+  if (unit === 'serving') return amount
+  if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return amount
+  const inBase = favoriteAmountInBase(amount, unit, base)
+  return inBase > 0 ? inBase / base.amount : amount
+}
+
+function favoriteBaseForItem(item: FavoriteAdjustItem) {
+  if (item.baseAmount && item.baseUnit) return { amount: item.baseAmount, unit: item.baseUnit }
+  return parseServingBaseForFavorite(item.servingLabel)
+}
+
+function isLikelyLiquidFavoriteItem(item: FavoriteAdjustItem) {
+  if (item.baseUnit === 'ml') return true
+  const labels = [
+    item.name,
+    item.servingLabel,
+    ...(Array.isArray(item.servingOptions) ? item.servingOptions.map((option) => option?.label || option?.serving_size || '') : []),
+  ]
+    .join(' ')
+    .toLowerCase()
+  return /\b(water|milk|juice|coffee|tea|smoothie|shake|soda|cola|drink|beverage|soup|broth|stock|oil|vinegar|sauce|cream|beer|wine)\b/.test(labels)
+}
+
+function favoriteAmountUnitOptions(item: FavoriteAdjustItem): FavoriteAmountUnit[] {
+  const isOpenServing = isOpenMeasurementServing(item.servingLabel)
+  const units: FavoriteAmountUnit[] = isOpenServing ? ['g', 'oz'] : ['serving', 'g', 'oz']
+  if (item.amountUnit === 'ml' || isLikelyLiquidFavoriteItem(item)) {
+    const insertIndex = units.includes('serving') ? 2 : 1
+    units.splice(insertIndex, 0, 'ml')
+  }
+  return units
+}
+
+function favoriteAmountUnitLabel(unit: FavoriteAmountUnit, item: FavoriteAdjustItem) {
+  if (unit === 'serving') return item.servingLabel || 'serving'
+  return unit
+}
+
+function favoriteAmountStateFromRaw(raw: any, servingLabel: string, servings: number) {
+  const base = parseServingBaseForFavorite(servingLabel)
+  const rawUnitValue = raw?.amountUnit ?? raw?.__unit ?? raw?.weightUnit
+  const hasRawUnit = rawUnitValue !== null && rawUnitValue !== undefined && String(rawUnitValue).trim().length > 0
+  const rawUnit = hasRawUnit ? normalizeFavoriteAmountUnit(rawUnitValue, 'serving') : null
+  const rawAmount = nullableNumber(raw?.amount ?? raw?.__amount ?? raw?.weightAmount)
+  const preferredUnit =
+    rawAmount && rawAmount > 0 && rawUnit
+      ? rawUnit
+      : base && isOpenMeasurementServing(servingLabel)
+      ? base.unit
+      : 'serving'
+  const amount =
+    rawAmount && rawAmount > 0 && rawUnit
+      ? rawAmount
+      : favoriteAmountFromServings(servings, preferredUnit, base)
+
+  return {
+    amountInput: formatFavoriteAmount(amount),
+    amountUnit: preferredUnit,
+    baseAmount: base?.amount ?? null,
+    baseUnit: base?.unit ?? null,
+  }
+}
+
+function favoriteAdjustPersistenceFields(entry: FavoriteAdjustItem) {
+  const base = favoriteBaseForItem(entry)
+  const amount = nullableNumber(entry.amountInput)
+  const safeAmount = amount && amount > 0 ? amount : favoriteAmountFromServings(entry.servings, entry.amountUnit, base)
+  const fields: any = {
+    __amount: roundTo(safeAmount, 3),
+    __unit: entry.amountUnit,
+    weightAmount: roundTo(safeAmount, 3),
+    weightUnit: entry.amountUnit,
+  }
+
+  if (base?.unit === 'ml') {
+    fields.customMlPerServing = roundTo(base.amount, 3)
+    fields.customGramsPerServing = null
+  } else if (base?.unit === 'oz') {
+    fields.customGramsPerServing = roundTo(base.amount * 28.3495, 3)
+    fields.customMlPerServing = null
+  } else if (base?.unit === 'g') {
+    fields.customGramsPerServing = roundTo(base.amount, 3)
+    fields.customMlPerServing = null
+  }
+
+  return fields
+}
+
+function updateFavoriteAdjustItemAmount(item: FavoriteAdjustItem, value: string): FavoriteAdjustItem {
+  const amount = Number(value)
+  const base = favoriteBaseForItem(item)
+  const servings = favoriteServingsFromAmount(amount, item.amountUnit, base)
+  return {
+    ...item,
+    amountInput: value,
+    servings: Math.max(0, roundTo(Number.isFinite(servings) ? servings : 0, 3)),
+  }
+}
+
+function updateFavoriteAdjustItemUnit(item: FavoriteAdjustItem, unit: FavoriteAmountUnit): FavoriteAdjustItem {
+  const options = favoriteAmountUnitOptions(item)
+  const nextUnit = options.includes(unit) ? unit : options[0] || 'g'
+  const base = favoriteBaseForItem(item)
+  const amount = favoriteAmountFromServings(item.servings, nextUnit, base)
+  return {
+    ...item,
+    amountUnit: nextUnit,
+    amountInput: formatFavoriteAmount(amount),
+  }
+}
+
+function servingOptionGrams(option: SearchFoodServingOption) {
+  const grams = nullableNumber(option?.grams)
+  if (grams && grams > 0) return grams
+  return parseServingGramsFromLabel(option?.serving_size || option?.label || '')
+}
+
+function nextServingsForServingOption(item: FavoriteAdjustItem, option: SearchFoodServingOption) {
+  const currentServings =
+    Number.isFinite(Number(item.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1
+  const currentLabel = String(item.servingLabel || '').toLowerCase()
+  if (!currentLabel.includes('estimated')) return currentServings
+
+  const currentGrams = parseServingGramsFromLabel(item.servingLabel)
+  const optionGrams = servingOptionGrams(option)
+  if (!currentGrams || !optionGrams) return currentServings
+  return Math.max(0.25, roundTo((currentGrams * currentServings) / optionGrams, 2))
+}
+
+function applyServingOptionToFavoriteAdjustItem(
+  item: FavoriteAdjustItem,
+  option: SearchFoodServingOption,
+  options: SearchFoodServingOption[],
+) {
+  const servingLabel = servingOptionDisplayLabel(option)
+  const raw = item.raw && typeof item.raw === 'object' ? item.raw : {}
+  const base = servingOptionBase(option) || parseServingBaseForFavorite(servingLabel)
+  const amountUnit: FavoriteAmountUnit = base && isOpenMeasurementServing(servingLabel) ? base.unit : 'serving'
+  const servings = item.amountUnit === 'serving' ? nextServingsForServingOption(item, option) : 1
+  const amount = favoriteAmountFromServings(servings, amountUnit, base)
+  return {
+    ...item,
+    servingLabel,
+    servings,
+    amountInput: formatFavoriteAmount(amount),
+    amountUnit,
+    baseAmount: base?.amount ?? null,
+    baseUnit: base?.unit ?? null,
+    calories: Math.max(0, numberOrZero(option?.calories)),
+    protein: Math.max(0, numberOrZero(option?.protein_g)),
+    carbs: Math.max(0, numberOrZero(option?.carbs_g)),
+    fat: Math.max(0, numberOrZero(option?.fat_g)),
+    fiber: Math.max(0, numberOrZero(option?.fiber_g)),
+    sugar: Math.max(0, numberOrZero(option?.sugar_g)),
+    servingOptions: options,
+    selectedServingId: String(option.id),
+    raw: {
+      ...raw,
+      serving_size: servingLabel,
+      selectedServingId: String(option.id),
+      servingOptions: options,
+      ...favoriteAdjustPersistenceFields({
+        ...item,
+        servingLabel,
+        servings,
+        amountInput: formatFavoriteAmount(amount),
+        amountUnit,
+        baseAmount: base?.amount ?? null,
+        baseUnit: base?.unit ?? null,
+      }),
+      calories: Math.max(0, numberOrZero(option?.calories)),
+      calories_kcal: Math.max(0, numberOrZero(option?.calories)),
+      protein: Math.max(0, numberOrZero(option?.protein_g)),
+      protein_g: Math.max(0, numberOrZero(option?.protein_g)),
+      carbs: Math.max(0, numberOrZero(option?.carbs_g)),
+      carbs_g: Math.max(0, numberOrZero(option?.carbs_g)),
+      fat: Math.max(0, numberOrZero(option?.fat_g)),
+      fat_g: Math.max(0, numberOrZero(option?.fat_g)),
+      fiber: Math.max(0, numberOrZero(option?.fiber_g)),
+      fiber_g: Math.max(0, numberOrZero(option?.fiber_g)),
+      sugar: Math.max(0, numberOrZero(option?.sugar_g)),
+      sugar_g: Math.max(0, numberOrZero(option?.sugar_g)),
+    },
+  }
+}
+
+function servingLookupForFavoriteAdjustItem(item: FavoriteAdjustItem) {
+  const raw = item.raw && typeof item.raw === 'object' ? item.raw : {}
+  let source = String(raw?.source || raw?.foodSource || raw?.dataSource || '').toLowerCase().trim()
+  let id = String(raw?.id || raw?.foodId || raw?.fdcId || raw?.sourceId || '').trim()
+
+  if (id.startsWith('custom:')) {
+    source = 'custom'
+    id = id.slice('custom:'.length)
+  } else if (raw?.__custom === true || source === 'custom') {
+    source = 'custom'
+  } else if (source === 'usda' || id.startsWith('usda:')) {
+    source = 'usda'
+    id = id.replace(/^usda:/i, '')
+  } else if (source === 'fatsecret' || id.startsWith('fatsecret:')) {
+    source = 'fatsecret'
+    id = id.replace(/^fatsecret:/i, '')
+  }
+
+  if (!source || !id) return null
+  return { source, id }
+}
+
+function searchQueryForFavoriteAdjustItem(item: FavoriteAdjustItem) {
+  const raw = item.raw && typeof item.raw === 'object' ? item.raw : {}
+  const value =
+    raw?.requestedName ||
+    raw?.canonicalName ||
+    raw?.foodName ||
+    raw?.name ||
+    raw?.label ||
+    item.name ||
+    ''
+  return String(value)
+    .toLowerCase()
+    .replace(/\b(one|two|three|four|five|six|seven|eight|nine|ten|half|a|an)\b/g, ' ')
+    .replace(/\b\d+(?:\.\d+)?\s*(grams?|g|ounces?|oz|ml|millilitres?|milliliters?|cups?|slices?)\b/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
 }
 
 function sanitizeEntryTotals(raw: any): EntryTotals | null {
@@ -995,19 +1461,28 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
   const source = item.favorite || item.entry
   const rawItems = Array.isArray(source?.items) ? source.items : []
   if (rawItems.length > 0) {
-    return rawItems.map((raw: any, index: number) => ({
-      id: String(raw?.id || raw?.foodId || `${item.id}-${index}`),
-      name: String(raw?.name || raw?.label || `Ingredient ${index + 1}`).trim(),
-      servingLabel: normalizeFavoriteLabel(raw?.serving_size || raw?.unit || raw?.weightUnit || '1 serving') || '1 serving',
-      servings: Number.isFinite(Number(raw?.servings)) && Number(raw?.servings) > 0 ? Number(raw.servings) : 1,
-      calories: Math.max(0, Number(raw?.calories ?? raw?.calories_kcal) || 0),
-      protein: Math.max(0, Number(raw?.protein_g ?? raw?.protein) || 0),
-      carbs: Math.max(0, Number(raw?.carbs_g ?? raw?.carbs) || 0),
-      fat: Math.max(0, Number(raw?.fat_g ?? raw?.fat) || 0),
-      fiber: Math.max(0, Number(raw?.fiber_g ?? raw?.fiber) || 0),
-      sugar: Math.max(0, Number(raw?.sugar_g ?? raw?.sugar) || 0),
-      raw: { ...raw },
-    }))
+    return rawItems.map((raw: any, index: number) => {
+      const servingOptions = normalizeFavoriteServingOptions(raw?.servingOptions)
+      const servingLabel = normalizeFavoriteLabel(raw?.serving_size || raw?.unit || raw?.weightUnit || '1 serving') || '1 serving'
+      const servings = Number.isFinite(Number(raw?.servings)) && Number(raw?.servings) > 0 ? Number(raw.servings) : 1
+      const amountState = favoriteAmountStateFromRaw(raw, servingLabel, servings)
+      return {
+        id: String(raw?.id || raw?.foodId || `${item.id}-${index}`),
+        name: String(raw?.name || raw?.label || `Ingredient ${index + 1}`).trim(),
+        servingLabel,
+        servings,
+        ...amountState,
+        calories: Math.max(0, Number(raw?.calories ?? raw?.calories_kcal) || 0),
+        protein: Math.max(0, Number(raw?.protein_g ?? raw?.protein) || 0),
+        carbs: Math.max(0, Number(raw?.carbs_g ?? raw?.carbs) || 0),
+        fat: Math.max(0, Number(raw?.fat_g ?? raw?.fat) || 0),
+        fiber: Math.max(0, Number(raw?.fiber_g ?? raw?.fiber) || 0),
+        sugar: Math.max(0, Number(raw?.sugar_g ?? raw?.sugar) || 0),
+        servingOptions,
+        selectedServingId: findSelectedServingId(servingOptions, servingLabel, raw?.selectedServingId),
+        raw: { ...raw, servingOptions },
+      }
+    })
   }
   const sourceTotals = item.favorite?.nutrients || item.entry?.nutrients || {
     calories: item.calories,
@@ -1023,6 +1498,7 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
       name: item.label,
       servingLabel: item.serving || '1 serving',
       servings: 1,
+      ...favoriteAmountStateFromRaw(null, item.serving || '1 serving', 1),
       calories: Math.max(0, Number(sourceTotals?.calories) || 0),
       protein: Math.max(0, Number(sourceTotals?.protein) || 0),
       carbs: Math.max(0, Number(sourceTotals?.carbs) || 0),
@@ -1035,18 +1511,25 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
 }
 
 function buildFavoriteAdjustItemFromSearchFood(item: SearchFoodItem): FavoriteAdjustItem {
+  const servingOptions = normalizeFavoriteServingOptions(item?.servingOptions)
+  const servingLabel = normalizeFavoriteLabel(item?.serving_size || '1 serving') || '1 serving'
+  const servings = Number.isFinite(Number(item?.servings)) && Number(item?.servings) > 0 ? Number(item.servings) : 1
+  const amountState = favoriteAmountStateFromRaw(item, servingLabel, servings)
   return {
     id: String(item?.id || `search-${Date.now()}-${Math.random().toString(16).slice(2)}`),
     name: String(item?.name || 'Ingredient').trim() || 'Ingredient',
-    servingLabel: normalizeFavoriteLabel(item?.serving_size || '1 serving') || '1 serving',
-    servings: Number.isFinite(Number(item?.servings)) && Number(item?.servings) > 0 ? Number(item.servings) : 1,
+    servingLabel,
+    servings,
+    ...amountState,
     calories: Math.max(0, Number(item?.calories ?? item?.calories_kcal) || 0),
     protein: Math.max(0, Number(item?.protein_g) || 0),
     carbs: Math.max(0, Number(item?.carbs_g) || 0),
     fat: Math.max(0, Number(item?.fat_g) || 0),
     fiber: Math.max(0, Number(item?.fiber_g) || 0),
     sugar: Math.max(0, Number(item?.sugar_g) || 0),
-    raw: { ...item },
+    servingOptions,
+    selectedServingId: findSelectedServingId(servingOptions, servingLabel, item?.selectedServingId),
+    raw: { ...item, servingOptions },
   }
 }
 
@@ -1084,6 +1567,40 @@ function buildFavoritesListItemFromFavorite(favorite: FavoriteMeal): FavoritesLi
   }
 }
 
+function isMealDiaryEntry(entry: FoodEntry | null | undefined) {
+  if (!entry) return false
+  const items = Array.isArray(entry.items) ? entry.items : []
+  const raw = entry.raw && typeof entry.raw === 'object' ? entry.raw : {}
+  const nutrients = entry.nutrients && typeof entry.nutrients === 'object' ? (entry.nutrients as any) : {}
+  return (
+    items.length > 1 ||
+    raw?.customMeal === true ||
+    raw?.nutrients?.customMeal === true ||
+    raw?.nutrients?.__voiceBuiltMeal === true ||
+    nutrients?.customMeal === true ||
+    nutrients?.__voiceBuiltMeal === true ||
+    String(raw?.method || raw?.nutrients?.method || nutrients?.method || '').toLowerCase() === 'meal-builder'
+  )
+}
+
+function buildFavoritesListItemFromEntry(entry: FoodEntry): FavoritesListItem {
+  const createdAtMs = toTimestampMs(entry?.createdAt)
+  const label = normalizeFavoriteLabel(entry?.name || entry?.description || 'Meal') || 'Meal'
+  return {
+    id: `entry-editor-${entry.id}`,
+    label,
+    serving: Array.isArray(entry.items) && entry.items.length > 1 ? `${entry.items.length} ingredients` : '1 serving',
+    calories: Math.max(0, Math.round(readNutrient(entry.nutrients, ['calories', 'calories_kcal']))),
+    sourceTag: isMealDiaryEntry(entry) ? 'Custom' : 'Manual',
+    createdAtMs,
+    lastUsedAtMs: createdAtMs,
+    sortPriority: 2,
+    favorite: null,
+    entry,
+    isSaved: false,
+  }
+}
+
 function buildFavoriteShareText(item: FavoritesListItem, adjustItems?: FavoriteAdjustItem[]) {
   const lines = [item.label, '']
   const ingredients = Array.isArray(adjustItems) && adjustItems.length > 0 ? adjustItems : buildFavoriteAdjustItems(item)
@@ -1105,7 +1622,9 @@ function buildFavoriteShareText(item: FavoritesListItem, adjustItems?: FavoriteA
 
 export function TrackCaloriesScreen() {
   const navigation = useNavigation<any>()
+  const route = useRoute<any>()
   const { mode, session, signOut } = useAppMode()
+  const { openVoiceAssistant } = useVoiceAssistant()
   const insets = useSafeAreaInsets()
 
   const authHeaders = useMemo(() => {
@@ -1185,6 +1704,8 @@ export function TrackCaloriesScreen() {
   const [favoriteEditName, setFavoriteEditName] = useState('')
   const [favoriteEditIngredientsExpanded, setFavoriteEditIngredientsExpanded] = useState(false)
   const [favoriteEditExpandedItemId, setFavoriteEditExpandedItemId] = useState<string | null>(null)
+  const [favoriteEditServingPickerItemId, setFavoriteEditServingPickerItemId] = useState<string | null>(null)
+  const [favoriteEditServingLoadingId, setFavoriteEditServingLoadingId] = useState<string | null>(null)
   const [favoriteEditSearchKind, setFavoriteEditSearchKind] = useState<'single' | 'packaged'>('packaged')
   const [favoriteEditSearchQuery, setFavoriteEditSearchQuery] = useState('')
   const [favoriteEditSearchResults, setFavoriteEditSearchResults] = useState<SearchFoodItem[]>([])
@@ -1602,6 +2123,22 @@ export function TrackCaloriesScreen() {
     [favoriteEditItems],
   )
 
+  const favoriteEditServingPickerItem = useMemo(
+    () =>
+      favoriteEditServingPickerItemId
+        ? favoriteEditItems.find((item) => item.id === favoriteEditServingPickerItemId) || null
+        : null,
+    [favoriteEditItems, favoriteEditServingPickerItemId],
+  )
+
+  const favoriteEditServingPickerOptions = useMemo(
+    () =>
+      normalizeFavoriteServingOptions(
+        favoriteEditServingPickerItem?.servingOptions || favoriteEditServingPickerItem?.raw?.servingOptions,
+      ),
+    [favoriteEditServingPickerItem],
+  )
+
   const favoriteAdjustTotals = useMemo(
     () => calculateFavoriteAdjustTotals(favoriteAdjustItems),
     [favoriteAdjustItems],
@@ -1819,6 +2356,8 @@ export function TrackCaloriesScreen() {
     setFavoriteEditName('')
     setFavoriteEditIngredientsExpanded(false)
     setFavoriteEditExpandedItemId(null)
+    setFavoriteEditServingPickerItemId(null)
+    setFavoriteEditServingLoadingId(null)
     setFavoriteEditSearchKind('packaged')
     setFavoriteEditSearchQuery('')
     setFavoriteEditSearchResults([])
@@ -1837,6 +2376,24 @@ export function TrackCaloriesScreen() {
     setFavoriteRenameItem(null)
     setFavoriteRenameValue('')
   }, [])
+
+  const openVoiceFromFoodOverlay = useCallback(() => {
+    if (favoritesOpen) closeFavoritesFlow()
+    setCombineOpen(false)
+    setExerciseOpen(false)
+    setTimeout(() => {
+      openVoiceAssistant({ source: 'button' })
+    }, 120)
+  }, [closeFavoritesFlow, favoritesOpen, openVoiceAssistant])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:voice-assistant-opening', () => {
+      closeFavoritesFlow()
+      setCombineOpen(false)
+      setExerciseOpen(false)
+    })
+    return () => subscription.remove()
+  }, [closeFavoritesFlow])
 
   const loadFavoritesLibrary = useCallback(async () => {
     if (!authHeaders) return
@@ -1911,7 +2468,7 @@ export function TrackCaloriesScreen() {
         headers: authHeaders,
       })
       const exercisePromise = fetch(`${API_BASE_URL}/api/exercise-entries?date=${selectedDate}`, {
-        headers: authHeaders,
+        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
       const creditPromise = fetch(`${API_BASE_URL}/api/credit/status`, {
         headers: buildNativeAuthHeaders(session.token),
@@ -2050,6 +2607,16 @@ export function TrackCaloriesScreen() {
   useEffect(() => {
     if (mode !== 'signedIn' || !session?.token) return
     void loadAll()
+  }, [loadAll, mode, selectedDate, session?.token])
+
+  useEffect(() => {
+    if (mode !== 'signedIn' || !session?.token) return
+    const subscription = DeviceEventEmitter.addListener('helfi:food-log-changed', (payload?: any) => {
+      const changedDate = typeof payload?.localDate === 'string' ? payload.localDate : ''
+      if (changedDate && changedDate !== selectedDate) return
+      void loadAll()
+    })
+    return () => subscription.remove()
   }, [loadAll, mode, selectedDate, session?.token])
 
   useEffect(() => {
@@ -2228,6 +2795,23 @@ export function TrackCaloriesScreen() {
     }
   }
 
+  const confirmEditEntryDelete = () => {
+    if (!editTarget) return
+    const entry = editTarget
+    Alert.alert('Delete entry', `Delete ${entry.name || 'this food entry'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      {
+        text: 'Delete',
+        style: 'destructive',
+        onPress: () => {
+          setEditModalOpen(false)
+          setEditTarget(null)
+          void handleEntryDelete(entry)
+        },
+      },
+    ])
+  }
+
   const openEditModal = (entry: FoodEntry) => {
     const n = entry.nutrients || {}
     setEditTarget(entry)
@@ -2250,16 +2834,26 @@ export function TrackCaloriesScreen() {
     const first = items[0] && typeof items[0] === 'object' ? { ...items[0] } : items[0]
     if (!first || typeof first !== 'object') return items
     const name = String(nextName || '').trim()
+    const servings = Number.isFinite(Number(first.servings)) && Number(first.servings) > 0 ? Number(first.servings) : 1
+    const perServing = (value: any, decimals = 3) => Math.max(0, roundTo((Number(value) || 0) / servings, decimals))
+    const caloriesPerServing = perServing(nextTotals.calories)
+    const proteinPerServing = perServing(Number(nextTotals.protein) || Number(nextTotals.protein_g) || 0, 3)
+    const carbsPerServing = perServing(Number(nextTotals.carbs) || Number(nextTotals.carbs_g) || 0, 3)
+    const fatPerServing = perServing(Number(nextTotals.fat) || Number(nextTotals.fat_g) || 0, 3)
+    const fiberPerServing = perServing(Number(nextTotals.fiber) || Number(nextTotals.fiber_g) || 0, 3)
+    const sugarPerServing = perServing(Number(nextTotals.sugar) || Number(nextTotals.sugar_g) || 0, 3)
+
     return [
       {
         ...first,
         ...(name ? { name, label: name } : {}),
-        calories: Math.max(0, Math.round(Number(nextTotals.calories) || 0)),
-        protein_g: Math.max(0, round1(Number(nextTotals.protein) || Number(nextTotals.protein_g) || 0)),
-        carbs_g: Math.max(0, round1(Number(nextTotals.carbs) || Number(nextTotals.carbs_g) || 0)),
-        fat_g: Math.max(0, round1(Number(nextTotals.fat) || Number(nextTotals.fat_g) || 0)),
-        fiber_g: Math.max(0, round1(Number(nextTotals.fiber) || Number(nextTotals.fiber_g) || 0)),
-        sugar_g: Math.max(0, round1(Number(nextTotals.sugar) || Number(nextTotals.sugar_g) || 0)),
+        calories: caloriesPerServing,
+        calories_kcal: caloriesPerServing,
+        protein_g: proteinPerServing,
+        carbs_g: carbsPerServing,
+        fat_g: fatPerServing,
+        fiber_g: fiberPerServing,
+        sugar_g: sugarPerServing,
       },
     ]
   }
@@ -2650,6 +3244,9 @@ export function TrackCaloriesScreen() {
             name: entry.name,
             serving_size: entry.servingLabel,
             servings: entry.servings,
+            ...favoriteAdjustPersistenceFields(entry),
+            selectedServingId: entry.selectedServingId || null,
+            servingOptions: Array.isArray(entry.servingOptions) && entry.servingOptions.length > 0 ? entry.servingOptions : null,
             calories: entry.calories,
             protein_g: entry.protein,
             carbs_g: entry.carbs,
@@ -2720,6 +3317,8 @@ export function TrackCaloriesScreen() {
     setFavoriteEditName(item.label)
     setFavoriteEditIngredientsExpanded(false)
     setFavoriteEditExpandedItemId(null)
+    setFavoriteEditServingPickerItemId(null)
+    setFavoriteEditServingLoadingId(null)
     setFavoriteEditSearchKind('packaged')
     setFavoriteEditSearchQuery('')
     setFavoriteEditSearchResults([])
@@ -2727,10 +3326,18 @@ export function TrackCaloriesScreen() {
     setFavoriteEditPortionControlEnabled(false)
   }
 
+  const openMealEntryEditor = (entry: FoodEntry) => {
+    const meal = String(entry.meal || entry.category || favoritesTargetMeal || 'uncategorized').toLowerCase()
+    setFavoritesTargetMeal(meal)
+    setEntryMenu(null)
+    closeEntrySwipeMenus()
+    openFavoriteEditor(buildFavoritesListItemFromEntry(entry))
+    setFavoriteEditSearchKind('single')
+  }
+
   const updateFavoriteFromEditor = async () => {
-    if (!favoriteEditItem?.favorite) return
+    if (!favoriteEditItem) return
     const nextName = normalizeFavoriteLabel(favoriteEditName) || favoriteEditItem.label || 'Favorite meal'
-    const sourceFavorite = favoriteEditItem.favorite
     const totals = calculateFavoriteAdjustTotals(favoriteEditItems)
     const nextItems = favoriteEditItems.map((entry) => ({
       ...(entry.raw && typeof entry.raw === 'object' ? entry.raw : {}),
@@ -2739,6 +3346,9 @@ export function TrackCaloriesScreen() {
       label: entry.name,
       serving_size: entry.servingLabel,
       servings: Number.isFinite(Number(entry.servings)) && Number(entry.servings) > 0 ? Number(entry.servings) : 1,
+      ...favoriteAdjustPersistenceFields(entry),
+      selectedServingId: entry.selectedServingId || null,
+      servingOptions: Array.isArray(entry.servingOptions) && entry.servingOptions.length > 0 ? entry.servingOptions : null,
       calories: Math.max(0, Number(entry.calories) || 0),
       protein_g: Math.max(0, Number(entry.protein) || 0),
       carbs_g: Math.max(0, Number(entry.carbs) || 0),
@@ -2746,6 +3356,73 @@ export function TrackCaloriesScreen() {
       fiber_g: Math.max(0, Number(entry.fiber) || 0),
       sugar_g: Math.max(0, Number(entry.sugar) || 0),
     }))
+
+    if (favoriteEditItem?.entry && !favoriteEditItem.favorite) {
+      if (!authHeaders) {
+        Alert.alert('Save failed', 'Please sign in again and retry.')
+        return
+      }
+      const sourceEntry = favoriteEditItem.entry
+      const meal = String(sourceEntry.meal || sourceEntry.category || favoritesTargetMeal || 'uncategorized').toLowerCase()
+      const baseNutrition =
+        sourceEntry.raw?.nutrients && typeof sourceEntry.raw.nutrients === 'object'
+          ? sourceEntry.raw.nutrients
+          : sourceEntry.nutrients && typeof sourceEntry.nutrients === 'object'
+          ? sourceEntry.nutrients
+          : {}
+      const nutrition = {
+        ...(baseNutrition as any),
+        calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
+        calories_kcal: Math.max(0, Math.round(Number(totals.calories) || 0)),
+        protein: Math.max(0, round1(Number(totals.protein) || 0)),
+        protein_g: Math.max(0, round1(Number(totals.protein) || 0)),
+        carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
+        carbs_g: Math.max(0, round1(Number(totals.carbs) || 0)),
+        fat: Math.max(0, round1(Number(totals.fat) || 0)),
+        fat_g: Math.max(0, round1(Number(totals.fat) || 0)),
+        fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
+        fiber_g: Math.max(0, round1(Number(totals.fiber) || 0)),
+        sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+        sugar_g: Math.max(0, round1(Number(totals.sugar) || 0)),
+        customMeal: true,
+        method: 'meal-builder',
+        ...(nextItems.length > 1 ? { __voiceBuiltMeal: true } : {}),
+      }
+      const res = await fetch(`${API_BASE_URL}/api/food-log`, {
+        method: 'PUT',
+        headers: buildNativeAuthHeaders(session?.token || '', { json: true, includeCookie: true }),
+        body: JSON.stringify({
+          id: sourceEntry.id,
+          name: nextName,
+          description: nextItems.map((item) => item.name).join(', ') || nextName,
+          meal,
+          category: meal,
+          localDate: sourceEntry.localDate || selectedDate,
+          nutrition,
+          total: { ...nutrition },
+          items: nextItems,
+          imageUrl: typeof sourceEntry.raw?.imageUrl === 'string' ? sourceEntry.raw.imageUrl : undefined,
+          createdAt: sourceEntry.createdAt || undefined,
+        }),
+      })
+      if (!res.ok) {
+        Alert.alert('Save failed', 'Could not save this meal.')
+        return
+      }
+
+      setFavoriteEditItem(null)
+      setFavoriteEditItems([])
+      setFavoriteEditName('')
+      setFavoriteEditIngredientsExpanded(false)
+      setFavoriteEditExpandedItemId(null)
+      setFavoriteEditServingPickerItemId(null)
+      setFavoriteEditServingLoadingId(null)
+      await loadAll()
+      return
+    }
+
+    if (!favoriteEditItem?.favorite) return
+    const sourceFavorite = favoriteEditItem.favorite
     const meal = String(sourceFavorite.meal || favoriteEditItem.entry?.meal || favoritesTargetMeal || 'uncategorized').toLowerCase()
     const method = String(sourceFavorite.method || sourceFavorite.raw?.method || '').toLowerCase()
     const custom =
@@ -2813,6 +3490,8 @@ export function TrackCaloriesScreen() {
     setFavoriteEditName('')
     setFavoriteEditIngredientsExpanded(false)
     setFavoriteEditExpandedItemId(null)
+    setFavoriteEditServingPickerItemId(null)
+    setFavoriteEditServingLoadingId(null)
     Alert.alert('Favorite updated', 'Would you like to add this updated meal to your diary now?', [
       {
         text: 'Not now',
@@ -2897,6 +3576,130 @@ export function TrackCaloriesScreen() {
   const removeFavoriteEditIngredient = (id: string) => {
     setFavoriteEditItems((prev) => prev.filter((item) => item.id !== id))
     setFavoriteEditExpandedItemId((prev) => (prev === id ? null : prev))
+    setFavoriteEditServingPickerItemId((prev) => (prev === id ? null : prev))
+  }
+
+  const cacheFavoriteEditServingOptions = (
+    id: string,
+    options: SearchFoodServingOption[],
+    identifiers?: { source?: string; id?: string } | null,
+  ) => {
+    setFavoriteEditItems((prev) =>
+      prev.map((entry) => {
+        if (entry.id !== id) return entry
+        const raw = entry.raw && typeof entry.raw === 'object' ? entry.raw : {}
+        return {
+          ...entry,
+          servingOptions: options,
+          selectedServingId: findSelectedServingId(options, entry.servingLabel, entry.selectedServingId),
+          raw: {
+            ...raw,
+            ...(identifiers?.source ? { source: identifiers.source } : {}),
+            ...(identifiers?.id ? { id: identifiers.source === 'custom' ? `custom:${identifiers.id}` : identifiers.id } : {}),
+            servingOptions: options,
+          },
+        }
+      }),
+    )
+  }
+
+  const fetchServingOptionsForFavoriteEditItem = async (item: FavoriteAdjustItem) => {
+    if (!authHeaders) return []
+    const lookup = servingLookupForFavoriteAdjustItem(item)
+    if (!lookup) return []
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/food-data/servings?source=${encodeURIComponent(lookup.source)}&id=${encodeURIComponent(lookup.id)}`,
+      { headers: authHeaders },
+    )
+    const data: any = await res.json().catch(() => ({}))
+    if (!res.ok) return []
+    const options = normalizeFavoriteServingOptions(data?.options)
+    if (options.length > 0) cacheFavoriteEditServingOptions(item.id, options, lookup)
+    return options
+  }
+
+  const searchServingOptionsForFavoriteEditItem = async (item: FavoriteAdjustItem) => {
+    if (!authHeaders) return []
+    const query = searchQueryForFavoriteAdjustItem(item)
+    if (!query) return []
+
+    const res = await fetch(
+      `${API_BASE_URL}/api/food-data?source=usda&kind=single&q=${encodeURIComponent(query)}&limit=8`,
+      { headers: authHeaders },
+    )
+    const data: any = await res.json().catch(() => ({}))
+    if (!res.ok) return []
+    const results: SearchFoodItem[] = Array.isArray(data?.items) ? data.items : []
+    const best = results.find((entry) => entry?.__custom === true || entry?.source === 'custom') || results[0] || null
+    if (!best) return []
+
+    const directOptions = normalizeFavoriteServingOptions(best.servingOptions)
+    const lookup = servingLookupForFavoriteAdjustItem({
+      ...item,
+      raw: best,
+    })
+    if (directOptions.length > 0) {
+      cacheFavoriteEditServingOptions(item.id, directOptions, lookup)
+      return directOptions
+    }
+    if (!lookup) return []
+
+    const resOptions = await fetch(
+      `${API_BASE_URL}/api/food-data/servings?source=${encodeURIComponent(lookup.source)}&id=${encodeURIComponent(lookup.id)}`,
+      { headers: authHeaders },
+    )
+    const optionsData: any = await resOptions.json().catch(() => ({}))
+    if (!resOptions.ok) return []
+    const fetchedOptions = normalizeFavoriteServingOptions(optionsData?.options)
+    if (fetchedOptions.length > 0) cacheFavoriteEditServingOptions(item.id, fetchedOptions, lookup)
+    return fetchedOptions
+  }
+
+  const openFavoriteEditServingPicker = async (item: FavoriteAdjustItem) => {
+    const existing = normalizeFavoriteServingOptions(item.servingOptions || item.raw?.servingOptions)
+    if (existing.length > 0) {
+      setFavoriteEditServingPickerItemId(item.id)
+      return
+    }
+    const fallback = buildFallbackFavoriteServingOptions(item)
+    const openWithFallback = () => {
+      if (fallback.length === 0) return false
+      cacheFavoriteEditServingOptions(item.id, fallback)
+      setFavoriteEditServingPickerItemId(item.id)
+      return true
+    }
+
+    try {
+      setFavoriteEditServingLoadingId(item.id)
+      const fetched = await fetchServingOptionsForFavoriteEditItem(item)
+      const options = fetched.length > 0 ? fetched : await searchServingOptionsForFavoriteEditItem(item)
+      if (options.length === 0) {
+        if (openWithFallback()) return
+        Alert.alert('Serving sizes unavailable', 'I could not find serving choices for this ingredient yet.')
+        return
+      }
+      setFavoriteEditServingPickerItemId(item.id)
+    } catch {
+      if (openWithFallback()) return
+      Alert.alert('Serving sizes unavailable', 'I could not load serving choices for this ingredient.')
+    } finally {
+      setFavoriteEditServingLoadingId((prev) => (prev === item.id ? null : prev))
+    }
+  }
+
+  const applyFavoriteEditServingOption = (
+    itemId: string,
+    option: SearchFoodServingOption,
+    optionsOverride?: SearchFoodServingOption[],
+  ) => {
+    const options = optionsOverride || favoriteEditServingPickerOptions
+    setFavoriteEditItems((prev) =>
+      prev.map((entry) =>
+        entry.id === itemId ? applyServingOptionToFavoriteAdjustItem(entry, option, options) : entry,
+      ),
+    )
+    setFavoriteEditServingPickerItemId(null)
   }
 
   const submitFavoriteEditMissingReport = async () => {
@@ -3041,8 +3844,20 @@ export function TrackCaloriesScreen() {
     } catch {}
   }
 
+  const navigateStackScreen = useCallback(
+    (routeName: string, params?: any) => {
+      const routeNames = navigation.getState?.()?.routeNames || []
+      if (Array.isArray(routeNames) && routeNames.includes(routeName)) {
+        navigation.navigate(routeName, params)
+        return
+      }
+      navigation.getParent()?.navigate(routeName, params)
+    },
+    [navigation],
+  )
+
   const openIngredientSearch = (meal: string) => {
-    navigation.getParent()?.navigate('AddIngredient', {
+    navigateStackScreen('AddIngredient', {
       meal,
       date: selectedDate,
       creditsRemaining,
@@ -3840,6 +4655,13 @@ export function TrackCaloriesScreen() {
     await loadAll()
   }
 
+  const confirmExerciseDelete = (entry: ExerciseEntry) => {
+    Alert.alert('Delete exercise', `Delete ${entry.exerciseType?.name || 'this exercise entry'}?`, [
+      { text: 'Cancel', style: 'cancel' },
+      { text: 'Delete', style: 'destructive', onPress: () => void deleteExercise(entry) },
+    ])
+  }
+
   const syncExerciseDevices = async () => {
     if (!authHeaders) return
 
@@ -3959,6 +4781,54 @@ export function TrackCaloriesScreen() {
     setSummarySlideIndex((prev) => clamp(prev + direction, 0, 2))
   }
 
+  const openFoodVoiceAction = (payload?: any) => {
+    const mealRaw = typeof payload?.meal === 'string' ? payload.meal : 'breakfast'
+    const meal = MEALS.some((item) => item.key === mealRaw) ? mealRaw : 'breakfast'
+    const action = String(payload?.action || '')
+    closeAllAddMenus()
+    setTopAddMeal(meal)
+    if (action === 'openAddFoodEntry') {
+      openIngredientSearch(meal)
+      return
+    }
+    if (action === 'openFavorites') {
+      openFavorites(meal)
+      return
+    }
+    if (action === 'openBuildMeal') {
+      openCombine(meal)
+      return
+    }
+    if (action === 'openImportRecipe') {
+      setIngredientTargetMeal(meal)
+      setCombineName('Imported Recipe')
+      setCombineIds([])
+      setCombineOpen(true)
+      return
+    }
+    if (action === 'openExercise') {
+      openExerciseAdd()
+    }
+  }
+
+  useEffect(() => {
+    if (mode !== 'signedIn' || !session?.token) return
+    const subscription = DeviceEventEmitter.addListener('helfi:food-voice-action', openFoodVoiceAction)
+    return () => subscription.remove()
+  }, [mode, navigation, session?.token])
+
+  useEffect(() => {
+    if (mode !== 'signedIn' || !session?.token) return
+    const action = typeof route.params?.voiceAction === 'string' ? route.params.voiceAction : ''
+    if (!action) return
+    const meal = typeof route.params?.voiceMeal === 'string' ? route.params.voiceMeal : 'breakfast'
+    const timeout = setTimeout(() => {
+      openFoodVoiceAction({ action, meal })
+      navigation.setParams?.({ voiceAction: undefined, voiceMeal: undefined, voiceActionNonce: undefined })
+    }, 150)
+    return () => clearTimeout(timeout)
+  }, [mode, navigation, route.params?.voiceAction, route.params?.voiceActionNonce, route.params?.voiceMeal, session?.token])
+
   const goToProfile = () => navigation.getParent()?.navigate('Profile')
   const goToAccountSettings = () => navigation.getParent()?.navigate('AccountSettings')
   const goToProfilePhoto = () => navigation.getParent()?.navigate('ProfilePhoto')
@@ -3988,10 +4858,29 @@ export function TrackCaloriesScreen() {
 
   return (
     <Screen style={{ backgroundColor: '#F2F4F6' }}>
-      <ScrollView contentContainerStyle={{ paddingBottom: 28 }}>
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 140 }}>
         <View style={{ backgroundColor: '#F2F4F6', borderBottomWidth: 1, borderBottomColor: '#DFE3EA', paddingHorizontal: 16, paddingTop: 14, paddingBottom: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <View style={{ width: 42 }} />
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Talk to Helfi"
+              onPress={() => openVoiceAssistant({ source: 'button' })}
+              style={{
+                width: 42,
+                height: 42,
+                borderRadius: 21,
+                backgroundColor: '#41AD49',
+                alignItems: 'center',
+                justifyContent: 'center',
+                shadowColor: '#000',
+                shadowOpacity: 0.12,
+                shadowRadius: 6,
+                shadowOffset: { width: 0, height: 3 },
+                elevation: 4,
+              }}
+            >
+              <MaterialCommunityIcons name="microphone" size={21} color="#FFFFFF" />
+            </Pressable>
             <Text style={{ flex: 1, textAlign: 'center', color: '#111827', fontSize: 21, fontWeight: '900' }}>Food Diary</Text>
             <Pressable
               onPress={() => setProfileMenuOpen((v) => !v)}
@@ -4364,6 +5253,46 @@ export function TrackCaloriesScreen() {
                   <Text style={{ color: '#059669', fontSize: 24, fontWeight: '900' }}>＋</Text>
                 </Pressable>
               </View>
+
+              {exerciseEntries.length > 0 ? (
+                <View style={{ marginTop: 10, gap: 8 }}>
+                  {exerciseEntries.map((entry) => (
+                    <View
+                      key={entry.id}
+                      style={{
+                        borderWidth: 1,
+                        borderColor: '#E5E7EB',
+                        borderRadius: 12,
+                        backgroundColor: '#FBFDFC',
+                        padding: 10,
+                      }}
+                    >
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                        <View style={{ flex: 1 }}>
+                          <Text style={{ color: '#111827', fontWeight: '800' }}>
+                            {entry.exerciseType?.name || 'Exercise'}
+                          </Text>
+                          <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 12 }}>
+                            {formatClockTime(entry.startTime)} • {Math.round(numberOrZero(entry.durationMinutes))} min • {formatCalories(numberOrZero(entry.calories), energyUnit)}
+                          </Text>
+                        </View>
+                        <Pressable
+                          onPress={() => openExerciseEdit(entry)}
+                          style={{ borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 9, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 7 }}
+                        >
+                          <Text style={{ color: '#1D4ED8', fontWeight: '800' }}>Edit</Text>
+                        </Pressable>
+                        <Pressable
+                          onPress={() => confirmExerciseDelete(entry)}
+                          style={{ borderWidth: 1, borderColor: '#FECACA', borderRadius: 9, backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 7 }}
+                        >
+                          <Text style={{ color: '#DC2626', fontWeight: '800' }}>Delete</Text>
+                        </Pressable>
+                      </View>
+                    </View>
+                  ))}
+                </View>
+              ) : null}
             </View>
 
             {MEALS.map((meal) => {
@@ -4477,6 +5406,8 @@ export function TrackCaloriesScreen() {
                                 </View>
                               ) : null}
                               <Pressable
+                                accessibilityRole="button"
+                                accessibilityLabel={`Open ${entry.name || entry.description || 'meal entry'}`}
                                 onTouchStart={(event) => {
                                   if (copyMode || !entryId) return
                                   const touch = event.nativeEvent.touches?.[0]
@@ -4512,6 +5443,7 @@ export function TrackCaloriesScreen() {
                                   if (copyMode || !entryId) return
                                   const meta = entrySwipeMetaRef.current[entryId]
                                   const offset = entrySwipeOffsets[entryId] || 0
+                                  const moved = Boolean(meta?.hasMoved)
                                   if (meta?.hasMoved) {
                                     entrySwipeBlockPressRef.current[entryId] = true
                                     setTimeout(() => {
@@ -4519,6 +5451,8 @@ export function TrackCaloriesScreen() {
                                     }, 160)
                                   }
                                   delete entrySwipeMetaRef.current[entryId]
+
+                                  if (!moved && Math.abs(offset) <= 1) return
 
                                   if (offset > 70) {
                                     setSwipeMenuEntryId(entryId)
@@ -4551,6 +5485,10 @@ export function TrackCaloriesScreen() {
                                   }
                                   if (Math.abs(swipeOffset) > 0) {
                                     closeSwipeForEntry()
+                                    return
+                                  }
+                                  if (isMealDiaryEntry(entry)) {
+                                    openMealEntryEditor(entry)
                                     return
                                   }
                                   openEditModal(entry)
@@ -4874,6 +5812,15 @@ export function TrackCaloriesScreen() {
                 <Text style={secondaryButtonText}>Cancel</Text>
               </Pressable>
             </View>
+            <Pressable
+              onPress={confirmEditEntryDelete}
+              style={[
+                secondaryButton,
+                { flex: 0, minHeight: 44, marginTop: 8, borderColor: '#FCA5A5', backgroundColor: '#FEF2F2' },
+              ]}
+            >
+              <Text style={[secondaryButtonText, { color: '#DC2626' }]}>Delete</Text>
+            </Pressable>
           </View>
         </View>
       </Modal>
@@ -4890,6 +5837,7 @@ export function TrackCaloriesScreen() {
                     : `Insert into ${mealLabel(favoritesTargetMeal)}`}
                 </Text>
               </View>
+              <VoiceAssistantIconButton size={38} iconSize={19} style={{ marginLeft: 10 }} onPress={openVoiceFromFoodOverlay} />
               <Pressable onPress={closeFavoritesFlow} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }}>
                 <MaterialCommunityIcons name="close" size={22} color="#4B5563" />
               </Pressable>
@@ -5170,7 +6118,10 @@ export function TrackCaloriesScreen() {
         visible={favoriteEditItem != null}
         animationType="slide"
         presentationStyle="fullScreen"
-        onRequestClose={() => setFavoriteEditItem(null)}
+        onRequestClose={() => {
+          setFavoriteEditServingPickerItemId(null)
+          setFavoriteEditItem(null)
+        }}
       >
         <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
           <View
@@ -5189,6 +6140,8 @@ export function TrackCaloriesScreen() {
                   setFavoriteEditItem(null)
                   setFavoriteEditItems([])
                   setFavoriteEditName('')
+                  setFavoriteEditServingPickerItemId(null)
+                  setFavoriteEditServingLoadingId(null)
                 }}
                 style={{ width: 36, paddingTop: 2 }}
               >
@@ -5419,6 +6372,9 @@ export function TrackCaloriesScreen() {
                     if (favoriteEditItems.length === 0) return
                     setFavoriteEditIngredientsExpanded((prev) => !prev)
                   }}
+                  accessibilityRole="button"
+                  accessibilityLabel="Toggle meal ingredients"
+                  accessibilityState={{ expanded: favoriteEditIngredientsExpanded, disabled: favoriteEditItems.length === 0 }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
                 >
                   <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>Your ingredients</Text>
@@ -5436,6 +6392,8 @@ export function TrackCaloriesScreen() {
               ) : !favoriteEditIngredientsExpanded ? (
                 <Pressable
                   onPress={() => setFavoriteEditIngredientsExpanded(true)}
+                  accessibilityRole="button"
+                  accessibilityLabel="Show meal ingredients"
                   style={{ marginTop: 12, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, backgroundColor: '#F9FAFB', paddingHorizontal: 12, paddingVertical: 10 }}
                 >
                   <Text style={{ color: '#6B7280', fontSize: 12 }}>Ingredients are hidden. Tap to expand.</Text>
@@ -5444,16 +6402,23 @@ export function TrackCaloriesScreen() {
                 <View style={{ marginTop: 12, gap: 10 }}>
                   {favoriteEditItems.map((editItem) => {
                     const expanded = favoriteEditExpandedItemId === editItem.id
+                    const servingOptions = normalizeFavoriteServingOptions(editItem.servingOptions || editItem.raw?.servingOptions)
+                    const servingPickerOpen = favoriteEditServingPickerItemId === editItem.id
+                    const amountUnitOptions = favoriteAmountUnitOptions(editItem)
+                    const amountUnitLabel = favoriteAmountUnitLabel(editItem.amountUnit, editItem)
                     return (
                       <View key={editItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, overflow: 'hidden', backgroundColor: '#FFFFFF' }}>
                         <Pressable
                           onPress={() => setFavoriteEditExpandedItemId(expanded ? null : editItem.id)}
+                          accessibilityRole="button"
+                          accessibilityLabel={`Edit ${editItem.name}`}
+                          accessibilityState={{ expanded }}
                           style={{ paddingHorizontal: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
                         >
                           <View style={{ flex: 1 }}>
                             <Text style={{ color: '#111827', fontWeight: '800', fontSize: 16 }}>{editItem.name}</Text>
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>
-                              Serving: {editItem.servingLabel} • Amount (full recipe): {formatMacroAmount(editItem.servings)}
+                              Serving: {editItem.servingLabel} • Amount: {editItem.amountInput || formatFavoriteAmount(favoriteAmountFromServings(editItem.servings, editItem.amountUnit, favoriteBaseForItem(editItem)))} {amountUnitLabel}
                             </Text>
                           </View>
                           <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{expanded ? '▾' : '▸'}</Text>
@@ -5461,62 +6426,127 @@ export function TrackCaloriesScreen() {
 
                         {expanded ? (
                           <View style={{ paddingHorizontal: 14, paddingBottom: 14, gap: 12 }}>
-                            <View style={{ flexDirection: 'row', gap: 10 }}>
-                              <View style={{ flex: 1 }}>
+                            <View style={{ gap: 10 }}>
+                              <View>
                                 <Text style={{ color: '#374151', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Amount</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                                  <Pressable
-                                    onPress={() =>
-                                      setFavoriteEditItems((prev) =>
-                                        prev.map((entry) =>
-                                          entry.id === editItem.id
-                                            ? { ...entry, servings: Math.max(0.25, roundTo(entry.servings - 0.25, 2)) }
-                                            : entry,
-                                        ),
-                                      )
-                                    }
-                                    style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
-                                  >
-                                    <Text style={{ color: '#111827', fontSize: 20, fontWeight: '800' }}>-</Text>
-                                  </Pressable>
                                   <TextInput
-                                    value={String(editItem.servings)}
+                                    value={editItem.amountInput}
                                     onChangeText={(value) =>
                                       setFavoriteEditItems((prev) =>
                                         prev.map((entry) =>
-                                          entry.id === editItem.id
-                                            ? { ...entry, servings: Math.max(0.25, Number(value) || 0.25) }
-                                            : entry,
+                                          entry.id === editItem.id ? updateFavoriteAdjustItemAmount(entry, value) : entry,
                                         ),
                                       )
                                     }
                                     keyboardType="decimal-pad"
-                                    style={{ flex: 1, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#111827', fontWeight: '800', textAlign: 'center' }}
+                                    style={{ width: 104, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: '#111827', fontWeight: '800', textAlign: 'center' }}
                                   />
-                                  <Pressable
-                                    onPress={() =>
-                                      setFavoriteEditItems((prev) =>
-                                        prev.map((entry) =>
-                                          entry.id === editItem.id ? { ...entry, servings: roundTo(entry.servings + 0.25, 2) } : entry,
-                                        ),
+                                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
+                                    {amountUnitOptions.map((unit) => {
+                                      const active = editItem.amountUnit === unit
+                                      return (
+                                        <Pressable
+                                          key={unit}
+                                          onPress={() =>
+                                            setFavoriteEditItems((prev) =>
+                                              prev.map((entry) =>
+                                                entry.id === editItem.id ? updateFavoriteAdjustItemUnit(entry, unit) : entry,
+                                              ),
+                                            )
+                                          }
+                                          style={{
+                                            borderWidth: 1,
+                                            borderColor: active ? '#10B981' : '#D1D5DB',
+                                            backgroundColor: active ? '#ECFDF5' : '#FFFFFF',
+                                            borderRadius: 999,
+                                            paddingHorizontal: 12,
+                                            paddingVertical: 9,
+                                          }}
+                                        >
+                                          <Text style={{ color: active ? '#047857' : '#374151', fontWeight: '800', fontSize: 12 }} numberOfLines={1}>
+                                            {favoriteAmountUnitLabel(unit, editItem)}
+                                          </Text>
+                                        </Pressable>
                                       )
-                                    }
-                                    style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
-                                  >
-                                    <Text style={{ color: '#111827', fontSize: 20, fontWeight: '800' }}>+</Text>
-                                  </Pressable>
+                                    })}
+                                  </ScrollView>
                                 </View>
                               </View>
-                              <View style={{ width: 124 }}>
+                              <View>
                                 <Text style={{ color: '#374151', fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Serving size</Text>
-                                <View style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 11, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                                <Pressable
+                                  onPress={() => {
+                                    if (servingPickerOpen) {
+                                      setFavoriteEditServingPickerItemId(null)
+                                      return
+                                    }
+                                    void openFavoriteEditServingPicker(editItem)
+                                  }}
+                                  disabled={favoriteEditServingLoadingId === editItem.id}
+                                  accessibilityRole="button"
+                                  accessibilityLabel={`Choose serving size for ${editItem.name}`}
+                                  style={{
+                                    borderWidth: 1,
+                                    borderColor: '#D1D5DB',
+                                    borderRadius: 10,
+                                    paddingHorizontal: 12,
+                                    paddingVertical: 11,
+                                    flexDirection: 'row',
+                                    alignItems: 'center',
+                                    justifyContent: 'space-between',
+                                    opacity: favoriteEditServingLoadingId === editItem.id ? 0.7 : 1,
+                                  }}
+                                >
                                   <Text style={{ color: '#374151', fontWeight: '700', flex: 1 }} numberOfLines={1}>
                                     {editItem.servingLabel}
                                   </Text>
-                                  <Text style={{ color: '#9CA3AF', marginLeft: 8 }}>▾</Text>
-                                </View>
+                                  {favoriteEditServingLoadingId === editItem.id ? (
+                                    <ActivityIndicator size="small" color="#6B7280" />
+                                  ) : (
+                                    <Text style={{ color: '#9CA3AF', marginLeft: 8 }}>▾</Text>
+                                  )}
+                                </Pressable>
                               </View>
                             </View>
+
+                            {servingPickerOpen ? (
+                              <View style={{ borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 12, backgroundColor: '#F0FDF4', padding: 10, gap: 8 }}>
+                                {servingOptions.length === 0 ? (
+                                  <Text style={{ color: '#6B7280', fontSize: 12 }}>No serving choices found yet.</Text>
+                                ) : (
+                                  servingOptions.map((option) => {
+                                    const selected =
+                                      String(option.id) === String(editItem.selectedServingId || '') ||
+                                      (!editItem.selectedServingId && servingOptionDisplayLabel(option) === editItem.servingLabel)
+                                    return (
+                                      <Pressable
+                                        key={String(option.id)}
+                                        onPress={() => applyFavoriteEditServingOption(editItem.id, option, servingOptions)}
+                                        style={{
+                                          borderWidth: 1,
+                                          borderColor: selected ? '#10B981' : '#D1D5DB',
+                                          backgroundColor: selected ? '#ECFDF5' : '#FFFFFF',
+                                          borderRadius: 10,
+                                          paddingHorizontal: 10,
+                                          paddingVertical: 9,
+                                        }}
+                                      >
+                                        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
+                                          <Text style={{ color: '#111827', fontWeight: '800', flex: 1 }} numberOfLines={2}>
+                                            {servingOptionDisplayLabel(option)}
+                                          </Text>
+                                          {selected ? <MaterialCommunityIcons name="check" size={17} color="#059669" /> : null}
+                                        </View>
+                                        <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4 }}>
+                                          {Math.round(numberOrZero(option.calories))} kcal • P {formatMacroAmount(numberOrZero(option.protein_g))}g • C {formatMacroAmount(numberOrZero(option.carbs_g))}g • F {formatMacroAmount(numberOrZero(option.fat_g))}g
+                                        </Text>
+                                      </Pressable>
+                                    )
+                                  })
+                                )}
+                              </View>
+                            ) : null}
 
                             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                               {[
@@ -6206,8 +7236,13 @@ export function TrackCaloriesScreen() {
       <Modal transparent visible={combineOpen} animationType="fade" onRequestClose={() => setCombineOpen(false)}>
         <View style={modalBackdrop}>
           <View style={modalCardLarge}>
-            <Text style={modalTitle}>Combine ingredients / Build meal</Text>
-            <Text style={{ color: theme.colors.muted }}>Target section: {mealLabel(combineTargetMeal)}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={modalTitle}>Combine ingredients / Build meal</Text>
+                <Text style={{ color: theme.colors.muted }}>Target section: {mealLabel(combineTargetMeal)}</Text>
+              </View>
+              <VoiceAssistantIconButton size={38} iconSize={19} onPress={openVoiceFromFoodOverlay} />
+            </View>
 
             <TextInput
               value={combineName}
@@ -6294,7 +7329,10 @@ export function TrackCaloriesScreen() {
       <Modal transparent visible={exerciseOpen} animationType="fade" onRequestClose={() => setExerciseOpen(false)}>
         <View style={modalBackdrop}>
           <View style={modalCardLarge}>
-            <Text style={modalTitle}>{exerciseEditId ? 'Edit exercise' : 'Add exercise'}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Text style={[modalTitle, { flex: 1 }]}>{exerciseEditId ? 'Edit exercise' : 'Add exercise'}</Text>
+              <VoiceAssistantIconButton size={38} iconSize={19} onPress={openVoiceFromFoodOverlay} />
+            </View>
 
             <TextInput
               value={exerciseTypeSearch}

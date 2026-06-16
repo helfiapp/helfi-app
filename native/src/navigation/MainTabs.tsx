@@ -1,5 +1,5 @@
-import React from 'react'
-import { useColorScheme } from 'react-native'
+import React, { useEffect } from 'react'
+import { DeviceEventEmitter, useColorScheme, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
@@ -10,19 +10,67 @@ import { MoreScreen } from '../screens/MoreScreen'
 import { SettingsScreen } from '../screens/SettingsScreen'
 import { TrackCaloriesScreen } from '../screens/TrackCaloriesScreen'
 import { getThemeColors, theme } from '../ui/theme'
+import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
 
 export type MainTabParamList = {
   Dashboard: undefined
   Insights: undefined
-  Food: undefined
+  Food:
+    | {
+        voiceAction?: string
+        voiceMeal?: string
+        voiceActionNonce?: number
+      }
+    | undefined
   More: undefined
   Settings: undefined
 }
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
 
-export function MainTabs() {
+export function MainTabs({ navigation }: { navigation: any }) {
   const colors = getThemeColors(useColorScheme())
+
+  useEffect(() => {
+    const sub = DeviceEventEmitter.addListener('helfi:navigate-native-web-tool', (payload?: any) => {
+      const path = typeof payload?.path === 'string' ? payload.path : ''
+      const target = payload?.nativeTarget && typeof payload.nativeTarget === 'object' ? payload.nativeTarget : null
+      if (target?.type === 'tab' && typeof target.tab === 'string') {
+        navigation.navigate('Tabs', { screen: target.tab })
+        return
+      }
+      if (target?.type === 'stack' && typeof target.route === 'string') {
+        navigation.navigate(target.route, target.params || undefined)
+        return
+      }
+      if (target?.type === 'foodAction' && typeof target.action === 'string') {
+        const meal = typeof target.meal === 'string' ? target.meal : 'breakfast'
+        navigation.navigate('Tabs', {
+          screen: 'Food',
+          params: {
+            voiceAction: target.action,
+            voiceMeal: meal,
+            voiceActionNonce: Date.now(),
+          },
+        })
+        const emitFoodAction = () => {
+          DeviceEventEmitter.emit('helfi:food-voice-action', {
+            action: target.action,
+            meal,
+          })
+        }
+        setTimeout(emitFoodAction, 350)
+        setTimeout(emitFoodAction, 900)
+        return
+      }
+      if (!path.startsWith('/')) return
+      navigation.navigate('NativeWebTool', {
+        title: typeof payload?.title === 'string' ? payload.title : 'Helfi',
+        path,
+      })
+    })
+    return () => sub.remove()
+  }, [navigation])
 
   return (
     <Tab.Navigator
@@ -30,6 +78,12 @@ export function MainTabs() {
       screenOptions={{
         headerStyle: { backgroundColor: colors.card },
         headerTitleStyle: { color: colors.text },
+        headerLeft: () => (
+          <View style={{ marginLeft: 12 }}>
+            <VoiceAssistantIconButton size={36} iconSize={18} />
+          </View>
+        ),
+        headerTitleAlign: 'center',
         tabBarStyle: {
           backgroundColor: colors.card,
           borderTopColor: colors.border,

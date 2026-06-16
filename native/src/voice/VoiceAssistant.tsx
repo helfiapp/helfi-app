@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
 import * as FileSystem from 'expo-file-system'
@@ -24,10 +24,18 @@ type VoiceAssistantContextValue = {
 type VoiceDraft = {
   action: string
   transcript: string
+  localDate?: string
   summary: string
   confirmationMessage: string
   canConfirm: boolean
+  autoSave?: boolean
   recipe?: { text?: string }
+  appTarget?: {
+    title?: string
+    path?: string
+    buttonLabel?: string
+    nativeTarget?: any
+  }
   food?: {
     entries?: Array<{ name: string; description?: string | null }>
     draftText?: string
@@ -40,6 +48,8 @@ type VoiceDraft = {
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
 const VOICE_REPLY_KEY = 'helfi_voice_reply_enabled_v1'
 const FOOD_FAVORITES_KEY = 'helfi_native_food_favorites_v2'
+const MAX_VOICE_FAVORITES = 120
+const VOICE_ASSISTANT_OPENING_EVENT = 'helfi:voice-assistant-opening'
 
 function audioMimeFromUri(uri: string) {
   const lower = uri.toLowerCase()
@@ -57,6 +67,33 @@ function todayLocalDate() {
   return `${y}-${m}-${d}`
 }
 
+function fallbackNativeTargetForAppTarget(appTarget?: VoiceDraft['appTarget'] | null) {
+  const title = cleanFavoriteText(appTarget?.title || appTarget?.buttonLabel || '', 120).toLowerCase()
+  const path = cleanFavoriteText(appTarget?.path || '', 200).toLowerCase()
+
+  const foodActionTarget = (action: string) => ({
+    type: 'stack',
+    route: 'TrackCalories',
+    params: { voiceAction: action, voiceMeal: 'breakfast', voiceActionNonce: Date.now() },
+  })
+
+  if (title.includes('add food entry')) return foodActionTarget('openAddFoodEntry')
+  if (path.startsWith('/food/build-meal')) return null
+  if (title.includes('build a meal')) return foodActionTarget('openBuildMeal')
+  if (title.includes('favorites') || title.includes('favourites')) return foodActionTarget('openFavorites')
+  if (title.includes('exercise')) return foodActionTarget('openExercise')
+  if (title.includes('food diary') || path === '/food') return { type: 'tab', tab: 'Food' }
+  if (title.includes('dashboard') || path === '/dashboard') return { type: 'tab', tab: 'Dashboard' }
+  if (title.includes('insights') || path.startsWith('/insights')) return { type: 'tab', tab: 'Insights' }
+  if (title.includes('settings') || path.startsWith('/settings')) return { type: 'tab', tab: 'Settings' }
+  if (title.includes('water')) return { type: 'stack', route: 'WaterIntake' }
+  if (title.includes('mood journal')) return { type: 'stack', route: 'MoodTracker', params: { tab: 'journal' } }
+  if (title.includes('mood tracker') || title === 'mood') return { type: 'stack', route: 'MoodTracker', params: { tab: 'checkin' } }
+  if (title.includes('billing') || path === '/billing') return { type: 'stack', route: 'Billing' }
+  if (title.includes('practitioner')) return { type: 'stack', route: 'Practitioners' }
+  return null
+}
+
 function cleanFavoriteText(value: unknown, max = 160) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
@@ -71,26 +108,56 @@ async function playableAudioUri(audioUri: string) {
   return file.uri
 }
 
-async function loadVoiceFavorites() {
+function normalizeVoiceFavorite(raw: any, source: 'saved' | 'library') {
+  if (!raw || typeof raw !== 'object') return null
+  const label = cleanFavoriteText(raw?.label || raw?.name || raw?.description || raw?.raw?.label || raw?.raw?.name)
+  if (!label) return null
+  const description = cleanFavoriteText(raw?.description || raw?.raw?.description || label, 500)
+  const meal = cleanFavoriteText(raw?.meal || raw?.category || raw?.persistedCategory || raw?.raw?.meal || raw?.raw?.category, 40).toLowerCase()
+  const nutrition = raw?.nutrition || raw?.nutrients || raw?.total || raw?.raw?.nutrition || raw?.raw?.nutrients || raw?.raw?.total || null
+  return {
+    id: source === 'saved' ? cleanFavoriteText(raw?.id, 120) : '',
+    label,
+    description: description || label,
+    meal,
+    nutrition,
+    total: raw?.total || nutrition,
+    items: Array.isArray(raw?.items) ? raw.items : Array.isArray(raw?.raw?.items) ? raw.raw.items : null,
+  }
+}
+
+async function loadVoiceFavorites(sessionToken?: string | null) {
+  const byLabel = new Map<string, any>()
+  const add = (favorite: any) => {
+    const normalized = normalizeVoiceFavorite(favorite, favorite?.__voiceSource === 'library' ? 'library' : 'saved')
+    if (!normalized?.label) return
+    const key = normalized.label.toLowerCase()
+    if (!byLabel.has(key)) byLabel.set(key, normalized)
+  }
+
   try {
     const raw = await AsyncStorage.getItem(FOOD_FAVORITES_KEY)
     const parsed = raw ? JSON.parse(raw) : []
     const list = Array.isArray(parsed) ? parsed : []
-    return list
-      .map((favorite: any) => ({
-        id: cleanFavoriteText(favorite?.id, 120),
-        label: cleanFavoriteText(favorite?.label || favorite?.name || favorite?.description),
-        description: cleanFavoriteText(favorite?.description || favorite?.label || favorite?.name, 500),
-        meal: cleanFavoriteText(favorite?.meal || favorite?.category || favorite?.persistedCategory, 40).toLowerCase(),
-        nutrition: favorite?.nutrition || favorite?.nutrients || favorite?.total || null,
-        total: favorite?.total || favorite?.nutrition || favorite?.nutrients || null,
-        items: Array.isArray(favorite?.items) ? favorite.items : null,
-      }))
-      .filter((favorite: any) => favorite.label)
-      .slice(0, 80)
+    list.forEach(add)
   } catch {
-    return []
+    // Recent foods from the server can still make voice matching useful.
   }
+
+  if (sessionToken) {
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/food-log/library?limit=200`, {
+        headers: buildNativeAuthHeaders(sessionToken, { includeCookie: true }),
+      })
+      const data: any = await res.json().catch(() => ({}))
+      const logs = Array.isArray(data?.logs) ? data.logs : []
+      logs.forEach((entry: any) => add({ ...entry, __voiceSource: 'library' }))
+    } catch {
+      // Voice still works for directly named foods if the recent-food list is unavailable.
+    }
+  }
+
+  return Array.from(byLabel.values()).slice(0, MAX_VOICE_FAVORITES)
 }
 
 export function VoiceAssistantProvider({ children }: { children: React.ReactNode }) {
@@ -170,13 +237,15 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   )
 
   const openVoiceAssistant = useCallback((input?: OpenVoiceAssistantInput) => {
+    DeviceEventEmitter.emit(VOICE_ASSISTANT_OPENING_EVENT)
     setDraft(null)
     setChargedCredits(null)
     setTranscript(input?.transcript || '')
-    setOpen(true)
-    if (input?.autoSubmit && input.transcript) {
-      setAutoSubmitToken((value) => value + 1)
-    }
+    const shouldAutoSubmit = Boolean(input?.autoSubmit && input.transcript)
+    setTimeout(() => {
+      setOpen(true)
+      if (shouldAutoSubmit) setAutoSubmitToken((value) => value + 1)
+    }, 140)
   }, [])
 
   const closePanel = useCallback(() => {
@@ -187,6 +256,43 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     stopPlayback().catch(() => {})
     setOpen(false)
   }, [recording, stopPlayback])
+
+  const saveDraft = useCallback(
+    async (targetDraft: VoiceDraft | null, options?: { automatic?: boolean }) => {
+      if (!session?.token || !targetDraft?.canConfirm) return null
+      setConfirming(true)
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/native-voice-assistant-confirm`, {
+          method: 'POST',
+          headers: buildNativeAuthHeaders(session.token, { json: true }),
+          body: JSON.stringify({ draft: targetDraft }),
+        })
+        const data: any = await res.json().catch(() => ({}))
+        if (!res.ok) throw new Error(data?.error || 'Could not save that.')
+        const resultKind = String(data?.result?.kind || '').toLowerCase()
+        if (resultKind === 'food' || resultKind === 'exercise' || resultKind === 'water') {
+          DeviceEventEmitter.emit('helfi:food-log-changed', {
+            localDate: targetDraft.localDate || todayLocalDate(),
+            source: 'voice-assistant',
+            kind: resultKind,
+          })
+        }
+        const message = data?.result?.message || 'Done.'
+        if (options?.automatic && voiceReply) {
+          void requestVoiceReply(String(message))
+        }
+        Alert.alert(options?.automatic ? 'Done' : 'Saved', message)
+        closePanel()
+        return data
+      } catch (error: any) {
+        Alert.alert('Could not save', error?.message || 'Please try again.')
+        return null
+      } finally {
+        setConfirming(false)
+      }
+    },
+    [closePanel, requestVoiceReply, session?.token, voiceReply],
+  )
 
   const sendDraftRequest = useCallback(
     async (options?: { audioUri?: string; durationMillis?: number; transcriptOverride?: string }) => {
@@ -202,7 +308,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setChargedCredits(null)
       try {
         let res: Response
-        const favorites = await loadVoiceFavorites()
+        const favorites = await loadVoiceFavorites(session.token)
         if (options?.audioUri) {
           const form = new FormData()
           const name = options.audioUri.split('/').pop() || `helfi-voice-${Date.now()}.m4a`
@@ -239,6 +345,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         const nextDraft = data?.draft || null
         setDraft(nextDraft)
         setChargedCredits(Number.isFinite(Number(data?.chargedCredits)) ? Number(data.chargedCredits) : null)
+        if (nextDraft?.autoSave && nextDraft?.canConfirm) {
+          await saveDraft(nextDraft, { automatic: true })
+          return
+        }
         if (voiceReply && nextDraft) {
           const speechText = nextDraft?.recipe?.text || nextDraft?.confirmationMessage || nextDraft?.summary || ''
           void requestVoiceReply(String(speechText))
@@ -249,7 +359,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setBusy(false)
       }
     },
-    [requestVoiceReply, session?.token, transcript, voiceReply],
+    [requestVoiceReply, saveDraft, session?.token, transcript, voiceReply],
   )
 
   useEffect(() => {
@@ -310,24 +420,30 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [recording, recordingStartedAt, sendDraftRequest])
 
   const confirmDraft = useCallback(async () => {
-    if (!session?.token || !draft?.canConfirm) return
-    setConfirming(true)
-    try {
-      const res = await fetch(`${API_BASE_URL}/api/native-voice-assistant-confirm`, {
-        method: 'POST',
-        headers: buildNativeAuthHeaders(session.token, { json: true }),
-        body: JSON.stringify({ draft }),
-      })
-      const data: any = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Could not save that.')
-      Alert.alert('Saved', data?.result?.message || 'Saved.')
-      closePanel()
-    } catch (error: any) {
-      Alert.alert('Could not save', error?.message || 'Please try again.')
-    } finally {
-      setConfirming(false)
+    await saveDraft(draft)
+  }, [draft, saveDraft])
+
+  const openAppTarget = useCallback(() => {
+    const path = draft?.appTarget?.path
+    if (!path) return
+    const nativeTarget = draft.appTarget?.nativeTarget || fallbackNativeTargetForAppTarget(draft.appTarget) || null
+    DeviceEventEmitter.emit('helfi:navigate-native-web-tool', {
+      title: draft.appTarget?.title || 'Helfi',
+      path,
+      nativeTarget,
+    })
+    if (nativeTarget?.type === 'foodAction' && typeof nativeTarget.action === 'string') {
+      const emitFoodAction = () => {
+        DeviceEventEmitter.emit('helfi:food-voice-action', {
+          action: nativeTarget.action,
+          meal: typeof nativeTarget.meal === 'string' ? nativeTarget.meal : 'breakfast',
+        })
+      }
+      setTimeout(emitFoodAction, 500)
+      setTimeout(emitFoodAction, 1100)
     }
-  }, [closePanel, draft, session?.token])
+    closePanel()
+  }, [closePanel, draft])
 
   const value = useMemo(() => ({ openVoiceAssistant }), [openVoiceAssistant])
   const visibleForUser = mode === 'signedIn' && Boolean(session?.token)
@@ -337,21 +453,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       {children}
       {visibleForUser && (
         <>
-          <Pressable
-            accessibilityRole="button"
-            accessibilityLabel="Talk to Helfi"
-            onPress={() => openVoiceAssistant({ source: 'button' })}
-            style={[styles.floatingButton, { top: Math.max(12, insets.top + 12) }]}
-          >
-            <Feather name="mic" size={19} color="#FFFFFF" />
-          </Pressable>
-
           <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={closePanel}>
             <View style={styles.panel}>
               <View style={styles.header}>
                 <View>
                   <Text style={styles.title}>Talk to Helfi</Text>
-                  <Text style={styles.subtitle}>Review before anything saves.</Text>
+                  <Text style={styles.subtitle}>Tell Helfi what you want done.</Text>
                 </View>
                 <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={closePanel} style={styles.iconButton}>
                   <Feather name="x" size={22} color={theme.colors.text} />
@@ -409,12 +516,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   />
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Review request"
+                    accessibilityLabel="Send request"
                     onPress={() => sendDraftRequest()}
                     disabled={busy || !transcript.trim()}
                     style={[styles.secondaryButton, (busy || !transcript.trim()) && styles.secondaryDisabled]}
                   >
-                    <Text style={styles.secondaryText}>Review request</Text>
+                    <Text style={styles.secondaryText}>Send request</Text>
                   </Pressable>
                 </View>
 
@@ -441,6 +548,16 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                       </Text>
                     ) : null}
                     {draft.food?.draftText ? <Text style={styles.message}>{draft.food.draftText}</Text> : null}
+                    {draft.appTarget?.path ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={draft.appTarget.buttonLabel || 'Open Helfi tool'}
+                        onPress={openAppTarget}
+                        style={styles.handoffButton}
+                      >
+                        <Text style={styles.handoffText}>{draft.appTarget.buttonLabel || 'Open Helfi tool'}</Text>
+                      </Pressable>
+                    ) : null}
                     {chargedCredits !== null && (
                       <Text style={styles.creditText}>Charged: {chargedCredits} credits</Text>
                     )}
@@ -454,12 +571,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Confirm save"
+                  accessibilityLabel="Save now"
                   onPress={confirmDraft}
                   disabled={!draft?.canConfirm || confirming}
                   style={[styles.confirmButton, (!draft?.canConfirm || confirming) && styles.confirmDisabled]}
                 >
-                  {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>Confirm save</Text>}
+                  {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>Save now</Text>}
                 </Pressable>
               </View>
             </View>
@@ -479,21 +596,6 @@ export function useVoiceAssistant() {
 }
 
 const styles = StyleSheet.create({
-  floatingButton: {
-    position: 'absolute',
-    left: 16,
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#41AD49',
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000',
-    shadowOpacity: 0.16,
-    shadowRadius: 8,
-    shadowOffset: { width: 0, height: 4 },
-    elevation: 8,
-  },
   panel: { flex: 1, backgroundColor: '#F7FAF9' },
   header: {
     paddingHorizontal: 20,
@@ -544,6 +646,8 @@ const styles = StyleSheet.create({
   secondaryButton: { minHeight: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F2EA' },
   secondaryDisabled: { opacity: 0.5 },
   secondaryText: { color: '#226B2C', fontWeight: '900' },
+  handoffButton: { minHeight: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#41AD49' },
+  handoffText: { color: '#FFFFFF', fontWeight: '900' },
   summary: { color: theme.colors.text, fontWeight: '900', fontSize: 16 },
   message: { color: theme.colors.text, lineHeight: 21 },
   entryList: { gap: 8, paddingTop: 4 },

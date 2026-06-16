@@ -1,5 +1,6 @@
 import 'server-only'
 import { prisma } from '@/lib/prisma'
+import { buildCustomFoodServingOptions } from '@/lib/food/custom-serving-options'
 
 export type CustomFoodMacro = {
   id?: string
@@ -190,7 +191,21 @@ const loadCustomFoods = async () => {
   if (cachedItems && Date.now() - cacheLoadedAt < CACHE_TTL_MS) return cachedItems
   const rows = await prisma.customFoodItem.findMany()
   const items: CustomFoodMacro[] = rows.map((row) => {
-    const servingOptions = Array.isArray(row.servingOptions) ? row.servingOptions : null
+    const storedServingOptions = Array.isArray(row.servingOptions) ? row.servingOptions : []
+    const generatedServingOptions =
+      storedServingOptions.length > 0
+        ? storedServingOptions
+        : buildCustomFoodServingOptions({
+            name: row.name,
+            kind: row.kind,
+            caloriesPer100g: row.caloriesPer100g,
+            proteinPer100g: row.proteinPer100g,
+            carbsPer100g: row.carbsPer100g,
+            fatPer100g: row.fatPer100g,
+            fiberPer100g: row.fiberPer100g,
+            sugarPer100g: row.sugarPer100g,
+          })
+    const servingOptions = generatedServingOptions.length > 0 ? generatedServingOptions : null
     return {
       id: row.id,
       name: row.name,

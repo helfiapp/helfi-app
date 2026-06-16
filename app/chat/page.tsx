@@ -10,6 +10,7 @@ function ChatPageContent() {
   const isFood = searchParams.get('context') === 'food'
   const openHistory = searchParams.get('history') === '1'
   const selectedDate = searchParams.get('date') || ''
+  const voicePrompt = searchParams.get('voicePrompt') || ''
   const entryContext = isFood ? 'food' : 'general'
   const handleExit = () => {
     router.push('/food')
@@ -20,6 +21,7 @@ function ChatPageContent() {
       entryContext={entryContext}
       selectedDate={selectedDate}
       openHistoryOnLoad={openHistory}
+      initialInput={voicePrompt}
       onExit={isFood ? handleExit : undefined}
     />
   )
