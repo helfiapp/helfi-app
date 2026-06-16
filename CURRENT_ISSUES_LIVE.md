@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 16 June 2026, 11:34 AM AEST
+- What changed: Deployed the Apple review fix package: stronger health disclaimers and source links, Apple Health wording, Terms/Privacy subscription links, voice assistant fixes from testing, and App Store resubmission notes.
+- Where to see it (page/link): https://helfi.ai, https://helfi.ai/symptoms, https://helfi.ai/medical-images, and the Helfi phone app screens backed by live.
+- What to quickly test: Open Symptom Analysis and Medical Image Analyzer and confirm source links/disclaimers are visible. In the phone app, confirm Apple Health says HealthKit and the pre-permission button says Continue.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 11 June 2026, 2:46 PM AEST
 - What changed: Restored the profile icon/menu on the desktop web Talk to Helfi page and added a guard rail so future agents must keep the profile icon on every logged-in web app page.
 - Where to see it (page/link): https://helfi.ai/chat
