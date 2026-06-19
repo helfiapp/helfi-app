@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 19 June 2026, 12:56 PM AEST
+- What changed: Deployed the latest Apple review fixes: native Apple sign-in endpoint and app flow, clearer microphone wording, clearer HealthKit disclosure, and safer non-diagnostic wording for symptom notes and health image notes.
+- Where to see it (page/link): https://helfi.ai, https://helfi.ai/symptoms, https://helfi.ai/medical-images, and the Helfi phone app login/dashboard/more screens.
+- What to quickly test: Open the phone app and confirm Apple sign-in opens the native Apple prompt, HealthKit wording is visible on Dashboard, and Symptom Notes/Health Image Notes no longer present as diagnosis tools.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 16 June 2026, 11:34 AM AEST
 - What changed: Deployed the Apple review fix package: stronger health disclaimers and source links, Apple Health wording, Terms/Privacy subscription links, voice assistant fixes from testing, and App Store resubmission notes.
 - Where to see it (page/link): https://helfi.ai, https://helfi.ai/symptoms, https://helfi.ai/medical-images, and the Helfi phone app screens backed by live.
