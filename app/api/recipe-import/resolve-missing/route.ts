@@ -17,9 +17,40 @@ const cleanIngredientName = (raw: string) => {
   s = s.replace(/^[\s•*\-–—]+/, '').trim()
   s = s.replace(/^\d+\.\s+/, '').trim()
   s = s.replace(/\(.*?\)/g, ' ')
+  s = s.replace(/\bself[\s-]*raising\s+flour\b/gi, 'self rising flour')
+  s = s.replace(/\bplain\s+flour\b/gi, 'all purpose flour')
   s = s.replace(/\b(to taste|optional|plus more|for garnish|garnish|divided)\b/gi, ' ')
   s = s.replace(/\s+/g, ' ').trim()
   return s
+}
+
+const normalizeTokens = (value: string) =>
+  cleanIngredientName(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter((token) => token && !['fresh', 'ripe', 'mashed', 'dried', 'large', 'medium', 'small'].includes(token))
+
+const isSafeExistingCustomMatch = (ingredient: string, itemName: string) => {
+  const wanted = new Set(normalizeTokens(ingredient))
+  const found = new Set(normalizeTokens(itemName))
+  const required = ['banana', 'egg', 'orange', 'apple', 'avocado', 'walnut']
+  for (const token of required) {
+    if (wanted.has(token) && !found.has(token)) return false
+  }
+  if (
+    wanted.has('flour') &&
+    (wanted.has('self') || wanted.has('rising') || wanted.has('raising')) &&
+    !found.has('self') &&
+    !found.has('rising') &&
+    !found.has('raising')
+  ) {
+    return false
+  }
+  return true
 }
 
 const toFiniteOrNull = (value: any) => {
@@ -70,7 +101,7 @@ export async function POST(request: NextRequest) {
 
     // First, try to find it in existing custom foods.
     const existing = await searchCustomFoodMacros(ingredient, 1, { allowTypo: false, country })
-    if (existing.length > 0) {
+    if (existing.length > 0 && isSafeExistingCustomMatch(ingredient, String(existing[0]?.name || ''))) {
       const top = existing[0]
       return NextResponse.json(
         {

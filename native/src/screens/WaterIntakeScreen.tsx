@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -10,10 +10,12 @@ import {
   View,
 } from 'react-native'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useRoute } from '@react-navigation/native'
+import type { RouteProp } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -60,6 +62,18 @@ function formatLocalDate(date = new Date()) {
   const m = String(date.getMonth() + 1).padStart(2, '0')
   const d = String(date.getDate()).padStart(2, '0')
   return `${y}-${m}-${d}`
+}
+
+function isValidLocalDate(raw: string | null | undefined) {
+  return /^\d{4}-\d{2}-\d{2}$/.test(String(raw || ''))
+}
+
+function normalizeMealParam(raw: string | null | undefined) {
+  const value = String(raw || '').trim().toLowerCase()
+  if (value === 'breakfast' || value === 'lunch' || value === 'dinner' || value === 'snacks') return value
+  if (value === 'snack') return 'snacks'
+  if (value === 'other' || value === 'uncategorized') return 'uncategorized'
+  return null
 }
 
 function parseLocalDate(raw: string) {
@@ -171,13 +185,16 @@ function formatTime(value: string) {
 
 export function WaterIntakeScreen() {
   const { mode, session } = useAppMode()
+  const route = useRoute<RouteProp<MainStackParamList, 'WaterIntake'>>()
+  const routeDate = typeof route.params?.date === 'string' ? route.params.date : ''
+  const sourceCategory = normalizeMealParam(typeof route.params?.meal === 'string' ? route.params.meal : null)
 
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
     return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [mode, session?.token])
 
-  const [selectedDate, setSelectedDate] = useState(formatLocalDate())
+  const [selectedDate, setSelectedDate] = useState(isValidLocalDate(routeDate) ? routeDate : formatLocalDate())
   const [showDatePicker, setShowDatePicker] = useState(false)
 
   const [loading, setLoading] = useState(true)
@@ -207,6 +224,12 @@ export function WaterIntakeScreen() {
   const [goalEditorOpen, setGoalEditorOpen] = useState(false)
   const [goalAmountInput, setGoalAmountInput] = useState('')
   const [goalUnit, setGoalUnit] = useState<'ml' | 'l' | 'oz'>('ml')
+
+  useEffect(() => {
+    if (isValidLocalDate(routeDate)) {
+      setSelectedDate(routeDate)
+    }
+  }, [routeDate])
 
   const totalMl = useMemo(() => {
     return entries.reduce((sum, item) => sum + toNumber(item.amountMl), 0)
@@ -288,13 +311,23 @@ export function WaterIntakeScreen() {
     waterLogId?: string
   }) => {
     if (!session?.token) return
+    const drinkAmountMl =
+      drinkUnit === 'l' ? drinkAmount * 1000 : drinkUnit === 'oz' ? drinkAmount * 29.5735 : drinkAmount
+    const drinkMeta = {
+      __drinkType: activeDrink,
+      __drinkAmount: drinkAmount,
+      __drinkUnit: drinkUnit,
+      __drinkAmountMl: Number.isFinite(drinkAmountMl) ? drinkAmountMl : undefined,
+      ...(params.waterLogId ? { __waterLogId: params.waterLogId } : {}),
+    }
 
-    await fetch(`${API_BASE_URL}/api/food-log`, {
+    const res = await fetch(`${API_BASE_URL}/api/food-log`, {
       method: 'POST',
       headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
       body: JSON.stringify({
         localDate: selectedDate,
-        meal: 'uncategorized',
+        meal: sourceCategory || 'uncategorized',
+        category: sourceCategory || 'uncategorized',
         name: params.label,
         description: params.label,
         calories: Math.max(0, params.calories),
@@ -308,6 +341,7 @@ export function WaterIntakeScreen() {
           fat: 0,
           fiber: 0,
           sugar: Math.max(0, params.sugar),
+          ...drinkMeta,
         },
         items: [
           {
@@ -318,11 +352,17 @@ export function WaterIntakeScreen() {
             fat_g: 0,
             fiber_g: 0,
             sugar_g: Math.max(0, params.sugar),
+            serving_size: `${formatNumber(drinkAmount)} ${drinkUnit === 'l' ? 'L' : drinkUnit}`,
+            ...drinkMeta,
             waterLogId: params.waterLogId || null,
           },
         ],
       }),
     })
+    if (!res.ok) {
+      const data: any = await res.json().catch(() => ({}))
+      throw new Error(String(data?.error || 'Could not save drink to Food Diary.'))
+    }
   }
 
   const addEntry = async (amount: number, unit: 'ml' | 'l' | 'oz', label?: string) => {
@@ -336,7 +376,7 @@ export function WaterIntakeScreen() {
         unit,
         localDate: selectedDate,
         label: label || `${formatNumber(amount)} ${unit === 'l' ? 'L' : unit}`,
-        category: 'other',
+        category: sourceCategory || 'uncategorized',
       }),
     })
 
@@ -541,15 +581,30 @@ export function WaterIntakeScreen() {
           <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Water Intake</Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Pressable onPress={() => setSelectedDate((prev) => shiftDate(prev, -1))} style={pillButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Previous day"
+              onPress={() => setSelectedDate((prev) => shiftDate(prev, -1))}
+              style={pillButton}
+            >
               <Text style={pillButtonText}>◀</Text>
             </Pressable>
 
-            <Pressable onPress={() => setShowDatePicker(true)} style={[pillButton, { flex: 1, marginHorizontal: 8 }]}> 
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Choose water date"
+              onPress={() => setShowDatePicker(true)}
+              style={[pillButton, { flex: 1, marginHorizontal: 8 }]}
+            >
               <Text style={pillButtonText}>{formatDateLabel(selectedDate)}</Text>
             </Pressable>
 
-            <Pressable onPress={() => setSelectedDate((prev) => shiftDate(prev, 1))} style={pillButton}>
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Next day"
+              onPress={() => setSelectedDate((prev) => shiftDate(prev, 1))}
+              style={pillButton}
+            >
               <Text style={pillButtonText}>▶</Text>
             </Pressable>
           </View>
@@ -560,7 +615,7 @@ export function WaterIntakeScreen() {
             <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text, flex: 1 }}>
               Daily hydration summary
             </Text>
-            <Pressable onPress={openGoalEditor} style={miniPrimaryButton}>
+            <Pressable accessibilityRole="button" accessibilityLabel="Edit water goal" onPress={openGoalEditor} style={miniPrimaryButton}>
               <Text style={miniPrimaryText}>Edit goal</Text>
             </Pressable>
           </View>
@@ -601,6 +656,8 @@ export function WaterIntakeScreen() {
             {DRINK_TYPES.map((drink) => (
               <Pressable
                 key={drink}
+                accessibilityRole="button"
+                accessibilityLabel={`Select ${drink}`}
                 onPress={() => setActiveDrink(drink)}
                 style={[chip, activeDrink === drink && chipActive]}
               >
@@ -616,6 +673,8 @@ export function WaterIntakeScreen() {
               return (
                 <Pressable
                   key={key}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Add ${formatAmount(preset.amount, preset.unit)}`}
                   onPress={() => void handleQuickAdd(preset.amount, preset.unit)}
                   style={[
                     {
@@ -647,6 +706,7 @@ export function WaterIntakeScreen() {
 
           <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
             <TextInput
+              accessibilityLabel="Custom drink amount"
               value={customAmountInput}
               onChangeText={setCustomAmountInput}
               keyboardType="decimal-pad"
@@ -657,19 +717,30 @@ export function WaterIntakeScreen() {
 
             <View style={{ flexDirection: 'row', gap: 6 }}>
               {(['ml', 'l', 'oz'] as const).map((unit) => (
-                <Pressable key={unit} onPress={() => setCustomUnit(unit)} style={[chip, customUnit === unit && chipActive]}>
+                <Pressable
+                  key={unit}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Use ${unit === 'l' ? 'L' : unit}`}
+                  onPress={() => setCustomUnit(unit)}
+                  style={[chip, customUnit === unit && chipActive]}
+                >
                   <Text style={[chipText, customUnit === unit && chipTextActive]}>{unit === 'l' ? 'L' : unit}</Text>
                 </Pressable>
               ))}
             </View>
           </View>
 
-          <Pressable onPress={() => void handleCustomAdd()} style={[primaryButton, { marginTop: 10 }]}> 
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Add water entry"
+            onPress={() => void handleCustomAdd()}
+            style={[primaryButton, { marginTop: 10 }]}
+          >
             <Text style={primaryButtonText}>Add Entry</Text>
           </Pressable>
         </View>
 
-        <View style={[cardStyle, { marginTop: 12 }]}> 
+        <View style={[cardStyle, { marginTop: 12 }]}>
           <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Water history</Text>
 
           {loading ? (
@@ -700,6 +771,8 @@ export function WaterIntakeScreen() {
                       </Text>
                     </View>
                     <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Delete ${entry.label || 'drink'} entry`}
                       onPress={() => void deleteEntry(entry.id)}
                       disabled={deletingId === entry.id}
                       style={[miniDangerButton, deletingId === entry.id && { opacity: 0.5 }]}

@@ -1,5 +1,10 @@
 import 'server-only'
 import { prisma } from '@/lib/prisma'
+import {
+  formatUnitLabel,
+  getFoodUnitGrams,
+  type MeasurementUnit,
+} from '@/lib/food/measurement-units'
 
 export interface NormalizedFoodItem {
   source: 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom'
@@ -33,6 +38,69 @@ export interface ServingOption {
   source: 'usda' | 'fatsecret' | 'custom'
 }
 
+const normalizeFoodText = (value: string) =>
+  String(value || '')
+    .toLowerCase()
+    .replace(/&/g, ' and ')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim()
+    .replace(/\s+/g, ' ')
+
+const isLikelyLiquidFoodName = (nameRaw: string | null | undefined) => {
+  const label = normalizeFoodText(String(nameRaw || ''))
+  if (!label) return false
+  if (label.includes('milk chocolate')) return false
+  if (/\b(chocolate|cocoa)\b/.test(label) && !/\b(chocolate milk|hot chocolate|milkshake|shake|smoothie|syrup)\b/.test(label)) {
+    return false
+  }
+  const solidHints = [
+    'bread',
+    'cookie',
+    'biscuit',
+    'cracker',
+    'cereal',
+    'chips',
+    'crisps',
+    'popcorn',
+    'powder',
+    'mix',
+    'bar',
+    'cake',
+    'brownie',
+  ]
+  if (solidHints.some((hint) => label.includes(hint))) return false
+  const liquidHints = [
+    'water',
+    'milk',
+    'juice',
+    'coffee',
+    'tea',
+    'soda',
+    'cola',
+    'drink',
+    'beverage',
+    'smoothie',
+    'shake',
+    'broth',
+    'stock',
+    'soup',
+    'oil',
+    'vinegar',
+    'sauce',
+    'syrup',
+  ]
+  return liquidHints.some((hint) => label.includes(hint))
+}
+
+const liquidDensityGramsPerMl = (nameRaw: string | null | undefined) => {
+  const label = normalizeFoodText(String(nameRaw || ''))
+  if (/\boil\b/.test(label)) return 0.92
+  if (/\bsyrup\b/.test(label)) return 1.33
+  return 1
+}
+
 const OPENFOODFACTS_BASE_URL =
   process.env.OPENFOODFACTS_BASE_URL || 'https://world.openfoodfacts.org'
 
@@ -47,6 +115,135 @@ const FATSECRET_CLIENT_SECRET =
   process.env.FATSECRET_CLIENT_SECRET || 'd544f96d19494c9ca8a3dec1bcaf1da3'
 
 type TimeoutFetchInit = RequestInit & { timeoutMs?: number }
+
+const roundMacro = (value: number) => Math.round(value * 10) / 10
+
+const buildScaledServingOption = (
+  params: {
+    fdcId: string
+    idSuffix: string
+    label: string
+    grams: number | null
+    ml: number | null
+    unit: 'g' | 'ml' | 'oz'
+    baseWeightGrams: number
+    base: {
+      calories: number | null
+      protein_g: number | null
+      carbs_g: number | null
+      fat_g: number | null
+      fiber_g: number | null
+      sugar_g: number | null
+    }
+  },
+): ServingOption | null => {
+  const amount = params.grams ?? params.ml
+  if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return null
+  if (!Number.isFinite(Number(params.baseWeightGrams)) || params.baseWeightGrams <= 0) return null
+  if (!Number.isFinite(Number(params.base.calories))) return null
+
+  const factor = Number(amount) / params.baseWeightGrams
+  return {
+    id: `usda:${params.fdcId}:${params.idSuffix}`,
+    label: params.label,
+    serving_size: params.label,
+    grams: params.grams,
+    ml: params.ml,
+    unit: params.unit,
+    calories: params.base.calories != null ? Math.round(params.base.calories * factor) : null,
+    protein_g: params.base.protein_g != null ? roundMacro(params.base.protein_g * factor) : null,
+    carbs_g: params.base.carbs_g != null ? roundMacro(params.base.carbs_g * factor) : null,
+    fat_g: params.base.fat_g != null ? roundMacro(params.base.fat_g * factor) : null,
+    fiber_g: params.base.fiber_g != null ? roundMacro(params.base.fiber_g * factor) : null,
+    sugar_g: params.base.sugar_g != null ? roundMacro(params.base.sugar_g * factor) : null,
+    source: 'usda',
+  }
+}
+
+const appendOptionIfMissing = (options: ServingOption[], option: ServingOption | null) => {
+  if (!option) return
+  const key = `${normalizeFoodText(option.serving_size)}|${option.grams ?? ''}|${option.ml ?? ''}`
+  const exists = options.some((existing) => {
+    const existingKey = `${normalizeFoodText(existing.serving_size)}|${existing.grams ?? ''}|${existing.ml ?? ''}`
+    return existingKey === key
+  })
+  if (!exists) options.push(option)
+}
+
+const appendLiquidServingOptions = (
+  options: ServingOption[],
+  fdcId: string,
+  foodName: string,
+  baseWeightGrams: number,
+  base: Parameters<typeof buildScaledServingOption>[0]['base'],
+) => {
+  if (!isLikelyLiquidFoodName(foodName)) return
+  const density = liquidDensityGramsPerMl(foodName)
+  const addMl = (idSuffix: string, label: string, ml: number) => {
+    appendOptionIfMissing(
+      options,
+      buildScaledServingOption({
+        fdcId,
+        idSuffix,
+        label,
+        grams: ml * density,
+        ml,
+        unit: 'ml',
+        baseWeightGrams,
+        base,
+      }),
+    )
+  }
+
+  addMl('100ml', '100 ml', 100)
+  addMl('250ml', '250 ml', 250)
+  addMl('cup-240ml', '1 cup (240 ml)', 240)
+  addMl('tbsp-15ml', '1 tbsp (15 ml)', 15)
+}
+
+const appendCommonFoodServingOptions = (
+  options: ServingOption[],
+  fdcId: string,
+  foodName: string,
+  baseWeightGrams: number,
+  base: Parameters<typeof buildScaledServingOption>[0]['base'],
+) => {
+  if (isLikelyLiquidFoodName(foodName)) return
+  const foodUnitGrams = getFoodUnitGrams(foodName)
+  if (!foodUnitGrams) return
+
+  const units: MeasurementUnit[] = [
+    'piece-small',
+    'piece-medium',
+    'piece-large',
+    'piece-extra-large',
+    'egg-small',
+    'egg-medium',
+    'egg-large',
+    'egg-extra-large',
+    'half-cup',
+    'cup',
+  ]
+
+  units.forEach((unit) => {
+    const grams = Number(foodUnitGrams[unit])
+    if (!Number.isFinite(grams) || grams <= 0) return
+    const label = formatUnitLabel(unit, foodName, grams)
+    appendOptionIfMissing(
+      options,
+      buildScaledServingOption({
+        fdcId,
+        idSuffix: `common-${unit}`,
+        label,
+        grams,
+        ml: null,
+        unit: 'g',
+        baseWeightGrams,
+        base,
+      }),
+    )
+  })
+}
 
 function nowMs(): number {
   return Date.now()
@@ -642,6 +839,10 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
         source: 'usda',
       })
     })
+
+    const foodName = String((food as any)?.description || (food as any)?.lowercaseDescription || '').trim()
+    appendLiquidServingOptions(options, fdcId, foodName, baseWeightGrams, base)
+    appendCommonFoodServingOptions(options, fdcId, foodName, baseWeightGrams, base)
 
     const deduped = new Map<string, ServingOption>()
     options.forEach((opt) => {

@@ -757,6 +757,70 @@ const scaleToFitCalories = (items: RecommendedItem[], caloriesCap: number | null
   return items.map((it) => ({ ...it, servings: round3(clamp((Number(it.servings) || 0) * factor, 0, 20)) }))
 }
 
+const buildProviderFallbackRecommendation = (
+  category: MealCategory,
+  date: string,
+  caloriesCap: number | null,
+  avoidTerms: string[] = [],
+): RecommendedMealRecord => {
+  const avoid = new Set(avoidTerms.map((term) => String(term || '').toLowerCase()).filter(Boolean))
+  const hasAvoid = (name: string) => {
+    const key = name.toLowerCase()
+    return Array.from(avoid).some((term) => term && key.includes(term))
+  }
+
+  const options: Array<{ mealName: string; tags: string[]; why: string; items: RecommendedItem[] }> = [
+    {
+      mealName: category === 'breakfast' ? 'Egg, avocado and toast plate' : 'Chicken, rice and vegetable bowl',
+      tags: ['High protein', 'Balanced', 'Simple'],
+      why: 'This is a practical balanced option with lean protein, steady carbohydrates, and vegetables. Portions can be adjusted to match the remaining energy target for the day.',
+      items: category === 'breakfast'
+        ? [
+            { name: 'Egg', serving_size: '2 large eggs', servings: 1, calories: 143, protein_g: 12.6, carbs_g: 0.8, fat_g: 9.5, fiber_g: 0, sugar_g: 0.4 },
+            { name: 'Avocado', serving_size: '50 g', servings: 1, calories: 80, protein_g: 1, carbs_g: 4.3, fat_g: 7.4, fiber_g: 3.4, sugar_g: 0.3 },
+            { name: 'Wholegrain toast', serving_size: '1 slice', servings: 1, calories: 90, protein_g: 4, carbs_g: 16, fat_g: 1.3, fiber_g: 2, sugar_g: 2 },
+          ]
+        : [
+            { name: 'Chicken breast', serving_size: '120 g cooked', servings: 1, calories: 198, protein_g: 37.2, carbs_g: 0, fat_g: 4.3, fiber_g: 0, sugar_g: 0 },
+            { name: 'Cooked rice', serving_size: '120 g', servings: 1, calories: 156, protein_g: 3.2, carbs_g: 34.2, fat_g: 0.3, fiber_g: 0.5, sugar_g: 0.1 },
+            { name: 'Broccoli', serving_size: '100 g', servings: 1, calories: 35, protein_g: 2.4, carbs_g: 7.2, fat_g: 0.4, fiber_g: 3.3, sugar_g: 1.4 },
+            { name: 'Olive oil', serving_size: '1 tsp', servings: 1, calories: 40, protein_g: 0, carbs_g: 0, fat_g: 4.5, fiber_g: 0, sugar_g: 0 },
+          ],
+    },
+    {
+      mealName: category === 'snacks' ? 'Greek yoghurt and berries' : 'Salmon, potato and greens plate',
+      tags: ['Protein', 'Fibre', 'Whole food'],
+      why: 'This option keeps the ingredient list familiar and gives a mix of protein, fibre, and carbohydrates. It is designed to be easy to log and easy to adjust.',
+      items: category === 'snacks'
+        ? [
+            { name: 'Greek yoghurt', serving_size: '170 g', servings: 1, calories: 100, protein_g: 17, carbs_g: 6, fat_g: 0.7, fiber_g: 0, sugar_g: 6 },
+            { name: 'Blueberries', serving_size: '75 g', servings: 1, calories: 43, protein_g: 0.5, carbs_g: 10.9, fat_g: 0.2, fiber_g: 1.8, sugar_g: 7.5 },
+          ]
+        : [
+            { name: 'Salmon', serving_size: '120 g cooked', servings: 1, calories: 247, protein_g: 26, carbs_g: 0, fat_g: 15, fiber_g: 0, sugar_g: 0 },
+            { name: 'Potato', serving_size: '150 g boiled', servings: 1, calories: 130, protein_g: 2.9, carbs_g: 30, fat_g: 0.2, fiber_g: 2.7, sugar_g: 1.3 },
+            { name: 'Spinach', serving_size: '80 g', servings: 1, calories: 18, protein_g: 2.3, carbs_g: 2.9, fat_g: 0.3, fiber_g: 1.8, sugar_g: 0.3 },
+          ],
+    },
+  ]
+
+  const picked = options.find((option) => option.items.every((item) => !hasAvoid(item.name))) || options[0]
+  const items = scaleToFitCalories(picked.items, caloriesCap).map((item) => ({ ...item, servings: Number(item.servings) || 1 }))
+  const totals = computeTotalsFromItems(items)
+  return {
+    id: `air-fallback-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+    createdAt: new Date().toISOString(),
+    date,
+    category,
+    mealName: picked.mealName,
+    tags: picked.tags,
+    why: picked.why,
+    recipe: buildFallbackRecipe(category, items),
+    items,
+    totals,
+  }
+}
+
 const filterCommittedHistory = (state: StoredState) => {
   const committedIdSet = new Set(
     Array.isArray(state.committedIds) ? state.committedIds.map((v) => String(v || '').trim()).filter(Boolean) : [],
@@ -1252,7 +1316,8 @@ export async function POST(req: NextRequest) {
         message: String(llmError?.message || llmError || ''),
       })
       if (attempt + 1 < maxAttempts) continue
-      return NextResponse.json({ error: 'AI is temporarily busy. Please try again in a moment.' }, { status: 503 })
+      record = buildProviderFallbackRecommendation(category, date, caloriesCap, [...avoidIngredients, ...allergies])
+      break
     }
     if (modelUsed && modelUsed !== model) {
       console.warn('[ai-meal-recommendation] used fallback model', { modelUsed, baseModel: model })

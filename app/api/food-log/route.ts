@@ -10,6 +10,7 @@ import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 import { createWriteGuard, hashPayload } from '@/lib/write-guard'
 import { deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
+import { normalizeMealCategory } from '@/lib/food-log-categories'
 
 const FOOD_PHOTO_PREFIX = 'food-photos'
 const FOOD_PHOTO_SCOPE = 'food-photo'
@@ -300,17 +301,6 @@ const normalizeFoodPhotoInput = async (userId: string, imageValue: string) => {
   if (blobPath) return blobPath
   if (isRemoteUrl(trimmed)) return trimmed
   return ''
-}
-
-export const normalizeMealCategory = (raw: any): string | null => {
-  const value = typeof raw === 'string' ? raw.toLowerCase() : ''
-  if (/breakfast/.test(value)) return 'breakfast'
-  if (/lunch/.test(value)) return 'lunch'
-  if (/dinner/.test(value)) return 'dinner'
-  if (/snack/.test(value)) return 'snacks'
-  if (/uncat/.test(value) || /other/.test(value)) return 'uncategorized'
-  if (typeof raw === 'string' && raw.trim()) return raw.trim()
-  return null
 }
 
 const stripNutritionFromServingSize = (raw: string) => {

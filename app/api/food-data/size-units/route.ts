@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 
 import { fetchUsdaServingOptions, searchLocalFoods } from '@/lib/food-data'
+import { getFoodUnitGrams } from '@/lib/food/measurement-units'
 
 type SizeUnit =
   | 'piece-small'
@@ -105,6 +106,40 @@ const isEggFood = (name: string) => {
 }
 
 const hasPositive = (value: number | null | undefined) => Number.isFinite(Number(value)) && Number(value) > 0
+
+const SIZE_UNITS: SizeUnit[] = [
+  'piece-small',
+  'piece-medium',
+  'piece-large',
+  'piece-extra-large',
+  'egg-small',
+  'egg-medium',
+  'egg-large',
+  'egg-extra-large',
+]
+
+const readBuiltInSizeUnits = (name: string): SizeUnitGrams => {
+  const normalized = normalizeText(name)
+  const liquidHints = /\b(water|milk|juice|coffee|tea|soda|cola|drink|beverage|smoothie|shake|broth|stock|soup|oil|vinegar|sauce|syrup)\b/
+  if (liquidHints.test(normalized) && !isEggFood(name)) return {}
+
+  const source = getFoodUnitGrams(name) || {}
+  const unitGrams: SizeUnitGrams = {}
+  SIZE_UNITS.forEach((unit) => {
+    const grams = Number((source as any)[unit])
+    if (Number.isFinite(grams) && grams > 0) unitGrams[unit] = Math.round(grams * 10) / 10
+  })
+  return unitGrams
+}
+
+const mergeSizeUnits = (primary: SizeUnitGrams, fallback: SizeUnitGrams): SizeUnitGrams => {
+  const merged: SizeUnitGrams = { ...fallback }
+  SIZE_UNITS.forEach((unit) => {
+    const grams = Number(primary[unit])
+    if (Number.isFinite(grams) && grams > 0) merged[unit] = Math.round(grams * 10) / 10
+  })
+  return merged
+}
 
 const scoreCandidate = (candidateName: string, requestedName: string) => {
   const candidateNorm = normalizeText(candidateName)
@@ -257,8 +292,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ success: true, ...emptyResponse })
     }
 
+    const builtInUnitGrams = readBuiltInSizeUnits(name)
     const options = await fetchUsdaServingOptions(usdaId)
-    const unitGrams = mapServingOptionsToSizeUnits(name, options)
+    const unitGrams = mergeSizeUnits(builtInUnitGrams, mapServingOptionsToSizeUnits(name, options))
     const response = {
       unitGrams,
       matchedItem: Object.keys(unitGrams).length > 0 ? matchedItem : null,

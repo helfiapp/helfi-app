@@ -19,6 +19,7 @@ import { API_BASE_URL } from '../config'
 import { PRODUCE_MEASUREMENTS, type ProduceMeasurement } from '../data/produceMeasurements'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -118,6 +119,30 @@ function numberOrZero(value: any) {
   return n
 }
 
+function analyzedFoodLabelLooksBad(value: any) {
+  const text = String(value || '').toLowerCase()
+  return (
+    /\b(no|not)\s+(visible\s+)?food\b/.test(text) ||
+    /\bnot\s+(a\s+)?food\b/.test(text) ||
+    /\bnon[-\s]?food\b/.test(text) ||
+    /\b(cannot|can't|could not|unable to)\s+(identify|detect|find)\s+(any\s+)?food\b/.test(text)
+  )
+}
+
+function analyzedFoodHasNutrition(value: any) {
+  const calories = numberOrZero(value?.calories ?? value?.calories_kcal)
+  const protein = numberOrZero(value?.protein_g ?? value?.protein)
+  const carbs = numberOrZero(value?.carbs_g ?? value?.carbs)
+  const fat = numberOrZero(value?.fat_g ?? value?.fat)
+  return calories > 5 || protein > 0.2 || carbs > 0.2 || fat > 0.2
+}
+
+function isUsableAnalyzedFood(value: any) {
+  if (!value || typeof value !== 'object') return false
+  const label = `${String(value?.name || '')} ${String(value?.serving_size || value?.description || '')}`
+  return !analyzedFoodLabelLooksBad(label) && analyzedFoodHasNutrition(value)
+}
+
 function safeNumber(value: any) {
   const n = Number(value)
   if (!Number.isFinite(n)) return null
@@ -194,6 +219,19 @@ const DISCRETE_COUNT_UNITS = new Set<AdjustUnit>([
 
 function isDiscreteCountUnit(unit: AdjustUnit | null | undefined) {
   return !!unit && DISCRETE_COUNT_UNITS.has(unit)
+}
+
+function hasSizedCountUnits(unitGrams?: FoodUnitGrams | null) {
+  return (
+    (unitGrams?.['piece-small'] || 0) > 0 ||
+    (unitGrams?.['piece-medium'] || 0) > 0 ||
+    (unitGrams?.['piece-large'] || 0) > 0 ||
+    (unitGrams?.['piece-extra-large'] || 0) > 0 ||
+    (unitGrams?.['egg-small'] || 0) > 0 ||
+    (unitGrams?.['egg-medium'] || 0) > 0 ||
+    (unitGrams?.['egg-large'] || 0) > 0 ||
+    (unitGrams?.['egg-extra-large'] || 0) > 0
+  )
 }
 
 const STATIC_UNIT_GRAMS: Record<AdjustUnit, number> = {
@@ -285,6 +323,55 @@ function isEggFood(name: string | null | undefined) {
   const tokens = foodTokens(String(name || '').trim())
   if (!tokens.includes('egg')) return false
   return tokens.every((token) => !EGG_BLOCKLIST.has(token))
+}
+
+function isLikelyLiquidFood(name: string | null | undefined) {
+  const normalized = normalizeFoodValue(String(name || '').trim())
+  if (!normalized) return false
+  if (normalized.includes('milk chocolate')) return false
+  if (
+    /\b(chocolate|cocoa)\b/.test(normalized) &&
+    !/\b(chocolate milk|hot chocolate|milkshake|shake|smoothie|syrup)\b/.test(normalized)
+  ) {
+    return false
+  }
+  const solidHints = [
+    'bread',
+    'cookie',
+    'biscuit',
+    'cracker',
+    'cereal',
+    'chips',
+    'crisps',
+    'popcorn',
+    'powder',
+    'mix',
+    'bar',
+    'cake',
+    'brownie',
+  ]
+  if (solidHints.some((hint) => normalized.includes(hint))) return false
+  const liquidHints = [
+    'water',
+    'milk',
+    'juice',
+    'coffee',
+    'tea',
+    'soda',
+    'cola',
+    'drink',
+    'beverage',
+    'smoothie',
+    'shake',
+    'broth',
+    'stock',
+    'soup',
+    'oil',
+    'vinegar',
+    'sauce',
+    'syrup',
+  ]
+  return liquidHints.some((hint) => normalized.includes(hint))
 }
 
 function safeNum(value: any) {
@@ -385,6 +472,8 @@ function findProduceMeasurement(name: string | null | undefined) {
 function getFoodUnitGrams(name: string | null | undefined): FoodUnitGrams {
   const units: FoodUnitGrams = {}
 
+  if (isLikelyLiquidFood(name)) return units
+
   if (isEggFood(name)) {
     units['egg-small'] = 38
     units['egg-medium'] = 44
@@ -479,6 +568,19 @@ function normalizeServingOptionsForAdjust(raw: any): ServingOption[] {
 
 function pickDefaultServingOptionForAdjust(options: ServingOption[]) {
   if (!Array.isArray(options) || options.length === 0) return null
+  const mlOptions = options.filter((option) => {
+    const label = String(option?.label || option?.serving_size || '').toLowerCase()
+    const ml = Number(option?.ml)
+    return (Number.isFinite(ml) && ml > 0) || option?.unit === 'ml' || /\bml\b/.test(label)
+  })
+  if (mlOptions.length > 0) {
+    return (
+      mlOptions.find((option) => /\b100\s*ml\b/i.test(String(option?.label || option?.serving_size || ''))) ||
+      mlOptions.find((option) => /\b250\s*ml\b/i.test(String(option?.label || option?.serving_size || ''))) ||
+      mlOptions[0] ||
+      null
+    )
+  }
   const byPreference = (needle: string) =>
     options.find((option) => String(option?.label || option?.serving_size || '').toLowerCase().includes(needle))
   return byPreference('medium') || byPreference('regular') || byPreference('standard') || options[0] || null
@@ -500,6 +602,19 @@ function scoreServingOption(option: ServingOption) {
 
 function pickBestServingOption(options: ServingOption[]) {
   if (!Array.isArray(options) || options.length === 0) return null
+  const mlOptions = options.filter((option) => {
+    const label = String(option?.label || option?.serving_size || '').toLowerCase()
+    const ml = Number(option?.ml)
+    return (Number.isFinite(ml) && ml > 0) || option?.unit === 'ml' || /\bml\b/.test(label)
+  })
+  if (mlOptions.length > 0) {
+    return (
+      mlOptions.find((option) => /\b100\s*ml\b/i.test(String(option?.label || option?.serving_size || ''))) ||
+      mlOptions.find((option) => /\b250\s*ml\b/i.test(String(option?.label || option?.serving_size || ''))) ||
+      mlOptions[0] ||
+      null
+    )
+  }
   const non100 = options.filter((option) => !is100gServing(option?.serving_size))
   const pool = non100.length > 0 ? non100 : options
   const sorted = [...pool].sort((a, b) => scoreServingOption(b) - scoreServingOption(a))
@@ -615,6 +730,10 @@ function defaultUnitOptions(
 ): AdjustUnit[] {
   if (!base) return ['g', 'ml', 'oz']
 
+  if (isLikelyLiquidFood(foodName)) {
+    return ['ml', 'g', 'oz', 'tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup']
+  }
+
   if (isEggFood(foodName)) {
     return ['g', 'oz', 'egg-small', 'egg-medium', 'egg-large', 'egg-extra-large']
   }
@@ -629,7 +748,7 @@ function defaultUnitOptions(
     (foodUnits['piece-large'] || 0) > 0 ||
     (foodUnits['piece-extra-large'] || 0) > 0
 
-  const baseUnits: AdjustUnit[] = ['g', 'ml', 'oz', 'tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup', 'pinch']
+  const baseUnits: AdjustUnit[] = ['g', 'oz', 'tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup', 'pinch']
   let units = [...baseUnits]
 
   if (hasProducePieceUnits) {
@@ -684,7 +803,8 @@ function singularizeToken(value: string) {
   const lower = String(value || '').toLowerCase()
   if (!lower) return lower
   if (lower.endsWith('ies') && lower.length > 4) return `${lower.slice(0, -3)}y`
-  if (lower.endsWith('es') && lower.length > 3 && !lower.endsWith('ses') && !lower.endsWith('xes') && !lower.endsWith('zes')) {
+  if (lower.endsWith('oes') && lower.length > 3) return lower.slice(0, -2)
+  if (/(ches|shes|xes|zes|ses)$/.test(lower) && lower.length > 4) {
     return lower.slice(0, -2)
   }
   if (lower.endsWith('s') && lower.length > 3 && !lower.endsWith('ss')) return lower.slice(0, -1)
@@ -769,18 +889,19 @@ function sortResultsAz(
     }
   }
 
+  const sourcePriority = (item: SearchFoodItem) => {
+    if (isCustomListItem(item)) return 0
+    if (item?.source === 'usda') return 1
+    if (item?.source === 'fatsecret') return 2
+    if (item?.source === 'openfoodfacts') return 3
+    return 4
+  }
+
+  if (options?.kind === 'single') {
+    return sortPlainFoodResults(filtered, options?.query || '', sourcePriority)
+  }
+
   return [...filtered].sort((a, b) => {
-    if (options?.kind === 'single') {
-      const sourcePriority = (item: SearchFoodItem) => {
-        if (isCustomListItem(item)) return 0
-        if (item?.source === 'usda') return 1
-        if (item?.source === 'fatsecret') return 2
-        if (item?.source === 'openfoodfacts') return 3
-        return 4
-      }
-      const bySource = sourcePriority(a) - sourcePriority(b)
-      if (bySource !== 0) return bySource
-    }
     const aName = String(a?.name || '').trim().toLowerCase()
     const bName = String(b?.name || '').trim().toLowerCase()
     const byName = aName.localeCompare(bName)
@@ -822,7 +943,7 @@ export function AddIngredientScreen() {
   }, [mode, session?.token])
 
   const [query, setQuery] = useState('')
-  const [kind, setKind] = useState<SearchKind>('packaged')
+  const [kind, setKind] = useState<SearchKind>('single')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [results, setResults] = useState<SearchFoodItem[]>([])
@@ -872,7 +993,7 @@ export function AddIngredientScreen() {
 
   const adjustFoodUnitGrams = useMemo(() => getFoodUnitGrams(adjustItem?.name || ''), [adjustItem?.name])
   const mergedAdjustUnitGrams = useMemo(
-    () => ({ ...adjustFoodUnitGrams, ...(adjustItem?.unitGrams || {}) }),
+    () => ({ ...(adjustItem?.unitGrams || {}), ...adjustFoodUnitGrams }),
     [adjustFoodUnitGrams, adjustItem?.unitGrams],
   )
 
@@ -1007,6 +1128,7 @@ export function AddIngredientScreen() {
     if (!authHeaders) return null
     if (!item || item.source !== 'usda') return null
     if (!is100gServing(item.serving_size)) return null
+    if (hasSizedCountUnits(getFoodUnitGrams(item.name))) return null
 
     const key = `${String(item.source)}:${String(item.id)}`
     const cached = servingOverrideCacheRef.current.get(key)
@@ -1149,17 +1271,20 @@ export function AddIngredientScreen() {
       })
 
       const mergedUnitGrams = {
-        ...getFoodUnitGrams(authoritativeItem?.name || ''),
         ...(dynamicUnitGrams || {}),
+        ...getFoodUnitGrams(authoritativeItem?.name || ''),
       }
       let units = defaultUnitOptions(base, authoritativeItem?.name || '', mergedUnitGrams)
       if (resolvedServingOptions.length > 0) {
         units = units.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz')
         units = ['serving', ...units]
       }
-      const nextUnit = resolvedServingOptions.length > 0 ? 'serving' : units[0] || 'g'
+      const liquidDefault = isLikelyLiquidFood(authoritativeItem?.name || '') && units.includes('ml')
+      const nextUnit = liquidDefault ? 'ml' : resolvedServingOptions.length > 0 ? 'serving' : units[0] || 'g'
       setAdjustUnit(nextUnit)
-      if (nextUnit === 'serving') {
+      if (liquidDefault) {
+        setAdjustAmountInput(formatAmount(base?.amount && base.amount > 0 ? base.amount : 100))
+      } else if (nextUnit === 'serving') {
         setAdjustAmountInput('1')
       } else if (base && nextUnit === base.unit) {
         setAdjustAmountInput(formatAmount(base.amount))
@@ -1422,7 +1547,7 @@ export function AddIngredientScreen() {
         return
       }
 
-      const items = Array.isArray(data?.items) ? data.items : []
+      const items = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
       if (items.length > 0) {
         let added = 0
         for (const item of items) {
@@ -1454,12 +1579,20 @@ export function AddIngredientScreen() {
           })
           if (ok) added += 1
         }
-        Alert.alert('Done', `${added} item${added === 1 ? '' : 's'} added from photo.`)
-        navigation.goBack()
+        if (added > 0) {
+          Alert.alert('Done', `${added} item${added === 1 ? '' : 's'} added from photo.`)
+          navigation.goBack()
+        } else {
+          Alert.alert('Add failed', 'The photo was analyzed, but no food entry could be saved.')
+        }
         return
       }
 
       const summary = data?.food || data || {}
+      if (!isUsableAnalyzedFood(summary)) {
+        Alert.alert('No food detected', 'Please try again with a clear photo of food.')
+        return
+      }
       const ok = await createFoodEntry({
         name: String(summary?.name || 'Photo analyzed meal'),
         calories: numberOrZero(summary?.calories || summary?.calories_kcal),
@@ -1474,6 +1607,8 @@ export function AddIngredientScreen() {
       if (ok) {
         Alert.alert('Done', 'Item added from photo.')
         navigation.goBack()
+      } else {
+        Alert.alert('Add failed', 'The photo was analyzed, but the food entry could not be saved.')
       }
     } catch {
       setPhotoLoading(false)
@@ -1623,6 +1758,8 @@ export function AddIngredientScreen() {
           }}
         >
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Back"
             onPress={() => navigation.goBack()}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, width: 36, alignItems: 'flex-start' })}
           >
@@ -1633,6 +1770,8 @@ export function AddIngredientScreen() {
             <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>Add to {categoryLabel}</Text>
           </View>
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Close Add ingredient"
             onPress={() => navigation.goBack()}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, width: 36, alignItems: 'flex-end' })}
           >
@@ -1680,6 +1819,8 @@ export function AddIngredientScreen() {
               }}
             />
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Search foods"
               onPress={() => void runSearch()}
               disabled={loading || query.trim().length === 0}
               style={({ pressed }) => ({
@@ -1701,6 +1842,9 @@ export function AddIngredientScreen() {
 
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Packaged/Fast-foods"
+              accessibilityState={{ selected: kind === 'packaged', disabled: loading }}
               disabled={loading}
               onPress={() => {
                 setKind('packaged')
@@ -1722,6 +1866,9 @@ export function AddIngredientScreen() {
               </Text>
             </Pressable>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Single food"
+              accessibilityState={{ selected: kind === 'single', disabled: loading }}
               disabled={loading}
               onPress={() => {
                 setKind('single')
@@ -1793,6 +1940,8 @@ export function AddIngredientScreen() {
                           <Text style={{ marginTop: 4, fontSize: 11, color: '#9CA3AF' }}>Source: {ingredientSourceLabel(item)}</Text>
                         </View>
                         <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel={`Add ${display.title}`}
                           disabled={isOpeningAdjust}
                           onPress={() => {
                             void openAdjust(item)
@@ -1831,7 +1980,12 @@ export function AddIngredientScreen() {
             paddingVertical: 14,
           }}
         >
-          <Pressable onPress={openMissingReport} style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Missing item? Tell us"
+            onPress={openMissingReport}
+            style={({ pressed }) => ({ opacity: pressed ? 0.8 : 1 })}
+          >
             <Text style={{ fontSize: 12, fontWeight: '700', color: '#047857' }}>Missing item? Tell us</Text>
           </Pressable>
         </View>
@@ -1876,6 +2030,9 @@ export function AddIngredientScreen() {
 
           <View style={{ flexDirection: 'row', gap: 8 }}>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel={photoLoading ? 'Analyzing image' : 'Add image'}
+              accessibilityState={{ disabled: photoLoading }}
               disabled={photoLoading}
               onPress={() => void addByPhoto()}
               style={({ pressed }) => ({
@@ -1893,6 +2050,8 @@ export function AddIngredientScreen() {
               </Text>
             </Pressable>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Reset"
               onPress={resetSearchSection}
               style={({ pressed }) => ({
                 borderRadius: 10,
@@ -2075,6 +2234,8 @@ export function AddIngredientScreen() {
             <Text style={{ fontSize: 22, color: '#111827' }}> </Text>
             <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>Adjust ingredient</Text>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Close adjust ingredient"
               onPress={() => {
                 if (adjustSaving) return
                 resetAdjustState()
@@ -2099,6 +2260,9 @@ export function AddIngredientScreen() {
                 <Text style={{ fontSize: 14, color: '#374151', marginBottom: 6 }}>Base serving size</Text>
                 <View ref={adjustServingTriggerRef}>
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Base serving size: ${selectedServingLabel}`}
+                    accessibilityHint="Opens serving size choices"
                     onPress={() => openAdjustPicker('serving')}
                     style={({ pressed }) => ({
                       borderWidth: 1,
@@ -2147,6 +2311,9 @@ export function AddIngredientScreen() {
                 />
                 <View ref={adjustUnitTriggerRef} style={{ flex: 1 }}>
                   <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={`Unit: ${activeUnitLabel}`}
+                    accessibilityHint="Opens unit choices"
                     onPress={() => openAdjustPicker('unit')}
                     style={({ pressed }) => ({
                       borderWidth: 1,
@@ -2202,6 +2369,9 @@ export function AddIngredientScreen() {
           <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingHorizontal: 16, paddingVertical: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={adjustSaving ? 'Adding to diary' : 'Add to diary'}
+                accessibilityState={{ disabled: adjustSaving }}
                 disabled={adjustSaving}
                 onPress={() => void addAdjustedItem()}
                 style={({ pressed }) => ({
@@ -2217,6 +2387,9 @@ export function AddIngredientScreen() {
                 <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 17 }}>{adjustSaving ? 'Adding…' : 'Add to diary'}</Text>
               </Pressable>
               <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Cancel"
+                accessibilityState={{ disabled: adjustSaving }}
                 disabled={adjustSaving}
                 onPress={() => {
                   resetAdjustState()
@@ -2277,6 +2450,9 @@ export function AddIngredientScreen() {
                         return (
                           <Pressable
                             key={`${option.id}-${index}`}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Choose serving size: ${optionLabel}`}
+                            accessibilityState={{ selected: isSelected }}
                             onPress={() => applyAdjustServingOption(option)}
                             style={({ pressed }) => ({
                               paddingHorizontal: 12,
@@ -2301,6 +2477,9 @@ export function AddIngredientScreen() {
                         return (
                           <Pressable
                             key={`${unit}-${index}`}
+                            accessibilityRole="button"
+                            accessibilityLabel={`Choose unit: ${unitText}`}
+                            accessibilityState={{ selected: isSelected }}
                             onPress={() => applyAdjustUnitChoice(unit)}
                             style={({ pressed }) => ({
                               paddingHorizontal: 10,

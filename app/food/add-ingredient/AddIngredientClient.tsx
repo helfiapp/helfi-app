@@ -12,6 +12,7 @@ import {
   formatUnitLabel as formatMeasurementUnitLabel,
   getAllowedUnitsForFood,
   getFoodUnitGrams,
+  isLiquidFood,
 } from '@/lib/food/measurement-units'
 
 type MealCategory = 'breakfast' | 'lunch' | 'dinner' | 'snacks' | 'uncategorized'
@@ -228,17 +229,19 @@ const singularizeToken = (value: string) => {
   const lower = value.toLowerCase()
   if (lower.endsWith('ies') && value.length > 4) return `${value.slice(0, -3)}y`
   if (
-    lower.endsWith('es') &&
-    value.length > 3 &&
-    !lower.endsWith('ses') &&
-    !lower.endsWith('xes') &&
-    !lower.endsWith('zes') &&
-    !lower.endsWith('ches') &&
-    !lower.endsWith('shes')
+    (lower.endsWith('ches') ||
+      lower.endsWith('shes') ||
+      lower.endsWith('xes') ||
+      lower.endsWith('zes') ||
+      lower.endsWith('ses') ||
+      lower.endsWith('oes')) &&
+    value.length > 4
   ) {
     return value.slice(0, -2)
   }
-  if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss')) return value.slice(0, -1)
+  if (lower.endsWith('s') && value.length > 3 && !lower.endsWith('ss') && !lower.endsWith('us')) {
+    return value.slice(0, -1)
+  }
   return value
 }
 
@@ -740,9 +743,12 @@ const isDiscreteCountUnit = (unit: MeasurementUnit | null | undefined) =>
 
 const hasPositiveUnitGrams = (value: number | null | undefined) => Number.isFinite(Number(value)) && Number(value) > 0
 
+const hasSizedCountUnits = (unitGrams?: DynamicUnitGrams | null) =>
+  MERGEABLE_SIZE_UNITS.some((unit) => hasPositiveUnitGrams(unitGrams?.[unit]))
+
 const mergeFoodUnitGrams = (foodName: string, unitGrams?: DynamicUnitGrams | null) => ({
-  ...(getFoodUnitGrams(foodName) || {}),
   ...(unitGrams || {}),
+  ...(getFoodUnitGrams(foodName) || {}),
 })
 
 const getAdjustPieceDisplayName = (name?: string | null) => {
@@ -770,6 +776,9 @@ const getAdjustPieceDisplayName = (name?: string | null) => {
     'chopped',
     'halved',
     'whole',
+    'all',
+    'commercial',
+    'varieties',
   ])
   const tokens = normalized.split(' ').filter(Boolean)
   while (tokens.length > 1 && descriptorTokens.has(tokens[tokens.length - 1])) {
@@ -955,7 +964,7 @@ export default function AddIngredientClient() {
       : null
 
   const [query, setQuery] = useState('')
-  const [kind, setKind] = useState<SearchKind>('packaged')
+  const [kind, setKind] = useState<SearchKind>('single')
   const sourceChoice: SearchSource = 'auto'
   const [loading, setLoading] = useState(false)
   const [addingId, setAddingId] = useState<string | null>(null)
@@ -1289,6 +1298,7 @@ export default function AddIngredientClient() {
   const loadServingOverride = async (r: NormalizedFoodItem): Promise<NormalizedFoodItem | null> => {
     if (!r || r.source !== 'usda') return null
     if (!is100gServing(r.serving_size)) return null
+    if (hasSizedCountUnits(getFoodUnitGrams(r.name))) return null
     const key = `${r.source}:${r.id}`
     const cached = servingCacheRef.current.get(key)
     if (cached) return applyServingOptionToResult(r, cached)
@@ -1677,6 +1687,9 @@ export default function AddIngredientClient() {
           nextUnit = 'ml'
           nextAmount = drinkOverride.amount * 1000
         }
+      } else if (isLiquidFood(baseItem.name) && allowedUnits.includes('ml')) {
+        nextUnit = 'ml'
+        nextAmount = base.amount && base.amount > 0 ? base.amount : 100
       } else if (servingOptions.length > 0) {
         // Fast-food menu items: default to "1 serving" so users can pick Small/Medium/Large.
         nextUnit = 'serving'

@@ -74,7 +74,12 @@ export type MainStackParamList = {
       }
     | undefined
   FoodAnalysis: undefined
-  WaterIntake: undefined
+  WaterIntake:
+    | {
+        meal?: string
+        date?: string
+      }
+    | undefined
   FoodDiarySettings: undefined
   Login:
     | {

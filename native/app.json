@@ -27,7 +27,7 @@
         "NSLocationWhenInUseUsageDescription": "Allow Helfi to use your location to show relevant nearby practitioners when matches are available.",
         "NSMicrophoneUsageDescription": "Allow Helfi to use your microphone only when you tap the voice button, so it can turn spoken requests such as \"add breakfast\" or \"log a 20 minute walk\" into text.",
         "ITSAppUsesNonExemptEncryption": false,
-        "NSPhotoLibraryUsageDescription": "Allow Helfi to access your photos so you can attach images to mood journal entries.",
+        "NSPhotoLibraryUsageDescription": "Allow Helfi to access your photos so you can log food from meal and nutrition label images.",
         "NSPhotoLibraryAddUsageDescription": "Allow Helfi to save or manage selected journal photos when needed."
       }
     },

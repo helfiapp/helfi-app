@@ -3381,7 +3381,7 @@ export default function FoodDiary() {
   const [officialSearchQuery, setOfficialSearchQuery] = useState<string>('')
   const [officialResults, setOfficialResults] = useState<any[]>([])
   const [officialResultsSource, setOfficialResultsSource] = useState<string>('usda')
-  const [officialSource, setOfficialSource] = useState<'packaged' | 'single'>('packaged')
+  const [officialSource, setOfficialSource] = useState<'packaged' | 'single'>('single')
   const [officialLoading, setOfficialLoading] = useState<boolean>(false)
   const [officialError, setOfficialError] = useState<string | null>(null)
   const officialSearchAbortRef = useRef<AbortController | null>(null)
@@ -5180,6 +5180,19 @@ export default function FoodDiary() {
     if (current) {
       const match = options.find((opt) => String(opt?.label || opt?.serving_size || '').toLowerCase() === current)
       if (match) return match
+    }
+    const mlOptions = options.filter((opt) => {
+      const label = String(opt?.label || opt?.serving_size || '').toLowerCase()
+      const ml = Number(opt?.ml)
+      return (Number.isFinite(ml) && ml > 0) || opt?.unit === 'ml' || /\bml\b/.test(label)
+    })
+    if (mlOptions.length > 0) {
+      return (
+        mlOptions.find((opt) => /\b100\s*ml\b/i.test(String(opt?.label || opt?.serving_size || ''))) ||
+        mlOptions.find((opt) => /\b250\s*ml\b/i.test(String(opt?.label || opt?.serving_size || ''))) ||
+        mlOptions[0] ||
+        null
+      )
     }
     const non100 = options.filter((opt) => !is100gServing(opt?.serving_size || opt?.label))
     const pool = non100.length > 0 ? non100 : options
@@ -13067,10 +13080,9 @@ Please add nutritional information manually if needed.`);
       try {
         if (meta.favoriteId) {
           const nextLabel = normalizeMealLabel(updatedEntry.description || '') || (updatedEntry.description || 'Meal')
-          setFavorites((prev) => {
-            const base = Array.isArray(prev) ? prev : []
-            const idx = base.findIndex((f: any) => String(f?.id || '') === meta.favoriteId)
-            if (idx < 0) return prev
+          const base = Array.isArray(favorites) ? favorites : []
+          const idx = base.findIndex((f: any) => String(f?.id || '') === meta.favoriteId)
+          if (idx >= 0) {
             const existing = base[idx]
             const existingLabel = favoriteDisplayLabel(existing) || ''
             const aliases = Array.isArray((existing as any)?.aliases) ? ([...(existing as any).aliases] as string[]) : []
@@ -13080,9 +13092,9 @@ Please add nutritional information manually if needed.`);
             }
             const updated = { ...(existing as any), label: nextLabel, description: nextLabel, ...(aliases.length > 0 ? { aliases } : {}) }
             const next = base.map((f: any, i: number) => (i === idx ? updated : f))
+            setFavorites(next)
             persistFavorites(next)
-            return next
-          })
+          }
         }
       } catch {}
 
@@ -13274,7 +13286,7 @@ Please add nutritional information manually if needed.`);
     setOfficialResults([])
     setOfficialSearchQuery('')
     setOfficialResultsSource('usda')
-    setOfficialSource('packaged')
+    setOfficialSource('single')
   }
 
   const startManualMealBuilder = (targetCategory: typeof MEAL_CATEGORY_ORDER[number]) => {
@@ -14270,6 +14282,51 @@ Please add nutritional information manually if needed.`);
         if (historyResult.matched) setHistoryFoods(historyResult.next)
 
         if (matched) {
+          sessionStorage.removeItem('foodDiary:entryOverride')
+          return
+        }
+
+        const overrideDate =
+          typeof parsed.localDate === 'string' && parsed.localDate.length >= 8 ? parsed.localDate.slice(0, 10) : selectedDate
+        const overrideCategory = normalizeCategory(parsed.category || parsed.meal || 'uncategorized')
+        const overrideDescription =
+          typeof parsed.description === 'string' && parsed.description.trim().length > 0 ? parsed.description.trim() : ''
+        const overrideCreatedAt =
+          typeof parsed.createdAt === 'string' && parsed.createdAt.trim().length > 0
+            ? parsed.createdAt
+            : alignTimestampToLocalDate(new Date().toISOString(), overrideDate)
+        if (overrideDate === selectedDate && overrideDescription) {
+          const overrideEntry = normalizeDiaryEntry(
+            {
+              id: new Date(overrideCreatedAt).getTime(),
+              dbId: targetId,
+              description: overrideDescription,
+              label: overrideDescription,
+              method: 'meal-builder',
+              nutrition: parsed.nutrition ?? parsed.total ?? null,
+              total: parsed.total ?? parsed.nutrition ?? null,
+              items: Array.isArray(parsed.items) ? parsed.items : [],
+              meal: overrideCategory,
+              category: overrideCategory,
+              persistedCategory: overrideCategory,
+              createdAt: overrideCreatedAt,
+              localDate: overrideDate,
+            },
+            selectedDate,
+          )
+          const baseList = isViewingToday
+            ? Array.isArray(latestTodaysFoodsRef.current)
+              ? latestTodaysFoodsRef.current
+              : []
+            : Array.isArray(latestHistoryFoodsRef.current)
+            ? (latestHistoryFoodsRef.current as any[])
+            : []
+          const nextList = dedupeEntries([overrideEntry, ...baseList], { fallbackDate: selectedDate })
+          if (isViewingToday) setTodaysFoods(nextList)
+          else setHistoryFoods(nextList)
+          updateUserSnapshotForDate(nextList, selectedDate)
+          updatePersistentDiarySnapshotForDate(nextList, selectedDate)
+          setExpandedCategories((prev) => ({ ...prev, [overrideCategory]: true }))
           sessionStorage.removeItem('foodDiary:entryOverride')
           return
         }
@@ -17465,36 +17522,33 @@ Please add nutritional information manually if needed.`);
       createdAt: Date.now(),
     }
 
-    let savedResult: { favorite: any; nextFavorites: any[] } | null = null
-    setFavorites((prev) => {
-      const base = Array.isArray(prev) ? prev : []
-      const existingIndex = base.findIndex(
-        (fav: any) =>
-          (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
-          (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
-      )
-      const payloadWithStableId =
-        existingIndex >= 0 ? { ...favoritePayload, id: base[existingIndex]?.id || favoritePayload.id } : favoritePayload
+    const base = Array.isArray(favorites) ? favorites : []
+    const existingIndex = base.findIndex(
+      (fav: any) =>
+        (fav.sourceId && favoritePayload.sourceId && fav.sourceId === favoritePayload.sourceId) ||
+        (fav.label && favoritePayload.label && fav.label === favoritePayload.label),
+    )
+    const payloadWithStableId =
+      existingIndex >= 0 ? { ...favoritePayload, id: base[existingIndex]?.id || favoritePayload.id } : favoritePayload
 
-      // If the user saved with a new name, remember the old name as an alias so "All" doesn't show duplicates.
-      const withAliases = (() => {
-        const shouldAlias = sourceLabelForAlias && sourceLabelForAlias !== cleanLabel
-        if (!shouldAlias) return payloadWithStableId
-        const existingAliases = Array.isArray((payloadWithStableId as any)?.aliases)
-          ? (payloadWithStableId as any).aliases
-          : []
-        const aliases = Array.from(new Set([...(Array.isArray(existingAliases) ? existingAliases : []), sourceLabelForAlias]))
-        return { ...(payloadWithStableId as any), aliases }
-      })()
+    // If the user saved with a new name, remember the old name as an alias so "All" doesn't show duplicates.
+    const withAliases = (() => {
+      const shouldAlias = sourceLabelForAlias && sourceLabelForAlias !== cleanLabel
+      if (!shouldAlias) return payloadWithStableId
+      const existingAliases = Array.isArray((payloadWithStableId as any)?.aliases)
+        ? (payloadWithStableId as any).aliases
+        : []
+      const aliases = Array.from(new Set([...(Array.isArray(existingAliases) ? existingAliases : []), sourceLabelForAlias]))
+      return { ...(payloadWithStableId as any), aliases }
+    })()
 
-      const next =
-        existingIndex >= 0
-          ? base.map((fav: any, idx: number) => (idx === existingIndex ? withAliases : fav))
-          : [...base, withAliases]
-      savedResult = { favorite: withAliases, nextFavorites: next }
-      persistFavorites(next)
-      return next
-    })
+    const next =
+      existingIndex >= 0
+        ? base.map((fav: any, idx: number) => (idx === existingIndex ? withAliases : fav))
+        : [...base, withAliases]
+    const savedResult: { favorite: any; nextFavorites: any[] } | null = { favorite: withAliases, nextFavorites: next }
+    setFavorites(next)
+    persistFavorites(next)
     return savedResult
   }
 
@@ -18365,28 +18419,25 @@ Please add nutritional information manually if needed.`);
     )
     if (!targetId && !sourceId && !labelKey) return
 
-    setFavorites((prev) => {
-      const base = Array.isArray(prev) ? prev : []
-      let changed = false
-      const next = base.map((fav: any) => {
-        const favId = typeof fav?.id === 'string' ? String(fav.id).trim() : ''
-        const favSourceId = getSourceIdForEntry(fav)
-        const favLabelKey = normalizeFoodName(
-          normalizeMealLabel(favoriteDisplayLabel(fav) || fav?.label || fav?.description || ''),
-        )
-        const idMatch = targetId && favId && favId === targetId
-        const sourceMatch = sourceId && favSourceId && favSourceId === sourceId
-        const labelMatch = labelKey && favLabelKey && favLabelKey === labelKey
-        if (!idMatch && !sourceMatch && !labelMatch) return fav
-        changed = true
-        return { ...fav, lastUsedAt: usedAtMs }
-      })
-      if (changed) {
-        persistFavorites(next)
-        return next
-      }
-      return prev
+    const base = Array.isArray(favorites) ? favorites : []
+    let changed = false
+    const next = base.map((fav: any) => {
+      const favId = typeof fav?.id === 'string' ? String(fav.id).trim() : ''
+      const favSourceId = getSourceIdForEntry(fav)
+      const favLabelKey = normalizeFoodName(
+        normalizeMealLabel(favoriteDisplayLabel(fav) || fav?.label || fav?.description || ''),
+      )
+      const idMatch = targetId && favId && favId === targetId
+      const sourceMatch = sourceId && favSourceId && favSourceId === sourceId
+      const labelMatch = labelKey && favLabelKey && favLabelKey === labelKey
+      if (!idMatch && !sourceMatch && !labelMatch) return fav
+      changed = true
+      return { ...fav, lastUsedAt: usedAtMs }
     })
+    if (changed) {
+      setFavorites(next)
+      persistFavorites(next)
+    }
   }
 
   const runFavoriteAdd = (item: any, opts?: { overrideSource?: any | null }) => {
@@ -18749,11 +18800,9 @@ Please add nutritional information manually if needed.`);
       delete next[id]
       return next
     })
-    setFavorites((prev) => {
-      const next = prev.filter((fav: any) => fav.id !== id)
-      persistFavorites(next)
-      return next
-    })
+    const next = (Array.isArray(favorites) ? favorites : []).filter((fav: any) => fav.id !== id)
+    setFavorites(next)
+    persistFavorites(next)
     showQuickToast('Favorite removed')
   }
 
@@ -18967,7 +19016,30 @@ Please add nutritional information manually if needed.`);
             console.warn('Move entry server update failed', await res.text())
           }
         } else {
-          enqueuePendingFoodLogSave(movedEntry, sourceDate)
+          const res = await fetch('/api/food-log', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              description: (movedEntry.description || movedEntry.label || '').toString(),
+              nutrition: buildPayloadNutrition(movedEntry),
+              imageUrl: movedEntry.photo || null,
+              items: Array.isArray(movedEntry.items) && movedEntry.items.length > 0 ? movedEntry.items : null,
+              meal: movedEntry.meal || movedEntry.category,
+              category: movedEntry.category || movedEntry.meal,
+              localDate: movedEntry.localDate || sourceDate,
+              createdAt: movedEntry.createdAt,
+              allowDuplicate: true,
+            }),
+          })
+          if (res.ok) {
+            const json = await res.json().catch(() => ({} as any))
+            if (json?.id) {
+              updateEntriesForPendingKey(movedPendingKey, (entry) => clearEntryPendingSave(entry, json.id))
+            }
+          } else {
+            console.warn('Move entry server save failed', await res.text())
+            enqueuePendingFoodLogSave(movedEntry, sourceDate)
+          }
         }
         await syncSnapshotOnly(updatedForDate, sourceDate)
       } catch (err) {
@@ -20251,20 +20323,18 @@ Please add nutritional information manually if needed.`);
           meal: normalizeCategory(combineCategory),
           createdAt: Date.now(),
         }
-        setFavorites((prev) => {
-          const base = Array.isArray(prev) ? prev : []
-          const existingIndex = base.findIndex(
-            (fav: any) =>
-              (fav.label && favoritePayload.label && String(fav.label).trim() === String(favoritePayload.label).trim()) ||
-              (fav.description && favoritePayload.description && String(fav.description).trim() === String(favoritePayload.description).trim()),
-          )
-          const next =
-            existingIndex >= 0
-              ? base.map((fav: any, idx: number) => (idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav))
-              : [...base, favoritePayload]
-          persistFavorites(next)
-          return next
-        })
+        const base = Array.isArray(favorites) ? favorites : []
+        const existingIndex = base.findIndex(
+          (fav: any) =>
+            (fav.label && favoritePayload.label && String(fav.label).trim() === String(favoritePayload.label).trim()) ||
+            (fav.description && favoritePayload.description && String(fav.description).trim() === String(favoritePayload.description).trim()),
+        )
+        const next =
+          existingIndex >= 0
+            ? base.map((fav: any, idx: number) => (idx === existingIndex ? { ...favoritePayload, id: fav.id || favoritePayload.id } : fav))
+            : [...base, favoritePayload]
+        setFavorites(next)
+        persistFavorites(next)
       } catch {}
 
       // 1c) Keep original ingredients available in "All" even after combining.
@@ -22217,6 +22287,31 @@ Please add nutritional information manually if needed.`);
 	                  <button
 	                    type="button"
 	                    onClick={() => {
+	                      setShowPhotoOptions(false);
+                      setPhotoOptionsAnchor(null);
+                      favoritesReplaceTargetRef.current = null;
+                      favoritesActionRef.current = 'diary';
+                      setShowFavoritesPicker(true);
+                    }}
+                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                  >
+                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mr-3 text-amber-600">
+                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
+                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
+                      </svg>
+                    </div>
+                    <div className="flex-1">
+                      <div className="text-base font-semibold text-gray-900">Favorites</div>
+                      <div className="text-xs text-gray-500">Reuse a saved meal in {categoryLabel(selectedAddCategory)}</div>
+                    </div>
+                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                    </svg>
+                  </button>
+
+	                  <button
+	                    type="button"
+	                    onClick={() => {
 	                      setShowPhotoOptions(false)
 	                      setPhotoOptionsAnchor(null)
                         const fresh = Date.now()
@@ -22241,31 +22336,6 @@ Please add nutritional information manually if needed.`);
 	                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
 	                    </svg>
 	                  </button>
-
-	                  <button
-	                    type="button"
-	                    onClick={() => {
-	                      setShowPhotoOptions(false);
-                      setPhotoOptionsAnchor(null);
-                      favoritesReplaceTargetRef.current = null;
-                      favoritesActionRef.current = 'diary';
-                      setShowFavoritesPicker(true);
-                    }}
-                    className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
-                  >
-                    <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-amber-100 flex items-center justify-center mr-3 text-amber-600">
-                      <svg className="w-5 h-5" fill="currentColor" viewBox="0 0 24 24">
-                        <path d="M12 17.27L18.18 21l-1.64-7.03L22 9.24l-7.19-.61L12 2 9.19 8.63 2 9.24l5.46 4.73L5.82 21z" />
-                      </svg>
-                    </div>
-                    <div className="flex-1">
-                      <div className="text-base font-semibold text-gray-900">Favorites</div>
-                      <div className="text-xs text-gray-500">Reuse a saved meal in {categoryLabel(selectedAddCategory)}</div>
-                    </div>
-                    <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                    </svg>
-                  </button>
 
                   <button
                     type="button"
@@ -22296,7 +22366,6 @@ Please add nutritional information manually if needed.`);
                     </svg>
                   </button>
 
-                  {/* Manual Entry Option */}
                   <button
                     type="button"
                     onClick={(e) =>
@@ -22313,8 +22382,84 @@ Please add nutritional information manually if needed.`);
                       </svg>
                     </div>
                                       <div className="flex-1">
-                                        <div className="text-base font-semibold text-gray-900">Manual Entry</div>
-                                        <div className="text-xs text-gray-500">Type your food description</div>
+                                        <div className="text-base font-semibold text-gray-900">Add ingredient</div>
+                                        <div className="text-xs text-gray-500">Search a database and add one item</div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowPhotoOptions(false)
+                                        setPhotoOptionsAnchor(null)
+                                        router.push(`/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(selectedAddCategory)}`)
+                                      }}
+                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-100 flex items-center justify-center mr-3 text-emerald-700">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                                        </svg>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Build a meal</div>
+                                        <div className="text-xs text-gray-500">Combine multiple ingredients into one entry</div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowPhotoOptions(false)
+                                        setPhotoOptionsAnchor(null)
+                                        router.push(
+                                          `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(selectedAddCategory)}`,
+                                        )
+                                      }}
+                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-emerald-50 flex items-center justify-center mr-3 text-emerald-700">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 00-2 2v10a2 2 0 002 2m0-14a2 2 0 012 2v10a2 2 0 01-2 2m0 0v2m-4-6h8" />
+                                        </svg>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Import Recipe</div>
+                                        <div className="text-xs text-gray-500">
+                                          Import by URL ({RECIPE_IMPORT_URL_CREDITS} credits) or photo ({RECIPE_IMPORT_PHOTO_CREDITS} credits) and auto-fill Build a meal
+                                        </div>
+                                      </div>
+                                      <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                                      </svg>
+                                    </button>
+
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        setShowPhotoOptions(false)
+                                        setPhotoOptionsAnchor(null)
+                                        const qs = new URLSearchParams()
+                                        qs.set('date', selectedDate)
+                                        qs.set('category', selectedAddCategory)
+                                        router.push(`/food/water?${qs.toString()}`)
+                                      }}
+                                      className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
+                                    >
+                                      <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center mr-3 text-sky-600">
+                                        <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3.75C9.25 7.2 6.75 10.65 6.75 14a5.25 5.25 0 1010.5 0C17.25 10.65 14.75 7.2 12 3.75z" />
+                                        </svg>
+                                      </div>
+                                      <div className="flex-1">
+                                        <div className="text-base font-semibold text-gray-900">Log Water Intake</div>
+                                        <div className="text-xs text-gray-500">Add water, tea, coffee, or bottle sizes</div>
                                       </div>
                                       <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -26819,16 +26964,9 @@ Please add nutritional information manually if needed.`);
                   return acc
                 }, { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 })
 
-                // Keep rings and macro bars in sync: prefer macros → kcal conversion when available.
-                const macroCalories =
-                  (totals.protein || 0) * 4 +
-                  (totals.carbs || 0) * 4 +
-                  (totals.fat || 0) * 9
-
                 // PROTECTED: ENERGY_SUMMARY_CALC START
                 const consumedKcal =
-                  (macroCalories && Number.isFinite(macroCalories) ? macroCalories : 0) ||
-                  totals.calories ||
+                  (Number.isFinite(Number(totals.calories)) ? Number(totals.calories) : 0) ||
                   0
                 const baseTargetCalories = dailyTargets.calories
                 const exerciseKcal = effectiveExerciseCaloriesKcal
@@ -28796,7 +28934,9 @@ Please add nutritional information manually if needed.`);
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center mr-3 text-sky-600">
-                                          <span className="material-symbols-outlined text-xl">water_drop</span>
+                                        <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3.75C9.25 7.2 6.75 10.65 6.75 14a5.25 5.25 0 1010.5 0C17.25 10.65 14.75 7.2 12 3.75z" />
+                                        </svg>
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-base font-semibold text-gray-900">Log Water Intake</div>
@@ -29164,7 +29304,9 @@ Please add nutritional information manually if needed.`);
                                         className="w-full text-left flex items-center px-4 py-3 hover:bg-gray-50 transition-colors"
                                       >
                                         <div className="flex-shrink-0 w-10 h-10 rounded-xl bg-sky-100 flex items-center justify-center mr-3 text-sky-600">
-                                          <span className="material-symbols-outlined text-xl">water_drop</span>
+                                          <svg className="h-5 w-5" aria-hidden="true" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 3.75C9.25 7.2 6.75 10.65 6.75 14a5.25 5.25 0 1010.5 0C17.25 10.65 14.75 7.2 12 3.75z" />
+                                          </svg>
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-base font-semibold text-gray-900">Log Water Intake</div>
@@ -29426,11 +29568,12 @@ Please add nutritional information manually if needed.`);
                             className="w-full bg-white flex items-stretch min-w-0 overflow-hidden"
                             style={{ borderRadius: 0 }}
                           >
-                            <button
-                              onClick={handleSelect}
-                              className="flex-1 min-w-0 w-full overflow-hidden text-left px-4 py-3 hover:bg-gray-50"
-                              style={{ borderRadius: 0 }}
-                            >
+	                            <button
+                              type="button"
+	                              onClick={handleSelect}
+	                              className="flex-1 min-w-0 w-full overflow-hidden text-left px-4 py-3 hover:bg-gray-50"
+	                              style={{ borderRadius: 0 }}
+	                            >
                               <div className="flex items-center justify-between gap-3 min-w-0">
                                 <div className="min-w-0">
                                   <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
@@ -29444,9 +29587,18 @@ Please add nutritional information manually if needed.`);
                                   <span className="text-xs text-gray-500">{tag}</span>
                                 </div>
                               </div>
+	                            </button>
+                            <button
+                              type="button"
+                              onClick={() => runFavoriteAdd(item)}
+                              className="px-3 flex items-center justify-center hover:bg-emerald-50 text-helfi-green text-sm font-semibold border-l border-gray-100"
+                              aria-label={`Add ${item.label} to diary`}
+                              title="Add to diary"
+                            >
+                              Add
                             </button>
-                            {favoritesActiveTab === 'all' && (
-                              <button
+	                            {favoritesActiveTab === 'all' && (
+	                              <button
                                 type="button"
                                 disabled={!canSaveFromAll}
                                 onClick={() => {

@@ -88,12 +88,51 @@ export async function DELETE(_req: NextRequest, context: { params: { id?: string
   if (!id) return NextResponse.json({ error: 'Missing id' }, { status: 400 })
 
   try {
+    const existing = await prisma.waterLog.findFirst({
+      where: { id, userId: user.id },
+      select: { id: true, localDate: true },
+    })
+    if (!existing) {
+      return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    }
+
     const result = await prisma.waterLog.deleteMany({
       where: { id, userId: user.id },
     })
     if (!result.count) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
+
+    try {
+      const linkedResult = await prisma.foodLog.deleteMany({
+        where: {
+          userId: user.id,
+          OR: [
+            { nutrients: { path: ['__waterLogId'], equals: id } },
+            { nutrients: { path: ['waterLogId'], equals: id } },
+          ],
+        },
+      })
+
+      if (!linkedResult.count) {
+        const candidates = await prisma.foodLog.findMany({
+          where: {
+            userId: user.id,
+            localDate: existing.localDate,
+          },
+          select: { id: true, nutrients: true, items: true },
+        })
+        const ids = candidates
+          .filter((entry) => JSON.stringify([entry.nutrients, entry.items]).includes(id))
+          .map((entry) => entry.id)
+        if (ids.length) {
+          await prisma.foodLog.deleteMany({ where: { userId: user.id, id: { in: ids } } })
+        }
+      }
+    } catch (cleanupError) {
+      console.warn('[water-log] Linked Food Diary drink cleanup failed', cleanupError)
+    }
+
     return NextResponse.json({ ok: true })
   } catch (error) {
     console.error('[water-log] DELETE failed', error)

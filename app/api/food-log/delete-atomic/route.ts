@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { normalizeMealCategory } from '../route'
+import { normalizeMealCategory } from '@/lib/food-log-categories'
 import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 
 // Atomic delete endpoint (Food Diary ghost-entry hardening)

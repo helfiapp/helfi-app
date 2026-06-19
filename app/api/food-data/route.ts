@@ -65,6 +65,42 @@ export async function GET(request: NextRequest) {
 
     const normalizeForCompact = (value: any) => normalizeForMatch(value).replace(/\s+/g, '')
 
+    const prefersMlServingLabel = (item: any) => {
+      const name = normalizeForMatch(item?.name)
+      if (!name) return false
+      if (/\b(chocolate|cocoa)\b/.test(name) && !/\b(chocolate milk|hot chocolate|milkshake|shake|smoothie|syrup)\b/.test(name)) {
+        return false
+      }
+      if (/\b(bread|cookie|biscuit|cracker|cereal|chips|crisps|popcorn|powder|mix|bar|cake|brownie|bean|beans)\b/.test(name)) {
+        return false
+      }
+      return /\b(water|milk|juice|coffee|tea|soda|cola|drink|beverage|smoothie|shake|broth|stock|oil|vinegar)\b/.test(name)
+    }
+
+    const liquidDensityForName = (item: any) => (/\boil\b/.test(normalizeForMatch(item?.name)) ? 0.92 : 1)
+
+    const normalizeSingleLiquidServing = (item: any) => {
+      if (!item || !prefersMlServingLabel(item)) return item
+      if (!/^\s*100\s*g\s*$/i.test(String(item?.serving_size || ''))) return item
+      const density = liquidDensityForName(item)
+      const scale = density
+      const scaleValue = (value: any) => {
+        const num = Number(value)
+        if (!Number.isFinite(num)) return value
+        return Math.round(num * scale * 10) / 10
+      }
+      return {
+        ...item,
+        serving_size: '100 ml',
+        calories: scaleValue(item.calories),
+        protein_g: scaleValue(item.protein_g),
+        carbs_g: scaleValue(item.carbs_g),
+        fat_g: scaleValue(item.fat_g),
+        fiber_g: scaleValue(item.fiber_g),
+        sugar_g: scaleValue(item.sugar_g),
+      }
+    }
+
     const sortByNameAsc = (list: any[]) =>
       [...list].sort((a, b) => normalizeForMatch(a?.name).localeCompare(normalizeForMatch(b?.name)))
 
@@ -750,8 +786,140 @@ export async function GET(request: NextRequest) {
       return items.filter((it) => hasMacroData(it))
     }
 
+    const buildPreferredSingleFoodItems = (value: string) => {
+      if (kindMode !== 'single') return []
+      const tokens = getSearchTokens(value).map((token) => singularizeToken(token))
+      const hasPreferredSingleFood =
+        tokens.includes('milk') ||
+        (tokens.includes('juice') && tokens.includes('orange')) ||
+        (tokens.includes('coffee') && !tokens.some((token) => ['bean', 'beans', 'creamer', 'whitener', 'milk'].includes(token))) ||
+        (tokens.includes('oil') && tokens.includes('olive'))
+      if (!hasPreferredSingleFood) return []
+      const makeMilk = (item: {
+        id: string
+        name: string
+        calories: number
+        protein_g: number
+        carbs_g: number
+        fat_g: number
+        sugar_g: number
+      }) => [
+        {
+          source: 'usda' as const,
+          id: item.id,
+          name: item.name,
+          brand: null,
+          serving_size: '100 ml',
+          calories: item.calories,
+          protein_g: item.protein_g,
+          carbs_g: item.carbs_g,
+          fat_g: item.fat_g,
+          fiber_g: 0,
+          sugar_g: item.sugar_g,
+        },
+      ]
+      const makePreferredLiquid = (item: {
+        id: string
+        name: string
+        serving_size: string
+        calories: number
+        protein_g: number
+        carbs_g: number
+        fat_g: number
+        fiber_g?: number
+        sugar_g?: number
+      }) => [
+        {
+          source: 'usda' as const,
+          id: item.id,
+          name: item.name,
+          brand: null,
+          serving_size: item.serving_size,
+          calories: item.calories,
+          protein_g: item.protein_g,
+          carbs_g: item.carbs_g,
+          fat_g: item.fat_g,
+          fiber_g: item.fiber_g ?? 0,
+          sugar_g: item.sugar_g ?? 0,
+        },
+      ]
+
+      if (tokens.includes('almond')) {
+        return makeMilk({ id: 'preferred:milk-almond', name: 'Almond milk, unsweetened', calories: 15, protein_g: 0.5, carbs_g: 0.6, fat_g: 1.2, sugar_g: 0.2 })
+      }
+      if (tokens.includes('oat')) {
+        return makeMilk({ id: 'preferred:milk-oat', name: 'Oat milk', calories: 45, protein_g: 1.0, carbs_g: 6.7, fat_g: 1.5, sugar_g: 4.0 })
+      }
+      if (tokens.includes('soy')) {
+        return makeMilk({ id: 'preferred:milk-soy', name: 'Soy milk, unsweetened', calories: 33, protein_g: 3.3, carbs_g: 0.6, fat_g: 1.8, sugar_g: 0.4 })
+      }
+      if (tokens.includes('coconut')) {
+        return makeMilk({ id: 'preferred:milk-coconut', name: 'Coconut milk beverage, unsweetened', calories: 20, protein_g: 0.2, carbs_g: 0.7, fat_g: 2.0, sugar_g: 0.4 })
+      }
+      if (tokens.some((token) => ['chocolate', 'dry', 'dried', 'powder', 'buttermilk'].includes(token))) {
+        return []
+      }
+      if (tokens.includes('skim') || tokens.includes('skimmed') || tokens.includes('nonfat') || (tokens.includes('fat') && tokens.includes('free'))) {
+        return makeMilk({ id: 'preferred:milk-skim', name: 'Milk, skim/nonfat', calories: 34, protein_g: 3.4, carbs_g: 4.9, fat_g: 0.1, sugar_g: 5.0 })
+      }
+      if (tokens.includes('lowfat') || (tokens.includes('low') && tokens.includes('fat')) || tokens.includes('1')) {
+        return makeMilk({ id: 'preferred:milk-lowfat', name: 'Milk, low fat 1%', calories: 43, protein_g: 3.4, carbs_g: 5.0, fat_g: 1.0, sugar_g: 5.0 })
+      }
+      if (tokens.includes('reduced') || tokens.includes('2')) {
+        return makeMilk({ id: 'preferred:milk-reduced-fat', name: 'Milk, reduced fat 2%', calories: 50, protein_g: 3.3, carbs_g: 4.9, fat_g: 1.9, sugar_g: 4.9 })
+      }
+      const isPlainMilkQuery =
+        tokens.length === 1 ||
+        tokens.includes('whole') ||
+        (tokens.includes('full') && tokens.includes('cream'))
+      if (isPlainMilkQuery) {
+        return makeMilk({ id: 'preferred:milk-whole', name: 'Milk, whole', calories: 61, protein_g: 3.2, carbs_g: 4.8, fat_g: 3.3, sugar_g: 5.1 })
+      }
+      if (tokens.includes('juice') && tokens.includes('orange')) {
+        return makePreferredLiquid({
+          id: 'preferred:orange-juice',
+          name: 'Orange juice',
+          serving_size: '100 ml',
+          calories: 45,
+          protein_g: 0.7,
+          carbs_g: 10.4,
+          fat_g: 0.2,
+          fiber_g: 0.2,
+          sugar_g: 8.4,
+        })
+      }
+      if (tokens.includes('coffee') && !tokens.some((token) => ['bean', 'beans', 'creamer', 'whitener', 'milk'].includes(token))) {
+        return makePreferredLiquid({
+          id: 'preferred:coffee-brewed',
+          name: 'Coffee, brewed',
+          serving_size: '100 ml',
+          calories: 2,
+          protein_g: 0.1,
+          carbs_g: 0,
+          fat_g: 0,
+          fiber_g: 0,
+          sugar_g: 0,
+        })
+      }
+      if (tokens.includes('oil') && tokens.includes('olive')) {
+        return makePreferredLiquid({
+          id: 'preferred:olive-oil',
+          name: 'Olive oil',
+          serving_size: '1 tbsp (15 ml)',
+          calories: 122,
+          protein_g: 0,
+          carbs_g: 0,
+          fat_g: 13.5,
+          fiber_g: 0,
+          sugar_g: 0,
+        })
+      }
+      return []
+    }
+
     const buildSingleFoodResults = async (value: string) => {
       const customPrefix = await toCustomFoodItems(value, { allowTypo: false })
+      const preferredItems = buildPreferredSingleFoodItems(value)
       const localSearchWindow = Math.max(limit, 60)
 
       // For single foods: only use foundation and legacy (simple foods), NOT branded (product foods)
@@ -782,12 +950,133 @@ export async function GET(request: NextRequest) {
       const hasPrefixMatches = customPrefix.length > 0 || mainPrefix.length > 0
 
       const customFinal = hasPrefixMatches ? customPrefix : await toCustomFoodItems(value, { allowTypo: true })
-      const mainFinal = hasPrefixMatches
+      let mainFinal = hasPrefixMatches
         ? mainPrefix
         : filterItemsByQuery(mainWithMacros, value, (item) => item?.name || '', true)
+      const requestedTokensForSingle = getSearchTokens(value).map((token) => singularizeToken(token))
+      const requestedMilkDrink = requestedTokensForSingle.includes('milk')
+      if (requestedMilkDrink) {
+        mainFinal = mainFinal.filter((item) => {
+          const name = normalizeForMatch(item?.name)
+          if (!name) return false
+          if (
+            !requestedTokensForSingle.some((token) => ['dry', 'dried', 'powder'].includes(token)) &&
+            /\bdry|dried|powder\b/.test(name)
+          ) {
+            return false
+          }
+          if (!requestedTokensForSingle.includes('chocolate') && /\bchocolate\b/.test(name)) return false
+          if (!requestedTokensForSingle.includes('buttermilk') && /\bbuttermilk\b/.test(name)) return false
+          if (/^milk\b/.test(name)) return true
+          if (/\b(?:almond|oat|soy|coconut) milk\b/.test(name)) return true
+          if (/\bmilk beverage\b/.test(name)) return true
+          return !/\bbabyfood|baby food|cereal|cheese|yogurt|bread|pudding|custard|dessert|cake|cookie|pie|potato|prepared with|candy|candies|nougat\b/.test(name)
+        })
+      }
+      const requestedPlantMilk =
+        requestedTokensForSingle.includes('milk') &&
+        requestedTokensForSingle.some((token) => ['almond', 'oat', 'soy', 'coconut'].includes(token))
+      if (requestedPlantMilk) {
+        mainFinal = mainFinal.filter((item) => !/\bcandy|candies|chocolate|nougat\b/.test(normalizeForMatch(item?.name)))
+      }
+
+      const scorePlainSingleFoodFit = (item: any) => {
+        const name = normalizeForMatch(item?.name)
+        if (!name) return 0
+        const rawNameTokens = name.split(' ').filter(Boolean)
+        const nameTokens = rawNameTokens.map((token) => singularizeToken(token))
+        const requestedTokens = getSearchTokens(value).filter(Boolean).map((token) => singularizeToken(token))
+        const requestedCoreWithoutDescriptors = requestedTokens.filter((token) => token.length >= 2 && !DESCRIPTOR_TOKENS.has(token))
+        const requestedCore =
+          requestedCoreWithoutDescriptors.length > 0
+            ? requestedCoreWithoutDescriptors
+            : requestedTokens.filter((token) => token.length >= 2)
+        if (requestedCore.length === 0) return 0
+
+        let score = 0
+        requestedCore.forEach((token, index) => {
+          if (nameTokens[index] === token) score += index === 0 ? 500 : 220
+          else if (nameTokens.includes(token)) score += 120
+          if (index === 0 && rawNameTokens[0] === `${token}s`) score += 180
+        })
+        if (name.includes(' raw')) score += 260
+        if (name.includes(' fresh')) score += 120
+        if (name.includes(' whole')) score += 90
+        if (name.includes(' with skin')) score += 70
+
+        if (requestedCore.includes('coffee')) {
+          if (/\bbeverages coffee\b/.test(name)) score += 760
+          if (/\bbrewed|espresso|prepared with (?:tap )?water\b/.test(name)) score += 420
+          if (/\bcandy|candies|beans|soymilk|whitener|whiteners|creamer|creamers|oil\b/.test(name)) score -= 640
+        }
+        if (requestedCore.includes('milk')) {
+          if (rawNameTokens[0] === 'milk') score += 900
+          if (/\bmilk whole\b/.test(name) || /\bwhole milk\b/.test(name)) score += 260
+          if (/\bmilk (?:whole|lowfat|nonfat|reduced fat|fluid)\b/.test(name)) score += 180
+          if (/\bprepared with whole milk\b/.test(name)) score -= 650
+          if (!requestedTokens.includes('buttermilk') && /\bbuttermilk\b/.test(name)) score -= 900
+          if (!requestedTokens.includes('canned') && /\bcanned|condensed|evaporated\b/.test(name)) score -= 820
+          if (!requestedTokens.includes('dried') && !requestedTokens.includes('powder') && /\bdried|powder\b/.test(name)) score -= 760
+          if (!requestedTokens.includes('cultured') && /\bcultured\b/.test(name)) score -= 360
+        }
+        if (requestedCore.includes('egg')) {
+          if (/\begg whole raw fresh\b/.test(name)) score += 520
+          if (/\bduck|goose|quail|turkey\b/.test(name)) score -= 260
+        }
+        if (requestedCore.includes('oat')) {
+          if (rawNameTokens[0] === 'oats' || name === 'oats') score += 620
+        }
+        if (requestedCore.includes('rice')) {
+          if (rawNameTokens[0] === 'rice') score += 180
+          if (requestedTokens.includes('cooked') && name.includes(' cooked')) score += 260
+          if (!requestedTokens.includes('noodle') && /\bnoodle|noodles\b/.test(name)) score -= 520
+          if (/\buncle bens|tinkyada|cream of rice|pasta|sausage links\b/.test(name)) score -= 520
+          if (/\brice, (?:white|brown), (?:long|medium|short)-grain\b/.test(name)) score += 160
+        }
+        if (requestedCore.includes('walnut')) {
+          if (/\bnuts walnuts\b/.test(name)) score += 620
+          if (/\bnuts walnuts english\b/.test(name)) score += 360
+          if (!requestedTokens.includes('roasted') && /\broasted\b/.test(name)) score -= 260
+          if (!requestedTokens.includes('salt') && /\bsalt|salted\b/.test(name)) score -= 360
+          if (!requestedTokens.includes('glazed') && /\bglazed\b/.test(name)) score -= 420
+          if (!requestedTokens.includes('oil') && /\boil\b/.test(name)) score -= 640
+        }
+
+        const queryAllowsProcessed = requestedTokens.some((token) =>
+          ['juice', 'drink', 'beverage', 'canned', 'bottled', 'dried', 'dehydrated', 'sauce', 'cooked', 'frozen', 'oil'].includes(token),
+        )
+        if (!queryAllowsProcessed) {
+          const processedPenalties: Array<[RegExp, number]> = [
+            [/\bjuice|drink|beverage|nectar\b/, -700],
+            [/\boil\b/, -720],
+            [/\bcanned|bottled|packed\b/, -420],
+            [/\bdried|dehydrated\b/, -420],
+            [/\bfrozen\b/, -260],
+            [/\bcooked|stewed|baked|fried|boiled\b/, -220],
+            [/\bsauce|butter|jam|jelly|pie filling\b/, -520],
+            [/\bpeel|rind|zest\b/, -520],
+            [/\bbabyfood|baby food\b/, -520],
+            [/\bsnack|chips|crisps|candy|dessert|pie|cake|cookie\b/, -520],
+          ]
+          processedPenalties.forEach(([pattern, penalty]) => {
+            if (pattern.test(name)) score += penalty
+          })
+        }
+        if (!requestedTokens.includes('bran') && /\bbran\b/.test(name)) score -= 360
+        if (!requestedTokens.includes('flour') && /\bflour\b/.test(name)) score -= 420
+        if (!requestedTokens.includes('powder') && /\bpowder\b/.test(name)) score -= 420
+
+        return score
+      }
+
+      const sortSingleFoodResults = (list: any[]) =>
+        sortByAlphabeticalHierarchyAsc(list, value)
+          .map((item, index) => ({ item, index, score: scorePlainSingleFoodFit(item) }))
+          .sort((a, b) => b.score - a.score || a.index - b.index)
+          .map((entry) => entry.item)
 
       const sortedCustom = sortByAlphabeticalHierarchyAsc(customFinal, value)
-      const sortedMain = sortByAlphabeticalHierarchyAsc(mainFinal, value)
+      const sortedMain = sortSingleFoodResults(mainFinal)
 
       const combined: any[] = []
       const pushGroup = (group: any[]) => {
@@ -800,6 +1089,7 @@ export async function GET(request: NextRequest) {
 
       // Simple USDA foods first, then the custom fallback list.
       // Branded/product foods are excluded from single food searches.
+      pushGroup(preferredItems)
       pushGroup(sortedMain)
       pushGroup(sortedCustom)
 
@@ -1293,6 +1583,10 @@ export async function GET(request: NextRequest) {
     if (Array.isArray(items) && items.length > 0) {
       const filtered = items.filter((item) => hasMacroData(item))
       items = filtered
+    }
+
+    if (kindMode === 'single' && Array.isArray(items) && items.length > 0) {
+      items = items.map((item) => normalizeSingleLiquidServing(item))
     }
 
     if (Array.isArray(items) && items.length > 1) {

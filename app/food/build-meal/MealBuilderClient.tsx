@@ -839,9 +839,13 @@ const FOOD_VARIANT_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bgreen onions?\b/g, 'spring onion'],
   [/\brocket\b/g, 'arugula'],
   [/\bcoriander\b/g, 'cilantro'],
+  [/\bcaster sugar\b/g, 'sugars granulated'],
+  [/\bgranulated sugar\b/g, 'sugars granulated'],
   [/\bicing sugar\b/g, 'powdered sugar'],
   [/\bconfectioners? sugar\b/g, 'powdered sugar'],
   [/\bsultanas?\b/g, 'raisins'],
+  [/\bself[\s-]*raising\s+flour\b/g, 'self rising flour'],
+  [/\bplain\s+flour\b/g, 'all purpose flour'],
 ]
 
 const RECIPE_LOOKUP_DESCRIPTORS = new Set([
@@ -862,6 +866,15 @@ const RECIPE_LOOKUP_DESCRIPTORS = new Set([
   'sliced',
   'peeled',
   'crushed',
+  'very',
+  'ripe',
+  'mashed',
+  'dried',
+  'melted',
+  'softened',
+  'beaten',
+  'handful',
+  'decoration',
   'boneless',
   'skinless',
   'trimmed',
@@ -871,6 +884,7 @@ const RECIPE_LOOKUP_DESCRIPTORS = new Set([
   'plus',
   'more',
   'to',
+  'for',
   'or',
   'garnish',
   'taste',
@@ -915,6 +929,10 @@ const RECIPE_LOOKUP_STOPWORDS = new Set([
 const RECIPE_LOOKUP_PHRASE_REPLACEMENTS: Array<[RegExp, string]> = [
   [/\bstore[\s-]*bought\b/gi, ' '],
   [/\bfresh\s+or\s+frozen\b/gi, ' '],
+  [/\bcaster sugar\b/gi, 'sugars granulated'],
+  [/\bgranulated sugar\b/gi, 'sugars granulated'],
+  [/\bself[\s-]*raising\s+flour\b/gi, 'self rising flour'],
+  [/\bplain\s+flour\b/gi, 'all purpose flour'],
   [/\byellow onions?\b/gi, 'onion'],
   [/\bwhite onions?\b/gi, 'onion'],
   [/\bbrown onions?\b/gi, 'onion'],
@@ -3245,6 +3263,45 @@ export default function MealBuilderClient() {
 
     if (hasConflictingRecipeFoodTokens(candidate, lookup)) return false
 
+    const lookupTokenSet = new Set(coreTokens)
+    const candidateTokenSet = new Set(candidateTokens)
+    const requiredSpecificTokens = ['banana', 'egg', 'orange', 'apple', 'avocado', 'walnut']
+    for (const token of requiredSpecificTokens) {
+      if (lookupTokenSet.has(token) && !candidateTokenSet.has(token)) return false
+    }
+    if (lookupTokenSet.has('sugar')) {
+      const sugarAllowed =
+        candidateTokenSet.has('sugar') ||
+        candidateTokenSet.has('sugars') ||
+        candidateTokenSet.has('sucrose') ||
+        candidateTokenSet.has('powdered') ||
+        candidateTokenSet.has('granulated')
+      if (!sugarAllowed) return false
+      if (candidateTokenSet.has('apple') || candidateTokenSet.has('doughnut') || candidateTokenSet.has('cookie')) return false
+    }
+    if (lookupTokenSet.has('banana')) {
+      if (lookupTokenSet.has('chip') || lookupTokenSet.has('chips')) {
+        const chipAllowed = candidateTokenSet.has('chip') || candidateTokenSet.has('chips') || candidateTokenSet.has('plantain')
+        if (!chipAllowed) return false
+      } else {
+        if (candidateTokenSet.has('dehydrated') || candidateTokenSet.has('powder') || candidateTokenSet.has('chip') || candidateTokenSet.has('chips')) {
+          return false
+        }
+      }
+    }
+    if (
+      lookupTokenSet.has('flour') &&
+      (lookupTokenSet.has('self') || lookupTokenSet.has('rising') || lookupTokenSet.has('raising')) &&
+      !candidateTokenSet.has('self') &&
+      !candidateTokenSet.has('rising') &&
+      !candidateTokenSet.has('raising')
+    ) {
+      return false
+    }
+    if (lookupTokenSet.has('flour') && candidateTokenSet.has('cornmeal') && !lookupTokenSet.has('corn') && !lookupTokenSet.has('cornmeal')) {
+      return false
+    }
+
     if (coreTokens.length === 0) {
       const lookupNorm = normalizeRecipeLookupValue(lookup)
       const candidateNorm = normalizeRecipeLookupValue(`${candidate?.brand || ''} ${candidate?.name || ''}`)
@@ -3290,6 +3347,56 @@ export default function MealBuilderClient() {
     return items
   }
 
+  const knownRecipeIngredient = (lookup: string): NormalizedFoodItem | null => {
+    const normalized = normalizeRecipeLookupValue(lookup)
+    const tokens = new Set(normalized.split(' ').filter(Boolean))
+    const item = (
+      id: string,
+      name: string,
+      calories: number,
+      protein_g: number,
+      carbs_g: number,
+      fat_g: number,
+      fiber_g = 0,
+      sugar_g = 0,
+    ): NormalizedFoodItem => ({
+      source: 'custom',
+      id,
+      name,
+      brand: null,
+      serving_size: '100 g',
+      calories,
+      protein_g,
+      carbs_g,
+      fat_g,
+      fiber_g,
+      sugar_g,
+    })
+
+    if (tokens.has('banana') && (tokens.has('chip') || tokens.has('chips'))) {
+      return item('recipe:banana-chips', 'Snacks, banana chips', 519, 2.3, 58.4, 33.6, 7.7, 35.3)
+    }
+    if (tokens.has('banana') || tokens.has('bananas')) {
+      return item('recipe:bananas-raw', 'Bananas, raw', 89, 1.09, 22.84, 0.33, 2.6, 12.23)
+    }
+    if (tokens.has('egg') || tokens.has('eggs')) {
+      return item('recipe:egg-whole', 'Egg, whole, raw, fresh', 143, 12.56, 0.72, 9.51, 0, 0.37)
+    }
+    if (tokens.has('flour') && (tokens.has('self') || tokens.has('rising') || tokens.has('raising'))) {
+      return item('recipe:self-rising-flour', 'Wheat flour, white, all-purpose, self-rising, enriched', 354, 9.89, 74.22, 1.38, 2.7, 0.27)
+    }
+    if (tokens.has('sugar') || tokens.has('sugars')) {
+      if (tokens.has('powdered') || tokens.has('icing')) {
+        return item('recipe:powdered-sugar', 'Sugars, powdered', 389, 0, 99.77, 0, 0, 97.81)
+      }
+      return item('recipe:granulated-sugar', 'Sugars, granulated', 385, 0, 99.98, 0, 0, 99.8)
+    }
+    if (tokens.has('butter')) {
+      return item('recipe:butter', 'Butter, salted', 717, 0.85, 0.06, 81.11, 0, 0.06)
+    }
+    return null
+  }
+
   const resolveItemWithMacros = async (lookup: string, options?: { fastImportMode?: boolean; plainSingleOnly?: boolean }) => {
     const lookupKey = normalizeRecipeLookupValue(lookup)
     if (!lookupKey) return null
@@ -3298,6 +3405,12 @@ export default function MealBuilderClient() {
     const cacheKey = `${plainSingleOnly ? 'plain' : fastImportMode ? 'fast' : 'full'}:${lookupKey}`
     if (importResolveCacheRef.current.has(cacheKey)) {
       return importResolveCacheRef.current.get(cacheKey) || null
+    }
+
+    const known = knownRecipeIngredient(lookupKey)
+    if (known) {
+      importResolveCacheRef.current.set(cacheKey, known)
+      return known
     }
 
     const candidates = buildRecipeLookupCandidates(lookup)
@@ -3503,7 +3616,13 @@ export default function MealBuilderClient() {
       RECIPE_LOOKUP_PHRASE_REPLACEMENTS.forEach(([pattern, replacement]) => {
         s = s.replace(pattern, replacement)
       })
-      s = s.replace(/\s+/g, ' ').trim()
+      s = s
+        .replace(/\s+/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .filter((token) => !RECIPE_LOOKUP_DESCRIPTORS.has(token.toLowerCase()))
+        .join(' ')
+        .trim()
       return s
     }
 
@@ -3523,6 +3642,7 @@ export default function MealBuilderClient() {
       if (u === 'tbsp' || u === 'tbs' || u === 'tbsps' || u === 'tablespoon' || u === 'tablespoons')
         return { unit: 'tbsp', scale: 1 }
       if (u === 'cup' || u === 'cups') return { unit: 'cup', scale: 1 }
+      if (u === 'handful' || u === 'handfuls') return { unit: 'handful', scale: 1 }
       if (u === 'clove' || u === 'cloves') return { unit: 'piece', scale: 1 }
       if (u === 'piece' || u === 'pieces') return { unit: 'piece', scale: 1 }
       if (u === 'egg' || u === 'eggs') return { unit: 'egg-large', scale: 1 }
@@ -3643,6 +3763,17 @@ export default function MealBuilderClient() {
         }
         return result
       }
+      const lookupAfterParsedUnit = (
+        parts: string[],
+        parsedUnit: { mapped: { unit: BuilderUnit | null; scale: number }; consumed: number; lookupFallback: string },
+        rest: string,
+      ) => {
+        const remaining = normalizeLookup(parts.slice(parsedUnit.consumed).join(' '))
+        if (remaining && getRecipeCoreTokens(remaining).length > 0) return remaining
+        const fallback = normalizeLookup(parsedUnit.lookupFallback)
+        if (fallback) return fallback
+        return normalizeLookup(rest)
+      }
 
       const mixed = line.match(/^(\d+)\s+(\d+\/\d+)\s+(.*)$/)
       if (mixed) {
@@ -3653,7 +3784,7 @@ export default function MealBuilderClient() {
         const parts = rest.split(/\s+/)
         const parsedUnit = parseMappedUnitFromParts(parts)
         const mapped = parsedUnit.mapped
-        const lookup = normalizeLookup(parts.slice(parsedUnit.consumed).join(' ') || parsedUnit.lookupFallback || rest)
+        const lookup = lookupAfterParsedUnit(parts, parsedUnit, rest)
         return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
       }
 
@@ -3664,7 +3795,7 @@ export default function MealBuilderClient() {
         const parts = rest.split(/\s+/)
         const parsedUnit = parseMappedUnitFromParts(parts)
         const mapped = parsedUnit.mapped
-        const lookup = normalizeLookup(parts.slice(parsedUnit.consumed).join(' ') || parsedUnit.lookupFallback || rest)
+        const lookup = lookupAfterParsedUnit(parts, parsedUnit, rest)
         return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
       }
 
@@ -3686,10 +3817,17 @@ export default function MealBuilderClient() {
         const parsedUnit = parseMappedUnitFromParts(parts)
         const mapped = parsedUnit.mapped
         if (mapped.unit) {
-          const lookup = normalizeLookup(parts.slice(parsedUnit.consumed).join(' ') || parsedUnit.lookupFallback || rest)
+          const lookup = lookupAfterParsedUnit(parts, parsedUnit, rest)
           return withMetricHint({ lookup, amount: amount !== null ? amount * mapped.scale : null, unit: mapped.unit })
         }
         return withMetricHint({ lookup: normalizeLookup(rest), amount: amount ?? null, unit: null })
+      }
+
+      const leadingUnitParts = line.split(/\s+/)
+      const leadingUnit = parseMappedUnitFromParts(leadingUnitParts)
+      if (leadingUnit.mapped.unit) {
+        const lookup = lookupAfterParsedUnit(leadingUnitParts, leadingUnit, line)
+        return withMetricHint({ lookup, amount: 1 * leadingUnit.mapped.scale, unit: leadingUnit.mapped.unit })
       }
 
       return withMetricHint({ lookup: normalizeLookup(line), amount: null, unit: null })
@@ -5959,6 +6097,7 @@ export default function MealBuilderClient() {
               nutrition: createNutrition,
               total: createNutrition,
               items: cleanedItems,
+              createdAt: createdAtIso,
             }),
           )
         }

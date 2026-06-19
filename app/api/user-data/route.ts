@@ -319,6 +319,16 @@ const normalizeFavoriteLabelKey = (value: any) =>
     .replace(/\s+/g, ' ')
     .trim()
 
+const redactRequestHeaders = (headers: Headers) => {
+  const sensitive = new Set(['authorization', 'cookie', 'set-cookie', 'x-native-token'])
+  return Object.fromEntries(
+    Array.from(headers.entries()).map(([key, value]) => [
+      key,
+      sensitive.has(key.toLowerCase()) && value ? '[REDACTED]' : value,
+    ]),
+  )
+}
+
 const looksLikeMealBuilderCreatedItemId = (rawId: any) => {
   const id = typeof rawId === 'string' ? rawId : ''
   if (!id) return false
@@ -337,7 +347,7 @@ export async function GET(request: NextRequest) {
   try {
     console.log('=== GET /api/user-data DEBUG START ===')
     console.log('Request URL:', request.url)
-    console.log('Request headers:', Object.fromEntries(request.headers.entries()))
+    console.log('Request headers:', redactRequestHeaders(request.headers))
     const scope = new URL(request.url).searchParams.get('scope')
     const includeFoodData = scope !== 'health-setup'
     
@@ -368,7 +378,7 @@ export async function GET(request: NextRequest) {
     if (!userEmail) {
       console.log('GET Authentication failed - no valid session or token found')
       console.log('Session:', session)
-      console.log('Request headers:', Object.fromEntries(request.headers.entries()))
+      console.log('Request headers:', redactRequestHeaders(request.headers))
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
     
@@ -1145,7 +1155,7 @@ export async function POST(request: NextRequest) {
     const apiStartTime = Date.now()
     
     console.log('Request URL:', request.url)
-    console.log('Request headers:', Object.fromEntries(request.headers.entries()))
+    console.log('Request headers:', redactRequestHeaders(request.headers))
     console.log('POST /api/user-data - Starting SIMPLIFIED approach...')
     
     // Get NextAuth session

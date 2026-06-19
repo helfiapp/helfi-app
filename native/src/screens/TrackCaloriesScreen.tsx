@@ -23,7 +23,9 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
+import { calculateDailyTargets } from '../lib/dailyTargets'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -330,6 +332,43 @@ function getFoodEntryIconUri(entry: FoodEntry) {
   return DEFAULT_FOOD_ICON_URI
 }
 
+function getFoodEntryDrinkMeta(entry: FoodEntry) {
+  const nutrients: any =
+    entry?.raw?.nutrients && typeof entry.raw.nutrients === 'object'
+      ? entry.raw.nutrients
+      : entry?.nutrients && typeof entry.nutrients === 'object'
+      ? entry.nutrients
+      : {}
+  const firstItem = Array.isArray(entry?.items) && entry.items.length > 0 ? entry.items[0] : null
+  const waterLogId = String(nutrients?.__waterLogId || firstItem?.__waterLogId || firstItem?.waterLogId || '').trim()
+  const type = String(nutrients?.__drinkType || '').trim()
+  const amount = numberOrZero(nutrients?.__drinkAmount)
+  const unit = String(nutrients?.__drinkUnit || '').trim().toLowerCase()
+  const amountMl = numberOrZero(nutrients?.__drinkAmountMl)
+  return { waterLogId, type, amount, unit, amountMl }
+}
+
+function getFoodEntryDrinkAmountMl(entry: FoodEntry) {
+  const meta = getFoodEntryDrinkMeta(entry)
+  if (meta.amountMl > 0) return meta.amountMl
+  if (meta.amount > 0) {
+    if (meta.unit === 'l') return meta.amount * 1000
+    if (meta.unit === 'oz') return meta.amount * 29.5735
+    return meta.amount
+  }
+  return 0
+}
+
+function formatFoodEntryDrinkAmount(entry: FoodEntry) {
+  const meta = getFoodEntryDrinkMeta(entry)
+  if (meta.amount > 0 && meta.unit) {
+    const label = meta.unit === 'l' ? 'L' : meta.unit === 'oz' ? 'oz' : 'ml'
+    return `${formatMacroAmount(meta.amount)} ${label}`
+  }
+  const amountMl = getFoodEntryDrinkAmountMl(entry)
+  return amountMl > 0 ? formatWaterMl(amountMl) : ''
+}
+
 function ingredientSourceLabel(item: SearchFoodItem) {
   if (item?.__custom || String(item?.id || '').startsWith('custom:')) return 'Custom list'
   if (item?.source === 'usda') return 'USDA FoodData Central'
@@ -404,18 +443,19 @@ function sortSearchResultsAz(
     }
   }
 
+  const sourcePriority = (item: SearchFoodItem) => {
+    if (isCustomSearchItem(item)) return 0
+    if (item?.source === 'usda') return 1
+    if (item?.source === 'fatsecret') return 2
+    if (item?.source === 'openfoodfacts') return 3
+    return 4
+  }
+
+  if (options?.kind === 'single') {
+    return sortPlainFoodResults(filtered, options?.query || '', sourcePriority)
+  }
+
   return [...filtered].sort((a, b) => {
-    if (options?.kind === 'single') {
-      const sourcePriority = (item: SearchFoodItem) => {
-        if (isCustomSearchItem(item)) return 0
-        if (item?.source === 'usda') return 1
-        if (item?.source === 'fatsecret') return 2
-        if (item?.source === 'openfoodfacts') return 3
-        return 4
-      }
-      const bySource = sourcePriority(a) - sourcePriority(b)
-      if (bySource !== 0) return bySource
-    }
     const byName = compareLabelAz(a?.name || '', b?.name || '')
     if (byName !== 0) return byName
     return compareLabelAz(a?.brand || '', b?.brand || '')
@@ -1114,26 +1154,49 @@ function normalizeMacroSplit(raw: any) {
 
 function buildDailyTargetsFromUserData(raw: any): DailyTargets {
   const source = raw?.data || raw || {}
+  const weightKg =
+    typeof source.weight === 'string'
+      ? parseFloat(source.weight)
+      : typeof source.weight === 'number'
+        ? source.weight
+        : null
+  const heightCm =
+    typeof source.height === 'string'
+      ? parseFloat(source.height)
+      : typeof source.height === 'number'
+        ? source.height
+        : null
+  const goalsArray = Array.isArray(source.goals) ? source.goals : []
+  const goalChoiceValue = typeof source.goalChoice === 'string' ? source.goalChoice.toLowerCase() : ''
+  const useManualTargets = goalChoiceValue.includes('lose') || goalChoiceValue.includes('gain')
 
-  const defaultProteinCal = DEFAULT_TARGETS.protein * 4
-  const defaultCarbCal = DEFAULT_TARGETS.carbs * 4
-  const defaultFatCal = DEFAULT_TARGETS.fat * 9
-  const defaultTotalMacroCal = defaultProteinCal + defaultCarbCal + defaultFatCal
-  const defaultSplit = {
-    proteinPct: defaultProteinCal / defaultTotalMacroCal,
-    carbPct: defaultCarbCal / defaultTotalMacroCal,
-    fatPct: defaultFatCal / defaultTotalMacroCal,
-  }
+  const calculated = calculateDailyTargets({
+    gender: source.gender,
+    birthdate: source.birthdate || source.profileInfo?.dateOfBirth,
+    weightKg: Number.isFinite(weightKg || NaN) ? weightKg : null,
+    heightCm: Number.isFinite(heightCm || NaN) ? heightCm : null,
+    dietTypes: source.dietTypes ?? source.dietType,
+    exerciseFrequency: source.exerciseFrequency,
+    goals: goalsArray,
+    goalChoice: source.goalChoice,
+    goalIntensity: source.goalIntensity,
+    calorieTarget: useManualTargets ? source.goalCalorieTarget : null,
+    macroSplit: useManualTargets ? normalizeMacroSplit(source.goalMacroSplit) : null,
+    fiberTarget: useManualTargets ? source.goalFiberTarget : null,
+    sugarMax: useManualTargets ? source.goalSugarMax : null,
+    exerciseDurations: source.exerciseDurations,
+    bodyType: source.bodyType,
+    healthSituations: source.healthSituations,
+    allergies: source.allergies,
+    diabetesType: source.diabetesType,
+  })
 
-  const calories = toOptionalPositive(source?.goalCalorieTarget) || DEFAULT_TARGETS.calories
-  const split = normalizeMacroSplit(source?.goalMacroSplit) || defaultSplit
-
-  const protein = Math.max(0, Math.round((calories * split.proteinPct) / 4))
-  const carbs = Math.max(0, Math.round((calories * split.carbPct) / 4))
-  const fat = Math.max(0, Math.round((calories * split.fatPct) / 9))
-
-  const fiber = Math.max(0, Math.round(toOptionalPositive(source?.goalFiberTarget) || DEFAULT_TARGETS.fiber))
-  const sugar = Math.max(0, Math.round(toOptionalPositive(source?.goalSugarMax) || DEFAULT_TARGETS.sugar))
+  const calories = Math.round(toOptionalPositive(calculated.calories) || DEFAULT_TARGETS.calories)
+  const protein = Math.max(0, Math.round(toOptionalPositive(calculated.protein) || DEFAULT_TARGETS.protein))
+  const carbs = Math.max(0, Math.round(toOptionalPositive(calculated.carbs) || DEFAULT_TARGETS.carbs))
+  const fat = Math.max(0, Math.round(toOptionalPositive(calculated.fat) || DEFAULT_TARGETS.fat))
+  const fiber = Math.max(0, Math.round(toOptionalPositive(calculated.fiber) || DEFAULT_TARGETS.fiber))
+  const sugar = Math.max(0, Math.round(toOptionalPositive(calculated.sugarMax) || DEFAULT_TARGETS.sugar))
 
   return {
     calories,
@@ -1157,6 +1220,27 @@ function formatMacroAmount(value: number) {
 function mealLabel(meal: string) {
   const found = MEALS.find((m) => m.key === meal)
   return found ? found.label : 'Uncategorized'
+}
+
+function normalizeWaterMeal(raw?: string | null) {
+  const value = String(raw || '').trim().toLowerCase()
+  if (value === 'breakfast' || value === 'lunch' || value === 'dinner' || value === 'snacks') return value
+  if (value === 'snack') return 'snacks'
+  if (value === 'other' || value === 'uncategorized') return 'uncategorized'
+  return 'uncategorized'
+}
+
+function formatWaterAmount(entry: WaterEntry) {
+  const amount = numberOrZero(entry.amount)
+  const unit = String(entry.unit || 'ml').toLowerCase()
+  const label = unit === 'l' ? 'L' : unit === 'oz' ? 'oz' : 'ml'
+  return `${formatMacroAmount(amount)} ${label}`
+}
+
+function formatWaterMl(value: number) {
+  const ml = Math.max(0, numberOrZero(value))
+  if (ml >= 1000) return `${formatMacroAmount(Math.round((ml / 1000) * 100) / 100)} L`
+  return `${Math.round(ml)} ml`
 }
 
 function formatCalories(value: number, unit: 'kcal' | 'kj') {
@@ -1757,6 +1841,7 @@ export function TrackCaloriesScreen() {
   const [recommendedMeal, setRecommendedMeal] = useState<RecommendedMeal | null>(null)
   const [recommendedHistory, setRecommendedHistory] = useState<RecommendedMeal[]>([])
   const [recommendedCostCredits, setRecommendedCostCredits] = useState(0)
+  const [recommendedError, setRecommendedError] = useState('')
   const [recommendedExplainOpen, setRecommendedExplainOpen] = useState(false)
   const [recommendedExplainSeen, setRecommendedExplainSeen] = useState(false)
 
@@ -1807,6 +1892,31 @@ export function TrackCaloriesScreen() {
     }
     return map
   }, [entries])
+
+  const linkedWaterLogIds = useMemo(() => {
+    const ids = new Set<string>()
+    for (const entry of entries) {
+      const waterLogId = getFoodEntryDrinkMeta(entry).waterLogId
+      if (waterLogId) ids.add(waterLogId)
+    }
+    return ids
+  }, [entries])
+
+  const waterEntriesByMeal = useMemo(() => {
+    const map: Record<string, WaterEntry[]> = {
+      breakfast: [],
+      lunch: [],
+      dinner: [],
+      snacks: [],
+      uncategorized: [],
+    }
+    for (const entry of waterEntries) {
+      if (linkedWaterLogIds.has(String(entry.id))) continue
+      const key = normalizeWaterMeal(entry.category)
+      map[key].push(entry)
+    }
+    return map
+  }, [linkedWaterLogIds, waterEntries])
 
   const totals = useMemo(() => {
     const all = entries.reduce(
@@ -1861,6 +1971,22 @@ export function TrackCaloriesScreen() {
     }
     return next
   }, [groupedByMeal])
+
+  const sectionWaterTotals = useMemo(() => {
+    const next: Record<string, number> = {}
+    for (const meal of MEALS) {
+      const visibleWaterMl = (waterEntriesByMeal[meal.key] || []).reduce(
+        (sum, entry) => sum + Math.max(0, numberOrZero(entry.amountMl)),
+        0,
+      )
+      const foodDrinkMl = (groupedByMeal[meal.key] || []).reduce(
+        (sum, entry) => sum + Math.max(0, getFoodEntryDrinkAmountMl(entry)),
+        0,
+      )
+      next[meal.key] = visibleWaterMl + foodDrinkMl
+    }
+    return next
+  }, [groupedByMeal, waterEntriesByMeal])
 
   const macroTargetsWithExercise = useMemo(() => {
     const base = {
@@ -2235,7 +2361,7 @@ export function TrackCaloriesScreen() {
           id: 'barcode',
           action: 'Barcode Scanner',
           title: 'Barcode Scanner',
-          subtitle: 'Scan packaged foods',
+          subtitle: 'Scan packaged foods • 3 credits per scan',
           icon: 'Ⅲ',
           iconBg: '#E0E7FF',
           iconColor: '#4F46E5',
@@ -2262,7 +2388,7 @@ export function TrackCaloriesScreen() {
           id: 'import',
           action: 'Import Recipe',
           title: 'Import Recipe',
-          subtitle: 'Import by URL (10 credits) or photo (15 credits)',
+          subtitle: 'Import by URL (10 credits) or photo (15 credits) and auto-fill Build a meal',
           icon: '⇵',
           iconBg: '#D1FAE5',
           iconColor: '#047857',
@@ -3781,7 +3907,15 @@ export function TrackCaloriesScreen() {
           ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
           : await ImagePicker.launchImageLibraryAsync({ quality: 0.7 })
 
-      if (picked.canceled || !picked.assets?.[0]?.uri) return
+      if (picked.canceled || !picked.assets?.[0]?.uri) {
+        if (modeValue === 'camera') {
+          Alert.alert(
+            'No photo taken',
+            'If you are using the simulator, camera capture is not available. Use Photo Library or test the camera on a real iPhone.',
+          )
+        }
+        return
+      }
 
       const asset = picked.assets[0]
       const photo = await prepareFoodPhotoForUpload(asset)
@@ -4232,7 +4366,11 @@ export function TrackCaloriesScreen() {
           if (ok) added += 1
         }
         await loadAll()
-        Alert.alert('Done', `${added} item${added === 1 ? '' : 's'} added from photo.`)
+        if (added > 0) {
+          Alert.alert('Done', `${added} item${added === 1 ? '' : 's'} added from photo.`)
+        } else {
+          Alert.alert('Add failed', 'The photo was analyzed, but no food entry could be saved.')
+        }
         return
       }
 
@@ -4255,6 +4393,9 @@ export function TrackCaloriesScreen() {
       })
       if (ok) {
         await loadAll()
+        Alert.alert('Done', 'Item added from photo.')
+      } else {
+        Alert.alert('Add failed', 'The photo was analyzed, but the food entry could not be saved.')
       }
     } catch {
       setSaving(false)
@@ -4275,11 +4416,13 @@ export function TrackCaloriesScreen() {
     setRecommendedTargetMeal(meal)
     setRecommendedOpen(true)
     setRecommendedTab('ingredients')
+    setRecommendedMeal(null)
+    setRecommendedError('')
     setSectionMenuMeal(null)
 
     try {
       const res = await fetch(
-        `${API_BASE_URL}/api/ai-meal-recommendation?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(meal)}`,
+        `${API_BASE_URL}/api/ai-meal-recommendation?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(meal)}&fresh=${Date.now()}`,
         { headers: authHeaders },
       )
       const data: any = await res.json().catch(() => ({}))
@@ -4288,21 +4431,19 @@ export function TrackCaloriesScreen() {
       setRecommendedHistory(history)
       const cost = Number(data?.costCredits)
       setRecommendedCostCredits(Number.isFinite(cost) && cost >= 0 ? Math.round(cost) : 0)
-      if (!recommendedExplainSeen) {
-        setRecommendedExplainOpen(true)
-      }
     } catch {}
   }
 
   const generateRecommended = async () => {
     if (!authHeaders) return
     if (!recommendedExplainSeen) {
-      setRecommendedExplainOpen(true)
-      return
+      await markRecommendedExplainSeen()
+      setRecommendedExplainOpen(false)
     }
 
     try {
       setRecommendedLoading(true)
+      setRecommendedError('')
       const res = await fetch(`${API_BASE_URL}/api/ai-meal-recommendation`, {
         method: 'POST',
         headers: buildNativeAuthHeaders(session?.token || '', { json: true, includeCookie: true }),
@@ -4314,7 +4455,9 @@ export function TrackCaloriesScreen() {
       })
       const data: any = await res.json().catch(() => ({}))
       if (!res.ok) {
-        Alert.alert('Could not generate', String(data?.error || 'Please try again.'))
+        const message = String(data?.error || 'Please try again.')
+        setRecommendedError(message)
+        Alert.alert('Could not generate', message)
         return
       }
       const cost = Number(data?.costCredits)
@@ -4324,6 +4467,10 @@ export function TrackCaloriesScreen() {
       if (recommendation) {
         setRecommendedMeal(recommendation)
         setRecommendedHistory((prev) => [recommendation, ...prev.filter((p) => p.id !== recommendation.id)].slice(0, 20))
+      } else {
+        const message = 'No recommendation came back. Please try again.'
+        setRecommendedError(message)
+        Alert.alert('Could not generate', message)
       }
     } finally {
       setRecommendedLoading(false)
@@ -4496,6 +4643,23 @@ export function TrackCaloriesScreen() {
 
     setWaterEditOpen(false)
     await loadAll()
+  }
+
+  const deleteWaterEntry = async (entry: WaterEntry) => {
+    if (!authHeaders) return
+    setWaterEditId(entry.id)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/water-log/${encodeURIComponent(entry.id)}`, {
+        method: 'DELETE',
+        headers: buildNativeAuthHeaders(session?.token || '', { includeCookie: true }),
+      })
+      if (!res.ok) throw new Error('delete failed')
+      await loadAll()
+    } catch {
+      Alert.alert('Delete failed', 'Could not delete this water entry.')
+    } finally {
+      setWaterEditId('')
+    }
   }
 
   const openExerciseAdd = () => {
@@ -4729,7 +4893,7 @@ export function TrackCaloriesScreen() {
     }
     if (action === 'Log Water Intake') {
       closeAllAddMenus()
-      navigation.getParent()?.navigate('WaterIntake')
+      navigateStackScreen('WaterIntake', { meal, date: selectedDate })
       return
     }
     if (action === 'Combine ingredients') {
@@ -5298,12 +5462,23 @@ export function TrackCaloriesScreen() {
             {MEALS.map((meal) => {
               const section = groupedByMeal[meal.key]
               const summary = sectionMacroTotals[meal.key]
+              const mealWaterEntries = waterEntriesByMeal[meal.key] || []
+              const waterTotalMl = sectionWaterTotals[meal.key] || 0
               const isExpanded = Boolean(expandedMeals[meal.key])
-              const sectionSummary =
-                section.length === 0
-                  ? 'No entries yet'
-                  : `${summary.calories} kcal, ${summary.protein}g Protein, ${summary.carbs}g Carbs, ${summary.fat}g Fat`
+              const sectionSummary = (() => {
+                const parts: string[] = []
+                if (section.length > 0) {
+                  parts.push(`${summary.calories} kcal, ${summary.protein}g Protein, ${summary.carbs}g Carbs, ${summary.fat}g Fat`)
+                }
+                if (waterTotalMl > 0) {
+                  parts.push(`Water ${formatWaterMl(waterTotalMl)}`)
+                }
+                return parts.length > 0 ? parts.join(', ') : 'No entries yet'
+              })()
               const sortedSection = [...section].sort(
+                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+              )
+              const sortedWaterEntries = [...mealWaterEntries].sort(
                 (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
               )
 
@@ -5322,6 +5497,8 @@ export function TrackCaloriesScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 12, paddingVertical: 11 }}>
                     <Pressable
+                      accessibilityRole="button"
+                      accessibilityLabel={`Add to ${meal.label}`}
                       onPress={() => setSectionMenuMeal(meal.key)}
                       style={{
                         width: 42,
@@ -5355,13 +5532,65 @@ export function TrackCaloriesScreen() {
 
                   {isExpanded ? (
                     <View style={{ borderTopWidth: 1, borderTopColor: '#F3F4F6' }}>
-                      {sortedSection.length === 0 ? (
+                      {sortedSection.length === 0 && sortedWaterEntries.length === 0 ? (
                         <Text style={{ color: '#6B7280', paddingHorizontal: 12, paddingVertical: 12, textAlign: 'center' }}>
                           No entries in this category yet.
                         </Text>
                       ) : (
-		                        sortedSection.map((entry) => {
+                        <>
+                          {sortedWaterEntries.map((entry) => (
+                            <View key={`water-${entry.id}`} style={{ borderTopWidth: 1, borderTopColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 10, backgroundColor: '#FFFFFF' }}>
+                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                <View
+                                  style={{
+                                    width: 34,
+                                    height: 34,
+                                    borderRadius: 17,
+                                    alignItems: 'center',
+                                    justifyContent: 'center',
+                                    backgroundColor: '#EFF6FF',
+                                    marginRight: 10,
+                                  }}
+                                >
+                                  <Image
+                                    source={{ uri: DRINK_ICON_BY_LABEL[normalizeWaterLabel(entry.label || 'Water')] || DRINK_ICON_BY_LABEL.water }}
+                                    style={{ width: 30, height: 30 }}
+                                    resizeMode="contain"
+                                  />
+                                </View>
+                                <View style={{ flex: 1, minWidth: 0 }}>
+                                  <Text style={{ color: '#1F2937', fontSize: 18 / 1.2, fontWeight: '700' }} numberOfLines={1}>
+                                    {entry.label || 'Water'}
+                                  </Text>
+                                  <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 13 }}>
+                                    {formatWaterAmount(entry)} • {formatClockTime(entry.createdAt)}
+                                  </Text>
+                                </View>
+                                <View style={{ flexDirection: 'row', gap: 8, marginLeft: 8 }}>
+                                  <Pressable
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Edit ${entry.label || 'water'} entry`}
+                                    onPress={() => openWaterEdit(entry)}
+                                    style={{ borderWidth: 1, borderColor: '#BFDBFE', borderRadius: 9, backgroundColor: '#EFF6FF', paddingHorizontal: 10, paddingVertical: 7 }}
+                                  >
+                                    <Text style={{ color: '#1D4ED8', fontWeight: '800' }}>Edit</Text>
+                                  </Pressable>
+                                  <Pressable
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`Delete ${entry.label || 'water'} entry`}
+                                    onPress={() => void deleteWaterEntry(entry)}
+                                    disabled={waterEditId === entry.id}
+                                    style={{ borderWidth: 1, borderColor: '#FECACA', borderRadius: 9, backgroundColor: '#FEF2F2', paddingHorizontal: 10, paddingVertical: 7, opacity: waterEditId === entry.id ? 0.5 : 1 }}
+                                  >
+                                    <Text style={{ color: '#DC2626', fontWeight: '800' }}>{waterEditId === entry.id ? 'Deleting...' : 'Delete'}</Text>
+                                  </Pressable>
+                                </View>
+                              </View>
+                            </View>
+                          ))}
+                          {sortedSection.map((entry) => {
 		                          const nutrients = entry.nutrients || {}
+                          const drinkAmountLabel = formatFoodEntryDrinkAmount(entry)
 		                          const selected = selectedIds.includes(entry.id)
                           const entryId = String(entry.id || '')
                           const swipeOffset = entrySwipeOffsets[entryId] || 0
@@ -5529,7 +5758,7 @@ export function TrackCaloriesScreen() {
                                       {formatCalories(readNutrient(nutrients, ['calories', 'calories_kcal']), energyUnit)}
                                     </Text>
                                     <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 13 }}>
-                                      {formatClockTime(entry.createdAt)}
+                                      {drinkAmountLabel ? `${drinkAmountLabel} • ${formatClockTime(entry.createdAt)}` : formatClockTime(entry.createdAt)}
                                     </Text>
                                   </View>
                                   {copyMode ? (
@@ -5541,7 +5770,8 @@ export function TrackCaloriesScreen() {
                               </Pressable>
                             </View>
                           )
-                        })
+                          })}
+                        </>
                       )}
                     </View>
                   ) : null}
@@ -5626,10 +5856,13 @@ export function TrackCaloriesScreen() {
             <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
               <Text style={modalTitle}>{mealLabel(sectionMenuMeal || 'uncategorized')}</Text>
             </View>
-            <ScrollView style={{ maxHeight: 420, borderTopWidth: 1, borderTopColor: '#F3F4F6' }}>
+            <ScrollView style={{ maxHeight: 620, borderTopWidth: 1, borderTopColor: '#F3F4F6' }}>
               {sectionMenuActions.map((item) => (
                 <Pressable
                   key={item.id}
+                  accessibilityRole="button"
+                  accessibilityLabel={item.title}
+                  accessibilityHint={item.subtitle}
                   onPress={() => void runSectionAction(item.action)}
                   style={{
                     flexDirection: 'row',
@@ -5791,7 +6024,14 @@ export function TrackCaloriesScreen() {
             <TextInput value={editName} onChangeText={setEditName} placeholder="Name" placeholderTextColor="#8AA39D" style={inputStyle} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 8 }}>
               {MEALS.map((meal) => (
-                <Pressable key={meal.key} onPress={() => setEditMeal(meal.key)} style={[chip, editMeal === meal.key && chipActive]}>
+                <Pressable
+                  key={meal.key}
+                  accessibilityRole="button"
+                  accessibilityLabel={`Move edit entry to ${meal.label}`}
+                  accessibilityState={{ selected: editMeal === meal.key }}
+                  onPress={() => setEditMeal(meal.key)}
+                  style={[chip, editMeal === meal.key && chipActive]}
+                >
                   <Text style={[chipText, editMeal === meal.key && chipTextActive]}>{meal.label}</Text>
                 </Pressable>
               ))}
@@ -5805,14 +6045,16 @@ export function TrackCaloriesScreen() {
               <LabeledNumberInput label="Sugar (g)" value={editSugar} onChange={setEditSugar} />
             </View>
             <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => void saveEditedEntry()} style={primaryButton}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Save food entry" onPress={() => void saveEditedEntry()} style={primaryButton}>
                 <Text style={primaryButtonText}>Save</Text>
               </Pressable>
-              <Pressable onPress={() => setEditModalOpen(false)} style={secondaryButton}>
+              <Pressable accessibilityRole="button" accessibilityLabel="Cancel food entry edit" onPress={() => setEditModalOpen(false)} style={secondaryButton}>
                 <Text style={secondaryButtonText}>Cancel</Text>
               </Pressable>
             </View>
             <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Delete food entry"
               onPress={confirmEditEntryDelete}
               style={[
                 secondaryButton,
@@ -5838,7 +6080,12 @@ export function TrackCaloriesScreen() {
                 </Text>
               </View>
               <VoiceAssistantIconButton size={38} iconSize={19} style={{ marginLeft: 10 }} onPress={openVoiceFromFoodOverlay} />
-              <Pressable onPress={closeFavoritesFlow} style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }}>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close favorites"
+                onPress={closeFavoritesFlow}
+                style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }}
+              >
                 <MaterialCommunityIcons name="close" size={22} color="#4B5563" />
               </Pressable>
             </View>
@@ -5864,7 +6111,11 @@ export function TrackCaloriesScreen() {
                   style={{ flex: 1, marginLeft: 8, color: '#111827', fontSize: 16, fontWeight: '700' }}
                 />
                 {favoritesSearch ? (
-                  <Pressable onPress={() => setFavoritesSearch('')}>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel="Clear favorites search"
+                    onPress={() => setFavoritesSearch('')}
+                  >
                     <MaterialCommunityIcons name="close" size={18} color="#6B7280" />
                   </Pressable>
                 ) : null}
@@ -5972,6 +6223,8 @@ export function TrackCaloriesScreen() {
 
                         {showStar && favoritesUsageMode === 'diary' ? (
                           <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={item.isSaved ? `${item.label} already saved to favorites` : `Save ${item.label} to favorites`}
                             disabled={!canSave}
                             onPress={() => void saveListItemToFavorites(item)}
                             style={{ width: 50, alignItems: 'center', justifyContent: 'center', opacity: canSave || item.isSaved ? 1 : 0.4 }}
@@ -5986,6 +6239,8 @@ export function TrackCaloriesScreen() {
 
                         {canDelete && favoritesUsageMode === 'diary' ? (
                           <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Remove ${item.label} from favorites`}
                             onPress={() => void deleteFavorite(item.favorite!)}
                             style={{ width: 50, alignItems: 'center', justifyContent: 'center' }}
                           >
@@ -5995,6 +6250,8 @@ export function TrackCaloriesScreen() {
 
                         {canEdit && favoritesUsageMode === 'diary' ? (
                           <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Edit ${item.label}`}
                             onPress={() => openFavoriteEditor(item)}
                             style={{ width: 50, alignItems: 'center', justifyContent: 'center' }}
                           >
@@ -7112,13 +7369,16 @@ export function TrackCaloriesScreen() {
             </View>
 
             <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => void generateRecommended()} style={primaryButton}>
+              <Pressable onPress={() => void generateRecommended()} disabled={recommendedLoading} style={[primaryButton, recommendedLoading && { opacity: 0.7 }]}>
                 <Text style={primaryButtonText}>{recommendedLoading ? 'Generating...' : 'Generate / Regenerate'}</Text>
               </Pressable>
               <Pressable onPress={() => void addRecommendedToDiary()} disabled={!recommendedMeal} style={[secondaryButton, !recommendedMeal && { opacity: 0.5 }]}>
                 <Text style={secondaryButtonText}>Add to diary</Text>
               </Pressable>
             </View>
+            {recommendedError ? (
+              <Text style={{ color: '#DC2626', fontWeight: '700', marginTop: 8 }}>{recommendedError}</Text>
+            ) : null}
 
             <ScrollView style={{ marginTop: 10, maxHeight: 300 }}>
               {!recommendedMeal ? (

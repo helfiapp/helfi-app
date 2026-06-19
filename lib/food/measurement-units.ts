@@ -168,6 +168,55 @@ const isEggFood = (name: string | null | undefined) => {
   return tokens.every((token) => !EGG_BLOCKLIST.has(token))
 }
 
+export const isLiquidFood = (name: string | null | undefined) => {
+  const normalized = normalizeFoodValue(String(name || '').trim())
+  if (!normalized) return false
+  if (normalized.includes('milk chocolate')) return false
+  if (
+    /\b(chocolate|cocoa)\b/.test(normalized) &&
+    !/\b(chocolate milk|hot chocolate|milkshake|shake|smoothie|syrup)\b/.test(normalized)
+  ) {
+    return false
+  }
+  const solidHints = [
+    'bread',
+    'cookie',
+    'biscuit',
+    'cracker',
+    'cereal',
+    'chips',
+    'crisps',
+    'popcorn',
+    'powder',
+    'mix',
+    'bar',
+    'cake',
+    'brownie',
+  ]
+  if (solidHints.some((hint) => normalized.includes(hint))) return false
+  const liquidHints = [
+    'water',
+    'milk',
+    'juice',
+    'coffee',
+    'tea',
+    'soda',
+    'cola',
+    'drink',
+    'beverage',
+    'smoothie',
+    'shake',
+    'broth',
+    'stock',
+    'soup',
+    'oil',
+    'vinegar',
+    'sauce',
+    'syrup',
+  ]
+  return liquidHints.some((hint) => normalized.includes(hint))
+}
+
 const splitFoodOptions = (value: string) =>
   value
     .split(/\/|,|\bor\b/gi)
@@ -337,6 +386,7 @@ export const getProduceUnitGrams = (name: string | null | undefined): FoodUnitGr
   resolveFoodUnitGrams(name, PRODUCE_MEASUREMENTS, PRODUCE_ALIASES, PRODUCE_LOOKUP_CACHE, buildProduceUnitGrams)
 
 export const getFoodUnitGrams = (name: string | null | undefined): FoodUnitGrams | null =>
+  isLiquidFood(name) ? null :
   (isEggFood(name) ? EGG_UNIT_GRAMS : null) ||
   getProduceUnitGrams(name) ||
   getDairySemiSolidUnitGrams(name) ||
@@ -347,9 +397,23 @@ export const getAllowedUnitsForFood = (
   pieceGrams?: number | null,
 ): MeasurementUnit[] => {
   let units: MeasurementUnit[] = [...DISPLAY_MEASUREMENT_UNITS]
+  if (isLiquidFood(name)) {
+    return units.filter(
+      (unit) =>
+        unit === 'ml' ||
+        unit === 'g' ||
+        unit === 'oz' ||
+        unit === 'tsp' ||
+        unit === 'tbsp' ||
+        unit === 'quarter-cup' ||
+        unit === 'half-cup' ||
+        unit === 'three-quarter-cup' ||
+      unit === 'cup',
+    )
+  }
+  units = units.filter((unit) => unit !== 'ml')
   if (isEggFood(name)) {
     const disallowed = new Set<MeasurementUnit>([
-      'ml',
       'tsp',
       'tbsp',
       'quarter-cup',
@@ -415,6 +479,9 @@ export const formatUnitLabel = (unit: MeasurementUnit, name?: string | null, pie
       'chopped',
       'halved',
       'whole',
+      'all',
+      'commercial',
+      'varieties',
     ])
     const tokens = normalizedProduceName.split(' ').filter(Boolean)
     while (tokens.length > 1 && descriptorTokens.has(tokens[tokens.length - 1])) {

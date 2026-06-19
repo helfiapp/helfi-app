@@ -4,7 +4,7 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
-import { normalizeMealCategory } from '../route'
+import { normalizeMealCategory } from '@/lib/food-log-categories'
 
 // Delete a specific food log (by id) for the authenticated user
 export async function POST(request: NextRequest) {

@@ -109,6 +109,9 @@ export default function ImportRecipeClient() {
       })
       const parseData = await parseRes.json().catch(() => ({} as any))
       if (!parseRes.ok || !parseData?.recipe) return null
+      try {
+        window.dispatchEvent(new Event('credits:refresh'))
+      } catch {}
       return parseData.recipe as ImportedRecipe
     } catch {
       return null
@@ -134,6 +137,9 @@ export default function ImportRecipeClient() {
         if (String(data?.error || '').toLowerCase().includes('could not load that link')) {
           const fallbackRecipe = await tryBrowserMirrorFallback(url)
           if (fallbackRecipe) {
+            try {
+              window.dispatchEvent(new Event('credits:refresh'))
+            } catch {}
             setRecipe(fallbackRecipe)
             return
           }
@@ -141,6 +147,9 @@ export default function ImportRecipeClient() {
         setError(data?.error || 'Import failed. Please try a different link or use a photo.')
         return
       }
+      try {
+        window.dispatchEvent(new Event('credits:refresh'))
+      } catch {}
       setRecipe(data.recipe as ImportedRecipe)
     } catch {
       setError('Import failed. Please try again.')
@@ -165,6 +174,9 @@ export default function ImportRecipeClient() {
         setError(data?.error || 'Import failed. Please try again with a clearer photo.')
         return
       }
+      try {
+        window.dispatchEvent(new Event('credits:refresh'))
+      } catch {}
       setRecipe(data.recipe as ImportedRecipe)
       // RECIPE LOCK (owner request): clear photo list immediately after successful import.
       // Do not remove/change without explicit written owner approval.
