@@ -113,7 +113,7 @@ export default function MedicalImagesPage() {
       return
     }
     if (!analysis && !analysisResult) {
-      setHistorySaveError('Please run an analysis before saving.')
+      setHistorySaveError('Please create image notes before saving.')
       return
     }
     if (currentHistorySaved || currentHistorySaving) return
@@ -167,7 +167,7 @@ export default function MedicalImagesPage() {
       return
     }
     if (hasAnalyzedCurrentImage) {
-      setError('This image has already been analyzed. Reset to analyze a new image.')
+      setError('This image already has notes. Reset to create notes for a new image.')
       return
     }
 
@@ -207,7 +207,7 @@ export default function MedicalImagesPage() {
 
       if (!response.ok) {
         const data = await response.json().catch(() => ({}))
-        throw new Error(data?.error || data?.message || 'Failed to analyze image')
+        throw new Error(data?.error || data?.message || 'Failed to create image notes')
       }
 
       const result = await response.json()
@@ -237,7 +237,7 @@ export default function MedicalImagesPage() {
           nextSteps,
           disclaimer:
             result.disclaimer ||
-            'This analysis is for information only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek the advice of a qualified healthcare provider with any questions you may have regarding a medical condition.',
+            'These are general image notes only. They are not medical advice, diagnosis, or treatment. A qualified healthcare professional should review any health concern.',
           analysisText: analysisText ?? undefined,
         }
         if (analysisText || hasStructured) {
@@ -289,7 +289,7 @@ export default function MedicalImagesPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <PageHeader title="Medical Image Analyzer" />
+      <PageHeader title="Health Image Notes" />
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
@@ -304,7 +304,7 @@ export default function MedicalImagesPage() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Medical Image Analyzer
+              Health Image Notes
             </Link>
             <Link
               href="/medical-images/history"
@@ -325,26 +325,21 @@ export default function MedicalImagesPage() {
       <main className="flex-1">
         <div className="mx-auto w-full px-0 sm:px-4 md:max-w-3xl md:px-4 py-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Medical Image Analyzer</h1>
+            <h1 className="text-xl font-semibold text-gray-900 mb-1">Health Image Notes</h1>
             <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-4">
               <h2 className="text-sm font-semibold text-blue-900 mb-2">What is this feature?</h2>
               <p className="text-sm text-blue-800 mb-2">
-                Our AI-powered Medical Image Analyzer helps you understand medical images by providing detailed analysis and insights. 
-                Upload photos of various medical conditions and receive AI-generated descriptions and observations.
+                Helfi can create simple notes about visible details in a health-related image so you can track changes and discuss them with a qualified healthcare professional.
               </p>
-              <p className="text-sm text-blue-800 font-medium mb-1">Perfect for analyzing:</p>
+              <p className="text-sm text-blue-800 font-medium mb-1">Useful for recording:</p>
               <ul className="text-sm text-blue-800 list-disc list-inside space-y-1 ml-2">
-                <li>Skin conditions (rashes, hives, eczema, psoriasis)</li>
-                <li>Skin anomalies (moles, lesions, growths)</li>
-                <li>X-rays and medical scans</li>
-                <li>Wounds and injuries</li>
-                <li>Eye conditions</li>
-                <li>Nail abnormalities</li>
-                <li>Other visible medical concerns</li>
+                <li>Visible skin changes you want to monitor</li>
+                <li>Photos you want to discuss with a doctor</li>
+                <li>Wound, nail, eye, or skin appearance notes</li>
+                <li>Changes over time for your own records</li>
               </ul>
               <p className="text-xs text-blue-700 mt-3 italic">
-                This tool provides informational analysis only and is not a substitute for professional medical advice, diagnosis, or treatment.
-                Always seek a doctor's advice in addition to using this app and before making medical decisions.
+                This tool provides general image notes only. It does not diagnose, treat, or replace a doctor's examination.
               </p>
             </div>
 
@@ -416,7 +411,7 @@ export default function MedicalImagesPage() {
                 Save this scan to my history
               </label>
               <p className="text-xs text-gray-500">
-                Saved scans include the image and analysis. Stored in Vercel Blob (AES-256 at rest, HTTPS in transit) and tied to your account.
+                Saved scans include the image and notes. Stored in Vercel Blob (AES-256 at rest, HTTPS in transit) and tied to your account.
                 You can delete them anytime. Leave this off to keep this scan private.
               </p>
               {historySaveError && (
@@ -448,10 +443,10 @@ export default function MedicalImagesPage() {
                       <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
                       <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
                     </svg>
-                    Analyzing...
+                    Creating notes...
                   </>
                 ) : (
-                  'Analyze Image'
+                  'Create Image Notes'
                 )}
               </button>
               {imagePreview && (
@@ -464,14 +459,14 @@ export default function MedicalImagesPage() {
               )}
             </div>
             <div className="mt-2">
-              <p className="text-xs text-gray-500 mb-2">Cost: 2 credits per analysis</p>
+              <p className="text-xs text-gray-500 mb-2">Cost: 2 credits per image notes request</p>
               {!hasPaidAccess && (
                 <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
-                  Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                  Free accounts can try this AI feature once. After your free notes request, upgrade or buy credits to continue.
                 </div>
               )}
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="medicalImageAnalysis" />
-              <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Medical Image Analysis" refreshTrigger={usageMeterRefresh} />
+              <FeatureUsageDisplay featureName="medicalImageAnalysis" featureLabel="Health Image Notes" refreshTrigger={usageMeterRefresh} />
             </div>
 
             {/* Analysis Results */}
@@ -480,7 +475,7 @@ export default function MedicalImagesPage() {
                 ref={resultRef}
                 className="mt-6 bg-gray-50 border border-gray-200 rounded-lg p-4 md:p-6 space-y-4"
               >
-                <h2 className="text-lg font-semibold text-gray-900">Analysis Results</h2>
+                <h2 className="text-lg font-semibold text-gray-900">Image notes</h2>
 
                 {/* Summary */}
                 {analysisResult?.summary && (
@@ -492,75 +487,30 @@ export default function MedicalImagesPage() {
                   </section>
                 )}
 
-                {/* Likely conditions (visually ranked: high → medium → low) */}
+                {/* Discussion topics */}
                 {Array.isArray(analysisResult?.possibleCauses) &&
                   analysisResult.possibleCauses.length > 0 && (
                     <section>
-                      <h3 className="font-medium text-gray-900 mb-2">Likely conditions</h3>
+                      <h3 className="font-medium text-gray-900 mb-2">Topics to discuss with a doctor</h3>
                       <ul className="space-y-2">
-                        {(() => {
-                          const sorted = [...analysisResult.possibleCauses].sort((a, b) => {
-                            const weight: Record<string, number> = { high: 3, medium: 2, low: 1 }
-                            const wa = weight[(a.confidence || 'medium').toLowerCase()] ?? 2
-                            const wb = weight[(b.confidence || 'medium').toLowerCase()] ?? 2
-                            return wb - wa
-                          })
-
-                          const hasExplicitHigh = sorted.some(
-                            (c) => String(c.confidence || '').toLowerCase() === 'high'
-                          )
-
-                          return sorted.map((c, idx) => {
-                            const raw = String(c.confidence || '').toLowerCase()
-
-                            // Normalise so there is always a clear "high" at the top
-                            // and a "low" at the bottom if we have more than one item.
-                            let level: ConfidenceLevel
-                            if (hasExplicitHigh) {
-                              // Respect the model's explicit labelling when a high is present.
-                              level =
-                                raw === 'high' || raw === 'medium' || raw === 'low'
-                                  ? (raw as ConfidenceLevel)
-                                  : 'medium'
-                            } else if (sorted.length === 1) {
-                              level = 'high'
-                            } else if (idx === 0) {
-                              level = 'high'
-                            } else if (idx === sorted.length - 1) {
-                              level = 'low'
-                            } else {
-                              level = 'medium'
-                            }
-
-                            const badgeClasses =
-                              level === 'high'
-                                ? 'bg-red-100 text-red-800 border-red-200'
-                                : level === 'low'
-                                ? 'bg-gray-100 text-gray-700 border-gray-200'
-                                : 'bg-amber-100 text-amber-800 border-amber-200'
-
-                            return (
-                              <li
-                                key={`${c.name}-${idx}`}
-                                className="p-3 border border-gray-200 rounded-lg bg-white"
-                              >
-                                <div className="flex items-center justify-between gap-3">
-                                  <div className="font-medium text-gray-900">{c.name}</div>
-                                  <span
-                                    className={`text-xs px-2 py-0.5 rounded-full border ${badgeClasses}`}
-                                  >
-                                    {level}
-                                  </span>
-                                </div>
-                                {c.whyLikely && (
-                                  <div className="mt-1 text-sm text-gray-700">
-                                    {c.whyLikely}
-                                  </div>
-                                )}
-                              </li>
-                            )
-                          })
-                        })()}
+                        {analysisResult.possibleCauses.map((c, idx) => (
+                          <li
+                            key={`${c.name}-${idx}`}
+                            className="p-3 border border-gray-200 rounded-lg bg-white"
+                          >
+                            <div className="flex items-center justify-between gap-3">
+                              <div className="font-medium text-gray-900">{c.name}</div>
+                              <span className="text-xs px-2 py-0.5 rounded-full border bg-gray-100 text-gray-700 border-gray-200">
+                                general
+                              </span>
+                            </div>
+                            {c.whyLikely && (
+                              <div className="mt-1 text-sm text-gray-700">
+                                {c.whyLikely}
+                              </div>
+                            )}
+                          </li>
+                        ))}
                       </ul>
                     </section>
                   )}
@@ -568,7 +518,7 @@ export default function MedicalImagesPage() {
                 {/* Red flags */}
                 {Array.isArray(analysisResult?.redFlags) && analysisResult.redFlags.length > 0 && (
                   <section>
-                    <h3 className="font-medium text-red-700 mb-2">Red‑flag signs to watch for</h3>
+                    <h3 className="font-medium text-red-700 mb-2">When to seek urgent care</h3>
                     <ul className="list-disc list-inside text-sm text-red-800 space-y-1">
                       {analysisResult.redFlags.map((rf, idx) => (
                         <li key={idx}>{rf}</li>
@@ -580,7 +530,7 @@ export default function MedicalImagesPage() {
                 {/* Next steps */}
                 {Array.isArray(analysisResult?.nextSteps) && analysisResult.nextSteps.length > 0 && (
                   <section>
-                    <h3 className="font-medium text-gray-900 mb-2">What to do next</h3>
+                    <h3 className="font-medium text-gray-900 mb-2">Tracking notes and doctor questions</h3>
                     <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
                       {analysisResult.nextSteps.map((step, idx) => (
                         <li key={idx}>{step}</li>
@@ -603,13 +553,13 @@ export default function MedicalImagesPage() {
                 <div className="mt-2 text-xs text-gray-500 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
                   <strong>⚠️ Important:</strong>{' '}
                   {analysisResult?.disclaimer ||
-                    'This analysis is for informational purposes only and is not a substitute for professional medical advice, diagnosis, or treatment. Always seek a doctor’s advice in addition to using this app and before making medical decisions.'}
+                    'These are general image notes only. They are not medical advice, diagnosis, or treatment. A qualified healthcare professional should review any health concern.'}
                 </div>
 
                 <div className="mt-3 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-3">
                   <div className="font-semibold text-gray-900 mb-1">General health sources</div>
                   <p className="mb-2">
-                    Helfi uses these public sources as general references. Your result is not a diagnosis.
+                    Helfi uses these public sources as general references. Your notes are not a diagnosis.
                   </p>
                   <ul className="list-disc list-inside space-y-1">
                     <li><a className="text-helfi-green underline" href="https://medlineplus.gov/encyclopedia.html" target="_blank" rel="noreferrer">MedlinePlus Medical Encyclopedia</a></li>

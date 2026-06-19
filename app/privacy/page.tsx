@@ -95,7 +95,7 @@ export default function PrivacyPage() {
               <div className="text-gray-700 leading-relaxed mb-3">We use your data to:</div>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>Provide and personalize the App's features</li>
-                <li>Deliver AI-generated reports and symptom analysis</li>
+                <li>Deliver AI-generated reports and symptom notes</li>
                 <li>Parse, normalize, display, and analyze laboratory test results for your personal use</li>
                 <li>Improve app functionality using aggregated or de-identified information where allowed, and only in line with your choices and applicable law</li>
                 <li>Process payments and manage subscriptions</li>

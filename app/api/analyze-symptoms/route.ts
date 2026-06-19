@@ -114,7 +114,7 @@ export async function POST(req: NextRequest) {
 
     // Daily/plan gating removed – wallet pre-check below governs access
 
-    // Build prompt for careful, longer analysis with structured JSON
+    // Build prompt for general symptom notes with structured JSON.
     const symptomsStr = symptomsList.join(', ')
     const durationStr = duration ? String(duration).trim() : 'unspecified'
     const notesStr = notes ? String(notes).trim() : ''
@@ -122,18 +122,24 @@ export async function POST(req: NextRequest) {
     const messages = [
       {
         role: 'user' as const,
-        content: `You are a careful clinical reasoning assistant that provides patient-friendly guidance without medical jargon.
-Analyze the user's symptoms and produce:
-- A short summary in plain language
-- 4-7 likely causes with brief "why likely" and confidence (low/medium/high)
-- A clear list of red flags (urgent symptoms)
-- Practical next steps they can take now
-- Always include a disclaimer to contact a licensed medical professional
+        content: `You are a general health information assistant that helps users organise symptom notes for a future conversation with a licensed healthcare professional.
+You are not a doctor, not a medical device, and must not provide diagnosis, treatment advice, or certainty.
+
+Create general symptom notes and produce:
+- A short plain-language summary of what the user logged
+- 3-5 general topics the user may want to discuss with a doctor, not likely causes and not diagnoses
+- A clear list of warning signs where urgent care or emergency help may be appropriate
+- Practical tracking notes and questions to discuss with a licensed healthcare professional
+- Always include a disclaimer that this is general information only
 
 Important:
-- Be concise but careful. Do not reveal chain-of-thought; only conclusions.
+- Do not name a condition as the likely answer.
+- Do not rank conditions by likelihood.
+- Do not suggest medicines, supplements, treatment plans, dosing, or home treatment.
+- Do not tell the user they do not need a doctor.
+- Be concise but careful. Do not reveal chain-of-thought.
 - Use non-alarming, supportive language.
-- If symptoms are potentially urgent, ensure they appear in red flags.
+- If symptoms are potentially urgent, put them in the warning signs section.
 
 User Input:
 Symptoms: ${symptomsStr}
@@ -143,7 +149,14 @@ Notes: ${notesStr}
 Return two parts:
 1) A readable explanation for the user (one to three short paragraphs and section headers)
 2) Then a compact JSON between <STRUCTURED_JSON> and </STRUCTURED_JSON> with this exact shape:
-<STRUCTURED_JSON>{"summary":"string","possibleCauses":[{"name":"string","whyLikely":"string","confidence":"low|medium|high"}],"redFlags":["string"],"nextSteps":["string"],"disclaimer":"string"}</STRUCTURED_JSON>`
+<STRUCTURED_JSON>{"summary":"string","possibleCauses":[{"name":"string","whyLikely":"string","confidence":"low|medium|high"}],"redFlags":["string"],"nextSteps":["string"],"disclaimer":"string"}</STRUCTURED_JSON>
+
+JSON rules:
+- The field named "possibleCauses" is an internal compatibility field. Fill it with general discussion topics only.
+- "name" must be a broad topic such as "Digestive pattern to discuss" or "Respiratory symptoms to discuss", not a diagnosis.
+- "whyLikely" must explain why the topic is worth discussing with a doctor, not why a condition is likely.
+- Set every "confidence" value to "low" because Helfi is not assessing medical likelihood.
+- "nextSteps" must contain tracking notes and doctor questions only, not treatment instructions.`
       }
     ]
 

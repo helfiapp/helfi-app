@@ -52,7 +52,7 @@ export default function SymptomHistoryPage() {
   }, [loadHistory])
 
   const handleDeleteHistoryItem = async (id: string) => {
-    if (!window.confirm('Delete this symptom analysis? This cannot be undone.')) return
+    if (!window.confirm('Delete these symptom notes? This cannot be undone.')) return
     try {
       setHistoryDeletingId(id)
       setHistoryError(null)
@@ -89,7 +89,7 @@ export default function SymptomHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <PageHeader title="Symptom Analysis" />
+      <PageHeader title="Symptom Notes" />
 
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
         <div className="bg-white rounded-t-xl border-b border-gray-200">
@@ -103,7 +103,7 @@ export default function SymptomHistoryPage() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Symptom Analysis
+              Symptom Notes
             </Link>
             <Link
               href="/symptoms/history"
@@ -127,7 +127,7 @@ export default function SymptomHistoryPage() {
               <div>
                 <h1 className="text-2xl font-bold text-gray-900">Symptom History</h1>
                 <p className="text-xs text-gray-500 mt-1">
-                  Review your previous symptom analyses. You can delete any entry at any time.
+                  Review your previous symptom notes. You can delete any entry at any time.
                 </p>
               </div>
               <div className="flex items-center gap-3 text-xs">
@@ -221,13 +221,13 @@ export default function SymptomHistoryPage() {
                         )}
                         {possibleCauses.length > 0 && (
                           <div>
-                            <div className="font-medium text-gray-900 mb-1">Likely causes</div>
+                            <div className="font-medium text-gray-900 mb-1">Topics to discuss with a doctor</div>
                             <ul className="space-y-1">
                               {possibleCauses.map((cause: any, idx: number) => (
                                 <li key={`${cause.name}-${idx}`} className="flex items-center gap-2">
                                   <span className="text-gray-900">{cause.name}</span>
                                   {cause.confidence && (
-                                    <span className="text-xs text-gray-500">({cause.confidence})</span>
+                                    <span className="text-xs text-gray-500">(general)</span>
                                   )}
                                 </li>
                               ))}
@@ -236,7 +236,7 @@ export default function SymptomHistoryPage() {
                         )}
                         {redFlags.length > 0 && (
                           <div>
-                            <div className="font-medium text-red-700 mb-1">Red-flag signs</div>
+                            <div className="font-medium text-red-700 mb-1">When to seek urgent care</div>
                             <ul className="list-disc list-inside space-y-1 text-red-800">
                               {redFlags.map((flag: string, idx: number) => (
                                 <li key={idx}>{flag}</li>
@@ -246,7 +246,7 @@ export default function SymptomHistoryPage() {
                         )}
                         {nextSteps.length > 0 && (
                           <div>
-                            <div className="font-medium text-gray-900 mb-1">Next steps</div>
+                            <div className="font-medium text-gray-900 mb-1">Tracking notes and doctor questions</div>
                             <ul className="list-disc list-inside space-y-1">
                               {nextSteps.map((step: string, idx: number) => (
                                 <li key={idx}>{step}</li>

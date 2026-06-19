@@ -1576,7 +1576,7 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
     return { title: 'Health Journal', path: '/health-journal', buttonLabel: 'Open Health Journal' }
   }
   if (/\b(medical image|medical images|image analyzer|image analyser)\b/.test(raw)) {
-    return { title: 'Medical Image Analyzer', path: '/medical-images', buttonLabel: 'Open Medical Images' }
+    return { title: 'Health Image Notes', path: '/medical-images', buttonLabel: 'Open Health Image Notes' }
   }
   if (/\b(lab report|lab reports|blood test upload|blood tests)\b/.test(raw)) {
     return { title: 'Lab Reports', path: '/lab-reports', buttonLabel: 'Open Lab Reports' }
@@ -1589,12 +1589,12 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
   }
   if (/\b(symptom|symptoms|diagnose|diagnosis|what could this be|red flag|red flags)\b/.test(raw)) {
     if (openOnly && !/\b(headache|migraine|nausea|vomiting|diarrhea|fever|cough|sore throat|fatigue|dizzy|dizziness|pain|rash|itchy|hives|chest pain|shortness of breath|palpitations|bloating|heartburn|cramps|swelling)\b/.test(raw)) {
-      return { title: 'Symptom Analysis', path: '/symptoms', buttonLabel: 'Open Symptom Analysis' }
+      return { title: 'Symptom Notes', path: '/symptoms', buttonLabel: 'Open Symptom Notes' }
     }
     const params = new URLSearchParams()
     params.set('voiceSymptoms', transcript)
     params.set('voiceNotes', transcript)
-    return { title: 'Symptom Analysis', path: `/symptoms?${params.toString()}`, buttonLabel: 'Open Symptom Analysis' }
+    return { title: 'Symptom Notes', path: `/symptoms?${params.toString()}`, buttonLabel: 'Open Symptom Notes' }
   }
   if (/\b(chat|talk|ask|question|advice|health|supplement|medication|medicine|sleep|stress|energy|labs?|blood test)\b/.test(raw)) {
     return { title: 'Talk to Helfi', path: `/chat?voicePrompt=${encodeQueryValue(transcript, 1200)}`, buttonLabel: 'Open Talk to Helfi' }
@@ -1706,13 +1706,13 @@ function buildQuickToolDraft(transcript: string, localDate: string): VoiceDraft 
       action: 'symptom_analysis',
       transcript: raw,
       localDate,
-      summary: 'Symptom Analysis',
-      confirmationMessage: 'I can open Symptom Analysis with your symptoms filled in. It will not run or charge until you press Analyze.',
+      summary: 'Symptom Notes',
+      confirmationMessage: 'I can open Symptom Notes with your symptoms filled in. It will not run or charge until you press Create symptom notes.',
       canConfirm: false,
       appTarget: {
-        title: 'Symptom Analysis',
+        title: 'Symptom Notes',
         path: `/symptoms?${params.toString()}`,
-        buttonLabel: 'Open Symptom Analysis',
+        buttonLabel: 'Open Symptom Notes',
       },
     }
   }
@@ -1865,13 +1865,13 @@ async function normalizeDraft(
         action: 'symptom_analysis',
         transcript,
         localDate,
-        summary: 'Symptom Analysis',
-        confirmationMessage: 'This sounds like a symptom-analysis request. I can open Symptom Analysis with your symptoms filled in. It will not run or charge until you press Analyze.',
+        summary: 'Symptom Notes',
+        confirmationMessage: 'This sounds like a symptom-notes request. I can open Symptom Notes with your symptoms filled in. It will not run or charge until you press Create symptom notes.',
         canConfirm: false,
         appTarget: {
-          title: 'Symptom Analysis',
+          title: 'Symptom Notes',
           path: `/symptoms?${params.toString()}`,
-          buttonLabel: 'Open Symptom Analysis',
+          buttonLabel: 'Open Symptom Notes',
         },
       },
     }

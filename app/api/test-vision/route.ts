@@ -195,7 +195,7 @@ async function resolveMedicalAnalysisUser(request: NextRequest) {
 
 export async function POST(req: NextRequest) {
   try {
-    // Medical image analysis is PREMIUM only
+    // Health image notes access check.
     const user = await resolveMedicalAnalysisUser(req);
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
 
@@ -225,7 +225,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         { 
           error: 'Payment required',
-          message: 'You\'ve used all your free medical image analyses. Subscribe to a monthly plan or purchase credits to continue.',
+          message: 'You have used all your free health image notes requests. Subscribe to a monthly plan or purchase credits to continue.',
           requiresPayment: true,
           exhaustedFreeCredits: true,
         },
@@ -267,7 +267,7 @@ export async function POST(req: NextRequest) {
     if (!rateCheck.allowed) {
       const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
       return NextResponse.json(
-        { error: 'Too many medical image analyses. Please wait and try again.' },
+        { error: 'Too many health image notes requests. Please wait and try again.' },
         { status: 429, headers: { 'Retry-After': String(retryAfter) } }
       );
     }
@@ -298,7 +298,7 @@ export async function POST(req: NextRequest) {
     if (!allowViaFreeUse) {
       try {
         const cm = new CreditManager(user.id);
-        const immediate = 2; // medical image analysis typical cost (credits)
+        const immediate = 2; // health image notes typical cost (credits)
         const okPre = await cm.chargeCents(immediate);
         if (!okPre && !hasPaidAccess) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
@@ -325,40 +325,37 @@ export async function POST(req: NextRequest) {
             {
               type: "text",
               text:
-                "You are a cautious medical image assistant helping users understand visible health concerns from photos. " +
-                "You are talking to people without medical training, not doctors, so everything must be explained in simple, everyday language. " +
-                "Avoid medical jargon and Latin terms unless you immediately explain them in plain words (for example: 'benign (non-cancerous) growth'). " +
-                "Treat every image you receive here as a medical or health-related image (for example: skin conditions, rashes, hives, eczema, psoriasis, acne, rosacea, vitiligo, fungal infections, " +
-                "bacterial infections, viral rashes, allergic reactions, burns, cuts, bruises, wounds, surgical scars, ulcers, bedsores, bites, stings, nail changes, eye redness, swelling, jaundice, " +
-                "moles, lesions, lumps, growths, discolorations, varicose veins, swelling in joints, deformities, and medical imaging such as X-rays, CT scans, MRIs, and ultrasounds). " +
-                "Focus ONLY on the medically relevant parts of the image and ignore backgrounds, furniture, or unrelated objects.\n\n" +
+                "You are a cautious general health image note assistant. You help users record visible details from photos so they can track changes and discuss them with a licensed healthcare professional. " +
+                "You are not a doctor, not a medical device, and must not provide diagnosis, treatment advice, or certainty. " +
+                "Use simple, everyday language and avoid medical jargon unless you immediately explain it. " +
+                "Focus only on visible details in the image and ignore backgrounds, furniture, or unrelated objects.\n\n" +
                 "Your response must ALWAYS be structured in this exact format:\n\n" +
-                "1) WHAT I SEE MEDICALLY:\n" +
-                "- Use simple, clear language to describe what you see that is medically relevant (location, size relative to body part, shape, color, borders, surface texture, any swelling, redness, discharge, or other visible features).\n\n" +
-                "2) POSSIBLE EXPLANATIONS (NOT A DIAGNOSIS):\n" +
-                "- List 2–4 possible explanations for what this could be (for example: eczema flare, contact dermatitis, fungal infection, acne breakout, infected wound, benign mole, suspicious mole, etc.).\n" +
-                "- Clearly state that these are possibilities only and NOT a confirmed diagnosis.\n\n" +
-                "3) RED-FLAG SIGNS TO WATCH FOR:\n" +
-                "- Explain which visible features in this image are concerning or could be red flags (irregular borders, very dark or changing moles, rapidly growing lumps, spreading redness, pus, black areas in a wound, severe swelling, etc.).\n" +
-                "- If the image does not show strong red-flag signs, say that clearly but still mention what would be worrying if it appeared later.\n\n" +
-                "4) WHAT TO DO NEXT:\n" +
-                "- Explain practical next steps in plain language: when it might be okay to monitor at home, when to book a routine doctor or dermatologist appointment, and when to seek urgent or emergency care.\n" +
-                "- Be specific about timeframes (for example: “within the next few days”, “as soon as possible”, “go to emergency/ER now if…”).\n\n" +
+                "1) VISIBLE DETAILS:\n" +
+                "- Describe only what is visible: location if obvious, size relative to the body part, shape, color, borders, texture, swelling, redness, discharge, or other visible features.\n\n" +
+                "2) TOPICS TO DISCUSS WITH A DOCTOR:\n" +
+                "- List 2-4 broad discussion topics only. Do not list likely conditions and do not diagnose.\n" +
+                "- Phrase each item as something to ask a healthcare professional about.\n\n" +
+                "3) WHEN TO SEEK URGENT CARE:\n" +
+                "- Explain visible warning signs that would make professional help urgent, and include general worsening signs the user should not ignore.\n\n" +
+                "4) TRACKING NOTES AND DOCTOR QUESTIONS:\n" +
+                "- Give practical tracking notes and questions for a doctor. Do not suggest medicines, supplements, procedures, dosing, or treatment plans.\n\n" +
                 "After you finish sections 1–4 above, append a compact JSON block between <STRUCTURED_JSON> and </STRUCTURED_JSON> with this exact shape:\n" +
                 "<STRUCTURED_JSON>{\"summary\":\"string\",\"possibleCauses\":[{\"name\":\"string\",\"whyLikely\":\"string\",\"confidence\":\"low|medium|high\"}],\"redFlags\":[\"string\"],\"nextSteps\":[\"string\"],\"disclaimer\":\"string\"}</STRUCTURED_JSON>\n" +
                 "Rules for the JSON:\n" +
-                "- \"summary\": 1–3 plain-language sentences describing what the image most likely shows overall.\n" +
-                "- \"possibleCauses\": 2–4 conditions ordered from most to least likely. The first item should be tagged \"high\" confidence, any middle items \"medium\", and the last item \"low\" when there is more than one.\n" +
-                "- \"whyLikely\": 2–4 short sentences written for a non-medical person. First, briefly explain in plain language what this condition usually is and how it commonly looks. Then explain why THIS specific image could match it (visible features such as color, shape, borders, distribution, etc.), and very briefly what it usually means for the person (for example how serious it typically is or how it is commonly managed).\n" +
-                "- Keep the \"name\" field as the usual medical term, but keep \"whyLikely\" free of unexplained jargon; immediately explain any medical word in brackets if you must mention it.\n" +
-                "- \"redFlags\": short bullet-style strings describing dangerous or urgent features related to what is seen.\n" +
-                "- \"nextSteps\": practical actions the user can take now (self-care, routine review, urgent care/emergency when needed).\n" +
-                "- \"disclaimer\": clear reminder that this is information only and not a diagnosis or a replacement for a real doctor.\n\n" +
+                "- \"summary\": 1-3 plain-language sentences describing visible details only.\n" +
+                "- The field named \"possibleCauses\" is an internal compatibility field. Fill it with broad doctor-discussion topics only, not conditions and not likely causes.\n" +
+                "- \"name\" must be a broad topic such as \"Skin change to review\" or \"Visible redness to discuss\", not a diagnosis.\n" +
+                "- \"whyLikely\" must explain why the visible detail is worth discussing with a doctor, not why a condition is likely.\n" +
+                "- Set every \"confidence\" value to \"low\" because Helfi is not assessing medical likelihood.\n" +
+                "- \"redFlags\": short bullet-style strings describing urgent warning signs.\n" +
+                "- \"nextSteps\": tracking notes and questions for a healthcare professional only.\n" +
+                "- \"disclaimer\": clear reminder that these are general notes only and not medical advice, diagnosis, treatment, or a replacement for a real doctor.\n\n" +
                 "Important safety rules:\n" +
-                "- Do NOT give a formal diagnosis or claim certainty. Always frame explanations as possibilities based on what can be seen.\n" +
-                "- Do NOT tell the user that they do not need a doctor. Instead, explain when medical review would be sensible and reassuring.\n" +
-                "- Always remind the user that this analysis is for information only and does not replace a real doctor’s examination.\n" +
-                "- If the image does not appear to contain anything medically relevant, say that clearly and advise the user to consult a healthcare professional if they are worried."
+                "- Do NOT give a formal diagnosis or claim certainty.\n" +
+                "- Do NOT tell the user that they do not need a doctor.\n" +
+                "- Do NOT provide treatment instructions.\n" +
+                "- Always remind the user that these notes are general information only and do not replace a real doctor examination.\n" +
+                "- If the image does not appear to contain a health-related concern, say that clearly and advise the user to consult a healthcare professional if they are worried."
             }
           ]
         },
@@ -368,8 +365,8 @@ export async function POST(req: NextRequest) {
             {
               type: "text",
               text:
-                "This image was uploaded in a Medical Image Analyzer inside a health app. " +
-                "Please analyze any visible medical or health-related issues in the image following the required structure."
+                "This image was uploaded to Health Image Notes inside a health app. " +
+                "Please create general visible-detail notes following the required structure."
             },
             {
               type: "image_url",
@@ -483,7 +480,7 @@ export async function POST(req: NextRequest) {
       resp.nextSteps = Array.isArray(structured.nextSteps) ? structured.nextSteps : [];
       resp.disclaimer =
         structured.disclaimer ||
-        'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
+        'These are general image notes only and do not replace a real doctor examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
     } else {
       const refusalPatterns = [
         /i['’]m sorry[, ]+i can['’]t assist/i,
@@ -503,7 +500,7 @@ export async function POST(req: NextRequest) {
 
       if (refusal) {
         resp.summary =
-          'This particular photo looks like something our AI provider is not allowed to analyse directly. Because images like this can sometimes indicate serious conditions, it is safer to have it checked in person.';
+          'This particular photo looks like something our AI provider is not allowed to describe directly. Because images like this can sometimes matter for your health, it is safer to have it checked in person.';
         resp.possibleCauses = [];
         resp.redFlags = [
           'A new or changing mole or spot on the skin, especially one that looks very dark, irregular, or different from your other moles.',
@@ -514,13 +511,13 @@ export async function POST(req: NextRequest) {
           'Seek same-day or emergency care if the area is rapidly changing, very painful, or you feel generally unwell.',
         ];
         resp.disclaimer =
-          'Because this image could represent a serious condition, the AI is not allowed to give a guess. This is not a diagnosis. Please have a licensed doctor or dermatologist examine the area as soon as you can.';
+          'The AI is not allowed to give a guess for this image. These notes are not a diagnosis. Please have a licensed doctor or dermatologist examine the area as soon as you can.';
         // Avoid showing the raw refusal sentence in the UI.
         resp.analysis = '';
       } else {
         // Always include at least a basic disclaimer
         resp.disclaimer =
-          'This analysis is for information only and does not replace a real doctor’s examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
+          'These are general image notes only and do not replace a real doctor examination. If symptoms worsen or you are worried, contact a licensed medical professional or emergency services.';
       }
     }
 
@@ -607,7 +604,7 @@ export async function POST(req: NextRequest) {
           )}`,
         };
       } catch (err) {
-        console.warn('Failed to save medical image history:', err);
+        console.warn('Failed to save health image history:', err);
         historyError = err instanceof Error ? err.message : 'Failed to save history';
       }
     }
@@ -651,7 +648,7 @@ export async function POST(req: NextRequest) {
         {
           success: false,
           error:
-            'Our AI image analysis service is temporarily being limited by the AI provider. Your analysis could not be completed right now. Please wait a short time and try again.',
+            'Our AI image notes service is temporarily being limited by the AI provider. Your notes could not be completed right now. Please wait a short time and try again.',
         },
         { status: 429 }
       );

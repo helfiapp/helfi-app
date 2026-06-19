@@ -49,9 +49,9 @@ export default function SymptomAnalysisPage() {
   // Progress phases shown while analyzing
   const phases = useMemo(() => [
     'Gathering context',
-    'Checking differentials',
-    'Flagging red flags',
-    'Drafting next steps'
+    'Preparing general notes',
+    'Checking urgent warning signs',
+    'Drafting questions to discuss'
   ], [])
 
   useEffect(() => {
@@ -186,7 +186,7 @@ export default function SymptomAnalysisPage() {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
-        throw new Error(data?.error || 'Failed to analyze symptoms')
+        throw new Error(data?.error || 'Failed to create symptom notes')
       }
 
       const data: AnalysisResult = await res.json()
@@ -212,7 +212,7 @@ export default function SymptomAnalysisPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <PageHeader title="Symptom Analysis" />
+      <PageHeader title="Symptom Notes" />
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
@@ -227,7 +227,7 @@ export default function SymptomAnalysisPage() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Symptom Analysis
+              Symptom Notes
             </Link>
             <Link
               href="/symptoms/history"
@@ -248,8 +248,8 @@ export default function SymptomAnalysisPage() {
       <main className="flex-1">
         <div className="mx-auto w-full px-0 sm:px-4 md:max-w-3xl md:px-4 py-6">
           <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6">
-            <h1 className="text-xl font-semibold text-gray-900 mb-1">Describe your symptoms</h1>
-            <p className="text-sm text-gray-600 mb-4">List symptoms separated by commas (e.g., Headache, Fever). Add duration and any notes.</p>
+            <h1 className="text-xl font-semibold text-gray-900 mb-1">Record symptoms</h1>
+            <p className="text-sm text-gray-600 mb-4">List symptoms separated by commas (e.g., headache, fever). Add duration and any notes.</p>
 
             <div className="mb-4 text-xs text-gray-600 bg-yellow-50 border border-yellow-200 rounded-lg p-3">
               <div className="font-semibold text-gray-900 mb-1">Important medical note</div>
@@ -263,7 +263,7 @@ export default function SymptomAnalysisPage() {
             <div className="mb-4 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-3">
               <div className="font-semibold text-gray-900 mb-1">General health sources</div>
               <p className="mb-2">
-                Helfi uses these public sources as general references. Results are not diagnoses.
+                Helfi uses these public sources as general references. Results are tracking notes, not diagnoses.
               </p>
               <ul className="list-disc list-inside space-y-1">
                 <li><a className="text-helfi-green underline" href="https://medlineplus.gov/symptoms.html" target="_blank" rel="noreferrer">MedlinePlus Symptoms</a></li>
@@ -358,7 +358,7 @@ export default function SymptomAnalysisPage() {
               disabled={isAnalyzing}
               className={`inline-flex items-center px-4 py-2 rounded-lg font-medium text-white transition-colors ${isAnalyzing ? 'bg-helfi-green/60' : 'bg-helfi-green hover:bg-helfi-green/90'}`}
             >
-              {isAnalyzing ? 'Analyzing…' : 'Analyze symptoms'}
+              {isAnalyzing ? 'Creating notes...' : 'Create symptom notes'}
             </button>
             <div className="mt-2">
               <p className="text-xs text-gray-500 mb-2">Cost: 1 credit per analysis</p>
@@ -368,8 +368,8 @@ export default function SymptomAnalysisPage() {
                 </div>
               )}
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="symptomAnalysis" />
-              <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Analysis" refreshTrigger={usageMeterRefresh} />
-              <p className="text-xs text-gray-600 mt-1">Cost: 1 credit per symptom analysis.</p>
+              <FeatureUsageDisplay featureName="symptomAnalysis" featureLabel="Symptom Notes" refreshTrigger={usageMeterRefresh} />
+              <p className="text-xs text-gray-600 mt-1">Cost: 1 credit per symptom notes request.</p>
             </div>
 
             {/* Progress Bar */}
@@ -392,7 +392,7 @@ export default function SymptomAnalysisPage() {
               ref={resultRef}
               className="mt-6 bg-white rounded-lg shadow-sm border border-gray-200 p-4 md:p-6"
             >
-              <h2 className="text-lg font-semibold text-gray-900 mb-2">Your analysis</h2>
+              <h2 className="text-lg font-semibold text-gray-900 mb-2">Your symptom notes</h2>
 
               {result.summary && (
                 <div className="mb-4">
@@ -403,13 +403,13 @@ export default function SymptomAnalysisPage() {
 
               {Array.isArray(result.possibleCauses) && result.possibleCauses.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="font-medium text-gray-900 mb-2">Likely causes</h3>
+                  <h3 className="font-medium text-gray-900 mb-2">Topics to discuss with a doctor</h3>
                   <ul className="space-y-2">
                     {result.possibleCauses.map((c, idx) => (
                       <li key={idx} className="p-3 border border-gray-200 rounded-lg">
                         <div className="flex items-center justify-between">
                           <div className="font-medium text-gray-900">{c.name}</div>
-                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">{c.confidence}</span>
+                          <span className="text-xs px-2 py-0.5 rounded-full bg-gray-100 text-gray-700">general</span>
                         </div>
                         <div className="mt-1 text-sm text-gray-700">{c.whyLikely}</div>
                       </li>
@@ -420,7 +420,7 @@ export default function SymptomAnalysisPage() {
 
               {Array.isArray(result.redFlags) && result.redFlags.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="font-medium text-red-700 mb-2 flex items-center">Red flags</h3>
+                  <h3 className="font-medium text-red-700 mb-2 flex items-center">When to seek urgent care</h3>
                   <ul className="list-disc list-inside text-sm text-red-800 space-y-1">
                     {result.redFlags.map((rf, idx) => (
                       <li key={idx}>{rf}</li>
@@ -431,7 +431,7 @@ export default function SymptomAnalysisPage() {
 
               {Array.isArray(result.nextSteps) && result.nextSteps.length > 0 && (
                 <div className="mb-4">
-                  <h3 className="font-medium text-gray-900 mb-2">What to do next</h3>
+                  <h3 className="font-medium text-gray-900 mb-2">Tracking notes and doctor questions</h3>
                   <ul className="list-disc list-inside text-sm text-gray-700 space-y-1">
                     {result.nextSteps.map((step, idx) => (
                       <li key={idx}>{step}</li>
@@ -447,7 +447,7 @@ export default function SymptomAnalysisPage() {
               <div className="mt-3 text-xs text-gray-600 bg-white border border-gray-200 rounded-lg p-3">
                 <div className="font-semibold text-gray-900 mb-1">General health sources</div>
                 <p className="mb-2">
-                  Helfi uses these public sources as general references. Your result is not a diagnosis.
+                  Helfi uses these public sources as general references. Your notes are not a diagnosis.
                 </p>
                 <ul className="list-disc list-inside space-y-1">
                   <li><a className="text-helfi-green underline" href="https://medlineplus.gov/symptoms.html" target="_blank" rel="noreferrer">MedlinePlus Symptoms</a></li>

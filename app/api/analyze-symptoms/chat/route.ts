@@ -159,10 +159,10 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build system prompt with analysis context
+    // Build system prompt with symptom notes context.
     const systemPrompt = [
-      'You are a careful, patient-friendly clinical assistant helping users understand their symptom analysis.',
-      'You have access to their recent symptom analysis results. Always include a disclaimer about consulting medical professionals.',
+      'You are a careful, patient-friendly general health assistant helping users discuss their symptom notes.',
+      'You are not a doctor and must not provide diagnosis, treatment advice, or certainty. Always include a reminder to consult qualified healthcare professionals.',
       '',
       `Original symptoms: ${symptoms.join(', ')}`,
       duration ? `Duration: ${duration}` : '',
@@ -170,24 +170,21 @@ export async function POST(req: NextRequest) {
       '',
       analysisResult.summary ? `Analysis summary: ${analysisResult.summary}` : '',
       analysisResult.possibleCauses?.length
-        ? `Likely causes:\n${analysisResult.possibleCauses.map((c: any) => `- ${c.name} (${c.confidence}): ${c.whyLikely}`).join('\n')}`
+        ? `Doctor discussion topics:\n${analysisResult.possibleCauses.map((c: any) => `- ${c.name}: ${c.whyLikely}`).join('\n')}`
         : '',
-      analysisResult.redFlags?.length ? `Red flags:\n${analysisResult.redFlags.map((rf: string) => `- ${rf}`).join('\n')}` : '',
-      analysisResult.nextSteps?.length ? `Next steps:\n${analysisResult.nextSteps.map((ns: string) => `- ${ns}`).join('\n')}` : '',
+      analysisResult.redFlags?.length ? `Urgent-care warning signs:\n${analysisResult.redFlags.map((rf: string) => `- ${rf}`).join('\n')}` : '',
+      analysisResult.nextSteps?.length ? `Tracking notes and doctor questions:\n${analysisResult.nextSteps.map((ns: string) => `- ${ns}`).join('\n')}` : '',
       '',
       'Rules:',
       '- Be concise and practical',
       '- Always remind users to consult healthcare professionals for concerning symptoms',
       '- Use clear, non-technical language',
-      '- Reference specific parts of their analysis when relevant',
-      '- Avoid providing diagnoses or treatment plans',
+      '- Reference specific parts of their notes when relevant',
+      '- Avoid providing diagnoses, treatment plans, or supplement recommendations',
       '',
       'When users ask about supplements or dietary supplements:',
-      '- Provide multiple (3-5+) specific supplement types that may be relevant to their condition',
-      '- DO NOT recommend specific brands or product names',
-      '- DO provide supplement categories/types (e.g., probiotics, digestive enzymes, omega-3 fatty acids, magnesium, vitamin D, etc.)',
-      '- Explain briefly why each supplement type might be helpful for their specific symptoms',
-      '- Always emphasize consulting a healthcare professional before starting any new supplements',
+      '- Do not recommend supplements for symptoms.',
+      '- Suggest discussing supplements with a qualified healthcare professional, especially if they use medications or have ongoing symptoms.',
       '- Consider multiple supplement categories: vitamins, minerals, herbal supplements, probiotics/prebiotics, enzymes, amino acids, etc.',
     ]
       .filter(Boolean)

@@ -1309,9 +1309,9 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
 
         {medicalImageSummary?.entries ? (
           <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/40 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-sky-900">Medical image analyser</h2>
+            <h2 className="text-lg font-semibold text-sky-900">Health image notes</h2>
             <p className="text-sm text-sky-800 mt-2">
-              {medicalImageSummary.entries} saved scan{medicalImageSummary.entries === 1 ? '' : 's'}
+              {medicalImageSummary.entries} saved image-note scan{medicalImageSummary.entries === 1 ? '' : 's'}
               {medicalImageSummary.daysWithScans ? ` across ${medicalImageSummary.daysWithScans} days` : ''}.
             </p>
             {Array.isArray(medicalImageSummary.highlights) && medicalImageSummary.highlights.length > 0 ? (

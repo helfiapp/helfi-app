@@ -84,17 +84,15 @@ function buildFallbackAssistantText(params: {
   topCause: { name?: string; whyLikely?: string; confidence?: string } | null
 }): string {
   const question = (params.question || '').toLowerCase()
-  const topCauseText = params.topCause?.name
-    ? `${params.topCause.name}${params.topCause?.confidence ? ` (${params.topCause.confidence})` : ''}`
-    : 'the top likely condition from your analysis'
-  const topCauseWhy = params.topCause?.whyLikely || null
+  const topTopicText = params.topCause?.name || 'the main topic from your image notes'
+  const topTopicWhy = params.topCause?.whyLikely || null
 
   const likelyDoctorTriggers = params.redFlags.length
     ? params.redFlags.slice(0, 3)
     : ['fast worsening pain', 'spreading redness', 'fever or feeling very unwell']
-  const likelyHomeSteps = params.nextSteps.length
+  const trackingNotes = params.nextSteps.length
     ? params.nextSteps.slice(0, 4)
-    : ['Keep the area clean and dry.', 'Take clear photos daily to track changes.', 'Avoid picking, squeezing, or scratching the area.']
+    : ['Take clear photos daily to track changes.', 'Write down when the change started.', 'Note whether the area is changing, painful, bleeding, or spreading.']
 
   if (question.includes('red flag') || question.includes('urgent') || question.includes('emergency')) {
     return [
@@ -107,15 +105,15 @@ function buildFallbackAssistantText(params: {
       '- These signs can mean the issue is getting worse.',
       '- Fast changes are safer to check early.',
       '',
-      '**When to see a doctor**',
+      '**When to seek care**',
       '',
       ...likelyDoctorTriggers.map((item) => `- ${item}`),
       '- Go to urgent care or emergency now if symptoms are severe or rapidly worsening.',
       '',
-      '**What you can do at home**',
+      '**Tracking notes**',
       '',
       '- Monitor the area twice daily and note any changes.',
-      '- Avoid irritation and keep the area protected.',
+      '- Keep clear notes and photos to show a healthcare professional.',
       '- This guidance does not replace an in-person medical exam.',
     ].join('\n')
   }
@@ -125,22 +123,22 @@ function buildFallbackAssistantText(params: {
     '',
     params.summary
       ? `${params.summary}`
-      : `From your analysis, the top likely condition is ${topCauseText}.`,
+      : `From your image notes, the main topic to discuss is ${topTopicText}.`,
     '',
     '**Why this matters**',
     '',
-    `- Your analysis suggests ${topCauseText}.`,
-    topCauseWhy ? `- Why this may fit: ${topCauseWhy}` : '- Matching symptoms and image features help guide next steps.',
+    `- Your notes mention ${topTopicText}.`,
+    topTopicWhy ? `- Why this is worth discussing: ${topTopicWhy}` : '- Visible changes can be easier to assess when they are tracked over time.',
     '- Watching changes over time helps you decide when to seek care.',
     '',
-    '**When to see a doctor**',
+    '**When to seek care**',
     '',
     ...likelyDoctorTriggers.map((item) => `- ${item}`),
     '- If you are unsure, booking a routine appointment is a safe next step.',
     '',
-    '**What you can do at home**',
+    '**Tracking notes**',
     '',
-    ...likelyHomeSteps.map((step) => `- ${step}`),
+    ...trackingNotes.map((step) => `- ${step}`),
     '- This information is not a diagnosis and does not replace a doctor.',
   ].join('\n')
 }
@@ -332,29 +330,24 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Build system prompt with medical image analysis context
+    // Build system prompt with health image notes context.
     const systemPrompt = [
-      'You are a careful, patient-friendly assistant helping users understand and ask follow-up questions about a recent medical image analysis.',
-      'You already have the analysis result from their Medical Image Analyzer. Treat that as background context that you silently keep in mind – the user has already seen those results above, so you do NOT need to repeat the whole analysis each time.',
+      'You are a careful, patient-friendly general health assistant helping users ask follow-up questions about recent health image notes.',
+      'You already have the image notes as background context. Treat them as general notes only. Do not diagnose, do not provide treatment advice, and do not claim certainty.',
       '',
       analysisResult.summary ? `Analysis summary: ${analysisResult.summary}` : '',
       Array.isArray(analysisResult.possibleCauses) && analysisResult.possibleCauses.length
-        ? `Likely conditions (from highest to lowest confidence):\n${analysisResult.possibleCauses
-            .map(
-              (c: any, index: number) =>
-                `- ${index === 0 ? '[highest]' : ''}${c.name} (${c.confidence || 'unknown'}): ${
-                  c.whyLikely || ''
-                }`.trim()
-            )
+        ? `Doctor discussion topics:\n${analysisResult.possibleCauses
+            .map((c: any) => `- ${c.name}: ${c.whyLikely || ''}`.trim())
             .join('\n')}`
         : '',
       Array.isArray(analysisResult.redFlags) && analysisResult.redFlags.length
-        ? `Red-flag signs mentioned in the analysis:\n${analysisResult.redFlags
+        ? `Urgent-care warning signs mentioned in the notes:\n${analysisResult.redFlags
             .map((rf: string) => `- ${rf}`)
             .join('\n')}`
         : '',
       Array.isArray(analysisResult.nextSteps) && analysisResult.nextSteps.length
-        ? `Suggested next steps from the analysis:\n${analysisResult.nextSteps
+        ? `Tracking notes and doctor questions:\n${analysisResult.nextSteps
             .map((ns: string) => `- ${ns}`)
             .join('\n')}`
         : '',
@@ -365,7 +358,7 @@ export async function POST(req: NextRequest) {
           )}`
         : '',
       '',
-      'When you answer, focus on the user’s specific question, not on re-stating the full analysis.',
+      'When you answer, focus on the user’s specific question, not on re-stating the full notes.',
       '',
       'Always use the following section layout with the bold headings written exactly as shown, each on its own line with a blank line after it:',
       '',
@@ -373,20 +366,20 @@ export async function POST(req: NextRequest) {
       '- 2–4 sentences that directly answer the user’s question in plain language.',
       '',
       '**Why this matters**',
-      '- 2–4 short bullet points explaining why this information is important for them (for example: what it could mean for their health, how it might change over time, or why monitoring is useful).',
+      '- 2-4 short bullet points explaining why this is worth tracking or discussing with a healthcare professional.',
       '',
-      '**When to see a doctor**',
+      '**When to seek care**',
       '- Bullet points explaining when it is sensible to book a routine appointment and when it is important to seek urgent or emergency care, tailored to their question.',
       '',
-      '**What you can do at home**',
-      '- Simple, practical self-care steps or monitoring tips that are appropriate for their situation and consistent with the analysis.',
+      '**Tracking notes**',
+      '- Simple monitoring notes and questions to ask a healthcare professional. Do not give treatment instructions.',
       '',
-      'Only pull in details from the original analysis when they help answer the question; do NOT dump or repeat the full report. Use short sentences and bullet points so the reply is easy to scan in the chat bubble.',
+      'Only pull in details from the original notes when they help answer the question; do NOT dump or repeat the full report. Use short sentences and bullet points so the reply is easy to scan in the chat bubble.',
       '',
       'Safety rules:',
       '- Do NOT provide a formal diagnosis or treatment plan.',
       '- Do NOT say that a doctor is unnecessary; instead, explain when medical review would be sensible.',
-      '- Always remind the user that this information does not replace a real doctor’s examination.',
+      '- Always remind the user that this information does not replace a real doctor examination.',
     ]
       .filter(Boolean)
       .join('\n')

@@ -7,7 +7,7 @@ import { LinearGradient } from 'expo-linear-gradient'
 import Svg, { Path } from 'react-native-svg'
 
 import { API_BASE_URL } from '../config'
-import { parseNativeSocialCompleteUrl, runNativeSocialAuth } from '../lib/nativeSocialAuth'
+import { parseNativeSocialCompleteUrl, runNativeAppleAuth, runNativeSocialAuth } from '../lib/nativeSocialAuth'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { HelfiTextField } from '../ui/HelfiTextField'
@@ -129,9 +129,9 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
   const onApple = async () => {
     try {
       setSocialLoading('apple')
-      const url = await runNativeSocialAuth('apple', 'signup')
-      if (!url) return
-      await handleSocialCompleteUrl(url)
+      const session = await runNativeAppleAuth('signup')
+      if (!session) return
+      await signIn({ rememberMe: true, session })
     } catch (error) {
       const message =
         error instanceof Error && error.message

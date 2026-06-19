@@ -39,11 +39,11 @@ export const NATIVE_WEB_PAGES: Record<NativeWebPageKey, NativeWebPageRoute> = {
     path: '/health-journal',
   },
   symptomAnalysis: {
-    title: 'Symptom Analysis',
+    title: 'Symptom Notes',
     path: '/symptoms',
   },
   medicalImageAnalyzer: {
-    title: 'Medical Image Analyzer',
+    title: 'Health Image Notes',
     path: '/medical-images',
   },
   healthIntake: {

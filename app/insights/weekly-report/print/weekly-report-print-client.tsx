@@ -324,9 +324,9 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
 
         {Number(medicalImageSummary?.entries ?? 0) > 0 ? (
           <div className="mt-8 rounded-2xl border border-sky-100 bg-sky-50/40 p-6 print-avoid-break">
-            <h2 className="text-lg font-semibold text-sky-900">Medical image analyser</h2>
+            <h2 className="text-lg font-semibold text-sky-900">Health image notes</h2>
             <p className="mt-2 text-sm text-sky-800">
-              {Number(medicalImageSummary?.entries ?? 0) || 0} saved scans
+              {Number(medicalImageSummary?.entries ?? 0) || 0} saved image-note scans
               {Number(medicalImageSummary?.daysWithScans ?? 0) > 0 ? ` across ${Number(medicalImageSummary?.daysWithScans ?? 0)} days` : ''}.
             </p>
             {Array.isArray(medicalImageSummary?.highlights) && medicalImageSummary.highlights.length > 0 ? (

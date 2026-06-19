@@ -1,5 +1,7 @@
 import { API_BASE_URL } from '../config'
-import { NativeAuthSession } from '../state/AppModeContext'
+import type { NativeAuthSession } from '../state/AppModeContext'
+import { Platform } from 'react-native'
+import * as AppleAuthentication from 'expo-apple-authentication'
 import * as WebBrowser from 'expo-web-browser'
 
 export type SocialProvider = 'google' | 'apple'
@@ -74,4 +76,69 @@ export async function runNativeSocialAuth(provider: SocialProvider, mode: Social
   const result = await WebBrowser.openAuthSessionAsync(startUrl, NATIVE_SOCIAL_REDIRECT_URL)
   if (result.type !== 'success') return null
   return typeof result.url === 'string' ? result.url : null
+}
+
+export async function runNativeAppleAuth(mode: SocialMode): Promise<NativeAuthSession | null> {
+  if (Platform.OS !== 'ios') {
+    throw new Error('Apple sign in is only available on iPhone and iPad.')
+  }
+
+  const available = await AppleAuthentication.isAvailableAsync()
+  if (!available) {
+    throw new Error('Apple sign in is not available on this device.')
+  }
+
+  let credential: AppleAuthentication.AppleAuthenticationCredential
+  try {
+    credential = await AppleAuthentication.signInAsync({
+      requestedScopes: [
+        AppleAuthentication.AppleAuthenticationScope.FULL_NAME,
+        AppleAuthentication.AppleAuthenticationScope.EMAIL,
+      ],
+    })
+  } catch (error: any) {
+    if (error?.code === 'ERR_REQUEST_CANCELED') return null
+    throw error
+  }
+
+  if (!credential.identityToken || !credential.user) {
+    throw new Error('Apple did not return the sign in details. Please try again.')
+  }
+
+  const response = await fetch(`${API_BASE_URL}/api/native-auth/apple`, {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: JSON.stringify({
+      mode,
+      identityToken: credential.identityToken,
+      authorizationCode: credential.authorizationCode || null,
+      appleUser: credential.user,
+      email: credential.email || null,
+      fullName: credential.fullName
+        ? {
+            givenName: credential.fullName.givenName || null,
+            familyName: credential.fullName.familyName || null,
+          }
+        : null,
+    }),
+  })
+
+  const data = await response.json().catch(() => ({} as any))
+  if (!response.ok) {
+    throw new Error(
+      typeof data?.error === 'string' && data.error
+        ? data.error
+        : 'Apple sign in failed. Please try again.',
+    )
+  }
+
+  const token = typeof data?.token === 'string' ? data.token : ''
+  const expiresAt = typeof data?.expiresAt === 'number' ? data.expiresAt : 0
+  const user = data?.user && typeof data.user === 'object' ? data.user : null
+
+  if (!token || !expiresAt || !user?.id || !user?.email) {
+    throw new Error('Apple sign in worked, but the app did not receive a valid login session.')
+  }
+
+  return { token, expiresAt, user }
 }

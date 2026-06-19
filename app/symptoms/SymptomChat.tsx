@@ -1001,7 +1001,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={onComposerKeyDown}
-                  placeholder={recognitionRef.current ? 'Type or use voice input...' : 'Message AI about your symptom analysis'}
+                  placeholder={recognitionRef.current ? 'Type or use voice input...' : 'Message AI about your symptom notes'}
                   rows={1}
                   className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
                 />

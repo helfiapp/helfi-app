@@ -52,7 +52,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "What's included in the Premium plan?",
-          a: "Premium includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 medical image analyses per day, advanced insights, priority support, and export capabilities. It's $20/month."
+          a: "Premium includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 health image notes requests per day, advanced insights, priority support, and export capabilities. It's $20/month."
         },
         {
           q: "What happens if I exceed my daily limits?",

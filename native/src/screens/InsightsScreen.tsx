@@ -1241,7 +1241,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         {moodSeries.filter((v) => v > 0).length >= 2 ? <SimpleBarChart labels={labels} values={moodSeries} color="#3B82F6" /> : <EmptyBox message="Not enough mood entries to chart a trend yet. Add a few mood check-ins this week." />}
       </ChartDisclosure> : null}
       {hasSymptomChart ? <ChartDisclosure id="symptoms" eyebrow="Symptoms" title="Symptom load" summary="How many symptoms showed up each day." open={openCharts.symptoms} onToggle={() => setOpenCharts((prev) => ({ ...prev, symptoms: !prev.symptoms }))}>
-        {symptomSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={symptomSeries} color="#F472B6" /> : <EmptyBox message="No symptom entries to chart yet. If you run symptom analysis, this will appear." />}
+        {symptomSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={symptomSeries} color="#F472B6" /> : <EmptyBox message="No symptom entries to chart yet. If you create symptom notes, this will appear." />}
       </ChartDisclosure> : null}
       {hasExerciseChart ? <ChartDisclosure id="exercise" eyebrow="Exercise" title="Minutes per day" summary="Total minutes logged." open={openCharts.exercise} onToggle={() => setOpenCharts((prev) => ({ ...prev, exercise: !prev.exercise }))}>
         {exerciseSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={exerciseSeries} color="#6366F1" /> : <EmptyBox message="No exercise entries this week yet. Add a workout to see this chart." />}
@@ -1249,8 +1249,8 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
       {hasFoodChart ? <ChartDisclosure id="foods" eyebrow="Top foods" title="Most common picks" summary="Based on your logged foods." open={openCharts.foods} onToggle={() => setOpenCharts((prev) => ({ ...prev, foods: !prev.foods }))}>
         {topFoods.length ? topFoods.slice(0, 6).map((row: any, idx: number) => <InfoItem key={`food-${idx}`} title={row.name || 'Food'} body={`${row.count ?? 0}`} />) : <EmptyBox message="No food patterns to show yet. Once you log a few meals, your top foods will appear here." />}
       </ChartDisclosure> : null}
-      {hasMedicalChart ? <ChartDisclosure id="scans" eyebrow="Medical image analyser" title="Saved scan highlights" summary={`${Number(medicalImageSummary?.entries ?? 0) || 0} scans across ${Number(medicalImageSummary?.daysWithScans ?? 0) || 0} days.`} open={openCharts.scans} onToggle={() => setOpenCharts((prev) => ({ ...prev, scans: !prev.scans }))}>
-        {medicalHighlights.length ? medicalHighlights.slice(0, 3).map((item: any, idx: number) => <InfoItem key={`scan-${idx}`} title={item.summary || 'Saved medical image scan'} body={[item.date, item.time].filter(Boolean).join(' - ')} />) : <EmptyBox message="No saved medical image scans this week yet. If you save a scan, a summary will show here." />}
+      {hasMedicalChart ? <ChartDisclosure id="scans" eyebrow="Health image notes" title="Saved image-note highlights" summary={`${Number(medicalImageSummary?.entries ?? 0) || 0} scans across ${Number(medicalImageSummary?.daysWithScans ?? 0) || 0} days.`} open={openCharts.scans} onToggle={() => setOpenCharts((prev) => ({ ...prev, scans: !prev.scans }))}>
+        {medicalHighlights.length ? medicalHighlights.slice(0, 3).map((item: any, idx: number) => <InfoItem key={`scan-${idx}`} title={item.summary || 'Saved health image note'} body={[item.date, item.time].filter(Boolean).join(' - ')} />) : <EmptyBox message="No saved health image notes this week yet. If you save notes, a summary will show here." />}
       </ChartDisclosure> : null}
       {hasJournalChart ? <ChartDisclosure id="journal" eyebrow="Health journal" title="Recent notes" summary={`${Number(journalSummary?.entries ?? 0) || 0} notes across ${Number(journalSummary?.daysWithNotes ?? 0) || 0} days.`} open={openCharts.journal} onToggle={() => setOpenCharts((prev) => ({ ...prev, journal: !prev.journal }))}>
         {journalHighlights.length ? journalHighlights.slice(0, 3).map((item: any, idx: number) => <InfoItem key={`journal-${idx}`} title={[item.date, item.time].filter(Boolean).join(' - ') || 'Journal note'} body={item.note || 'Saved note'} />) : <EmptyBox message="No health journal notes this week yet. If you add notes, they will show up here." />}
@@ -1289,10 +1289,10 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
       ) : null}
       {medicalImageSummary?.entries ? (
         <Card tone="sky">
-          <Text style={{ color: '#075985', fontSize: 18, fontWeight: '900' }}>Medical image analyser</Text>
-          <Text style={{ color: '#075985', marginTop: 5 }}>{medicalImageSummary.entries} saved scan{medicalImageSummary.entries === 1 ? '' : 's'}{medicalImageSummary.daysWithScans ? ` across ${medicalImageSummary.daysWithScans} days` : ''}.</Text>
+          <Text style={{ color: '#075985', fontSize: 18, fontWeight: '900' }}>Health image notes</Text>
+          <Text style={{ color: '#075985', marginTop: 5 }}>{medicalImageSummary.entries} saved image-note scan{medicalImageSummary.entries === 1 ? '' : 's'}{medicalImageSummary.daysWithScans ? ` across ${medicalImageSummary.daysWithScans} days` : ''}.</Text>
           <View style={{ gap: 8, marginTop: 10 }}>
-            {medicalHighlights.slice(0, 3).map((item: any, idx: number) => <InfoItem key={`medical-${idx}`} title={item.summary || 'Saved medical image scan'} body={(item.nextSteps || []).slice(0, 2).join('\n')} />)}
+            {medicalHighlights.slice(0, 3).map((item: any, idx: number) => <InfoItem key={`medical-${idx}`} title={item.summary || 'Saved health image note'} body={(item.nextSteps || []).slice(0, 2).join('\n')} />)}
           </View>
         </Card>
       ) : null}

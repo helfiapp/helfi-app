@@ -963,7 +963,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                   value={input}
                   onChange={(event) => setInput(event.target.value)}
                   onKeyDown={onComposerKeyDown}
-                  placeholder="Message AI about your medical image analysis"
+                  placeholder="Message AI about your health image notes"
                   rows={1}
                   className="max-h-[200px] min-h-[60px] w-full resize-none bg-transparent px-4 py-[18px] text-[16px] text-black placeholder-gray-400 focus:outline-none border-none focus:ring-0"
                 />

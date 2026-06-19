@@ -754,7 +754,7 @@ export default function ReportVisuals(props: {
             </div>
           ) : (
             <div className="mt-4">
-              <EmptyChart message="No symptom entries to chart yet. If you run symptom analysis, this will appear." />
+              <EmptyChart message="No symptom entries to chart yet. If you create symptom notes, this will appear." />
             </div>
           )}
         </ChartDisclosure>
@@ -821,11 +821,11 @@ export default function ReportVisuals(props: {
         <ChartDisclosure
           eyebrow="Symptoms"
           title="What showed up most"
-          summary="Based on symptom analysis."
+          summary="Based on symptom notes."
         >
           <div className="text-xs font-semibold uppercase tracking-wide text-slate-500">Top symptoms</div>
           <div className="mt-1 text-lg font-semibold text-slate-900">What showed up most</div>
-          <div className="mt-1 text-sm text-slate-600">Based on symptom analysis</div>
+          <div className="mt-1 text-sm text-slate-600">Based on symptom notes</div>
           {topSymptoms.length ? (
             <div className="mt-4 space-y-2">
               {topSymptoms.slice(0, 6).map((row, idx) => (
@@ -853,7 +853,7 @@ export default function ReportVisuals(props: {
             </div>
           ) : (
             <div className="mt-4">
-              <EmptyChart message="No symptom highlights yet. This fills in once symptom analysis has been used a few times." />
+              <EmptyChart message="No symptom highlights yet. This fills in once symptom notes have been used a few times." />
             </div>
           )}
         </ChartDisclosure>
@@ -861,12 +861,12 @@ export default function ReportVisuals(props: {
 
       <div className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
         <ChartDisclosure
-          eyebrow="Medical image analyser"
-          title="Saved scan highlights"
+          eyebrow="Health image notes"
+          title="Saved image-note highlights"
           summary={`${Number(props.medicalImageSummary?.entries ?? 0) || 0} scans across ${Number(props.medicalImageSummary?.daysWithScans ?? 0) || 0} days.`}
         >
-          <div className="text-xs font-semibold uppercase tracking-wide text-sky-700/80">Medical image analyser</div>
-          <div className="mt-1 text-lg font-semibold text-sky-950">Saved scan highlights</div>
+          <div className="text-xs font-semibold uppercase tracking-wide text-sky-700/80">Health image notes</div>
+          <div className="mt-1 text-lg font-semibold text-sky-950">Saved image-note highlights</div>
           <div className="mt-1 text-sm text-sky-900/80">
             {Number(props.medicalImageSummary?.entries ?? 0) || 0} scans • {Number(props.medicalImageSummary?.daysWithScans ?? 0) || 0} days
           </div>
@@ -875,9 +875,9 @@ export default function ReportVisuals(props: {
               {medicalHighlights.slice(0, 3).map((item, idx) => (
                 <div key={`medical-highlight-${idx}`} className="rounded-xl border border-sky-100 bg-white p-3">
                   <div className="text-xs font-semibold text-sky-800">
-                    {[item.date, item.time].filter(Boolean).join(' • ') || 'Saved scan'}
+                    {[item.date, item.time].filter(Boolean).join(' • ') || 'Saved image notes'}
                   </div>
-                  <div className="mt-1 text-sm font-semibold text-slate-900">{item.summary || 'Saved medical image scan'}</div>
+                  <div className="mt-1 text-sm font-semibold text-slate-900">{item.summary || 'Saved health image notes'}</div>
                   {Array.isArray(item.possibleCauses) && item.possibleCauses.length ? (
                     <div className="mt-2 flex flex-wrap gap-2">
                       {item.possibleCauses.slice(0, 3).map((cause, causeIdx) => (
@@ -895,7 +895,7 @@ export default function ReportVisuals(props: {
             </div>
           ) : (
             <div className="mt-4">
-              <EmptyChart message="No saved medical image scans this week yet. If you save a scan, a summary will show here." />
+              <EmptyChart message="No saved health image notes this week yet. If you save notes, a summary will show here." />
             </div>
           )}
         </ChartDisclosure>

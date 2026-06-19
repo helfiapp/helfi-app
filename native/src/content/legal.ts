@@ -245,7 +245,7 @@ export const privacyPolicy: LegalDoc = {
       paragraphs: ['We use your data to:'],
       bullets: [
         "Provide and personalize the App's features",
-        'Deliver AI-generated reports and symptom analysis',
+        'Deliver AI-generated reports and symptom notes',
         'Parse, normalize, display, and analyze laboratory test results for your personal use',
         'Improve app functionality using aggregated or de-identified information where allowed, and only in line with your choices and applicable law',
         'Process payments and manage subscriptions',

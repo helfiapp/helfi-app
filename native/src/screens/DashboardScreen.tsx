@@ -929,8 +929,7 @@ export function DashboardScreen() {
         <View style={{ marginTop: theme.spacing.xl }}>
           <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>Connect Your Devices</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted, lineHeight: 20 }}>
-            Apple Health uses HealthKit to read only the activity data you choose to share, such as steps,
-            walking distance, and active calories.
+            Helfi can connect to Apple Health using HealthKit. Helfi does not use CareKit.
           </Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -940,15 +939,37 @@ export function DashboardScreen() {
 
           <View style={{ marginTop: theme.spacing.md, gap: 10 }}>
             {Platform.OS === 'ios' ? (
-              <DeviceRow
-                name="Apple Health (HealthKit)"
-                icon={<AppleHealthLogo />}
-                detail="Reads selected HealthKit activity data only after you continue and approve Apple's permission screen."
-                rightLabel={appleHealthConnected ? 'Import today' : 'Continue'}
-                rightKind="connect"
-                disabled={appleHealthBusy}
-                onPress={appleHealthConnected ? onAppleHealthImportToday : onAppleHealthConnect}
-              />
+              <>
+                <View
+                  style={{
+                    borderWidth: 1,
+                    borderColor: '#BBD7FF',
+                    backgroundColor: '#F2F7FF',
+                    borderRadius: theme.radius.md,
+                    padding: theme.spacing.md,
+                    gap: 6,
+                  }}
+                >
+                  <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Apple Health / HealthKit</Text>
+                  <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+                    Helfi asks HealthKit for read access only after you tap Continue and approve Apple's Health
+                    permission screen.
+                  </Text>
+                  <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+                    Helfi reads steps, walking/running distance, and active energy so your dashboard can show your
+                    daily activity summary.
+                  </Text>
+                </View>
+                <DeviceRow
+                  name="Apple Health (HealthKit)"
+                  icon={<AppleHealthLogo />}
+                  detail="Continue to Apple's HealthKit permission screen for steps, distance, and active energy."
+                  rightLabel={appleHealthConnected ? 'Import today' : 'Continue'}
+                  rightKind="connect"
+                  disabled={appleHealthBusy}
+                  onPress={appleHealthConnected ? onAppleHealthImportToday : onAppleHealthConnect}
+                />
+              </>
             ) : null}
             <DeviceRow
               name="Fitbit"

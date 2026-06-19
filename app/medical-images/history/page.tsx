@@ -121,7 +121,7 @@ export default function MedicalImagesHistoryPage() {
 
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
-      <PageHeader title="Medical Image Analyzer" />
+      <PageHeader title="Health Image Notes" />
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
@@ -136,7 +136,7 @@ export default function MedicalImagesHistoryPage() {
                   : 'text-gray-600 hover:text-gray-900'
               }`}
             >
-              Medical Image Analyzer
+              Health Image Notes
             </Link>
             <Link
               href="/medical-images/history"
@@ -238,13 +238,13 @@ export default function MedicalImagesHistoryPage() {
                           <div className="pt-2 space-y-3 text-sm text-gray-700">
                             {possibleCauses.length > 0 && (
                               <div>
-                                <div className="font-medium text-gray-900 mb-1">Likely conditions</div>
+                                <div className="font-medium text-gray-900 mb-1">Topics to discuss with a doctor</div>
                                 <ul className="space-y-1">
                                   {possibleCauses.map((cause: any, idx: number) => (
                                     <li key={`${cause.name}-${idx}`} className="flex items-center gap-2">
                                       <span className="text-gray-900">{cause.name}</span>
                                       {cause.confidence && (
-                                        <span className="text-xs text-gray-500">({cause.confidence})</span>
+                                        <span className="text-xs text-gray-500">(general)</span>
                                       )}
                                     </li>
                                   ))}
