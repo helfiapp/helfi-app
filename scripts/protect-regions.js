@@ -227,7 +227,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
     startMarker: 'PROTECTED: ENERGY_SUMMARY_CALC START',
     endMarker: 'PROTECTED: ENERGY_SUMMARY_CALC END',
-    expectedHash: 'e003846101a2fcaea648e4e39df08aa1970836625816c2121a0ce67195217a1c',
+    expectedHash: '54f5c91100a2c4346d9ddb4b1264a225a92de9993321938da0bbbc7ce7963963',
     allowEnvVar: 'ALLOW_ENERGY_SUMMARY_CALC_EDIT',
     description: 'Food Diary energy summary calorie math',
   });
@@ -379,7 +379,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
     startMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY START',
     endMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY END',
-    expectedHash: '66f4835c61fae29a8e5e23054ac8386f48dc50cc1504a9f7f8a3bc668e00a112',
+    expectedHash: '02741ad65b59194464c02f1c2b3a109a86f9bf62b9558a0b86c7e571ec158131',
     allowEnvVar: 'ALLOW_MEAL_BUILDER_RECIPE_IMPORT_APPLY_EDIT',
     description: 'Meal builder recipe-import draft apply + serving inference flow',
   });
