@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 20 June 2026, 09:57 AM AEST
+- What changed: Deployed the Food Diary QA fix package: matching web totals, Favorites add fix, Recommended fallback, recipe import matching fixes, Build meal return fix, photo-analysis local fallback, native Recommended fix, and Water/Coffee cleanup fixes.
+- Where to see it (page/link): https://helfi.ai/food and the Helfi phone app Food Diary backed by https://helfi.ai.
+- What to quickly test: Open Food Diary, add a banana, confirm row totals match the top summary, test Recommended, Favorites, Build meal, Import Recipe, Photo Library, and Water/Coffee.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 19 June 2026, 12:56 PM AEST
 - What changed: Deployed the latest Apple review fixes: native Apple sign-in endpoint and app flow, clearer microphone wording, clearer HealthKit disclosure, and safer non-diagnostic wording for symptom notes and health image notes.
 - Where to see it (page/link): https://helfi.ai, https://helfi.ai/symptoms, https://helfi.ai/medical-images, and the Helfi phone app login/dashboard/more screens.
