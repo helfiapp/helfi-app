@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: TestFlight
+- Date/time: 20 June 2026, 10:05 AM AEST
+- What changed: Uploaded Helfi iPhone build 18 to TestFlight with the Food Diary QA fix package. This did not replace or resubmit the current App Store review submission.
+- Where to see it (page/link): App Store Connect / TestFlight build 18 once Apple finishes processing.
+- What to quickly test: Install TestFlight build 18 on iPhone and retest Food Diary totals, Add Food, Recommended, Photo Library, Build meal, Import Recipe, Favorites, Water/Coffee, barcode, and real camera.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 20 June 2026, 09:57 AM AEST
 - What changed: Deployed the Food Diary QA fix package: matching web totals, Favorites add fix, Recommended fallback, recipe import matching fixes, Build meal return fix, photo-analysis local fallback, native Recommended fix, and Water/Coffee cleanup fixes.
