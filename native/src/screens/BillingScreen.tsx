@@ -50,8 +50,6 @@ const defaultCredits: CreditState = {
 
 const creditDisplayList = [
   { label: 'Food photo analysis', key: 'foodAnalysis', credits: 10 },
-  { label: 'Symptom analysis', key: 'symptomAnalysis', credits: 1 },
-  { label: 'Medical image analysis', key: 'medicalImageAnalysis', credits: 2 },
   { label: 'Insights generation', key: 'insightsGeneration', credits: 7 },
   { label: 'Talk to Helfi chat', key: 'chatLight', credits: 10 },
 ]

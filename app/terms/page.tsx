@@ -21,7 +21,7 @@ export default function TermsPage() {
       <div className="max-w-4xl mx-auto p-8 bg-white mt-8 rounded-lg shadow-sm">
         <div className="prose prose-lg max-w-none">
           <h1 className="text-4xl font-bold text-center mb-2 text-gray-900">Helfi Terms of Use</h1>
-          <p className="text-center text-gray-600 text-lg">Last updated: June 6, 2026</p>
+          <p className="text-center text-gray-600 text-lg">Last updated: June 22, 2026</p>
           <p className="text-center text-sm text-gray-500 mb-8">
             Operated by Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)
           </p>
@@ -36,7 +36,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">1. Medical Disclaimer</h2>
               <p className="text-gray-700 leading-relaxed">
-                Helfi is not a licensed medical provider and does not provide medical advice, diagnosis, or treatment. All content, including AI-generated responses, health reports, symptom analyses, supplement suggestions, and any other information provided by Helfi is for informational purposes only. It should not be relied upon for medical decisions. You must consult a qualified healthcare professional for any medical concerns. Use of Helfi does not create a doctor-patient relationship.
+                Helfi is not a licensed medical provider and does not provide medical advice, diagnosis, or treatment. All content, including AI-generated responses, health reports, supplement information, and any other information provided by Helfi is for informational purposes only. It should not be relied upon for medical decisions. You must consult a qualified healthcare professional for any medical concerns. Use of Helfi does not create a doctor-patient relationship.
               </p>
             </section>
 
@@ -46,7 +46,7 @@ export default function TermsPage() {
                 <li>You must be at least 18 years of age to use Helfi.</li>
                 <li>You agree to provide accurate, complete, and up-to-date information about yourself and your health.</li>
                 <li>You are solely responsible for any decisions or actions you take based on information provided by Helfi.</li>
-                <li>You understand that supplement-medication contradictions, AI-based symptom guesses, and lifestyle advice are not substitutes for clinical evaluation.</li>
+                <li>You understand that supplement-medication information, AI-generated health summaries, and lifestyle information are not substitutes for clinical evaluation.</li>
                 <li>Helfi is available internationally. It is your responsibility to ensure that your use of Helfi complies with the laws, regulations, and rules of the country or jurisdiction in which you reside.</li>
               </ul>
             </section>
@@ -79,7 +79,7 @@ export default function TermsPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">3. Subscription and Payment</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>Helfi offers both free and paid subscription plans.</li>
-                <li>Paid features (e.g., AI health reports, symptom analyzer, wearable sync, unlimited goals, AI chatbot) require an active subscription.</li>
+                <li>Paid features (e.g., AI health reports, food photo analysis, wearable sync, unlimited goals, AI chatbot) require an active subscription.</li>
                 <li>All payments are billed in the currency shown at checkout and are non-refundable, except as required by law.</li>
                 <li>Practitioner listing subscriptions and boosts are billed in USD.</li>
                 <li>Boosts provide additional visibility only and do not guarantee leads, bookings, or outcomes.</li>
@@ -90,7 +90,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">4. Content & Data Usage</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
-                <li>By uploading information, images, or descriptions (e.g., supplement bottles, symptoms), you grant us a non-exclusive, royalty-free, worldwide license to use that data for the purpose of providing and improving our services.</li>
+                <li>By uploading information, images, or descriptions (e.g., supplement bottles, food photos, lab reports, or notes), you grant us a non-exclusive, royalty-free, worldwide license to use that data for the purpose of providing and improving our services.</li>
                 <li>Helfi uses machine learning and artificial intelligence. We may use aggregated or de-identified information to improve the service where allowed, and only in line with your choices, our Privacy Policy, and applicable law.</li>
                 <li>We do not sell personal data to third parties. For full data handling terms, refer to our Privacy Policy.</li>
               </ul>

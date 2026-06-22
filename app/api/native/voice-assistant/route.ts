@@ -117,9 +117,15 @@ type VoiceDraft = {
 
 const SELF_HARM_RISK_PATTERN =
   /\b(kill myself|hurt myself|hurting myself|harm myself|harming myself|end my life|suicide|suicidal|self[-\s]?harm|do not want to live|don't want to live|want to die|wish i was dead|can't go on|cant go on)\b/i
+const MEDICAL_SAFETY_REQUEST_PATTERN =
+  /\b(symptom|symptoms|headache|migraine|nausea|vomiting|diarrhea|fever|cough|sore throat|fatigue|dizzy|dizziness|pain|rash|itchy|hives|chest pain|shortness of breath|palpitations|bloating|heartburn|cramps|swelling|diagnose|diagnosis|red flag|red flags|treatment|treat|cure|what could this be|what might this be|what is this|medical image|medical photo|health image|skin photo|rash photo|scan this|check this image)\b/i
 
 function hasSelfHarmRisk(value: unknown) {
   return SELF_HARM_RISK_PATTERN.test(String(value || ''))
+}
+
+function isMedicalSafetyRequest(value: unknown) {
+  return MEDICAL_SAFETY_REQUEST_PATTERN.test(String(value || ''))
 }
 
 function buildSelfHarmSupportDraft(transcript: string, localDate: string): VoiceDraft {
@@ -138,6 +144,20 @@ function buildSelfHarmSupportDraft(transcript: string, localDate: string): Voice
       path: `/chat?voicePrompt=${encodeQueryValue(raw, 1200)}`,
       buttonLabel: 'Open Talk to Helfi',
     },
+  }
+}
+
+function buildMedicalSafetyDraft(transcript: string, localDate: string): VoiceDraft {
+  const raw = cleanText(transcript, 1200)
+  return {
+    action: 'health_question',
+    transcript: raw,
+    localDate,
+    summary: 'General health safety',
+    confirmationMessage:
+      'Helfi can help you track food, water, mood, and notes, but it cannot analyze symptoms or medical images, diagnose conditions, or tell you treatment. Please speak with a qualified health professional about symptoms, images, medication, or treatment questions. If symptoms feel urgent, call emergency services.',
+    canConfirm: false,
+    autoSave: false,
   }
 }
 
@@ -1289,7 +1309,7 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
         'You quickly understand natural spoken requests for the Helfi health app.',
         'Return compact JSON only. Do not explain.',
         'For clear low-risk logging requests, prepare a saveable draft. The app may save it automatically and then tell the user it is done.',
-        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_build_meal, food_draft, recipe, symptom_analysis, health_question, app_handoff, unknown.',
+        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_build_meal, food_draft, recipe, health_question, app_handoff, unknown.',
         'For exercise, infer the exercise name, duration, distance, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
         'For journal, make a short title and journal content. If the user says health journal, include journalType "health"; if they say mood journal, include journalType "mood".',
@@ -1297,10 +1317,10 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
         'For new meals or foods with named ingredients, return food_build_meal with meal, mealName, draftText, and ingredients array. The app will find nutrition before saving.',
         'Use food_draft only when the user gives a vague food request without any usable food names.',
         'For recipes, return action recipe and recipeRequest.',
-        'For symptom_analysis, use when the user wants symptoms analyzed or describes symptoms and asks what it could be. Extract symptoms, duration, and notes.',
         'For health_question, use when the user asks health advice, interpretation, supplements, medication, labs, fitness, sleep, or wellbeing questions that are not a save action.',
+        'If the user asks about symptoms, diagnosis, treatment, red flags, or medical image review, use health_question. The app will show a safe general message and will not open a symptom or image analysis tool.',
         'For app_handoff, use when the user clearly asks to open or use a Helfi app area that is not one of the save actions.',
-        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"symptoms":["headache","fatigue"],"duration":"2 days","notes":"...","recipeRequest":"..."}',
+        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"recipeRequest":"..."}',
       ].join('\n'),
     },
     {
@@ -1575,9 +1595,6 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
   if (/\b(health journal|journal)\b/.test(raw) && openOnly) {
     return { title: 'Health Journal', path: '/health-journal', buttonLabel: 'Open Health Journal' }
   }
-  if (/\b(medical image|medical images|image analyzer|image analyser)\b/.test(raw)) {
-    return { title: 'Health Image Notes', path: '/medical-images', buttonLabel: 'Open Health Image Notes' }
-  }
   if (/\b(lab report|lab reports|blood test upload|blood tests)\b/.test(raw)) {
     return { title: 'Lab Reports', path: '/lab-reports', buttonLabel: 'Open Lab Reports' }
   }
@@ -1586,15 +1603,6 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
   }
   if (/\b(settings|account settings)\b/.test(raw) && openOnly) {
     return nativeTarget('Settings', '/settings', 'Open Settings', { type: 'tab', tab: 'Settings' })
-  }
-  if (/\b(symptom|symptoms|diagnose|diagnosis|what could this be|red flag|red flags)\b/.test(raw)) {
-    if (openOnly && !/\b(headache|migraine|nausea|vomiting|diarrhea|fever|cough|sore throat|fatigue|dizzy|dizziness|pain|rash|itchy|hives|chest pain|shortness of breath|palpitations|bloating|heartburn|cramps|swelling)\b/.test(raw)) {
-      return { title: 'Symptom Notes', path: '/symptoms', buttonLabel: 'Open Symptom Notes' }
-    }
-    const params = new URLSearchParams()
-    params.set('voiceSymptoms', transcript)
-    params.set('voiceNotes', transcript)
-    return { title: 'Symptom Notes', path: `/symptoms?${params.toString()}`, buttonLabel: 'Open Symptom Notes' }
   }
   if (/\b(chat|talk|ask|question|advice|health|supplement|medication|medicine|sleep|stress|energy|labs?|blood test)\b/.test(raw)) {
     return { title: 'Talk to Helfi', path: `/chat?voicePrompt=${encodeQueryValue(transcript, 1200)}`, buttonLabel: 'Open Talk to Helfi' }
@@ -1652,9 +1660,7 @@ function buildQuickToolDraft(transcript: string, localDate: string): VoiceDraft 
   const raw = cleanText(transcript, 1200)
   const lower = raw.toLowerCase()
   if (hasSelfHarmRisk(raw)) return buildSelfHarmSupportDraft(raw, localDate)
-  const symptomWords =
-    /\b(symptom|symptoms|headache|migraine|nausea|vomiting|diarrhea|fever|cough|sore throat|fatigue|dizzy|dizziness|pain|rash|itchy|hives|chest pain|shortness of breath|palpitations|bloating|heartburn|anxious|anxiety|insomnia|cramps|swelling)\b/
-  const asksForAnalysis = /\b(analyze|analyse|check|review|what could|what might|what is causing|diagnose|red flag)\b/.test(lower)
+  if (isMedicalSafetyRequest(raw)) return buildMedicalSafetyDraft(raw, localDate)
   const directTarget = inferNativeWebTarget({}, raw)
   const explicitOpen = /\b(open|show|go to|take me to|use|find)\b/.test(lower)
   const asksForInsights = directTarget?.title === 'Insights' && /\b(insight|insights|coach)\b/.test(lower)
@@ -1689,30 +1695,6 @@ function buildQuickToolDraft(transcript: string, localDate: string): VoiceDraft 
         title: 'Talk to Helfi',
         path: `/chat?voicePrompt=${encodeQueryValue(raw, 1200)}`,
         buttonLabel: 'Open Talk to Helfi',
-      },
-    }
-  }
-
-  const describesSymptoms = /\b(i have|i've got|i feel|feeling|my)\b/.test(lower)
-  if (symptomWords.test(lower) && (asksForAnalysis || describesSymptoms || lower.includes('symptom'))) {
-    const params = new URLSearchParams()
-    const knownSymptoms = knownSymptomsFromText(raw)
-    const symptomText = knownSymptoms.length ? knownSymptoms.join(', ') : extractSymptomText(raw) || raw
-    params.set('voiceSymptoms', symptomText)
-    params.set('voiceNotes', raw)
-    const durationMatch = raw.match(/\b(?:for|since|over)\s+((?:about\s+)?(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten)\s+(?:hour|hours|day|days|week|weeks|month|months)|today|yesterday|this morning|tonight|last night)\b/i)
-    if (durationMatch?.[1]) params.set('voiceDuration', durationMatch[1])
-    return {
-      action: 'symptom_analysis',
-      transcript: raw,
-      localDate,
-      summary: 'Symptom Notes',
-      confirmationMessage: 'I can open Symptom Notes with your symptoms filled in. It will not run or charge until you press Create symptom notes.',
-      canConfirm: false,
-      appTarget: {
-        title: 'Symptom Notes',
-        path: `/symptoms?${params.toString()}`,
-        buttonLabel: 'Open Symptom Notes',
       },
     }
   }
@@ -1823,6 +1805,9 @@ async function normalizeDraft(
   if (hasSelfHarmRisk(transcript)) {
     return { aiCostCents: 0, draft: buildSelfHarmSupportDraft(transcript, localDate) }
   }
+  if (isMedicalSafetyRequest(transcript)) {
+    return { aiCostCents: 0, draft: buildMedicalSafetyDraft(transcript, localDate) }
+  }
 
   const actionRaw = cleanText(parsed?.action, 40).toLowerCase() as VoiceAction
   const action: VoiceAction = ['exercise', 'mood', 'journal', 'water', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'food_draft', 'recipe', 'symptom_analysis', 'health_question', 'app_handoff'].includes(actionRaw)
@@ -1849,32 +1834,7 @@ async function normalizeDraft(
   }
 
   if (action === 'symptom_analysis') {
-    const symptoms = Array.isArray(parsed?.symptoms)
-      ? parsed.symptoms.map((item: any) => cleanText(item, 60)).filter(Boolean).slice(0, 12)
-      : []
-    const symptomsText = symptoms.length ? symptoms.join(', ') : transcript
-    const duration = cleanText(parsed?.duration, 120)
-    const notes = cleanText(parsed?.notes || transcript, 800)
-    const params = new URLSearchParams()
-    params.set('voiceSymptoms', symptomsText)
-    if (duration) params.set('voiceDuration', duration)
-    if (notes) params.set('voiceNotes', notes)
-    return {
-      aiCostCents,
-      draft: {
-        action: 'symptom_analysis',
-        transcript,
-        localDate,
-        summary: 'Symptom Notes',
-        confirmationMessage: 'This sounds like a symptom-notes request. I can open Symptom Notes with your symptoms filled in. It will not run or charge until you press Create symptom notes.',
-        canConfirm: false,
-        appTarget: {
-          title: 'Symptom Notes',
-          path: `/symptoms?${params.toString()}`,
-          buttonLabel: 'Open Symptom Notes',
-        },
-      },
-    }
+    return { aiCostCents, draft: buildMedicalSafetyDraft(transcript, localDate) }
   }
 
   if (action === 'health_question') {

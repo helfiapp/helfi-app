@@ -8,7 +8,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES, type NativeWebPageRoute } from '../config/nativePageRoutes'
 import { useAppMode } from '../state/AppModeContext'
-import { appleHealthConnectAndReadToday } from '../health/appleHealth'
+import { appleHealthConnectAndReadToday, isAppleHealthSupportedDevice } from '../health/appleHealth'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
@@ -31,12 +31,14 @@ export function DashboardScreen() {
   const { width } = useWindowDimensions()
 
   const layout = useMemo(() => {
-    // Use more of the screen like a real phone app (closer to edges).
-    const horizontalPadding = 14
-    const gap = 10
-    const cardWidth = Math.floor((width - horizontalPadding * 2 - gap) / 2)
-    return { horizontalPadding, gap, cardWidth }
+    const isTablet = width >= 700
+    const horizontalPadding = isTablet ? 32 : 14
+    const gap = isTablet ? 14 : 10
+    const contentWidth = Math.min(width, 860)
+    const cardWidth = Math.floor((contentWidth - horizontalPadding * 2 - gap) / 2)
+    return { horizontalPadding, gap, cardWidth, isTablet }
   }, [width])
+  const appleHealthAvailable = isAppleHealthSupportedDevice()
 
   const [creditsRemaining, setCreditsRemaining] = useState(0)
   const [creditsFillPct, setCreditsFillPct] = useState(0)
@@ -460,7 +462,10 @@ export function DashboardScreen() {
   }
 
   const onAppleHealthConnect = async () => {
-    if (Platform.OS !== 'ios') return
+    if (!appleHealthAvailable) {
+      Alert.alert('Apple Health is iPhone only', 'Apple Health import works on iPhone. You can still use food, water, mood, and other tracking on this iPad.')
+      return
+    }
     try {
       setAppleHealthBusy(true)
       // This triggers the permission prompt. We don’t need the values yet.
@@ -499,7 +504,10 @@ export function DashboardScreen() {
   }
 
   const onAppleHealthImportSample = async () => {
-    if (Platform.OS !== 'ios') return
+    if (!appleHealthAvailable) {
+      Alert.alert('Apple Health is iPhone only', 'Apple Health import works on iPhone. You can still use food, water, mood, and other tracking on this iPad.')
+      return
+    }
     if (!session?.token) {
       Alert.alert('Not signed in', 'Please log in again, then try importing.')
       return
@@ -540,7 +548,10 @@ export function DashboardScreen() {
   }
 
   const onAppleHealthImportToday = async () => {
-    if (Platform.OS !== 'ios') return
+    if (!appleHealthAvailable) {
+      Alert.alert('Apple Health is iPhone only', 'Apple Health import works on iPhone. You can still use food, water, mood, and other tracking on this iPad.')
+      return
+    }
     if (!session?.token) {
       Alert.alert('Not signed in', 'Please log in again, then try importing.')
       return
@@ -951,22 +962,30 @@ export function DashboardScreen() {
                   }}
                 >
                   <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Apple Health / HealthKit</Text>
-                  <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-                    Helfi asks HealthKit for read access only after you tap Continue and approve Apple's Health
-                    permission screen.
-                  </Text>
-                  <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-                    Helfi reads steps, walking/running distance, and active energy so your dashboard can show your
-                    daily activity summary.
-                  </Text>
+                  {appleHealthAvailable ? (
+                    <>
+                      <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+                        Helfi asks HealthKit for read access only after you tap Continue and approve Apple's Health
+                        permission screen.
+                      </Text>
+                      <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+                        Helfi reads steps, walking/running distance, and active energy so your dashboard can show your
+                        daily activity summary.
+                      </Text>
+                    </>
+                  ) : (
+                    <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+                      Apple Health import is available on iPhone only. This iPad can still use food, water, mood, check-ins, and reports.
+                    </Text>
+                  )}
                 </View>
                 <DeviceRow
                   name="Apple Health (HealthKit)"
                   icon={<AppleHealthLogo />}
-                  detail="Continue to Apple's HealthKit permission screen for steps, distance, and active energy."
-                  rightLabel={appleHealthConnected ? 'Import today' : 'Continue'}
+                  detail={appleHealthAvailable ? "Continue to Apple's HealthKit permission screen for steps, distance, and active energy." : 'Available on iPhone only.'}
+                  rightLabel={!appleHealthAvailable ? 'iPhone only' : appleHealthConnected ? 'Import today' : 'Continue'}
                   rightKind="connect"
-                  disabled={appleHealthBusy}
+                  disabled={appleHealthBusy || !appleHealthAvailable}
                   onPress={appleHealthConnected ? onAppleHealthImportToday : onAppleHealthConnect}
                 />
               </>

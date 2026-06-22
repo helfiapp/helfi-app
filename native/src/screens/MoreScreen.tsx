@@ -116,8 +116,6 @@ export function MoreScreen({ navigation }: { navigation: any }) {
             onPress={() => openNativeTool(NATIVE_WEB_PAGES.dailyCheckIn)}
           />
           <Row icon={<Feather name="smile" size={18} color={theme.colors.muted} />} label="Mood Tracker" onPress={openMoodTracker} />
-          <Row icon={<Feather name="activity" size={18} color={theme.colors.muted} />} label="Symptom Notes" onPress={() => openNativeTool(NATIVE_WEB_PAGES.symptomAnalysis)} />
-          <Row icon={<Feather name="image" size={18} color={theme.colors.muted} />} label="Health Image Notes" onPress={() => openNativeTool(NATIVE_WEB_PAGES.medicalImageAnalyzer)} />
           <Row icon={<Feather name="clipboard" size={18} color={theme.colors.muted} />} label="Health Intake" onPress={() => navigation.getParent()?.navigate('HealthSetup')} />
           <Row icon={<Feather name="heart" size={18} color={theme.colors.muted} />} label="Health Tips" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthTips)} />
           <Row icon={<Feather name="clock" size={18} color={theme.colors.muted} />} label="Health Tips History" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthTipsHistory)} />

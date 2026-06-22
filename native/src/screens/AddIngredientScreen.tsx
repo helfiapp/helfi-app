@@ -18,6 +18,7 @@ import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 import { API_BASE_URL } from '../config'
 import { PRODUCE_MEASUREMENTS, type ProduceMeasurement } from '../data/produceMeasurements'
 import type { MainStackParamList } from '../navigation/MainNavigator'
+import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { useAppMode } from '../state/AppModeContext'
@@ -1508,6 +1509,9 @@ export function AddIngredientScreen() {
     if (!session?.token) return
 
     try {
+      const aiAllowed = await requestAiDataSharingPermission()
+      if (!aiAllowed) return
+
       const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
       if (!permission.granted) {
         Alert.alert('Permission needed', 'Please allow photo access to continue.')

@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
 import * as FileSystem from 'expo-file-system'
@@ -7,6 +7,7 @@ import { Feather } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { API_BASE_URL } from '../config'
+import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { theme } from '../ui/theme'
@@ -175,6 +176,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [autoSubmitToken, setAutoSubmitToken] = useState(0)
   const autoSubmittedRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
+  const voiceRecordingSupported = !(Platform.OS === 'ios' && (Platform as any).isPad === true)
 
   useEffect(() => {
     AsyncStorage.getItem(VOICE_REPLY_KEY)
@@ -303,6 +305,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         return
       }
 
+      const aiAllowed = await requestAiDataSharingPermission()
+      if (!aiAllowed) {
+        Alert.alert('AI request not sent', 'No data was sent. You can still use non-AI tracking in Helfi.')
+        return
+      }
+
       setBusy(true)
       setDraft(null)
       setChargedCredits(null)
@@ -371,6 +379,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
 
   const startRecording = useCallback(async () => {
     try {
+      if (!voiceRecordingSupported) {
+        Alert.alert('Type your request instead', 'Voice recording is iPhone only for now. You can type your request here on iPad.')
+        return
+      }
       if (recording) return
       setDraft(null)
       setChargedCredits(null)
@@ -393,7 +405,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     } catch (error: any) {
       Alert.alert('Recording failed', error?.message || 'Please try again.')
     }
-  }, [recording])
+  }, [recording, voiceRecordingSupported])
 
   const stopRecording = useCallback(async () => {
     if (!recording) return
@@ -485,22 +497,29 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </Pressable>
                 </View>
 
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={recording ? 'Stop recording' : 'Record command'}
-                  onPress={recording ? stopRecording : startRecording}
-                  disabled={busy}
-                  style={[styles.recordButton, recording && styles.recordingButton, busy && styles.disabled]}
-                >
-                  {busy ? (
-                    <ActivityIndicator color="#FFFFFF" />
-                  ) : (
-                    <>
-                      <Feather name={recording ? 'square' : 'mic'} size={22} color="#FFFFFF" />
-                      <Text style={styles.recordText}>{recording ? 'Stop recording' : 'Record command'}</Text>
-                    </>
-                  )}
-                </Pressable>
+                {voiceRecordingSupported ? (
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={recording ? 'Stop recording' : 'Record command'}
+                    onPress={recording ? stopRecording : startRecording}
+                    disabled={busy}
+                    style={[styles.recordButton, recording && styles.recordingButton, busy && styles.disabled]}
+                  >
+                    {busy ? (
+                      <ActivityIndicator color="#FFFFFF" />
+                    ) : (
+                      <>
+                        <Feather name={recording ? 'square' : 'mic'} size={22} color="#FFFFFF" />
+                        <Text style={styles.recordText}>{recording ? 'Stop recording' : 'Record command'}</Text>
+                      </>
+                    )}
+                  </Pressable>
+                ) : (
+                  <View style={styles.noticeBox}>
+                    <Text style={styles.noticeTitle}>Type-only on iPad</Text>
+                    <Text style={styles.noticeText}>Voice recording is iPhone only for now. Type your request below.</Text>
+                  </View>
+                )}
 
                 <View style={styles.section}>
                   <Text style={styles.label}>Helfi heard</Text>
@@ -510,7 +529,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                       setTranscript(value)
                       setDraft(null)
                     }}
-                    placeholder="Your spoken request will appear here."
+                    placeholder={voiceRecordingSupported ? 'Your spoken request will appear here.' : 'Type your request here.'}
                     multiline
                     style={styles.input}
                   />
@@ -629,6 +648,9 @@ const styles = StyleSheet.create({
   recordingButton: { backgroundColor: '#B42318' },
   disabled: { opacity: 0.65 },
   recordText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
+  noticeBox: { borderRadius: 8, borderWidth: 1, borderColor: '#CFE8D4', backgroundColor: '#F2FBF4', padding: 12, gap: 4 },
+  noticeTitle: { color: theme.colors.text, fontWeight: '900' },
+  noticeText: { color: theme.colors.muted, lineHeight: 20 },
   section: { backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#DDE8E1', padding: 14, gap: 10 },
   label: { color: theme.colors.text, fontSize: 14, fontWeight: '900' },
   input: {

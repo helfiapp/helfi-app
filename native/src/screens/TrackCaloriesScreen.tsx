@@ -24,6 +24,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context'
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
 import { calculateDailyTargets } from '../lib/dailyTargets'
+import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { useAppMode } from '../state/AppModeContext'
@@ -3893,6 +3894,9 @@ export function TrackCaloriesScreen() {
     if (!session?.token) return
 
     try {
+      const aiAllowed = await requestAiDataSharingPermission()
+      if (!aiAllowed) return
+
       const permission =
         modeValue === 'camera'
           ? await ImagePicker.requestCameraPermissionsAsync()
@@ -4291,6 +4295,9 @@ export function TrackCaloriesScreen() {
     }
 
     try {
+      const aiAllowed = await requestAiDataSharingPermission()
+      if (!aiAllowed) return
+
       const permission =
         modeValue === 'camera'
           ? await ImagePicker.requestCameraPermissionsAsync()
@@ -4436,6 +4443,11 @@ export function TrackCaloriesScreen() {
 
   const generateRecommended = async () => {
     if (!authHeaders) return
+    const aiAllowed = await requestAiDataSharingPermission()
+    if (!aiAllowed) {
+      setRecommendedError('AI request not sent.')
+      return
+    }
     if (!recommendedExplainSeen) {
       await markRecommendedExplainSeen()
       setRecommendedExplainOpen(false)

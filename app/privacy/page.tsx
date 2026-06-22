@@ -21,7 +21,7 @@ export default function PrivacyPage() {
       <div className="max-w-4xl mx-auto p-8 bg-white mt-8 rounded-lg shadow-sm">
         <div className="prose prose-lg max-w-none">
           <h1 className="text-4xl font-bold text-center mb-2 text-gray-900">Helfi Privacy Policy</h1>
-          <p className="text-center text-gray-600 text-lg">Last updated: June 6, 2026</p>
+          <p className="text-center text-gray-600 text-lg">Last updated: June 22, 2026</p>
           <p className="text-center text-sm text-gray-500 mb-8">
             Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)
           </p>
@@ -43,8 +43,8 @@ export default function PrivacyPage() {
                 <h3 className="text-xl font-semibold text-gray-800 mb-3">a. Information You Provide Directly:</h3>
                 <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                   <li>Name, email address, gender, age, height, weight, and other demographic data</li>
-                  <li>Health goals, symptom ratings, supplement and medication data</li>
-                  <li>Uploaded content (e.g., supplement labels, symptom images, notes)</li>
+                  <li>Health goals, daily check-in notes, supplement and medication data</li>
+                  <li>Uploaded content you choose to provide (e.g., supplement labels, food photos, journal notes, voice notes, profile photos, and lab reports)</li>
                   <li>Laboratory report PDFs and extracted lab test results (analyte names, values, units, reference ranges, collection dates, accession numbers, and laboratory names)</li>
                   <li>Payment and subscription information</li>
                   <li>Customer support communications</li>
@@ -95,7 +95,7 @@ export default function PrivacyPage() {
               <div className="text-gray-700 leading-relaxed mb-3">We use your data to:</div>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>Provide and personalize the App's features</li>
-                <li>Deliver AI-generated reports and symptom notes</li>
+                <li>Deliver AI-generated reports, chat responses, food analysis, and other AI assistance after you give in-app permission</li>
                 <li>Parse, normalize, display, and analyze laboratory test results for your personal use</li>
                 <li>Improve app functionality using aggregated or de-identified information where allowed, and only in line with your choices and applicable law</li>
                 <li>Process payments and manage subscriptions</li>
@@ -106,12 +106,25 @@ export default function PrivacyPage() {
             </section>
 
             <section>
+              <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">2a. AI Features and OpenAI Permission</h2>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                Before Helfi sends your information to an AI provider, the App asks for your in-app permission. The AI provider is OpenAI, LLC.
+              </p>
+              <p className="text-gray-700 leading-relaxed mb-3">
+                If you agree, Helfi may send the content you choose to use with AI features, such as typed text, voice audio or transcripts, uploaded photos, notes, food logs, health profile details, and lab report text, to OpenAI, LLC. This is used to create your AI response, report, summary, or analysis inside Helfi.
+              </p>
+              <p className="text-gray-700 leading-relaxed">
+                You can decline AI data sharing and still use non-AI tracking features such as food, water, mood, device logs, and account tools. OpenAI, LLC is required to protect the data it processes for Helfi to a level at least equivalent to this Privacy Policy and applicable privacy requirements.
+              </p>
+            </section>
+
+            <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">3. How We Share Your Data</h2>
               <div className="text-gray-700 leading-relaxed mb-3">
                 We do not sell your personal data. We only share it as follows:
               </div>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
-                <li><strong>Service Providers:</strong> For hosting, analytics, AI processing, payment processing, email delivery, file storage, and technical support</li>
+                <li><strong>Service Providers:</strong> For hosting, analytics, payment processing, email delivery, file storage, technical support, and AI processing with OpenAI, LLC after you give in-app permission</li>
                 <li><strong>No health-data advertising sale:</strong> We do not sell your personal health data or share it for targeted advertising.</li>
                 <li><strong>Legal Requirements:</strong> If required by law, court order, or regulatory request</li>
                 <li><strong>Business Transfers:</strong> If Helfi is involved in a merger, acquisition, or sale of assets, your data may be transferred</li>

@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useRef, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
@@ -7,12 +7,14 @@ import { WebView } from 'react-native-webview'
 
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
+import { grantAiDataSharingPermission, hasAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeWebSource } from '../lib/openNativeWebPath'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 
 const PRACTITIONER_LOCATION_KEY = 'helfi:practitionerLocation'
+const AI_WEB_PATHS = ['/chat', '/insights', '/health-tips', '/lab-reports', '/symptoms', '/medical-images']
 
 type NativeRecommendationSource = 'onboarding' | 'chat' | 'image' | 'symptom-analysis'
 
@@ -61,6 +63,11 @@ function pathForNativePage(path: string) {
   } catch {
     return String(path || '').split('?')[0] || '/'
   }
+}
+
+function requiresAiDataSharingPermission(path: string) {
+  const pathname = pathForNativePage(path)
+  return AI_WEB_PATHS.some((item) => pathname === item || pathname.startsWith(`${item}/`))
 }
 
 function titleForNativeWebUrl(rawUrl: string, fallback: string) {
@@ -238,6 +245,8 @@ export function NativeWebToolScreen({ route }: { route: any }) {
 
   const requestedPath = String(route?.params?.path || '/dashboard')
   const requestedTitle = String(route?.params?.title || 'Page')
+  const requiresAiPermission = useMemo(() => requiresAiDataSharingPermission(requestedPath), [requestedPath])
+  const [aiPermissionGranted, setAiPermissionGranted] = useState(!requiresAiPermission)
   const webViewKey = `${session?.user?.id || 'signed-out'}:${requestedPath}`
   const requestedPathWithFreshLoad = useMemo(() => {
     const joiner = requestedPath.includes('?') ? '&' : '?'
@@ -253,6 +262,27 @@ export function NativeWebToolScreen({ route }: { route: any }) {
   )
 
   const hasNativeToken = String(session?.token || '').trim().length > 0
+
+  useEffect(() => {
+    let cancelled = false
+    if (!requiresAiPermission) {
+      setAiPermissionGranted(true)
+      return () => {
+        cancelled = true
+      }
+    }
+    setAiPermissionGranted(false)
+    hasAiDataSharingPermission()
+      .then((allowed) => {
+        if (!cancelled) setAiPermissionGranted(allowed)
+      })
+      .catch(() => {
+        if (!cancelled) setAiPermissionGranted(false)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [requiresAiPermission, requestedPath])
 
   const loadNativeRecommendations = useCallback(
     async (issueText: string, sourceArea: NativeRecommendationSource) => {
@@ -416,26 +446,42 @@ export function NativeWebToolScreen({ route }: { route: any }) {
   return (
     <Screen>
       <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-        {loading ? (
+        {requiresAiPermission && !aiPermissionGranted ? (
           <View
             style={{
-              position: 'absolute',
-              top: 0,
-              left: 0,
-              right: 0,
-              bottom: 0,
-              alignItems: 'center',
+              flex: 1,
               justifyContent: 'center',
-              gap: 10,
-              zIndex: 2,
+              padding: 22,
+              gap: 14,
+              backgroundColor: '#F7FAF9',
             }}
           >
-            <ActivityIndicator size="large" color={theme.colors.primary} />
-            <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>Opening page...</Text>
+            <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>
+              Allow AI help?
+            </Text>
+            <Text style={{ color: theme.colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' }}>
+              To use this AI feature, Helfi may send what you choose to share, such as typed text, voice audio, photos, notes, food logs, health profile details, or lab report text, to OpenAI, LLC.
+            </Text>
+            <Text style={{ color: theme.colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' }}>
+              OpenAI processes it so Helfi can create your AI response. You can say no and still use non-AI tracking like food, water, mood, and device logs.
+            </Text>
+            <Pressable
+              onPress={async () => {
+                await grantAiDataSharingPermission()
+                setAiPermissionGranted(true)
+              }}
+              style={{ marginTop: 8, minHeight: 48, borderRadius: 8, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>I agree</Text>
+            </Pressable>
+            <Pressable
+              onPress={() => navigation.goBack()}
+              style={{ minHeight: 48, borderRadius: 8, backgroundColor: '#E8F2EA', alignItems: 'center', justifyContent: 'center' }}
+            >
+              <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Not now</Text>
+            </Pressable>
           </View>
-        ) : null}
-
-        {failed ? (
+        ) : failed ? (
           <View
             style={{
               flex: 1,
@@ -463,6 +509,25 @@ export function NativeWebToolScreen({ route }: { route: any }) {
             </Pressable>
           </View>
         ) : (
+          <>
+            {loading ? (
+          <View
+            style={{
+              position: 'absolute',
+              top: 0,
+              left: 0,
+              right: 0,
+              bottom: 0,
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: 10,
+              zIndex: 2,
+            }}
+          >
+            <ActivityIndicator size="large" color={theme.colors.primary} />
+            <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>Opening page...</Text>
+          </View>
+            ) : null}
           <WebView
             key={webViewKey}
             source={source}
@@ -515,6 +580,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
             domStorageEnabled
             startInLoadingState
           />
+          </>
         )}
         <NativePractitionerRecommendationPanel
           items={recommendations}

@@ -23,8 +23,12 @@ function nowISO() {
   return new Date().toISOString()
 }
 
+export function isAppleHealthSupportedDevice() {
+  return Platform.OS === 'ios' && (Platform as any).isPad !== true
+}
+
 function initHealthKit(): Promise<void> {
-  if (Platform.OS !== 'ios') return Promise.reject(new Error('Apple Health is only available on iPhone'))
+  if (!isAppleHealthSupportedDevice()) return Promise.reject(new Error('Apple Health is available only on iPhone.'))
 
   const permissions: HealthKitPermissions = {
     permissions: {
@@ -97,4 +101,3 @@ export async function appleHealthConnectAndReadToday(): Promise<AppleHealthToday
 
   return { steps, distanceKm, activeEnergyKcal }
 }
-

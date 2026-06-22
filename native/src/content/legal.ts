@@ -24,7 +24,7 @@ export type LegalDoc = {
 
 export const termsOfUse: LegalDoc = {
   title: 'Helfi Terms of Use',
-  lastUpdated: 'June 6, 2026',
+  lastUpdated: 'June 22, 2026',
   companyLine: 'Operated by Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)',
   intro: [
     'By accessing or using the Helfi app, website, or related services ("Helfi", "we", "us", or "our"), you ("user", "you") agree to be bound by these Terms of Use and our Privacy Policy. Please read them carefully before using the platform.',
@@ -33,7 +33,7 @@ export const termsOfUse: LegalDoc = {
     {
       title: '1. Medical Disclaimer',
       paragraphs: [
-        'Helfi is not a licensed medical provider and does not provide medical advice, diagnosis, or treatment. All content, including AI-generated responses, health reports, symptom analyses, supplement suggestions, and any other information provided by Helfi is for informational purposes only. It should not be relied upon for medical decisions. You must consult a qualified healthcare professional for any medical concerns. Use of Helfi does not create a doctor-patient relationship.',
+        'Helfi is not a licensed medical provider and does not provide medical advice, diagnosis, or treatment. All content, including AI-generated responses, health reports, supplement information, and any other information provided by Helfi is for informational purposes only. It should not be relied upon for medical decisions. You must consult a qualified healthcare professional for any medical concerns. Use of Helfi does not create a doctor-patient relationship.',
       ],
     },
     {
@@ -42,7 +42,7 @@ export const termsOfUse: LegalDoc = {
         'You must be at least 18 years of age to use Helfi.',
         'You agree to provide accurate, complete, and up-to-date information about yourself and your health.',
         'You are solely responsible for any decisions or actions you take based on information provided by Helfi.',
-        'You understand that supplement-medication contradictions, AI-based symptom guesses, and lifestyle advice are not substitutes for clinical evaluation.',
+        'You understand that supplement-medication information, AI-generated health summaries, and lifestyle information are not substitutes for clinical evaluation.',
         "Helfi is available internationally. It is your responsibility to ensure that your use of Helfi complies with the laws, regulations, and rules of the country or jurisdiction in which you reside.",
       ],
     },
@@ -61,7 +61,7 @@ export const termsOfUse: LegalDoc = {
       title: '3. Subscription and Payment',
       bullets: [
         'Helfi offers both free and paid subscription plans.',
-        'Paid features (e.g., AI health reports, symptom analyzer, wearable sync, unlimited goals, AI chatbot) require an active subscription.',
+        'Paid features (e.g., AI health reports, food photo analysis, wearable sync, unlimited goals, AI chatbot) require an active subscription.',
         'All payments are billed in the currency shown at checkout and are non-refundable, except as required by law.',
         'Practitioner listing subscriptions and boosts are billed in USD.',
         'Boosts provide additional visibility only and do not guarantee leads, bookings, or outcomes.',
@@ -71,7 +71,7 @@ export const termsOfUse: LegalDoc = {
     {
       title: '4. Content & Data Usage',
       bullets: [
-        'By uploading information, images, or descriptions (e.g., supplement bottles, symptoms), you grant us a non-exclusive, royalty-free, worldwide license to use that data for the purpose of providing and improving our services.',
+        'By uploading information, images, or descriptions (e.g., supplement bottles, food photos, lab reports, or notes), you grant us a non-exclusive, royalty-free, worldwide license to use that data for the purpose of providing and improving our services.',
         'Helfi uses machine learning and artificial intelligence. We may use aggregated or de-identified information to improve the service where allowed, and only in line with your choices, our Privacy Policy, and applicable law.',
         'We do not sell personal data to third parties. For full data handling terms, refer to our Privacy Policy.',
       ],
@@ -187,7 +187,7 @@ export const termsOfUse: LegalDoc = {
 
 export const privacyPolicy: LegalDoc = {
   title: 'Helfi Privacy Policy',
-  lastUpdated: 'June 6, 2026',
+  lastUpdated: 'June 22, 2026',
   companyLine: 'Global 22 Pty Ltd trading as Helfi (ACN 620 610 120 · ABN 46 620 610 120 · DUNS 744832520)',
   intro: [
     'This Privacy Policy explains how Helfi ("we," "us," or "our") collects, uses, discloses, and protects your information when you use our mobile application and associated services (collectively, the "App").',
@@ -201,8 +201,8 @@ export const privacyPolicy: LegalDoc = {
           title: 'a. Information You Provide Directly:',
           bullets: [
             'Name, email address, gender, age, height, weight, and other demographic data',
-            'Health goals, symptom ratings, supplement and medication data',
-            'Uploaded content (e.g., supplement labels, symptom images, notes)',
+            'Health goals, daily check-in notes, supplement and medication data',
+            'Uploaded content you choose to provide (e.g., supplement labels, food photos, journal notes, voice notes, profile photos, and lab reports)',
             'Laboratory report PDFs and extracted lab test results (analyte names, values, units, reference ranges, collection dates, accession numbers, and laboratory names)',
             'Payment and subscription information',
             'Customer support communications',
@@ -245,7 +245,7 @@ export const privacyPolicy: LegalDoc = {
       paragraphs: ['We use your data to:'],
       bullets: [
         "Provide and personalize the App's features",
-        'Deliver AI-generated reports and symptom notes',
+        'Deliver AI-generated reports, chat responses, food analysis, and other AI assistance after you give in-app permission',
         'Parse, normalize, display, and analyze laboratory test results for your personal use',
         'Improve app functionality using aggregated or de-identified information where allowed, and only in line with your choices and applicable law',
         'Process payments and manage subscriptions',
@@ -255,10 +255,18 @@ export const privacyPolicy: LegalDoc = {
       ],
     },
     {
+      title: '2a. AI Features and OpenAI Permission',
+      paragraphs: [
+        'Before Helfi sends your information to an AI provider, the App asks for your in-app permission. The AI provider is OpenAI, LLC.',
+        'If you agree, Helfi may send the content you choose to use with AI features, such as typed text, voice audio or transcripts, uploaded photos, notes, food logs, health profile details, and lab report text, to OpenAI, LLC. This is used to create your AI response, report, summary, or analysis inside Helfi.',
+        'You can decline AI data sharing and still use non-AI tracking features such as food, water, mood, device logs, and account tools. OpenAI, LLC is required to protect the data it processes for Helfi to a level at least equivalent to this Privacy Policy and applicable privacy requirements.',
+      ],
+    },
+    {
       title: '3. How We Share Your Data',
       paragraphs: ['We do not sell your personal data. We only share it as follows:'],
       bullets: [
-        'Service Providers: For hosting, analytics, AI processing, payment processing, email delivery, file storage, and technical support',
+        'Service Providers: For hosting, analytics, payment processing, email delivery, file storage, technical support, and AI processing with OpenAI, LLC after you give in-app permission',
         'No health-data advertising sale: We do not sell your personal health data or share it for targeted advertising.',
         'Legal Requirements: If required by law, court order, or regulatory request',
         'Business Transfers: If Helfi is involved in a merger, acquisition, or sale of assets, your data may be transferred',
