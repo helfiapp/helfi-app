@@ -15,7 +15,7 @@
       "ios": {
         "supportsTablet": true,
         "bundleIdentifier": "ai.helfi.app",
-        "buildNumber": "19",
+        "buildNumber": "20",
         "associatedDomains": [
           "applinks:helfi.ai",
           "applinks:www.helfi.ai"
@@ -23,6 +23,7 @@
         "infoPlist": {
         "NSCameraUsageDescription": "Allow Helfi to use your camera so you can take a photo for food logging, journal notes, or profile photos when you choose.",
         "NSHealthShareUsageDescription": "Allow Helfi to read selected Apple Health data, such as steps, distance, and active calories, so it can show your daily activity in your health dashboard.",
+        "NSHealthUpdateUsageDescription": "Helfi does not write data to Apple Health. This permission wording is included because Apple requires it when Health access is available.",
         "NSLocationWhenInUseUsageDescription": "Allow Helfi to use your location to show relevant nearby practitioners when matches are available.",
         "NSMicrophoneUsageDescription": "Allow Helfi to use your microphone only when you tap the voice button, so it can turn spoken requests such as \"add breakfast\" or \"log a 20 minute walk\" into text.",
         "ITSAppUsesNonExemptEncryption": false,

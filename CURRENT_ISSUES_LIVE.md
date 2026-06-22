@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 22 June 2026, 12:09 PM AEST
+- What changed: Deployed the latest Apple rejection fixes: in-app AI data sharing permission, OpenAI privacy wording, safer voice assistant replies, hidden native symptom/image tools, iPad Apple Health fallback, iPad type-only voice fallback, and iOS build number 20.
+- Where to see it (page/link): https://helfi.ai/privacy, https://helfi.ai/terms, and Helfi iOS build 20 in App Store Connect/TestFlight.
+- What to quickly test: Open the iPad app Dashboard and Talk to Helfi. Confirm Apple Health says iPhone only, voice recording is type-only on iPad, AI features ask permission before sending data, and More/Billing no longer show the removed medical review tools.
+
+DEPLOYED:
 - LIVE or STAGING: TestFlight
 - Date/time: 20 June 2026, 10:05 AM AEST
 - What changed: Uploaded Helfi iPhone build 18 to TestFlight with the Food Diary QA fix package. This did not replace or resubmit the current App Store review submission.
