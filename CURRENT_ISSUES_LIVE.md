@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE + App Store Connect
+- Date/time: 23 June 2026, 10:37 AM AEST
+- What changed: Removed the web-based Google sign-in button from the iOS app login and sign-up screens, kept Apple/email sign-in, and uploaded iOS build 21.
+- Where to see it (page/link): Helfi iOS login and sign-up screens; App Store Connect build 21.
+- What to quickly test: Open the iOS app login/sign-up screens and confirm the Google button is gone, so iPad no longer shows a helfi.ai website sign-in prompt.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 22 June 2026, 12:09 PM AEST
 - What changed: Deployed the latest Apple rejection fixes: in-app AI data sharing permission, OpenAI privacy wording, safer voice assistant replies, hidden native symptom/image tools, iPad Apple Health fallback, iPad type-only voice fallback, and iOS build number 20.

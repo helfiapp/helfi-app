@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-06-22T02:02:41.031Z",
+  "generatedAt": "2026-06-23T00:37:33.814Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "13cb120b2263a3ab31c3043d8fff694a666106b5bcef78fae4adc94557439db0",
@@ -227,7 +227,7 @@
     "native/src/screens/InsightsScreen.tsx": "28a1eaf979603dc7a48ad250d27a86441f9dd1d603ff6c8c3059b74bc5eb5519",
     "native/src/screens/ListYourPracticeScreen.tsx": "e11e13b53513984e6f1e329dac3f3d80046351313669a3331c9670ef7899f0d4",
     "native/src/screens/ListYourPracticeStartScreen.tsx": "5973f6fec772e38625e07d95e7eaca1988b1db680deca19bc0c2b4a4fb8e3c9d",
-    "native/src/screens/LoginScreen.tsx": "ee82710e44ecf1ebb89327b9a75281669077edde37c32934e4978ea78d32f5d8",
+    "native/src/screens/LoginScreen.tsx": "fab0738dd11cd4f76fdbee7d9a24abefddb6210bf336af996cccc74ce0d6faf5",
     "native/src/screens/MoodTrackerScreen.tsx": "230c586ff13b710f097e9caf5215684ba80b7497555e0ae206bdaa6a965f23a6",
     "native/src/screens/MoreScreen.tsx": "80e83c1df73710e35aff7c039d0940583a63f451e989b5999b6d0820d885bb0e",
     "native/src/screens/NativeWebToolScreen.tsx": "6bae521446fc42da508f42b4e9f0da4492b2e4d0aa1ee4d29326f90034538249",
@@ -245,7 +245,7 @@
     "native/src/screens/ProfileScreen.tsx": "013eb4cdeb3124c70fe76eb45ffa9252fa4763f019df7c989f76204476ed7092",
     "native/src/screens/RemindersScreen.tsx": "063942542206db83760901cb64abb73d9aee487ba986b17908f167c63382a2b0",
     "native/src/screens/SettingsScreen.tsx": "4a45f1572e6bbe63b832b957d68b3948dba25d0a4c39a4b52a4ac21e433fa609",
-    "native/src/screens/SignupScreen.tsx": "53a2eb3b96e991697d02f6a8d6a2d91404055d3398b2a5a99afcfb09cbf52c32",
+    "native/src/screens/SignupScreen.tsx": "01062b514d40326efb3d808e6bd0034c73d92b6f881c65c7b7656c1cc7d49aa0",
     "native/src/screens/SleepCoachScreen.tsx": "0fa85b6e8a219e8af3883bd80714122f2178d41eb74fcc8fbad61e0056224fab",
     "native/src/screens/SmartHealthCoachScreen.tsx": "0068263797a921ce37107179d9fdc6222b16f3ce15ea04d7f9feef7a4acbf8fe",
     "native/src/screens/SupportScreen.tsx": "fb37dd443f74ca8ec44959e4a51ceb5c055e3b6a326d95fdc3b3fa300241aefd",
