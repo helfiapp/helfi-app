@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 25 June 2026, 01:25 PM AEST
+- What changed: Deployed the full audit fix package for safer Apple wording, AI permission prompts, Food Diary fixes, iOS/web parity fixes, billing/credits wording, and removal of risky public screenshot assets.
+- Where to see it (page/link): https://helfi.ai, https://helfi.ai/food, https://helfi.ai/chat, https://helfi.ai/symptoms, https://helfi.ai/medical-images, and the Helfi iOS app screens backed by live.
+- What to quickly test: Open web and iOS Food Diary, Talk to Helfi, Symptom Notes, Health Image Notes, Insights, More, Settings, and Billing. Confirm AI permission appears before AI use and risky symptom/medical-image wording is gone from app pages.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE + App Store Connect
 - Date/time: 23 June 2026, 10:37 AM AEST
 - What changed: Removed the web-based Google sign-in button from the iOS app login and sign-up screens, kept Apple/email sign-in, and uploaded iOS build 21.
