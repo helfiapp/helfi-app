@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 25 June 2026, 10:00 PM AEST
+- What changed: Deployed the final audit fix package and prepared iOS build 23, including safer Apple wording, web/iOS parity fixes, account password flow, Food Diary wording/accessibility fixes, native fallback wording, and safer public screenshot asset names.
+- Where to see it (page/link): https://helfi.ai, https://helfi.ai/food, https://helfi.ai/chat, https://helfi.ai/symptoms, https://helfi.ai/medical-images, https://helfi.ai/account, and the native app screens backed by live.
+- What to quickly test: Open Food Diary, Talk to Helfi, Symptom Notes, Health Image Notes, Account, Settings, Billing, Devices, and Insights. Confirm AI permission appears before AI use and risky symptom/medical-image wording is gone.
+
+DEPLOYED:
 - LIVE or STAGING: TestFlight
 - Date/time: 25 June 2026, 01:36 PM AEST
 - What changed: Uploaded Helfi iOS 1.0.0 build 22 to Apple/TestFlight after the full audit fix package and live web deployment.
