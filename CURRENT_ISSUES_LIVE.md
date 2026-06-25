@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: TestFlight
+- Date/time: 25 June 2026, 01:36 PM AEST
+- What changed: Uploaded Helfi iOS 1.0.0 build 22 to Apple/TestFlight after the full audit fix package and live web deployment.
+- Where to see it (page/link): App Store Connect / TestFlight build 22 once Apple finishes processing.
+- What to quickly test: Install TestFlight build 22 on a real iPhone and iPad, then retest Food Diary, Talk to Helfi, Symptom Notes, Health Image Notes, Insights, Settings, Billing, camera/photo, barcode, Apple Health, microphone, and purchases.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 25 June 2026, 01:25 PM AEST
 - What changed: Deployed the full audit fix package for safer Apple wording, AI permission prompts, Food Diary fixes, iOS/web parity fixes, billing/credits wording, and removal of risky public screenshot assets.
