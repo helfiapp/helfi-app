@@ -72,6 +72,11 @@ export default function ImportRecipeClient() {
   const cameraInputRef = useRef<HTMLInputElement | null>(null)
   const libraryInputRef = useRef<HTMLInputElement | null>(null)
 
+  const switchMode = (nextMode: 'url' | 'photo') => {
+    setMode(nextMode)
+    setError(null)
+  }
+
   const addSelectedFiles = (incoming: File[]) => {
     if (!incoming.length) return
     setFiles((prev) => {
@@ -244,7 +249,7 @@ export default function ImportRecipeClient() {
         <div className="flex flex-wrap gap-2">
           <button
             type="button"
-            onClick={() => setMode('url')}
+            onClick={() => switchMode('url')}
             className={`px-3 py-2 text-sm font-semibold rounded-xl border ${
               mode === 'url'
                 ? 'bg-emerald-600 text-white border-emerald-600'
@@ -256,7 +261,7 @@ export default function ImportRecipeClient() {
           </button>
           <button
             type="button"
-            onClick={() => setMode('photo')}
+            onClick={() => switchMode('photo')}
             className={`px-3 py-2 text-sm font-semibold rounded-xl border ${
               mode === 'photo'
                 ? 'bg-emerald-600 text-white border-emerald-600'

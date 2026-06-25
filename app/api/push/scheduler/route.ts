@@ -12,6 +12,11 @@ export const dynamic = 'force-dynamic'
 // Ensure Node.js runtime (web-push requires Node, not Edge)
 export const runtime = 'nodejs'
 
+const redactHeaderValue = (key: string, value: string) => {
+  const sensitive = new Set(['authorization', 'cookie', 'set-cookie', 'x-native-token'])
+  return sensitive.has(key.toLowerCase()) && value ? '[REDACTED]' : value
+}
+
 // This endpoint is intended to be triggered by a cron (e.g., Vercel Cron) every 5 minutes.
 // It finds users whose reminder time matches the current time in their timezone and sends a push.
 
@@ -28,7 +33,7 @@ export async function POST(req: NextRequest) {
   // Also check all headers for debugging
   const allHeaders: Record<string, string> = {}
   req.headers.forEach((value, key) => {
-    allHeaders[key] = value
+    allHeaders[key] = redactHeaderValue(key, value)
   })
   
   // Log authentication attempt for debugging

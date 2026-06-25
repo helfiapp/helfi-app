@@ -58,19 +58,19 @@ export default function SymptomHistoryPage() {
       setHistoryError(null)
       const res = await fetch(`/api/symptoms/history/${id}`, { method: 'DELETE' })
       if (!res.ok) {
-        throw new Error('Failed to delete analysis')
+        throw new Error('Failed to delete symptom notes')
       }
       setHistoryItems((prev) => prev.filter((item) => item.id !== id))
       setExpandedHistoryId((prev) => (prev === id ? null : prev))
     } catch (err) {
-      setHistoryError((err as Error).message || 'Failed to delete analysis')
+      setHistoryError((err as Error).message || 'Failed to delete symptom notes')
     } finally {
       setHistoryDeletingId(null)
     }
   }
 
   const handleClearHistory = async () => {
-    if (!window.confirm('Clear all symptom analyses? This cannot be undone.')) return
+    if (!window.confirm('Clear all symptom notes? This cannot be undone.')) return
     try {
       setHistoryClearing(true)
       setHistoryError(null)
@@ -155,7 +155,7 @@ export default function SymptomHistoryPage() {
             {historyLoading && <div className="text-sm text-gray-500">Loading history...</div>}
             {historyError && <div className="text-sm text-red-700">{historyError}</div>}
             {!historyLoading && !historyError && historyItems.length === 0 && (
-              <div className="text-sm text-gray-500">No saved analyses yet.</div>
+              <div className="text-sm text-gray-500">No saved symptom notes yet.</div>
             )}
 
             <div className="mt-4 space-y-4">

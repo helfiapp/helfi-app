@@ -417,7 +417,7 @@ export default function AdminUserPage() {
                         <span className="font-semibold">{user.dailyInteractionAnalysisUsed || 0}</span>
                       </div>
                       <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2">
-                        <span>Symptom analysis</span>
+                        <span>Symptom notes</span>
                         <span className="font-semibold">{user.monthlySymptomAnalysisUsed || 0}</span>
                       </div>
                       <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2">

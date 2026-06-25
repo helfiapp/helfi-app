@@ -7,6 +7,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES, type NativeWebPageRoute } from '../config/nativePageRoutes'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { appleHealthConnectAndReadToday, isAppleHealthSupportedDevice } from '../health/appleHealth'
 import { Screen } from '../ui/Screen'
@@ -40,7 +41,7 @@ export function DashboardScreen() {
   }, [width])
   const appleHealthAvailable = isAppleHealthSupportedDevice()
 
-  const [creditsRemaining, setCreditsRemaining] = useState(0)
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null)
   const [creditsFillPct, setCreditsFillPct] = useState(0)
   const [hasPremiumPlan, setHasPremiumPlan] = useState(false)
   const [profileMenuOpen, setProfileMenuOpen] = useState(false)
@@ -63,8 +64,7 @@ export function DashboardScreen() {
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
     return {
-      authorization: `Bearer ${session.token}`,
-      'cache-control': 'no-store',
+      ...buildNativeAuthHeaders(session.token, { includeCookie: true }),
     }
   }, [mode, session?.token])
 
@@ -100,17 +100,14 @@ export function DashboardScreen() {
   const refreshCreditAndPlan = async () => {
     try {
       if (mode !== 'signedIn' || !session?.token) {
-        setCreditsRemaining(0)
+        setCreditsRemaining(null)
         setCreditsFillPct(0)
         setHasPremiumPlan(false)
         return
       }
 
       const res = await fetch(`${API_BASE_URL}/api/credit/status`, {
-        headers: {
-          authorization: `Bearer ${session.token}`,
-          'cache-control': 'no-store',
-        },
+        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
 
       const data: any = await res.json().catch(() => ({}))
@@ -139,10 +136,7 @@ export function DashboardScreen() {
       }
 
       const res = await fetch(`${API_BASE_URL}/api/native-account-status`, {
-        headers: {
-          authorization: `Bearer ${session.token}`,
-          'cache-control': 'no-store',
-        },
+        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
 
       const data: any = await res.json().catch(() => ({}))
@@ -828,7 +822,7 @@ export function DashboardScreen() {
             </View>
 
             <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>Credits remaining</Text>
-            <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>{creditsRemaining.toLocaleString()}</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>{creditsRemaining == null ? '—' : creditsRemaining.toLocaleString()}</Text>
           </View>
         </View>
 

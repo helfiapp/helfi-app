@@ -2837,8 +2837,15 @@ export function TrackCaloriesScreen() {
   )
 
   const deleteFoodEntry = useCallback(
-    async (entryId: string) => {
+    async (entryOrId: string | FoodEntry) => {
       if (!authHeaders) return false
+      const entry = typeof entryOrId === 'string' ? null : entryOrId
+      const entryId = String(typeof entryOrId === 'string' ? entryOrId : entryOrId?.id || '').trim()
+      if (!entryId) return false
+      const entryDescription = entry ? String(entry.description || entry.name || '').trim() : ''
+      const entryCategory = entry ? String(entry.meal || entry.category || '').trim() : ''
+      const entryLocalDate = entry?.localDate ? String(entry.localDate).slice(0, 10) : ''
+      const deleteDates = Array.from(new Set([selectedDate, entryLocalDate].filter((date) => /^\d{4}-\d{2}-\d{2}$/.test(date))))
 
       const tryDelete = async (path: string, body: any) => {
         const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -2850,14 +2857,18 @@ export function TrackCaloriesScreen() {
       }
 
       const okSimple = await tryDelete('/api/food-log/delete', { id: entryId })
-      if (okSimple) return true
+      if (okSimple && !entryDescription) return true
 
       const okAtomic = await tryDelete('/api/food-log/delete-atomic', {
         id: entryId,
+        description: entryDescription || undefined,
+        category: entryCategory || undefined,
         snapshotDate: selectedDate,
-        dates: [selectedDate],
+        dates: deleteDates.length > 0 ? deleteDates : [selectedDate],
       })
-      return okAtomic
+      if (okAtomic) return true
+
+      return okSimple
     },
     [authHeaders, selectedDate, session?.token],
   )
@@ -2914,7 +2925,7 @@ export function TrackCaloriesScreen() {
       editTarget,
     }
     removeFoodEntryLocally(entry.id)
-    const ok = await deleteFoodEntry(entry.id)
+    const ok = await deleteFoodEntry(entry)
     if (!ok) {
       restoreFoodEntryLocally(snapshot)
       Alert.alert('Delete failed', 'Could not delete this entry.')
@@ -3167,7 +3178,7 @@ export function TrackCaloriesScreen() {
       return
     }
 
-    const deleted = await deleteFoodEntry(entry.id)
+    const deleted = await deleteFoodEntry(entry)
     if (!deleted) {
       Alert.alert('Move partial', 'Copied the entry but could not remove the old one.')
       return
@@ -4555,6 +4566,22 @@ export function TrackCaloriesScreen() {
     setSectionMenuMeal(null)
   }
 
+  const openBuildMealTool = (meal: string) => {
+    navigateStackScreen('NativeWebTool', {
+      title: 'Build a meal',
+      path: `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(meal)}`,
+    })
+    setSectionMenuMeal(null)
+  }
+
+  const openImportRecipeTool = (meal: string) => {
+    navigateStackScreen('NativeWebTool', {
+      title: 'Import Recipe',
+      path: `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(meal)}`,
+    })
+    setSectionMenuMeal(null)
+  }
+
   const saveCombinedMeal = async () => {
     const chosen = entries.filter((entry) => combineIds.includes(entry.id))
     if (chosen.length < 2) {
@@ -4595,7 +4622,7 @@ export function TrackCaloriesScreen() {
     }
 
     for (const entry of chosen) {
-      await deleteFoodEntry(entry.id)
+      await deleteFoodEntry(entry)
     }
 
     const customFavorite: FavoriteMeal = {
@@ -4877,10 +4904,7 @@ export function TrackCaloriesScreen() {
     }
     if (action === 'Import Recipe') {
       closeAllAddMenus()
-      setIngredientTargetMeal(meal)
-      setCombineName('Imported Recipe')
-      setCombineIds([])
-      setCombineOpen(true)
+      openImportRecipeTool(meal)
       return
     }
     if (action === 'Recommended') {
@@ -4900,7 +4924,7 @@ export function TrackCaloriesScreen() {
     }
     if (action === 'Build a meal') {
       closeAllAddMenus()
-      openCombine(meal)
+      openBuildMealTool(meal)
       return
     }
     if (action === 'Log Water Intake') {
@@ -4972,14 +4996,11 @@ export function TrackCaloriesScreen() {
       return
     }
     if (action === 'openBuildMeal') {
-      openCombine(meal)
+      openBuildMealTool(meal)
       return
     }
     if (action === 'openImportRecipe') {
-      setIngredientTargetMeal(meal)
-      setCombineName('Imported Recipe')
-      setCombineIds([])
-      setCombineOpen(true)
+      openImportRecipeTool(meal)
       return
     }
     if (action === 'openExercise') {
@@ -7276,17 +7297,37 @@ export function TrackCaloriesScreen() {
               style={[inputStyle, { marginTop: 10 }]}
             />
             <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => void captureBarcodePhoto()} style={miniSecondaryButton}>
+              <Pressable
+                onPress={() => void captureBarcodePhoto()}
+                style={miniSecondaryButton}
+                accessibilityRole="button"
+                accessibilityLabel="Scan barcode with camera"
+              >
                 <Text style={miniSecondaryText}>Camera scan</Text>
               </Pressable>
-              <Pressable onPress={() => setBarcodeFlashOn((prev) => !prev)} style={miniSecondaryButton}>
+              <Pressable
+                onPress={() => setBarcodeFlashOn((prev) => !prev)}
+                style={miniSecondaryButton}
+                accessibilityRole="button"
+                accessibilityLabel={barcodeFlashOn ? 'Turn barcode flash off' : 'Turn barcode flash on'}
+              >
                 <Text style={miniSecondaryText}>Flash: {barcodeFlashOn ? 'On' : 'Off'}</Text>
               </Pressable>
             </View>
-            <Pressable onPress={() => void lookupBarcode()} style={[primaryButton, { marginTop: 8 }]}>
+            <Pressable
+              onPress={() => void lookupBarcode()}
+              style={[primaryButton, { marginTop: 8 }]}
+              accessibilityRole="button"
+              accessibilityLabel={barcodeLoading ? 'Searching for barcode' : 'Lookup barcode'}
+            >
               <Text style={primaryButtonText}>{barcodeLoading ? 'Searching...' : 'Lookup barcode'}</Text>
             </Pressable>
-            <Pressable onPress={() => setBarcodeLabelOpen(true)} style={[secondaryButton, { marginTop: 8 }]}>
+            <Pressable
+              onPress={() => setBarcodeLabelOpen(true)}
+              style={[secondaryButton, { marginTop: 8 }]}
+              accessibilityRole="button"
+              accessibilityLabel="Capture missing barcode label details"
+            >
               <Text style={secondaryButtonText}>Missing label? Capture details</Text>
             </Pressable>
 
@@ -7296,13 +7337,23 @@ export function TrackCaloriesScreen() {
                 <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
                   {formatCalories(numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal), energyUnit)} • P {round1(numberOrZero(barcodeFood.protein_g))}g • C {round1(numberOrZero(barcodeFood.carbs_g))}g • F {round1(numberOrZero(barcodeFood.fat_g))}g
                 </Text>
-                <Pressable onPress={() => void addBarcodeFood()} style={[primaryButton, { marginTop: 8 }]}> 
+                <Pressable
+                  onPress={() => void addBarcodeFood()}
+                  style={[primaryButton, { marginTop: 8 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={barcodeUsageMode === 'editor' ? 'Add barcode ingredient' : 'Add barcode food to diary'}
+                >
                   <Text style={primaryButtonText}>{barcodeUsageMode === 'editor' ? 'Add ingredient' : 'Add to diary'}</Text>
                 </Pressable>
               </View>
             ) : null}
 
-            <Pressable onPress={() => setBarcodeOpen(false)} style={modalCancelButton}>
+            <Pressable
+              onPress={() => setBarcodeOpen(false)}
+              style={modalCancelButton}
+              accessibilityRole="button"
+              accessibilityLabel="Close barcode scanner"
+            >
               <Text style={modalCancelText}>Close</Text>
             </Pressable>
           </View>
@@ -7369,22 +7420,49 @@ export function TrackCaloriesScreen() {
             </Text>
 
             <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => setRecommendedTab('ingredients')} style={[chip, recommendedTab === 'ingredients' && chipActive]}>
+              <Pressable
+                onPress={() => setRecommendedTab('ingredients')}
+                style={[chip, recommendedTab === 'ingredients' && chipActive]}
+                accessibilityRole="button"
+                accessibilityLabel="Show recommended meal ingredients"
+              >
                 <Text style={[chipText, recommendedTab === 'ingredients' && chipTextActive]}>Ingredients</Text>
               </Pressable>
-              <Pressable onPress={() => setRecommendedTab('recipe')} style={[chip, recommendedTab === 'recipe' && chipActive]}>
+              <Pressable
+                onPress={() => setRecommendedTab('recipe')}
+                style={[chip, recommendedTab === 'recipe' && chipActive]}
+                accessibilityRole="button"
+                accessibilityLabel="Show recommended meal recipe"
+              >
                 <Text style={[chipText, recommendedTab === 'recipe' && chipTextActive]}>Recipe</Text>
               </Pressable>
-              <Pressable onPress={() => setRecommendedTab('reason')} style={[chip, recommendedTab === 'reason' && chipActive]}>
+              <Pressable
+                onPress={() => setRecommendedTab('reason')}
+                style={[chip, recommendedTab === 'reason' && chipActive]}
+                accessibilityRole="button"
+                accessibilityLabel="Show recommended meal reason"
+              >
                 <Text style={[chipText, recommendedTab === 'reason' && chipTextActive]}>Reason</Text>
               </Pressable>
             </View>
 
             <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => void generateRecommended()} disabled={recommendedLoading} style={[primaryButton, recommendedLoading && { opacity: 0.7 }]}>
+              <Pressable
+                onPress={() => void generateRecommended()}
+                disabled={recommendedLoading}
+                style={[primaryButton, recommendedLoading && { opacity: 0.7 }]}
+                accessibilityRole="button"
+                accessibilityLabel={recommendedLoading ? 'Generating recommended meal' : 'Generate recommended meal'}
+              >
                 <Text style={primaryButtonText}>{recommendedLoading ? 'Generating...' : 'Generate / Regenerate'}</Text>
               </Pressable>
-              <Pressable onPress={() => void addRecommendedToDiary()} disabled={!recommendedMeal} style={[secondaryButton, !recommendedMeal && { opacity: 0.5 }]}>
+              <Pressable
+                onPress={() => void addRecommendedToDiary()}
+                disabled={!recommendedMeal}
+                style={[secondaryButton, !recommendedMeal && { opacity: 0.5 }]}
+                accessibilityRole="button"
+                accessibilityLabel="Add recommended meal to diary"
+              >
                 <Text style={secondaryButtonText}>Add to diary</Text>
               </Pressable>
             </View>
@@ -7457,7 +7535,12 @@ export function TrackCaloriesScreen() {
               </ScrollView>
             </View>
 
-            <Pressable onPress={() => setRecommendedOpen(false)} style={modalCancelButton}>
+            <Pressable
+              onPress={() => setRecommendedOpen(false)}
+              style={modalCancelButton}
+              accessibilityRole="button"
+              accessibilityLabel="Close recommended meal"
+            >
               <Text style={modalCancelText}>Close</Text>
             </Pressable>
           </View>
@@ -7556,10 +7639,20 @@ export function TrackCaloriesScreen() {
             </ScrollView>
 
             <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => void saveCombinedMeal()} style={primaryButton}>
+              <Pressable
+                onPress={() => void saveCombinedMeal()}
+                style={primaryButton}
+                accessibilityRole="button"
+                accessibilityLabel="Save combined meal"
+              >
                 <Text style={primaryButtonText}>Save combined meal</Text>
               </Pressable>
-              <Pressable onPress={() => setCombineOpen(false)} style={secondaryButton}>
+              <Pressable
+                onPress={() => setCombineOpen(false)}
+                style={secondaryButton}
+                accessibilityRole="button"
+                accessibilityLabel="Cancel build meal"
+              >
                 <Text style={secondaryButtonText}>Cancel</Text>
               </Pressable>
             </View>

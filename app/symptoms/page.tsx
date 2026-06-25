@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
+import AiConsentModal, { hasSavedAiConsent, saveAiConsent } from '@/components/AiConsentModal'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import SymptomChat from './SymptomChat'
 import UsageMeter from '@/components/UsageMeter'
@@ -45,6 +46,7 @@ export default function SymptomAnalysisPage() {
   const [hasPaidAccess, setHasPaidAccess] = useState<boolean>(false)
   const [creditRefreshTick, setCreditRefreshTick] = useState<number>(0)
   const [voicePrefillParams, setVoicePrefillParams] = useState({ symptoms: '', duration: '', notes: '' })
+  const [showAiConsent, setShowAiConsent] = useState<boolean>(false)
 
   // Progress phases shown while analyzing
   const phases = useMemo(() => [
@@ -153,14 +155,9 @@ export default function SymptomAnalysisPage() {
     setSelectedSymptoms((prev) => prev.filter((s) => s !== symptom))
   }
 
-  const handleAnalyze = async () => {
+  const runSymptomNotes = async () => {
     setError('')
     setResult(null)
-    const hasAny = selectedSymptoms.length > 0
-    if (!hasAny) {
-      setError('Please enter at least one symptom.')
-      return
-    }
     setIsAnalyzing(true)
     try {
       const res = await fetch('/api/analyze-symptoms', {
@@ -201,6 +198,27 @@ export default function SymptomAnalysisPage() {
     }
   }
 
+  const handleAnalyze = async () => {
+    const hasAny = selectedSymptoms.length > 0
+    if (!hasAny) {
+      setError('Please enter at least one symptom.')
+      return
+    }
+
+    if (!hasSavedAiConsent()) {
+      setShowAiConsent(true)
+      return
+    }
+
+    await runSymptomNotes()
+  }
+
+  const handleAiConsentAgree = () => {
+    saveAiConsent()
+    setShowAiConsent(false)
+    void runSymptomNotes()
+  }
+
   useEffect(() => {
     if (!result) return
     const el = resultRef.current
@@ -213,6 +231,11 @@ export default function SymptomAnalysisPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <PageHeader title="Symptom Notes" />
+      <AiConsentModal
+        open={showAiConsent}
+        onAgree={handleAiConsentAgree}
+        onCancel={() => setShowAiConsent(false)}
+      />
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
@@ -361,10 +384,10 @@ export default function SymptomAnalysisPage() {
               {isAnalyzing ? 'Creating notes...' : 'Create symptom notes'}
             </button>
             <div className="mt-2">
-              <p className="text-xs text-gray-500 mb-2">Cost: 1 credit per analysis</p>
+              <p className="text-xs text-gray-500 mb-2">Cost: 1 credit per symptom notes request</p>
               {!hasPaidAccess && (
                 <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
-                  Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                  Free accounts can try this AI feature once. After your free symptom notes request, upgrade or buy credits to continue.
                 </div>
               )}
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="symptomAnalysis" />

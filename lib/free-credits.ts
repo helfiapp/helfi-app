@@ -5,8 +5,8 @@ import { prisma } from '@/lib/prisma';
  * 
  * New users receive:
  * - 5 x Food image analysis
- * - 2 x Symptom analysis
- * - 2 x Medical image analysis
+ * - 2 x Symptom notes
+ * - 2 x Health image notes
  * - 2 x Supplement/Medication interaction analysis
  * - 1 x Full Health intake analysis (when completing onboarding page 11)
  * - 3 x Insights updates (when changing health setup)

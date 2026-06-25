@@ -336,8 +336,8 @@ export const featurePages: FeaturePageContent[] = [
     ],
     summary: 'Weekly reports and focused insights built from your last 7 days.',
     heroImage: aiInsightsPhoto(
-      '/WEBSITE IMAGES/AI INSIGHTS/AI DOCTOR.jpg',
-      'AI doctor discussing health insights with a patient'
+      '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS BANNER.png',
+      'AI health insights overview'
     ),
     bannerImage: aiInsightsPhoto(
       '/WEBSITE IMAGES/AI INSIGHTS/AI INSIGHTS BANNER.png',
@@ -1293,20 +1293,20 @@ export const featurePages: FeaturePageContent[] = [
   },
   {
     slug: 'medical-imaging',
-    title: 'Medical Image Analysis',
+    title: 'Health Image Notes',
     subtitle: 'Store images and keep structured summaries you can revisit.',
     intro:
-      'Upload medical images to keep them organized and pair them with notes for follow-ups.',
+      'Upload health-related images to keep them organized and pair them with notes for follow-ups.',
     overview: [
-      'Medical images can be scattered across different providers and portals. Helfi keeps them in one place.',
+      'Health-related images can be scattered across different providers and portals. Helfi keeps them in one place.',
       'Structured summaries help you remember what was discussed so you can prepare for future visits.',
       'The goal is to keep your imaging history visible alongside the rest of your health timeline.',
-      'This medical image analysis workspace keeps your scans and notes organized and easy to revisit.',
+      'This health image notes workspace keeps your scans and notes organized and easy to revisit.',
     ],
-    summary: 'Centralize medical images with AI-assisted summaries.',
+    summary: 'Centralize health-related images with AI-assisted notes.',
     heroImage: {
       src: '/screenshots/hero/HEALTH ISSUES.png',
-      alt: 'Medical imaging summary on a phone',
+      alt: 'Health image notes summary on a phone',
     },
     primaryCta,
     secondaryCta,
@@ -1439,9 +1439,9 @@ export const featurePages: FeaturePageContent[] = [
       },
     ],
     seo: {
-      title: 'Medical Image Analysis',
+      title: 'Health Image Notes',
       description:
-        'Store medical images, add context, and keep structured summaries in one place.',
+        'Store health-related images, add context, and keep structured notes in one place.',
     },
   },
   {
@@ -1458,7 +1458,7 @@ export const featurePages: FeaturePageContent[] = [
     ],
     summary: 'Track symptoms and connect them to nutrition, sleep, and routines.',
     heroImage: {
-      src: '/screenshots/hero/SYMPTOM ANALYZER.png',
+      src: '/screenshots/hero/HEALTH ISSUES.png',
       alt: 'Symptom tracking on a phone',
     },
     primaryCta,
@@ -1523,7 +1523,7 @@ export const featurePages: FeaturePageContent[] = [
           'Works alongside check-ins',
         ],
         image: {
-          src: '/screenshots/hero/SYMPTOM ANALYZER.png',
+          src: '/screenshots/hero/HEALTH ISSUES.png',
           alt: 'Symptom log entry screen',
         },
       },

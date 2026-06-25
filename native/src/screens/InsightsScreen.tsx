@@ -13,6 +13,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -31,6 +32,19 @@ type SectionKey =
   | 'mood'
   | 'symptoms'
 type DetailBucket = 'working' | 'suggested' | 'avoid'
+
+type IssueSummary = {
+  id: string
+  slug: string
+  name: string
+  severityLabel: string
+  currentRating: number | null
+  ratingScaleMax: number | null
+  lastUpdated: string | null
+  highlight: string
+  blockers: string[]
+  status: 'needs-data' | 'focus' | 'monitor' | 'on-track'
+}
 
 type WeeklyReportRecord = {
   id: string
@@ -379,6 +393,13 @@ function InfoItem({ title, body, tone = 'white' }: { title: string; body?: strin
   )
 }
 
+function issueStatusColors(status?: IssueSummary['status']) {
+  if (status === 'focus') return { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', color: '#92400E' }
+  if (status === 'monitor') return { backgroundColor: '#EFF8FF', borderColor: '#BDE3FF', color: '#075985' }
+  if (status === 'on-track') return { backgroundColor: '#ECFDF3', borderColor: '#BFEAD0', color: '#047857' }
+  return { backgroundColor: '#F3F4F6', borderColor: '#E5E7EB', color: '#4B5563' }
+}
+
 function SectionBucketPanel({
   title,
   bucket,
@@ -523,6 +544,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
   const [error, setError] = useState('')
   const [healthSetupComplete, setHealthSetupComplete] = useState<boolean | null>(null)
   const [weeklyStatus, setWeeklyStatus] = useState<any>(null)
+  const [issues, setIssues] = useState<IssueSummary[]>([])
   const [reports, setReports] = useState<WeeklyReportRecord[]>([])
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [reportNav, setReportNav] = useState<ReportNavKey>('summary')
@@ -548,11 +570,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
 
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
-    return {
-      authorization: `Bearer ${session.token}`,
-      'x-native-token': session.token,
-      'cache-control': 'no-store',
-    }
+    return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [mode, session?.token])
 
   const selectedReport = useMemo(() => {
@@ -567,6 +585,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         setLoading(false)
         setHealthSetupComplete(false)
         setWeeklyStatus(null)
+        setIssues([])
         setReports([])
         return
       }
@@ -581,22 +600,28 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         setHealthSetupComplete(complete)
         if (!complete) {
           setWeeklyStatus(null)
+          setIssues([])
           setReports([])
           setSelectedReportId(null)
           return
         }
 
-        const [statusRes, listRes] = await Promise.all([
+        const [statusRes, listRes, issuesRes] = await Promise.all([
           fetch(`${API_BASE_URL}/api/reports/weekly/status`, { headers: authHeaders }),
           fetch(`${API_BASE_URL}/api/reports/weekly/list?preview=1`, { headers: authHeaders }),
+          fetch(`${API_BASE_URL}/api/insights/issues`, { headers: authHeaders }),
         ])
         const statusData = await statusRes.json().catch(() => ({}))
         const listData = await listRes.json().catch(() => ({}))
+        const issuesData = await issuesRes.json().catch(() => ({}))
         if (!statusRes.ok) throw new Error(statusData?.error || 'Could not load weekly report status.')
         if (!listRes.ok) throw new Error(listData?.error || 'Could not load weekly reports.')
+        if (!issuesRes.ok) throw new Error(issuesData?.error || 'Could not load tracked issues.')
         const nextReports = Array.isArray(listData?.reports) ? listData.reports : []
+        const nextIssues = Array.isArray(issuesData?.issues) ? issuesData.issues : []
         setWeeklyStatus(statusData)
         setReports(nextReports)
+        setIssues(nextIssues)
       } catch (err: any) {
         setError(String(err?.message || 'Could not load Insights. Please try again.'))
       } finally {
@@ -728,6 +753,14 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         body: JSON.stringify({ reportId: id, action: 'viewed' }),
       }).catch(() => {})
     }
+  }
+
+  const openIssue = (issue: IssueSummary) => {
+    if (!issue?.slug) return
+    goToStackScreen('NativeWebTool', {
+      title: issue.name || 'Insight',
+      path: `/insights/issues/${issue.slug}`,
+    })
   }
 
   const openPdf = async () => {
@@ -906,7 +939,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     { label: 'Symptoms', value: Number(coverage?.symptomCount ?? 0) || 0 },
     { label: 'Exercise', value: Number(coverage?.exerciseCount ?? 0) || 0 },
     { label: 'Journal notes', value: Number(coverage?.journalCount ?? 0) || 0 },
-    { label: 'Medical scans', value: Number(coverage?.medicalImageCount ?? 0) || 0 },
+    { label: 'Health image notes', value: Number(coverage?.medicalImageCount ?? 0) || 0 },
     { label: 'Lab uploads', value: Number(coverage?.labCount ?? 0) || 0 },
     { label: 'AI chats', value: Number(coverage?.talkToAiCount ?? 0) || 0 },
   ]
@@ -1130,6 +1163,58 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           {displayNextReportDueAt ? <Text style={{ color: theme.colors.muted, marginTop: 10 }}>Next report due: {formatDateForLocale(displayNextReportDueAt)}</Text> : null}
         </Card>
       )}
+
+      {issues.length === 0 ? (
+        <Card>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>No health issues tracked yet</Text>
+          <Text style={{ color: theme.colors.muted, marginTop: 6, lineHeight: 20 }}>Add issues through Health Intake or Health Tracking so Helfi can generate focused insights for you.</Text>
+        </Card>
+      ) : (
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border, flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+            <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Tracked issues</Text>
+            <Text style={{ color: theme.colors.muted, fontSize: 11, fontWeight: '900', textTransform: 'uppercase' }}>Tap to open workspace</Text>
+          </View>
+          {issues.map((issue, index) => {
+            const colors = issueStatusColors(issue.status)
+            const ratingText = issue.currentRating !== null ? `${issue.currentRating}/${issue.ratingScaleMax ?? 6}` : null
+            return (
+              <Pressable
+                key={issue.id || issue.slug}
+                onPress={() => openIssue(issue)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open ${issue.name} workspace`}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.86 : 1,
+                  padding: 14,
+                  borderTopWidth: index === 0 ? 0 : 1,
+                  borderTopColor: theme.colors.border,
+                  backgroundColor: '#FFFFFF',
+                })}
+              >
+                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
+                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#ECFDF3', alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name="zap" size={17} color={theme.colors.primary} />
+                  </View>
+                  <View style={{ flex: 1, gap: 6 }}>
+                    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, alignItems: 'center' }}>
+                      <View style={{ borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.backgroundColor, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8 }}>
+                        <Text style={{ color: colors.color, fontSize: 11, fontWeight: '900' }}>{issue.severityLabel || 'Needs data'}</Text>
+                      </View>
+                      {ratingText ? <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800' }}>{ratingText}</Text> : null}
+                    </View>
+                    <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '900' }}>{issue.name}</Text>
+                    <Text style={{ color: theme.colors.muted, lineHeight: 19, fontSize: 13 }}>{issue.highlight || 'Open the workspace to see personalised guidance.'}</Text>
+                    {issue.lastUpdated ? <Text style={{ color: '#9CA3AF', fontSize: 12 }}>Last updated {formatDateForLocale(issue.lastUpdated)}</Text> : null}
+                    {issue.blockers?.length ? <Text style={{ color: '#B45309', fontSize: 12, lineHeight: 17 }}>Next step: {issue.blockers[0]}</Text> : null}
+                  </View>
+                  <Feather name="chevron-right" size={21} color={theme.colors.muted} />
+                </View>
+              </Pressable>
+            )
+          })}
+        </Card>
+      )}
     </View>
   )
 
@@ -1290,7 +1375,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
       {medicalImageSummary?.entries ? (
         <Card tone="sky">
           <Text style={{ color: '#075985', fontSize: 18, fontWeight: '900' }}>Health image notes</Text>
-          <Text style={{ color: '#075985', marginTop: 5 }}>{medicalImageSummary.entries} saved image-note scan{medicalImageSummary.entries === 1 ? '' : 's'}{medicalImageSummary.daysWithScans ? ` across ${medicalImageSummary.daysWithScans} days` : ''}.</Text>
+          <Text style={{ color: '#075985', marginTop: 5 }}>{medicalImageSummary.entries} saved image note{medicalImageSummary.entries === 1 ? '' : 's'}{medicalImageSummary.daysWithScans ? ` across ${medicalImageSummary.daysWithScans} days` : ''}.</Text>
           <View style={{ gap: 8, marginTop: 10 }}>
             {medicalHighlights.slice(0, 3).map((item: any, idx: number) => <InfoItem key={`medical-${idx}`} title={item.summary || 'Saved health image note'} body={(item.nextSteps || []).slice(0, 2).join('\n')} />)}
           </View>

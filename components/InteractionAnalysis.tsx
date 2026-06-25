@@ -84,10 +84,10 @@ const InteractionAnalysis: React.FC<InteractionAnalysisProps> = ({
       {/* Header */}
       <div className="mb-8">
         <h2 className="text-2xl font-bold text-gray-900 mb-2">
-          Interaction Analysis Results
+          Interaction Check Results
         </h2>
         <p className="text-gray-600">
-          Analysis of {analysis.supplementCount} supplements and {analysis.medicationCount} medications
+          Check of {analysis.supplementCount} supplements and {analysis.medicationCount} medications
         </p>
       </div>
 
@@ -97,10 +97,10 @@ const InteractionAnalysis: React.FC<InteractionAnalysisProps> = ({
           <span className="text-2xl">{getRiskIcon(analysis.overallRisk)}</span>
           <div>
             <h3 className="text-lg font-semibold">
-              Overall Risk: {getRiskText(analysis.overallRisk)}
+              Caution level: {getRiskText(analysis.overallRisk)}
             </h3>
             <p className="text-sm opacity-80">
-              Based on analysis of all supplement and medication combinations
+              Based on this supplement and medication check
             </p>
           </div>
         </div>
@@ -160,12 +160,12 @@ const InteractionAnalysis: React.FC<InteractionAnalysisProps> = ({
                         <p className="text-sm mt-1">{interaction.description}</p>
                       </div>
                       <div>
-                        <h5 className="font-medium text-sm uppercase tracking-wide opacity-80">Recommendation</h5>
+                        <h5 className="font-medium text-sm uppercase tracking-wide opacity-80">Discussion note</h5>
                         <p className="text-sm mt-1">{interaction.recommendation}</p>
                       </div>
                       {interaction.timingAdjustment && interaction.timingAdjustment !== 'No adjustment needed' && (
                         <div>
-                          <h5 className="font-medium text-sm uppercase tracking-wide opacity-80">Timing Adjustment</h5>
+                          <h5 className="font-medium text-sm uppercase tracking-wide opacity-80">Timing notes</h5>
                           <p className="text-sm mt-1">{interaction.timingAdjustment}</p>
                         </div>
                       )}
@@ -180,7 +180,7 @@ const InteractionAnalysis: React.FC<InteractionAnalysisProps> = ({
 
       {/* Timing Optimization */}
       <div className="mb-8">
-        <h3 className="text-xl font-semibold mb-4">Optimal Timing Schedule</h3>
+        <h3 className="text-xl font-semibold mb-4">Timing Notes</h3>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
           {Object.entries(analysis.timingOptimization).map(([timing, substances]) => (
             <div key={timing} className="bg-gray-50 rounded-lg p-4">
@@ -209,7 +209,7 @@ const InteractionAnalysis: React.FC<InteractionAnalysisProps> = ({
       {/* General Recommendations */}
       {analysis.generalRecommendations.length > 0 && (
         <div className="mb-8">
-          <h3 className="text-xl font-semibold mb-4">General Recommendations</h3>
+          <h3 className="text-xl font-semibold mb-4">General Discussion Notes</h3>
           <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
             <ul className="space-y-2">
               {analysis.generalRecommendations.map((recommendation, index) => (
@@ -267,4 +267,4 @@ const InteractionAnalysis: React.FC<InteractionAnalysisProps> = ({
   );
 };
 
-export default InteractionAnalysis; 
+export default InteractionAnalysis;

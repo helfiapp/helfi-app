@@ -7,6 +7,7 @@ import { useSession, signOut } from 'next-auth/react'
 import Image from 'next/image'
 import Link from 'next/link'
 import { formatChatContent } from '@/lib/chatFormatting'
+import AiConsentModal, { hasSavedAiConsent, saveAiConsent } from '@/components/AiConsentModal'
 import UsageMeter from '@/components/UsageMeter'
 import PractitionerRecommendations from '@/components/PractitionerRecommendations'
 import { useUserData } from '@/components/providers/UserDataProvider'
@@ -908,6 +909,7 @@ export default function VoiceChat({
   const [selectedThreadIds, setSelectedThreadIds] = useState<string[]>([])
   const [bulkActionPending, setBulkActionPending] = useState(false)
   const [openingFoodOptionKey, setOpeningFoodOptionKey] = useState<string | null>(null)
+  const [showAiConsent, setShowAiConsent] = useState(false)
   const photoInputRef = useRef<HTMLInputElement | null>(null)
   const barcodeVideoRef = useRef<HTMLVideoElement | null>(null)
   const barcodeScannerRef = useRef<{ reader: any; controls: any } | null>(null)
@@ -916,6 +918,10 @@ export default function VoiceChat({
   const sendChatMessageRef = useRef<
     ((messageText: string, options?: { foodContextOverride?: string }) => Promise<void> | void) | null
   >(null)
+  const pendingAiSendRef = useRef<{
+    messageText: string
+    options?: { foodContextOverride?: string }
+  } | null>(null)
   const [dynamicExampleQuestions, setDynamicExampleQuestions] = useState<string[] | null>(null)
   const storageKey = useMemo(() => `helfi:chat:talk:${entryContext}`, [entryContext])
   const archivedKey = useMemo(() => `helfi:chat:talk:${entryContext}:archived`, [entryContext])
@@ -2015,6 +2021,12 @@ export default function VoiceChat({
       return
     }
 
+    if (!hasSavedAiConsent()) {
+      pendingAiSendRef.current = { messageText, options }
+      setShowAiConsent(true)
+      return
+    }
+
     if (pendingPhotos.length > 0) {
       await sendFridgePhoto(text)
       return
@@ -2384,6 +2396,22 @@ export default function VoiceChat({
   useEffect(() => {
     sendChatMessageRef.current = sendChatMessage
   }, [sendChatMessage])
+
+  const handleAiConsentAgree = () => {
+    saveAiConsent()
+    setShowAiConsent(false)
+    const pending = pendingAiSendRef.current
+    pendingAiSendRef.current = null
+    if (pending) {
+      void sendChatMessageRef.current?.(pending.messageText, pending.options)
+    }
+  }
+
+  const handleAiConsentCancel = () => {
+    pendingAiSendRef.current = null
+    setShowAiConsent(false)
+    setError('AI request not sent. No data was sent.')
+  }
 
   // PROTECTED: FOOD_CHAT_BUILD_MEAL_HANDOFF START
   const openFoodOptionInMealBuilder = (option: ParsedFoodOption) => {
@@ -2910,6 +2938,11 @@ export default function VoiceChat({
 
   const chatUI = (
     <div className={wrapperClass} style={expanded ? { paddingTop: 'env(safe-area-inset-top, 0px)' } : undefined}>
+      <AiConsentModal
+        open={showAiConsent}
+        onAgree={handleAiConsentAgree}
+        onCancel={handleAiConsentCancel}
+      />
       <header className="sticky top-0 z-30 flex items-center justify-between bg-[#f6f8f7]/95 backdrop-blur px-4 py-3 border-b border-gray-200/60">
         <div className="flex items-center gap-2">
           <button

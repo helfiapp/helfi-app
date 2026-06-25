@@ -908,7 +908,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
     { label: 'Symptoms', value: coverage?.symptomCount ?? 0 },
     { label: 'Exercise', value: coverage?.exerciseCount ?? 0 },
     { label: 'Journal notes', value: coverage?.journalCount ?? 0 },
-    { label: 'Medical scans', value: coverage?.medicalImageCount ?? 0 },
+    { label: 'Health image notes', value: coverage?.medicalImageCount ?? 0 },
     { label: 'Lab uploads', value: coverage?.labCount ?? 0 },
     { label: 'AI chats', value: coverage?.talkToAiCount ?? 0 },
   ]
@@ -1311,7 +1311,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           <div className="mt-6 rounded-2xl border border-sky-100 bg-sky-50/40 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-sky-900">Health image notes</h2>
             <p className="text-sm text-sky-800 mt-2">
-              {medicalImageSummary.entries} saved image-note scan{medicalImageSummary.entries === 1 ? '' : 's'}
+              {medicalImageSummary.entries} saved image note{medicalImageSummary.entries === 1 ? '' : 's'}
               {medicalImageSummary.daysWithScans ? ` across ${medicalImageSummary.daysWithScans} days` : ''}.
             </p>
             {Array.isArray(medicalImageSummary.highlights) && medicalImageSummary.highlights.length > 0 ? (
@@ -1319,10 +1319,10 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                 {medicalImageSummary.highlights.slice(0, 3).map((item, idx) => (
                   <div key={`medical-image-${idx}`} className="rounded-xl border border-sky-100 bg-white p-4">
                     <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-                      {[item.date, item.time].filter(Boolean).join(' • ') || 'Saved scan'}
+                      {[item.date, item.time].filter(Boolean).join(' • ') || 'Saved image note'}
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-900">
-                      {replaceIsoDates(item.summary || 'Saved medical image scan')}
+                      {replaceIsoDates(item.summary || 'Saved health image note')}
                     </div>
                     {Array.isArray(item.possibleCauses) && item.possibleCauses.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">

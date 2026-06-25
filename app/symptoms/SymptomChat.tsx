@@ -831,14 +831,14 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
                 <div className="flex flex-col items-center justify-center text-center">
                   <h1 className="text-2xl font-bold tracking-tight text-gray-900">Need more detail?</h1>
                   <p className="mt-2 text-sm text-gray-500">
-                    Ask about causes, red flags, or next steps.
+                    Ask about patterns to track, doctor questions, or when to seek care.
                   </p>
                   <div className="mt-6 grid w-full max-w-md gap-3">
                     {[
-                      'What should I do about these red flags?',
-                      'Can you explain these likely causes in more detail?',
+                      'What patterns should I track?',
+                      'What questions should I ask a doctor?',
                       'When should I see a doctor?',
-                      'What lifestyle changes can help?',
+                      'What everyday notes should I write down?',
                     ].map((q) => (
                       <button
                         key={q}
@@ -867,7 +867,7 @@ export default function SymptomChat({ analysisResult, symptoms, duration, notes 
                   <div className={`${m.role === 'user' ? 'max-w-[85%] text-right' : 'flex-1'}`}>
                     {m.role === 'assistant' ? (
                       <div className="space-y-2 rounded-2xl border border-gray-200 bg-gray-100 px-6 py-5 shadow-sm">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Symptom analysis</div>
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Symptom notes</div>
                         <div className="text-[16px] md:text-[15px] leading-7 text-gray-800">
                           {formatChatContent(m.content).split('\n').map((line, lineIdx) => {
                             const trimmed = line.trim()

@@ -171,7 +171,7 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
       { label: 'Symptoms', value: Number(c.symptomCount ?? 0) || 0 },
       { label: 'Exercise', value: Number(c.exerciseCount ?? 0) || 0 },
       { label: 'Journal notes', value: Number(c.journalCount ?? 0) || 0 },
-      { label: 'Medical scans', value: Number(c.medicalImageCount ?? 0) || 0 },
+      { label: 'Health image notes', value: Number(c.medicalImageCount ?? 0) || 0 },
       { label: 'Lab uploads', value: Number(c.labCount ?? 0) || 0 },
       { label: 'AI chats', value: Number(c.talkToAiCount ?? 0) || 0 },
     ]
@@ -326,7 +326,7 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
           <div className="mt-8 rounded-2xl border border-sky-100 bg-sky-50/40 p-6 print-avoid-break">
             <h2 className="text-lg font-semibold text-sky-900">Health image notes</h2>
             <p className="mt-2 text-sm text-sky-800">
-              {Number(medicalImageSummary?.entries ?? 0) || 0} saved image-note scans
+              {Number(medicalImageSummary?.entries ?? 0) || 0} saved image notes
               {Number(medicalImageSummary?.daysWithScans ?? 0) > 0 ? ` across ${Number(medicalImageSummary?.daysWithScans ?? 0)} days` : ''}.
             </p>
             {Array.isArray(medicalImageSummary?.highlights) && medicalImageSummary.highlights.length > 0 ? (
@@ -334,10 +334,10 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
                 {medicalImageSummary.highlights.slice(0, 4).map((item: any, idx: number) => (
                   <div key={`medical-${idx}`} className="rounded-xl border border-sky-100 bg-white p-4 print-avoid-break">
                     <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
-                      {[item?.date, item?.time].filter(Boolean).join(' • ') || 'Saved scan'}
+                      {[item?.date, item?.time].filter(Boolean).join(' • ') || 'Saved image note'}
                     </div>
                     <div className="mt-2 text-sm font-semibold text-slate-900">
-                      {replaceIsoDates(String(item?.summary || 'Saved medical image scan'))}
+                      {replaceIsoDates(String(item?.summary || 'Saved health image note'))}
                     </div>
                     {Array.isArray(item?.possibleCauses) && item.possibleCauses.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">

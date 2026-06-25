@@ -778,7 +778,11 @@ export default function RecommendedMealClient() {
         }
       } catch {}
 
-      router.push('/food')
+      const qs = new URLSearchParams()
+      qs.set('date', date)
+      qs.set('refresh', '1')
+      qs.set('refreshAt', String(Date.now()))
+      router.push(`/food?${qs.toString()}`)
     } catch {
       setError('Saving failed. Please try again.')
     } finally {

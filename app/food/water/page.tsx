@@ -295,6 +295,8 @@ export default function WaterIntakePage() {
   const [showCustomUnitPicker, setShowCustomUnitPicker] = useState(false)
 
   const customUnitRef = useRef<HTMLDivElement | null>(null)
+  const savingRef = useRef(false)
+  const lastPresetRef = useRef<string | null>(null)
   const goalInputRef = useRef<HTMLInputElement | null>(null)
   // Guard rail: keep requestId gating so stale loads cannot overwrite the latest date (shows 0 ml on first open).
   // Restore by re-adding requestId ref + checks in loadEntries before setState and in finally.
@@ -442,6 +444,7 @@ export default function WaterIntakePage() {
   }, [showCustomUnitPicker])
 
   const addEntry = async (amount: number, unit: string, labelOverride?: string) => {
+    savingRef.current = true
     setSaving(true)
     setBanner(null)
     try {
@@ -485,6 +488,7 @@ export default function WaterIntakePage() {
       setBanner({ type: 'error', message: 'Could not save. Please try again.' })
       return null
     } finally {
+      savingRef.current = false
       setSaving(false)
     }
   }
@@ -577,12 +581,16 @@ export default function WaterIntakePage() {
     setDrinkDetailError(null)
   }
 
-  const closeDrinkDetail = () => {
-    if (drinkDetailSaving) return
+  const resetDrinkDetail = () => {
     setDrinkDetail(null)
     setDrinkSugarChoice(null)
     setDrinkSugarAmount('')
     setDrinkDetailError(null)
+  }
+
+  const closeDrinkDetail = () => {
+    if (drinkDetailSaving) return
+    resetDrinkDetail()
   }
 
   const addDrinkFoodLog = async ({
@@ -711,7 +719,7 @@ export default function WaterIntakePage() {
         drinkUnit: drinkDetail.unit,
         waterLogId: waterEntry.id,
       })
-      closeDrinkDetail()
+      resetDrinkDetail()
     } catch {
       setDrinkDetailError('Saved water intake, but could not create the drink entry. Please try again.')
     } finally {
@@ -750,7 +758,7 @@ export default function WaterIntakePage() {
         drinkUnit: drinkDetail.unit,
         waterLogId: waterEntry?.id,
       })
-      closeDrinkDetail()
+      resetDrinkDetail()
     } catch {
       setDrinkDetailError('Could not save this drink. Please try again.')
     } finally {
@@ -774,7 +782,6 @@ export default function WaterIntakePage() {
         return activeDrink
       })()
       const waterEntry = await addEntry(drinkDetail.amount, drinkDetail.unit, navigationLabel)
-      closeDrinkDetail()
       const category = sourceCategory || 'uncategorized'
       const amountParam = String(drinkDetail.amount)
       const unitParam = String(drinkDetail.unit || '')
@@ -800,6 +807,7 @@ export default function WaterIntakePage() {
           }
         }
       }
+      resetDrinkDetail()
       if (mode === 'photo') {
         const qs = new URLSearchParams({
           date: selectedDate,
@@ -855,7 +863,9 @@ export default function WaterIntakePage() {
   }
 
   const handleQuickAdd = (amount: number, unit: string) => {
-    setLastPresetKey(`${amount}-${unit}`)
+    const presetKey = `${amount}-${unit}`
+    lastPresetRef.current = presetKey
+    setLastPresetKey(presetKey)
     if (activeDrink === 'Water') {
       addEntry(amount, unit)
       return
@@ -864,11 +874,17 @@ export default function WaterIntakePage() {
   }
 
   const handleCustomAdd = () => {
+    if (savingRef.current) return
     const amount = Number(customAmountInput)
     if (!Number.isFinite(amount) || amount <= 0) {
+      if (lastPresetRef.current) {
+        setBanner(null)
+        return
+      }
       setBanner({ type: 'error', message: 'Enter a valid amount first.' })
       return
     }
+    lastPresetRef.current = null
     if (activeDrink === 'Water') {
       addEntry(amount, customUnit)
       setCustomAmountInput('')
@@ -1130,8 +1146,12 @@ export default function WaterIntakePage() {
                       min="0"
                       step="0.1"
                       value={customAmountInput}
-                      onChange={(e) => setCustomAmountInput(e.target.value)}
+                      onChange={(e) => {
+                        lastPresetRef.current = null
+                        setCustomAmountInput(e.target.value)
+                      }}
                       onFocus={(e) => {
+                        lastPresetRef.current = null
                         setCustomAmountInput('')
                         e.currentTarget.select()
                       }}

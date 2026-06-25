@@ -105,9 +105,9 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
           ),
         },
         {
-          label: 'Medical Imaging',
+          label: 'Health Image Notes',
           href: '/features/medical-imaging',
-          description: 'Interpretation of medical images.',
+          description: 'General notes for health images.',
           icon: (
             <svg className={iconClassName} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
               <rect x="3" y="4" width="18" height="14" rx="2" />

@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
       return NextResponse.json(
         {
           error: 'Payment required',
-          message: 'You\'ve used all your free symptom analyses. Subscribe to a monthly plan or purchase credits to continue.',
+          message: 'You\'ve used all your free symptom note uses. Subscribe to a monthly plan or purchase credits to continue.',
           requiresPayment: true,
           exhaustedFreeCredits: true,
         },

@@ -28,6 +28,9 @@ export function HelfiButton({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       style={({ pressed }) => [
         {
           paddingVertical: 14,
@@ -45,4 +48,3 @@ export function HelfiButton({
     </Pressable>
   )
 }
-

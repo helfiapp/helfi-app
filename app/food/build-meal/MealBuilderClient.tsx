@@ -5085,6 +5085,12 @@ export default function MealBuilderClient() {
     resetTorchState()
   }
 
+  const closeBarcodeScanner = () => {
+    stopBarcodeScanner()
+    resetBarcodeState()
+    setShowBarcodeScanner(false)
+  }
+
   const lookupBarcodeAndAdd = async (codeRaw: string) => {
     const code = String(codeRaw || '').trim().replace(/[^0-9A-Za-z]/g, '')
     if (!code) {
@@ -5156,7 +5162,7 @@ export default function MealBuilderClient() {
         fiber_g: toNumber(food.fiber_g),
         sugar_g: toNumber(food.sugar_g),
       }
-      setShowBarcodeScanner(false)
+      closeBarcodeScanner()
       setBarcodeStatus('idle')
       setBarcodeStatusHint('')
       addItemDirect(normalized)
@@ -6511,7 +6517,16 @@ export default function MealBuilderClient() {
               <div className="flex-shrink-0 flex items-center justify-between px-4 py-3 bg-white border-b border-gray-200">
                 <button
                   type="button"
-                  onClick={() => setShowBarcodeScanner(false)}
+                  onPointerDown={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    closeBarcodeScanner()
+                  }}
+                  onClick={(event) => {
+                    event.preventDefault()
+                    event.stopPropagation()
+                    closeBarcodeScanner()
+                  }}
                   className="w-10 h-10 flex items-center justify-center"
                   aria-label="Close scanner"
                 >
@@ -6631,6 +6646,17 @@ export default function MealBuilderClient() {
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h2m2 0h2m2 0h2m2 0h2M4 18h2m2 0h2m2 0h2m2 0h2M7 6v12m4-12v12m4-12v12" />
                     </svg>
                     <span className="text-sm uppercase tracking-wide">{showManualBarcodeInput ? 'Hide Input' : 'Type Barcode'}</span>
+                  </button>
+
+                  <button
+                    type="button"
+                    onClick={closeBarcodeScanner}
+                    className="flex items-center gap-2 text-gray-800 font-semibold"
+                  >
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                    <span className="text-sm uppercase tracking-wide">Close scanner</span>
                   </button>
                 </div>
               </div>

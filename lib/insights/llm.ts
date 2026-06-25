@@ -360,7 +360,7 @@ Requirements:
         {
           role: 'system',
           content:
-            'You are a careful clinical decision support assistant. Adjust prior guidance to meet explicit minimum requirements without omitting important safety details.',
+            'You are a careful health tracking assistant. Adjust prior guidance to meet explicit minimum requirements without omitting important safety details.',
         },
         {
           role: 'user',
@@ -825,7 +825,7 @@ Return JSON:
       messages: [
         {
           role: 'system',
-          content: 'You are a clinical decision support assistant. Analyze logged items by their mechanisms but ALWAYS output exact logged names. Output strict JSON only.',
+          content: 'You are a cautious health tracking assistant. Review logged items by their mechanisms but ALWAYS output exact logged names. Output strict JSON only.',
         },
         { role: 'user', content: prompt },
       ],
@@ -1253,7 +1253,7 @@ export async function generateSectionInsightsFromLLM(
           {
             role: 'system',
             content:
-              'You are a careful clinical decision support assistant. Follow instructions precisely, remain evidence-aligned, and never fabricate data.',
+              'You are a careful health tracking assistant. Follow instructions precisely, remain evidence-aligned, and never fabricate data.',
           },
           { role: 'user', content: prompt },
         ],

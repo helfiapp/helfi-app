@@ -36,11 +36,11 @@ const SECTION_HEADINGS = [
   '**When to see a doctor**',
   '**What you can do at home**',
   // Legacy headings kept for backwards compatibility
-  '**Summary of what the analysis found**',
-  '**Most likely condition (high confidence)**',
-  '**Other possible explanations (medium / low)**',
-  '**Red-flag signs to watch for**',
-  '**What you can do next**',
+  '**Summary of these notes**',
+  '**Main thing to discuss with a doctor**',
+  '**Other things to track**',
+  '**When to seek urgent care**',
+  '**Tracking notes and doctor questions**',
 ]
 
 const COST_PREFIX = '__cost__'
@@ -722,7 +722,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
           </button>
         </div>
         <div className="flex-1 text-center">
-          <div className="text-sm font-semibold text-gray-900">Medical image chat</div>
+          <div className="text-sm font-semibold text-gray-900">Health image notes chat</div>
           <div className="text-[11px] text-gray-400 hidden md:block truncate">{currentThreadTitle}</div>
         </div>
         <div className="flex items-center gap-2">
@@ -763,14 +763,14 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                 <div className="flex flex-col items-center justify-center text-center">
                   <h1 className="text-2xl font-bold tracking-tight text-gray-900">Need more detail?</h1>
                   <p className="mt-2 text-sm text-gray-500">
-                    Ask about likely causes, red flags, or next steps.
+                    Ask about things to track, doctor questions, or when to seek help.
                   </p>
                   <div className="mt-6 grid w-full max-w-md gap-3">
                     {[
-                      'What should I do about these red flags?',
-                      'Can you explain the most likely condition in more detail?',
+                      'What should I track from these notes?',
+                      'What questions should I ask a doctor?',
                       'When should I see a doctor about this image?',
-                      'What everyday things can make this better or worse?',
+                      'What everyday changes should I write down?',
                     ].map((q) => (
                       <button
                         key={q}
@@ -799,7 +799,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
                   <div className={`${m.role === 'user' ? 'max-w-[85%] text-right' : 'flex-1'}`}>
                     {m.role === 'assistant' ? (
                       <div className="space-y-2 rounded-2xl border border-gray-200 bg-gray-100 px-6 py-5 shadow-sm">
-                        <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Medical image analysis</div>
+                        <div className="text-[11px] font-bold uppercase tracking-wide text-gray-500">Health image notes</div>
                         <div className="text-[16px] md:text-[15px] leading-7 text-gray-800">
                           {normaliseMedicalChatContent(m.content).split('\n').map((line, i) => {
                             const trimmed = line.trim()

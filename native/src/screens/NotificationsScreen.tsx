@@ -21,6 +21,8 @@ function Row({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => ({
         opacity: pressed ? 0.9 : 1,
         backgroundColor: theme.colors.card,

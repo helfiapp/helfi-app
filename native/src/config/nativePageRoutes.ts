@@ -2,6 +2,8 @@ export type NativeWebPageKey =
   | 'talkToHelfi'
   | 'chatHistory'
   | 'healthJournal'
+  | 'symptomNotes'
+  | 'healthImageNotes'
   | 'healthIntake'
   | 'dailyCheckIn'
   | 'moodTracker'
@@ -35,6 +37,14 @@ export const NATIVE_WEB_PAGES: Record<NativeWebPageKey, NativeWebPageRoute> = {
   healthJournal: {
     title: 'Health Journal',
     path: '/health-journal',
+  },
+  symptomNotes: {
+    title: 'Symptom Notes',
+    path: '/symptoms',
+  },
+  healthImageNotes: {
+    title: 'Health Image Notes',
+    path: '/medical-images',
   },
   healthIntake: {
     title: 'Health Intake',

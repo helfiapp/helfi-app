@@ -5,6 +5,7 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
 import CreditPurchaseModal from '@/components/CreditPurchaseModal'
+import AiConsentModal, { hasSavedAiConsent, saveAiConsent } from '@/components/AiConsentModal'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
 import UsageMeter from '@/components/UsageMeter'
 import FeatureUsageDisplay from '@/components/FeatureUsageDisplay'
@@ -47,7 +48,7 @@ export default function MedicalImagesPage() {
     dailyLimit: 0,
     additionalCredits: 0,
     plan: 'FREE',
-    creditCost: 2, // Medical image analysis costs 2 credits
+    creditCost: 2, // Health image notes cost 2 credits
     featureUsageToday: { foodAnalysis: 0, interactionAnalysis: 0 }
   })
   const [usageMeterRefresh, setUsageMeterRefresh] = useState<number>(0) // Trigger for UsageMeter refresh
@@ -56,6 +57,7 @@ export default function MedicalImagesPage() {
   const [analysisSessionId, setAnalysisSessionId] = useState<number>(0)
   const resultRef = useRef<HTMLDivElement | null>(null)
   const [creditRefreshTick, setCreditRefreshTick] = useState<number>(0)
+  const [showAiConsent, setShowAiConsent] = useState<boolean>(false)
 
   const handleImageSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0]
@@ -161,13 +163,10 @@ export default function MedicalImagesPage() {
     }
   }
 
-  const handleAnalyze = async () => {
-    if (!imageFile) {
+  const runImageNotes = async () => {
+    const selectedImageFile = imageFile
+    if (!selectedImageFile) {
       setError('Please select an image first')
-      return
-    }
-    if (hasAnalyzedCurrentImage) {
-      setError('This image already has notes. Reset to create notes for a new image.')
       return
     }
 
@@ -182,7 +181,7 @@ export default function MedicalImagesPage() {
 
     try {
       const formData = new FormData()
-      formData.append('image', imageFile)
+      formData.append('image', selectedImageFile)
       formData.append('saveToHistory', saveToHistory ? 'true' : 'false')
 
       const response = await fetch('/api/test-vision', {
@@ -267,6 +266,30 @@ export default function MedicalImagesPage() {
     }
   }
 
+  const handleAnalyze = async () => {
+    if (!imageFile) {
+      setError('Please select an image first')
+      return
+    }
+    if (hasAnalyzedCurrentImage) {
+      setError('This image already has notes. Reset to create notes for a new image.')
+      return
+    }
+
+    if (!hasSavedAiConsent()) {
+      setShowAiConsent(true)
+      return
+    }
+
+    await runImageNotes()
+  }
+
+  const handleAiConsentAgree = () => {
+    saveAiConsent()
+    setShowAiConsent(false)
+    void runImageNotes()
+  }
+
   const handleReset = () => {
     setImageFile(null)
     setImagePreview(null)
@@ -290,6 +313,11 @@ export default function MedicalImagesPage() {
   return (
     <div className="min-h-screen bg-gray-50 flex flex-col">
       <PageHeader title="Health Image Notes" />
+      <AiConsentModal
+        open={showAiConsent}
+        onAgree={handleAiConsentAgree}
+        onCancel={() => setShowAiConsent(false)}
+      />
 
       {/* Tabs */}
       <div className="max-w-7xl mx-auto w-full px-4 pt-4">
@@ -408,18 +436,18 @@ export default function MedicalImagesPage() {
                   onChange={(e) => handleSaveToggle(e.target.checked)}
                   className="h-4 w-4 rounded border-gray-300 text-helfi-green focus:ring-helfi-green"
                 />
-                Save this scan to my history
+                Save this image note to my history
               </label>
               <p className="text-xs text-gray-500">
-                Saved scans include the image and notes. Stored in Vercel Blob (AES-256 at rest, HTTPS in transit) and tied to your account.
-                You can delete them anytime. Leave this off to keep this scan private.
+                Saved image notes include the image and notes. Stored in Vercel Blob (AES-256 at rest, HTTPS in transit) and tied to your account.
+                You can delete them anytime. Leave this off to keep this image note private.
               </p>
               {historySaveError && (
                 <p className="text-xs text-amber-700">{historySaveError}</p>
               )}
               {analysisResult && saveToHistory && !currentHistorySaved && !historySaveError && (
                 <p className="text-xs text-gray-500">
-                  {currentHistorySaving ? 'Saving this scan to history...' : 'This scan will be saved to your history.'}
+                  {currentHistorySaving ? 'Saving this image note to history...' : 'This image note will be saved to your history.'}
                 </p>
               )}
               {analysisResult && saveToHistory && currentHistorySaved && (

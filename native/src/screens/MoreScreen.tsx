@@ -22,6 +22,8 @@ function Row({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={label}
       style={({ pressed }) => ({
         opacity: pressed ? 0.9 : 1,
         backgroundColor: theme.colors.card,
@@ -109,6 +111,8 @@ export function MoreScreen({ navigation }: { navigation: any }) {
           <Row icon={<Feather name="message-circle" size={18} color={theme.colors.muted} />} label="Chat History" onPress={() => openNativeTool(NATIVE_WEB_PAGES.chatHistory)} />
           <Row icon={<Feather name="book-open" size={18} color={theme.colors.muted} />} label="Health Journal" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthJournal)} />
           <Row icon={<Feather name="bookmark" size={18} color={theme.colors.muted} />} label="Health Coach" onPress={() => navigation.getParent()?.navigate('SmartHealthCoach')} />
+          <Row icon={<Feather name="clipboard" size={18} color={theme.colors.muted} />} label="Symptom Notes" onPress={() => openNativeTool(NATIVE_WEB_PAGES.symptomNotes)} />
+          <Row icon={<Feather name="image" size={18} color={theme.colors.muted} />} label="Health Image Notes" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthImageNotes)} />
           <Row icon={<Feather name="file-text" size={18} color={theme.colors.muted} />} label="Lab Reports" onPress={() => openNativeTool(NATIVE_WEB_PAGES.labReports)} />
           <Row
             icon={<Feather name="check-square" size={18} color={theme.colors.muted} />}
@@ -116,7 +120,7 @@ export function MoreScreen({ navigation }: { navigation: any }) {
             onPress={() => openNativeTool(NATIVE_WEB_PAGES.dailyCheckIn)}
           />
           <Row icon={<Feather name="smile" size={18} color={theme.colors.muted} />} label="Mood Tracker" onPress={openMoodTracker} />
-          <Row icon={<Feather name="clipboard" size={18} color={theme.colors.muted} />} label="Health Intake" onPress={() => navigation.getParent()?.navigate('HealthSetup')} />
+          <Row icon={<Feather name="clipboard" size={18} color={theme.colors.muted} />} label="Health Intake" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthIntake)} />
           <Row icon={<Feather name="heart" size={18} color={theme.colors.muted} />} label="Health Tips" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthTips)} />
           <Row icon={<Feather name="clock" size={18} color={theme.colors.muted} />} label="Health Tips History" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthTipsHistory)} />
           <Row icon={<Feather name="watch" size={18} color={theme.colors.muted} />} label="Devices" onPress={() => openNativeTool(NATIVE_WEB_PAGES.devices)} />

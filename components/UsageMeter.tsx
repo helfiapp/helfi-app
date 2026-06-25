@@ -124,18 +124,9 @@ async function fetchCreditStatus(feature?: string, forceRefresh?: boolean): Prom
 export default function UsageMeter({ compact = false, showResetDate = false, inline = false, className = '', refreshTrigger = 0, feature }: UsageMeterProps) {
   const { data: session } = useSession()
   const userCacheKey = (session as any)?.user?.id || (session as any)?.user?.email || ''
-  const initialStatus = (() => {
-    if (typeof window === 'undefined') return null
-    const key = feature || 'all'
-    const stored = userCacheKey ? readStoredCreditStatus(userCacheKey, feature) : null
-    const lastStored = !stored?.data ? readLastStoredCreditStatus(feature) : null
-    const cached = creditStatusCache[key]?.data ? { data: creditStatusCache[key]?.data, fetchedAt: creditStatusCache[key]?.fetchedAt } : null
-    if (stored?.data) return stored
-    if (lastStored?.data) return lastStored
-    return cached
-  })()
-  const initialData = initialStatus?.data
-  const initialCredits = initialData?.credits
+  const initialData: any | null = null
+  const initialCredits: any | null = null
+  const [mounted, setMounted] = useState(false)
   const [walletPercentUsed, setWalletPercentUsed] = useState<number | null>(
     typeof initialData?.percentUsed === 'number' ? initialData.percentUsed : null,
   )
@@ -164,6 +155,11 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   const [creditData, setCreditData] = useState<any>(initialData ?? null) // Store full API response for free credits check
   // Listen for global refresh events so sidebar meter updates immediately after charges
   const [eventTick, setEventTick] = useState(0)
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
+
   useEffect(() => {
     const handler = (event?: Event) => {
       const detail = (event as CustomEvent | null)?.detail as { force?: boolean } | null
@@ -262,7 +258,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   }, [session, refreshTrigger, eventTick, feature, userCacheKey, applyCreditStatus]) // include eventTick for global refresh
 
   // Don't render if not authenticated, still loading, or no access
-  if ((!session && !initialData) || loading || !hasAccess) {
+  if (!mounted || (!session && !initialData) || loading || !hasAccess) {
     return null
   }
 

@@ -48,6 +48,8 @@ function LinkRow({
   return (
     <Pressable
       onPress={onPress}
+      accessibilityRole="button"
+      accessibilityLabel={title}
       style={({ pressed }) => ({
         opacity: pressed ? 0.88 : 1,
         borderWidth: 1,
@@ -369,6 +371,11 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
             </View>
 
             <HelfiButton label="Open privacy settings" onPress={() => goToStackScreen('PrivacySettings')} variant="secondary" />
+            <LinkRow
+              title="Download my data (PDF)"
+              subtitle="Open your formatted health summary."
+              onPress={() => goToStackScreen('NativeWebTool', { title: 'Health summary PDF', path: '/api/export/pdf' })}
+            />
           </View>
         </SectionCard>
 
@@ -390,10 +397,6 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
               onPress={() => goToStackScreen('Support')}
             />
             <HelfiButton label="Log out" onPress={onPressSignOut} variant="secondary" />
-            <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
-              Mode: {mode === 'signedIn' ? 'Signed in' : 'Signed out'}
-            </Text>
-            <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Connected to: {API_BASE_URL}</Text>
           </View>
         </SectionCard>
       </ScrollView>

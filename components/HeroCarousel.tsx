@@ -11,7 +11,6 @@ const screenshots = [
   'INSIGHTS.png',                     // 4. Core feature - AI insights
   'HEALTH ISSUES.png',                // 5. Health tracking
   'TODAYS CHECK IN.png',              // 6. Daily engagement
-  'SYMPTOM ANALYZER.png',             // 7. Problem-solving feature
   'SUPPLEMENT INTERACTIONS.png',      // 8. Safety feature
   'INSIGHTS ENERGY.png',              // 9. Specific insight example
   'UPLOAD BLOOD RESULTS.png',         // 10. Advanced feature

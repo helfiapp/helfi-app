@@ -84,25 +84,25 @@ export default function MedicalImagesHistoryPage() {
   }, [loadHistory])
 
   const handleDeleteHistoryItem = async (id: string) => {
-    if (!window.confirm('Delete this saved scan? This cannot be undone.')) return
+    if (!window.confirm('Delete this saved image note? This cannot be undone.')) return
     try {
       setHistoryDeletingId(id)
       setHistoryError(null)
       const res = await fetch(`/api/medical-images/history/${id}`, { method: 'DELETE' })
       if (!res.ok) {
-        throw new Error('Failed to delete saved scan')
+        throw new Error('Failed to delete saved image note')
       }
       setHistoryItems((prev) => prev.filter((item) => item.id !== id))
       setExpandedHistoryId((prev) => (prev === id ? null : prev))
     } catch (err) {
-      setHistoryError((err as Error).message || 'Failed to delete saved scan')
+      setHistoryError((err as Error).message || 'Failed to delete saved image note')
     } finally {
       setHistoryDeletingId(null)
     }
   }
 
   const handleClearHistory = async () => {
-    if (!window.confirm('Clear all saved scans? This cannot be undone.')) return
+    if (!window.confirm('Clear all saved image notes? This cannot be undone.')) return
     try {
       setHistoryClearing(true)
       setHistoryError(null)
@@ -158,7 +158,7 @@ export default function MedicalImagesHistoryPage() {
           <div className="bg-white rounded-b-2xl shadow-sm border border-gray-200 p-6">
             <div className="flex items-center justify-between gap-2 mb-4">
               <div>
-                <h1 className="text-2xl font-bold text-gray-900">Medical Image History</h1>
+                <h1 className="text-2xl font-bold text-gray-900">Health Image Notes History</h1>
                 <p className="text-xs text-gray-500 mt-1">Only scans you chose to save appear here.</p>
               </div>
               <div className="flex items-center gap-3 text-xs">
@@ -186,7 +186,7 @@ export default function MedicalImagesHistoryPage() {
             {historyLoading && <div className="text-sm text-gray-500">Loading history...</div>}
             {historyError && <div className="text-sm text-red-700">{historyError}</div>}
             {!historyLoading && !historyError && historyItems.length === 0 && (
-              <div className="text-sm text-gray-500">No saved scans yet.</div>
+              <div className="text-sm text-gray-500">No saved image notes yet.</div>
             )}
 
             <div className="mt-4 space-y-4">
@@ -253,7 +253,7 @@ export default function MedicalImagesHistoryPage() {
                             )}
                             {redFlags.length > 0 && (
                               <div>
-                                <div className="font-medium text-red-700 mb-1">Red-flag signs</div>
+                                <div className="font-medium text-red-700 mb-1">When to seek urgent care</div>
                                 <ul className="list-disc list-inside space-y-1 text-red-800">
                                   {redFlags.map((flag: string, idx: number) => (
                                     <li key={idx}>{flag}</li>
@@ -263,7 +263,7 @@ export default function MedicalImagesHistoryPage() {
                             )}
                             {nextSteps.length > 0 && (
                               <div>
-                                <div className="font-medium text-gray-900 mb-1">Next steps</div>
+                                <div className="font-medium text-gray-900 mb-1">Tracking notes and doctor questions</div>
                                 <ul className="list-disc list-inside space-y-1">
                                   {nextSteps.map((step: string, idx: number) => (
                                     <li key={idx}>{step}</li>

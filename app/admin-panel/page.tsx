@@ -2405,7 +2405,7 @@ Ready to supercharge your health journey? Helfi Premium gives you everything you
 
 ✨ **Premium Benefits:**
 • 30 AI food analyses per day (vs 3 on free)
-• 30 medical image analyses per day
+• 30 health image note uses per day
 • Advanced medication interaction checking
 • Priority customer support
 • Early access to new features
@@ -2449,7 +2449,7 @@ Big news! We've just released some amazing new features that will take your heal
 
 🔥 **What's New:**
 • Enhanced AI food analysis with better accuracy
-• New medical image analysis for skin conditions
+• New health image notes for tracking visible changes
 • Improved medication interaction database
 • Faster mobile app performance
 • Smart health insights dashboard
@@ -4221,8 +4221,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                         const labelMap: Record<string, string> = {
                           foodAnalysis: 'Food analysis',
                           packagedFoodLabel: 'Packaged food label',
-                          symptomAnalysis: 'Symptom analysis',
-                          medicalImageAnalysis: 'Medical image analysis',
+                          symptomAnalysis: 'Symptom notes',
+                          medicalImageAnalysis: 'Health image notes',
                           interactionAnalysis: 'Interaction analysis',
                           healthTips: 'Health tips',
                         }
@@ -5437,7 +5437,7 @@ Great news! Helfi is officially live and ready to transform your health journey.
 
 As a valued waitlist member, you get:
 ✅ 14-day free trial with full premium access
-✅ 30 AI food analyses per day + 30 medical image analyses  
+✅ 30 AI food analyses per day + 30 health image note uses
 ✅ Complete medication interaction checking
 ✅ Priority support from our team
 

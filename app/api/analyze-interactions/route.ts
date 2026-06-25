@@ -360,7 +360,7 @@ export async function POST(request: NextRequest) {
       schedule: m.scheduleInfo
     }));
 
-    const prompt = `As a clinical pharmacist, analyze the following supplements and medications for potential interactions:
+    const prompt = `Review the following supplements and medications for possible interaction risks and discussion points:
 
 SUPPLEMENTS:
 ${supplementList.map(s => `- ${s.name}: ${s.dosage}, taken ${s.timing}, schedule: ${s.schedule}`).join('\n')}
@@ -452,7 +452,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
         {
           role: "system",
           content:
-            "You are a clinical pharmacist with expertise in drug-supplement interactions. Provide accurate, evidence-based analysis while being appropriately cautious about medical advice. Return ONLY valid JSON.",
+            "You are a cautious medication and supplement interaction reviewer. Provide evidence-aligned tracking notes and discussion points while avoiding medical advice, diagnosis, or treatment instructions. Return ONLY valid JSON.",
         },
         {
           role: "user",

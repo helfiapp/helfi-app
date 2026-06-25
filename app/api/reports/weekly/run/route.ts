@@ -1567,7 +1567,7 @@ function buildMedicalImageSummary(
 
     const rawSummary = String(entry?.summary || '').trim()
     const rawAnalysis = String(entry?.analysisText || '').trim()
-    const summary = clipText(rawSummary || rawAnalysis || 'Saved medical image scan.', 220)
+    const summary = clipText(rawSummary || rawAnalysis || 'Saved health image note.', 220)
 
     return {
       date,
@@ -3144,8 +3144,8 @@ function buildFallbackReport(context: any) {
       ? `Next steps noted: ${highlight.nextSteps.join(' ')}`
       : ''
     sections.overview.working.push({
-      name: 'Medical image scan',
-      reason: `On ${highlight?.date || 'this week'} at ${highlight?.time || 'recently'} the saved scan said: \"${highlight?.summary || 'Saved medical image scan.'}\" ${causeText} ${nextStepText}`.trim(),
+      name: 'Health image note',
+      reason: `On ${highlight?.date || 'this week'} at ${highlight?.time || 'recently'} the saved note said: \"${highlight?.summary || 'Saved health image note.'}\" ${causeText} ${nextStepText}`.trim(),
     })
   }
 
@@ -3168,7 +3168,7 @@ function buildFallbackReport(context: any) {
   if (Array.isArray(medicalImageSummary?.highlights) && medicalImageSummary.highlights.length) {
     const highlight = medicalImageSummary.highlights[0]
     summarySentences.push(
-      `Saved medical image scan on ${highlight?.date || 'this week'}${highlight?.time ? ` at ${highlight.time}` : ''}: \"${highlight?.summary || 'Saved medical image scan.'}\".`
+      `Saved health image note on ${highlight?.date || 'this week'}${highlight?.time ? ` at ${highlight.time}` : ''}: \"${highlight?.summary || 'Saved health image note.'}\".`
     )
   }
   if (nutritionSummary?.dailyAverages?.calories) {
@@ -4137,8 +4137,8 @@ Rules:
 - Do not ask the user what they ate or to log meals. Use the foods already in the data.
 - If journalEntries exist, include at least 2 items that quote the note with date/time and link it to the same day's foods, fluids, exercise, mood, symptoms, or check-ins.
 - If check-in data exists, include at least 1 item that names the goal and ties it to a specific date range or change.
-- If medicalImageSummary exists, include at least 1 item in overview, symptoms, or labs that references the scan date/time and the saved scan summary.
-- Use medical image possibleCauses, redFlags, and nextSteps only as supporting context from the saved scan. Do not present them as a diagnosis.
+- If medicalImageSummary exists, include at least 1 item in overview, symptoms, or labs that references the saved note date/time and summary.
+- Use health image note possibleCauses, redFlags, and nextSteps only as supporting context from the saved note. Do not present them as a diagnosis.
 - Do not list raw log counts or repeat "you logged X entries" unless it directly supports a pattern or gap.
 - Avoid telling the user to "keep logging" unless a section has no usable data.
 - If sectionSignals show data for a section, include 2-3 items in "working" or "suggested" when there is enough data; otherwise include at least 1.

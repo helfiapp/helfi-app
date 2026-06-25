@@ -188,12 +188,12 @@ function supportProductFacts(): string {
   return [
     'PRODUCT FACTS:',
     '- No free trial. New users get multiple free uses of AI features before needing credits or a subscription.',
-    '- Free AI uses on signup: 5 food photo analyses, 2 symptom analyses, 2 medical image analyses, 2 supplement/medication interaction analyses.',
+    '- Free AI uses on signup: 5 food photo analyses, 2 symptom note uses, 2 health image note uses, 2 supplement/medication interaction checks.',
     '- Extra free uses on signup: 1 full health intake analysis, 3 insights updates.',
-    '- Free chats on signup: 2 symptom follow-up chats, 2 medical image follow-up chats, 2 insights chats, 2 voice chats.',
+    '- Free chats on signup: 2 symptom note chats, 2 health image note chats, 2 insights chats, 2 voice chats.',
     '- Free re-analyses on signup: 2 food re-analyses, 2 interaction re-analyses.',
     '- Non-AI features remain free for all users.',
-    '- Premium plan: $20/month includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 medical image analyses per day, advanced insights, priority support, and export capabilities.',
+    '- Premium plan: $20/month includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 health image note uses per day, advanced insights, priority support, and export capabilities.',
     '- Credit packs: $5 for 100 credits or $10 for 150 credits. Credits do not expire and can be used for any analysis.',
     '- Helfi is a web app that works in the browser on mobile and desktop; no download is required.',
     '- Device integrations: Fitbit is available now. Garmin Connect is in evaluation and may be temporarily unavailable until production approval is granted.',
@@ -287,7 +287,7 @@ function analyzeChatBugMessage(message: string): ChatBugAnalysis {
     /(bug|buggy|broken|not working|doesn.t work|does not work|issue|problem|glitch|jump|jumping|move|moving|disappear|off the screen|off-screen|weird)/i.test(text)
   const hasMobile = /(iphone|ipad|ios|android|mobile)/i.test(text)
   const hasDesktop = /(mac|windows|desktop|laptop|browser)/i.test(text)
-  const hasChatArea = /(symptom|medical image|image analyzer|insight|talk to ai|talk to helfi|voice|support chat)/i.test(text)
+  const hasChatArea = /(symptom|medical image|health image|image analyzer|insight|talk to ai|talk to helfi|voice|support chat)/i.test(text)
   const isFrustrated = /(repeating|already told|stop asking|check your code|check the code|loop|looping)/i.test(text)
   const areas: string[] = []
   if (/support chat|support widget|support/i.test(text)) {
@@ -296,8 +296,8 @@ function analyzeChatBugMessage(message: string): ChatBugAnalysis {
   if (/symptom/i.test(text)) {
     areas.push('Symptoms chat')
   }
-  if (/medical image|image analyzer|medical/i.test(text)) {
-    areas.push('Medical image chat')
+  if (/medical image|health image|image analyzer|medical/i.test(text)) {
+    areas.push('Health image notes chat')
   }
   if (/insight/i.test(text)) {
     areas.push('Insights chat')
@@ -386,7 +386,7 @@ function buildDeterministicSupportReply(options: {
   if (chatBug.isChatBug) {
     const followups: string[] = []
     if (!chatBug.hasChatArea) {
-      followups.push('Which chat is it in? (Talk to Helfi, Symptoms, Medical Image, or Insights)')
+      followups.push('Which chat is it in? (Talk to Helfi, Symptom Notes, Health Image Notes, or Insights)')
     }
     if (!chatBug.hasMobile && !chatBug.hasDesktop) {
       followups.push('Does it happen on mobile, desktop, or both?')
@@ -419,8 +419,8 @@ function buildDeterministicSupportReply(options: {
       'Medication and supplement tracking with interaction checks.',
       'AI insights dashboard and personalized recommendations.',
       'Sleep data from connected devices (Fitbit; Garmin evaluation) and optional sleep quality ratings in mood check-ins.',
-      'Symptom analysis with follow-up chat.',
-      'Medical image analyzer with follow-up chat.',
+      'Symptom notes with follow-up chat.',
+      'Health image notes with follow-up chat.',
       'Lab report upload and analysis (PDF or photos).',
       'Mood tracking and quick mood check-in.',
       'Daily check-ins and rating history.',

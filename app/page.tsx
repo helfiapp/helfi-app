@@ -272,7 +272,7 @@ export default function SplashPage() {
             <p className="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed max-w-4xl mx-auto">
               Track meals, supplements, symptoms, and daily health metrics in one place. Get weekly AI
               health insights, monitor trends, and turn your data into practical next steps. Analyze food
-              photos, lab reports, and medical images with clear guidance you can actually use. Find trusted
+              photos, lab reports, and health images with clear notes you can actually use. Find trusted
               healthcare providers in our practitioner directory.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">

@@ -3634,6 +3634,7 @@ export default function FoodDiary() {
   const midnightTimerRef = useRef<number | null>(null)
   const todayIsoRef = useRef<string>(buildTodayIso())
   const openMenuKeyRef = useRef<string | null>(null)
+  const consumedDiaryRefreshRef = useRef<string | null>(null)
   const clearDrinkFlowParamsFromUrl = () => {
     if (typeof window === 'undefined') return
     try {
@@ -10237,6 +10238,14 @@ const applyStructuredItems = (
           markDiaryVerified(targetDate)
           lastVerifyFetchAtRef.current[targetDate] = Date.now()
           setFoodDiaryLoaded(true)
+          if (isViewingToday) {
+            updateTodaysFoodsForDate([], targetDate)
+            updateUserSnapshotForDate([], targetDate)
+          } else {
+            setHistoryFoods([])
+            setHistoryFoodsDate(targetDate)
+          }
+          updatePersistentDiarySnapshotForDate([], targetDate)
           return
         }
       }
@@ -10363,6 +10372,29 @@ const applyStructuredItems = (
       setIsDiaryRefreshing(false)
     }
   }
+  useEffect(() => {
+    if (typeof window === 'undefined') return
+    if (!diaryHydrated) return
+    if (editingEntry) return
+
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('refresh') !== '1') return
+
+    const routeDate = String(params.get('date') || '').slice(0, 10)
+    const marker = params.get('refreshAt') || `${routeDate}|${window.location.search}`
+    if (consumedDiaryRefreshRef.current === marker) return
+    consumedDiaryRefreshRef.current = marker
+
+    if (/^\d{4}-\d{2}-\d{2}$/.test(routeDate) && routeDate !== selectedDate) {
+      setSelectedDate(routeDate)
+    }
+
+    const timer = window.setTimeout(() => {
+      refreshDiaryNow()
+    }, 150)
+
+    return () => window.clearTimeout(timer)
+  }, [diaryHydrated, editingEntry?.id, selectedDate])
   const PULL_REFRESH_ACTIVATE = 80
   const PULL_REFRESH_THRESHOLD = 320
   const PULL_REFRESH_MAX = 420
@@ -22894,7 +22926,7 @@ Please add nutritional information manually if needed.`);
                       <p className="text-xs text-gray-500 text-center mb-2">Cost: 10 credits per food analysis</p>
                       {!hasPaidAccess && (
                         <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
-                          Free accounts can try this AI feature once. After your free analysis, upgrade or buy credits to continue.
+                          Free accounts can try this AI feature once. After your free use, upgrade or buy credits to continue.
                         </div>
                       )}
                       <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
@@ -24523,7 +24555,7 @@ Please add nutritional information manually if needed.`);
                         <div className="flex flex-col gap-3">
                           <div>
                             <div className="font-semibold text-amber-800">Payment required</div>
-                            <div className="text-sm text-amber-700">Subscribe to Premium or purchase credits to unlock AI food analysis, medical image analysis, and interaction checks.</div>
+                            <div className="text-sm text-amber-700">Subscribe to Premium or purchase credits to unlock AI food notes, health image notes, and interaction checks.</div>
                           </div>
                           <Link href="/billing" className="inline-flex items-center justify-center px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg font-medium w-full sm:w-auto">Upgrade to Premium</Link>
                         </div>

@@ -115,6 +115,9 @@ function ActionButton({
     <Pressable
       onPress={onPress}
       disabled={disabled}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ disabled: Boolean(disabled) }}
       style={{
         backgroundColor: colors.bg,
         borderRadius: 10,
@@ -587,6 +590,9 @@ export function BillingScreen() {
     <Pressable
       key={key}
       onPress={() => setUsageRange(key)}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      accessibilityState={{ selected: usageRange === key }}
       style={{
         paddingHorizontal: 10,
         paddingVertical: 7,
@@ -787,10 +793,10 @@ export function BillingScreen() {
             Choose a monthly subscription plan. Subscriptions renew monthly until cancelled.
           </Text>
           <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
-            <Pressable onPress={() => openExternalUrl(TERMS_URL)}>
+            <Pressable accessibilityRole="link" accessibilityLabel="Terms of Use" onPress={() => openExternalUrl(TERMS_URL)}>
               <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Terms of Use</Text>
             </Pressable>
-            <Pressable onPress={() => openExternalUrl(PRIVACY_URL)}>
+            <Pressable accessibilityRole="link" accessibilityLabel="Privacy Policy" onPress={() => openExternalUrl(PRIVACY_URL)}>
               <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Privacy Policy</Text>
             </Pressable>
           </View>

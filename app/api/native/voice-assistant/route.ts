@@ -155,7 +155,7 @@ function buildMedicalSafetyDraft(transcript: string, localDate: string): VoiceDr
     localDate,
     summary: 'General health safety',
     confirmationMessage:
-      'Helfi can help you track food, water, mood, and notes, but it cannot analyze symptoms or medical images, diagnose conditions, or tell you treatment. Please speak with a qualified health professional about symptoms, images, medication, or treatment questions. If symptoms feel urgent, call emergency services.',
+      'Helfi can help you track food, water, mood, and notes, but it cannot analyze symptoms or health images, diagnose conditions, or tell you treatment. Please speak with a qualified health professional about symptoms, images, medication, or treatment questions. If symptoms feel urgent, call emergency services.',
     canConfirm: false,
     autoSave: false,
   }
@@ -1318,7 +1318,7 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
         'Use food_draft only when the user gives a vague food request without any usable food names.',
         'For recipes, return action recipe and recipeRequest.',
         'For health_question, use when the user asks health advice, interpretation, supplements, medication, labs, fitness, sleep, or wellbeing questions that are not a save action.',
-        'If the user asks about symptoms, diagnosis, treatment, red flags, or medical image review, use health_question. The app will show a safe general message and will not open a symptom or image analysis tool.',
+        'If the user asks about symptoms, diagnosis, treatment, red flags, or health image review, use health_question. The app will show a safe general message and will not open a symptom notes or health image notes tool.',
         'For app_handoff, use when the user clearly asks to open or use a Helfi app area that is not one of the save actions.',
         'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"recipeRequest":"..."}',
       ].join('\n'),

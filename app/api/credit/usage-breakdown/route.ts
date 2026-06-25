@@ -158,7 +158,7 @@ export async function GET(_req: NextRequest) {
         totalCredits: (user.monthlySymptomAnalysisUsed || 0) * CREDIT_COSTS.SYMPTOM_ANALYSIS,
       }
 
-      // Medical image analysis - check if there's a way to track this
+      // Health image notes - check if there's a way to track this
       breakdown.features.medicalImageAnalysis = {
         count: user.monthlyMedicalImageAnalysisUsed || 0,
         costPerUse: CREDIT_COSTS.MEDICAL_IMAGE_ANALYSIS,

@@ -6,11 +6,21 @@ import { authOptions } from '@/lib/auth'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
+const redactRequestHeaders = (headers: Headers) => {
+  const sensitive = new Set(['authorization', 'cookie', 'set-cookie', 'x-native-token'])
+  return Object.fromEntries(
+    Array.from(headers.entries()).map(([key, value]) => [
+      key,
+      sensitive.has(key.toLowerCase()) && value ? '[REDACTED]' : value,
+    ]),
+  )
+}
+
 export async function GET(request: NextRequest) {
   try {
     console.log('=== AUTH TEST DEBUG START ===')
     console.log('Request URL:', request.url)
-    console.log('Request headers:', Object.fromEntries(request.headers.entries()))
+    console.log('Request headers:', redactRequestHeaders(request.headers))
     
     // Test NextAuth session
     const session = await getServerSession(authOptions)
@@ -34,8 +44,8 @@ export async function GET(request: NextRequest) {
         debugEnabled: authOptions.debug || false
       },
       headers: {
-        authorization: request.headers.get('authorization') || null,
-        cookie: request.headers.get('cookie') || null,
+        authorization: request.headers.get('authorization') ? '[REDACTED]' : null,
+        cookie: request.headers.get('cookie') ? '[REDACTED]' : null,
         userAgent: request.headers.get('user-agent') || null
       }
     })
@@ -48,4 +58,4 @@ export async function GET(request: NextRequest) {
       timestamp: new Date().toISOString()
     }, { status: 500 })
   }
-} 
+}

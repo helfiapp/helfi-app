@@ -3,7 +3,7 @@ import { Inter } from 'next/font/google'
 import { AuthProvider } from '@/components/providers/AuthProvider'
 import { UserDataProvider } from '@/components/providers/UserDataProvider'
 import LayoutWrapper from '@/components/LayoutWrapper'
-import type { Metadata } from 'next'
+import type { Metadata, Viewport } from 'next'
 import { absoluteUrl, getSiteUrl } from '@/lib/site-url'
 
 const inter = Inter({ 
@@ -41,7 +41,6 @@ export const metadata: Metadata = {
     'find practitioner',
     'practitioner directory',
   ],
-  viewport: 'width=device-width, initial-scale=1, minimum-scale=1, maximum-scale=5, user-scalable=yes',
   applicationName: 'Helfi',
   manifest: '/manifest.json',
   robots: {
@@ -99,6 +98,14 @@ export const metadata: Metadata = {
       { url: '/apple-touch-icon.png', sizes: '180x180' },
     ],
   },
+}
+
+export const viewport: Viewport = {
+  width: 'device-width',
+  initialScale: 1,
+  minimumScale: 1,
+  maximumScale: 5,
+  userScalable: true,
 }
 
 export default function RootLayout({

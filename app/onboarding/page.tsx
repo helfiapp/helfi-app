@@ -7940,7 +7940,7 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
             onClick={handleNext}
             disabled={medications.length === 0}
           >
-            Analyze for Interactions & Contradictions
+            Check supplement and medication interactions
           </button>
           <p className="text-center text-sm text-gray-500">
             Uses AI credits (2× model cost). Typical total: 6–10 credits depending on your supplements/meds and recommendations.
@@ -8362,7 +8362,7 @@ function AIInsightsStep({ onNext, onBack, initial }: { onNext: (data: any) => vo
       </p>
       <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-sm text-green-800 mb-6">
         To get the best report, try to use these features during the week: Food Diary, Mood Tracker, Daily Check-ins,
-        Symptom Analyzer, and Health Setup updates.
+        Symptom Notes, and Health Setup updates.
       </div>
       <div className="flex justify-between">
         <button className="btn-secondary" onClick={onBack}>Back</button>
@@ -8658,10 +8658,10 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
           // Set a default empty state so page doesn't get stuck
           setAnalysisResult({
             overallRisk: 'low',
-            summary: 'No previous interaction analysis found. Go back and tap "Analyze for Interactions" to create one.',
+            summary: 'No previous interaction check found. Go back and tap "Check supplement and medication interactions" to create one.',
             interactions: [],
             timingOptimization: {},
-            generalRecommendations: ['Go back and tap "Analyze for Interactions" to create your first report.'],
+            generalRecommendations: ['Go back and tap "Check supplement and medication interactions" to create your first report.'],
             disclaimer: 'This analysis is for informational purposes only and should not replace professional medical advice.'
           });
         }
@@ -9176,7 +9176,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
                               
                               {interaction.recommendation && (
                                 <div className="bg-blue-50 border border-blue-200 rounded-lg p-3">
-                                  <h4 className="font-medium text-blue-900 mb-1">💡 Recommendation:</h4>
+                                  <h4 className="font-medium text-blue-900 mb-1">Discussion note:</h4>
                                   <p className="text-blue-800 text-sm leading-relaxed">{interaction.recommendation}</p>
                                 </div>
                               )}
@@ -9184,7 +9184,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
                               {interaction.severity === 'high' && (
                                 <div className="bg-red-50 border border-red-200 rounded-lg p-3">
                                   <h4 className="font-medium text-red-900 mb-1">⚠️ Important:</h4>
-                                  <p className="text-red-800 text-sm">This is a high-risk interaction. Please consult with your healthcare provider immediately.</p>
+                                  <p className="text-red-800 text-sm">This is a possible interaction that needs prompt review by a qualified healthcare professional.</p>
                                 </div>
                               )}
                             </div>
@@ -9201,8 +9201,8 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
               <div className="mb-6">
                 <div className="bg-green-50 border border-green-200 rounded-lg p-4 text-center">
                   <div className="text-green-600 text-4xl mb-2">✅</div>
-                  <h3 className="text-lg font-semibold text-green-900 mb-1">No Dangerous Interactions Found</h3>
-                  <p className="text-green-800 text-sm">Your current supplements and medications appear to be safe to take together.</p>
+                  <h3 className="text-lg font-semibold text-green-900 mb-1">No major cautions found</h3>
+                  <p className="text-green-800 text-sm">No major supplement and medication cautions were found in this check. Ask a qualified healthcare professional before making changes.</p>
                 </div>
               </div>
             );
@@ -9218,7 +9218,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
               onClick={() => setShowRecommendations(!showRecommendations)}
               className="flex items-center justify-between w-full text-left mb-3 p-3 bg-green-50 border border-green-200 rounded-lg hover:bg-green-100 transition-colors"
             >
-              <h3 className="text-lg font-semibold text-green-900">Recommendations</h3>
+              <h3 className="text-lg font-semibold text-green-900">Discussion notes</h3>
               <svg 
                 className={`w-5 h-5 text-green-600 transition-transform ${showRecommendations ? 'rotate-180' : ''}`}
                 fill="none" 
@@ -9350,7 +9350,7 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
                             {/* Timing Optimization */}
                             {analysisData.timingOptimization && Object.keys(analysisData.timingOptimization).length > 0 && (
                               <div>
-                                <h4 className="font-medium text-gray-900 mb-2">Timing Recommendations</h4>
+                                <h4 className="font-medium text-gray-900 mb-2">Timing notes</h4>
                                 <div className="grid grid-cols-2 gap-2">
                                   {Object.entries(analysisData.timingOptimization).slice(0, 4).map(([timeSlot, substances]: [string, any]) => (
                                     <div key={timeSlot} className="text-sm bg-blue-50 p-2 rounded">
