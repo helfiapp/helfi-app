@@ -7,7 +7,7 @@ import Image from 'next/image'
 const screenshots = [
   'DASHBOARD.png',                    // 1. Start with main overview
   "LET'S GET STARTED.png",           // 2. Show onboarding experience
-  'FOOD ANALYSIS.png',                // 3. Core feature - food tracking
+  'FOOD PHOTO NOTES.png',             // 3. Core feature - food tracking
   'INSIGHTS.png',                     // 4. Core feature - AI insights
   'HEALTH ISSUES.png',                // 5. Health tracking
   'TODAYS CHECK IN.png',              // 6. Daily engagement

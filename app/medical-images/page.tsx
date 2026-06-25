@@ -30,6 +30,23 @@ type MedicalAnalysisResult = {
   analysisText?: string
 }
 
+const SAFE_IMAGE_NOTE_FALLBACK =
+  'Image note created. Please review this image with a qualified healthcare professional if you are concerned.'
+
+const riskyMedicalClaimPattern =
+  /\b(possibly indicating|may indicate|could indicate|suggests|suggesting|consistent with|likely|viral infection|skin reaction|infection|cancer|melanoma|diagnosis|diagnose)\b/i
+
+function safeImageNoteText(value: unknown, fallback = SAFE_IMAGE_NOTE_FALLBACK) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (riskyMedicalClaimPattern.test(text)) return fallback
+  return text
+}
+
+function safeDiscussionTopicName(value: unknown) {
+  return safeImageNoteText(value, 'Image detail to discuss with a doctor') || 'Image detail to discuss with a doctor'
+}
+
 export default function MedicalImagesPage() {
   const pathname = usePathname()
   const [imageFile, setImageFile] = useState<File | null>(null)
@@ -125,14 +142,22 @@ export default function MedicalImagesPage() {
       setHistorySaveError(null)
 
       const payload = {
-        summary: analysisResult?.summary ?? null,
+        summary: safeImageNoteText(analysisResult?.summary) || null,
         possibleCauses: Array.isArray(analysisResult?.possibleCauses)
-          ? analysisResult?.possibleCauses
+          ? analysisResult.possibleCauses.map((cause) => ({
+              ...cause,
+              name: safeDiscussionTopicName(cause.name),
+              whyLikely: safeImageNoteText(
+                cause.whyLikely,
+                'This visible detail is worth discussing with a healthcare professional.',
+              ),
+              confidence: 'low',
+            }))
           : [],
         redFlags: Array.isArray(analysisResult?.redFlags) ? analysisResult?.redFlags : [],
         nextSteps: Array.isArray(analysisResult?.nextSteps) ? analysisResult?.nextSteps : [],
         disclaimer: analysisResult?.disclaimer ?? null,
-        analysisText: analysis ?? analysisResult?.analysisText ?? null,
+        analysisText: safeImageNoteText(analysis ?? analysisResult?.analysisText) || null,
       }
 
       const formData = new FormData()
@@ -377,10 +402,9 @@ export default function MedicalImagesPage() {
                 Helfi uses these public sources as general references. Results are not diagnoses.
               </p>
               <ul className="list-disc list-inside space-y-1">
-                <li><a className="text-helfi-green underline" href="https://medlineplus.gov/encyclopedia.html" target="_blank" rel="noreferrer">MedlinePlus Medical Encyclopedia</a></li>
                 <li><a className="text-helfi-green underline" href="https://medlineplus.gov/healthtopics.html" target="_blank" rel="noreferrer">MedlinePlus Health Topics</a></li>
-                <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/diseases-conditions" target="_blank" rel="noreferrer">Mayo Clinic Diseases and Conditions</a></li>
-                <li><a className="text-helfi-green underline" href="https://www.nhs.uk/conditions/" target="_blank" rel="noreferrer">NHS Conditions A to Z</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/healthy-lifestyle" target="_blank" rel="noreferrer">Mayo Clinic Health Information</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.nhs.uk/live-well/" target="_blank" rel="noreferrer">NHS Health Information</a></li>
               </ul>
             </div>
 
@@ -510,7 +534,7 @@ export default function MedicalImagesPage() {
                   <section>
                     <h3 className="font-medium text-gray-900 mb-1">Summary</h3>
                     <p className="text-sm text-gray-700 whitespace-pre-line">
-                      {analysisResult.summary}
+                      {safeImageNoteText(analysisResult.summary)}
                     </p>
                   </section>
                 )}
@@ -527,14 +551,17 @@ export default function MedicalImagesPage() {
                             className="p-3 border border-gray-200 rounded-lg bg-white"
                           >
                             <div className="flex items-center justify-between gap-3">
-                              <div className="font-medium text-gray-900">{c.name}</div>
+                              <div className="font-medium text-gray-900">{safeDiscussionTopicName(c.name)}</div>
                               <span className="text-xs px-2 py-0.5 rounded-full border bg-gray-100 text-gray-700 border-gray-200">
                                 general
                               </span>
                             </div>
                             {c.whyLikely && (
                               <div className="mt-1 text-sm text-gray-700">
-                                {c.whyLikely}
+                                {safeImageNoteText(
+                                  c.whyLikely,
+                                  'This visible detail is worth discussing with a healthcare professional.',
+                                )}
                               </div>
                             )}
                           </li>
@@ -573,7 +600,7 @@ export default function MedicalImagesPage() {
                     analysisResult.possibleCauses.length === 0) &&
                   analysis && (
                     <section>
-                      <p className="text-sm text-gray-700 whitespace-pre-line">{analysis}</p>
+                      <p className="text-sm text-gray-700 whitespace-pre-line">{safeImageNoteText(analysis)}</p>
                     </section>
                   )}
 
@@ -590,10 +617,9 @@ export default function MedicalImagesPage() {
                     Helfi uses these public sources as general references. Your notes are not a diagnosis.
                   </p>
                   <ul className="list-disc list-inside space-y-1">
-                    <li><a className="text-helfi-green underline" href="https://medlineplus.gov/encyclopedia.html" target="_blank" rel="noreferrer">MedlinePlus Medical Encyclopedia</a></li>
                     <li><a className="text-helfi-green underline" href="https://medlineplus.gov/healthtopics.html" target="_blank" rel="noreferrer">MedlinePlus Health Topics</a></li>
-                    <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/diseases-conditions" target="_blank" rel="noreferrer">Mayo Clinic Diseases and Conditions</a></li>
-                    <li><a className="text-helfi-green underline" href="https://www.nhs.uk/conditions/" target="_blank" rel="noreferrer">NHS Conditions A to Z</a></li>
+                    <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/healthy-lifestyle" target="_blank" rel="noreferrer">Mayo Clinic Health Information</a></li>
+                    <li><a className="text-helfi-green underline" href="https://www.nhs.uk/live-well/" target="_blank" rel="noreferrer">NHS Health Information</a></li>
                   </ul>
                 </div>
 
@@ -613,7 +639,7 @@ export default function MedicalImagesPage() {
               </div>
             )}
 
-            {/* Medical image chat – follows the analysis and is pre‑aware of it.
+            {/* Health image notes chat follows the saved summary context.
                 We key it by a simple incrementing session so the chat fully resets
                 whenever a new analysis is completed. */}
             {analysisResult && (

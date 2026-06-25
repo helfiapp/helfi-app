@@ -289,9 +289,9 @@ export default function SymptomAnalysisPage() {
                 Helfi uses these public sources as general references. Results are tracking notes, not diagnoses.
               </p>
               <ul className="list-disc list-inside space-y-1">
-                <li><a className="text-helfi-green underline" href="https://medlineplus.gov/symptoms.html" target="_blank" rel="noreferrer">MedlinePlus Symptoms</a></li>
-                <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/symptom-checker/select-symptom/itt-20009075" target="_blank" rel="noreferrer">Mayo Clinic Symptom Checker</a></li>
-                <li><a className="text-helfi-green underline" href="https://www.nhs.uk/symptoms/" target="_blank" rel="noreferrer">NHS Symptoms A to Z</a></li>
+                <li><a className="text-helfi-green underline" href="https://medlineplus.gov/healthtopics.html" target="_blank" rel="noreferrer">MedlinePlus Health Topics</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/healthy-lifestyle" target="_blank" rel="noreferrer">Mayo Clinic Health Information</a></li>
+                <li><a className="text-helfi-green underline" href="https://www.nhs.uk/live-well/" target="_blank" rel="noreferrer">NHS Health Information</a></li>
                 <li><a className="text-helfi-green underline" href="https://www.cdc.gov/index.html" target="_blank" rel="noreferrer">CDC Health Topics</a></li>
               </ul>
             </div>
@@ -473,15 +473,15 @@ export default function SymptomAnalysisPage() {
                   Helfi uses these public sources as general references. Your notes are not a diagnosis.
                 </p>
                 <ul className="list-disc list-inside space-y-1">
-                  <li><a className="text-helfi-green underline" href="https://medlineplus.gov/symptoms.html" target="_blank" rel="noreferrer">MedlinePlus Symptoms</a></li>
-                  <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/symptom-checker/select-symptom/itt-20009075" target="_blank" rel="noreferrer">Mayo Clinic Symptom Checker</a></li>
-                  <li><a className="text-helfi-green underline" href="https://www.nhs.uk/symptoms/" target="_blank" rel="noreferrer">NHS Symptoms A to Z</a></li>
+                  <li><a className="text-helfi-green underline" href="https://medlineplus.gov/healthtopics.html" target="_blank" rel="noreferrer">MedlinePlus Health Topics</a></li>
+                  <li><a className="text-helfi-green underline" href="https://www.mayoclinic.org/healthy-lifestyle" target="_blank" rel="noreferrer">Mayo Clinic Health Information</a></li>
+                  <li><a className="text-helfi-green underline" href="https://www.nhs.uk/live-well/" target="_blank" rel="noreferrer">NHS Health Information</a></li>
                   <li><a className="text-helfi-green underline" href="https://www.cdc.gov/index.html" target="_blank" rel="noreferrer">CDC Health Topics</a></li>
                 </ul>
               </div>
 
               <PractitionerRecommendations
-                sourceArea="symptom-analysis"
+                sourceArea="symptom-notes"
                 issueText={[
                   selectedSymptoms.join(', '),
                   duration,

@@ -72,10 +72,10 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({ success: true, history })
   } catch (error) {
-    console.error('Error fetching medical image history:', error)
+    console.error('Error fetching health image notes history:', error)
     return NextResponse.json(
       {
-        error: 'Failed to fetch medical image history',
+        error: 'Failed to fetch health image notes history',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
@@ -190,10 +190,10 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Error saving medical image history:', error)
+    console.error('Error saving health image notes history:', error)
     return NextResponse.json(
       {
-        error: 'Failed to save medical image history',
+        error: 'Failed to save health image notes history',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
@@ -238,7 +238,7 @@ export async function DELETE(request: NextRequest) {
       try {
         await del(blobTargets)
       } catch (deleteError) {
-        console.warn('Failed to delete medical image blobs:', deleteError)
+        console.warn('Failed to delete health image note files:', deleteError)
       }
     }
 
@@ -259,10 +259,10 @@ export async function DELETE(request: NextRequest) {
       deletedCount: deletedCount[0].count,
     })
   } catch (error) {
-    console.error('Error deleting medical image history:', error)
+    console.error('Error deleting health image notes history:', error)
     return NextResponse.json(
       {
-        error: 'Failed to delete medical image history',
+        error: 'Failed to delete health image notes history',
         details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }

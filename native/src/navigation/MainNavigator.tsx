@@ -321,7 +321,7 @@ export function MainNavigator() {
         name="FoodAnalysis"
         component={TrackCaloriesWithBottomNav}
         options={{
-          title: 'Food Analysis',
+          title: 'Food Photo Notes',
           headerTitleAlign: 'center',
           headerBackTitle: '',
         }}

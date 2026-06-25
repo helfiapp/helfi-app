@@ -293,6 +293,24 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 
             <HelfiButton label="Upgrade or add credits" onPress={() => goToStackScreen('Billing')} variant="secondary" />
 
+            {!weeklyReportsLoading && !weeklyReportsSaving && weeklyReportsEnabled !== null ? (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel={weeklyReportsEnabled ? 'Turn off weekly reports' : 'Turn on weekly reports'}
+                onPress={() => void toggleWeeklyReports(!weeklyReportsEnabled)}
+                style={({ pressed }) => ({
+                  opacity: pressed ? 0.8 : 1,
+                  alignSelf: 'flex-start',
+                  paddingVertical: 8,
+                  paddingHorizontal: 2,
+                })}
+              >
+                <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                  {weeklyReportsEnabled ? 'Turn off weekly reports' : 'Turn on weekly reports'}
+                </Text>
+              </Pressable>
+            ) : null}
+
             {weeklyReportsLoading || weeklyReportsSaving ? (
               <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Saving...</Text>
             ) : null}

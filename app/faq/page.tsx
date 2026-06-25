@@ -27,23 +27,23 @@ export default function FAQPage() {
       ]
     },
     {
-      category: "Food Tracking & AI Analysis",
+      category: "Food Tracking & AI Food Notes",
       questions: [
         {
-          q: "How does the AI food analysis work?",
-          a: "Simply take a photo of your meal and our AI will analyze the food items, estimate portions, calculate nutritional content, and provide personalized recommendations based on your health goals and dietary needs."
+          q: "How do AI food photo notes work?",
+          a: "You can take a photo of your meal and Helfi will help identify likely food items, estimate portions, and create nutrition notes you can review and edit."
         },
         {
-          q: "How accurate is the nutritional analysis?",
-          a: "Our AI uses advanced computer vision and a comprehensive nutritional database to provide highly accurate estimates. While not 100% perfect, it's significantly more accurate and convenient than manual logging."
+          q: "How accurate are the nutrition estimates?",
+          a: "Food photo results are estimates. You can always review, edit, or replace them before relying on your diary totals."
         },
         {
           q: "Can I track meals without photos?",
-          a: "Yes! You can manually log meals, search our food database, or use voice notes. However, photo analysis is the most convenient and accurate method."
+          a: "Yes. You can manually log meals, search the food database, or use voice notes. Photos are optional."
         },
         {
           q: "What if the AI gets something wrong?",
-          a: "You can always edit or correct the AI's analysis. Premium users get reanalysis credits to have meals re-analyzed for better accuracy."
+          a: "You can always edit or correct the food notes. Premium users get extra food-photo credits for another estimate when needed."
         }
       ]
     },
@@ -52,11 +52,11 @@ export default function FAQPage() {
       questions: [
         {
           q: "What's included in the Premium plan?",
-          a: "Premium includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 health image notes requests per day, advanced insights, priority support, and export capabilities. It's $20/month."
+          a: "Premium includes 30 daily AI food-photo notes, 30 retry credits per day, 30 health image notes requests per day, advanced insights, priority support, and export capabilities. It's $20/month."
         },
         {
           q: "What happens if I exceed my daily limits?",
-          a: "You can purchase additional credits: $5 for 100 credits or $10 for 150 credits. Credits don't expire and can be used for any type of analysis."
+          a: "You can purchase additional credits: $5 for 100 credits or $10 for 150 credits. Credits don't expire and can be used for supported AI note features."
         },
         {
           q: "Can I cancel my subscription anytime?",

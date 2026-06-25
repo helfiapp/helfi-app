@@ -73,7 +73,7 @@ export async function POST(req: NextRequest) {
       endpoint: '/api/analyze-symptoms',
       kind: 'analysis',
     }).catch((error) => {
-      console.error('❌ Failed to log symptom analysis call:', error)
+      console.error('❌ Failed to log symptom notes call:', error)
     })
 
     // PREMIUM/CREDITS/FREE USE GATING
@@ -296,7 +296,7 @@ JSON rules:
         },
       })
     } catch (historyError) {
-      console.warn('Failed to save symptom analysis history:', historyError)
+      console.warn('Failed to save symptom notes history:', historyError)
     }
 
     return NextResponse.json(resp)

@@ -23,6 +23,23 @@ type MedicalHistoryItem = {
   imageUrl?: string | null
 }
 
+const SAFE_IMAGE_NOTE_FALLBACK =
+  'Older saved image note. Please review this image with a qualified healthcare professional if you are concerned.'
+
+const riskyMedicalClaimPattern =
+  /\b(possibly indicating|may indicate|could indicate|suggests|suggesting|consistent with|likely|viral infection|skin reaction|infection|cancer|melanoma|diagnosis|diagnose)\b/i
+
+function safeImageNoteText(value: unknown, fallback = SAFE_IMAGE_NOTE_FALLBACK) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (riskyMedicalClaimPattern.test(text)) return fallback
+  return text
+}
+
+function safeDiscussionTopicName(value: unknown) {
+  return safeImageNoteText(value, 'Image detail to discuss with a doctor') || 'Image detail to discuss with a doctor'
+}
+
 function SavedScanImage({ imageUrl }: { imageUrl?: string | null }) {
   const [failed, setFailed] = useState(false)
 
@@ -197,6 +214,8 @@ export default function MedicalImagesHistoryPage() {
                   : []
                 const redFlags = Array.isArray(analysisData?.redFlags) ? analysisData?.redFlags : []
                 const nextSteps = Array.isArray(analysisData?.nextSteps) ? analysisData?.nextSteps : []
+                const safeSummary = safeImageNoteText(item.summary)
+                const safeAnalysisText = safeImageNoteText(item.analysisText)
                 const isExpanded = expandedHistoryId === item.id
                 const createdAtLabel = item.createdAt
                   ? new Date(item.createdAt).toLocaleString()
@@ -229,9 +248,9 @@ export default function MedicalImagesHistoryPage() {
                             </button>
                           </div>
                         </div>
-                        {item.summary && <p className="text-sm text-gray-800">{item.summary}</p>}
-                        {!item.summary && item.analysisText && (
-                          <p className="text-sm text-gray-800 whitespace-pre-line">{item.analysisText}</p>
+                        {safeSummary && <p className="text-sm text-gray-800">{safeSummary}</p>}
+                        {!safeSummary && safeAnalysisText && (
+                          <p className="text-sm text-gray-800 whitespace-pre-line">{safeAnalysisText}</p>
                         )}
 
                         {isExpanded && (
@@ -242,7 +261,7 @@ export default function MedicalImagesHistoryPage() {
                                 <ul className="space-y-1">
                                   {possibleCauses.map((cause: any, idx: number) => (
                                     <li key={`${cause.name}-${idx}`} className="flex items-center gap-2">
-                                      <span className="text-gray-900">{cause.name}</span>
+                                      <span className="text-gray-900">{safeDiscussionTopicName(cause.name)}</span>
                                       {cause.confidence && (
                                         <span className="text-xs text-gray-500">(general)</span>
                                       )}
@@ -271,10 +290,10 @@ export default function MedicalImagesHistoryPage() {
                                 </ul>
                               </div>
                             )}
-                            {item.analysisText && item.summary && (
+                            {safeAnalysisText && safeSummary && (
                               <div>
                                 <div className="font-medium text-gray-900 mb-1">Full notes</div>
-                                <p className="whitespace-pre-line">{item.analysisText}</p>
+                                <p className="whitespace-pre-line">{safeAnalysisText}</p>
                               </div>
                             )}
                           </div>

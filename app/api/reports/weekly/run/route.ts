@@ -3432,7 +3432,7 @@ export async function POST(request: NextRequest) {
         },
       })
       .catch((error) => {
-        console.warn('[weekly-report] Failed to load medical image analyses', error)
+        console.warn('[weekly-report] Failed to load health image notes', error)
         return []
       }),
     prisma.exerciseLog

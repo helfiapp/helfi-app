@@ -42,10 +42,10 @@ export async function GET(request: NextRequest) {
       fallbackCount,
       estimatedCallsPerAnalysis,
       estimatedTotalServerCalls,
-      note: 'Estimate assumes 1 analysis call + 1 save + 1 refresh per food analysis.',
+      note: 'Estimate assumes 1 note call + 1 save + 1 refresh per food photo notes request.',
     })
   } catch (error) {
     console.error('[admin food-analysis-usage] error', error)
-    return NextResponse.json({ error: 'Failed to load food analysis usage' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to load food photo notes usage' }, { status: 500 })
   }
 }

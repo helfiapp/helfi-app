@@ -64,7 +64,7 @@ async function sendWaitlistAcknowledgmentEmail(email: string, name: string) {
             </p>
             
             <p style="margin: 18px 0; line-height: 1.7; font-size: 16px; color: #4b5563;">
-              Thank you for joining the Helfi waitlist! We're thrilled to have you on board as we prepare to launch our revolutionary AI-powered health intelligence platform.
+              Thank you for joining the Helfi waitlist! We're thrilled to have you on board as we prepare to launch our health tracking app.
             </p>
             
             <p style="margin: 18px 0; line-height: 1.7; font-size: 16px; color: #4b5563;">

@@ -56,7 +56,7 @@ export function FoodScreen() {
           onPress={() => navigation.getParent()?.navigate('TrackCalories')}
         />
         <FoodTile
-          title="Food Analysis"
+          title="Food Photo Notes"
           subtitle="Open the same main Food Diary experience."
           onPress={() => navigation.getParent()?.navigate('FoodAnalysis')}
         />

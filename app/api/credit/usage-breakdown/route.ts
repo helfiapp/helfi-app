@@ -149,7 +149,7 @@ export async function GET(_req: NextRequest) {
         totalCredits: interactionCount * CREDIT_COSTS.INTERACTION_ANALYSIS,
       }
 
-      // For symptom analysis, we need to check if there's a way to track it
+      // For symptom notes, we need to check if there's a way to track them
       // Since there's no SymptomAnalysis table, we'll use the monthly counter
       // but also check if there are any other records
       breakdown.features.symptomAnalysis = {

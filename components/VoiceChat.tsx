@@ -3046,7 +3046,7 @@ export default function VoiceChat({
                             <li>Uses your current Food Diary totals to spot macro gaps.</li>
                             <li>Suggests what to eat right now based on what you are missing.</li>
                             <li>Upload a menu, meal, fridge, pantry, or nutrition label photo.</li>
-                            <li>Photo analysis costs an extra 10 credits per image. Barcode scans cost 3 credits.</li>
+                            <li>Photo notes cost an extra 10 credits per image. Barcode scans cost 3 credits.</li>
                           </ul>
                         ) : (
                           <ul className="mt-3 space-y-2 text-[15px] md:text-[13px] text-gray-600">
@@ -3212,7 +3212,7 @@ export default function VoiceChat({
                   )}
                   {estimatedPhotoCost > 0 && (
                     <span>
-                      Photo analysis <span className="font-semibold text-gray-700">{estimatedPhotoCost} credits</span>
+                      Photo notes <span className="font-semibold text-gray-700">{estimatedPhotoCost} credits</span>
                       {' '}for {pendingPhotos.length} photo{pendingPhotos.length > 1 ? 's' : ''}
                     </span>
                   )}

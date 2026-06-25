@@ -9,6 +9,7 @@ export default function NotificationDeliveryPage() {
   const [localPrefsLoaded, setLocalPrefsLoaded] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [isNativeApp, setIsNativeApp] = useState(false)
 
   useEffect(() => {
     try {
@@ -26,6 +27,8 @@ export default function NotificationDeliveryPage() {
       (window.navigator as any).standalone === true ||
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
     setIsInstalled(standalone)
+    const params = new URLSearchParams(window.location.search)
+    setIsNativeApp(params.get('helfiNative') === '1')
     setLocalPrefsLoaded(true)
   }, [])
 
@@ -56,6 +59,11 @@ export default function NotificationDeliveryPage() {
   }, [])
 
   const handlePushNotificationToggle = async (enabled: boolean) => {
+    if (isNativeApp && enabled) {
+      alert('Use the Reminders screen in the app to manage phone alerts.')
+      return
+    }
+
     if (isIOS && !isInstalled && enabled) {
       alert('To enable notifications on iPhone, first Add to Home Screen, then open the Helfi app icon and enable here.')
       return
@@ -111,6 +119,9 @@ export default function NotificationDeliveryPage() {
     return outputArray
   }
 
+  const needsIosInstall = isIOS && !isInstalled && !isNativeApp
+  const pushNotificationsDisabled = isNativeApp || needsIosInstall
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <PageHeader title="Notification delivery" backHref="/notifications" />
@@ -144,20 +155,22 @@ export default function NotificationDeliveryPage() {
             <div>
               <h3 className="font-medium text-gray-900 dark:text-white">Push notifications</h3>
               <p className="text-sm text-gray-600 dark:text-gray-400">
-                {isIOS && !isInstalled
+                {isNativeApp
+                  ? 'Use the Reminders screen in the app to manage phone alerts'
+                  : needsIosInstall
                   ? 'On iPhone: Add to Home Screen, then open the app to enable'
                   : 'Get reminders on this device'}
               </p>
             </div>
-            <label className={`relative inline-flex items-center ${(isIOS && !isInstalled) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <label className={`relative inline-flex items-center ${pushNotificationsDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 className="sr-only peer"
                 checked={pushNotifications}
-                disabled={isIOS && !isInstalled}
+                disabled={pushNotificationsDisabled}
                 onChange={(e) => handlePushNotificationToggle(e.target.checked)}
               />
-              <div className={`w-11 h-6 ${(isIOS && !isInstalled) ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${(isIOS && !isInstalled) ? '' : 'peer-checked:bg-helfi-green'} ${(isIOS && !isInstalled) ? 'opacity-50' : ''}`}></div>
+              <div className={`w-11 h-6 ${pushNotificationsDisabled ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${pushNotificationsDisabled ? '' : 'peer-checked:bg-helfi-green'} ${pushNotificationsDisabled ? 'opacity-50' : ''}`}></div>
             </label>
           </div>
 

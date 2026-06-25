@@ -155,7 +155,7 @@ function buildMedicalSafetyDraft(transcript: string, localDate: string): VoiceDr
     localDate,
     summary: 'General health safety',
     confirmationMessage:
-      'Helfi can help you track food, water, mood, and notes, but it cannot analyze symptoms or health images, diagnose conditions, or tell you treatment. Please speak with a qualified health professional about symptoms, images, medication, or treatment questions. If symptoms feel urgent, call emergency services.',
+      'Helfi can help you track food, water, mood, and notes, but it cannot review symptoms or health photos, diagnose conditions, or tell you treatment. Please speak with a qualified health professional about symptoms, images, medication, or treatment questions. If symptoms feel urgent, call emergency services.',
     canConfirm: false,
     autoSave: false,
   }

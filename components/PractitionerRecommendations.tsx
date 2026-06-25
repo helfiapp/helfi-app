@@ -30,7 +30,7 @@ type UserLocation = {
 
 type Props = {
   issueText: string
-  sourceArea: 'onboarding' | 'chat' | 'image' | 'symptom-analysis'
+  sourceArea: 'onboarding' | 'chat' | 'image' | 'symptom-notes'
   className?: string
   compact?: boolean
 }

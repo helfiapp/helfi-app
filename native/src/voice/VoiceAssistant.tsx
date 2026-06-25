@@ -481,19 +481,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 <View style={styles.replyRow}>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Text only replies"
+                    accessibilityLabel="Text reply"
                     onPress={() => setVoiceReplyPreference(false)}
                     style={[styles.segment, !voiceReply && styles.segmentActive]}
                   >
-                    <Text style={[styles.segmentText, !voiceReply && styles.segmentTextActive]}>Text only</Text>
+                    <Text style={[styles.segmentText, !voiceReply && styles.segmentTextActive]}>Text reply</Text>
                   </Pressable>
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Voice and text replies"
+                    accessibilityLabel="Spoken reply"
                     onPress={() => setVoiceReplyPreference(true)}
                     style={[styles.segment, voiceReply && styles.segmentActive]}
                   >
-                    <Text style={[styles.segmentText, voiceReply && styles.segmentTextActive]}>Voice + text</Text>
+                    <Text style={[styles.segmentText, voiceReply && styles.segmentTextActive]}>Spoken reply</Text>
                   </Pressable>
                 </View>
 

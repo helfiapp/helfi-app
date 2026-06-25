@@ -5254,7 +5254,7 @@ export function TrackCaloriesScreen() {
               <Text style={{ fontWeight: '800' }}>This AI feature has been used {foodAnalysisUsageCount} times.</Text>
             </Text>
             <Text style={{ marginTop: 2, color: '#4B5563', fontSize: 14 }}>
-              Cost: {foodAnalysisCostPerUse} credits per food analysis.
+              Cost: {foodAnalysisCostPerUse} credits per food photo notes request.
             </Text>
           </View>
         </View>
@@ -7282,130 +7282,141 @@ export function TrackCaloriesScreen() {
         </View>
       </Modal>
 
-      <Modal transparent visible={barcodeOpen} animationType="fade" onRequestClose={() => setBarcodeOpen(false)}>
+      <Modal
+        transparent
+        visible={barcodeOpen || barcodeLabelOpen}
+        animationType="fade"
+        onRequestClose={() => {
+          setBarcodeOpen(false)
+          setBarcodeLabelOpen(false)
+        }}
+      >
         <View style={modalBackdrop}>
-          <View style={modalCard}>
-            <Text style={modalTitle}>Barcode scanner</Text>
-            <Text style={{ color: theme.colors.muted }}>
-              {barcodeUsageMode === 'editor' ? 'Adding ingredient to the meal editor' : `Adding to: ${mealLabel(barcodeTargetMeal)}`}
-            </Text>
-            <TextInput
-              value={barcodeCode}
-              onChangeText={setBarcodeCode}
-              placeholder="Type barcode number"
-              placeholderTextColor="#8AA39D"
-              style={[inputStyle, { marginTop: 10 }]}
-            />
-            <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-              <Pressable
-                onPress={() => void captureBarcodePhoto()}
-                style={miniSecondaryButton}
-                accessibilityRole="button"
-                accessibilityLabel="Scan barcode with camera"
-              >
-                <Text style={miniSecondaryText}>Camera scan</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setBarcodeFlashOn((prev) => !prev)}
-                style={miniSecondaryButton}
-                accessibilityRole="button"
-                accessibilityLabel={barcodeFlashOn ? 'Turn barcode flash off' : 'Turn barcode flash on'}
-              >
-                <Text style={miniSecondaryText}>Flash: {barcodeFlashOn ? 'On' : 'Off'}</Text>
-              </Pressable>
-            </View>
-            <Pressable
-              onPress={() => void lookupBarcode()}
-              style={[primaryButton, { marginTop: 8 }]}
-              accessibilityRole="button"
-              accessibilityLabel={barcodeLoading ? 'Searching for barcode' : 'Lookup barcode'}
-            >
-              <Text style={primaryButtonText}>{barcodeLoading ? 'Searching...' : 'Lookup barcode'}</Text>
-            </Pressable>
-            <Pressable
-              onPress={() => setBarcodeLabelOpen(true)}
-              style={[secondaryButton, { marginTop: 8 }]}
-              accessibilityRole="button"
-              accessibilityLabel="Capture missing barcode label details"
-            >
-              <Text style={secondaryButtonText}>Missing label? Capture details</Text>
-            </Pressable>
-
-            {barcodeFood ? (
-              <View style={{ marginTop: 10, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{barcodeFood.name}</Text>
+          <View style={barcodeLabelOpen ? modalCardLarge : modalCard}>
+            {barcodeLabelOpen ? (
+              <>
+                <Text style={modalTitle}>Missing label capture</Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
-                  {formatCalories(numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal), energyUnit)} • P {round1(numberOrZero(barcodeFood.protein_g))}g • C {round1(numberOrZero(barcodeFood.carbs_g))}g • F {round1(numberOrZero(barcodeFood.fat_g))}g
+                  Save product details so this barcode can work next time.
                 </Text>
+
+                <View style={{ marginTop: 10, gap: 8 }}>
+                  <TextInput
+                    value={barcodeLabelName}
+                    onChangeText={setBarcodeLabelName}
+                    placeholder="Product name"
+                    placeholderTextColor="#8AA39D"
+                    style={inputStyle}
+                  />
+                  <TextInput
+                    value={barcodeLabelBrand}
+                    onChangeText={setBarcodeLabelBrand}
+                    placeholder="Brand (optional)"
+                    placeholderTextColor="#8AA39D"
+                    style={inputStyle}
+                  />
+                  <TextInput
+                    value={barcodeLabelServing}
+                    onChangeText={setBarcodeLabelServing}
+                    placeholder="Serving size (example: 100 g)"
+                    placeholderTextColor="#8AA39D"
+                    style={inputStyle}
+                  />
+                  <LabeledNumberInput label="Calories" value={barcodeLabelCalories} onChange={setBarcodeLabelCalories} />
+                  <LabeledNumberInput label="Protein (g)" value={barcodeLabelProtein} onChange={setBarcodeLabelProtein} />
+                  <LabeledNumberInput label="Carbs (g)" value={barcodeLabelCarbs} onChange={setBarcodeLabelCarbs} />
+                  <LabeledNumberInput label="Fat (g)" value={barcodeLabelFat} onChange={setBarcodeLabelFat} />
+                  <LabeledNumberInput label="Fiber (g)" value={barcodeLabelFiber} onChange={setBarcodeLabelFiber} />
+                  <LabeledNumberInput label="Sugar (g)" value={barcodeLabelSugar} onChange={setBarcodeLabelSugar} />
+                </View>
+
+                <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+                  <Pressable onPress={() => void saveBarcodeLabel()} style={[primaryButton, barcodeModalRowActionButton]}>
+                    <Text style={primaryButtonText}>Save label</Text>
+                  </Pressable>
+                  <Pressable onPress={() => setBarcodeLabelOpen(false)} style={[secondaryButton, barcodeModalRowActionButton]}>
+                    <Text style={secondaryButtonText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              </>
+            ) : (
+              <>
+                <Text style={modalTitle}>Barcode scanner</Text>
+                <Text style={{ color: theme.colors.muted }}>
+                  {barcodeUsageMode === 'editor' ? 'Adding ingredient to the meal editor' : `Adding to: ${mealLabel(barcodeTargetMeal)}`}
+                </Text>
+                <TextInput
+                  value={barcodeCode}
+                  onChangeText={setBarcodeCode}
+                  placeholder="Type barcode number"
+                  placeholderTextColor="#8AA39D"
+                  style={[inputStyle, { marginTop: 10 }]}
+                />
+                <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
+                  <Pressable
+                    onPress={() => void captureBarcodePhoto()}
+                    style={miniSecondaryButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Scan barcode with camera"
+                  >
+                    <Text style={miniSecondaryText}>Camera scan</Text>
+                  </Pressable>
+                  <Pressable
+                    onPress={() => setBarcodeFlashOn((prev) => !prev)}
+                    style={miniSecondaryButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={barcodeFlashOn ? 'Turn barcode flash off' : 'Turn barcode flash on'}
+                  >
+                    <Text style={miniSecondaryText}>Flash: {barcodeFlashOn ? 'On' : 'Off'}</Text>
+                  </Pressable>
+                </View>
                 <Pressable
-                  onPress={() => void addBarcodeFood()}
-                  style={[primaryButton, { marginTop: 8 }]}
+                  onPress={() => void lookupBarcode()}
+                  style={[primaryButton, barcodeModalActionButton, { marginTop: 8 }]}
                   accessibilityRole="button"
-                  accessibilityLabel={barcodeUsageMode === 'editor' ? 'Add barcode ingredient' : 'Add barcode food to diary'}
+                  accessibilityLabel={barcodeLoading ? 'Searching for barcode' : 'Lookup barcode'}
                 >
-                  <Text style={primaryButtonText}>{barcodeUsageMode === 'editor' ? 'Add ingredient' : 'Add to diary'}</Text>
+                  <Text style={primaryButtonText}>{barcodeLoading ? 'Searching...' : 'Lookup barcode'}</Text>
                 </Pressable>
-              </View>
-            ) : null}
+                <Pressable
+                  onPress={() => setBarcodeLabelOpen(true)}
+                  style={[secondaryButton, barcodeModalActionButton, { marginTop: 8 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Capture missing barcode label details"
+                >
+                  <Text style={secondaryButtonText}>Missing label? Capture details</Text>
+                </Pressable>
 
-            <Pressable
-              onPress={() => setBarcodeOpen(false)}
-              style={modalCancelButton}
-              accessibilityRole="button"
-              accessibilityLabel="Close barcode scanner"
-            >
-              <Text style={modalCancelText}>Close</Text>
-            </Pressable>
-          </View>
-        </View>
-      </Modal>
+                {barcodeFood ? (
+                  <View style={{ marginTop: 10, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10 }}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{barcodeFood.name}</Text>
+                    <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
+                      {formatCalories(numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal), energyUnit)} • P {round1(numberOrZero(barcodeFood.protein_g))}g • C {round1(numberOrZero(barcodeFood.carbs_g))}g • F {round1(numberOrZero(barcodeFood.fat_g))}g
+                    </Text>
+                    <Pressable
+                      onPress={() => void addBarcodeFood()}
+                      style={[primaryButton, barcodeModalActionButton, { marginTop: 8 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel={barcodeUsageMode === 'editor' ? 'Add barcode ingredient' : 'Add barcode food to diary'}
+                    >
+                      <Text style={primaryButtonText}>{barcodeUsageMode === 'editor' ? 'Add ingredient' : 'Add to diary'}</Text>
+                    </Pressable>
+                  </View>
+                ) : null}
 
-      <Modal transparent visible={barcodeLabelOpen} animationType="fade" onRequestClose={() => setBarcodeLabelOpen(false)}>
-        <View style={modalBackdrop}>
-          <View style={modalCardLarge}>
-            <Text style={modalTitle}>Missing label capture</Text>
-            <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
-              Save product details so this barcode can work next time.
-            </Text>
-
-            <View style={{ marginTop: 10, gap: 8 }}>
-              <TextInput
-                value={barcodeLabelName}
-                onChangeText={setBarcodeLabelName}
-                placeholder="Product name"
-                placeholderTextColor="#8AA39D"
-                style={inputStyle}
-              />
-              <TextInput
-                value={barcodeLabelBrand}
-                onChangeText={setBarcodeLabelBrand}
-                placeholder="Brand (optional)"
-                placeholderTextColor="#8AA39D"
-                style={inputStyle}
-              />
-              <TextInput
-                value={barcodeLabelServing}
-                onChangeText={setBarcodeLabelServing}
-                placeholder="Serving size (example: 100 g)"
-                placeholderTextColor="#8AA39D"
-                style={inputStyle}
-              />
-              <LabeledNumberInput label="Calories" value={barcodeLabelCalories} onChange={setBarcodeLabelCalories} />
-              <LabeledNumberInput label="Protein (g)" value={barcodeLabelProtein} onChange={setBarcodeLabelProtein} />
-              <LabeledNumberInput label="Carbs (g)" value={barcodeLabelCarbs} onChange={setBarcodeLabelCarbs} />
-              <LabeledNumberInput label="Fat (g)" value={barcodeLabelFat} onChange={setBarcodeLabelFat} />
-              <LabeledNumberInput label="Fiber (g)" value={barcodeLabelFiber} onChange={setBarcodeLabelFiber} />
-              <LabeledNumberInput label="Sugar (g)" value={barcodeLabelSugar} onChange={setBarcodeLabelSugar} />
-            </View>
-
-            <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={() => void saveBarcodeLabel()} style={primaryButton}>
-                <Text style={primaryButtonText}>Save label</Text>
-              </Pressable>
-              <Pressable onPress={() => setBarcodeLabelOpen(false)} style={secondaryButton}>
-                <Text style={secondaryButtonText}>Cancel</Text>
-              </Pressable>
-            </View>
+                <Pressable
+                  onPress={() => {
+                    setBarcodeOpen(false)
+                    setBarcodeLabelOpen(false)
+                  }}
+                  style={modalCancelButton}
+                  accessibilityRole="button"
+                  accessibilityLabel="Close barcode scanner"
+                >
+                  <Text style={modalCancelText}>Close</Text>
+                </Pressable>
+              </>
+            )}
           </View>
         </View>
       </Modal>
@@ -8104,6 +8115,16 @@ const primaryButton = {
 const primaryButtonText = {
   color: theme.colors.primaryText,
   fontWeight: '900' as const,
+}
+
+const barcodeModalActionButton = {
+  flex: 0,
+  minHeight: 44,
+  alignSelf: 'stretch' as const,
+}
+
+const barcodeModalRowActionButton = {
+  minHeight: 44,
 }
 
 const secondaryButton = {

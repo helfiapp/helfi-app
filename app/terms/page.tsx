@@ -79,7 +79,7 @@ export default function TermsPage() {
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">3. Subscription and Payment</h2>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>Helfi offers both free and paid subscription plans.</li>
-                <li>Paid features (e.g., AI health reports, food photo analysis, wearable sync, unlimited goals, AI chatbot) require an active subscription.</li>
+                <li>Paid features (e.g., AI health reports, food photo notes, wearable sync, unlimited goals, AI chatbot) require an active subscription.</li>
                 <li>All payments are billed in the currency shown at checkout and are non-refundable, except as required by law.</li>
                 <li>Practitioner listing subscriptions and boosts are billed in USD.</li>
                 <li>Boosts provide additional visibility only and do not guarantee leads, bookings, or outcomes.</li>
@@ -99,7 +99,7 @@ export default function TermsPage() {
             <section>
               <h2 className="text-2xl font-bold text-gray-900 mb-4 border-b-2 border-green-500 pb-2">4a. Laboratory Report PDFs</h2>
               <p className="text-gray-700 leading-relaxed mb-3">
-                By uploading a laboratory report in PDF format, you represent that you are permitted to provide the report to Helfi for the sole purpose of extracting and analyzing laboratory test results for your personal use.
+                By uploading a laboratory report in PDF format, you represent that you are permitted to provide the report to Helfi for the sole purpose of extracting and organizing laboratory test results for your personal use.
               </p>
               <ul className="text-gray-700 leading-relaxed space-y-2 list-disc pl-6">
                 <li>If your PDF is password-protected and you choose to supply the password, you expressly authorize Helfi to use that password once to decrypt and process the file. We do not store your password.</li>

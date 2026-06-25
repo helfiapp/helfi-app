@@ -28,6 +28,7 @@ export default function DevicesPage() {
   const [garminCheckingStatus, setGarminCheckingStatus] = useState(false)
   const [deviceInterest, setDeviceInterest] = useState<Record<string, boolean>>({})
   const [savingInterest, setSavingInterest] = useState(false)
+  const [isNativeApp, setIsNativeApp] = useState(false)
   const [loadingDemo, setLoadingDemo] = useState(false)
   const [clearingDemo, setClearingDemo] = useState(false)
   const [adminToken, setAdminToken] = useState<string | null>(null)
@@ -39,6 +40,9 @@ export default function DevicesPage() {
   const garminClosedCheckRef = useRef<ReturnType<typeof setInterval> | null>(null)
 
   useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    const nativeApp = params.get('helfiNative') === '1'
+    setIsNativeApp(nativeApp)
     checkFitbitStatus()
     if (garminConnectEnabled) {
       checkGarminStatus()
@@ -60,7 +64,6 @@ export default function DevicesPage() {
     }
     
     // Check URL params for Fitbit connection result
-    const params = new URLSearchParams(window.location.search)
     if (params.get('fitbit_connected') === 'true') {
       setFitbitConnected(true)
       window.history.replaceState({}, '', '/devices')
@@ -224,6 +227,11 @@ export default function DevicesPage() {
   }
 
   const handleConnectFitbit = async () => {
+    if (isNativeApp) {
+      window.location.href = '/api/auth/fitbit/authorize'
+      return
+    }
+
     setFitbitLoading(true)
     setPopupOpen(true)
     setCheckingStatus(true)
@@ -359,6 +367,11 @@ export default function DevicesPage() {
       alert('Garmin Connect is temporarily unavailable while production access is pending.')
       return
     }
+    if (isNativeApp) {
+      window.location.href = '/api/auth/garmin/authorize'
+      return
+    }
+
     setGarminLoading(true)
     setGarminPopupOpen(true)
     setGarminCheckingStatus(true)
@@ -937,7 +950,9 @@ export default function DevicesPage() {
                 </button>
               </div>
               <p className="text-xs text-gray-500 dark:text-gray-400">
-                You&apos;ll be redirected to Garmin Connect to approve access. We keep the popup open so you can continue browsing while you authorize.
+                {isNativeApp
+                  ? 'You will be redirected to Garmin Connect to approve access, then returned to Helfi.'
+                  : 'You will be redirected to Garmin Connect to approve access. We keep the popup open so you can continue browsing while you authorize.'}
               </p>
             </div>
           )}

@@ -91,7 +91,7 @@ export async function GET(request: NextRequest) {
 
         await del(blobPathname).catch(() => {})
       } catch (upgradeError) {
-        console.warn('Medical image encryption upgrade failed:', upgradeError)
+        console.warn('Health image note encryption upgrade failed:', upgradeError)
       }
     }
 
@@ -102,7 +102,7 @@ export async function GET(request: NextRequest) {
       },
     })
   } catch (error) {
-    console.error('Secure medical image fetch failed:', error)
+    console.error('Secure health image note fetch failed:', error)
     return NextResponse.json({ error: 'Failed to load file' }, { status: 500 })
   }
 }

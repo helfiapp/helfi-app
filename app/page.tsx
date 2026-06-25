@@ -270,9 +270,9 @@ export default function SplashPage() {
               Your AI <span className="text-helfi-green">Health Tracking App</span>
             </h1>
             <p className="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed max-w-4xl mx-auto">
-              Track meals, supplements, symptoms, and daily health metrics in one place. Get weekly AI
-              health insights, monitor trends, and turn your data into practical next steps. Analyze food
-              photos, lab reports, and health images with clear notes you can actually use. Find trusted
+              Track meals, supplements, daily notes, and health metrics in one place. Get weekly AI
+              health insights, monitor trends, and turn your data into practical next steps. Review food
+              photos, lab reports, and personal health notes with clear summaries you can actually use. Find trusted
               healthcare providers in our practitioner directory.
             </p>
             <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -373,7 +373,7 @@ export default function SplashPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Food Analysis and Nutrition</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Food Photo Notes and Nutrition</h3>
               <p className="text-gray-600 leading-relaxed">
                 Photo-assisted meal logging with flexible edits and trends.
               </p>
@@ -403,14 +403,14 @@ export default function SplashPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Lab Report Analysis</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Lab Report Review</h3>
               <p className="text-gray-600 leading-relaxed">
                 Upload labs and follow biomarkers over time.
               </p>
             </Link>
 
             <Link
-              href="/features/medical-imaging"
+              href="/features/health-image-notes"
               className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
             >
               <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
@@ -433,9 +433,9 @@ export default function SplashPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
                 </svg>
               </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Symptom Tracking</h3>
+              <h3 className="text-2xl font-bold text-helfi-black mb-4">Health Notes</h3>
               <p className="text-gray-600 leading-relaxed">
-                Log symptoms with context and spot patterns.
+                Log how you feel with context and spot patterns over time.
               </p>
             </Link>
 
@@ -785,7 +785,7 @@ export default function SplashPage() {
             </h2>
             <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
               In today's fast-paced world, maintaining optimal health requires more than just good intentions. 
-              Our AI-powered health intelligence platform transforms how you understand and optimize your wellbeing.
+              Helfi helps you keep daily health tracking organized so patterns are easier to review over time.
             </p>
           </div>
 
@@ -1227,17 +1227,17 @@ export default function SplashPage() {
               Frequently Asked Questions
             </h2>
             <p className="text-xl text-gray-600">
-              Everything you need to know about Helfi's AI-powered health intelligence platform
+              Everything you need to know about Helfi's health tracking tools
             </p>
           </div>
 
           <div className="space-y-8">
             <div className="bg-gray-50 rounded-2xl p-8">
               <h3 className="text-xl font-bold text-helfi-black mb-4">
-                How does Helfi's AI analyze my health data?
+                How does Helfi review my health tracking data?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Helfi looks at the data you log across nutrition, supplements, sleep, check-ins, and symptoms. Each week we
+                Helfi looks at the data you log across nutrition, supplements, sleep, check-ins, and health notes. Each week we
                 build a report from your last 7 days and surface patterns that are easier to miss in day-to-day tracking. The
                 more consistent your logging, the clearer the weekly trends become.
               </p>
@@ -1270,7 +1270,7 @@ export default function SplashPage() {
                 How accurate is the food photo recognition?
               </h3>
               <p className="text-gray-600 leading-relaxed">
-                Food photo analysis provides estimates that you can review and edit. For best results, take clear photos and
+                Food photo notes provide estimates that you can review and edit. For best results, take clear photos and
                 adjust ingredients or portions before saving. The goal is speed and consistency, with you in control of final
                 entries.
               </p>
@@ -1353,7 +1353,7 @@ export default function SplashPage() {
               <div className="text-4xl mb-4">⚡</div>
               <h3 className="text-xl font-bold text-helfi-black mb-4">Increase Energy Levels</h3>
               <p className="text-gray-600">
-                By analyzing patterns in your sleep, nutrition, and supplement intake, Helfi identifies what factors 
+                By reviewing patterns in your sleep, nutrition, and supplement intake, Helfi helps highlight what factors
                 contribute to energy crashes and sustained vitality, helping you maintain consistent energy throughout the day.
               </p>
             </div>
@@ -1503,7 +1503,7 @@ export default function SplashPage() {
                 We're finalizing an updated demo video to show you all the amazing features of Helfi.
               </p>
               <p className="text-gray-600 leading-relaxed">
-                Stay tuned for a comprehensive walkthrough of how our AI-powered health intelligence platform can transform your wellness journey!
+                Stay tuned for a simple walkthrough of how Helfi helps you organize food, water, mood, notes, and weekly reports.
               </p>
             </div>
             <div className="flex gap-3">

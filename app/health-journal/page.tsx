@@ -55,7 +55,7 @@ function mergeContentWithMediaNotes(content: string, summaries: string[]) {
   const cleaned = summaries.map((item) => trimSummary(item, '')).filter(Boolean)
   if (!cleaned.length) return base
   const list = cleaned.map((item, index) => `${index + 1}. ${item}`).join('\n')
-  const block = `Media notes (auto-analyzed):\n${list}`
+  const block = `Media notes (auto-summarized):\n${list}`
   return [base, block].filter(Boolean).join('\n\n').trim()
 }
 
@@ -416,8 +416,8 @@ export default function HealthJournalPage() {
   const extractMediaFromFile = async (params: { kind: 'image' | 'audio'; file: File }) => {
     const fallback =
       params.kind === 'image'
-        ? 'Image analyzed for health journal context.'
-        : 'Voice note analyzed for health journal context.'
+        ? 'Image summarized for health journal context.'
+        : 'Voice note summarized for health journal context.'
 
     const formData = new FormData()
     formData.append('kind', params.kind)
@@ -494,7 +494,7 @@ export default function HealthJournalPage() {
             : item,
         ),
       )
-      setError(err?.message || 'Image analysis failed. You can still continue.')
+      setError(err?.message || 'Image summary failed. You can still continue.')
     }
   }
 
@@ -657,7 +657,7 @@ export default function HealthJournalPage() {
               ),
             )
           }
-          setError(err?.message || 'Voice note analysis failed. You can still continue.')
+          setError(err?.message || 'Voice note summary failed. You can still continue.')
         } finally {
           mediaRecorderRef.current = null
           recorderStreamRef.current?.getTracks().forEach((track) => track.stop())
@@ -708,7 +708,7 @@ export default function HealthJournalPage() {
     }
 
     if (images.some((item) => item.processing) || audioClips.some((item) => item.processing)) {
-      setError('Please wait for photo and voice analysis to finish.')
+      setError('Please wait for photo and voice summaries to finish.')
       return
     }
 
@@ -741,7 +741,7 @@ export default function HealthJournalPage() {
       }
       setNote('')
       clearComposerMedia()
-      setNotice('Saved. Media was analyzed and only summary text was kept.')
+      setNotice('Saved. Media was summarized and only summary text was kept.')
       if (activeTab === 'history' && selectedDate === todayIso) {
         loadHistory(selectedDate)
         loadMonthDates(dateSheetMonth)
@@ -1051,7 +1051,7 @@ export default function HealthJournalPage() {
               Write a quick note about pain, symptoms, supplements, food, or anything health-related.
             </p>
             <p className="mt-2 text-xs text-gray-500">
-              Photos and voice notes are analyzed straight away. Raw files are not kept on our server.
+              Photos and voice notes are summarized straight away. Raw files are not kept on our server.
             </p>
             <input
               ref={imageInputRef}
@@ -1172,7 +1172,7 @@ export default function HealthJournalPage() {
                           </button>
                         </div>
                         <div className="mt-2 text-xs text-gray-600">
-                          {item.processing ? 'Analyzing photo...' : item.failed ? 'Could not analyze photo.' : 'Photo analyzed'}
+                          {item.processing ? 'Summarizing photo...' : item.failed ? 'Could not summarize photo.' : 'Photo summarized'}
                         </div>
                       </div>
                     ))}
@@ -1208,7 +1208,7 @@ export default function HealthJournalPage() {
                           className="mt-2 w-full"
                         />
                         <div className="mt-2 text-xs text-gray-600">
-                          {item.processing ? 'Analyzing voice note...' : item.failed ? 'Could not analyze voice note.' : 'Voice note analyzed'}
+                          {item.processing ? 'Summarizing voice note...' : item.failed ? 'Could not summarize voice note.' : 'Voice note summarized'}
                         </div>
                       </div>
                     ))}
@@ -1217,7 +1217,7 @@ export default function HealthJournalPage() {
 
                 {mediaProcessing ? (
                   <div className="rounded-xl border border-amber-200 bg-amber-50 px-3 py-2 text-xs text-amber-800">
-                    Media analysis is in progress. Please wait before submitting.
+                    Media summary is in progress. Please wait before submitting.
                   </div>
                 ) : extractedMediaNotes.length > 0 ? (
                   <div className="rounded-xl border border-emerald-200 bg-emerald-50 p-3">
@@ -1245,7 +1245,7 @@ export default function HealthJournalPage() {
             <div className="mt-4 flex items-center justify-between">
               <span className="text-xs text-gray-400">
                 {mediaProcessing
-                  ? 'Media is still analyzing...'
+                  ? 'Media is still summarizing...'
                   : "Saved with today's date and time."}
               </span>
               <button

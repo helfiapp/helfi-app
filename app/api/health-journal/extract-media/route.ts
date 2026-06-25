@@ -88,7 +88,7 @@ const summarizeImage = async (client: OpenAI, file: File, userId: string) => {
 
   return trimSummary(
     completion.choices?.[0]?.message?.content || '',
-    'Image analyzed for health journal context.',
+    'Image summarized for health journal context.',
   )
 }
 
@@ -113,7 +113,7 @@ const transcribeAudio = async (client: OpenAI, file: File, userId: string) => {
   })
 
   const text = typeof response === 'string' ? response : (response as any)?.text || ''
-  return trimSummary(text, 'Voice note analyzed for health journal context.')
+  return trimSummary(text, 'Voice note summarized for health journal context.')
 }
 
 export async function POST(request: NextRequest) {
@@ -160,8 +160,8 @@ export async function POST(request: NextRequest) {
     if (!openai) {
       const fallback =
         kind === 'image'
-          ? 'Image analyzed for health journal context.'
-          : 'Voice note analyzed for health journal context.'
+          ? 'Image summarized for health journal context.'
+          : 'Voice note summarized for health journal context.'
       return NextResponse.json({ success: true, kind, summary: fallback, ai: false })
     }
 
@@ -197,6 +197,6 @@ export async function POST(request: NextRequest) {
       }).catch(() => {})
     }
     console.error('[health-journal] media extraction error', error)
-    return NextResponse.json({ error: 'Failed to analyze media' }, { status: 500 })
+    return NextResponse.json({ error: 'Failed to summarize media' }, { status: 500 })
   }
 }

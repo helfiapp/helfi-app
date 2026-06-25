@@ -38,7 +38,7 @@ export async function DELETE(
       try {
         await del(blobTarget)
       } catch (deleteError) {
-        console.warn('Failed to delete medical image blob:', deleteError)
+        console.warn('Failed to delete health image note file:', deleteError)
       }
     }
 
@@ -51,7 +51,7 @@ export async function DELETE(
 
     return NextResponse.json({ success: true })
   } catch (error) {
-    console.error('Error deleting medical image history item:', error)
+    console.error('Error deleting health image notes history item:', error)
     return NextResponse.json(
       {
         error: 'Failed to delete history item',

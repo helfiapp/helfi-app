@@ -11085,7 +11085,7 @@ const applyStructuredItems = (
       }
       if (!response.ok) {
         const text = await response.text().catch(() => '')
-        throw new Error(text || 'Photo analysis failed')
+        throw new Error(text || 'Photo estimate failed')
       }
       const result = await response.json()
       const items = Array.isArray(result?.items) ? result.items : []
@@ -11099,8 +11099,8 @@ const applyStructuredItems = (
       nextItem.dbLocked = true
       replaceIngredientAtIndex(targetIndex, nextItem, `Updated to ${nextItem.name}`)
     } catch (err) {
-      console.error('Replace photo analysis failed', err)
-      setReplacePhotoError('Photo analysis failed. Please try again.')
+      console.error('Replace photo estimate failed', err)
+      setReplacePhotoError('Photo estimate failed. Please try again.')
     } finally {
       setReplacePhotoLoading(false)
       photoReplaceTargetRef.current = null
@@ -11848,7 +11848,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     } catch {}
     
     try {
-      console.log('🔍 AGENT #6 DEBUG: Starting photo analysis...');
+      console.log('🔍 AGENT #6 DEBUG: Starting photo estimate...');
       console.log('📊 Original file:', { 
         name: fileToAnalyze.name, 
         size: fileToAnalyze.size, 
@@ -12055,7 +12055,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
         throw new Error('Invalid response format from AI service');
       }
     } catch (error) {
-      console.error('💥 PHOTO ANALYSIS FAILED:', error);
+      console.error('💥 PHOTO ESTIMATE FAILED:', error);
       
       const errorMessage = error instanceof Error ? error.message : 'Unknown error occurred';
       console.error('🔍 Error details:', {
@@ -12066,7 +12066,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       
       if (!isFeedbackRescan) {
         // More specific error messages based on error type
-        let fallbackMessage = `🤖 Photo analysis failed: ${errorMessage}`;
+        let fallbackMessage = `🤖 Photo estimate failed: ${errorMessage}`;
         
         if (errorMessage.includes('fetch')) {
           fallbackMessage = `🌐 Network error occurred while analyzing photo. Please check your connection and try again.`;
@@ -12139,7 +12139,7 @@ Meanwhile, you can describe your food manually:
           .join('; ');
       }
       
-      console.log('🚀 PERFORMANCE: Analyzing text (faster than photo analysis)...');
+      console.log('🚀 PERFORMANCE: Analyzing text (faster than photo estimate)...');
       
       // Call OpenAI to analyze the manual food entry
       const response = await fetch('/api/analyze-food', {
@@ -13330,7 +13330,7 @@ Please add nutritional information manually if needed.`);
       setPendingPhotoPicker(false)
     } catch {}
 
-    // Build a multi-ingredient meal using the same ingredient cards UI as photo analysis,
+    // Build a multi-ingredient meal using the same ingredient cards UI as photo estimates,
     // but without requiring a photo.
     setSelectedAddCategory(targetCategory)
     setManualMealBuildMode(true)
@@ -21838,7 +21838,7 @@ Please add nutritional information manually if needed.`);
                         <div className="space-y-1">
                           <div>No results yet. Plurals are OK — we auto-try the single word.</div>
                           {hint && <div className="text-[11px] text-gray-400">{hint}{err}</div>}
-                          <div>Can't find your food? You can use AI photo analysis instead.</div>
+                          <div>Can't find your food? You can use AI food photo notes instead.</div>
                         </div>
                       )
                     })()}
@@ -21855,7 +21855,7 @@ Please add nutritional information manually if needed.`);
                 </div>
                 <div className="mt-4 pt-3 border-t border-gray-100 space-y-2">
                   <div className="text-sm font-medium text-gray-900">
-                    Or use AI photo analysis
+                    Or use AI food photo notes
                   </div>
                   <p className="text-xs text-gray-500">
                     Take a clear photo of the food or package and let Helfi estimate the nutrition using AI.
@@ -22234,11 +22234,11 @@ Please add nutritional information manually if needed.`);
             </svg>
           </button>
 
-          {/* Credits usage meter for Food Analysis (visible on initial load) */}
+          {/* Credits usage meter for Food Photo Notes (visible on initial load) */}
           <div className="mt-2">
             <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
-            <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
-            <p className="text-xs text-gray-600 mt-1">Cost: 10 credits per food analysis.</p>
+            <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Photo Notes" refreshTrigger={usageMeterRefresh} />
+            <p className="text-xs text-gray-600 mt-1">Cost: 10 credits per food photo notes request.</p>
           </div>
 
           {/* Category picker first */}
@@ -22524,13 +22524,13 @@ Please add nutritional information manually if needed.`);
                 </svg>
                 Back
               </button>
-              <div className="text-base sm:text-lg font-semibold text-gray-900">Food Analysis</div>
+              <div className="text-base sm:text-lg font-semibold text-gray-900">Food Photo Notes</div>
               <div className="w-10" />
             </div>
             <div>
               <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
-              <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
-              <p className="text-xs text-gray-600 mt-1">Cost: 10 credits per food analysis.</p>
+              <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Photo Notes" refreshTrigger={usageMeterRefresh} />
+              <p className="text-xs text-gray-600 mt-1">Cost: 10 credits per food photo notes request.</p>
             </div>
           </div>
         )}
@@ -22654,7 +22654,7 @@ Please add nutritional information manually if needed.`);
             <div className="relative w-full max-w-sm bg-white rounded-2xl shadow-2xl border border-gray-200 p-5 space-y-4">
               <div className="text-base font-semibold text-gray-900">Analysis in progress</div>
               <p className="text-sm text-gray-600">
-                A food analysis is running. Are you sure you want to cancel and go back?
+                A food photo estimate is running. Are you sure you want to cancel and go back?
               </p>
               <div className="flex items-center justify-end gap-2">
                 <button
@@ -22682,7 +22682,7 @@ Please add nutritional information manually if needed.`);
 
                 {/* Food Processing Area */}
         {shouldShowAddPanel && (
-          // Outer wrapper now has no extra background so the inner Food Analysis
+          // Outer wrapper now has no extra background so the inner Food Photo Notes
           // card can stretch closer to the screen edges on mobile.
           <div className="mb-6">
 
@@ -22753,7 +22753,7 @@ Please add nutritional information manually if needed.`);
               </div>
             )}
             
-            {/* Photo Analysis Flow */}
+            {/* Photo estimate flow */}
             {photoPreview && !showAiResult && !isEditingDescription && (
               <div className="text-center">
                 <h3 className="text-lg font-semibold mb-4">📸 Your Photo</h3>
@@ -22923,14 +22923,14 @@ Please add nutritional information manually if needed.`);
                   </div>
                   {!isAnalysisRoute && (
                     <div className="mt-2">
-                      <p className="text-xs text-gray-500 text-center mb-2">Cost: 10 credits per food analysis</p>
+                      <p className="text-xs text-gray-500 text-center mb-2">Cost: 10 credits per food photo notes request</p>
                       {!hasPaidAccess && (
                         <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2 text-center">
                           Free accounts can try this AI feature once. After your free use, upgrade or buy credits to continue.
                         </div>
                       )}
                       <UsageMeter inline={true} refreshTrigger={usageMeterRefresh} feature="foodAnalysis" />
-                      <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Analysis" refreshTrigger={usageMeterRefresh} />
+                      <FeatureUsageDisplay featureName="foodAnalysis" featureLabel="Food Photo Notes" refreshTrigger={usageMeterRefresh} />
                     </div>
                   )}
                   

@@ -16,7 +16,7 @@ import { theme } from '../ui/theme'
 const PRACTITIONER_LOCATION_KEY = 'helfi:practitionerLocation'
 const AI_WEB_PATHS = ['/chat', '/insights', '/health-tips', '/lab-reports', '/symptoms', '/medical-images']
 
-type NativeRecommendationSource = 'onboarding' | 'chat' | 'image' | 'symptom-analysis'
+type NativeRecommendationSource = 'onboarding' | 'chat' | 'image' | 'symptom-notes'
 
 type NativePractitionerRecommendation = {
   id: string

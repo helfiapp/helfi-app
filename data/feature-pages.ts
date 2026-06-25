@@ -541,7 +541,7 @@ export const featurePages: FeaturePageContent[] = [
     ],
     summary: 'Photo-assisted meal logging with flexible edits and trends.',
     heroImage: foodDiaryPhoto(
-      '/WEBSITE IMAGES/FOOD DIARY/WOMAN ANALYZING HER FOOD.png',
+      '/WEBSITE IMAGES/FOOD DIARY/WOMAN REVIEWING FOOD.png',
       'Reviewing a meal with the Helfi app'
     ),
     bannerImage: foodDiaryPhoto(
@@ -692,18 +692,18 @@ export const featurePages: FeaturePageContent[] = [
             'Preparing a meal at home'
           ),
           foodDiaryPhoto(
-            '/WEBSITE IMAGES/FOOD DIARY/FOOD ANALYZER IN ACTION.jpg',
+            '/WEBSITE IMAGES/FOOD DIARY/FOOD PHOTO NOTES IN ACTION.jpg',
             'Meal captured in the moment'
           ),
         ],
       },
       {
         anchorId: 'ai-photo-scan',
-        title: 'AI photo scan and ingredient breakdown',
+        title: 'AI food photo notes and ingredient breakdown',
         description:
           'Upload a meal photo and start with a structured breakdown.',
         details: [
-          'Photo analysis provides a quick starting point for ingredients and portions.',
+          'Food photo notes provide a quick starting point for ingredients and portions.',
           'You can review the entry and adjust it before saving the final log.',
           'This keeps the workflow fast while still letting you refine the data.',
         ],
@@ -1140,7 +1140,7 @@ export const featurePages: FeaturePageContent[] = [
   },
   {
     slug: 'lab-reports',
-    title: 'Lab Report Analysis',
+    title: 'Lab Report Review',
     subtitle: 'Upload lab results and follow trends over time.',
     intro:
       'Helfi extracts key markers from lab reports so you can track changes and prepare questions.',
@@ -1148,7 +1148,7 @@ export const featurePages: FeaturePageContent[] = [
       'Upload PDFs or photos of lab results and keep them organized by date.',
       'Trends help you see how markers change between visits so you can plan follow-up conversations.',
       'Lab summaries connect to your weekly health view so you can track progress over time.',
-      'The lab report analysis workflow supports biomarker tracking without manual spreadsheets.',
+      'The lab report review workflow supports biomarker tracking without manual spreadsheets.',
     ],
     summary: 'Upload lab reports and track biomarkers over time.',
     heroImage: {
@@ -1286,13 +1286,13 @@ export const featurePages: FeaturePageContent[] = [
       },
     ],
     seo: {
-      title: 'Lab Report Analysis',
+      title: 'Lab Report Review',
       description:
         'Upload lab reports and track biomarker trends over time in a secure, organized view.',
     },
   },
   {
-    slug: 'medical-imaging',
+    slug: 'health-image-notes',
     title: 'Health Image Notes',
     subtitle: 'Store images and keep structured summaries you can revisit.',
     intro:
@@ -1300,8 +1300,8 @@ export const featurePages: FeaturePageContent[] = [
     overview: [
       'Health-related images can be scattered across different providers and portals. Helfi keeps them in one place.',
       'Structured summaries help you remember what was discussed so you can prepare for future visits.',
-      'The goal is to keep your imaging history visible alongside the rest of your health timeline.',
-      'This health image notes workspace keeps your scans and notes organized and easy to revisit.',
+      'The goal is to keep your image history visible alongside the rest of your health timeline.',
+      'This health image notes workspace keeps saved images and notes organized and easy to revisit.',
     ],
     summary: 'Centralize health-related images with AI-assisted notes.',
     heroImage: {
@@ -1345,20 +1345,20 @@ export const featurePages: FeaturePageContent[] = [
       },
     ],
     outcomes: [
-      'A centralized place for medical imaging history.',
+      'A centralized place for health image notes history.',
       'Structured summaries that make follow-ups easier.',
       'Better preparation for appointments.',
-      'Clearer links between imaging and symptoms.',
+      'Clearer links between saved images and health notes.',
       'Less time searching across multiple portals.',
       'Context you can revisit when needed.',
     ],
     segments: [
       {
-        title: 'Upload medical images',
+        title: 'Upload health photos',
         description:
-          'Store images such as X-rays or scans in your Helfi timeline.',
+          'Store health-related images in your Helfi timeline.',
         details: [
-          'Uploads are organized by date so you can keep imaging history tidy.',
+          'Uploads are organized by date so you can keep image history tidy.',
           'Attach notes to highlight what matters from each appointment.',
           'This keeps your imaging library easy to navigate over time.',
         ],
@@ -1371,7 +1371,7 @@ export const featurePages: FeaturePageContent[] = [
         ],
         image: {
           src: '/screenshots/hero/HEALTH ISSUES.png',
-          alt: 'Medical images list on a phone',
+          alt: 'Health image notes list on a phone',
         },
       },
       {
@@ -1392,15 +1392,15 @@ export const featurePages: FeaturePageContent[] = [
         ],
         image: {
           src: '/screenshots/hero/INSIGHTS.png',
-          alt: 'Medical image summary view',
+          alt: 'Health image notes summary view',
         },
       },
       {
         title: 'History and comparison',
         description:
-          'Keep imaging history in one place so you can compare over time.',
+          'Keep health image notes in one place so you can compare over time.',
         details: [
-          'Track how imaging results shift between visits without losing older files.',
+          'Track how your saved notes change between visits without losing older files.',
           'This helps you keep long-term context in one place.',
           'Comparisons are easier when everything is organized chronologically.',
         ],
@@ -1413,7 +1413,7 @@ export const featurePages: FeaturePageContent[] = [
         ],
         image: {
           src: '/screenshots/hero/DASHBOARD.png',
-          alt: 'Medical imaging history on a phone',
+          alt: 'Health image notes history on a phone',
         },
       },
       {
@@ -1429,12 +1429,12 @@ export const featurePages: FeaturePageContent[] = [
           'Simple context notes',
           'Consistent documentation',
           'Better appointment prep',
-          'Keeps imaging history aligned',
+          'Keeps health image notes aligned',
           'Supports informed decisions',
         ],
         image: {
           src: '/screenshots/hero/MORE MENU.png',
-          alt: 'Medical imaging notes view',
+          alt: 'Health image notes view',
         },
       },
     ],

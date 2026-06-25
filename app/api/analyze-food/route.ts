@@ -525,7 +525,7 @@ const buildLocalNoKeyPhotoFallback = async (req: NextRequest): Promise<NextRespo
   }
   if (itemNames.length === 0) {
     return NextResponse.json(
-      { error: 'AI service is not configured for local photo analysis.' },
+      { error: 'AI service is not configured for local photo estimates.' },
       { status: 503 },
     );
   }
@@ -4704,7 +4704,7 @@ CRITICAL REQUIREMENTS:
       console.error('❌ Image analysis finished without card-ready items. Refusing to return a fake summary card.');
       return NextResponse.json(
         {
-          error: 'Food analysis could not create ingredient cards. Please try the photo again.',
+          error: 'Food photo notes could not create ingredient cards. Please try the photo again.',
           code: 'CARD_READY_ITEMS_MISSING',
         },
         { status: 502 },
@@ -4738,7 +4738,7 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    // NOTE: USDA/FatSecret database enhancement removed from AI photo analysis flow
+    // NOTE: USDA/FatSecret database enhancement removed from AI photo estimate flow
     // These databases are still available via /api/food-data for manual ingredient lookup
     // The AI analysis works better without database interference - it provides accurate
     // estimates based on visual analysis and portion sizes, which databases can't match.
@@ -5071,7 +5071,7 @@ CRITICAL REQUIREMENTS:
       }
       if (lowerMessage.includes('consumer') && lowerMessage.includes('suspended')) {
         return NextResponse.json(
-          { error: 'AI photo analysis provider is currently unavailable.' },
+          { error: 'AI photo estimate provider is currently unavailable.' },
           { status: 503 }
         );
       }

@@ -626,7 +626,7 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      // Log AI usage for non-streaming medical image chat
+      // Log AI usage for non-streaming health image notes chat
       try {
         await logAIUsage({
           context: { feature: 'medical-image:chat', userId: user.id },

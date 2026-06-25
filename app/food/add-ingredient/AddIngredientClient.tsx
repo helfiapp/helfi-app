@@ -1799,7 +1799,7 @@ export default function AddIngredientClient() {
             ? data.message
             : typeof data?.error === 'string'
             ? data.error
-            : 'Photo analysis failed. Please try again.'
+            : 'Photo estimate failed. Please try again.'
         setError(msg)
         return
       }
@@ -1861,7 +1861,7 @@ export default function AddIngredientClient() {
       } catch {}
       router.push('/food')
     } catch (e: any) {
-      setError(e?.message || 'Photo analysis failed. Please try again.')
+      setError(e?.message || 'Photo estimate failed. Please try again.')
     } finally {
       setPhotoLoading(false)
       try {
@@ -2068,7 +2068,7 @@ export default function AddIngredientClient() {
           </div>
 
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2">
-            <div className="text-sm font-semibold text-gray-900">Or use AI photo analysis</div>
+            <div className="text-sm font-semibold text-gray-900">Or use AI food photo notes</div>
             <div className="text-sm text-gray-600">Take a clear photo of the food or package.</div>
 
             <div>

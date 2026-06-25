@@ -61,7 +61,7 @@ export const termsOfUse: LegalDoc = {
       title: '3. Subscription and Payment',
       bullets: [
         'Helfi offers both free and paid subscription plans.',
-        'Paid features (e.g., AI health reports, food photo analysis, wearable sync, unlimited goals, AI chatbot) require an active subscription.',
+        'Paid features (e.g., AI health reports, food photo notes, wearable sync, unlimited goals, AI chatbot) require an active subscription.',
         'All payments are billed in the currency shown at checkout and are non-refundable, except as required by law.',
         'Practitioner listing subscriptions and boosts are billed in USD.',
         'Boosts provide additional visibility only and do not guarantee leads, bookings, or outcomes.',
@@ -79,7 +79,7 @@ export const termsOfUse: LegalDoc = {
     {
       title: '4a. Laboratory Report PDFs',
       paragraphs: [
-        'By uploading a laboratory report in PDF format, you represent that you are permitted to provide the report to Helfi for the sole purpose of extracting and analyzing laboratory test results for your personal use.',
+        'By uploading a laboratory report in PDF format, you represent that you are permitted to provide the report to Helfi for the sole purpose of extracting and organizing laboratory test results for your personal use.',
       ],
       bullets: [
         'If your PDF is password-protected and you choose to supply the password, you expressly authorize Helfi to use that password once to decrypt and process the file. We do not store your password.',
@@ -245,7 +245,7 @@ export const privacyPolicy: LegalDoc = {
       paragraphs: ['We use your data to:'],
       bullets: [
         "Provide and personalize the App's features",
-        'Deliver AI-generated reports, chat responses, food analysis, and other AI assistance after you give in-app permission',
+        'Deliver AI-generated reports, chat responses, food photo notes, and other AI assistance after you give in-app permission',
         'Parse, normalize, display, and analyze laboratory test results for your personal use',
         'Improve app functionality using aggregated or de-identified information where allowed, and only in line with your choices and applicable law',
         'Process payments and manage subscriptions',

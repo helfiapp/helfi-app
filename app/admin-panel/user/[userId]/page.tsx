@@ -401,15 +401,15 @@ export default function AdminUserPage() {
                     <div className="text-xs text-slate-500 mb-3">Monthly feature usage</div>
                     <div className="grid gap-3 md:grid-cols-2 text-sm">
                       <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2">
-                        <span>Food analysis</span>
+                        <span>Food photo notes</span>
                         <span className="font-semibold">{user.dailyFoodAnalysisUsed || 0}</span>
                       </div>
                       <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2">
-                        <span>Food reanalysis</span>
+                        <span>Food photo retry</span>
                         <span className="font-semibold">{user.dailyFoodReanalysisUsed || 0}</span>
                       </div>
                       <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2">
-                        <span>Medical image</span>
+                        <span>Health image notes</span>
                         <span className="font-semibold">{user.monthlyMedicalImageAnalysisUsed || 0}</span>
                       </div>
                       <div className="flex justify-between bg-slate-50 rounded-lg px-3 py-2">

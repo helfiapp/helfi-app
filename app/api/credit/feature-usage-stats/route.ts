@@ -189,7 +189,7 @@ export async function GET(req: NextRequest) {
   for (const ev of events) {
     const f = String(ev.feature || '')
 
-    // Food photo analysis (AI calls only): keep this for fallback/debug, but prefer FoodLog count.
+    // Food photo notes (AI calls only): keep this for fallback/debug, but prefer FoodLog count.
     if (
       (f === 'food:image-analysis' || f === 'food:text-analysis' || f === 'food:analyze-packaged') &&
       !f.includes('reanalysis')

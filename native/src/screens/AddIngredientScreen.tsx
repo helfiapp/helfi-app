@@ -2005,7 +2005,7 @@ export function AddIngredientScreen() {
             gap: 10,
           }}
         >
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Or use AI photo analysis</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Or use AI food photo notes</Text>
           <Text style={{ fontSize: 14, color: '#4B5563' }}>Take a clear photo of the food or package.</Text>
 
           <View>

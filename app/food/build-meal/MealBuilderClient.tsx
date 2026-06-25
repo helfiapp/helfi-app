@@ -4981,7 +4981,7 @@ export default function MealBuilderClient() {
             ? data.message
             : typeof data?.error === 'string'
             ? data.error
-            : 'Photo analysis failed. Please try again.'
+            : 'Photo estimate failed. Please try again.'
         setError(msg)
         return
       }
@@ -4995,7 +4995,7 @@ export default function MealBuilderClient() {
         window.dispatchEvent(new Event('credits:refresh'))
       } catch {}
     } catch {
-      setError('Photo analysis failed. Please try again.')
+      setError('Photo estimate failed. Please try again.')
     } finally {
       setPhotoLoading(false)
       try {

@@ -106,8 +106,8 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
         },
         {
           label: 'Health Image Notes',
-          href: '/features/medical-imaging',
-          description: 'General notes for health images.',
+          href: '/features/health-image-notes',
+          description: 'Personal notes for saved health photos.',
           icon: (
             <svg className={iconClassName} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
               <rect x="3" y="4" width="18" height="14" rx="2" />
@@ -117,9 +117,9 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
           ),
         },
         {
-          label: 'Symptom Tracking',
+          label: 'Health Notes',
           href: '/features/symptom-tracking',
-          description: 'Log symptoms and spot patterns.',
+          description: 'Log how you feel and spot patterns.',
           icon: (
             <svg className={iconClassName} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" aria-hidden="true">
               <path strokeLinecap="round" strokeLinejoin="round" d="M12 3v18" />

@@ -52,6 +52,7 @@ export default function ReminderSettingsPage() {
   const [pushBusy, setPushBusy] = useState(false)
   const [isIOS, setIsIOS] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
+  const [isNativeApp, setIsNativeApp] = useState(false)
 
   const checkinsStickyKeyGlobal = 'checkins-settings-sticky'
   const readStickyCheckins = () => {
@@ -160,6 +161,8 @@ export default function ReminderSettingsPage() {
       (window.navigator as any).standalone === true ||
       (window.matchMedia && window.matchMedia('(display-mode: standalone)').matches)
     setIsInstalled(standalone)
+    const params = new URLSearchParams(window.location.search)
+    setIsNativeApp(params.get('helfiNative') === '1')
     setLocalPrefsLoaded(true)
   }, [])
 
@@ -186,6 +189,10 @@ export default function ReminderSettingsPage() {
 
   const handlePushNotificationToggle = async (enabled: boolean) => {
     if (pushBusy) return
+    if (isNativeApp && enabled) {
+      alert('Use the Reminders screen in the app to manage phone alerts.')
+      return
+    }
     if (isIOS && !isInstalled && enabled) {
       alert('On iPhone: add to Home Screen first, then open the app icon and enable here.')
       return
@@ -575,6 +582,8 @@ export default function ReminderSettingsPage() {
   const moodMaxReminderLabel = moodMaxFrequency >= 4
     ? 'You can set up to 4 reminders per day.'
     : 'Free members can set 1 reminder per day.'
+  const needsIosInstall = isIOS && !isInstalled && !isNativeApp
+  const pushNotificationsDisabled = pushBusy || isNativeApp || needsIosInstall
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
@@ -585,26 +594,36 @@ export default function ReminderSettingsPage() {
           <div className="flex items-center justify-between mb-3">
             <div>
               <h2 className="text-xl font-bold text-gray-900 dark:text-white">Push notifications</h2>
-              <p className="text-sm text-gray-600 dark:text-gray-400">Turn these on to receive reminders on this device.</p>
+              <p className="text-sm text-gray-600 dark:text-gray-400">
+                {isNativeApp
+                  ? 'Use the Reminders screen in the app to manage phone alerts.'
+                  : 'Turn these on to receive reminders on this device.'}
+              </p>
             </div>
-            <label className={`relative inline-flex items-center ${(isIOS && !isInstalled) ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
+            <label className={`relative inline-flex items-center ${pushNotificationsDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
                 className="sr-only peer"
                 checked={pushNotifications}
-                disabled={isIOS && !isInstalled}
+                disabled={pushNotificationsDisabled}
                 onChange={(e) => handlePushNotificationToggle(e.target.checked)}
               />
-              <div className={`w-11 h-6 ${(isIOS && !isInstalled) ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${(isIOS && !isInstalled) ? '' : 'peer-checked:bg-helfi-green'} ${(isIOS && !isInstalled) ? 'opacity-50' : ''}`}></div>
+              <div className={`w-11 h-6 ${pushNotificationsDisabled ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${pushNotificationsDisabled ? '' : 'peer-checked:bg-helfi-green'} ${pushNotificationsDisabled ? 'opacity-50' : ''}`}></div>
             </label>
           </div>
-          {isIOS && !isInstalled && (
+          {isNativeApp ? (
+            <p className="text-xs text-gray-500 dark:text-gray-400">
+              Phone notification permission is handled by the native app. The reminder choices below still control which reminders are active.
+            </p>
+          ) : needsIosInstall && (
             <p className="text-xs text-gray-500 dark:text-gray-400">
               On iPhone: Add to Home Screen first, then open the app icon to enable notifications.
             </p>
           )}
           <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">
-            Step 1: turn on push notifications. Step 2: turn on the check-in and mood reminders below and pick times.
+            {isNativeApp
+              ? 'Turn on the check-in and mood reminders below, pick times, and make sure phone notifications are allowed for Helfi.'
+              : 'Step 1: turn on push notifications. Step 2: turn on the check-in and mood reminders below and pick times.'}
           </p>
         </div>
 
@@ -612,7 +631,9 @@ export default function ReminderSettingsPage() {
           <div className="bg-amber-50 border border-amber-200 text-amber-900 rounded-lg p-4">
             <div className="font-semibold mb-1">Push notifications are off on this device.</div>
             <div className="text-sm">
-              Turn them on above so reminders can actually appear.
+              {isNativeApp
+                ? 'Allow phone notifications from the native app so reminders can appear.'
+                : 'Turn them on above so reminders can actually appear.'}
             </div>
           </div>
         )}

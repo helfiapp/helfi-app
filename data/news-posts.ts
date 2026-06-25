@@ -42,7 +42,7 @@ export const newsPosts: NewsPost[] = [
     heroImageAlt: 'Helfi iOS and Android apps coming soon banner',
     internalLinks: [
       {
-        label: 'Explore Food Analysis and Nutrition Logging',
+        label: 'Explore Food Photo Notes and Nutrition Logging',
         href: '/features/nutrition-food',
       },
       {

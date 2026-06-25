@@ -40,6 +40,9 @@ export default function AccountPage() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
+  const [passwordError, setPasswordError] = useState('')
+  const [passwordSuccess, setPasswordSuccess] = useState('')
   
   // Delete confirmation state
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -120,6 +123,57 @@ export default function AccountPage() {
     if (!dirtyRef.current) return
     saveAccount({ silent: true, payload: accountRef.current })
   })
+
+  const resetPasswordModal = () => {
+    setShowPasswordModal(false)
+    setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+    setPasswordError('')
+    setPasswordSuccess('')
+    setIsChangingPassword(false)
+  }
+
+  const handlePasswordChange = async () => {
+    setPasswordError('')
+    setPasswordSuccess('')
+
+    if (passwordData.newPassword.length < 8) {
+      setPasswordError('New password must be at least 8 characters long.')
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      setPasswordError('New password and confirmation must match.')
+      return
+    }
+
+    setIsChangingPassword(true)
+    try {
+      const response = await fetch('/api/account/change-password', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      })
+
+      const data = await response.json().catch(() => ({}))
+      if (!response.ok) {
+        throw new Error(data?.error || 'Password could not be changed. Please try again.')
+      }
+
+      setPasswordSuccess('Password changed successfully.')
+      setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
+      setTimeout(() => {
+        setShowPasswordModal(false)
+        setPasswordSuccess('')
+      }, 1200)
+    } catch (error: any) {
+      setPasswordError(error?.message || 'Password could not be changed. Please try again.')
+    } finally {
+      setIsChangingPassword(false)
+    }
+  }
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -205,8 +259,12 @@ export default function AccountPage() {
                   <h4 className="font-medium text-gray-900">Password</h4>
                   <p className="text-sm text-gray-600">Change your account password</p>
                 </div>
-                <button
-                  onClick={() => setShowPasswordModal(true)}
+              <button
+                onClick={() => {
+                  setPasswordError('')
+                  setPasswordSuccess('')
+                  setShowPasswordModal(true)
+                }}
                   className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium"
                 >
                   Change Password
@@ -228,6 +286,7 @@ export default function AccountPage() {
                 <button
                   onClick={() => setShowDeleteConfirm(true)}
                   className="bg-red-500 text-white px-4 py-2 rounded-lg hover:bg-red-600 transition-colors font-medium"
+                  style={{ backgroundColor: '#dc2626' }}
                 >
                   Delete Account
                 </button>
@@ -320,6 +379,16 @@ export default function AccountPage() {
           <div className="bg-white rounded-lg p-6 w-full max-w-md mx-4">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Change Password</h3>
             <div className="space-y-4">
+              {passwordError && (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
+                  {passwordError}
+                </div>
+              )}
+              {passwordSuccess && (
+                <div className="rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm text-green-700">
+                  {passwordSuccess}
+                </div>
+              )}
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-1">Current Password</label>
                 <div className="relative">
@@ -407,25 +476,22 @@ export default function AccountPage() {
             </div>
             <div className="flex justify-end space-x-3 mt-6">
               <button
-                onClick={() => {
-                  setShowPasswordModal(false)
-                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                }}
+                onClick={resetPasswordModal}
                 className="px-4 py-2 text-gray-700 border border-gray-300 rounded-lg hover:bg-gray-50"
               >
                 Cancel
               </button>
               <button
-                onClick={async () => {
-                  // Password change logic here
-                  alert('Password change functionality coming soon!')
-                  setShowPasswordModal(false)
-                  setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' })
-                }}
+                onClick={handlePasswordChange}
                 className="px-4 py-2 bg-helfi-green text-white rounded-lg hover:bg-helfi-green/90"
-                disabled={!passwordData.currentPassword || !passwordData.newPassword || passwordData.newPassword !== passwordData.confirmPassword}
+                disabled={
+                  isChangingPassword ||
+                  !passwordData.currentPassword ||
+                  !passwordData.newPassword ||
+                  passwordData.newPassword !== passwordData.confirmPassword
+                }
               >
-                Change Password
+                {isChangingPassword ? 'Changing...' : 'Change Password'}
               </button>
             </div>
           </div>
@@ -504,6 +570,7 @@ export default function AccountPage() {
                   }
                 }}
                 className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
+                style={{ backgroundColor: deleteConfirmText === 'DELETE' && !isDeleting ? '#dc2626' : '#9ca3af' }}
                 disabled={deleteConfirmText !== 'DELETE' || isDeleting}
               >
                 {isDeleting ? 'Deleting...' : 'Delete Account'}

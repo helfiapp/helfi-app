@@ -96,7 +96,7 @@ const CreditPurchaseModal: React.FC<CreditPurchaseModalProps> = ({
               <h4 className="font-medium text-gray-900 mb-2">Today's Feature Usage</h4>
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
-                  <span className="text-gray-700">Food Analysis (1 credit each):</span>
+                  <span className="text-gray-700">Food Photo Notes (1 credit each):</span>
                   <span className="font-medium text-gray-900">{creditInfo.featureUsageToday.foodAnalysis}</span>
                 </div>
                 <div className="flex justify-between">

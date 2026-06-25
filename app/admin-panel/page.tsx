@@ -156,7 +156,7 @@ export default function AdminPanel() {
   const [visionUsageLoading, setVisionUsageLoading] = useState(false)
   const [visionUsageError, setVisionUsageError] = useState('')
 
-  // Food analysis cost testing (admin)
+  // Food photo notes cost testing (admin)
   const [foodCostSimRange, setFoodCostSimRange] = useState(7)
   const [foodCostSim, setFoodCostSim] = useState<any>(null)
   const [foodCostSimLoading, setFoodCostSimLoading] = useState(false)
@@ -840,10 +840,10 @@ export default function AdminPanel() {
         headers: { Authorization: `Bearer ${authToken}` },
       })
       const data = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(data?.error || 'Failed to load food analysis usage')
+      if (!res.ok) throw new Error(data?.error || 'Failed to load food photo notes usage')
       setFoodServerUsage(data)
     } catch (err: any) {
-      setFoodServerUsageError(err?.message || 'Failed to load food analysis usage')
+      setFoodServerUsageError(err?.message || 'Failed to load food photo notes usage')
     } finally {
       setFoodServerUsageLoading(false)
     }
@@ -2448,7 +2448,7 @@ The Helfi Team`)
 Big news! We've just released some amazing new features that will take your health journey to the next level:
 
 🔥 **What's New:**
-• Enhanced AI food analysis with better accuracy
+• Enhanced AI food photo notes with clearer estimates
 • New health image notes for tracking visible changes
 • Improved medication interaction database
 • Faster mobile app performance
@@ -3988,9 +3988,9 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             <div className="bg-white rounded-lg shadow p-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <div className="font-semibold text-gray-900">Food analysis server usage (estimate)</div>
+                  <div className="font-semibold text-gray-900">Food photo notes server usage (estimate)</div>
                   <div className="text-xs text-gray-500">
-                    Based on food analysis logs. Estimate assumes 1 analysis call + 1 save + 1 refresh.
+                    Based on food photo notes logs. Estimate assumes 1 note call + 1 save + 1 refresh.
                   </div>
                 </div>
                 <div className="flex items-center gap-2">
@@ -4021,7 +4021,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
               )}
 
               {foodServerUsageLoading && (
-                <div className="mt-3 text-sm text-gray-600">Loading food analysis usage...</div>
+                <div className="mt-3 text-sm text-gray-600">Loading food photo notes usage...</div>
               )}
 
               {!foodServerUsageLoading && foodServerUsage && (
@@ -4062,7 +4062,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             <div className="bg-white rounded-lg shadow p-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2">
                 <div>
-                  <div className="font-semibold text-gray-900">Server cost estimator (food analysis)</div>
+                  <div className="font-semibold text-gray-900">Server cost estimator (food photo notes)</div>
                   <div className="text-xs text-gray-500">
                     Uses server calls only. Set your cost per 1,000 calls from Vercel usage.
                   </div>
@@ -4219,7 +4219,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     <tbody>
                       {(serverCallUsage.features || []).map((row: any) => {
                         const labelMap: Record<string, string> = {
-                          foodAnalysis: 'Food analysis',
+                          foodAnalysis: 'Food photo notes',
                           packagedFoodLabel: 'Packaged food label',
                           symptomAnalysis: 'Symptom notes',
                           medicalImageAnalysis: 'Health image notes',
@@ -4578,7 +4578,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
             <div className="bg-white rounded-lg shadow p-6 space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900">Food Analysis Cost Simulator</h3>
+                  <h3 className="text-lg font-semibold text-gray-900">Food Photo Notes Cost Simulator</h3>
                   <p className="text-sm text-gray-600">
                     Uses recent Helfi usage logs to estimate what switching models (e.g. GPT‑5.2) would cost per food image analysis.
                   </p>

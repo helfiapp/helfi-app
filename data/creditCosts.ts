@@ -13,7 +13,7 @@ export const CREDIT_DISPLAY = {
 }
 
 export const usageDisplayList = [
-  { label: 'Food photo analysis', key: 'foodAnalysis', credits: CREDIT_DISPLAY.foodAnalysis },
+  { label: 'Food photo notes', key: 'foodAnalysis', credits: CREDIT_DISPLAY.foodAnalysis },
   { label: 'Symptom notes', key: 'symptomAnalysis', credits: CREDIT_DISPLAY.symptomAnalysis },
   { label: 'Health image notes', key: 'medicalImageAnalysis', credits: CREDIT_DISPLAY.medicalImageAnalysis },
   { label: 'Insights generation', key: 'insightsGeneration', credits: CREDIT_DISPLAY.insightsGeneration },
