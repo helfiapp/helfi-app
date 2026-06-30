@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 30 June 2026, 10:20 AM AEST
+- What changed: Deployed the latest full iOS/web parity audit fixes and native app support API fixes, including Fitbit/Garmin native linking support, native Check-in/Profile/Journal/Symptom/Image Notes support routes, Talk to Helfi command handling, Billing/Credits row parity, Dashboard/More/Profile/Settings fixes, and iOS build 24 code updates.
+- Where to see it (page/link): https://helfi.ai and the Helfi iOS app screens backed by live.
+- What to quickly test: Install the newest available TestFlight build, then check login, Dashboard, Food Diary, More, Devices, Health Journal, Symptom Notes, Health Image Notes, Check-in, Profile Photo, Billing/Credits, Fitbit/Garmin Connect, and Talk to Helfi.
+
+DEPLOYED:
 - LIVE or STAGING: TestFlight
 - Date/time: 25 June 2026, 10:06 PM AEST
 - What changed: Uploaded Helfi iOS 1.0.0 build 23 to Apple/TestFlight from commit `21fca5dc` after the live audit fixes were deployed.
