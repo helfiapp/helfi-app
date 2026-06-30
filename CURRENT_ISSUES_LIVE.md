@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: TestFlight
+- Date/time: 30 June 2026, 10:25 AM AEST
+- What changed: Added iOS 1.0.0 build 24 to the Helfi Internal Testers group after Apple showed the upload as complete.
+- Where to see it (page/link): App Store Connect / TestFlight / Helfi Internal Testers. The group now shows build 1.0.0 (24) with status Testing.
+- What to quickly test: Install TestFlight build 24 on a real iPhone and retest the audit blockers, especially login, Food Diary, Talk to Helfi, Check-in, More, Devices, Fitbit/Garmin Connect, Health Journal, Symptom Notes, Health Image Notes, Profile Photo, Billing/Credits, camera, barcode, microphone, and Apple Health.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 30 June 2026, 10:20 AM AEST
 - What changed: Deployed the latest full iOS/web parity audit fixes and native app support API fixes, including Fitbit/Garmin native linking support, native Check-in/Profile/Journal/Symptom/Image Notes support routes, Talk to Helfi command handling, Billing/Credits row parity, Dashboard/More/Profile/Settings fixes, and iOS build 24 code updates.

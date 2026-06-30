@@ -9,9 +9,9 @@ Release status: NOT READY.
 - Build 24 was archived locally and uploaded to Apple/TestFlight from Xcode for real-phone testing.
 - Archive confirmed version 1.0.0 build 24.
 - Upload confirmed "Upload succeeded" and "Uploaded package is processing."
-- App Store Connect browser check could not visually confirm build 24 because the already-open Apple session expired and redirected to login.
+- FULL APP AUDIT 5 confirmed in App Store Connect on 2026-06-30 that build 24 is complete, added to the Helfi Internal Testers group, and shown as Testing.
 - No App Review submission was made, and Update Review was not clicked.
-- No web deploy was done, so server-side fixes in this local folder still need a separate owner-approved live deploy before real-phone tests that depend on those API changes can fully pass.
+- FULL APP AUDIT 5 deployed the live website/API fixes on 2026-06-30 and verified `helfi.ai` plus `www.helfi.ai` point to the newest READY deployment.
 
 ## Current Top Blockers
 
