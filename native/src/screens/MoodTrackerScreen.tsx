@@ -962,7 +962,7 @@ export function MoodTrackerScreen() {
     if (!authHeaders) return
     const name = uri.split('/').pop() || `mood-image-${Date.now()}.jpg`
     const type = mimeType || 'image/jpeg'
-    const targets = ['/api/native-mood-journal-upload', '/api/mood/journal/upload']
+    const targets = ['/api/mood/journal/upload']
     let lastError = 'Could not upload image'
 
     for (const target of targets) {
@@ -1017,7 +1017,7 @@ export function MoodTrackerScreen() {
     if (!authHeaders) return
     const name = uri.split('/').pop() || `voice-note-${Date.now()}.m4a`
     const mime = audioMimeFromUri(uri)
-    const targets = ['/api/native-mood-journal-upload-audio', '/api/mood/journal/upload-audio']
+    const targets = ['/api/mood/journal/upload-audio']
     let lastError = 'Could not upload audio'
 
     for (const target of targets) {

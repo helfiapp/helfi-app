@@ -87,7 +87,7 @@ export const NATIVE_WEB_PAGES: Record<NativeWebPageKey, NativeWebPageRoute> = {
     path: '/notifications/mood-reminders',
   },
   help: {
-    title: 'Help',
+    title: 'Help & Support',
     path: '/help',
   },
   faq: {

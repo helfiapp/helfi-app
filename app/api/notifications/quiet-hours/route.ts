@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { ensureSmartCoachTables } from '@/lib/smart-health-coach'
 
@@ -11,15 +12,23 @@ const normalizeTime = (input: unknown, fallback: string) => {
   return `${match[1].padStart(2, '0')}:${match[2]}`
 }
 
-export async function GET() {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+async function getQuietHoursUser(req: NextRequest) {
+  const nativeUserId = await getUserIdFromNativeAuth(req)
+  if (nativeUserId) {
+    return prisma.user.findUnique({ where: { id: nativeUserId } })
   }
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const session = await getServerSession(authOptions)
+  const email = String(session?.user?.email || '').trim().toLowerCase()
+  if (!email) return null
+
+  return prisma.user.findUnique({ where: { email } })
+}
+
+export async function GET(req: NextRequest) {
+  const user = await getQuietHoursUser(req)
   if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   await ensureSmartCoachTables()
@@ -66,14 +75,9 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) {
-    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  }
-
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await getQuietHoursUser(req)
   if (!user) {
-    return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const body = await req.json().catch(() => ({} as any))

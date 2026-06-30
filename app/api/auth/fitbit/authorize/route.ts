@@ -3,7 +3,7 @@ export const dynamic = 'force-dynamic';
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
-import { prisma } from '@/lib/prisma'
+import { verifyNativeDeviceOauthTicket } from '@/lib/native-device-oauth-ticket'
 
 /**
  * Initiate Fitbit OAuth flow
@@ -11,9 +11,12 @@ import { prisma } from '@/lib/prisma'
  */
 export async function GET(request: NextRequest) {
   try {
+    const nativeTicket = request.nextUrl.searchParams.get('nativeTicket')
+    const nativePayload = verifyNativeDeviceOauthTicket(nativeTicket, 'fitbit')
     const session = await getServerSession(authOptions)
+    const userId = nativePayload?.userId || session?.user?.id
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized - Please sign in first' },
         { status: 401 }
@@ -32,7 +35,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Generate state parameter for CSRF protection
-    const state = Buffer.from(JSON.stringify({ userId: session.user.id })).toString('base64')
+    const state = nativePayload ? String(nativeTicket) : Buffer.from(JSON.stringify({ userId })).toString('base64')
     
     // Store state in session/cookie for verification
     const authUrl = `https://www.fitbit.com/oauth2/authorize?` +

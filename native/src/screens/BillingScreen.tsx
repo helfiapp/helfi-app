@@ -48,10 +48,19 @@ const defaultCredits: CreditState = {
   refreshAt: null,
 }
 
-const creditDisplayList = [
+const usageDisplayList = [
   { label: 'Food photo notes', key: 'foodAnalysis', credits: 10 },
+  { label: 'Symptom notes', key: 'symptomAnalysis', credits: 1 },
+  { label: 'Health image notes', key: 'medicalImageAnalysis', credits: 2 },
   { label: 'Insights generation', key: 'insightsGeneration', credits: 7 },
   { label: 'Talk to Helfi chat', key: 'chatLight', credits: 10 },
+]
+
+const creditCostDisplayList = [
+  ...usageDisplayList,
+  { label: 'AI recommended meal', key: 'aiMealRecommendation', credits: 10 },
+  { label: 'Recipe import (URL)', key: 'recipeImportUrl', credits: 10 },
+  { label: 'Recipe import (photo)', key: 'recipeImportPhoto', credits: 15 },
 ]
 
 const planCards = [
@@ -928,7 +937,7 @@ export function BillingScreen() {
             {!usageStatsLoading && !!usageStatsError ? <Text style={{ color: '#B91C1C' }}>{usageStatsError}</Text> : null}
             {!usageStatsLoading && !usageStatsError && usageStats ? (
               <View style={{ gap: 8 }}>
-                {creditDisplayList.map((item) => {
+                {usageDisplayList.map((item) => {
                   const count = Number(usageStats?.[item.key] || 0)
                   return (
                     <View
@@ -960,7 +969,7 @@ export function BillingScreen() {
           <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>AI feature credit costs</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>Each AI action deducts credits from your wallet.</Text>
           <View style={{ marginTop: 12, gap: 8 }}>
-            {creditDisplayList.map((item) => (
+            {creditCostDisplayList.map((item) => (
               <View
                 key={item.key}
                 style={{

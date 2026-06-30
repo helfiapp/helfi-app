@@ -4,6 +4,25 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { verifyNativeDeviceOauthTicket } from '@/lib/native-device-oauth-ticket'
+
+function nativeReturnHtml(provider: 'fitbit', status: 'connected' | 'error', error?: string) {
+  const url = `helfi://oauth-complete?provider=${provider}&status=${status}${error ? `&error=${encodeURIComponent(error)}` : ''}`
+  const title = status === 'connected' ? 'Fitbit Connected' : 'Fitbit Connection Failed'
+  const message = status === 'connected' ? 'Fitbit connected. Returning to Helfi...' : 'Fitbit connection failed. Returning to Helfi...'
+  return new NextResponse(
+    `<!DOCTYPE html>
+      <html>
+        <head><title>${title}</title></head>
+        <body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">
+          <p>${message}</p>
+          <script>window.location.replace(${JSON.stringify(url)})</script>
+          <p><a href="${url}">Open Helfi</a></p>
+        </body>
+      </html>`,
+    { headers: { 'Content-Type': 'text/html' } },
+  )
+}
 
 /**
  * Handle Fitbit OAuth callback
@@ -15,9 +34,12 @@ export async function GET(request: NextRequest) {
     const code = searchParams.get('code')
     const state = searchParams.get('state')
     const error = searchParams.get('error')
+    const nativePayload = verifyNativeDeviceOauthTicket(state, 'fitbit')
+    const isNative = !!nativePayload
 
     if (error) {
       console.error('❌ Fitbit OAuth error:', error)
+      if (isNative) return nativeReturnHtml('fitbit', 'error', error)
       const errorHtml = `
         <!DOCTYPE html>
         <html>
@@ -47,6 +69,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (!code || !state) {
+      if (isNative) return nativeReturnHtml('fitbit', 'error', 'missing_params')
       const errorHtml = `
         <!DOCTYPE html>
         <html>
@@ -78,10 +101,15 @@ export async function GET(request: NextRequest) {
     // Verify state and get userId
     let userId: string
     try {
-      const decodedState = JSON.parse(Buffer.from(state, 'base64').toString())
-      userId = decodedState.userId
+      if (nativePayload) {
+        userId = nativePayload.userId
+      } else {
+        const decodedState = JSON.parse(Buffer.from(state, 'base64').toString())
+        userId = decodedState.userId
+      }
     } catch (e) {
       console.error('❌ Invalid state parameter:', e)
+      if (isNative) return nativeReturnHtml('fitbit', 'error', 'invalid_state')
       return NextResponse.redirect(
         new URL('/devices?fitbit_error=invalid_state', request.nextUrl.origin)
       )
@@ -89,7 +117,7 @@ export async function GET(request: NextRequest) {
 
     // Verify user session matches state
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id || session.user.id !== userId) {
+    if (!isNative && (!session?.user?.id || session.user.id !== userId)) {
       return NextResponse.redirect(
         new URL('/devices?fitbit_error=session_mismatch', request.nextUrl.origin)
       )
@@ -167,7 +195,7 @@ export async function GET(request: NextRequest) {
         scope: tokens.scope,
       },
       create: {
-        userId: session.user.id,
+        userId,
         type: 'oauth',
         provider: 'fitbit',
         providerAccountId: fitbitUserId,
@@ -179,7 +207,9 @@ export async function GET(request: NextRequest) {
       },
     })
 
-    console.log('✅ Fitbit account linked successfully:', { userId: session.user.id, fitbitUserId })
+    console.log('✅ Fitbit account linked successfully:', { userId, fitbitUserId })
+
+    if (isNative) return nativeReturnHtml('fitbit', 'connected')
 
     // Return a page that will redirect and close popup
     // Since window.opener might be lost after Fitbit redirects, we'll use a redirect approach

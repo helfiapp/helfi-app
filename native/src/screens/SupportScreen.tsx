@@ -5,7 +5,6 @@ import {
   Linking,
   Pressable,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   View,
@@ -215,10 +214,8 @@ export function SupportScreen() {
     name: '',
     email: '',
     inquiryType: '',
-    registeredEmail: '',
     subject: '',
     message: '',
-    isRegisteredUser: true,
   })
 
   const [inquiryPickerOpen, setInquiryPickerOpen] = useState(false)
@@ -228,7 +225,6 @@ export function SupportScreen() {
       ...prev,
       name: String(session?.user?.name || ''),
       email: String(session?.user?.email || ''),
-      isRegisteredUser: true,
     }))
   }, [session?.user?.name, session?.user?.email])
 
@@ -541,15 +537,9 @@ export function SupportScreen() {
     const inquiryType = formData.inquiryType.trim()
     const subject = formData.subject.trim()
     const message = formData.message.trim()
-    const registeredEmail = formData.registeredEmail.trim().toLowerCase()
 
     if (!name || !email || !inquiryType || !message) {
       Alert.alert('Please fill all required fields.')
-      return
-    }
-
-    if (inquiryType === 'account' && !registeredEmail) {
-      Alert.alert('Please add your registered email for account support.')
       return
     }
 
@@ -582,7 +572,6 @@ export function SupportScreen() {
       setFormData((prev) => ({
         ...prev,
         inquiryType: '',
-        registeredEmail: '',
         subject: '',
         message: '',
       }))
@@ -1051,14 +1040,6 @@ export function SupportScreen() {
                 </View>
               ) : null}
 
-              <View style={{ marginTop: 2 }}>
-                <Text style={{ color: theme.colors.muted, fontWeight: '700', marginBottom: 6 }}>Registered user</Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                  <Text style={{ color: theme.colors.text }}>I am a registered Helfi user</Text>
-                  <Switch value={formData.isRegisteredUser} onValueChange={(next) => setFormData((prev) => ({ ...prev, isRegisteredUser: next }))} />
-                </View>
-              </View>
-
               <View>
                 <Text style={{ color: theme.colors.muted, fontWeight: '700', marginBottom: 6 }}>Your Name *</Text>
                 <TextInput
@@ -1132,29 +1113,6 @@ export function SupportScreen() {
                   </View>
                 ) : null}
               </View>
-
-              {formData.inquiryType === 'account' ? (
-                <View>
-                  <Text style={{ color: theme.colors.muted, fontWeight: '700', marginBottom: 6 }}>Registered Email Address *</Text>
-                  <TextInput
-                    value={formData.registeredEmail}
-                    onChangeText={(value) => setFormData((prev) => ({ ...prev, registeredEmail: value }))}
-                    placeholder="Email on your Helfi account"
-                    placeholderTextColor="#8AA39D"
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    style={{
-                      borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      borderRadius: theme.radius.md,
-                      paddingHorizontal: 12,
-                      paddingVertical: 11,
-                      color: theme.colors.text,
-                      backgroundColor: theme.colors.card,
-                    }}
-                  />
-                </View>
-              ) : null}
 
               <View>
                 <Text style={{ color: theme.colors.muted, fontWeight: '700', marginBottom: 6 }}>Subject</Text>

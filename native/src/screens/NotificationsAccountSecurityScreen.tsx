@@ -81,18 +81,20 @@ export function NotificationsAccountSecurityScreen({ navigation }: { navigation:
           </View>
 
           <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Manage account settings"
             onPress={() => navigation.navigate('AccountSettings')}
             style={({ pressed }) => ({
               opacity: pressed ? 0.9 : 1,
               borderWidth: 1,
               borderColor: theme.colors.border,
               borderRadius: theme.radius.md,
-              backgroundColor: theme.colors.card,
               paddingVertical: 12,
+              paddingHorizontal: 14,
               alignItems: 'center',
             })}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Manage account settings</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Manage account settings</Text>
           </Pressable>
         </View>
       </ScrollView>

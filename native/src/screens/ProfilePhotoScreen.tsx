@@ -72,7 +72,7 @@ export function ProfilePhotoScreen() {
         } as any,
       )
 
-      const res = await fetch(`${API_BASE_URL}/api/native-upload-profile-image`, {
+      const res = await fetch(`${API_BASE_URL}/api/upload-profile-image`, {
         method: 'POST',
         headers: {
           authorization: `Bearer ${session.token}`,
@@ -147,7 +147,7 @@ export function ProfilePhotoScreen() {
           try {
             if (mode !== 'signedIn' || !session?.token) return
             setUploading(true)
-            const res = await fetch(`${API_BASE_URL}/api/native-upload-profile-image`, {
+            const res = await fetch(`${API_BASE_URL}/api/upload-profile-image`, {
               method: 'DELETE',
               headers: {
                 authorization: `Bearer ${session.token}`,

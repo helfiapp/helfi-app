@@ -2,7 +2,7 @@ import { prisma } from '@/lib/prisma'
 import { calculateExerciseCalories } from '@/lib/exercise/calories'
 import { getHealthProfileForUser } from '@/lib/exercise/health-profile'
 
-export type ExerciseIngestSource = 'FITBIT' | 'GARMIN'
+export type ExerciseIngestSource = 'FITBIT' | 'GARMIN' | 'APPLE_HEALTH'
 
 export type IngestExerciseEntryInput = {
   userId: string
@@ -68,4 +68,3 @@ export async function ingestExerciseEntry(input: IngestExerciseEntryInput) {
   const entry = await prisma.exerciseEntry.create({ data })
   return { created: true, entry }
 }
-

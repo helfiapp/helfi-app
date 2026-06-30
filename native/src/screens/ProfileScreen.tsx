@@ -1,12 +1,10 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, Image, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
-import * as ImagePicker from 'expo-image-picker'
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
 import { useAppMode } from '../state/AppModeContext'
-import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 
@@ -15,7 +13,6 @@ type GenderOption = '' | 'male' | 'female' | 'other' | 'prefer-not-to-say'
 type ProfileForm = {
   firstName: string
   lastName: string
-  email: string
   bio: string
   dateOfBirth: string
   gender: GenderOption
@@ -24,7 +21,6 @@ type ProfileForm = {
 const emptyProfile: ProfileForm = {
   firstName: '',
   lastName: '',
-  email: '',
   bio: '',
   dateOfBirth: '',
   gender: '',
@@ -115,12 +111,11 @@ function DropdownOption({
 
 export function ProfileScreen() {
   const { session, mode } = useAppMode()
+  const navigation = useNavigation<any>()
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
-  const [uploadingImage, setUploadingImage] = useState(false)
   const [profile, setProfile] = useState<ProfileForm>(emptyProfile)
   const [initialHash, setInitialHash] = useState('')
-  const [accountImage, setAccountImage] = useState<string | null>(null)
   const [genderMenuOpen, setGenderMenuOpen] = useState(false)
 
   const isDirty = useMemo(() => JSON.stringify(profile) !== initialHash, [profile, initialHash])
@@ -152,13 +147,11 @@ export function ProfileScreen() {
       const next: ProfileForm = {
         firstName: String(info?.firstName || '').trim(),
         lastName: String(info?.lastName || '').trim(),
-        email: String(session?.user?.email || info?.email || '').trim(),
         bio: String(info?.bio || '').trim(),
         dateOfBirth: String(info?.dateOfBirth || '').trim(),
         gender: selectedGender,
       }
 
-      setAccountImage(typeof data?.profileImage === 'string' && data.profileImage ? data.profileImage : session?.user?.image || null)
       setProfile(next)
       setInitialHash(JSON.stringify(next))
       setGenderMenuOpen(false)
@@ -176,7 +169,7 @@ export function ProfileScreen() {
     }, [mode, session?.token]),
   )
 
-  const saveProfile = async () => {
+  const saveProfile = async (profileToSave: ProfileForm = profile) => {
     try {
       if (mode !== 'signedIn' || !session?.token) return
 
@@ -187,7 +180,7 @@ export function ProfileScreen() {
           'content-type': 'application/json',
           authorization: `Bearer ${session.token}`,
         },
-        body: JSON.stringify({ profileInfo: profile }),
+        body: JSON.stringify({ profileInfo: profileToSave }),
       })
 
       const data: any = await res.json().catch(() => ({}))
@@ -195,8 +188,7 @@ export function ProfileScreen() {
         throw new Error(data?.error || 'Could not save profile')
       }
 
-      setInitialHash(JSON.stringify(profile))
-      Alert.alert('Saved', 'Your profile has been updated.')
+      setInitialHash(JSON.stringify(profileToSave))
     } catch (error: any) {
       Alert.alert('Save failed', error?.message || 'Please try again.')
     } finally {
@@ -204,121 +196,13 @@ export function ProfileScreen() {
     }
   }
 
-  const uploadPickedImage = async (asset: ImagePicker.ImagePickerAsset) => {
-    try {
-      if (mode !== 'signedIn' || !session?.token) return
-      setUploadingImage(true)
-
-      const fileType = asset.mimeType || (asset.uri.toLowerCase().endsWith('.png') ? 'image/png' : 'image/jpeg')
-      const fileName = asset.fileName || `profile-${Date.now()}.${fileType.includes('png') ? 'png' : 'jpg'}`
-      const formData = new FormData()
-      formData.append(
-        'image',
-        {
-          uri: asset.uri,
-          name: fileName,
-          type: fileType,
-        } as any,
-      )
-
-      const res = await fetch(`${API_BASE_URL}/api/native-upload-profile-image`, {
-        method: 'POST',
-        headers: {
-          authorization: `Bearer ${session.token}`,
-        },
-        body: formData,
-      })
-
-      const data: any = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(data?.error || 'Could not upload photo')
-      }
-
-      if (typeof data?.imageUrl === 'string' && data.imageUrl) {
-        setAccountImage(data.imageUrl)
-      }
-      Alert.alert('Profile photo updated', 'Your new photo is saved.')
-    } catch (error: any) {
-      Alert.alert('Photo upload failed', error?.message || 'Please try again.')
-    } finally {
-      setUploadingImage(false)
-    }
-  }
-
-  const onPickPhoto = async () => {
-    try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
-      if (!permission.granted) {
-        Alert.alert('Permission needed', 'Please allow photo access to change your profile image.')
-        return
-      }
-
-      const result = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.85,
-      })
-
-      if (result.canceled || !result.assets?.[0]) return
-      await uploadPickedImage(result.assets[0])
-    } catch (error: any) {
-      Alert.alert('Could not open photos', error?.message || 'Please try again.')
-    }
-  }
-
-  const onTakePhoto = async () => {
-    try {
-      const permission = await ImagePicker.requestCameraPermissionsAsync()
-      if (!permission.granted) {
-        Alert.alert('Permission needed', 'Please allow camera access to take a profile photo.')
-        return
-      }
-
-      const result = await ImagePicker.launchCameraAsync({
-        allowsEditing: true,
-        aspect: [1, 1],
-        quality: 0.85,
-      })
-
-      if (result.canceled || !result.assets?.[0]) return
-      await uploadPickedImage(result.assets[0])
-    } catch (error: any) {
-      Alert.alert('Could not open camera', error?.message || 'Please try again.')
-    }
-  }
-
-  const onRemovePhoto = async () => {
-    Alert.alert('Remove profile photo?', 'This will remove your current profile image.', [
-      { text: 'Cancel', style: 'cancel' },
-      {
-        text: 'Remove',
-        style: 'destructive',
-        onPress: async () => {
-          try {
-            if (mode !== 'signedIn' || !session?.token) return
-            setUploadingImage(true)
-            const res = await fetch(`${API_BASE_URL}/api/native-upload-profile-image`, {
-              method: 'DELETE',
-              headers: {
-                authorization: `Bearer ${session.token}`,
-              },
-            })
-            const data: any = await res.json().catch(() => ({}))
-            if (!res.ok) {
-              throw new Error(data?.error || 'Could not remove photo')
-            }
-            setAccountImage(null)
-            Alert.alert('Removed', 'Your profile photo was removed.')
-          } catch (error: any) {
-            Alert.alert('Remove failed', error?.message || 'Please try again.')
-          } finally {
-            setUploadingImage(false)
-          }
-        },
-      },
-    ])
-  }
+  useEffect(() => {
+    if (loading || !isDirty || saving) return
+    const timer = setTimeout(() => {
+      void saveProfile(profile)
+    }, 900)
+    return () => clearTimeout(timer)
+  }, [profile, loading, isDirty, saving])
 
   if (loading) {
     return (
@@ -334,36 +218,27 @@ export function ProfileScreen() {
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg, padding: 16 }}>
           <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Profile Information</Text>
-          <Text style={{ marginTop: 6, color: theme.colors.muted }}>This is your native app profile page.</Text>
+          <Text style={{ marginTop: 6, color: theme.colors.muted }}>Auto-save enabled: Your changes save automatically when you leave this page.</Text>
 
-          <View style={{ alignItems: 'center', marginTop: 16, marginBottom: 16 }}>
-            {accountImage ? (
-              <Image source={{ uri: accountImage }} style={{ width: 84, height: 84, borderRadius: 42 }} />
-            ) : (
-              <View
-                style={{
-                  width: 84,
-                  height: 84,
-                  borderRadius: 42,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  backgroundColor: '#EAF5EF',
-                  borderWidth: 1,
-                  borderColor: theme.colors.border,
-                }}
-              >
-                <Text style={{ fontSize: 28, fontWeight: '900', color: theme.colors.primary }}>
-                  {String(profile.firstName || session?.user?.name || 'U').charAt(0).toUpperCase()}
-                </Text>
-              </View>
-            )}
-
-            <View style={{ marginTop: 12, width: '100%', gap: 8 }}>
-              <HelfiButton label={uploadingImage ? 'Uploading...' : 'Choose From Photos'} onPress={onPickPhoto} disabled={uploadingImage} />
-              <HelfiButton label={uploadingImage ? 'Uploading...' : 'Take Photo'} onPress={onTakePhoto} disabled={uploadingImage} variant="secondary" />
-              {accountImage ? <HelfiButton label={uploadingImage ? 'Please wait...' : 'Remove Photo'} onPress={onRemovePhoto} disabled={uploadingImage} variant="secondary" /> : null}
-            </View>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Change Profile Photo"
+            onPress={() => navigation.navigate('ProfilePhoto')}
+            style={({ pressed }) => ({
+              marginTop: 16,
+              marginBottom: 16,
+              alignSelf: 'flex-start',
+              borderRadius: theme.radius.md,
+              paddingHorizontal: 14,
+              paddingVertical: 10,
+              backgroundColor: '#EAF5EF',
+              borderWidth: 1,
+              borderColor: '#CFE8D4',
+              opacity: pressed ? 0.85 : 1,
+            })}
+          >
+            <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Change Profile Photo</Text>
+          </Pressable>
 
           <Field
             label="First Name"
@@ -378,16 +253,10 @@ export function ProfileScreen() {
             placeholder="Enter your last name"
           />
           <Field
-            label="Email"
-            value={profile.email}
-            onChangeText={(email) => setProfile((prev) => ({ ...prev, email }))}
-            placeholder="Enter your email"
-          />
-          <Field
             label="Bio"
             value={profile.bio}
             onChangeText={(bio) => setProfile((prev) => ({ ...prev, bio }))}
-            placeholder="Tell us about yourself"
+            placeholder="Tell us about yourself..."
             multiline
           />
           <Field
@@ -466,17 +335,10 @@ export function ProfileScreen() {
                 />
               </View>
             ) : null}
-            {genderMenuOpen ? (
-              <Pressable onPress={() => setGenderMenuOpen(false)} style={{ marginTop: 10 }}>
-                <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Tap again to close</Text>
-              </Pressable>
-            ) : null}
-            <View style={{ marginTop: 8 }}>
-              <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Matches web profile dropdown behavior.</Text>
-            </View>
           </View>
-
-          <HelfiButton label={saving ? 'Saving...' : isDirty ? 'Save Changes' : 'Saved'} onPress={saveProfile} disabled={saving || !isDirty} />
+          <Text style={{ color: saving ? theme.colors.primary : theme.colors.muted, fontSize: 12 }}>
+            {saving ? 'Saving...' : isDirty ? 'Saving changes automatically...' : 'All changes saved.'}
+          </Text>
         </View>
       </ScrollView>
     </Screen>

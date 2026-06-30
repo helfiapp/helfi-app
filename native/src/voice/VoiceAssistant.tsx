@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
 import * as FileSystem from 'expo-file-system'
@@ -51,6 +51,24 @@ const VOICE_REPLY_KEY = 'helfi_voice_reply_enabled_v1'
 const FOOD_FAVORITES_KEY = 'helfi_native_food_favorites_v2'
 const MAX_VOICE_FAVORITES = 120
 const VOICE_ASSISTANT_OPENING_EVENT = 'helfi:voice-assistant-opening'
+
+async function waitForActiveApp(timeoutMs = 1200) {
+  if (AppState.currentState === 'active') return true
+  return new Promise<boolean>((resolve) => {
+    let settled = false
+    const finish = (value: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      subscription.remove()
+      resolve(value)
+    }
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') finish(true)
+    })
+    const timer = setTimeout(() => finish(AppState.currentState === 'active'), timeoutMs)
+  })
+}
 
 function audioMimeFromUri(uri: string) {
   const lower = uri.toLowerCase()
@@ -168,13 +186,16 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [transcript, setTranscript] = useState('')
   const [draft, setDraft] = useState<VoiceDraft | null>(null)
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
+  const [recordingStarting, setRecordingStarting] = useState(false)
   const [recordingStartedAt, setRecordingStartedAt] = useState(0)
   const [busy, setBusy] = useState(false)
   const [confirming, setConfirming] = useState(false)
   const [voiceReply, setVoiceReply] = useState(false)
   const [chargedCredits, setChargedCredits] = useState<number | null>(null)
   const [autoSubmitToken, setAutoSubmitToken] = useState(0)
+  const [autoStartRecordingToken, setAutoStartRecordingToken] = useState(0)
   const autoSubmittedRef = useRef(0)
+  const autoStartedRecordingRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
   const voiceRecordingSupported = !(Platform.OS === 'ios' && (Platform as any).isPad === true)
 
@@ -244,9 +265,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setChargedCredits(null)
     setTranscript(input?.transcript || '')
     const shouldAutoSubmit = Boolean(input?.autoSubmit && input.transcript)
+    const shouldAutoStartRecording = input?.source === 'button' && !input?.transcript
     setTimeout(() => {
       setOpen(true)
       if (shouldAutoSubmit) setAutoSubmitToken((value) => value + 1)
+      if (shouldAutoStartRecording) setAutoStartRecordingToken((value) => value + 1)
     }, 140)
   }, [])
 
@@ -384,11 +407,17 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         return
       }
       if (recording) return
+      setRecordingStarting(true)
       setDraft(null)
       setChargedCredits(null)
       const permission = await Audio.requestPermissionsAsync()
       if (!permission.granted) {
         Alert.alert('Permission needed', 'Please allow microphone access to use Helfi voice.')
+        return
+      }
+      const appIsActive = await waitForActiveApp()
+      if (!appIsActive) {
+        Alert.alert('Recording unavailable', 'Please keep Helfi open, then tap the microphone again.')
         return
       }
       await Audio.setAudioModeAsync({
@@ -403,9 +432,29 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setRecording(created)
       setRecordingStartedAt(Date.now())
     } catch (error: any) {
-      Alert.alert('Recording failed', error?.message || 'Please try again.')
+      const message = String(error?.message || '')
+      Alert.alert(
+        'Recording failed',
+        message.toLowerCase().includes('background')
+          ? 'Please keep Helfi open, then tap the microphone again.'
+          : 'Please try again.',
+      )
+    } finally {
+      setRecordingStarting(false)
     }
   }, [recording, voiceRecordingSupported])
+
+  useEffect(() => {
+    if (!open || autoStartRecordingToken <= 0) return
+    if (autoStartedRecordingRef.current === autoStartRecordingToken) return
+    autoStartedRecordingRef.current = autoStartRecordingToken
+    const timer = setTimeout(() => {
+      if (!busy && !recording) {
+        void startRecording()
+      }
+    }, 80)
+    return () => clearTimeout(timer)
+  }, [autoStartRecordingToken, busy, open, recording, startRecording])
 
   const stopRecording = useCallback(async () => {
     if (!recording) return
@@ -469,8 +518,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             <View style={styles.panel}>
               <View style={styles.header}>
                 <View>
-                  <Text style={styles.title}>Talk to Helfi</Text>
-                  <Text style={styles.subtitle}>Tell Helfi what you want done.</Text>
+                  <Text style={styles.title}>Listening for a command</Text>
+                  <Text style={styles.subtitle}>Tell Helfi what to do in the app.</Text>
                 </View>
                 <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={closePanel} style={styles.iconButton}>
                   <Feather name="x" size={22} color={theme.colors.text} />
@@ -500,17 +549,17 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 {voiceRecordingSupported ? (
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel={recording ? 'Stop recording' : 'Record command'}
+                    accessibilityLabel={recording ? 'Stop recording' : recordingStarting ? 'Starting recording' : 'Record command'}
                     onPress={recording ? stopRecording : startRecording}
-                    disabled={busy}
-                    style={[styles.recordButton, recording && styles.recordingButton, busy && styles.disabled]}
+                    disabled={busy || recordingStarting}
+                    style={[styles.recordButton, recording && styles.recordingButton, (busy || recordingStarting) && styles.disabled]}
                   >
                     {busy ? (
                       <ActivityIndicator color="#FFFFFF" />
                     ) : (
                       <>
                         <Feather name={recording ? 'square' : 'mic'} size={22} color="#FFFFFF" />
-                        <Text style={styles.recordText}>{recording ? 'Stop recording' : 'Record command'}</Text>
+                        <Text style={styles.recordText}>{recording ? 'Stop recording' : recordingStarting ? 'Starting...' : 'Record command'}</Text>
                       </>
                     )}
                   </Pressable>
@@ -522,7 +571,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 )}
 
                 <View style={styles.section}>
-                  <Text style={styles.label}>Helfi heard</Text>
+                  <Text style={styles.label}>Command heard</Text>
                   <TextInput
                     value={transcript}
                     onChangeText={(value) => {
@@ -535,12 +584,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   />
                   <Pressable
                     accessibilityRole="button"
-                    accessibilityLabel="Send request"
+                    accessibilityLabel="Run command"
                     onPress={() => sendDraftRequest()}
                     disabled={busy || !transcript.trim()}
                     style={[styles.secondaryButton, (busy || !transcript.trim()) && styles.secondaryDisabled]}
                   >
-                    <Text style={styles.secondaryText}>Send request</Text>
+                    <Text style={styles.secondaryText}>Run command</Text>
                   </Pressable>
                 </View>
 
@@ -590,12 +639,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 </Pressable>
                 <Pressable
                   accessibilityRole="button"
-                  accessibilityLabel="Save now"
+                  accessibilityLabel="Confirm command"
                   onPress={confirmDraft}
                   disabled={!draft?.canConfirm || confirming}
                   style={[styles.confirmButton, (!draft?.canConfirm || confirming) && styles.confirmDisabled]}
                 >
-                  {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>Save now</Text>}
+                  {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>Confirm</Text>}
                 </Pressable>
               </View>
             </View>

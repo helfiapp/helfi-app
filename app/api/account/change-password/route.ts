@@ -3,14 +3,16 @@ import { getServerSession } from 'next-auth'
 import bcrypt from 'bcryptjs'
 
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 
 export async function POST(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
     const email = String(session?.user?.email || '').trim().toLowerCase()
+    const nativeUserId = email ? null : await getUserIdFromNativeAuth(request)
 
-    if (!email) {
+    if (!email && !nativeUserId) {
       return NextResponse.json({ error: 'Please sign in again before changing your password.' }, { status: 401 })
     }
 
@@ -27,7 +29,7 @@ export async function POST(request: NextRequest) {
     }
 
     const user = await prisma.user.findUnique({
-      where: { email },
+      where: nativeUserId ? { id: nativeUserId } : { email },
       select: { id: true, passwordHash: true },
     })
 

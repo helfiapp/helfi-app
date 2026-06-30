@@ -10,10 +10,11 @@ import {
   useWindowDimensions,
   View,
 } from 'react-native'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/native'
 import Svg, { Circle, Line as SvgLine, Path, Text as SvgText } from 'react-native-svg'
 
 import { API_BASE_URL } from '../config'
+import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -58,6 +59,8 @@ const PERIOD_OPTIONS: Array<{ key: PeriodKey; label: string }> = [
 
 export function DailyCheckInScreen() {
   const { mode, session } = useAppMode()
+  const route = useRoute<RouteProp<MainStackParamList, 'DailyCheckIn'>>()
+  const requestedTab = route.params?.tab
   const { width: screenWidth } = useWindowDimensions()
 
   const authHeaders = useMemo(() => {
@@ -76,7 +79,7 @@ export function DailyCheckInScreen() {
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [na, setNa] = useState<Record<string, boolean>>({})
   const [detailsOpen, setDetailsOpen] = useState<Record<string, boolean>>({})
-  const [activeTab, setActiveTab] = useState<TabKey>('today')
+  const [activeTab, setActiveTab] = useState<TabKey>(requestedTab === 'history' ? 'history' : 'today')
 
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyRows, setHistoryRows] = useState<CheckInHistoryRow[]>([])
@@ -90,6 +93,11 @@ export function DailyCheckInScreen() {
   const [editNote, setEditNote] = useState('')
   const [historyActionLoading, setHistoryActionLoading] = useState(false)
 
+  useEffect(() => {
+    if (requestedTab === 'history') setActiveTab('history')
+    if (requestedTab === 'today') setActiveTab('today')
+  }, [requestedTab])
+
   const loadToday = useCallback(async () => {
     if (!authHeaders) {
       setLoading(false)
@@ -98,7 +106,7 @@ export function DailyCheckInScreen() {
 
     try {
       setLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/native-checkins-today`, {
+      const res = await fetch(`${API_BASE_URL}/api/checkins/today`, {
         headers: authHeaders,
       })
       const data: any = await res.json().catch(() => ({}))
@@ -144,7 +152,7 @@ export function DailyCheckInScreen() {
 
     try {
       setHistoryLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/native-checkins-history`, {
+      const res = await fetch(`${API_BASE_URL}/api/checkins/history`, {
         headers: authHeaders,
       })
       const data: any = await res.json().catch(() => ({}))
@@ -183,7 +191,7 @@ export function DailyCheckInScreen() {
         isNa: !!na[issue.id],
       }))
 
-      const res = await fetch(`${API_BASE_URL}/api/native-checkins-today`, {
+      const res = await fetch(`${API_BASE_URL}/api/checkins/today`, {
         method: 'POST',
         headers: {
           ...authHeaders,
@@ -346,7 +354,7 @@ export function DailyCheckInScreen() {
     try {
       setHistoryActionLoading(true)
       const params = new URLSearchParams({ date: entry.date, issueId: entry.issueId })
-      const res = await fetch(`${API_BASE_URL}/api/native-checkins-ratings?${params.toString()}`, {
+      const res = await fetch(`${API_BASE_URL}/api/checkins/ratings?${params.toString()}`, {
         method: 'DELETE',
         headers: authHeaders,
       })
@@ -370,7 +378,7 @@ export function DailyCheckInScreen() {
     if (!authHeaders || !editingEntry) return
     try {
       setHistoryActionLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/native-checkins-ratings`, {
+      const res = await fetch(`${API_BASE_URL}/api/checkins/ratings`, {
         method: 'PATCH',
         headers: {
           ...authHeaders,
@@ -408,7 +416,7 @@ export function DailyCheckInScreen() {
     if (issueIds.length === 0) return
     try {
       setHistoryActionLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/native-checkins-ratings`, {
+      const res = await fetch(`${API_BASE_URL}/api/checkins/ratings`, {
         method: 'POST',
         headers: {
           ...authHeaders,
@@ -431,7 +439,7 @@ export function DailyCheckInScreen() {
     if (!authHeaders) return
     try {
       setHistoryActionLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/native-checkins-ratings`, {
+      const res = await fetch(`${API_BASE_URL}/api/checkins/ratings`, {
         method: 'POST',
         headers: {
           ...authHeaders,

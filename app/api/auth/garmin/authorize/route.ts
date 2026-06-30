@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import crypto from 'crypto'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { verifyNativeDeviceOauthTicket } from '@/lib/native-device-oauth-ticket'
 import {
   assertGarminConfigured,
   buildGarminAuthorizeUrl,
@@ -21,9 +22,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/devices?garmin_error=disabled', request.nextUrl.origin))
     }
 
+    const nativeTicket = request.nextUrl.searchParams.get('nativeTicket')
+    const nativePayload = verifyNativeDeviceOauthTicket(nativeTicket, 'garmin')
     const session = await getServerSession(authOptions)
+    const userId = nativePayload?.userId || session?.user?.id
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized - please sign in first' }, { status: 401 })
     }
 
@@ -41,7 +45,8 @@ export async function GET(request: NextRequest) {
       JSON.stringify({
         state,
         codeVerifier,
-        userId: session.user.id,
+        userId,
+        nativeTicket: nativePayload ? nativeTicket : null,
         exp: Date.now() + 15 * 60 * 1000,
       }),
       {

@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from 'react'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native'
 import Slider from '@react-native-community/slider'
 
 import { API_BASE_URL } from '../config'
+import { calculateDailyTargets } from '../lib/dailyTargets'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -59,17 +60,77 @@ const normalizeSettings = (raw: any): HealthCheckSettings => {
 
 type ThresholdKey = 'sugar' | 'carbs' | 'fat'
 
+const BASE_THRESHOLDS: Record<ThresholdKey, number> = {
+  sugar: 30,
+  carbs: 90,
+  fat: 35,
+}
+
 const THRESHOLD_CONFIG: Array<{
   key: ThresholdKey
   label: string
   min: number
   max: number
-  defaultValue: number
+  step: number
 }> = [
-  { key: 'sugar', label: 'Sugar', min: 10, max: 120, defaultValue: 30 },
-  { key: 'carbs', label: 'Carbs', min: 40, max: 260, defaultValue: 90 },
-  { key: 'fat', label: 'Fat', min: 20, max: 140, defaultValue: 35 },
+  { key: 'sugar', label: 'Sugar', min: 10, max: 120, step: 5 },
+  { key: 'carbs', label: 'Carbs', min: 40, max: 260, step: 5 },
+  { key: 'fat', label: 'Fat', min: 20, max: 140, step: 5 },
 ]
+
+const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
+const roundToStep = (value: number, step: number) => Math.round(value / step) * step
+
+const buildRecommendedThresholds = (raw: any): Record<ThresholdKey, number> => {
+  const source = raw?.data || raw || {}
+  const weightKg =
+    typeof source.weight === 'string'
+      ? parseFloat(source.weight)
+      : typeof source.weight === 'number'
+        ? source.weight
+        : null
+  const heightCm =
+    typeof source.height === 'string'
+      ? parseFloat(source.height)
+      : typeof source.height === 'number'
+        ? source.height
+        : null
+  const goalsArray = Array.isArray(source.goals) ? source.goals : []
+  const goalChoiceValue = typeof source.goalChoice === 'string' ? source.goalChoice.toLowerCase() : ''
+  const useManualTargets = goalChoiceValue.includes('lose') || goalChoiceValue.includes('gain')
+
+  const dailyTargets = calculateDailyTargets({
+    gender: source.gender,
+    birthdate: source.birthdate || source.profileInfo?.dateOfBirth,
+    weightKg: Number.isFinite(weightKg || NaN) ? weightKg : null,
+    heightCm: Number.isFinite(heightCm || NaN) ? heightCm : null,
+    dietTypes: source.dietTypes ?? source.dietType,
+    exerciseFrequency: source.exerciseFrequency,
+    goals: goalsArray,
+    goalChoice: source.goalChoice,
+    goalIntensity: source.goalIntensity,
+    calorieTarget: useManualTargets ? source.goalCalorieTarget : null,
+    macroSplit: useManualTargets ? source.goalMacroSplit : null,
+    fiberTarget: useManualTargets ? source.goalFiberTarget : null,
+    sugarMax: useManualTargets ? source.goalSugarMax : null,
+    exerciseDurations: source.exerciseDurations,
+    bodyType: source.bodyType,
+    healthSituations: source.healthSituations,
+    allergies: source.allergies,
+    diabetesType: source.diabetesType,
+  })
+
+  const pick = (target: any, base: number) => {
+    const n = Number(target)
+    return Number.isFinite(n) && n > 0 ? Math.max(base, n * 0.55) : base
+  }
+
+  return {
+    sugar: pick(dailyTargets.sugarMax, BASE_THRESHOLDS.sugar),
+    carbs: pick(dailyTargets.carbs, BASE_THRESHOLDS.carbs),
+    fat: pick(dailyTargets.fat, BASE_THRESHOLDS.fat),
+  }
+}
 
 export function FoodDiarySettingsScreen() {
   const { mode, session } = useAppMode()
@@ -77,9 +138,19 @@ export function FoodDiarySettingsScreen() {
   const [loading, setLoading] = useState(true)
   const [saveState, setSaveState] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [settings, setSettings] = useState<HealthCheckSettings>(DEFAULT_SETTINGS)
+  const [recommendedThresholds, setRecommendedThresholds] = useState<Record<ThresholdKey, number>>(BASE_THRESHOLDS)
   const [error, setError] = useState('')
 
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  const thresholdBounds = useMemo(() => {
+    return THRESHOLD_CONFIG.reduce((acc, item) => {
+      const safe = Number.isFinite(recommendedThresholds[item.key]) ? recommendedThresholds[item.key] : item.max
+      const max = Math.max(item.max, Math.ceil(safe / item.step) * item.step)
+      acc[item.key] = { ...item, max }
+      return acc
+    }, {} as Record<ThresholdKey, (typeof THRESHOLD_CONFIG)[number]>)
+  }, [recommendedThresholds])
 
   useEffect(() => {
     let cancelled = false
@@ -102,7 +173,9 @@ export function FoodDiarySettingsScreen() {
         if (!res.ok) throw new Error(data?.error || 'Could not load settings')
 
         if (!cancelled) {
-          setSettings(normalizeSettings(data?.healthCheckSettings))
+          const source = data?.data || data || {}
+          setRecommendedThresholds(buildRecommendedThresholds(source))
+          setSettings(normalizeSettings(source?.healthCheckSettings))
           setError('')
         }
       } catch {
@@ -155,7 +228,8 @@ export function FoodDiarySettingsScreen() {
   }
 
   const setThreshold = (key: ThresholdKey, value: number) => {
-    const rounded = Math.round(value)
+    const bounds = thresholdBounds[key]
+    const rounded = clamp(roundToStep(value, bounds.step), bounds.min, bounds.max)
     queueSave({
       ...settings,
       thresholds: {
@@ -194,7 +268,7 @@ export function FoodDiarySettingsScreen() {
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '900' }}>Health check prompts</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
-                Control when the food diary suggests a paid health check.
+                Control when the food diary suggests a paid health check based on your goals and diet.
               </Text>
             </View>
             <Text
@@ -224,7 +298,7 @@ export function FoodDiarySettingsScreen() {
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <View style={{ flex: 1 }}>
               <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Enable health check prompts</Text>
-              <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Show prompts before a check runs.</Text>
+              <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Show the prompt before running a check.</Text>
             </View>
             <Switch
               value={settings.enabled}
@@ -236,6 +310,7 @@ export function FoodDiarySettingsScreen() {
 
           <View style={{ gap: 8 }}>
             <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Prompt frequency</Text>
+            <Text style={{ color: theme.colors.muted }}>Only high risk is recommended.</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {([
                 { key: 'always', label: 'Always' },
@@ -269,6 +344,7 @@ export function FoodDiarySettingsScreen() {
 
           <View style={{ gap: 8 }}>
             <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Daily cap</Text>
+            <Text style={{ color: theme.colors.muted }}>Limit how many prompts you see per day.</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable
                 onPress={() => queueSave({ ...settings, dailyCap: null })}
@@ -328,10 +404,16 @@ export function FoodDiarySettingsScreen() {
           </View>
 
           <View style={{ gap: 12 }}>
-            <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>High-risk trigger levels</Text>
+            <View>
+              <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>High-risk trigger levels</Text>
+              <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
+                Adjust the thresholds that decide when a prompt appears.
+              </Text>
+            </View>
 
             {THRESHOLD_CONFIG.map((item) => {
-              const value = settings.thresholds[item.key] ?? item.defaultValue
+              const bounds = thresholdBounds[item.key]
+              const value = clamp(settings.thresholds[item.key] ?? bounds.min, bounds.min, bounds.max)
               return (
                 <View key={item.key}>
                   <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
@@ -339,14 +421,17 @@ export function FoodDiarySettingsScreen() {
                     <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>{Math.round(value)} g</Text>
                   </View>
                   <Slider
-                    minimumValue={item.min}
-                    maximumValue={item.max}
-                    step={1}
+                    minimumValue={bounds.min}
+                    maximumValue={bounds.max}
+                    step={bounds.step}
                     minimumTrackTintColor={theme.colors.primary}
                     maximumTrackTintColor="#D1D5DB"
                     value={value}
                     onSlidingComplete={(next) => setThreshold(item.key, next)}
                   />
+                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 3 }}>
+                    Prompt when {item.label.toLowerCase()} exceeds {Math.round(value)} g.
+                  </Text>
                 </View>
               )
             })}

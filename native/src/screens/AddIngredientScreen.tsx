@@ -20,7 +20,6 @@ import { PRODUCE_MEASUREMENTS, type ProduceMeasurement } from '../data/produceMe
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
-import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -820,35 +819,29 @@ function isCustomListItem(item: SearchFoodItem) {
   return Boolean(item?.__custom) || String(item?.id || '').startsWith('custom:') || item?.source === 'custom'
 }
 
-function nameMatchesQueryTokens(name: string, query: string) {
+function nameMatchesQueryTokens(name: string, query: string, options?: { requireFirstWord?: boolean }) {
   const nameTokens = normalizeSearchToken(name).split(' ').filter(Boolean)
   const queryTokens = normalizeSearchToken(query).split(' ').filter(Boolean)
   if (queryTokens.length === 0 || nameTokens.length === 0) return false
 
-  const firstWord = nameTokens[0] || ''
-  const firstQuery = queryTokens[0] || ''
-  if (!firstWord || !firstQuery) return false
+  const tokenMatchesWord = (token: string, word: string) => {
+    if (!token || !word) return false
+    const singularWord = singularizeToken(word)
+    const singularToken = singularizeToken(token)
+    return (
+      word.startsWith(token) ||
+      singularWord.startsWith(singularToken) ||
+      word === token ||
+      singularWord === singularToken
+    )
+  }
 
-  const firstWordSingular = singularizeToken(firstWord)
-  const firstQuerySingular = singularizeToken(firstQuery)
-  const firstWordMatches =
-    firstWord.startsWith(firstQuery) ||
-    firstWordSingular.startsWith(firstQuerySingular) ||
-    firstWord === firstQuery ||
-    firstWordSingular === firstQuerySingular
+  if (options?.requireFirstWord) {
+    const firstWord = nameTokens[0] || ''
+    if (!queryTokens.some((token) => tokenMatchesWord(token, firstWord))) return false
+  }
 
-  if (!firstWordMatches) return false
-  if (queryTokens.length === 1) return true
-
-  const remaining = queryTokens.slice(1)
-  return remaining.every((token) =>
-    nameTokens.some((word) => {
-      if (word.startsWith(token)) return true
-      const singularWord = singularizeToken(word)
-      const singularToken = singularizeToken(token)
-      return singularWord.startsWith(singularToken)
-    }),
-  )
+  return queryTokens.every((token) => nameTokens.some((word) => tokenMatchesWord(token, word)))
 }
 
 function filterItemsForQuery(
@@ -875,44 +868,6 @@ function filterItemsForQuery(
   if (prefixMatches.length > 0) return prefixMatches
   if (options?.allowTypoFallback === false) return []
   return items
-}
-
-function sortResultsAz(
-  list: SearchFoodItem[],
-  options?: { kind?: SearchKind; query?: string },
-) {
-  let filtered = Array.isArray(list) ? list : []
-  if (options?.kind === 'single') {
-    const normalizedQuery = normalizeSearchToken(options?.query || '')
-    if (normalizedQuery.length > 0) {
-      const strictMatches = filtered.filter((item) => nameMatchesQueryTokens(String(item?.name || ''), normalizedQuery))
-      if (strictMatches.length > 0) filtered = strictMatches
-    }
-  }
-
-  const sourcePriority = (item: SearchFoodItem) => {
-    if (isCustomListItem(item)) return 0
-    if (item?.source === 'usda') return 1
-    if (item?.source === 'fatsecret') return 2
-    if (item?.source === 'openfoodfacts') return 3
-    return 4
-  }
-
-  if (options?.kind === 'single') {
-    return sortPlainFoodResults(filtered, options?.query || '', sourcePriority)
-  }
-
-  return [...filtered].sort((a, b) => {
-    const aName = String(a?.name || '').trim().toLowerCase()
-    const bName = String(b?.name || '').trim().toLowerCase()
-    const byName = aName.localeCompare(bName)
-    if (byName !== 0) return byName
-    const aBrand = String(a?.brand || '').trim().toLowerCase()
-    const bBrand = String(b?.brand || '').trim().toLowerCase()
-    const byBrand = aBrand.localeCompare(bBrand)
-    if (byBrand !== 0) return byBrand
-    return String(a?.id || '').localeCompare(String(b?.id || ''))
-  })
 }
 
 function buildSearchDisplay(item: SearchFoodItem, searchQuery: string) {
@@ -999,10 +954,7 @@ export function AddIngredientScreen() {
   )
 
   const requestIdRef = useRef(0)
-  const displayedResults = useMemo(
-    () => (kind === 'packaged' ? results : sortResultsAz(results, { kind, query })),
-    [results, kind, query],
-  )
+  const displayedResults = results
 
   useEffect(() => {
     if (!authHeaders) return

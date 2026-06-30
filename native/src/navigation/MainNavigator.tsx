@@ -22,6 +22,11 @@ import { ProfileScreen } from '../screens/ProfileScreen'
 import { ProfilePhotoScreen } from '../screens/ProfilePhotoScreen'
 import { AccountSettingsScreen } from '../screens/AccountSettingsScreen'
 import { BillingScreen } from '../screens/BillingScreen'
+import { DevicesScreen } from '../screens/DevicesScreen'
+import { HelpScreen } from '../screens/HelpScreen'
+import { HealthJournalScreen } from '../screens/HealthJournalScreen'
+import { HealthImageNotesScreen } from '../screens/HealthImageNotesScreen'
+import { SymptomNotesScreen } from '../screens/SymptomNotesScreen'
 import { SupportScreen } from '../screens/SupportScreen'
 import { PrivacySettingsScreen } from '../screens/PrivacySettingsScreen'
 import { PrivacyScreen } from '../screens/PrivacyScreen'
@@ -46,17 +51,22 @@ export type MainStackParamList = {
   ProfilePhoto: undefined
   AccountSettings: undefined
   Billing: undefined
+  Devices: undefined
+  Help: { activeTab?: NativeBottomNavKey } | undefined
+  HealthJournal: undefined
+  HealthImageNotes: undefined
+  SymptomNotes: undefined
   Notifications: undefined
   NotificationsInbox: undefined
   NotificationsAIInsights: undefined
-  SmartHealthCoach: { tab?: 'today' | 'history' } | undefined
+  SmartHealthCoach: { tab?: 'today' | 'history'; activeTab?: NativeBottomNavKey } | undefined
   NotificationsQuietHours: undefined
   NotificationsAccountSecurity: undefined
   PrivacySettings: undefined
   Support: undefined
   HealthSetup: undefined
   Reminders: { focus?: 'checkin' | 'mood'; returnToMoodTracker?: boolean } | undefined
-  DailyCheckIn: undefined
+  DailyCheckIn: { tab?: 'today' | 'history' } | undefined
   MoodTracker: { tab?: 'checkin' | 'history' | 'journal' } | undefined
   TrackCalories:
     | {
@@ -148,10 +158,35 @@ const ProfileWithBottomNav = withBottomNav(ProfileScreen, 'More')
 const ProfilePhotoWithBottomNav = withBottomNav(ProfilePhotoScreen, 'More')
 const AccountSettingsWithBottomNav = withBottomNav(AccountSettingsScreen, 'Settings')
 const BillingWithBottomNav = withBottomNav(BillingScreen, 'Settings')
+const DevicesWithBottomNav = withBottomNav(DevicesScreen, 'More')
+const HealthJournalWithBottomNav = withBottomNav(HealthJournalScreen, 'More')
+const HealthImageNotesWithBottomNav = withBottomNav(HealthImageNotesScreen, 'More')
+const SymptomNotesWithBottomNav = withBottomNav(SymptomNotesScreen, 'More')
+function HelpWithBottomNav(props: React.ComponentProps<typeof HelpScreen>) {
+  const active = props.route?.params?.activeTab || 'More'
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <HelpScreen {...props} />
+      </View>
+      <NativeBottomNav active={active} />
+    </View>
+  )
+}
 const NotificationsWithBottomNav = withBottomNav(NotificationsScreen, 'Settings')
 const NotificationInboxWithBottomNav = withBottomNav(NotificationInboxScreen, 'Settings')
 const NotificationsAiInsightsWithBottomNav = withBottomNav(NotificationsAiInsightsScreen, 'Settings')
-const SmartHealthCoachWithBottomNav = withBottomNav(SmartHealthCoachScreen, 'Insights')
+function SmartHealthCoachWithBottomNav(props: React.ComponentProps<typeof SmartHealthCoachScreen>) {
+  const active = props.route?.params?.activeTab || 'Insights'
+  return (
+    <View style={{ flex: 1 }}>
+      <View style={{ flex: 1 }}>
+        <SmartHealthCoachScreen {...props} />
+      </View>
+      <NativeBottomNav active={active} />
+    </View>
+  )
+}
 const NotificationsQuietHoursWithBottomNav = withBottomNav(NotificationsQuietHoursScreen, 'Settings')
 const NotificationsAccountSecurityWithBottomNav = withBottomNav(NotificationsAccountSecurityScreen, 'Settings')
 const PrivacySettingsWithBottomNav = withBottomNav(PrivacySettingsScreen, 'Settings')
@@ -216,6 +251,51 @@ export function MainNavigator() {
         }}
       />
       <Stack.Screen
+        name="Devices"
+        component={DevicesWithBottomNav}
+        options={{
+          title: 'Devices',
+          headerTitleAlign: 'center',
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="Help"
+        component={HelpWithBottomNav}
+        options={{
+          title: 'Help & Support',
+          headerTitleAlign: 'center',
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="HealthJournal"
+        component={HealthJournalWithBottomNav}
+        options={{
+          title: 'Health Journal',
+          headerTitleAlign: 'center',
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="SymptomNotes"
+        component={SymptomNotesWithBottomNav}
+        options={{
+          title: 'Symptom Notes',
+          headerTitleAlign: 'center',
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
+        name="HealthImageNotes"
+        component={HealthImageNotesWithBottomNav}
+        options={{
+          title: 'Health Image Notes',
+          headerTitleAlign: 'center',
+          headerBackTitle: '',
+        }}
+      />
+      <Stack.Screen
         name="Notifications"
         component={NotificationsWithBottomNav}
         options={{
@@ -238,7 +318,7 @@ export function MainNavigator() {
         name="NotificationsAIInsights"
         component={NotificationsAiInsightsWithBottomNav}
         options={{
-          title: 'Smart Health Coach',
+          title: 'Health Coach',
           headerTitleAlign: 'center',
           headerBackTitle: '',
         }}
@@ -247,7 +327,7 @@ export function MainNavigator() {
         name="SmartHealthCoach"
         component={SmartHealthCoachWithBottomNav}
         options={{
-          title: 'Smart Health Coach',
+          title: 'Health Coach',
           headerTitleAlign: 'center',
           headerBackTitle: '',
         }}

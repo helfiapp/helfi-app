@@ -29,7 +29,9 @@ The owner has given agents permission to use the currently open browser, Apple M
 
 Browser rules:
 - Do not open a separate browser app for normal testing.
-- Use the browser that is already open.
+- Do not open a separate hidden browser, in-app browser, Playwright/browser tool session, Chrome profile, or headless browser for normal Helfi testing.
+- Use the browser that is already open on the web app.
+- If the already-open browser cannot be controlled, stop and tell the owner instead of opening another browser.
 - It is OK to open a new tab in that same browser when needed.
 - Agents may use logged-in browser sessions for Helfi, Linear, App Store Connect, Gmail, and related project checks.
 

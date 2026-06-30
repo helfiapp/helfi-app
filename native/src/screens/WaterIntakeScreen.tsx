@@ -10,7 +10,7 @@ import {
   View,
 } from 'react-native'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
-import { useFocusEffect, useRoute } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import type { RouteProp } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
@@ -96,7 +96,9 @@ function formatDateLabel(raw: string) {
   if (isToday(raw)) return 'Today'
   const d = parseLocalDate(raw)
   if (Number.isNaN(d.getTime())) return raw
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+  const weekdays = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+  return `${weekdays[d.getDay()]}, ${months[d.getMonth()]} ${d.getDate()}`
 }
 
 function toNumber(value: any) {
@@ -180,11 +182,41 @@ function normalizeUnit(raw: string): 'ml' | 'l' | 'oz' {
 function formatTime(value: string) {
   const d = new Date(value)
   if (Number.isNaN(d.getTime())) return ''
-  return d.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function formatTimeInput(value: string) {
+  const d = new Date(value)
+  if (Number.isNaN(d.getTime())) return ''
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
+
+function buildCreatedAtIso(localDate: string, timeValue: string) {
+  if (!isValidLocalDate(localDate)) return null
+  if (!/^\d{2}:\d{2}$/.test(String(timeValue || ''))) return null
+  const [year, month, day] = String(localDate).split('-').map((value) => Number(value))
+  const [hours, minutes] = String(timeValue).split(':').map((value) => Number(value))
+  if (
+    !Number.isFinite(year) ||
+    !Number.isFinite(month) ||
+    !Number.isFinite(day) ||
+    !Number.isFinite(hours) ||
+    !Number.isFinite(minutes) ||
+    hours < 0 ||
+    hours > 23 ||
+    minutes < 0 ||
+    minutes > 59
+  ) {
+    return null
+  }
+  const local = new Date(year, month - 1, day, hours, minutes, 0, 0)
+  if (Number.isNaN(local.getTime())) return null
+  return local.toISOString()
 }
 
 export function WaterIntakeScreen() {
   const { mode, session } = useAppMode()
+  const navigation = useNavigation<any>()
   const route = useRoute<RouteProp<MainStackParamList, 'WaterIntake'>>()
   const routeDate = typeof route.params?.date === 'string' ? route.params.date : ''
   const sourceCategory = normalizeMealParam(typeof route.params?.meal === 'string' ? route.params.meal : null)
@@ -198,9 +230,14 @@ export function WaterIntakeScreen() {
   const [showDatePicker, setShowDatePicker] = useState(false)
 
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState(false)
   const [saving, setSaving] = useState(false)
   const [entries, setEntries] = useState<WaterEntry[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [editingTimeEntry, setEditingTimeEntry] = useState<WaterEntry | null>(null)
+  const [editingTimeValue, setEditingTimeValue] = useState('')
+  const [editingTimeSaving, setEditingTimeSaving] = useState(false)
+  const [editingTimeError, setEditingTimeError] = useState<string | null>(null)
 
   const [goalLoading, setGoalLoading] = useState(false)
   const [goalSaving, setGoalSaving] = useState(false)
@@ -260,9 +297,10 @@ export function WaterIntakeScreen() {
       const data: any = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(String(data?.error || 'Could not load water logs.'))
       setEntries(Array.isArray(data?.entries) ? data.entries : [])
-    } catch (error: any) {
+      setLoadError(false)
+    } catch {
       setEntries([])
-      Alert.alert('Could not load water logs', error?.message || 'Please try again.')
+      setLoadError(true)
     } finally {
       setLoading(false)
     }
@@ -485,6 +523,42 @@ export function WaterIntakeScreen() {
     }
   }
 
+  const drinkNutritionLabel = () => {
+    if (drinkSugarChoice === 'sugar' || drinkSugarChoice === 'honey') {
+      const rawAmount = toNumber(drinkSugarAmount)
+      if (rawAmount > 0) return `${activeDrink} with ${drinkSugarChoice} (${formatNumber(rawAmount)} ${drinkSugarUnit})`
+      return `${activeDrink} with ${drinkSugarChoice}`
+    }
+    return activeDrink
+  }
+
+  const openDrinkNutrition = async (mode: 'search' | 'barcode' | 'photo' | 'favorites') => {
+    setSaving(true)
+    try {
+      await addEntry(drinkAmount, drinkUnit, drinkNutritionLabel())
+      const meal = sourceCategory || 'uncategorized'
+      setDrinkDetailOpen(false)
+
+      if (mode === 'search') {
+        navigation.navigate('AddIngredient', {
+          meal,
+          date: selectedDate,
+        })
+        return
+      }
+
+      navigation.navigate('TrackCalories', {
+        voiceAction: mode === 'barcode' ? 'openBarcode' : mode === 'photo' ? 'openPhoto' : 'openFavorites',
+        voiceMeal: meal,
+        voiceActionNonce: Date.now(),
+      })
+    } catch (error: any) {
+      Alert.alert('Save failed', error?.message || 'Please try again.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const deleteEntry = async (id: string) => {
     if (!session?.token) return
     setDeletingId(id)
@@ -499,6 +573,63 @@ export function WaterIntakeScreen() {
       Alert.alert('Delete failed', error?.message || 'Please try again.')
     } finally {
       setDeletingId(null)
+    }
+  }
+
+  const openTimeEditor = (entry: WaterEntry) => {
+    setEditingTimeEntry(entry)
+    setEditingTimeValue(formatTimeInput(entry.createdAt))
+    setEditingTimeError(null)
+  }
+
+  const closeTimeEditor = () => {
+    if (editingTimeSaving) return
+    setEditingTimeEntry(null)
+    setEditingTimeValue('')
+    setEditingTimeError(null)
+  }
+
+  const saveTimeEdit = async () => {
+    if (!session?.token || !editingTimeEntry) return
+    const createdAt = buildCreatedAtIso(editingTimeEntry.localDate || selectedDate, editingTimeValue)
+    if (!createdAt) {
+      setEditingTimeError('Please choose a valid time.')
+      return
+    }
+
+    setEditingTimeSaving(true)
+    setEditingTimeError(null)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/water-log/${encodeURIComponent(editingTimeEntry.id)}`, {
+        method: 'PATCH',
+        headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
+        body: JSON.stringify({
+          amount: editingTimeEntry.amount,
+          unit: editingTimeEntry.unit,
+          label: editingTimeEntry.label,
+          category: editingTimeEntry.category,
+          localDate: editingTimeEntry.localDate,
+          createdAt,
+        }),
+      })
+      if (!res.ok) throw new Error('Could not update this entry.')
+      const data = await res.json().catch(() => ({}))
+      const updated = data?.entry as WaterEntry | undefined
+      if (updated?.id) {
+        setEntries((prev) =>
+          prev
+            .map((entry) => (String(entry.id) === String(updated.id) ? updated : entry))
+            .slice()
+            .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        )
+      } else {
+        await loadEntries()
+      }
+      closeTimeEditor()
+    } catch (error: any) {
+      setEditingTimeError(error?.message || 'Could not update time. Please try again.')
+    } finally {
+      setEditingTimeSaving(false)
     }
   }
 
@@ -577,43 +708,39 @@ export function WaterIntakeScreen() {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: 28 }}>
-        <View style={cardStyle}>
-          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Water Intake</Text>
+        <View style={dateSegment}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Previous day"
+            onPress={() => setSelectedDate((prev) => shiftDate(prev, -1))}
+            style={dateSegmentButton}
+          >
+            <Text style={dateSegmentTextMuted}>Previous</Text>
+          </Pressable>
 
-          <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Previous day"
-              onPress={() => setSelectedDate((prev) => shiftDate(prev, -1))}
-              style={pillButton}
-            >
-              <Text style={pillButtonText}>◀</Text>
-            </Pressable>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Choose water date"
+            onPress={() => setShowDatePicker(true)}
+            style={[dateSegmentButton, dateSegmentButtonActive]}
+          >
+            <Text style={dateSegmentText}>{formatDateLabel(selectedDate)}</Text>
+          </Pressable>
 
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Choose water date"
-              onPress={() => setShowDatePicker(true)}
-              style={[pillButton, { flex: 1, marginHorizontal: 8 }]}
-            >
-              <Text style={pillButtonText}>{formatDateLabel(selectedDate)}</Text>
-            </Pressable>
-
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Next day"
-              onPress={() => setSelectedDate((prev) => shiftDate(prev, 1))}
-              style={pillButton}
-            >
-              <Text style={pillButtonText}>▶</Text>
-            </Pressable>
-          </View>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel="Next day"
+            onPress={() => setSelectedDate((prev) => shiftDate(prev, 1))}
+            style={dateSegmentButton}
+          >
+            <Text style={dateSegmentTextMuted}>Next</Text>
+          </Pressable>
         </View>
 
         <View style={[cardStyle, { marginTop: 12 }]}> 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
             <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text, flex: 1 }}>
-              Daily hydration summary
+              Daily Hydration Summary
             </Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Edit water goal" onPress={openGoalEditor} style={miniPrimaryButton}>
               <Text style={miniPrimaryText}>Edit goal</Text>
@@ -635,7 +762,7 @@ export function WaterIntakeScreen() {
           </View>
 
           <Text style={{ marginTop: 8, color: theme.colors.muted, fontSize: 12 }}>
-            {entries.length} {entries.length === 1 ? 'entry' : 'entries'} logged on this day
+            {entries.length} {entries.length === 1 ? 'entry' : 'entries'} logged today
           </Text>
 
           {goalExerciseBonusMl > 0 && goalSource === 'auto' ? (
@@ -649,8 +776,8 @@ export function WaterIntakeScreen() {
           ) : null}
         </View>
 
-        <View style={[cardStyle, { marginTop: 12 }]}> 
-          <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Quick add</Text>
+        <View style={[cardStyle, { marginTop: 12 }]}>
+          <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Quick Add</Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 8 }}>
             {DRINK_TYPES.map((drink) => (
@@ -701,8 +828,8 @@ export function WaterIntakeScreen() {
           </View>
         </View>
 
-        <View style={[cardStyle, { marginTop: 12 }]}> 
-          <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Custom drink</Text>
+        <View style={[cardStyle, { marginTop: 12 }]}>
+          <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Custom Entry</Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
             <TextInput
@@ -741,15 +868,34 @@ export function WaterIntakeScreen() {
         </View>
 
         <View style={[cardStyle, { marginTop: 12 }]}>
-          <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Water history</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18, flex: 1 }}>Recent Logs</Text>
+            <Text style={{ color: theme.colors.muted, fontWeight: '700', fontSize: 12 }}>History</Text>
+          </View>
 
           {loading ? (
             <View style={{ paddingVertical: 16, alignItems: 'center' }}>
               <ActivityIndicator color={theme.colors.primary} />
               <Text style={{ color: theme.colors.muted, marginTop: 8 }}>Loading entries...</Text>
             </View>
+          ) : loadError ? (
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Retry loading water entries"
+              onPress={() => void loadEntries()}
+              style={{
+                marginTop: 10,
+                borderWidth: 1,
+                borderColor: '#FECACA',
+                borderRadius: 10,
+                padding: 12,
+                backgroundColor: '#FFFFFF',
+              }}
+            >
+              <Text style={{ color: '#DC2626', fontWeight: '700' }}>Could not load water entries. Tap to retry.</Text>
+            </Pressable>
           ) : entries.length === 0 ? (
-            <Text style={{ color: theme.colors.muted, marginTop: 8 }}>No water entries yet for this day.</Text>
+            <Text style={{ color: theme.colors.muted, marginTop: 8 }}>No water entries yet. Add your first drink above.</Text>
           ) : (
             <View style={{ marginTop: 10, gap: 8 }}>
               {entries.map((entry) => (
@@ -767,18 +913,31 @@ export function WaterIntakeScreen() {
                     <View style={{ flex: 1 }}>
                       <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{entry.label || 'Drink'}</Text>
                       <Text style={{ color: theme.colors.muted, marginTop: 2, fontSize: 12 }}>
-                        {formatTime(entry.createdAt)} • {formatAmount(entry.amount, normalizeUnit(entry.unit))}
+                        {formatTime(entry.createdAt)}
                       </Text>
                     </View>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel={`Delete ${entry.label || 'drink'} entry`}
-                      onPress={() => void deleteEntry(entry.id)}
-                      disabled={deletingId === entry.id}
-                      style={[miniDangerButton, deletingId === entry.id && { opacity: 0.5 }]}
-                    >
-                      <Text style={miniDangerText}>{deletingId === entry.id ? 'Deleting...' : 'Delete'}</Text>
-                    </Pressable>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>
+                        {formatAmount(entry.amount, normalizeUnit(entry.unit))}
+                      </Text>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Edit ${entry.label || 'drink'} entry time`}
+                        onPress={() => openTimeEditor(entry)}
+                        style={miniSecondaryButton}
+                      >
+                        <Text style={miniSecondaryText}>Edit</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={`Delete ${entry.label || 'drink'} entry`}
+                        onPress={() => void deleteEntry(entry.id)}
+                        disabled={deletingId === entry.id}
+                        style={[miniDangerButton, deletingId === entry.id && { opacity: 0.5 }]}
+                      >
+                        <Text style={miniDangerText}>{deletingId === entry.id ? 'Deleting...' : 'Delete'}</Text>
+                      </Pressable>
+                    </View>
                   </View>
                 </View>
               ))}
@@ -796,13 +955,63 @@ export function WaterIntakeScreen() {
         />
       ) : null}
 
-      <Modal transparent visible={drinkDetailOpen} animationType="fade" onRequestClose={() => setDrinkDetailOpen(false)}>
+      <Modal transparent visible={editingTimeEntry != null} animationType="fade" onRequestClose={closeTimeEditor}>
         <View style={modalBackdrop}>
-          <View style={modalCardLarge}>
-            <Text style={modalTitle}>Drink details</Text>
-            <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
-              {activeDrink} • {formatAmount(drinkAmount, drinkUnit)}
+          <View style={modalCard}>
+            <Text style={modalTitle}>Edit Time</Text>
+            <Text style={{ color: theme.colors.muted, marginTop: 4, marginBottom: 12 }}>
+              Change when this drink was logged.
             </Text>
+            <TextInput
+              accessibilityLabel="Drink log time"
+              value={editingTimeValue}
+              onChangeText={setEditingTimeValue}
+              keyboardType="numbers-and-punctuation"
+              placeholder="HH:MM"
+              placeholderTextColor="#8AA39D"
+              style={inputStyle}
+            />
+            {editingTimeError ? (
+              <Text style={{ color: '#DC2626', marginTop: 8, fontWeight: '700' }}>{editingTimeError}</Text>
+            ) : null}
+            <View style={{ marginTop: 14, flexDirection: 'row', gap: 8 }}>
+              <Pressable onPress={closeTimeEditor} disabled={editingTimeSaving} style={secondaryButton}>
+                <Text style={secondaryButtonText}>Cancel</Text>
+              </Pressable>
+              <Pressable onPress={() => void saveTimeEdit()} disabled={editingTimeSaving} style={[primaryButton, editingTimeSaving && { opacity: 0.6 }]}>
+                <Text style={primaryButtonText}>{editingTimeSaving ? 'Saving...' : 'Save'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal transparent visible={drinkDetailOpen} animationType="fade" onRequestClose={() => setDrinkDetailOpen(false)}>
+        <View style={modalSheetBackdrop}>
+          <View style={drinkDetailSheet}>
+            <View style={sheetHandle} />
+
+            <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={[modalTitle, { fontSize: 18 }]}>Drink details</Text>
+                <Text style={{ color: theme.colors.muted, marginTop: 3, fontSize: 12 }}>Select a sweetener option.</Text>
+              </View>
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Close drink details"
+                onPress={() => setDrinkDetailOpen(false)}
+                style={sheetCloseButton}
+              >
+                <Text style={sheetCloseText}>X</Text>
+              </Pressable>
+            </View>
+
+            <View style={drinkDetailSummaryCard}>
+              <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{activeDrink}</Text>
+              <Text style={{ color: theme.colors.muted, marginTop: 8, fontSize: 12 }}>
+                Amount: {formatAmount(drinkAmount, drinkUnit)}
+              </Text>
+            </View>
 
             <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
               <Pressable onPress={() => setDrinkSugarChoice('free')} style={[chip, drinkSugarChoice === 'free' && chipActive]}>
@@ -852,7 +1061,7 @@ export function WaterIntakeScreen() {
               </View>
             ) : null}
 
-            <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+            <View style={{ marginTop: 12 }}>
               <Pressable
                 onPress={() => {
                   if (drinkSugarChoice === 'free') {
@@ -865,12 +1074,52 @@ export function WaterIntakeScreen() {
                   }
                   Alert.alert('Choose an option', 'Please choose Sugar-free, Sugar, or Honey.')
                 }}
-                style={primaryButton}
+                style={[primaryButton, { flex: undefined }]}
                 disabled={saving}
               >
-                <Text style={primaryButtonText}>{saving ? 'Saving...' : 'Save drink'}</Text>
+                <Text style={primaryButtonText}>
+                  {saving
+                    ? 'Saving...'
+                    : drinkSugarChoice === 'sugar'
+                    ? 'Add with sugar'
+                    : drinkSugarChoice === 'honey'
+                    ? 'Add with honey'
+                    : 'Add drink'}
+                </Text>
               </Pressable>
-              <Pressable onPress={() => setDrinkDetailOpen(false)} style={secondaryButton}>
+
+              <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                <Pressable
+                  onPress={() => void openDrinkNutrition('search')}
+                  style={[drinkOptionButton, saving && { opacity: 0.6 }]}
+                  disabled={saving}
+                >
+                  <Text style={drinkOptionText}>Search food</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void openDrinkNutrition('barcode')}
+                  style={[drinkOptionButton, saving && { opacity: 0.6 }]}
+                  disabled={saving}
+                >
+                  <Text style={drinkOptionText}>Scan barcode</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void openDrinkNutrition('photo')}
+                  style={[drinkOptionButton, saving && { opacity: 0.6 }]}
+                  disabled={saving}
+                >
+                  <Text style={drinkOptionText}>Add by photo</Text>
+                </Pressable>
+                <Pressable
+                  onPress={() => void openDrinkNutrition('favorites')}
+                  style={[drinkOptionButton, saving && { opacity: 0.6 }]}
+                  disabled={saving}
+                >
+                  <Text style={drinkOptionText}>Add from favorites</Text>
+                </Pressable>
+              </View>
+
+              <Pressable onPress={() => setDrinkDetailOpen(false)} style={[secondaryButton, { flex: undefined, marginTop: 10 }]}>
                 <Text style={secondaryButtonText}>Cancel</Text>
               </Pressable>
             </View>
@@ -965,20 +1214,43 @@ const inputStyle = {
   fontWeight: '700' as const,
 }
 
-const pillButton = {
-  borderWidth: 1,
-  borderColor: theme.colors.border,
-  borderRadius: 999,
-  paddingHorizontal: 12,
-  paddingVertical: 8,
+const dateSegment = {
+  height: 42,
+  flexDirection: 'row' as const,
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
-  backgroundColor: theme.colors.card,
+  borderRadius: theme.radius.md,
+  backgroundColor: '#E5E7EB',
+  padding: 4,
 }
 
-const pillButtonText = {
+const dateSegmentButton = {
+  flex: 1,
+  height: '100%' as const,
+  borderRadius: theme.radius.sm,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 8,
+}
+
+const dateSegmentButtonActive = {
+  backgroundColor: theme.colors.card,
+  shadowColor: '#000',
+  shadowOpacity: 0.08,
+  shadowRadius: 4,
+  shadowOffset: { width: 0, height: 0 },
+}
+
+const dateSegmentText = {
   color: theme.colors.text,
   fontWeight: '800' as const,
+  fontSize: 14,
+}
+
+const dateSegmentTextMuted = {
+  color: theme.colors.muted,
+  fontWeight: '700' as const,
+  fontSize: 14,
 }
 
 const modalBackdrop = {
@@ -987,6 +1259,14 @@ const modalBackdrop = {
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
   padding: 16,
+}
+
+const modalSheetBackdrop = {
+  flex: 1,
+  backgroundColor: 'rgba(6, 17, 14, 0.35)',
+  justifyContent: 'flex-end' as const,
+  paddingHorizontal: 14,
+  paddingBottom: 18,
 }
 
 const modalCard = {
@@ -1006,6 +1286,48 @@ const modalCardLarge = {
   borderColor: theme.colors.border,
   padding: 14,
   maxHeight: '90%' as const,
+}
+
+const drinkDetailSheet = {
+  width: '100%' as const,
+  backgroundColor: theme.colors.card,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: theme.colors.border,
+  padding: 16,
+  maxHeight: '88%' as const,
+}
+
+const sheetHandle = {
+  alignSelf: 'center' as const,
+  width: 40,
+  height: 5,
+  borderRadius: 999,
+  backgroundColor: '#CBD5E1',
+  marginBottom: 14,
+}
+
+const sheetCloseButton = {
+  width: 36,
+  height: 36,
+  borderRadius: 18,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+}
+
+const sheetCloseText = {
+  color: theme.colors.text,
+  fontSize: 18,
+  fontWeight: '900' as const,
+}
+
+const drinkDetailSummaryCard = {
+  marginTop: 18,
+  borderWidth: 1,
+  borderColor: theme.colors.border,
+  borderRadius: 12,
+  padding: 14,
+  backgroundColor: theme.colors.card,
 }
 
 const modalTitle = {
@@ -1042,6 +1364,25 @@ const secondaryButton = {
 const secondaryButtonText = {
   color: theme.colors.text,
   fontWeight: '800' as const,
+}
+
+const drinkOptionButton = {
+  width: '48%' as const,
+  minHeight: 48,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: theme.colors.border,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 8,
+  paddingVertical: 10,
+  backgroundColor: theme.colors.card,
+}
+
+const drinkOptionText = {
+  color: theme.colors.text,
+  fontWeight: '800' as const,
+  textAlign: 'center' as const,
 }
 
 const miniPrimaryButton = {

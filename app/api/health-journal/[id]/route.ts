@@ -1,14 +1,23 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { ensureHealthJournalSchema } from '@/lib/health-journal-db'
 
 export const dynamic = 'force-dynamic'
 
-export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+async function resolveHealthJournalUserId(request: NextRequest) {
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (nativeUserId) return nativeUserId
+
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  return session?.user?.id || null
+}
+
+export async function PATCH(request: NextRequest, { params }: { params: { id: string } }) {
+  const userId = await resolveHealthJournalUserId(request)
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -26,7 +35,7 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   }
 
   const existing = await prisma.healthJournalEntry.findFirst({
-    where: { id: entryId, userId: session.user.id },
+    where: { id: entryId, userId },
   })
   if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
@@ -40,9 +49,9 @@ export async function PATCH(request: NextRequest, { params }: { params: { id: st
   return NextResponse.json({ entry })
 }
 
-export async function DELETE(_request: NextRequest, { params }: { params: { id: string } }) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+export async function DELETE(request: NextRequest, { params }: { params: { id: string } }) {
+  const userId = await resolveHealthJournalUserId(request)
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -54,7 +63,7 @@ export async function DELETE(_request: NextRequest, { params }: { params: { id: 
   }
 
   const existing = await prisma.healthJournalEntry.findFirst({
-    where: { id: entryId, userId: session.user.id },
+    where: { id: entryId, userId },
   })
   if (!existing) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })

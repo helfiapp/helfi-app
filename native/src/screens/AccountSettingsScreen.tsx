@@ -13,6 +13,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
@@ -104,6 +105,7 @@ export function AccountSettingsScreen() {
   const [showCurrentPassword, setShowCurrentPassword] = useState(false)
   const [showNewPassword, setShowNewPassword] = useState(false)
   const [showConfirmPassword, setShowConfirmPassword] = useState(false)
+  const [isChangingPassword, setIsChangingPassword] = useState(false)
 
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
@@ -196,9 +198,41 @@ export function AccountSettingsScreen() {
     setShowConfirmPassword(false)
   }
 
-  const submitPasswordChange = () => {
-    Alert.alert('Coming soon', 'Password change functionality coming soon!')
-    closePasswordModal()
+  const submitPasswordChange = async () => {
+    if (mode !== 'signedIn' || !session?.token) {
+      Alert.alert('Please sign in again', 'Please sign in again before changing your password.')
+      return
+    }
+
+    if (passwordData.newPassword.length < 8) {
+      Alert.alert('Password too short', 'New password must be at least 8 characters long.')
+      return
+    }
+
+    if (passwordData.newPassword !== passwordData.confirmPassword) {
+      Alert.alert('Passwords do not match', 'New password and confirmation must match.')
+      return
+    }
+
+    setIsChangingPassword(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/account/change-password`, {
+        method: 'POST',
+        headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
+        body: JSON.stringify({
+          currentPassword: passwordData.currentPassword,
+          newPassword: passwordData.newPassword,
+        }),
+      })
+      const data = await res.json().catch(() => ({} as any))
+      if (!res.ok) throw new Error(data?.error || 'Password could not be changed. Please try again.')
+      closePasswordModal()
+      Alert.alert('Password changed', 'Password changed successfully.')
+    } catch (error: any) {
+      Alert.alert('Password could not be changed', error?.message || 'Please try again.')
+    } finally {
+      setIsChangingPassword(false)
+    }
   }
 
   const closeDeleteModal = () => {
@@ -376,7 +410,11 @@ export function AccountSettingsScreen() {
 
             <View style={{ flexDirection: 'row', justifyContent: 'flex-end', gap: 10, marginTop: 8 }}>
               <HelfiButton label="Cancel" onPress={closePasswordModal} variant="secondary" />
-              <HelfiButton label="Change Password" onPress={submitPasswordChange} disabled={!passwordValid} />
+              <HelfiButton
+                label={isChangingPassword ? 'Changing...' : 'Change Password'}
+                onPress={() => void submitPasswordChange()}
+                disabled={!passwordValid || isChangingPassword}
+              />
             </View>
           </View>
         </View>

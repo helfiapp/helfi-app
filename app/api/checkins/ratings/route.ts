@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getCheckinUser } from '@/app/api/checkins/_auth'
 
 // Delete a single rating entry
 export async function DELETE(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const user = await getCheckinUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { searchParams } = new URL(req.url)
   const date = searchParams.get('date')
@@ -32,10 +29,8 @@ export async function DELETE(req: NextRequest) {
 
 // Update a rating entry
 export async function PATCH(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const user = await getCheckinUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
   const { date, issueId, value, note } = body
@@ -62,10 +57,8 @@ export async function PATCH(req: NextRequest) {
 
 // Delete multiple ratings (by issue or all)
 export async function POST(req: NextRequest) {
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
-  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+  const user = await getCheckinUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const body = await req.json().catch(() => ({}))
   const { action, issueIds } = body
@@ -96,4 +89,3 @@ export async function POST(req: NextRequest) {
 
   return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
 }
-

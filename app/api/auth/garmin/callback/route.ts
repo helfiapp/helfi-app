@@ -5,12 +5,31 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { verifyNativeDeviceOauthTicket } from '@/lib/native-device-oauth-ticket'
 import {
   assertGarminConfigured,
   exchangeGarminCodeForTokens,
   fetchGarminUserId,
   registerGarminUser,
 } from '@/lib/garmin-oauth'
+
+function nativeReturnHtml(provider: 'garmin', status: 'connected' | 'error', error?: string) {
+  const url = `helfi://oauth-complete?provider=${provider}&status=${status}${error ? `&error=${encodeURIComponent(error)}` : ''}`
+  const title = status === 'connected' ? 'Garmin Connected' : 'Garmin Connection Failed'
+  const message = status === 'connected' ? 'Garmin Connect linked. Returning to Helfi...' : 'Garmin Connect failed. Returning to Helfi...'
+  return new NextResponse(
+    `<!DOCTYPE html>
+      <html>
+        <head><title>${title}</title></head>
+        <body style="font-family: Arial, sans-serif; padding: 40px; text-align: center;">
+          <p>${message}</p>
+          <script>window.location.replace(${JSON.stringify(url)})</script>
+          <p><a href="${url}">Open Helfi</a></p>
+        </body>
+      </html>`,
+    { headers: { 'Content-Type': 'text/html' } },
+  )
+}
 
 /**
  * Garmin OAuth callback
@@ -21,11 +40,6 @@ export async function GET(request: NextRequest) {
   const code = url.searchParams.get('code')
   const state = url.searchParams.get('state')
   const pkceCookie = request.cookies.get('garmin_pkce')?.value
-
-  const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
-    return NextResponse.redirect(new URL('/devices?garmin_error=unauthorized', request.nextUrl.origin))
-  }
 
   if (!code || !state) {
     return NextResponse.redirect(new URL('/devices?garmin_error=missing_params', request.nextUrl.origin))
@@ -38,14 +52,21 @@ export async function GET(request: NextRequest) {
       return NextResponse.redirect(new URL('/devices?garmin_error=invalid_request_token', request.nextUrl.origin))
     }
 
-    let parsedPkce: { state: string; codeVerifier: string; userId: string; exp: number } | null = null
+    let parsedPkce: { state: string; codeVerifier: string; userId: string; exp: number; nativeTicket?: string | null } | null = null
     try {
       parsedPkce = JSON.parse(pkceCookie)
     } catch {
       parsedPkce = null
     }
 
-    if (!parsedPkce || parsedPkce.state !== state || parsedPkce.userId !== session.user.id) {
+    const nativePayload = parsedPkce?.nativeTicket
+      ? verifyNativeDeviceOauthTicket(parsedPkce.nativeTicket, 'garmin')
+      : null
+    const session = nativePayload ? null : await getServerSession(authOptions)
+    const userId = nativePayload?.userId || session?.user?.id
+
+    if (!parsedPkce || parsedPkce.state !== state || !userId || parsedPkce.userId !== userId) {
+      if (nativePayload) return nativeReturnHtml('garmin', 'error', 'invalid_request_token')
       return NextResponse.redirect(new URL('/devices?garmin_error=invalid_request_token', request.nextUrl.origin))
     }
 
@@ -63,7 +84,7 @@ export async function GET(request: NextRequest) {
     // Store Garmin tokens on the Account table (provider = garmin)
     const existingAccount = await prisma.account.findFirst({
       where: {
-        userId: session.user.id,
+        userId,
         provider: 'garmin',
       },
     })
@@ -83,7 +104,7 @@ export async function GET(request: NextRequest) {
     } else {
       await prisma.account.create({
         data: {
-          userId: session.user.id,
+          userId,
           type: 'oauth',
           provider: 'garmin',
           providerAccountId: userInfo.userId || tokenResponse.access_token,
@@ -142,6 +163,11 @@ export async function GET(request: NextRequest) {
       headers: { 'Content-Type': 'text/html' },
     })
     successResponse.cookies.set('garmin_pkce', '', { maxAge: 0, path: '/' })
+    if (nativePayload) {
+      const nativeResponse = nativeReturnHtml('garmin', 'connected')
+      nativeResponse.cookies.set('garmin_pkce', '', { maxAge: 0, path: '/' })
+      return nativeResponse
+    }
     return successResponse
   } catch (error) {
     console.error('❌ Garmin callback error:', error)

@@ -790,7 +790,6 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
                 disabled={!checkins.enabled}
                 onPress={() => openTimezonePicker('checkin')}
               />
-              <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Detected on this device: {deviceTz}</Text>
             </View>
 
             {loading ? (

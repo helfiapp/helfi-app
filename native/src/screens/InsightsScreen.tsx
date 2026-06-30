@@ -59,6 +59,16 @@ type WeeklyReportRecord = {
   viewedAt?: string | null
 }
 
+type ReportCountdown = {
+  days: number
+  hours: number
+  minutes: number
+  seconds: number
+  percent: number
+  dueNow: boolean
+  dueAtMs: number
+}
+
 const REPORT_NAV_ITEMS: Array<{ key: ReportNavKey; label: string; icon: keyof typeof Feather.glyphMap }> = [
   { key: 'summary', label: 'Summary', icon: 'file-text' },
   { key: 'visuals', label: 'Charts', icon: 'bar-chart-2' },
@@ -138,6 +148,23 @@ function formatDateForLocale(value?: string | Date | number | null) {
   const date = value instanceof Date ? value : new Date(value)
   if (Number.isNaN(date.getTime())) return String(value)
   return new Intl.DateTimeFormat('en-AU', { day: '2-digit', month: 'short', year: 'numeric' }).format(date)
+}
+
+function formatDateTimeForLocale(value?: string | Date | number | null) {
+  if (!value) return ''
+  const date = value instanceof Date ? value : new Date(value)
+  if (Number.isNaN(date.getTime())) return String(value)
+  return new Intl.DateTimeFormat('en-AU', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  }).format(date)
+}
+
+function padTime(value: number) {
+  return String(Math.max(0, value)).padStart(2, '0')
 }
 
 const WEEKLY_REPORT_PERIOD_MS = 7 * 24 * 60 * 60 * 1000
@@ -546,6 +573,8 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
   const [weeklyStatus, setWeeklyStatus] = useState<any>(null)
   const [issues, setIssues] = useState<IssueSummary[]>([])
   const [reports, setReports] = useState<WeeklyReportRecord[]>([])
+  const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null)
+  const [countdown, setCountdown] = useState<ReportCountdown | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
   const [reportNav, setReportNav] = useState<ReportNavKey>('summary')
   const [activeSection, setActiveSection] = useState<SectionKey>('overview')
@@ -587,6 +616,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         setWeeklyStatus(null)
         setIssues([])
         setReports([])
+        setLastLoadedAt(null)
         return
       }
       if (!quiet) setLoading(true)
@@ -603,6 +633,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           setIssues([])
           setReports([])
           setSelectedReportId(null)
+          setLastLoadedAt(null)
           return
         }
 
@@ -622,6 +653,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         setWeeklyStatus(statusData)
         setReports(nextReports)
         setIssues(nextIssues)
+        setLastLoadedAt(new Date().toISOString())
       } catch (err: any) {
         setError(String(err?.message || 'Could not load Insights. Please try again.'))
       } finally {
@@ -631,6 +663,58 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     },
     [authHeaders, selectedReportId],
   )
+
+  useEffect(() => {
+    const dueRaw = weeklyStatus?.nextReportDueAt
+    const enabledRaw = weeklyStatus?.reportsEnabledAt
+
+    let dueAt = Number.NaN
+    if (dueRaw) {
+      dueAt = new Date(dueRaw).getTime()
+    } else if (enabledRaw) {
+      const enabledAt = new Date(enabledRaw).getTime()
+      if (!Number.isNaN(enabledAt)) {
+        dueAt = enabledAt + WEEKLY_REPORT_PERIOD_MS
+      }
+    }
+
+    if (Number.isNaN(dueAt)) {
+      setCountdown(null)
+      return
+    }
+
+    const now = Date.now()
+    if (dueAt <= now) {
+      dueAt = now + WEEKLY_REPORT_PERIOD_MS
+    }
+    const startAt = dueAt - WEEKLY_REPORT_PERIOD_MS
+
+    const tick = () => {
+      const now = Date.now()
+      const remaining = dueAt - now
+      const clampedRemaining = Math.max(0, remaining)
+      const totalSeconds = Math.floor(clampedRemaining / 1000)
+      const days = Math.floor(totalSeconds / 86400)
+      const hours = Math.floor((totalSeconds % 86400) / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const seconds = totalSeconds % 60
+      const progressRaw = (now - startAt) / WEEKLY_REPORT_PERIOD_MS
+      const percent = Math.min(100, Math.max(0, Math.round(progressRaw * 100)))
+      setCountdown({
+        days,
+        hours,
+        minutes,
+        seconds,
+        percent,
+        dueNow: remaining <= 0,
+        dueAtMs: dueAt,
+      })
+    }
+
+    tick()
+    const interval = setInterval(tick, 1000)
+    return () => clearInterval(interval)
+  }, [weeklyStatus?.nextReportDueAt, weeklyStatus?.reportsEnabledAt])
 
   useEffect(() => {
     void loadData()
@@ -790,6 +874,13 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     const parent = navigation.getParent?.()
     if (parent?.navigate) parent.navigate(screen, params)
     else navigation.navigate(screen, params)
+  }
+
+  const openChatLog = () => {
+    goToStackScreen('NativeWebTool', {
+      title: 'Chat History',
+      path: '/chat?history=1',
+    })
   }
 
   const payload = useMemo(() => parseMaybeJson(selectedReport?.report), [selectedReport?.report])
@@ -1047,6 +1138,9 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
       <View>
         <Text style={{ color: theme.colors.text, fontSize: theme.fontSize.pageTitle, fontWeight: '900' }}>Your health focus areas</Text>
         <Text style={{ color: theme.colors.muted, marginTop: 5, lineHeight: 20 }}>Start with your tracked issues, then open your deeper weekly report.</Text>
+        {lastLoadedAt ? (
+          <Text style={{ color: theme.colors.muted, marginTop: 4, fontSize: 12 }}>Updated {formatDateTimeForLocale(lastLoadedAt)}</Text>
+        ) : null}
       </View>
 
       {error ? (
@@ -1082,7 +1176,47 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         {reportAccessActive && weeklyStatus?.reportLocked ? (
           <Text style={{ color: '#B45309', fontWeight: '800', marginTop: 12 }}>Your latest report is ready, but needs a subscription or top-up credits to unlock.</Text>
         ) : null}
-        {reportAccessActive && displayNextReportDueAt ? (
+        {reportAccessActive && countdown ? (
+          <View style={{ marginTop: 14, gap: 10 }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' }}>Current cycle progress</Text>
+              <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '900' }}>{countdown.percent}%</Text>
+            </View>
+            <ProgressBar percent={countdown.percent} />
+            {(weeklyStatus?.status === 'RUNNING' || countdown.dueNow) ? (
+              <Card tone="mint" style={{ padding: 10 }}>
+                <Text style={{ color: '#047857', lineHeight: 18 }}>Your report is being prepared now. Check back soon.</Text>
+              </Card>
+            ) : null}
+            <Text style={{ color: theme.colors.muted }}>
+              Next report due <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{formatDateForLocale(countdown.dueAtMs)}</Text>
+            </Text>
+            <View
+              style={{
+                flexDirection: 'row',
+                flexWrap: 'wrap',
+                gap: 8,
+                borderWidth: 1,
+                borderColor: theme.colors.border,
+                borderRadius: 14,
+                backgroundColor: '#F9FAFB',
+                padding: 10,
+              }}
+            >
+              {[
+                { label: 'Days', value: countdown.days },
+                { label: 'Hours', value: countdown.hours },
+                { label: 'Mins', value: countdown.minutes },
+                { label: 'Secs', value: countdown.seconds },
+              ].map((item) => (
+                <View key={item.label} style={{ flex: 1, minWidth: 64, alignItems: 'center' }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '900' }}>{padTime(item.value)}</Text>
+                  <Text style={{ color: theme.colors.muted, fontSize: 10, fontWeight: '900', textTransform: 'uppercase' }}>{item.label}</Text>
+                </View>
+              ))}
+            </View>
+          </View>
+        ) : reportAccessActive && displayNextReportDueAt ? (
           <View style={{ marginTop: 14, gap: 7 }}>
             <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '900', textTransform: 'uppercase' }}>Current cycle progress</Text>
             <ProgressBar percent={weeklyStatus?.reportReady ? 100 : 60} />
@@ -1136,34 +1270,6 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         {busyMessage ? <Text style={{ color: theme.colors.primary, fontWeight: '800', marginTop: 10 }}>{busyMessage}</Text> : null}
       </Card>
 
-      {reports.length ? (
-        <Card>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Previous reports</Text>
-          <View style={{ gap: 10, marginTop: 12 }}>
-            {reports.slice(0, 6).map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => openReport(item.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`Open report ${formatDateRange(item.periodStart, item.periodEnd)}`}
-                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
-              >
-                <Card tone="white" style={{ padding: 12 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{formatDateRange(item.periodStart, item.periodEnd)}</Text>
-                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 3 }}>Generated {formatDateForLocale(item.createdAt)}</Text>
-                </Card>
-              </Pressable>
-            ))}
-          </View>
-        </Card>
-      ) : (
-        <Card>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>No report yet</Text>
-          <Text style={{ color: theme.colors.muted, marginTop: 6, lineHeight: 20 }}>Your weekly report will appear here once your first 7 days of data are complete.</Text>
-          {displayNextReportDueAt ? <Text style={{ color: theme.colors.muted, marginTop: 10 }}>Next report due: {formatDateForLocale(displayNextReportDueAt)}</Text> : null}
-        </Card>
-      )}
-
       {issues.length === 0 ? (
         <Card>
           <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>No health issues tracked yet</Text>
@@ -1213,6 +1319,34 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
               </Pressable>
             )
           })}
+        </Card>
+      )}
+
+      {reports.length ? (
+        <Card>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Previous reports</Text>
+          <View style={{ gap: 10, marginTop: 12 }}>
+            {reports.slice(0, 6).map((item) => (
+              <Pressable
+                key={item.id}
+                onPress={() => openReport(item.id)}
+                accessibilityRole="button"
+                accessibilityLabel={`Open report ${formatDateRange(item.periodStart, item.periodEnd)}`}
+                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+              >
+                <Card tone="white" style={{ padding: 12 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{formatDateRange(item.periodStart, item.periodEnd)}</Text>
+                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 3 }}>Generated {formatDateForLocale(item.createdAt)}</Text>
+                </Card>
+              </Pressable>
+            ))}
+          </View>
+        </Card>
+      ) : (
+        <Card>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>No report yet</Text>
+          <Text style={{ color: theme.colors.muted, marginTop: 6, lineHeight: 20 }}>Your weekly report will appear here once your first 7 days of data are complete.</Text>
+          {displayNextReportDueAt ? <Text style={{ color: theme.colors.muted, marginTop: 10 }}>Next report due: {formatDateForLocale(displayNextReportDueAt)}</Text> : null}
         </Card>
       )}
     </View>
@@ -1367,6 +1501,9 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         <Card tone="sky">
           <Text style={{ color: '#075985', fontSize: 18, fontWeight: '900' }}>Talk to Helfi highlights</Text>
           <Text style={{ color: '#075985', marginTop: 5 }}>{talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}{talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.</Text>
+          <View style={{ alignSelf: 'flex-start', marginTop: 10 }}>
+            <SecondaryButton label="Open chat log" onPress={openChatLog} />
+          </View>
           <View style={{ gap: 8, marginTop: 10 }}>
             {(talkToAiSummary.highlights || []).slice(-3).map((item: any, idx: number) => <InfoItem key={`talk-${idx}`} title={item.content || 'Chat highlight'} />)}
           </View>
@@ -1491,10 +1628,10 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
       <View style={{ gap: 14 }}>
         <View style={{ flexDirection: 'row', gap: 10 }}>
           <View style={{ flex: 1 }}>
-            <SecondaryButton label="Back" onPress={() => setSelectedReportId(null)} />
+            <SecondaryButton label="Back to Insights" onPress={() => setSelectedReportId(null)} />
           </View>
           <View style={{ flex: 1 }}>
-            <SecondaryButton label="PDF" onPress={openPdf} />
+            <SecondaryButton label="Save as PDF" onPress={openPdf} />
           </View>
         </View>
         {parsedSummary?.dataWarning ? (

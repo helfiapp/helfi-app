@@ -261,7 +261,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
       })
       const data: any = await res.json().catch(() => ({}))
       if (!res.ok) {
-        throw new Error(data?.error || data?.detail || 'Could not load Smart Health Coach settings')
+        throw new Error(data?.error || data?.detail || 'Could not load Health Coach settings')
       }
       applySettings(data, { setSnapshot: true })
     } catch (e: any) {
@@ -314,7 +314,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
         setHasUnsavedChanges(false)
 
         if (!options?.silent) {
-          Alert.alert('Saved', 'Smart Health Coach settings saved.')
+          Alert.alert('Saved', 'Health Coach settings saved.')
         }
         return true
       } catch (e: any) {
@@ -417,7 +417,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
       acceptPricingTerms: true,
     })
     if (saved) {
-      Alert.alert('Smart Health Coach enabled.')
+      Alert.alert('Health Coach enabled.')
     } else {
       setEnabled(false)
     }
@@ -426,7 +426,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
   if (mode !== 'signedIn') {
     return (
       <Screen style={{ alignItems: 'center', justifyContent: 'center', padding: 24 }}>
-        <Text style={{ color: theme.colors.muted }}>Please log in again to manage Smart Health Coach settings.</Text>
+        <Text style={{ color: theme.colors.muted }}>Please log in again to manage Health Coach settings.</Text>
       </Screen>
     )
   }
@@ -446,13 +446,13 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
         >
           <View style={{ gap: 8 }}>
             <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Smart Health Coach settings</Text>
+              <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Health Coach settings</Text>
               <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>
                 Get proactive guidance based on your daily logs and habits.
               </Text>
             </View>
             <Pressable onPress={() => void openSmartCoach()} style={{ alignSelf: 'flex-end', paddingTop: 2 }}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Open Smart Health Coach</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Open Health Coach</Text>
             </Pressable>
           </View>
 
@@ -464,7 +464,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Enable Smart Health Coach</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Enable Health Coach</Text>
                   <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12 }}>
                     10 credits per alert. Up to 50 credits per day. Charges only apply when an alert is sent.
                   </Text>
@@ -487,7 +487,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
                 </Text>
               </View>
 
-              <ActionButton label="Save Smart Health Coach settings" loading={saving} onPress={() => void saveSettings()} />
+              <ActionButton label="Save Health Coach settings" loading={saving} onPress={() => void saveSettings()} />
 
               {hasUnsavedChanges ? (
                 <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
@@ -602,7 +602,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
             }}
           >
             <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text }}>
-              Enable Smart Health Coach?
+              Enable Health Coach?
             </Text>
 
             <View style={{ gap: 4 }}>

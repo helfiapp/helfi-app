@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
@@ -21,9 +22,10 @@ const getOpenAIClient = () => {
 export async function POST(req: NextRequest) {
   try {
     // Auth check (with JWT fallback to avoid sporadic session resolution issues)
+    const nativeUserId = await getUserIdFromNativeAuth(req)
     const session = await getServerSession(authOptions)
     let userEmail: string | null = session?.user?.email ?? null
-    if (!userEmail) {
+    if (!nativeUserId && !userEmail) {
       try {
         const token = await getToken({
           req,
@@ -36,7 +38,7 @@ export async function POST(req: NextRequest) {
         // ignore – will fall through to 401 below if still missing
       }
     }
-    if (!userEmail) {
+    if (!nativeUserId && !userEmail) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -63,7 +65,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Fetch user
-    const user = await prisma.user.findUnique({ where: { email: userEmail }, include: { subscription: true, creditTopUps: true } })
+    const user = nativeUserId
+      ? await prisma.user.findUnique({ where: { id: nativeUserId }, include: { subscription: true, creditTopUps: true } })
+      : await prisma.user.findUnique({ where: { email: userEmail as string }, include: { subscription: true, creditTopUps: true } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }

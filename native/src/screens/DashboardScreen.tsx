@@ -6,7 +6,6 @@ import { useFocusEffect, useNavigation } from '@react-navigation/native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { API_BASE_URL } from '../config'
-import { NATIVE_WEB_PAGES, type NativeWebPageRoute } from '../config/nativePageRoutes'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { appleHealthConnectAndReadToday, isAppleHealthSupportedDevice } from '../health/appleHealth'
@@ -25,6 +24,22 @@ const APPLE_HEALTH_CONNECTED_KEY = 'helfi_apple_health_connected_v1'
 const APPLE_HEALTH_MODE_KEY = 'helfi_apple_health_mode_v1' // 'real' | 'sample'
 const MOOD_REMINDERS_KEY = 'helfi_reminders_mood_v1'
 type WearableProvider = 'fitbit' | 'garmin'
+type HealthSetupChips = {
+  medications: boolean
+  supplements: boolean
+}
+
+const EMPTY_HEALTH_SETUP_CHIPS: HealthSetupChips = {
+  medications: false,
+  supplements: false,
+}
+
+function chipsFromHealthSetupData(data: any): HealthSetupChips {
+  return {
+    medications: Array.isArray(data?.medications) && data.medications.length > 0,
+    supplements: Array.isArray(data?.supplements) && data.supplements.length > 0,
+  }
+}
 
 export function DashboardScreen() {
   const { mode, session, signOut } = useAppMode()
@@ -51,6 +66,7 @@ export function DashboardScreen() {
 
   // These start as "unknown/false" until we load from the server / app storage.
   const [healthSetupComplete, setHealthSetupComplete] = useState(false)
+  const [healthSetupChips, setHealthSetupChips] = useState<HealthSetupChips>(EMPTY_HEALTH_SETUP_CHIPS)
   const [moodRemindersSet, setMoodRemindersSet] = useState(false)
 
   const [appleHealthConnected, setAppleHealthConnected] = useState(false)
@@ -135,16 +151,17 @@ export function DashboardScreen() {
         return
       }
 
-      const res = await fetch(`${API_BASE_URL}/api/native-account-status`, {
+      const res = await fetch(`${API_BASE_URL}/api/native-auth/me`, {
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
 
       const data: any = await res.json().catch(() => ({}))
       if (!res.ok) return
 
-      if (typeof data?.name === 'string' && data.name.trim()) setAccountName(data.name.trim())
-      if (typeof data?.email === 'string' && data.email.trim()) setAccountEmail(data.email.trim())
-      if (typeof data?.image === 'string') setAccountImage(data.image || null)
+      const user = data?.user || data
+      if (typeof user?.name === 'string' && user.name.trim()) setAccountName(user.name.trim())
+      if (typeof user?.email === 'string' && user.email.trim()) setAccountEmail(user.email.trim())
+      if (typeof user?.image === 'string') setAccountImage(user.image || null)
       if (typeof data?.isPremium === 'boolean') setHasPremiumPlan(data.isPremium)
     } catch {
       // Keep UI stable if this request fails.
@@ -234,7 +251,28 @@ export function DashboardScreen() {
     try {
       if (mode !== 'signedIn' || !session?.token) {
         setHealthSetupComplete(false)
+        setHealthSetupChips(EMPTY_HEALTH_SETUP_CHIPS)
         return
+      }
+
+      const loadHealthSetupChips = async () => {
+        const chipRes = await fetch(`${API_BASE_URL}/api/user-data?scope=health-setup`, {
+          headers: {
+            authorization: `Bearer ${session.token}`,
+            'x-native-token': session.token,
+            'cache-control': 'no-store',
+          },
+        })
+        const chipPayload: any = await chipRes.json().catch(() => ({}))
+        if (!chipRes.ok) {
+          setHealthSetupChips(EMPTY_HEALTH_SETUP_CHIPS)
+          return null
+        }
+        const chipData = chipPayload?.data && typeof chipPayload.data === 'object'
+          ? chipPayload.data
+          : chipPayload
+        setHealthSetupChips(chipsFromHealthSetupData(chipData))
+        return chipData
       }
 
       const res = await fetch(`${API_BASE_URL}/api/health-setup-status`, {
@@ -248,26 +286,20 @@ export function DashboardScreen() {
       const data: any = await res.json().catch(() => ({}))
       if (res.ok && typeof data?.complete === 'boolean') {
         setHealthSetupComplete(data.complete)
+        if (data.complete) {
+          await loadHealthSetupChips()
+        } else {
+          setHealthSetupChips(EMPTY_HEALTH_SETUP_CHIPS)
+        }
         return
       }
 
       // Fallback: compute completion from real onboarding profile data.
-      const fallbackRes = await fetch(`${API_BASE_URL}/api/user-data?scope=health-setup`, {
-        headers: {
-          authorization: `Bearer ${session.token}`,
-          'x-native-token': session.token,
-          'cache-control': 'no-store',
-        },
-      })
-      const fallbackPayload: any = await fallbackRes.json().catch(() => ({}))
-      if (!fallbackRes.ok) {
+      const fallbackData = await loadHealthSetupChips()
+      if (!fallbackData) {
         setHealthSetupComplete(false)
         return
       }
-
-      const fallbackData = fallbackPayload?.data && typeof fallbackPayload.data === 'object'
-        ? fallbackPayload.data
-        : fallbackPayload
 
       const hasBasicProfile = !!(fallbackData?.gender && fallbackData?.weight && fallbackData?.height)
       const hasGoals =
@@ -276,6 +308,7 @@ export function DashboardScreen() {
       setHealthSetupComplete(hasBasicProfile && hasGoals)
     } catch {
       setHealthSetupComplete(false)
+      setHealthSetupChips(EMPTY_HEALTH_SETUP_CHIPS)
     }
   }
 
@@ -383,13 +416,7 @@ export function DashboardScreen() {
 
   const goToMore = () => navigation.navigate('More')
   const goToHealthSetup = () => navigation.getParent()?.navigate('HealthSetup')
-  const openNativeTool = (page: NativeWebPageRoute) => {
-    navigation.getParent()?.navigate('NativeWebTool', {
-      title: page.title,
-      path: page.path,
-    })
-  }
-  const goToDailyCheckIn = () => openNativeTool(NATIVE_WEB_PAGES.dailyCheckIn)
+  const goToDailyCheckIn = () => navigation.getParent()?.navigate('DailyCheckIn', { tab: 'today' })
   const goToMoodTracker = () => navigation.getParent()?.navigate('MoodTracker', { tab: 'checkin' })
   const goToTrackCalories = () => navigation.getParent()?.navigate('TrackCalories')
   const goToWaterIntake = () => navigation.getParent()?.navigate('WaterIntake')
@@ -1009,7 +1036,7 @@ export function DashboardScreen() {
 
         <View style={{ marginTop: theme.spacing.xl }}>
           {healthSetupComplete ? (
-            <StatusCardComplete onPressEdit={goToHealthSetup} />
+            <StatusCardComplete onPressEdit={goToHealthSetup} chips={healthSetupChips} />
           ) : (
             <StatusCardIncomplete onPressContinue={goToHealthSetup} />
           )}
@@ -1312,7 +1339,30 @@ function StatusCardIncomplete({ onPressContinue }: { onPressContinue: () => void
   )
 }
 
-function StatusCardComplete({ onPressEdit }: { onPressEdit: () => void }) {
+function HealthSetupChip({ label }: { label: string }) {
+  return (
+    <View
+      style={{
+        flexDirection: 'row',
+        alignItems: 'center',
+        gap: 6,
+        borderWidth: 1,
+        borderColor: '#BCEFD2',
+        borderRadius: 999,
+        backgroundColor: '#FFFFFF',
+        paddingHorizontal: 12,
+        paddingVertical: 7,
+      }}
+    >
+      <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 12 }}>{label}</Text>
+      <Feather name="check" size={13} color={theme.colors.primary} />
+    </View>
+  )
+}
+
+function StatusCardComplete({ onPressEdit, chips }: { onPressEdit: () => void; chips: HealthSetupChips }) {
+  const hasChips = chips.medications || chips.supplements
+
   return (
     <View
       style={{
@@ -1343,6 +1393,13 @@ function StatusCardComplete({ onPressEdit }: { onPressEdit: () => void }) {
       <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 20, textAlign: 'center' }}>
         Your health profile has been successfully created and synced across your connected devices.
       </Text>
+
+      {hasChips ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 14 }}>
+          {chips.medications ? <HealthSetupChip label="Medications" /> : null}
+          {chips.supplements ? <HealthSetupChip label="Supplements" /> : null}
+        </View>
+      ) : null}
 
       <Pressable
         onPress={onPressEdit}

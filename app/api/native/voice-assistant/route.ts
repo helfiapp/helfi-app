@@ -271,6 +271,19 @@ function stripIngredientLookupModifiers(value: unknown) {
     .join(' ')
 }
 
+function stripVoiceFoodCommandWords(value: string) {
+  return cleanText(value, 1200)
+    .replace(/\b(can you|could you|please|i want to|i need to|i would like to|i'd like to|help me)\b/gi, ' ')
+    .replace(/\b(add|log|put|input|record|track|save|create|make|build|enter)\b/gi, ' ')
+    .replace(/\b(new|a|an|my|some|this|that)\b/gi, ' ')
+    .replace(/\b(food|foods|meal|meals|ingredient|ingredients|entry|diary|log)\b/gi, ' ')
+    .replace(/\b(as|for)\s+(?:a\s+|an\s+|my\s+)?(breakfast|lunch|dinner|snacks?|meal)\b/gi, ' ')
+    .replace(/\b(to|into|in)\s+(?:my\s+)?(?:food\s+)?(?:diary|log|breakfast|lunch|dinner|snacks?)\b/gi, ' ')
+    .replace(/\b(breakfast|lunch|dinner|snacks?)\b/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
 function buildIngredientLookupQueries(query: string) {
   const compactQuery = compactFoodMatchText(query)
   const strippedQuery = stripIngredientLookupModifiers(query)
@@ -697,21 +710,23 @@ function tryParseIngredientMealRequest(transcript: string) {
   const text = cleanText(transcript, 1400)
   const lower = text.toLowerCase()
   const asksForFood =
-    /\b(build|make|create|add|log|put|input|record)\b/.test(lower) &&
-    /\b(breakfast|lunch|dinner|snack|meal|food)\b/.test(lower)
+    /\b(build|make|create|add|log|put|input|record|track|save|enter)\b/.test(lower) &&
+    /\b(breakfast|lunch|dinner|snack|meal|food|ingredient|ingredients)\b/.test(lower)
   if (!asksForFood) return null
 
   const meal = inferMealFromText(text, lower.includes('snack') || lower.includes('coffee') || lower.includes('drink') ? 'snacks' : 'uncategorized')
-  const withMatch = text.match(/^(.*?)\b(?:with|using|including|contains|made of)\b\s+(.+)$/i)
+  const withMatch = text.match(/^(.*?)\b(?:with|using|including|contains|made of|made from)\b\s+(.+)$/i)
   const beforeWith = cleanText(
     withMatch?.[1]
-      ?.replace(/\b(build|make|create|add|log|put|input|record)\b/gi, ' ')
-      .replace(/\b(me|a|an|my|breakfast|lunch|dinner|snacks?|meal|food)\b/gi, ' '),
+      ?.replace(/\b(build|make|create|add|log|put|input|record|track|save|enter)\b/gi, ' ')
+      .replace(/\b(me|a|an|my|breakfast|lunch|dinner|snacks?|meal|food|ingredient|ingredients)\b/gi, ' '),
     500,
   )
   const afterWith = withMatch?.[2]
   const afterColon = text.includes(':') ? text.split(':').slice(1).join(':') : ''
-  const listText = cleanText([beforeWith, afterWith || afterColon].filter(Boolean).join(', '), 1000)
+  const explicitList = cleanText([beforeWith, afterWith || afterColon].filter(Boolean).join(', '), 1000)
+  const fallbackList = stripVoiceFoodCommandWords(text)
+  const listText = cleanText(explicitList || fallbackList, 1000)
   if (!listText) return null
   const ingredients = splitIngredientList(listText).map(parseIngredientPhrase).filter(Boolean)
   if (ingredients.length < 2) return null
@@ -727,23 +742,19 @@ function tryParseIngredientMealRequest(transcript: string) {
 function tryParseDirectFoodRequest(transcript: string) {
   const text = cleanText(transcript, 1400)
   const lower = text.toLowerCase()
-  if (!/\b(add|log|put|input|record)\b/.test(lower)) return null
-  if (!/\b(food|meal|breakfast|lunch|dinner|snack|snacks|coffee|banana|shake|smoothie|yogurt|yoghurt|egg|toast|avocado|chicken|rice|milk)\b/.test(lower)) return null
+  if (!/\b(add|log|put|input|record|track|save|enter)\b/.test(lower)) return null
+  const clearlyFoodRequest =
+    /\b(food|meal|breakfast|lunch|dinner|snack|snacks|ingredient|ingredients)\b/.test(lower) ||
+    /\b(to|into|in|for|as)\s+(?:my\s+)?(breakfast|lunch|dinner|snacks?)\b/.test(lower) ||
+    /\b(coffee|tea|banana|shake|smoothie|yogurt|yoghurt|egg|eggs|toast|avocado|chicken|rice|milk|salmon|beef|steak|pork|tuna|turkey|bread|oats?|potato|sweet potato|broccoli|spinach|apple|orange|berries|blueberries|protein|pasta|noodles|wrap|sandwich|soup|salad)\b/.test(lower)
+  if (!clearlyFoodRequest) return null
   if (/\b(favourite|favorite|saved|same|yesterday|previous)\b/.test(lower)) return null
 
   const meal = inferMealFromText(text, lower.includes('snack') || lower.includes('coffee') || lower.includes('drink') ? 'snacks' : 'uncategorized')
-  const withoutCommand = text
-    .replace(/\b(add|log|put|input|record)\b/gi, ' ')
-    .replace(/\b(as|for)\s+(?:a\s+|an\s+)?(breakfast|lunch|dinner|snacks?|meal)\b/gi, ' ')
-    .replace(/\b(to|into|in)\s+(?:my\s+)?(breakfast|lunch|dinner|snacks?)\b/gi, ' ')
-    .replace(/\b(breakfast|lunch|dinner|snacks?|meal|food)\b/gi, ' ')
-    .replace(/\b(to|in)\s+(my\s+)?(food\s+)?(diary|log)\b/gi, ' ')
-    .replace(/\b(a|an|my|please)\b/gi, ' ')
+  const withoutCommand = stripVoiceFoodCommandWords(text)
   const listText = cleanText(withoutCommand.replace(/\bwith\b/gi, ',').replace(/\band\b/gi, ','), 1000)
   const ingredients = splitIngredientList(listText).map(parseIngredientPhrase).filter(Boolean)
   if (ingredients.length === 0) return null
-  const foodWordsInRequest = /\b(coffee|banana|shake|smoothie|yogurt|yoghurt|egg|eggs|toast|avocado|chicken|rice|milk|tea|honey|water|juice|oats?|muffins?|frittata|fritata)\b/.test(listText.toLowerCase())
-  if (ingredients.length === 1 && !foodWordsInRequest) return null
   const mealName = meal === 'uncategorized' ? 'Food' : `${meal.charAt(0).toUpperCase()}${meal.slice(1)}`
   return {
     meal,
@@ -756,9 +767,9 @@ function tryParseDirectFoodRequest(transcript: string) {
 function tryParseExerciseRequest(transcript: string) {
   const raw = cleanText(transcript, 600)
   const lower = raw.toLowerCase()
-  if (!/\b(log|add|record|track)\b/.test(lower)) return null
-  if (!/\b(walk|run|gym|workout|bike|cycle|ride|exercise)\b/.test(lower)) return null
-  const distanceMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(km|kilometre|kilometer|kilometres|kilometers|mi|mile|miles)\b/)
+  if (!/\b(log|add|record|track|did|done|completed|finished|went|ran)\b/.test(lower)) return null
+  if (!/\b(walk|run|ran|jog|gym|workout|bike|cycle|ride|exercise)\b/.test(lower)) return null
+  const distanceMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(k|km|kilometre|kilometer|kilometres|kilometers|mi|mile|miles)\b/)
   const durationMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|hour|hours|hr|hrs)\b/)
   const distanceKm = distanceMatch ? Number(distanceMatch[1]) * (distanceMatch[2].startsWith('mi') || distanceMatch[2].startsWith('mile') ? 1.609 : 1) : null
   const durationRaw = durationMatch ? Number(durationMatch[1]) : null
@@ -773,7 +784,7 @@ function tryParseExerciseRequest(transcript: string) {
     : lower.includes('gym') || lower.includes('workout')
     ? 45
     : 30
-  const name = lower.includes('run')
+  const name = lower.includes('run') || lower.includes('ran') || lower.includes('jog')
     ? 'running'
     : lower.includes('bike') || lower.includes('cycle') || lower.includes('ride')
     ? 'cycling'
@@ -902,8 +913,14 @@ function requestedRecipeIngredients(transcript: string) {
 function buildQuickRecipeDraft(transcript: string, localDate: string): VoiceDraft | null {
   const raw = cleanText(transcript, 1000)
   const lower = raw.toLowerCase()
-  if (!/\b(recipe|meal idea)\b/.test(lower)) return null
-  if (!/\b(create|make|give|suggest|build)\b/.test(lower)) return null
+  const recipeIntent =
+    /\b(recipe|meal idea|meal plan|dinner idea|lunch idea|breakfast idea|snack idea)\b/.test(lower) ||
+    /\b(what can i make|what should i make|what can i cook|what should i cook|give me something to cook|suggest a meal|suggest something to eat)\b/.test(lower)
+  if (!recipeIntent) return null
+  if (!/\b(create|make|give|suggest|build|cook|prepare|want|need|can|should)\b/.test(lower)) return null
+  const hasDetailedConstraints =
+    /\b(no|without|avoid|allergy|allergic|free|dairy|gluten|nuts?|egg-free|vegan|vegetarian|keto|low carb|low calorie|high protein|calorie|calories|protein|servings?|serve|for two|for three|for four|for \d+)\b/.test(lower)
+  if (hasDetailedConstraints) return null
   const meal = lower.includes('breakfast') ? 'breakfast' : lower.includes('lunch') ? 'lunch' : lower.includes('snack') ? 'snack' : 'dinner'
   const highProtein = /\b(high protein|high-protein|protein)\b/.test(lower)
   const lowCalorie = /\b(low calorie|low-calorie|light)\b/.test(lower)
@@ -1308,18 +1325,21 @@ async function runJsonCommandModel(openai: OpenAI, transcript: string, localDate
       content: [
         'You quickly understand natural spoken requests for the Helfi health app.',
         'Return compact JSON only. Do not explain.',
+        'The user may speak from any screen. Your job is to understand what action they want done, not to act like a chat page.',
         'For clear low-risk logging requests, prepare a saveable draft. The app may save it automatically and then tell the user it is done.',
-        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_build_meal, food_draft, recipe, health_question, app_handoff, unknown.',
+        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, recipe, health_question, app_handoff, unknown.',
         'For exercise, infer the exercise name, duration, distance, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
         'For journal, make a short title and journal content. If the user says health journal, include journalType "health"; if they say mood journal, include journalType "mood".',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
-        'For new meals or foods with named ingredients, return food_build_meal with meal, mealName, draftText, and ingredients array. The app will find nutrition before saving.',
+        'For saved/favourite meal requests, return food_favorite when the user asks to add a favorite/favourite/saved meal or food.',
+        'For new meals, single foods, or ingredient adds with named foods, return food_build_meal with meal, mealName, draftText, and ingredients array. The app will find nutrition before saving.',
+        'If the user says add ingredients, input a new meal, log salmon, add chicken and rice, or similar, treat that as a food_build_meal request when food names are present.',
         'Use food_draft only when the user gives a vague food request without any usable food names.',
-        'For recipes, return action recipe and recipeRequest.',
+        'For recipes, meal ideas, cooking requests, or “what can I make with...” requests, return action recipe and recipeRequest. Preserve all requested constraints such as high protein, low calorie, ingredients, meal time, allergies, dislikes, and servings.',
         'For health_question, use when the user asks health advice, interpretation, supplements, medication, labs, fitness, sleep, or wellbeing questions that are not a save action.',
         'If the user asks about symptoms, diagnosis, treatment, red flags, or health image review, use health_question. The app will show a safe general message and will not open a symptom notes or health image notes tool.',
-        'For app_handoff, use when the user clearly asks to open or use a Helfi app area that is not one of the save actions.',
+        'For app_handoff, use only when the user clearly asks to open, show, find, or use a Helfi app area and does not ask to save/log/create data.',
         'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"recipeRequest":"..."}',
       ].join('\n'),
     },

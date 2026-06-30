@@ -5,6 +5,7 @@ import OpenAI from 'openai'
 import { authOptions } from '@/lib/auth'
 import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 
 export const runtime = 'nodejs'
@@ -24,7 +25,10 @@ const getOpenAIClient = () => {
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 }
 
-async function resolveUserId(): Promise<string | null> {
+async function resolveUserId(request: NextRequest): Promise<string | null> {
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (nativeUserId) return nativeUserId
+
   const session = await getServerSession(authOptions)
   if (session?.user?.id) return session.user.id
   if (session?.user?.email) {
@@ -118,7 +122,7 @@ const transcribeAudio = async (client: OpenAI, file: File, userId: string) => {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await resolveUserId()
+    const userId = await resolveUserId(request)
     if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
@@ -182,7 +186,7 @@ export async function POST(request: NextRequest) {
         { status: 429 },
       )
     }
-    const userId = await resolveUserId().catch(() => null)
+    const userId = await resolveUserId(request).catch(() => null)
     if (userId) {
       logAiUsageEvent({
         feature: 'health-journal:extract-media',

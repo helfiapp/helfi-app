@@ -3,7 +3,6 @@ import { Pressable, ScrollView, Text, View } from 'react-native'
 
 import { Feather } from '@expo/vector-icons'
 
-import { NATIVE_WEB_PAGES, type NativeWebPageRoute } from '../config/nativePageRoutes'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 
@@ -52,13 +51,6 @@ function Row({
 }
 
 export function NotificationsScreen({ navigation }: { navigation: any }) {
-  const openNativeTool = (page: NativeWebPageRoute) => {
-    navigation.navigate('NativeWebTool', {
-      title: page.title,
-      path: page.path,
-    })
-  }
-
   const goToInbox = () => navigation.navigate('NotificationsInbox')
   const goToReminders = () => navigation.navigate('Reminders')
   const goToAiInsights = () => navigation.navigate('NotificationsAIInsights')
@@ -89,26 +81,8 @@ export function NotificationsScreen({ navigation }: { navigation: any }) {
             onPress={goToReminders}
           />
           <Row
-            icon={<Feather name="send" size={18} color={theme.colors.muted} />}
-            label="Notification delivery"
-            subtitle="Match the web delivery settings page."
-            onPress={() => openNativeTool(NATIVE_WEB_PAGES.notificationDelivery)}
-          />
-          <Row
-            icon={<Feather name="calendar" size={18} color={theme.colors.muted} />}
-            label="Health reminders"
-            subtitle="Separate web health reminder settings."
-            onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthReminders)}
-          />
-          <Row
-            icon={<Feather name="smile" size={18} color={theme.colors.muted} />}
-            label="Mood reminders"
-            subtitle="Separate web mood reminder settings."
-            onPress={() => openNativeTool(NATIVE_WEB_PAGES.moodReminders)}
-          />
-          <Row
             icon={<Feather name="zap" size={18} color={theme.colors.muted} />}
-            label="Smart Health Coach"
+            label="Health Coach"
             subtitle="Paid proactive alerts based on your logs and habits."
             onPress={goToAiInsights}
           />

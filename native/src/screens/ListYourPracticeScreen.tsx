@@ -61,12 +61,8 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
             List your practice on Helfi
           </Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-            Reach people searching for trusted care. You get 6 months free, then it is $4.95/month (USD). No card is
-            needed to start. Your free period begins only after your listing is approved.
-          </Text>
-          <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-            This is separate from your personal Helfi health account. You can use this app as a normal member and still
-            create a practitioner listing if that applies to you.
+            Reach people searching for trusted care in a free practitioner directory. You get 6 months free, then it is
+            $4.95/month (USD). No card is needed to start. Your free period begins only after your listing is approved.
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
             <Pressable
@@ -124,7 +120,8 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
           <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Safety review</Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
             Every listing is reviewed for safety and fraud. If it looks good, it goes live and you are emailed right
-            away. If it needs a closer look, the listing stays hidden until a staff member reviews it.
+            away. If it needs a closer look, the listing stays hidden until a staff member reviews it. We will email you
+            to explain that it is under review, and we will email you again once approved.
           </Text>
         </View>
 

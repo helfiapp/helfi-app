@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
+import { getUserIdFromNativeAuth } from '@/lib/native-auth';
 import { prisma } from '@/lib/prisma';
 import { v2 as cloudinary } from 'cloudinary';
 
@@ -17,13 +18,20 @@ export async function POST(request: NextRequest) {
     
     // Check authentication
     const session = await getServerSession(authOptions);
-    
-    if (!session?.user?.email) {
+
+    const nativeUserId = session?.user?.email ? null : await getUserIdFromNativeAuth(request);
+    const user = session?.user?.email
+      ? await prisma.user.findUnique({ where: { email: session.user.email } })
+      : nativeUserId
+        ? await prisma.user.findUnique({ where: { id: nativeUserId } })
+        : null;
+
+    if (!user) {
       console.log('❌ Authentication failed - no session or user email');
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 });
     }
 
-    console.log('✅ Authentication successful for user:', session.user.email);
+    console.log('✅ Authentication successful for user:', user.email || user.id);
 
     // NextRequest.formData() returns a standard web FormData, but type
     // definitions can vary between runtimes and cause build-time TS errors.
@@ -52,7 +60,7 @@ export async function POST(request: NextRequest) {
       name: imageFile.name,
       type: imageFile.type,
       size: imageFile.size,
-      userEmail: session.user.email
+      userEmail: user.email || user.id
     });
 
     // Convert file to buffer for Cloudinary upload
@@ -66,7 +74,7 @@ export async function POST(request: NextRequest) {
         {
           resource_type: 'image',
           folder: 'helfi/profile-images',
-          public_id: `user_${session.user.email?.replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
+          public_id: `user_${String(user.email || user.id).replace(/[^a-zA-Z0-9]/g, '_')}_${Date.now()}`,
           transformation: [
             { width: 400, height: 400, crop: 'fill', gravity: 'face' },  // Smart crop focusing on face
             { quality: 'auto', fetch_format: 'auto' }  // Optimize quality and format
@@ -93,16 +101,6 @@ export async function POST(request: NextRequest) {
       secureUrl: cloudinaryResult.secure_url,
       bytes: cloudinaryResult.bytes
     });
-
-    // Find user by email
-    const user = await prisma.user.findUnique({
-      where: { email: session.user.email }
-    });
-
-    if (!user) {
-      console.log('❌ User not found in database:', session.user.email);
-      return NextResponse.json({ error: 'User not found' }, { status: 404 });
-    }
 
     console.log('✅ User found in database:', { id: user.id, email: user.email });
 

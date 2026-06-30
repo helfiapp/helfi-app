@@ -233,7 +233,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Dark Mode</Text>
-                <Text style={{ color: theme.colors.muted, marginTop: 3 }}>Save your theme preference.</Text>
+                <Text style={{ color: theme.colors.muted, marginTop: 3 }}>Switch to dark theme</Text>
               </View>
               <Switch
                 value={darkMode}
@@ -248,7 +248,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                 <View style={{ flex: 1 }}>
                   <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Haptic Tap Feedback</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
-                    Light vibration on taps (Android).
+                    Light vibration on nav taps (Android supported)
                   </Text>
                 </View>
                 <Switch
@@ -279,7 +279,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                   7-day report
                 </Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
-                  Turn weekly reports on or off.
+                  Turn on the 7-day report. Reports use credits based on how much you log.
                 </Text>
               </View>
               <Switch
@@ -335,7 +335,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
         <SectionCard title="Notifications">
           <LinkRow
             title="Open notification settings"
-            subtitle="Delivery, reminders, AI insights, and more."
+            subtitle="Delivery, reminders, Health Coach, and more."
             onPress={() => goToStackScreen('Notifications')}
           />
         </SectionCard>
@@ -344,13 +344,13 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           <View style={{ gap: 14 }}>
             <View>
               <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Profile Visibility</Text>
-              <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Choose who can see your profile.</Text>
+              <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Make your profile visible to others</Text>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {[
                 { value: 'private' as const, label: 'Private' },
                 { value: 'public' as const, label: 'Public' },
-                { value: 'friends' as const, label: 'Friends only' },
+                { value: 'friends' as const, label: 'Friends Only' },
               ].map((option) => {
                 const selected = profileVisibility === option.value
                 return (
@@ -378,7 +378,9 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Data Analytics</Text>
-                <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Share anonymous app usage data.</Text>
+                <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
+                  Help us improve by sharing anonymous usage data
+                </Text>
               </View>
               <Switch
                 value={dataAnalytics}
@@ -388,10 +390,9 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
               />
             </View>
 
-            <HelfiButton label="Open privacy settings" onPress={() => goToStackScreen('PrivacySettings')} variant="secondary" />
             <LinkRow
               title="Download my data (PDF)"
-              subtitle="Open your formatted health summary."
+              subtitle="Get a nicely formatted health summary"
               onPress={() => goToStackScreen('NativeWebTool', { title: 'Health summary PDF', path: '/api/export/pdf' })}
             />
           </View>
@@ -401,18 +402,18 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           <View style={{ gap: 10 }}>
             <LinkRow
               title="Account Settings"
-              subtitle="Manage your account information."
+              subtitle="Manage your account information"
               onPress={() => goToStackScreen('AccountSettings')}
             />
             <LinkRow
               title="Subscription & Billing"
-              subtitle="Manage your plan and credits."
+              subtitle="Manage your subscription"
               onPress={() => goToStackScreen('Billing')}
             />
             <LinkRow
               title="Help & Support"
-              subtitle="Get help and contact support."
-              onPress={() => goToStackScreen('Support')}
+              subtitle="Get help and contact support"
+              onPress={() => goToStackScreen('Help', { activeTab: 'Settings' })}
             />
             <HelfiButton label="Log out" onPress={onPressSignOut} variant="secondary" />
           </View>

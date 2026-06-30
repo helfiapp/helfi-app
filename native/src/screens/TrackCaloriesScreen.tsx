@@ -11,12 +11,14 @@ import {
   Switch,
   Text,
   TextInput,
+  useWindowDimensions,
   View,
 } from 'react-native'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
+import { CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
 import * as ImageManipulator from 'expo-image-manipulator'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
@@ -129,6 +131,33 @@ type FavoritesListItem = {
   isSaved: boolean
 }
 
+type FavoriteNutrientKey = 'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar'
+
+const FAVORITE_NUTRIENT_CARDS: Array<{
+  key: FavoriteNutrientKey
+  label: string
+  bg: string
+  border: string
+  color: string
+}> = [
+  { key: 'calories', label: 'Calories', bg: '#FFF7ED', border: '#FED7AA', color: '#F97316' },
+  { key: 'protein', label: 'Protein', bg: '#EFF6FF', border: '#BFDBFE', color: '#3B82F6' },
+  { key: 'carbs', label: 'Carbs', bg: '#ECFDF5', border: '#A7F3D0', color: '#22C55E' },
+  { key: 'fat', label: 'Fat', bg: '#F5F3FF', border: '#DDD6FE', color: '#8B5CF6' },
+  { key: 'fiber', label: 'Fibre', bg: '#FEFCE8', border: '#FDE68A', color: '#EAB308' },
+  { key: 'sugar', label: 'Sugar', bg: '#FDF2F8', border: '#FBCFE8', color: '#EC4899' },
+]
+
+const BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'code93', 'itf14', 'codabar']
+
+function formatFavoriteNutrientValue(key: FavoriteNutrientKey, value: number, energyUnit: 'kcal' | 'kj') {
+  const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0
+  if (key === 'calories') {
+    return energyUnit === 'kj' ? `${Math.round(safeValue * 4.184)} kJ` : String(Math.round(safeValue))
+  }
+  return `${formatMacroAmount(safeValue)}g`
+}
+
 type FavoriteAdjustItem = {
   id: string
   name: string
@@ -195,6 +224,21 @@ type RecommendedMeal = {
   mealName: string
   why: string
   category: string
+  createdAt?: string | number | null
+  tags?: string[] | null
+  totals?: {
+    calories?: number | null
+    protein?: number | null
+    protein_g?: number | null
+    carbs?: number | null
+    carbs_g?: number | null
+    fat?: number | null
+    fat_g?: number | null
+    fiber?: number | null
+    fiber_g?: number | null
+    sugar?: number | null
+    sugar_g?: number | null
+  } | null
   items: Array<{
     id?: string
     name: string
@@ -214,8 +258,80 @@ type RecommendedMeal = {
   } | null
 }
 
+type ImportedRecipe = {
+  title: string
+  servings: number | null
+  prepMinutes: number | null
+  cookMinutes: number | null
+  ingredients: string[]
+  steps: string[]
+  sourceUrl: string | null
+}
+
 const FAVORITES_KEY = 'helfi_native_food_favorites_v2'
 const RECOMMENDED_EXPLAIN_KEY = 'helfi_native_recommended_explain_seen_v1'
+const RECIPE_IMPORT_URL_CREDITS = 10
+const RECIPE_IMPORT_PHOTO_CREDITS = 15
+
+const recipeImportModeChip = {
+  borderWidth: 1,
+  borderColor: '#D1D5DB',
+  borderRadius: 12,
+  paddingHorizontal: 12,
+  paddingVertical: 8,
+  backgroundColor: '#FFFFFF',
+}
+
+const recipeImportModeChipActive = {
+  borderColor: '#059669',
+  backgroundColor: '#059669',
+}
+
+const recipeImportModeChipText = {
+  color: '#374151',
+  fontSize: 14,
+  fontWeight: '700' as const,
+}
+
+const recipeImportModeChipTextActive = {
+  color: '#FFFFFF',
+}
+
+const recipeImportPrimaryButton = {
+  flex: 0,
+  minHeight: 42,
+  borderRadius: 12,
+  backgroundColor: '#059669',
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+}
+
+const recipeImportPrimaryButtonText = {
+  color: '#FFFFFF',
+  fontSize: 14,
+  fontWeight: '800' as const,
+}
+
+const recipeImportSecondaryButton = {
+  flex: 0,
+  minHeight: 42,
+  borderRadius: 12,
+  borderWidth: 1,
+  borderColor: '#D1D5DB',
+  backgroundColor: '#FFFFFF',
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 16,
+  paddingVertical: 10,
+}
+
+const recipeImportSecondaryButtonText = {
+  color: '#1F2937',
+  fontSize: 14,
+  fontWeight: '800' as const,
+}
 
 const MEALS = [
   { key: 'breakfast', label: 'Breakfast' },
@@ -276,7 +392,7 @@ function formatDateLabel(raw: string) {
   if (isToday(raw)) return 'Today'
   const d = parseLocalDate(raw)
   if (Number.isNaN(d.getTime())) return raw
-  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+  return d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })
 }
 
 async function prepareFoodPhotoForUpload(asset: ImagePicker.ImagePickerAsset) {
@@ -378,6 +494,13 @@ function ingredientSourceLabel(item: SearchFoodItem) {
   return 'Best match'
 }
 
+function searchFoodDisplayName(item: SearchFoodItem) {
+  const name = String(item?.name || '').trim()
+  const brand = String(item?.brand || '').trim()
+  if (!brand || name.toLowerCase().includes(brand.toLowerCase())) return name
+  return `${name} - ${brand}`
+}
+
 function round1(n: number) {
   return Math.round(n * 10) / 10
 }
@@ -386,6 +509,22 @@ function numberOrZero(value: any) {
   const n = Number(value)
   if (!Number.isFinite(n)) return 0
   return n
+}
+
+function isValidHttpUrl(value: string) {
+  try {
+    const url = new URL(value)
+    return url.protocol === 'http:' || url.protocol === 'https:'
+  } catch {
+    return false
+  }
+}
+
+function cleanRecipeLines(raw: string) {
+  return String(raw || '')
+    .split('\n')
+    .map((line) => line.trim())
+    .filter(Boolean)
 }
 
 function analyzedFoodLabelLooksBad(value: any) {
@@ -456,11 +595,7 @@ function sortSearchResultsAz(
     return sortPlainFoodResults(filtered, options?.query || '', sourcePriority)
   }
 
-  return [...filtered].sort((a, b) => {
-    const byName = compareLabelAz(a?.name || '', b?.name || '')
-    if (byName !== 0) return byName
-    return compareLabelAz(a?.brand || '', b?.brand || '')
-  })
+  return filtered
 }
 
 type EntryTotals = {
@@ -1305,6 +1440,35 @@ function toTimestampMs(value: any) {
   return 0
 }
 
+function toValidTimestampMs(value: any) {
+  const ts = toTimestampMs(value)
+  return Number.isFinite(ts) && ts > 946684800000 ? ts : 0
+}
+
+function foodEntryRecencyMs(entry: FoodEntry | null | undefined) {
+  const raw = entry?.raw && typeof entry.raw === 'object' ? entry.raw : {}
+  const nutrition = raw?.nutrition && typeof raw.nutrition === 'object' ? raw.nutrition : {}
+  const nutrients = raw?.nutrients && typeof raw.nutrients === 'object' ? raw.nutrients : {}
+  const total = raw?.total && typeof raw.total === 'object' ? raw.total : {}
+  const candidates = [
+    raw?.__addedOrder,
+    nutrition?.__addedOrder,
+    nutrients?.__addedOrder,
+    total?.__addedOrder,
+    raw?.__sourceCreatedAt,
+    nutrition?.__loggedAt,
+    nutrients?.__loggedAt,
+    total?.__loggedAt,
+    raw?.createdAt,
+    entry?.createdAt,
+  ]
+  for (const candidate of candidates) {
+    const ts = toValidTimestampMs(candidate)
+    if (ts > 0) return ts
+  }
+  return 0
+}
+
 function cloneFavoriteItems(raw: any) {
   if (Array.isArray(raw)) {
     try {
@@ -1351,6 +1515,8 @@ function looksLikeMealBuilderCreatedItemId(rawId: any) {
 }
 
 function isCustomFavoriteMeal(raw: any, items: any[] | null) {
+  const isSingleIngredient = !Array.isArray(items) || items.length <= 1
+  if (isSingleIngredient) return false
   if (raw?.custom === true || raw?.customMeal === true) return true
   const method = String(raw?.method || '').toLowerCase()
   if (method === 'combined' || method === 'meal-builder') return true
@@ -1440,28 +1606,6 @@ function favoriteStorageRecord(favorite: FavoriteMeal) {
   }
 }
 
-function mergeFavoriteMeals(primary: FavoriteMeal[], secondary: FavoriteMeal[]) {
-  const next = new Map<string, FavoriteMeal>()
-  const push = (favorite: FavoriteMeal) => {
-    const key =
-      String(favorite?.sourceId || '').trim() ||
-      normalizeFavoriteKey(favorite?.name || favorite?.description || '') ||
-      String(favorite?.id || '').trim()
-    if (!key) return
-    if (!next.has(key)) {
-      next.set(key, favorite)
-      return
-    }
-    const existing = next.get(key)!
-    const existingTs = Math.max(toTimestampMs(existing?.lastUsedAt), toTimestampMs(existing?.createdAt))
-    const candidateTs = Math.max(toTimestampMs(favorite?.lastUsedAt), toTimestampMs(favorite?.createdAt))
-    if (candidateTs >= existingTs) next.set(key, favorite)
-  }
-  primary.forEach(push)
-  secondary.forEach(push)
-  return Array.from(next.values())
-}
-
 function linkedFavoriteIdFromEntry(entry: FoodEntry | null | undefined) {
   const raw = entry?.raw && typeof entry.raw === 'object' ? entry.raw : null
   const nutrition = raw?.nutrients && typeof raw.nutrients === 'object' ? raw.nutrients : null
@@ -1469,77 +1613,6 @@ function linkedFavoriteIdFromEntry(entry: FoodEntry | null | undefined) {
   const fromNutrition = typeof nutrition?.__favoriteId === 'string' ? String(nutrition.__favoriteId).trim() : ''
   if (fromNutrition) return fromNutrition
   return typeof total?.__favoriteId === 'string' ? String(total.__favoriteId).trim() : ''
-}
-
-function favoriteFromLinkedEntry(entry: FoodEntry): FavoriteMeal | null {
-  const favoriteId = linkedFavoriteIdFromEntry(entry)
-  if (!favoriteId) return null
-
-  const raw = entry?.raw && typeof entry.raw === 'object' ? { ...entry.raw } : {}
-  const items =
-    Array.isArray(entry?.items) && entry.items.length > 0
-      ? JSON.parse(JSON.stringify(entry.items))
-      : cloneFavoriteItems(raw?.items)
-  const method = normalizeFavoriteLabel(raw?.method || raw?.__origin || raw?.origin).toLowerCase()
-  const label =
-    normalizeFavoriteLabel(raw?.label || entry?.name || entry?.description || raw?.description || 'Favorite meal') ||
-    'Favorite meal'
-  const custom =
-    isCustomFavoriteMeal(raw, items) ||
-    method === 'combined' ||
-    method === 'meal-builder'
-  const base = makeFavoriteFromEntry(entry)
-  const meal = String(entry?.meal || entry?.category || raw?.meal || raw?.category || 'uncategorized').toLowerCase()
-  const createdAt = entry?.createdAt || raw?.createdAt || Date.now()
-
-  return {
-    ...base,
-    id: favoriteId,
-    name: label,
-    meal,
-    description: label,
-    custom,
-    items,
-    createdAt,
-    lastUsedAt: createdAt,
-    sourceId: raw?.sourceId ? String(raw.sourceId) : String(entry?.id || ''),
-    method: method || (custom ? 'meal-builder' : 'text'),
-    raw: {
-      ...raw,
-      label,
-      description: label,
-      meal,
-      category: meal,
-      items,
-      ...(custom ? { customMeal: true } : {}),
-    },
-  }
-}
-
-function mergeRecoveredFavorites(existing: FavoriteMeal[], recovered: FavoriteMeal[]) {
-  const next = [...existing]
-  const existingIds = new Set(existing.map((favorite) => String(favorite?.id || '').trim()).filter(Boolean))
-  const existingSources = new Set(existing.map((favorite) => String(favorite?.sourceId || '').trim()).filter(Boolean))
-  const existingKeys = new Set(
-    existing.map((favorite) => normalizeFavoriteKey(favorite?.name || favorite?.description || '')).filter(Boolean),
-  )
-  let changed = false
-
-  recovered.forEach((favorite) => {
-    const id = String(favorite?.id || '').trim()
-    const sourceId = String(favorite?.sourceId || '').trim()
-    const key = normalizeFavoriteKey(favorite?.name || favorite?.description || '')
-    if ((id && existingIds.has(id)) || (sourceId && existingSources.has(sourceId)) || (key && existingKeys.has(key))) {
-      return
-    }
-    if (id) existingIds.add(id)
-    if (sourceId) existingSources.add(sourceId)
-    if (key) existingKeys.add(key)
-    next.push(favorite)
-    changed = true
-  })
-
-  return { next, changed }
 }
 
 function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[] {
@@ -1669,7 +1742,7 @@ function isMealDiaryEntry(entry: FoodEntry | null | undefined) {
 }
 
 function buildFavoritesListItemFromEntry(entry: FoodEntry): FavoritesListItem {
-  const createdAtMs = toTimestampMs(entry?.createdAt)
+  const createdAtMs = foodEntryRecencyMs(entry)
   const label = normalizeFavoriteLabel(entry?.name || entry?.description || 'Meal') || 'Meal'
   return {
     id: `entry-editor-${entry.id}`,
@@ -1711,6 +1784,9 @@ export function TrackCaloriesScreen() {
   const { mode, session, signOut } = useAppMode()
   const { openVoiceAssistant } = useVoiceAssistant()
   const insets = useSafeAreaInsets()
+  const { width: windowWidth } = useWindowDimensions()
+  const importRecipeWide = windowWidth >= 640
+  const [cameraPermission, requestCameraPermission] = useCameraPermissions()
 
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
@@ -1774,7 +1850,7 @@ export function TrackCaloriesScreen() {
 
   const [favorites, setFavorites] = useState<FavoriteMeal[]>([])
   const [favoritesOpen, setFavoritesOpen] = useState(false)
-  const [favoritesTab, setFavoritesTab] = useState<'all' | 'favorites' | 'custom'>('all')
+  const [favoritesTab, setFavoritesTab] = useState<'all' | 'favorites' | 'custom'>('favorites')
   const [favoritesSearch, setFavoritesSearch] = useState('')
   const [favoritesTargetMeal, setFavoritesTargetMeal] = useState('breakfast')
   const [favoritesUsageMode, setFavoritesUsageMode] = useState<'diary' | 'editor'>('diary')
@@ -1808,6 +1884,19 @@ export function TrackCaloriesScreen() {
   const [favoriteEditMissingReportError, setFavoriteEditMissingReportError] = useState('')
   const [favoriteRenameItem, setFavoriteRenameItem] = useState<FavoritesListItem | null>(null)
   const [favoriteRenameValue, setFavoriteRenameValue] = useState('')
+  const [mealBuilderOpen, setMealBuilderOpen] = useState(false)
+  const [importRecipeOpen, setImportRecipeOpen] = useState(false)
+  const [importRecipeTargetMeal, setImportRecipeTargetMeal] = useState('lunch')
+  const [importRecipeMode, setImportRecipeMode] = useState<'url' | 'photo'>('url')
+  const [importRecipeUrl, setImportRecipeUrl] = useState('')
+  const [importRecipePhotoAssets, setImportRecipePhotoAssets] = useState<ImagePicker.ImagePickerAsset[]>([])
+  const [importRecipeLoading, setImportRecipeLoading] = useState(false)
+  const [importRecipeError, setImportRecipeError] = useState('')
+  const [importRecipe, setImportRecipe] = useState<ImportedRecipe | null>(null)
+  const [importRecipeTitle, setImportRecipeTitle] = useState('')
+  const [importRecipeServings, setImportRecipeServings] = useState('')
+  const [importRecipeIngredientsText, setImportRecipeIngredientsText] = useState('')
+  const [importRecipeStepsText, setImportRecipeStepsText] = useState('')
 
   const [ingredientOpen, setIngredientOpen] = useState(false)
   const [ingredientTargetMeal, setIngredientTargetMeal] = useState('breakfast')
@@ -1824,6 +1913,8 @@ export function TrackCaloriesScreen() {
   const [barcodeLoading, setBarcodeLoading] = useState(false)
   const [barcodeFood, setBarcodeFood] = useState<SearchFoodItem | null>(null)
   const [barcodeFlashOn, setBarcodeFlashOn] = useState(false)
+  const [barcodeManualInputOpen, setBarcodeManualInputOpen] = useState(false)
+  const [barcodeCameraError, setBarcodeCameraError] = useState('')
   const [barcodeLabelOpen, setBarcodeLabelOpen] = useState(false)
   const [barcodeLabelName, setBarcodeLabelName] = useState('')
   const [barcodeLabelBrand, setBarcodeLabelBrand] = useState('')
@@ -1834,6 +1925,7 @@ export function TrackCaloriesScreen() {
   const [barcodeLabelFat, setBarcodeLabelFat] = useState('')
   const [barcodeLabelFiber, setBarcodeLabelFiber] = useState('')
   const [barcodeLabelSugar, setBarcodeLabelSugar] = useState('')
+  const barcodeScanLockRef = useRef(false)
 
   const [recommendedOpen, setRecommendedOpen] = useState(false)
   const [recommendedLoading, setRecommendedLoading] = useState(false)
@@ -1841,10 +1933,12 @@ export function TrackCaloriesScreen() {
   const [recommendedTargetMeal, setRecommendedTargetMeal] = useState('lunch')
   const [recommendedMeal, setRecommendedMeal] = useState<RecommendedMeal | null>(null)
   const [recommendedHistory, setRecommendedHistory] = useState<RecommendedMeal[]>([])
-  const [recommendedCostCredits, setRecommendedCostCredits] = useState(0)
+  const [recommendedCostCredits, setRecommendedCostCredits] = useState(10)
   const [recommendedError, setRecommendedError] = useState('')
   const [recommendedExplainOpen, setRecommendedExplainOpen] = useState(false)
   const [recommendedExplainSeen, setRecommendedExplainSeen] = useState(false)
+  const [recommendedSavingFavorite, setRecommendedSavingFavorite] = useState(false)
+  const [recommendedExpandedIngredientIndex, setRecommendedExpandedIngredientIndex] = useState<number | null>(null)
 
   const [copyMode, setCopyMode] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>([])
@@ -2101,42 +2195,48 @@ export function TrackCaloriesScreen() {
     return clamp(100 - creditsPercentUsed, 0, 100)
   }, [creditsPercentUsed])
 
-  const recoveredFavoritesFromLibrary = useMemo(() => {
-    const byId = new Map<string, FavoriteMeal>()
-    favoritesLibraryEntries.forEach((entry) => {
-      const recovered = favoriteFromLinkedEntry(entry)
-      const favoriteId = String(recovered?.id || '').trim()
-      if (!recovered || !favoriteId) return
-      const existing = byId.get(favoriteId)
-      if (!existing) {
-        byId.set(favoriteId, recovered)
-        return
-      }
-      const existingTs = Math.max(toTimestampMs(existing?.lastUsedAt), toTimestampMs(existing?.createdAt))
-      const candidateTs = Math.max(toTimestampMs(recovered?.lastUsedAt), toTimestampMs(recovered?.createdAt))
-      if (candidateTs >= existingTs) byId.set(favoriteId, recovered)
-    })
-    return Array.from(byId.values())
-  }, [favoritesLibraryEntries])
-
   const favoritesForList = useMemo(() => {
     const favoritesById = new Map<string, FavoriteMeal>()
     const favoritesByLabel = new Map<string, FavoriteMeal>()
+    const favoritesBySourceId = new Map<string, FavoriteMeal>()
     favorites.forEach((favorite) => {
       const id = String(favorite?.id || '').trim()
       const key = normalizeFavoriteKey(favorite?.name || favorite?.description || '')
+      const sourceId = String(favorite?.sourceId || favorite?.raw?.sourceId || '').trim()
       if (id) favoritesById.set(id, favorite)
       if (key && !favoritesByLabel.has(key)) favoritesByLabel.set(key, favorite)
+      if (sourceId && !favoritesBySourceId.has(sourceId)) favoritesBySourceId.set(sourceId, favorite)
     })
 
-    const allRawItems: FavoritesListItem[] = favoritesLibraryEntries.map((entry) => {
+    const favoriteLastUsedFromLibrary = new Map<string, number>()
+    const stampFavoriteLastUsedFromLibrary = (favorite: FavoriteMeal | null | undefined, ts: number) => {
+      const favoriteId = String(favorite?.id || '').trim()
+      if (!favoriteId || !Number.isFinite(ts) || ts <= 0) return
+      const current = Number(favoriteLastUsedFromLibrary.get(favoriteId) || 0)
+      if (ts > current) favoriteLastUsedFromLibrary.set(favoriteId, ts)
+    }
+    const matchFavoriteForEntry = (entry: FoodEntry) => {
       const linkedFavoriteId = String(entry?.raw?.nutrients?.__favoriteId || entry?.raw?.total?.__favoriteId || '').trim()
-      const matchedFavorite =
+      const entrySourceId = String(entry?.raw?.sourceId || '').trim()
+      return (
         (linkedFavoriteId && favoritesById.get(linkedFavoriteId)) ||
+        (entrySourceId && favoritesBySourceId.get(entrySourceId)) ||
         favoritesByLabel.get(normalizeFavoriteKey(entry?.name || entry?.description || '')) ||
         null
+      )
+    }
+    const resolveFavoriteLastUsedAtMs = (favorite: FavoriteMeal) => {
+      const createdAtMs = toTimestampMs(favorite?.createdAt)
+      const savedLastUsedAtMs = toTimestampMs(favorite?.lastUsedAt)
+      const libraryLastUsedAtMs = Number(favoriteLastUsedFromLibrary.get(String(favorite?.id || '').trim()) || 0)
+      return Math.max(savedLastUsedAtMs, libraryLastUsedAtMs, createdAtMs)
+    }
+
+    const allRawItems: FavoritesListItem[] = favoritesLibraryEntries.map((entry) => {
+      const matchedFavorite = matchFavoriteForEntry(entry)
       const entryLabel = normalizeFavoriteLabel(matchedFavorite?.name || entry?.name || entry?.description || 'Meal') || 'Meal'
-      const entryCreatedAtMs = toTimestampMs(entry?.createdAt)
+      const entryCreatedAtMs = foodEntryRecencyMs(entry)
+      stampFavoriteLastUsedFromLibrary(matchedFavorite, entryCreatedAtMs)
       const entryCustom =
         Boolean(matchedFavorite?.custom) ||
         entry?.raw?.customMeal === true ||
@@ -2179,7 +2279,7 @@ export function TrackCaloriesScreen() {
       const key = normalizeFavoriteKey(favorite?.name || favorite?.description || '')
       if ((favorite.id && usedFavoriteIds.has(String(favorite.id))) || (key && usedFavoriteKeys.has(key))) return
       const createdAtMs = toTimestampMs(favorite?.createdAt)
-      const lastUsedAtMs = Math.max(toTimestampMs(favorite?.lastUsedAt), createdAtMs)
+      const lastUsedAtMs = resolveFavoriteLastUsedAtMs(favorite)
       allItems.push({
         id: `favorite-${favorite.id}`,
         label: normalizeFavoriteLabel(favorite?.name || favorite?.description || 'Favorite meal') || 'Favorite meal',
@@ -2197,7 +2297,7 @@ export function TrackCaloriesScreen() {
 
     const favoriteItems: FavoritesListItem[] = favorites.map((favorite) => {
       const createdAtMs = toTimestampMs(favorite?.createdAt)
-      const lastUsedAtMs = Math.max(toTimestampMs(favorite?.lastUsedAt), createdAtMs)
+      const lastUsedAtMs = resolveFavoriteLastUsedAtMs(favorite)
       return {
         id: `favorite-only-${favorite.id}`,
         label: normalizeFavoriteLabel(favorite?.name || favorite?.description || 'Favorite meal') || 'Favorite meal',
@@ -2272,8 +2372,9 @@ export function TrackCaloriesScreen() {
   )
 
   const buildAddMenuActions = useCallback(
-    (meal: string) => {
+    (meal: string, options?: { includeCopyUtilities?: boolean }) => {
       const entriesForMeal = groupedByMeal[meal] || []
+      const includeCopyUtilities = options?.includeCopyUtilities !== false
       const actions: Array<{
         id: string
         action: string
@@ -2296,7 +2397,7 @@ export function TrackCaloriesScreen() {
           id: 'favorites',
           action: 'Favorites',
           title: 'Favorites',
-          subtitle: `Insert a saved meal in ${mealLabel(meal).toLowerCase()}`,
+          subtitle: `Reuse a saved meal in ${mealLabel(meal)}`,
           icon: '★',
           iconBg: '#FEF3C7',
           iconColor: '#D97706',
@@ -2312,7 +2413,7 @@ export function TrackCaloriesScreen() {
         },
       ]
 
-      if (!isToday(selectedDate) && entriesForMeal.length > 0) {
+      if (includeCopyUtilities && !isToday(selectedDate) && entriesForMeal.length > 0) {
         actions.push({
           id: 'copy-to-today',
           action: 'Copy category to Today',
@@ -2324,7 +2425,7 @@ export function TrackCaloriesScreen() {
         })
       }
 
-      if (entriesForMeal.length > 1) {
+      if (includeCopyUtilities && entriesForMeal.length > 1) {
         actions.push({
           id: 'copy-multi',
           action: 'Copy multiple items',
@@ -2336,7 +2437,7 @@ export function TrackCaloriesScreen() {
         })
       }
 
-      if (copiedEntries.length > 0) {
+      if (includeCopyUtilities && copiedEntries.length > 0) {
         actions.push({
           id: 'paste',
           action: 'Paste items',
@@ -2428,7 +2529,7 @@ export function TrackCaloriesScreen() {
   )
 
   const topAddMenuActions = useMemo(
-    () => buildAddMenuActions(topAddMeal || 'breakfast'),
+    () => buildAddMenuActions(topAddMeal || 'breakfast', { includeCopyUtilities: false }),
     [buildAddMenuActions, topAddMeal],
   )
 
@@ -2443,7 +2544,7 @@ export function TrackCaloriesScreen() {
         const res = await fetch(`${API_BASE_URL}/api/user-data`, { headers: authHeaders })
         const data: any = await res.json().catch(() => ({}))
         const serverFavorites = normalizeFavoriteList(data?.favorites)
-        nextFavorites = mergeFavoriteMeals(serverFavorites, localFavorites)
+        nextFavorites = Array.isArray(data?.favorites) ? serverFavorites : localFavorites
       }
 
       setFavorites(nextFavorites)
@@ -2522,8 +2623,17 @@ export function TrackCaloriesScreen() {
     return () => subscription.remove()
   }, [closeFavoritesFlow])
 
+  useEffect(() => {
+    if (!barcodeOpen || barcodeLabelOpen) return
+    if (cameraPermission?.granted) return
+    if (cameraPermission?.canAskAgain === false) return
+    void requestCameraPermission()
+  }, [barcodeLabelOpen, barcodeOpen, cameraPermission?.canAskAgain, cameraPermission?.granted, requestCameraPermission])
+
   const loadFavoritesLibrary = useCallback(async () => {
-    if (!authHeaders) return
+    if (!authHeaders) {
+      return
+    }
     setFavoritesLibraryLoading(true)
     try {
       const res = await fetch(`${API_BASE_URL}/api/food-log/library?limit=5000`, {
@@ -2556,7 +2666,9 @@ export function TrackCaloriesScreen() {
   }, [])
 
   const loadExerciseTypes = useCallback(async () => {
-    if (!authHeaders) return
+    if (!authHeaders) {
+      return
+    }
     try {
       const params = new URLSearchParams()
       if (exerciseTypeSearch.trim()) params.set('search', exerciseTypeSearch.trim())
@@ -2573,16 +2685,17 @@ export function TrackCaloriesScreen() {
     } catch {}
   }, [authHeaders, exerciseCategoryFilter, exerciseTypeSearch])
 
-  const loadAll = useCallback(async () => {
+  const loadAll = useCallback(async (options?: { silent?: boolean }) => {
     if (!authHeaders || !session?.token) {
-      setLoading(false)
+      if (!options?.silent) setLoading(false)
       return
     }
 
+    const silent = options?.silent === true
     const requestId = ++loadRequestIdRef.current
     const isCurrentRequest = () => requestId === loadRequestIdRef.current
 
-    setLoading(true)
+    if (!silent) setLoading(true)
     try {
       const tzOffsetMin = new Date().getTimezoneOffset()
       const foodPromise = fetch(
@@ -2640,7 +2753,7 @@ export function TrackCaloriesScreen() {
         setExerciseCalories(0)
       }
 
-      if (isCurrentRequest()) {
+      if (!silent && isCurrentRequest()) {
         setLoading(false)
       }
 
@@ -2681,15 +2794,19 @@ export function TrackCaloriesScreen() {
       if (!isCurrentRequest()) return
       if (userDataRes.ok) {
         setDailyTargets(buildDailyTargetsFromUserData(userData))
-        const serverFavorites = normalizeFavoriteList(userData?.favorites)
-        setFavorites((prev) => mergeFavoriteMeals(serverFavorites, prev))
+        if (Array.isArray(userData?.favorites)) {
+          const serverFavorites = normalizeFavoriteList(userData.favorites)
+          setFavorites(serverFavorites)
+        }
       } else {
         setDailyTargets(DEFAULT_TARGETS)
       }
     } catch (error: any) {
-      Alert.alert('Could not load Food Diary', error?.message || 'Please try again.')
+      if (!silent) {
+        Alert.alert('Could not load Food Diary', error?.message || 'Please try again.')
+      }
     } finally {
-      if (requestId === loadRequestIdRef.current) {
+      if (!silent && requestId === loadRequestIdRef.current) {
         setLoading(false)
       }
     }
@@ -2750,14 +2867,6 @@ export function TrackCaloriesScreen() {
     if (!favoritesOpen) return
     void loadFavoritesLibrary()
   }, [favoritesOpen, loadFavoritesLibrary])
-
-  useEffect(() => {
-    if (!favoritesOpen) return
-    if (recoveredFavoritesFromLibrary.length === 0) return
-    const { next, changed } = mergeRecoveredFavorites(favorites, recoveredFavoritesFromLibrary)
-    if (!changed) return
-    void saveFavorites(next)
-  }, [favorites, favoritesOpen, recoveredFavoritesFromLibrary, saveFavorites])
 
   useEffect(() => {
     if (!exerciseOpen) return
@@ -3254,6 +3363,8 @@ export function TrackCaloriesScreen() {
   const openFavorites = (meal: string, mode: 'diary' | 'editor' = 'diary') => {
     setFavoritesTargetMeal(meal)
     setFavoritesUsageMode(mode)
+    setFavoritesTab('favorites')
+    setFavoritesSearch('')
     setFavoritesLibraryLoading(true)
     setFavoritesOpen(true)
     setSectionMenuMeal(null)
@@ -3405,6 +3516,24 @@ export function TrackCaloriesScreen() {
       sugar: Math.max(0, round1(Number(totals?.sugar) || 0)),
       ...(favoriteId ? { __favoriteId: favoriteId, __favoriteManualEdit: false } : {}),
     }
+    const createdAt = new Date().toISOString()
+    const optimisticEntry = normalizeFoodApiEntry({
+      id: `pending-favorite-${Date.now()}-${Math.random().toString(16).slice(2)}`,
+      name: item.label,
+      meal: favoritesTargetMeal,
+      category: favoritesTargetMeal,
+      description: item.label,
+      localDate: selectedDate,
+      nutrients: nutritionPayload,
+      nutrition: nutritionPayload,
+      total: { ...nutritionPayload },
+      items: normalizedItems,
+      createdAt,
+    })
+    setEntries((prev) => [optimisticEntry, ...prev.filter((entry) => entry.id !== optimisticEntry.id)])
+    setExpandedMeals((prev) => ({ ...prev, [favoritesTargetMeal]: true }))
+    closeFavoritesFlow()
+
     const ok = await createFoodEntry({
       name: item.label,
       meal: favoritesTargetMeal,
@@ -3418,17 +3547,20 @@ export function TrackCaloriesScreen() {
       items: normalizedItems,
       nutrition: nutritionPayload,
       total: { ...nutritionPayload },
-      createdAt: new Date().toISOString(),
+      localDate: selectedDate,
+      createdAt,
     })
     if (!ok) {
+      setEntries((prev) => prev.filter((entry) => entry.id !== optimisticEntry.id))
       Alert.alert('Failed', 'Could not add favorite to diary.')
       return
     }
     if (item.favorite) {
-      await markFavoriteAsUsed(item)
+      void markFavoriteAsUsed(item)
     }
-    closeFavoritesFlow()
-    await loadAll()
+    setTimeout(() => {
+      void loadAll({ silent: true })
+    }, 600)
   }
 
   const openFavoritePreview = (item: FavoritesListItem) => {
@@ -3444,6 +3576,7 @@ export function TrackCaloriesScreen() {
   }
 
   const openFavoriteEditor = (item: FavoritesListItem) => {
+    setMealBuilderOpen(false)
     setFavoriteActionItem(null)
     setFavoritePreviewItem(null)
     setFavoriteAdjustItem(null)
@@ -3464,6 +3597,224 @@ export function TrackCaloriesScreen() {
     setFavoriteEditPortionControlEnabled(false)
   }
 
+  const buildImportedRecipeItems = (ingredients: string[]) =>
+    ingredients.slice(0, 80).map((line, index) =>
+      buildFavoriteAdjustItemFromSearchFood({
+        id: `recipe-import-${Date.now()}-${index}`,
+        source: 'custom',
+        name: line,
+        serving_size: line,
+        servings: 1,
+        calories: 0,
+        protein_g: 0,
+        carbs_g: 0,
+        fat_g: 0,
+        fiber_g: 0,
+        sugar_g: 0,
+        __custom: true,
+      }),
+    )
+
+  const buildRecommendedMealBuilderItems = (meal: RecommendedMeal) =>
+    (meal.items || []).slice(0, 80).map((item, index) =>
+      buildFavoriteAdjustItemFromSearchFood({
+        id: `recommended-${String(meal.id || Date.now())}-${String(item.id || index)}`,
+        source: 'custom',
+        name: item.name,
+        serving_size: item.serving_size || '1 serving',
+        servings: numberOrZero(item.servings) || 1,
+        calories: item.calories ?? 0,
+        protein_g: item.protein_g ?? 0,
+        carbs_g: item.carbs_g ?? 0,
+        fat_g: item.fat_g ?? 0,
+        fiber_g: item.fiber_g ?? 0,
+        sugar_g: item.sugar_g ?? 0,
+        __custom: true,
+      }),
+    )
+
+  const openNativeMealBuilder = (
+    meal: string,
+    prefill?: { name?: string; ingredients?: string[]; items?: FavoriteAdjustItem[]; steps?: string[]; servings?: number | null },
+  ) => {
+    const prefillItems = prefill?.items?.length ? prefill.items : prefill?.ingredients?.length ? buildImportedRecipeItems(prefill.ingredients) : []
+    setFavoritesTargetMeal(meal)
+    setFavoriteActionItem(null)
+    setFavoritePreviewItem(null)
+    setFavoriteAdjustItem(null)
+    setFavoriteAdjustItems([])
+    setFavoriteRenameItem(null)
+    setFavoriteRenameValue('')
+    setFavoriteEditItem(null)
+    setFavoriteEditItems(prefillItems)
+    setFavoriteEditName(normalizeFavoriteLabel(prefill?.name || ''))
+    setFavoriteEditIngredientsExpanded(prefillItems.length > 0)
+    setFavoriteEditExpandedItemId(prefillItems[0]?.id || null)
+    setFavoriteEditServingPickerItemId(null)
+    setFavoriteEditServingLoadingId(null)
+    setFavoriteEditSearchKind('packaged')
+    setFavoriteEditSearchQuery('')
+    setFavoriteEditSearchResults([])
+    setFavoriteEditSearchError('')
+    setFavoriteEditPortionControlEnabled(false)
+    setFavoriteEditMissingReportOpen(false)
+    setMealBuilderOpen(true)
+    setSectionMenuMeal(null)
+  }
+
+  const resetImportRecipe = () => {
+    setImportRecipeMode('url')
+    setImportRecipeUrl('')
+    setImportRecipePhotoAssets([])
+    setImportRecipeLoading(false)
+    setImportRecipeError('')
+    setImportRecipe(null)
+    setImportRecipeTitle('')
+    setImportRecipeServings('')
+    setImportRecipeIngredientsText('')
+    setImportRecipeStepsText('')
+  }
+
+  const applyImportedRecipe = (recipe: ImportedRecipe) => {
+    setImportRecipe(recipe)
+    setImportRecipeTitle(recipe.title || 'Recipe')
+    setImportRecipeServings(recipe.servings ? String(recipe.servings) : '')
+    setImportRecipeIngredientsText((recipe.ingredients || []).join('\n'))
+    setImportRecipeStepsText((recipe.steps || []).join('\n'))
+  }
+
+  const openNativeImportRecipe = (meal: string) => {
+    setImportRecipeTargetMeal(meal)
+    resetImportRecipe()
+    setImportRecipeOpen(true)
+    setSectionMenuMeal(null)
+  }
+
+  const doImportRecipeFromUrl = async () => {
+    if (!session?.token) return
+    const url = importRecipeUrl.trim()
+    if (!isValidHttpUrl(url)) {
+      setImportRecipeError('Please paste a valid recipe link (it must start with http:// or https://).')
+      return
+    }
+    const aiAllowed = await requestAiDataSharingPermission()
+    if (!aiAllowed) {
+      setImportRecipeError('AI request not sent.')
+      return
+    }
+    try {
+      setImportRecipeLoading(true)
+      setImportRecipeError('')
+      const res = await fetch(`${API_BASE_URL}/api/recipe-import`, {
+        method: 'POST',
+        headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
+        body: JSON.stringify({ url }),
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.recipe) {
+        setImportRecipeError(String(data?.message || data?.error || 'Import failed. Please try a different link or use a photo.'))
+        return
+      }
+      applyImportedRecipe(data.recipe as ImportedRecipe)
+      setImportRecipePhotoAssets([])
+    } catch {
+      setImportRecipeError('Import failed. Please try again.')
+    } finally {
+      setImportRecipeLoading(false)
+    }
+  }
+
+  const chooseImportRecipePhotos = async (source: 'camera' | 'library') => {
+    const permission =
+      source === 'camera'
+        ? await ImagePicker.requestCameraPermissionsAsync()
+        : await ImagePicker.requestMediaLibraryPermissionsAsync()
+    if (!permission.granted) {
+      Alert.alert('Permission needed', 'Please allow access to continue.')
+      return
+    }
+    const picked =
+      source === 'camera'
+        ? await ImagePicker.launchCameraAsync({ quality: 0.7 })
+        : await ImagePicker.launchImageLibraryAsync({
+            quality: 0.7,
+            allowsMultipleSelection: true,
+            selectionLimit: 6,
+          })
+    if (picked.canceled || !picked.assets?.length) {
+      if (source === 'camera') {
+        Alert.alert(
+          'No photo taken',
+          'If you are using the simulator, camera capture is not available. Use Photo Library or test the camera on a real iPhone.',
+        )
+      }
+      return
+    }
+    setImportRecipeError('')
+    setImportRecipePhotoAssets((prev) => {
+      const next = [...prev]
+      picked.assets.forEach((asset) => {
+        if (!asset.uri) return
+        if (next.some((existing) => existing.uri === asset.uri)) return
+        next.push(asset)
+      })
+      return next.slice(0, 6)
+    })
+  }
+
+  const doImportRecipeFromPhoto = async () => {
+    if (!session?.token) return
+    if (importRecipePhotoAssets.length === 0) {
+      setImportRecipeError('Please add at least 1 photo.')
+      return
+    }
+    const aiAllowed = await requestAiDataSharingPermission()
+    if (!aiAllowed) {
+      setImportRecipeError('AI request not sent.')
+      return
+    }
+    try {
+      setImportRecipeLoading(true)
+      setImportRecipeError('')
+      const form = new FormData()
+      for (const asset of importRecipePhotoAssets.slice(0, 6)) {
+        const photo = await prepareFoodPhotoForUpload(asset)
+        form.append('images', photo as any)
+      }
+      const res = await fetch(`${API_BASE_URL}/api/recipe-import`, {
+        method: 'POST',
+        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
+        body: form,
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.recipe) {
+        setImportRecipeError(String(data?.message || data?.error || 'Import failed. Please try again with a clearer photo.'))
+        return
+      }
+      applyImportedRecipe(data.recipe as ImportedRecipe)
+      setImportRecipePhotoAssets([])
+    } catch {
+      setImportRecipeError('Import failed. Please try again.')
+    } finally {
+      setImportRecipeLoading(false)
+    }
+  }
+
+  const continueImportedRecipeToBuilder = () => {
+    if (!importRecipe) return
+    const ingredients = cleanRecipeLines(importRecipeIngredientsText)
+    const steps = cleanRecipeLines(importRecipeStepsText)
+    const servingsRaw = importRecipeServings.trim()
+    const servings = servingsRaw && Number.isFinite(Number(servingsRaw)) && Number(servingsRaw) > 0 ? Number(servingsRaw) : null
+    setImportRecipeOpen(false)
+    openNativeMealBuilder(importRecipeTargetMeal, {
+      name: normalizeFavoriteLabel(importRecipeTitle) || importRecipe.title || 'Recipe',
+      ingredients,
+      steps,
+      servings,
+    })
+  }
+
   const openMealEntryEditor = (entry: FoodEntry) => {
     const meal = String(entry.meal || entry.category || favoritesTargetMeal || 'uncategorized').toLowerCase()
     setFavoritesTargetMeal(meal)
@@ -3474,8 +3825,14 @@ export function TrackCaloriesScreen() {
   }
 
   const updateFavoriteFromEditor = async () => {
-    if (!favoriteEditItem) return
-    const nextName = normalizeFavoriteLabel(favoriteEditName) || favoriteEditItem.label || 'Favorite meal'
+    const isMealBuilder = mealBuilderOpen && !favoriteEditItem
+    if (!favoriteEditItem && !isMealBuilder) return
+    if (isMealBuilder && favoriteEditItems.length === 0) {
+      Alert.alert('Add ingredients', 'Add at least one ingredient first.')
+      return
+    }
+    const fallbackName = favoriteEditItems.map((item) => item.name).filter(Boolean).slice(0, 3).join(', ')
+    const nextName = normalizeFavoriteLabel(favoriteEditName) || favoriteEditItem?.label || fallbackName || 'Built meal'
     const totals = calculateFavoriteAdjustTotals(favoriteEditItems)
     const nextItems = favoriteEditItems.map((entry) => ({
       ...(entry.raw && typeof entry.raw === 'object' ? entry.raw : {}),
@@ -3494,6 +3851,56 @@ export function TrackCaloriesScreen() {
       fiber_g: Math.max(0, Number(entry.fiber) || 0),
       sugar_g: Math.max(0, Number(entry.sugar) || 0),
     }))
+
+    if (isMealBuilder) {
+      const meal = String(favoritesTargetMeal || 'uncategorized').toLowerCase()
+      const nutrition = {
+        calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
+        calories_kcal: Math.max(0, Math.round(Number(totals.calories) || 0)),
+        protein: Math.max(0, round1(Number(totals.protein) || 0)),
+        protein_g: Math.max(0, round1(Number(totals.protein) || 0)),
+        carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
+        carbs_g: Math.max(0, round1(Number(totals.carbs) || 0)),
+        fat: Math.max(0, round1(Number(totals.fat) || 0)),
+        fat_g: Math.max(0, round1(Number(totals.fat) || 0)),
+        fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
+        fiber_g: Math.max(0, round1(Number(totals.fiber) || 0)),
+        sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+        sugar_g: Math.max(0, round1(Number(totals.sugar) || 0)),
+        customMeal: true,
+        method: 'meal-builder',
+        ...(nextItems.length > 1 ? { __voiceBuiltMeal: true } : {}),
+      }
+      const ok = await createFoodEntry({
+        name: nextName,
+        meal,
+        calories: nutrition.calories,
+        protein: nutrition.protein,
+        carbs: nutrition.carbs,
+        fat: nutrition.fat,
+        fiber: nutrition.fiber,
+        sugar: nutrition.sugar,
+        description: nextItems.map((item) => item.name).join(', ') || nextName,
+        localDate: selectedDate,
+        items: nextItems,
+        nutrition,
+        total: { ...nutrition },
+        createdAt: new Date().toISOString(),
+      })
+      if (!ok) {
+        Alert.alert('Save failed', 'Could not save this meal.')
+        return
+      }
+      setMealBuilderOpen(false)
+      setFavoriteEditItems([])
+      setFavoriteEditName('')
+      setFavoriteEditIngredientsExpanded(false)
+      setFavoriteEditExpandedItemId(null)
+      setFavoriteEditServingPickerItemId(null)
+      setFavoriteEditServingLoadingId(null)
+      await loadAll()
+      return
+    }
 
     if (favoriteEditItem?.entry && !favoriteEditItem.favorite) {
       if (!authHeaders) {
@@ -4147,21 +4554,36 @@ export function TrackCaloriesScreen() {
     setBarcodeTargetMeal(meal)
     setBarcodeCode('')
     setBarcodeFood(null)
+    setBarcodeManualInputOpen(false)
+    setBarcodeCameraError('')
+    barcodeScanLockRef.current = false
     setBarcodeLabelOpen(false)
     setBarcodeOpen(true)
     setSectionMenuMeal(null)
   }
 
-  const lookupBarcode = async () => {
-    const code = barcodeCode.trim().replace(/[^0-9A-Za-z]/g, '')
+  const openBarcodeFromFavoritesSearch = () => {
+    const mode = favoritesUsageMode
+    const meal = favoritesTargetMeal
+    setFavoritesOpen(false)
+    openBarcode(meal, mode)
+  }
+
+  const lookupBarcode = async (codeOverride?: string) => {
+    const code = String(codeOverride ?? barcodeCode).trim().replace(/[^0-9A-Za-z]/g, '')
     if (!code) {
       Alert.alert('Missing barcode', 'Type a barcode first.')
+      barcodeScanLockRef.current = false
       return
     }
-    if (!authHeaders) return
+    if (!authHeaders) {
+      barcodeScanLockRef.current = false
+      return
+    }
 
     try {
       setBarcodeLoading(true)
+      setBarcodeCode(code)
       const res = await fetch(`${API_BASE_URL}/api/barcode/lookup?code=${encodeURIComponent(code)}`, {
         headers: authHeaders,
       })
@@ -4188,7 +4610,16 @@ export function TrackCaloriesScreen() {
       Alert.alert('Lookup failed', 'Could not look up this barcode.')
     } finally {
       setBarcodeLoading(false)
+      barcodeScanLockRef.current = false
     }
+  }
+
+  const handleBarcodeScanned = (result: BarcodeScanningResult) => {
+    const code = String(result?.data || '').replace(/[^0-9A-Za-z]/g, '')
+    if (!code || barcodeLoading || barcodeScanLockRef.current) return
+    barcodeScanLockRef.current = true
+    setBarcodeManualInputOpen(false)
+    void lookupBarcode(code)
   }
 
   const addBarcodeFood = async () => {
@@ -4435,6 +4866,7 @@ export function TrackCaloriesScreen() {
     setRecommendedOpen(true)
     setRecommendedTab('ingredients')
     setRecommendedMeal(null)
+    setRecommendedExpandedIngredientIndex(null)
     setRecommendedError('')
     setSectionMenuMeal(null)
 
@@ -4448,7 +4880,7 @@ export function TrackCaloriesScreen() {
       const history = Array.isArray(data?.history) ? data.history : []
       setRecommendedHistory(history)
       const cost = Number(data?.costCredits)
-      setRecommendedCostCredits(Number.isFinite(cost) && cost >= 0 ? Math.round(cost) : 0)
+      setRecommendedCostCredits(Number.isFinite(cost) && cost > 0 ? Math.round(cost) : 10)
     } catch {}
   }
 
@@ -4489,6 +4921,7 @@ export function TrackCaloriesScreen() {
       const recommendation = data?.recommendation || null
       if (recommendation) {
         setRecommendedMeal(recommendation)
+        setRecommendedExpandedIngredientIndex(null)
         setRecommendedHistory((prev) => [recommendation, ...prev.filter((p) => p.id !== recommendation.id)].slice(0, 20))
       } else {
         const message = 'No recommendation came back. Please try again.'
@@ -4503,8 +4936,159 @@ export function TrackCaloriesScreen() {
   const addRecommendedToDiary = async () => {
     if (!recommendedMeal) return
     const name = String(recommendedMeal.mealName || 'AI Recommended Meal')
+    const nutrients = recommendedMealTotals(recommendedMeal)
+    const nutritionPayload = {
+      calories: nutrients.calories,
+      protein: nutrients.protein,
+      carbs: nutrients.carbs,
+      fat: nutrients.fat,
+      fiber: nutrients.fiber,
+      sugar: nutrients.sugar,
+      __origin: 'ai-recommended',
+      __aiRecipe: recommendedMeal.recipe || null,
+      __aiWhy: recommendedMeal.why || '',
+      __aiMealId: recommendedMeal.id || '',
+    }
 
-    const nutrients = (recommendedMeal.items || []).reduce(
+    const ok = await createFoodEntry({
+      name,
+      meal: recommendedTargetMeal,
+      calories: nutrients.calories,
+      protein: nutrients.protein,
+      carbs: nutrients.carbs,
+      fat: nutrients.fat,
+      fiber: nutrients.fiber,
+      sugar: nutrients.sugar,
+      description: recommendedMeal.why || 'AI meal recommendation',
+      items: recommendedMeal.items || [],
+      nutrition: nutritionPayload,
+      total: {
+        calories: nutrients.calories,
+        protein: nutrients.protein,
+        carbs: nutrients.carbs,
+        fat: nutrients.fat,
+        fiber: nutrients.fiber,
+        sugar: nutrients.sugar,
+      },
+    })
+
+    if (!ok) {
+      Alert.alert('Add failed', 'Could not add recommendation.')
+      return
+    }
+
+    setRecommendedOpen(false)
+    void commitRecommendedMeal(recommendedMeal)
+    await loadAll()
+  }
+
+  const commitRecommendedMeal = async (meal: RecommendedMeal) => {
+    if (!session?.token || !meal) return
+    try {
+      const totals = recommendedMealTotals(meal)
+      await fetch(`${API_BASE_URL}/api/ai-meal-recommendation`, {
+        method: 'PUT',
+        headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
+        body: JSON.stringify({
+          action: 'commit',
+          recommendation: {
+            ...meal,
+            mealName: meal.mealName,
+            category: recommendedTargetMeal,
+            date: selectedDate,
+            items: meal.items || [],
+            totals,
+          },
+        }),
+      })
+    } catch {}
+  }
+
+  const saveRecommendedToFavorites = async () => {
+    if (!recommendedMeal || recommendedSavingFavorite) return
+    const name = normalizeFavoriteLabel(recommendedMeal.mealName || 'AI Recommended Meal')
+    if (!name) return
+    const totals = recommendedMealTotals(recommendedMeal)
+    const now = Date.now()
+    const favorite: FavoriteMeal = {
+      id: `fav-ai-${String(recommendedMeal.id || now)}`,
+      name,
+      meal: recommendedTargetMeal,
+      nutrients: totals,
+      description: name,
+      custom: true,
+      items: Array.isArray(recommendedMeal.items) ? JSON.parse(JSON.stringify(recommendedMeal.items)) : [],
+      createdAt: recommendedMeal.createdAt || now,
+      lastUsedAt: now,
+      sourceId: String(recommendedMeal.id || ''),
+      method: 'ai-recommended',
+      raw: {
+        method: 'ai-recommended',
+        label: name,
+        description: name,
+        meal: recommendedTargetMeal,
+        category: recommendedTargetMeal,
+        recipe: recommendedMeal.recipe || null,
+        why: recommendedMeal.why || '',
+        items: Array.isArray(recommendedMeal.items) ? JSON.parse(JSON.stringify(recommendedMeal.items)) : [],
+        nutrition: totals,
+        total: totals,
+        tags: recommendedMealTags(recommendedMeal),
+        sourceId: String(recommendedMeal.id || ''),
+        createdAt: recommendedMeal.createdAt || now,
+        lastUsedAt: now,
+      },
+    }
+    const key = normalizeFavoriteKey(name)
+    const existing = favorites.find((item) => {
+      const sameSource = favorite.sourceId && item.sourceId && String(item.sourceId) === favorite.sourceId
+      const sameName = normalizeFavoriteKey(item.name || item.description || '') === key
+      return sameSource || sameName
+    })
+    const nextFavorite = existing ? { ...favorite, id: existing.id } : favorite
+    const next = existing
+      ? favorites.map((item) => (item.id === existing.id ? nextFavorite : item))
+      : [nextFavorite, ...favorites]
+
+    try {
+      setRecommendedSavingFavorite(true)
+      await saveFavorites(next.slice(0, 300))
+      void commitRecommendedMeal(recommendedMeal)
+      Alert.alert('Saved', 'Meal saved to favorites.')
+    } finally {
+      setRecommendedSavingFavorite(false)
+    }
+  }
+
+  const openRecommendedBuildMeal = () => {
+    if (!recommendedMeal) return
+    const meal = recommendedMeal
+    setRecommendedOpen(false)
+    setSectionMenuMeal(null)
+    setTimeout(
+      () =>
+        openNativeMealBuilder(recommendedTargetMeal, {
+          name: meal.mealName,
+          items: buildRecommendedMealBuilderItems(meal),
+          steps: meal.recipe?.steps || [],
+        }),
+      120,
+    )
+  }
+
+  const updateRecommendedServing = (index: number, nextValue: number) => {
+    const safe = clamp(nextValue, 0, 20)
+    setRecommendedMeal((prev) => {
+      if (!prev) return prev
+      const nextItems = [...prev.items]
+      if (!nextItems[index]) return prev
+      nextItems[index] = { ...nextItems[index], servings: round1(safe) }
+      return { ...prev, items: nextItems }
+    })
+  }
+
+  const recommendedMealTotals = (meal: RecommendedMeal) => {
+    const itemTotals = (meal.items || []).reduce(
       (acc, item) => {
         const servings = numberOrZero(item.servings) || 1
         acc.calories += numberOrZero(item.calories) * servings
@@ -4517,37 +5101,58 @@ export function TrackCaloriesScreen() {
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
     )
-
-    const ok = await createFoodEntry({
-      name,
-      meal: recommendedTargetMeal,
-      calories: nutrients.calories,
-      protein: nutrients.protein,
-      carbs: nutrients.carbs,
-      fat: nutrients.fat,
-      fiber: nutrients.fiber,
-      sugar: nutrients.sugar,
-      description: recommendedMeal.why || 'AI meal recommendation',
-    })
-
-    if (!ok) {
-      Alert.alert('Add failed', 'Could not add recommendation.')
-      return
+    const totals = meal.totals || null
+    return {
+      calories: numberOrZero(totals?.calories) || itemTotals.calories,
+      protein: numberOrZero(totals?.protein ?? totals?.protein_g) || itemTotals.protein,
+      carbs: numberOrZero(totals?.carbs ?? totals?.carbs_g) || itemTotals.carbs,
+      fat: numberOrZero(totals?.fat ?? totals?.fat_g) || itemTotals.fat,
+      fiber: numberOrZero(totals?.fiber ?? totals?.fiber_g) || itemTotals.fiber,
+      sugar: numberOrZero(totals?.sugar ?? totals?.sugar_g) || itemTotals.sugar,
     }
-
-    setRecommendedOpen(false)
-    await loadAll()
   }
 
-  const updateRecommendedServing = (index: number, nextValue: number) => {
-    const safe = clamp(nextValue, 0, 20)
-    setRecommendedMeal((prev) => {
-      if (!prev) return prev
-      const nextItems = [...prev.items]
-      if (!nextItems[index]) return prev
-      nextItems[index] = { ...nextItems[index], servings: round1(safe) }
-      return { ...prev, items: nextItems }
-    })
+  const recommendedMealCalories = (meal: RecommendedMeal) => Math.round(recommendedMealTotals(meal).calories)
+
+  const recommendedMacroLine = (meal: RecommendedMeal) => {
+    const n = recommendedMealTotals(meal)
+    return `${Math.round(n.calories)} kcal • Protein ${formatMacroAmount(n.protein)}g • Carbs ${formatMacroAmount(n.carbs)}g • Fat ${formatMacroAmount(n.fat)}g`
+  }
+
+  const recommendedSecondaryMacroLine = (meal: RecommendedMeal) => {
+    const n = recommendedMealTotals(meal)
+    return `Fiber ${formatMacroAmount(n.fiber)}g • Sugar ${formatMacroAmount(n.sugar)}g`
+  }
+
+  const recommendedMealTags = (meal: RecommendedMeal) =>
+    Array.isArray(meal.tags) ? meal.tags.map((tag) => String(tag || '').trim()).filter(Boolean).slice(0, 8) : []
+
+  const recommendedMacroRows = (meal: RecommendedMeal) => {
+    const n = recommendedMealTotals(meal)
+    return [
+      { label: 'Calories', value: Math.round(n.calories), unit: 'kcal', target: dailyTargets.calories, color: '#10B981' },
+      { label: 'Protein', value: n.protein, unit: 'g', target: macroTargetsWithExercise.protein, color: '#EF4444' },
+      { label: 'Carbs', value: n.carbs, unit: 'g', target: macroTargetsWithExercise.carbs, color: '#22C55E' },
+      { label: 'Fat', value: n.fat, unit: 'g', target: macroTargetsWithExercise.fat, color: '#6366F1' },
+      { label: 'Fiber', value: n.fiber, unit: 'g', target: macroTargetsWithExercise.fiber, color: '#12ADC9' },
+      { label: 'Sugar', value: n.sugar, unit: 'g', target: macroTargetsWithExercise.sugar, color: '#F97316' },
+    ].map((row) => ({
+      ...row,
+      display: row.unit === 'kcal' ? String(Math.round(row.value)) : `${formatMacroAmount(row.value)}g`,
+      percent: row.target > 0 ? clamp((Number(row.value) / Number(row.target)) * 100, 0, 100) : 0,
+    }))
+  }
+
+  const recommendedIngredientMeta = (item: RecommendedMeal['items'][number]) => {
+    const serving = String(item.serving_size || '1 serving').trim()
+    const servings = formatMacroAmount(numberOrZero(item.servings) || 1)
+    return `Serving: ${serving} • Amount (full recipe): ${servings} serving${servings === '1' ? '' : 's'}`
+  }
+
+  const recommendedMealMeta = (meal: RecommendedMeal) => {
+    const createdAt = String((meal as any)?.createdAt || (meal as any)?.created_at || '')
+    const dateText = createdAt ? new Date(createdAt).toLocaleString() : ''
+    return [mealLabel(String(meal.category || recommendedTargetMeal)), dateText].filter(Boolean).join(' • ')
   }
 
   const openAskAIChat = () => {
@@ -4567,19 +5172,11 @@ export function TrackCaloriesScreen() {
   }
 
   const openBuildMealTool = (meal: string) => {
-    navigateStackScreen('NativeWebTool', {
-      title: 'Build a meal',
-      path: `/food/build-meal?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(meal)}`,
-    })
-    setSectionMenuMeal(null)
+    openNativeMealBuilder(meal)
   }
 
   const openImportRecipeTool = (meal: string) => {
-    navigateStackScreen('NativeWebTool', {
-      title: 'Import Recipe',
-      path: `/food/import-recipe?date=${encodeURIComponent(selectedDate)}&category=${encodeURIComponent(meal)}`,
-    })
-    setSectionMenuMeal(null)
+    openNativeImportRecipe(meal)
   }
 
   const saveCombinedMeal = async () => {
@@ -4995,6 +5592,14 @@ export function TrackCaloriesScreen() {
       openFavorites(meal)
       return
     }
+    if (action === 'openBarcode') {
+      openBarcode(meal)
+      return
+    }
+    if (action === 'openPhoto') {
+      openFoodPhotoPicker(meal)
+      return
+    }
     if (action === 'openBuildMeal') {
       openBuildMealTool(meal)
       return
@@ -5040,6 +5645,132 @@ export function TrackCaloriesScreen() {
       { text: 'Cancel', style: 'cancel' },
       { text: 'Log out', style: 'destructive', onPress: () => void signOut() },
     ])
+  }
+
+  const renderFavoriteNutrientCards = (entryTotals: Record<FavoriteNutrientKey, number>) => (
+    <View style={{ marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
+      {FAVORITE_NUTRIENT_CARDS.map((card) => {
+        const rawValue = Number(entryTotals[card.key] || 0)
+        const label = card.key === 'calories' && energyUnit === 'kj' ? 'Kilojoules' : card.label
+        return (
+          <View
+            key={card.key}
+            style={{
+              width: '47%',
+              borderWidth: 1,
+              borderColor: card.border,
+              borderRadius: 16,
+              padding: 14,
+              backgroundColor: card.bg,
+            }}
+          >
+            <Text style={{ color: card.color, fontSize: 18, fontWeight: '900' }}>
+              {formatFavoriteNutrientValue(card.key, rawValue, energyUnit)}
+            </Text>
+            <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '800', marginTop: 6, textTransform: 'uppercase' }}>
+              {label}
+            </Text>
+          </View>
+        )
+      })}
+    </View>
+  )
+
+  const renderFavoriteDailyTotals = (entryTotals: Record<FavoriteNutrientKey, number>) => {
+    const rows = [
+      {
+        key: 'calories',
+        label: 'Calories',
+        consumed: totals.calories + entryTotals.calories,
+        target: dailyAllowanceKcal,
+        color: '#F97316',
+        bg: '#FFF7ED',
+        border: '#FED7AA',
+        value:
+          energyUnit === 'kj'
+            ? `${Math.round((totals.calories + entryTotals.calories) * 4.184)} kJ / ${Math.round(dailyAllowanceKcal * 4.184)} kJ`
+            : `${Math.round(totals.calories + entryTotals.calories)} kcal / ${dailyAllowanceKcal} kcal`,
+      },
+      {
+        key: 'protein',
+        label: 'Protein',
+        consumed: totals.protein + entryTotals.protein,
+        target: macroTargetsWithExercise.protein,
+        color: '#3B82F6',
+        bg: '#EFF6FF',
+        border: '#BFDBFE',
+        value: `${formatMacroAmount(totals.protein + entryTotals.protein)} g / ${formatMacroAmount(macroTargetsWithExercise.protein)} g`,
+      },
+      {
+        key: 'carbs',
+        label: 'Carbs',
+        consumed: totals.carbs + entryTotals.carbs,
+        target: macroTargetsWithExercise.carbs,
+        color: '#22C55E',
+        bg: '#ECFDF5',
+        border: '#A7F3D0',
+        value: `${formatMacroAmount(totals.carbs + entryTotals.carbs)} g / ${formatMacroAmount(macroTargetsWithExercise.carbs)} g`,
+      },
+      {
+        key: 'fat',
+        label: 'Fat',
+        consumed: totals.fat + entryTotals.fat,
+        target: macroTargetsWithExercise.fat,
+        color: '#8B5CF6',
+        bg: '#F5F3FF',
+        border: '#DDD6FE',
+        value: `${formatMacroAmount(totals.fat + entryTotals.fat)} g / ${formatMacroAmount(macroTargetsWithExercise.fat)} g`,
+      },
+      {
+        key: 'fiber',
+        label: 'Fibre',
+        consumed: totals.fiber + entryTotals.fiber,
+        target: macroTargetsWithExercise.fiber,
+        color: '#EAB308',
+        bg: '#FEFCE8',
+        border: '#FDE68A',
+        value: `${formatMacroAmount(totals.fiber + entryTotals.fiber)} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g`,
+      },
+      {
+        key: 'sugar',
+        label: 'Sugar',
+        consumed: totals.sugar + entryTotals.sugar,
+        target: macroTargetsWithExercise.sugar,
+        color: '#EC4899',
+        bg: '#FDF2F8',
+        border: '#FBCFE8',
+        value: `${formatMacroAmount(totals.sugar + entryTotals.sugar)} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g`,
+      },
+    ]
+
+    return (
+      <View style={{ marginTop: 12, gap: 10 }}>
+        {rows.map((row) => {
+          const target = Number(row.target) || 0
+          const progress = target > 0 ? clamp((Number(row.consumed) / target) * 100, 0, 100) : 0
+          return (
+            <View
+              key={row.key}
+              style={{
+                borderWidth: 1,
+                borderColor: row.border,
+                borderRadius: 14,
+                padding: 12,
+                backgroundColor: row.bg,
+              }}
+            >
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
+                <Text style={{ color: '#374151', fontWeight: '800' }}>{row.label}</Text>
+                <Text style={{ color: '#111827', fontWeight: '900', textAlign: 'right', flex: 1 }}>{row.value}</Text>
+              </View>
+              <View style={{ marginTop: 10, height: 8, borderRadius: 999, backgroundColor: '#FFFFFF', overflow: 'hidden' }}>
+                <View style={{ width: `${progress}%`, height: '100%', borderRadius: 999, backgroundColor: row.color }} />
+              </View>
+            </View>
+          )
+        })}
+      </View>
+    )
   }
 
   if (mode !== 'signedIn' || !session?.token) {
@@ -5798,7 +6529,30 @@ export function TrackCaloriesScreen() {
                                     <Text style={{ marginLeft: 8, color: selected ? '#059669' : '#9CA3AF', fontWeight: '900' }}>
                                       {selected ? '✓' : '○'}
                                     </Text>
-                                  ) : null}
+                                  ) : (
+                                    <Pressable
+                                      accessibilityRole="button"
+                                      accessibilityLabel={`Open actions for ${entry.name || entry.description || 'meal entry'}`}
+                                      hitSlop={8}
+                                      onPress={(event) => {
+                                        event.stopPropagation()
+                                        setEntryMenu(entry)
+                                        setSwipeMenuEntryId(entryId)
+                                        setEntrySwipeOffsets((prev) => ({ ...prev, [entryId]: 0 }))
+                                      }}
+                                      style={{
+                                        marginLeft: 8,
+                                        width: 34,
+                                        height: 34,
+                                        borderRadius: 17,
+                                        alignItems: 'center',
+                                        justifyContent: 'center',
+                                        backgroundColor: '#F3F4F6',
+                                      }}
+                                    >
+                                      <MaterialCommunityIcons name="dots-horizontal" size={22} color="#4B5563" />
+                                    </Pressable>
+                                  )}
                                 </View>
                               </Pressable>
                             </View>
@@ -6006,7 +6760,6 @@ export function TrackCaloriesScreen() {
             <Pressable onPress={() => entryMenu && void handleEntryDelete(entryMenu)} style={[entryActionRow, entryActionRowDivider]}>
               <MaterialCommunityIcons name="trash-can-outline" size={28} color="#DC2626" />
               <Text style={[entryActionText, { color: '#DC2626' }]}>Delete</Text>
-              <MaterialCommunityIcons name="trash-can-outline" size={26} color="#DC2626" />
             </Pressable>
             <Pressable
               onPress={() => {
@@ -6152,6 +6905,14 @@ export function TrackCaloriesScreen() {
                     <MaterialCommunityIcons name="close" size={18} color="#6B7280" />
                   </Pressable>
                 ) : null}
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel="Open barcode scanner"
+                  onPress={openBarcodeFromFavoritesSearch}
+                  style={{ marginLeft: 10 }}
+                >
+                  <MaterialCommunityIcons name="barcode-scan" size={20} color="#4B5563" />
+                </Pressable>
               </View>
 
               <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
@@ -6210,6 +6971,7 @@ export function TrackCaloriesScreen() {
                     const canEdit = Boolean(item.favorite)
                     const canSave = favoritesTab === 'all' && !item.isSaved && Boolean(item.entry)
                     const showStar = favoritesTab === 'all'
+                    const displayedSourceTag = favoritesTab === 'favorites' || favoritesTab === 'custom' ? 'Favorite' : item.sourceTag
                     return (
                       <View
                         key={item.id}
@@ -6249,10 +7011,21 @@ export function TrackCaloriesScreen() {
                               <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>
                                 {Math.round(item.calories)} kcal
                               </Text>
-                              <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 3 }}>{item.sourceTag}</Text>
+                              <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 3 }}>{displayedSourceTag}</Text>
                             </View>
                           </View>
                         </Pressable>
+
+                        {favoritesUsageMode === 'diary' ? (
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Add ${item.label} to diary`}
+                            onPress={() => void addFavoriteToDiary(item)}
+                            style={{ width: 52, alignItems: 'center', justifyContent: 'center' }}
+                          >
+                            <Text style={{ color: '#3E9B44', fontSize: 14, fontWeight: '800' }}>Add</Text>
+                          </Pressable>
+                        ) : null}
 
                         {showStar && favoritesUsageMode === 'diary' ? (
                           <Pressable
@@ -6332,7 +7105,17 @@ export function TrackCaloriesScreen() {
 
       <Modal visible={favoritePreviewItem != null} animationType="slide" onRequestClose={() => setFavoritePreviewItem(null)}>
         <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: Math.max(insets.top + 8, 18),
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E5E7EB',
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
             <Pressable onPress={() => { if (favoritePreviewItem) { setFavoritePreviewItem(null); setFavoriteActionItem(favoritePreviewItem) } }}>
               <Text style={{ color: '#374151', fontWeight: '800' }}>Back</Text>
             </Pressable>
@@ -6365,50 +7148,254 @@ export function TrackCaloriesScreen() {
             </Text>
             <Text style={{ color: '#6B7280', marginTop: 4 }}>This is a preview. It does not add the meal yet.</Text>
 
-            <View style={{ marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              {[
-                { label: energyUnit === 'kj' ? 'Kilojoules' : 'Calories', value: energyUnit === 'kj' ? Math.round(favoritePreviewTotals.calories * 4.184) : Math.round(favoritePreviewTotals.calories) },
-                { label: 'Protein', value: `${formatMacroAmount(favoritePreviewTotals.protein)} g` },
-                { label: 'Carbs', value: `${formatMacroAmount(favoritePreviewTotals.carbs)} g` },
-                { label: 'Fat', value: `${formatMacroAmount(favoritePreviewTotals.fat)} g` },
-                { label: 'Fibre', value: `${formatMacroAmount(favoritePreviewTotals.fiber)} g` },
-                { label: 'Sugar', value: `${formatMacroAmount(favoritePreviewTotals.sugar)} g` },
-              ].map((card) => (
-                <View key={card.label} style={{ width: '47%', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14, backgroundColor: '#F9FAFB' }}>
-                  <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>{card.value}</Text>
-                  <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '800', marginTop: 6, textTransform: 'uppercase' }}>{card.label}</Text>
-                </View>
-              ))}
-            </View>
+            {renderFavoriteNutrientCards(favoritePreviewTotals)}
 
             <View style={{ marginTop: 24 }}>
               <Text style={{ color: '#111827', fontWeight: '800' }}>Daily totals after adding</Text>
               <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>This shows what your full day would look like if you added this.</Text>
-              <View style={{ marginTop: 12, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, gap: 8 }}>
-                {[
-                  { label: energyUnit === 'kj' ? 'Calories' : 'Calories', value: `${Math.round(totals.calories + favoritePreviewTotals.calories)} kcal / ${dailyAllowanceKcal} kcal` },
-                  { label: 'Protein', value: `${formatMacroAmount(totals.protein + favoritePreviewTotals.protein)} g / ${formatMacroAmount(macroTargetsWithExercise.protein)} g` },
-                  { label: 'Carbs', value: `${formatMacroAmount(totals.carbs + favoritePreviewTotals.carbs)} g / ${formatMacroAmount(macroTargetsWithExercise.carbs)} g` },
-                  { label: 'Fat', value: `${formatMacroAmount(totals.fat + favoritePreviewTotals.fat)} g / ${formatMacroAmount(macroTargetsWithExercise.fat)} g` },
-                  { label: 'Fibre', value: `${formatMacroAmount(totals.fiber + favoritePreviewTotals.fiber)} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g` },
-                  { label: 'Sugar', value: `${formatMacroAmount(totals.sugar + favoritePreviewTotals.sugar)} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g` },
-                ].map((row) => (
-                  <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                    <Text style={{ color: '#374151', fontWeight: '700' }}>{row.label}</Text>
-                    <Text style={{ color: '#111827', fontWeight: '800', textAlign: 'right', flex: 1 }}>{row.value}</Text>
-                  </View>
-                ))}
-              </View>
+              {renderFavoriteDailyTotals(favoritePreviewTotals)}
             </View>
           </ScrollView>
         </View>
       </Modal>
 
       <Modal
-        visible={favoriteEditItem != null}
+        visible={importRecipeOpen}
+        animationType="slide"
+        presentationStyle="fullScreen"
+        onRequestClose={() => setImportRecipeOpen(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: Math.max(insets.top + 8, 18),
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E5E7EB',
+              backgroundColor: '#FFFFFF',
+            }}
+          >
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
+              <Pressable
+                onPress={() => setImportRecipeOpen(false)}
+                accessibilityRole="button"
+                accessibilityLabel="Back"
+                style={{ width: 38, minHeight: 42, alignItems: 'flex-start', justifyContent: 'center' }}
+              >
+                <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
+              </Pressable>
+              <Text style={{ color: '#111827', fontSize: 18, fontWeight: '700', flex: 1 }}>Import recipe</Text>
+            </View>
+          </View>
+
+          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingTop: 24, paddingBottom: 40, gap: 14 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <Pressable
+                onPress={() => {
+                  setImportRecipeMode('url')
+                  setImportRecipeError('')
+                }}
+                style={[recipeImportModeChip, importRecipeMode === 'url' && recipeImportModeChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: importRecipeMode === 'url' }}
+                accessibilityLabel="Import by URL"
+              >
+                <Text style={[recipeImportModeChipText, importRecipeMode === 'url' && recipeImportModeChipTextActive]}>
+                  Import by URL ({RECIPE_IMPORT_URL_CREDITS} credits)
+                </Text>
+              </Pressable>
+              <Pressable
+                onPress={() => {
+                  setImportRecipeMode('photo')
+                  setImportRecipeError('')
+                }}
+                style={[recipeImportModeChip, importRecipeMode === 'photo' && recipeImportModeChipActive]}
+                accessibilityRole="button"
+                accessibilityState={{ selected: importRecipeMode === 'photo' }}
+                accessibilityLabel="Import by photo"
+              >
+                <Text style={[recipeImportModeChipText, importRecipeMode === 'photo' && recipeImportModeChipTextActive]}>
+                  Import by photo ({RECIPE_IMPORT_PHOTO_CREDITS} credits)
+                </Text>
+              </Pressable>
+            </View>
+
+            {!importRecipe ? (
+              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' }}>
+                {importRecipeMode === 'url' ? (
+                  <>
+                    <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>Recipe link</Text>
+                    <TextInput
+                      value={importRecipeUrl}
+                      onChangeText={(text) => {
+                        setImportRecipeUrl(text)
+                        setImportRecipeError('')
+                      }}
+                      autoCapitalize="none"
+                      autoCorrect={false}
+                      keyboardType="url"
+                      placeholder="Paste a recipe URL"
+                      placeholderTextColor="#9CA3AF"
+                      style={[inputStyle, { marginTop: 10 }]}
+                    />
+                    <Pressable
+                      onPress={() => void doImportRecipeFromUrl()}
+                      disabled={importRecipeLoading}
+                      style={[recipeImportPrimaryButton, { marginTop: 8 }, importRecipeLoading && { opacity: 0.7 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Import recipe URL"
+                    >
+                      <Text style={recipeImportPrimaryButtonText}>{importRecipeLoading ? 'Importing...' : 'Import'}</Text>
+                    </Pressable>
+                    <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 10 }}>
+                      Cost: {RECIPE_IMPORT_URL_CREDITS} credits per URL import.
+                    </Text>
+                    <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>
+                      Tip: if a site blocks imports, use the photo option instead.
+                    </Text>
+                  </>
+                ) : (
+                  <>
+                    <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>Recipe photos</Text>
+                    <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 8 }}>
+                      Cost: {RECIPE_IMPORT_PHOTO_CREDITS} credits per photo import.
+                    </Text>
+                    <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>
+                      You can add multiple photos (useful if the recipe is on 2 pages).
+                    </Text>
+                    <View style={{ marginTop: 12, flexDirection: importRecipeWide ? 'row' : 'column', gap: 8 }}>
+                      <Pressable
+                        onPress={() => void chooseImportRecipePhotos('camera')}
+                        style={[recipeImportSecondaryButton, importRecipeWide && { flex: 1 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Take recipe photo"
+                      >
+                        <Text style={recipeImportSecondaryButtonText}>Take photo</Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => void chooseImportRecipePhotos('library')}
+                        style={[recipeImportSecondaryButton, importRecipeWide && { flex: 1 }]}
+                        accessibilityRole="button"
+                        accessibilityLabel="Choose recipe photo from library"
+                      >
+                        <Text style={recipeImportSecondaryButtonText}>Choose from library</Text>
+                      </Pressable>
+                    </View>
+                    {importRecipePhotoAssets.length > 0 ? (
+                      <View style={{ marginTop: 12 }}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+                          <Text style={{ color: '#6B7280', fontSize: 12 }}>
+                            {importRecipePhotoAssets.length} photo{importRecipePhotoAssets.length === 1 ? '' : 's'} selected
+                          </Text>
+                          <Pressable onPress={() => setImportRecipePhotoAssets([])} accessibilityRole="button" accessibilityLabel="Clear recipe photos">
+                            <Text style={{ color: '#6B7280', fontSize: 12, fontWeight: '800', textDecorationLine: 'underline' }}>Clear</Text>
+                          </Pressable>
+                        </View>
+                        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
+                          {importRecipePhotoAssets.map((asset) => (
+                            <Image
+                              key={asset.uri}
+                              source={{ uri: asset.uri }}
+                              style={{ width: 76, height: 76, borderRadius: 10, backgroundColor: '#F3F4F6' }}
+                            />
+                          ))}
+                        </View>
+                      </View>
+                    ) : null}
+                    <Pressable
+                      onPress={() => void doImportRecipeFromPhoto()}
+                      disabled={importRecipeLoading}
+                      style={[recipeImportPrimaryButton, { marginTop: 12 }, importRecipeLoading && { opacity: 0.7 }]}
+                      accessibilityRole="button"
+                      accessibilityLabel="Import recipe from photo"
+                    >
+                      <Text style={recipeImportPrimaryButtonText}>{importRecipeLoading ? 'Importing...' : 'Import from photo'}</Text>
+                    </Pressable>
+                  </>
+                )}
+
+                {importRecipeError ? (
+                  <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: '700', marginTop: 12 }}>{importRecipeError}</Text>
+                ) : null}
+              </View>
+            ) : (
+              <>
+                <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: '#FFFFFF' }}>
+                  <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>Review (you can edit)</Text>
+                  <Text style={{ color: '#374151', fontSize: 13, fontWeight: '700', marginTop: 12 }}>Title</Text>
+                  <TextInput
+                    value={importRecipeTitle}
+                    onChangeText={setImportRecipeTitle}
+                    placeholder="Recipe title"
+                    placeholderTextColor="#9CA3AF"
+                    style={[inputStyle, { marginTop: 6 }]}
+                  />
+                  <Text style={{ color: '#374151', fontSize: 13, fontWeight: '700', marginTop: 12 }}>Servings (optional)</Text>
+                  <TextInput
+                    value={importRecipeServings}
+                    onChangeText={setImportRecipeServings}
+                    placeholder="Example: 4"
+                    placeholderTextColor="#9CA3AF"
+                    keyboardType="numeric"
+                    style={[inputStyle, { marginTop: 6 }]}
+                  />
+                  <Text style={{ color: '#374151', fontSize: 13, fontWeight: '700', marginTop: 12 }}>
+                    Ingredients (one per line)
+                  </Text>
+                  <TextInput
+                    value={importRecipeIngredientsText}
+                    onChangeText={setImportRecipeIngredientsText}
+                    multiline
+                    textAlignVertical="top"
+                    style={[inputStyle, { marginTop: 6, minHeight: 150 }]}
+                  />
+                  <Text style={{ color: '#374151', fontSize: 13, fontWeight: '700', marginTop: 12 }}>
+                    Instructions (one step per line)
+                  </Text>
+                  <TextInput
+                    value={importRecipeStepsText}
+                    onChangeText={setImportRecipeStepsText}
+                    multiline
+                    textAlignVertical="top"
+                    style={[inputStyle, { marginTop: 6, minHeight: 150 }]}
+                  />
+                </View>
+
+                <Pressable
+                  onPress={continueImportedRecipeToBuilder}
+                  style={[primaryButton, { flex: 0, minHeight: 46 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Continue to Build a meal"
+                >
+                  <Text style={primaryButtonText}>Continue to Build a meal</Text>
+                </Pressable>
+                <Text style={{ color: '#6B7280', fontSize: 12 }}>
+                  You can choose Save to favorites on the next screen after reviewing the meal.
+                </Text>
+                <Pressable
+                  onPress={() => {
+                    setImportRecipe(null)
+                    setImportRecipeError('')
+                  }}
+                  style={[secondaryButton, { flex: 0, minHeight: 44 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel="Start recipe import over"
+                >
+                  <Text style={secondaryButtonText}>Start over</Text>
+                </Pressable>
+              </>
+            )}
+          </ScrollView>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={favoriteEditItem != null || mealBuilderOpen}
         animationType="slide"
         presentationStyle="fullScreen"
         onRequestClose={() => {
+          setMealBuilderOpen(false)
           setFavoriteEditServingPickerItemId(null)
           setFavoriteEditItem(null)
         }}
@@ -6427,6 +7414,7 @@ export function TrackCaloriesScreen() {
             <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
               <Pressable
                 onPress={() => {
+                  setMealBuilderOpen(false)
                   setFavoriteEditItem(null)
                   setFavoriteEditItems([])
                   setFavoriteEditName('')
@@ -6438,7 +7426,9 @@ export function TrackCaloriesScreen() {
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#4B5563" />
               </Pressable>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>Edit meal</Text>
+                <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>
+                  {mealBuilderOpen && !favoriteEditItem ? 'Build a meal' : 'Edit meal'}
+                </Text>
                 <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                   <View style={{ borderRadius: 999, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4 }}>
                     <Text style={{ color: '#047857', fontSize: 13, fontWeight: '700' }}>{mealLabel(favoritesTargetMeal)}</Text>
@@ -6630,8 +7620,15 @@ export function TrackCaloriesScreen() {
                   ))}
                 </View>
                 <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 10 }}>
-                  Full meal has {favoriteEditItems.length} ingredient{favoriteEditItems.length === 1 ? '' : 's'}.
+                  {mealBuilderOpen && !favoriteEditItem
+                    ? favoriteEditPortionControlEnabled
+                      ? 'These update live when you change portion size.'
+                      : 'Portion control is off. Totals show the full meal.'
+                    : `Full meal has ${favoriteEditItems.length} ingredient${favoriteEditItems.length === 1 ? '' : 's'}.`}
                 </Text>
+                {mealBuilderOpen && !favoriteEditItem ? (
+                  <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 6 }}>Add weights to ingredients to use portions.</Text>
+                ) : null}
               </View>
 
               {favoriteEditSearchError ? <Text style={{ color: '#DC2626', marginTop: 10 }}>{favoriteEditSearchError}</Text> : null}
@@ -6640,7 +7637,7 @@ export function TrackCaloriesScreen() {
                 <ScrollView style={{ marginTop: 12, maxHeight: 280 }}>
                   {favoriteEditSearchResults.map((item) => (
                     <View key={`${String(item.source || 'auto')}:${String(item.id)}`} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 12, marginBottom: 8 }}>
-                      <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>{item.name}</Text>
+                      <Text style={{ color: '#111827', fontSize: 14, fontWeight: '800' }}>{searchFoodDisplayName(item)}</Text>
                       <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 3 }}>
                         {item.serving_size ? `Serving: ${item.serving_size} • ` : ''}
                         {Math.round(numberOrZero(item.calories ?? item.calories_kcal))} kcal
@@ -6907,7 +7904,7 @@ export function TrackCaloriesScreen() {
             </View>
 
             <Pressable onPress={() => void updateFavoriteFromEditor()} style={primaryButton}>
-              <Text style={primaryButtonText}>Update</Text>
+              <Text style={primaryButtonText}>{mealBuilderOpen && !favoriteEditItem ? 'Save meal' : 'Update'}</Text>
             </Pressable>
           </ScrollView>
         </View>
@@ -7005,7 +8002,17 @@ export function TrackCaloriesScreen() {
 
       <Modal visible={favoriteAdjustItem != null} animationType="slide" onRequestClose={() => setFavoriteAdjustItem(null)}>
         <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
-          <View style={{ paddingHorizontal: 16, paddingVertical: 14, borderBottomWidth: 1, borderBottomColor: '#E5E7EB', flexDirection: 'row', alignItems: 'center' }}>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: Math.max(insets.top + 8, 18),
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E5E7EB',
+              flexDirection: 'row',
+              alignItems: 'center',
+            }}
+          >
             <Pressable
               onPress={() => {
                 if (!favoriteAdjustItem) return
@@ -7085,37 +8092,35 @@ export function TrackCaloriesScreen() {
             </View>
 
             <View style={{ marginTop: 22, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-              {[
-                { label: energyUnit === 'kj' ? 'Kilojoules' : 'Calories', value: energyUnit === 'kj' ? Math.round(favoriteAdjustTotals.calories * 4.184) : Math.round(favoriteAdjustTotals.calories) },
-                { label: 'Protein', value: `${formatMacroAmount(favoriteAdjustTotals.protein)} g` },
-                { label: 'Carbs', value: `${formatMacroAmount(favoriteAdjustTotals.carbs)} g` },
-                { label: 'Fat', value: `${formatMacroAmount(favoriteAdjustTotals.fat)} g` },
-                { label: 'Fibre', value: `${formatMacroAmount(favoriteAdjustTotals.fiber)} g` },
-                { label: 'Sugar', value: `${formatMacroAmount(favoriteAdjustTotals.sugar)} g` },
-              ].map((card) => (
-                <View key={card.label} style={{ width: '47%', borderWidth: 1, borderColor: '#F3F4F6', borderRadius: 16, padding: 14, backgroundColor: '#F9FAFB' }}>
-                  <Text style={{ color: '#111827', fontSize: 18, fontWeight: '900' }}>{card.value}</Text>
-                  <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '800', marginTop: 6, textTransform: 'uppercase' }}>{card.label}</Text>
-                </View>
-              ))}
+              {FAVORITE_NUTRIENT_CARDS.map((card) => {
+                const label = card.key === 'calories' && energyUnit === 'kj' ? 'Kilojoules' : card.label
+                return (
+                  <View
+                    key={card.key}
+                    style={{
+                      width: '47%',
+                      borderWidth: 1,
+                      borderColor: card.border,
+                      borderRadius: 16,
+                      padding: 14,
+                      backgroundColor: card.bg,
+                    }}
+                  >
+                    <Text style={{ color: card.color, fontSize: 18, fontWeight: '900' }}>
+                      {formatFavoriteNutrientValue(card.key, Number(favoriteAdjustTotals[card.key] || 0), energyUnit)}
+                    </Text>
+                    <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '800', marginTop: 6, textTransform: 'uppercase' }}>
+                      {label}
+                    </Text>
+                  </View>
+                )
+              })}
             </View>
 
-            <View style={{ marginTop: 24, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 14, gap: 8 }}>
+            <View style={{ marginTop: 24 }}>
               <Text style={{ color: '#111827', fontWeight: '800' }}>Daily totals after adding</Text>
               <Text style={{ color: '#6B7280', fontSize: 12 }}>This updates live as you change amounts.</Text>
-              {[
-                { label: 'Calories', value: `${Math.round(totals.calories + favoriteAdjustTotals.calories)} kcal / ${dailyAllowanceKcal} kcal` },
-                { label: 'Protein', value: `${formatMacroAmount(totals.protein + favoriteAdjustTotals.protein)} g / ${formatMacroAmount(macroTargetsWithExercise.protein)} g` },
-                { label: 'Carbs', value: `${formatMacroAmount(totals.carbs + favoriteAdjustTotals.carbs)} g / ${formatMacroAmount(macroTargetsWithExercise.carbs)} g` },
-                { label: 'Fat', value: `${formatMacroAmount(totals.fat + favoriteAdjustTotals.fat)} g / ${formatMacroAmount(macroTargetsWithExercise.fat)} g` },
-                { label: 'Fibre', value: `${formatMacroAmount(totals.fiber + favoriteAdjustTotals.fiber)} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g` },
-                { label: 'Sugar', value: `${formatMacroAmount(totals.sugar + favoriteAdjustTotals.sugar)} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g` },
-              ].map((row) => (
-                <View key={row.label} style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                  <Text style={{ color: '#374151', fontWeight: '700' }}>{row.label}</Text>
-                  <Text style={{ color: '#111827', fontWeight: '800', textAlign: 'right', flex: 1 }}>{row.value}</Text>
-                </View>
-              ))}
+              {renderFavoriteDailyTotals(favoriteAdjustTotals)}
             </View>
           </ScrollView>
 
@@ -7259,7 +8264,7 @@ export function TrackCaloriesScreen() {
               ) : (
                 ingredientResults.map((item) => (
                   <View key={String(item.id)} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#FBFDFC' }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{item.name}</Text>
+                    <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{searchFoodDisplayName(item)}</Text>
                     <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
                       {item.serving_size ? `Serving: ${item.serving_size} • ` : ''}
                       {Math.round(numberOrZero(item.calories ?? item.calories_kcal))} kcal
@@ -7283,278 +8288,502 @@ export function TrackCaloriesScreen() {
       </Modal>
 
       <Modal
-        transparent
+        transparent={barcodeLabelOpen}
         visible={barcodeOpen || barcodeLabelOpen}
         animationType="fade"
         onRequestClose={() => {
           setBarcodeOpen(false)
           setBarcodeLabelOpen(false)
+          setBarcodeManualInputOpen(false)
+          setBarcodeFood(null)
+          barcodeScanLockRef.current = false
         }}
       >
-        <View style={modalBackdrop}>
-          <View style={barcodeLabelOpen ? modalCardLarge : modalCard}>
-            {barcodeLabelOpen ? (
-              <>
-                <Text style={modalTitle}>Missing label capture</Text>
-                <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
-                  Save product details so this barcode can work next time.
-                </Text>
+        {barcodeLabelOpen ? (
+          <View style={modalBackdrop}>
+            <View style={modalCardLarge}>
+              <Text style={modalTitle}>Missing label capture</Text>
+              <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
+                Save product details so this barcode can work next time.
+              </Text>
 
-                <View style={{ marginTop: 10, gap: 8 }}>
-                  <TextInput
-                    value={barcodeLabelName}
-                    onChangeText={setBarcodeLabelName}
-                    placeholder="Product name"
-                    placeholderTextColor="#8AA39D"
-                    style={inputStyle}
-                  />
-                  <TextInput
-                    value={barcodeLabelBrand}
-                    onChangeText={setBarcodeLabelBrand}
-                    placeholder="Brand (optional)"
-                    placeholderTextColor="#8AA39D"
-                    style={inputStyle}
-                  />
-                  <TextInput
-                    value={barcodeLabelServing}
-                    onChangeText={setBarcodeLabelServing}
-                    placeholder="Serving size (example: 100 g)"
-                    placeholderTextColor="#8AA39D"
-                    style={inputStyle}
-                  />
-                  <LabeledNumberInput label="Calories" value={barcodeLabelCalories} onChange={setBarcodeLabelCalories} />
-                  <LabeledNumberInput label="Protein (g)" value={barcodeLabelProtein} onChange={setBarcodeLabelProtein} />
-                  <LabeledNumberInput label="Carbs (g)" value={barcodeLabelCarbs} onChange={setBarcodeLabelCarbs} />
-                  <LabeledNumberInput label="Fat (g)" value={barcodeLabelFat} onChange={setBarcodeLabelFat} />
-                  <LabeledNumberInput label="Fiber (g)" value={barcodeLabelFiber} onChange={setBarcodeLabelFiber} />
-                  <LabeledNumberInput label="Sugar (g)" value={barcodeLabelSugar} onChange={setBarcodeLabelSugar} />
-                </View>
-
-                <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
-                  <Pressable onPress={() => void saveBarcodeLabel()} style={[primaryButton, barcodeModalRowActionButton]}>
-                    <Text style={primaryButtonText}>Save label</Text>
-                  </Pressable>
-                  <Pressable onPress={() => setBarcodeLabelOpen(false)} style={[secondaryButton, barcodeModalRowActionButton]}>
-                    <Text style={secondaryButtonText}>Cancel</Text>
-                  </Pressable>
-                </View>
-              </>
-            ) : (
-              <>
-                <Text style={modalTitle}>Barcode scanner</Text>
-                <Text style={{ color: theme.colors.muted }}>
-                  {barcodeUsageMode === 'editor' ? 'Adding ingredient to the meal editor' : `Adding to: ${mealLabel(barcodeTargetMeal)}`}
-                </Text>
+              <View style={{ marginTop: 10, gap: 8 }}>
                 <TextInput
-                  value={barcodeCode}
-                  onChangeText={setBarcodeCode}
-                  placeholder="Type barcode number"
+                  value={barcodeLabelName}
+                  onChangeText={setBarcodeLabelName}
+                  placeholder="Product name"
                   placeholderTextColor="#8AA39D"
-                  style={[inputStyle, { marginTop: 10 }]}
+                  style={inputStyle}
                 />
-                <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
-                  <Pressable
-                    onPress={() => void captureBarcodePhoto()}
-                    style={miniSecondaryButton}
-                    accessibilityRole="button"
-                    accessibilityLabel="Scan barcode with camera"
-                  >
-                    <Text style={miniSecondaryText}>Camera scan</Text>
-                  </Pressable>
-                  <Pressable
-                    onPress={() => setBarcodeFlashOn((prev) => !prev)}
-                    style={miniSecondaryButton}
-                    accessibilityRole="button"
-                    accessibilityLabel={barcodeFlashOn ? 'Turn barcode flash off' : 'Turn barcode flash on'}
-                  >
-                    <Text style={miniSecondaryText}>Flash: {barcodeFlashOn ? 'On' : 'Off'}</Text>
-                  </Pressable>
-                </View>
-                <Pressable
-                  onPress={() => void lookupBarcode()}
-                  style={[primaryButton, barcodeModalActionButton, { marginTop: 8 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel={barcodeLoading ? 'Searching for barcode' : 'Lookup barcode'}
-                >
-                  <Text style={primaryButtonText}>{barcodeLoading ? 'Searching...' : 'Lookup barcode'}</Text>
-                </Pressable>
-                <Pressable
-                  onPress={() => setBarcodeLabelOpen(true)}
-                  style={[secondaryButton, barcodeModalActionButton, { marginTop: 8 }]}
-                  accessibilityRole="button"
-                  accessibilityLabel="Capture missing barcode label details"
-                >
-                  <Text style={secondaryButtonText}>Missing label? Capture details</Text>
-                </Pressable>
+                <TextInput
+                  value={barcodeLabelBrand}
+                  onChangeText={setBarcodeLabelBrand}
+                  placeholder="Brand (optional)"
+                  placeholderTextColor="#8AA39D"
+                  style={inputStyle}
+                />
+                <TextInput
+                  value={barcodeLabelServing}
+                  onChangeText={setBarcodeLabelServing}
+                  placeholder="Serving size (example: 100 g)"
+                  placeholderTextColor="#8AA39D"
+                  style={inputStyle}
+                />
+                <LabeledNumberInput label="Calories" value={barcodeLabelCalories} onChange={setBarcodeLabelCalories} />
+                <LabeledNumberInput label="Protein (g)" value={barcodeLabelProtein} onChange={setBarcodeLabelProtein} />
+                <LabeledNumberInput label="Carbs (g)" value={barcodeLabelCarbs} onChange={setBarcodeLabelCarbs} />
+                <LabeledNumberInput label="Fat (g)" value={barcodeLabelFat} onChange={setBarcodeLabelFat} />
+                <LabeledNumberInput label="Fiber (g)" value={barcodeLabelFiber} onChange={setBarcodeLabelFiber} />
+                <LabeledNumberInput label="Sugar (g)" value={barcodeLabelSugar} onChange={setBarcodeLabelSugar} />
+              </View>
 
-                {barcodeFood ? (
-                  <View style={{ marginTop: 10, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10 }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{barcodeFood.name}</Text>
-                    <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
-                      {formatCalories(numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal), energyUnit)} • P {round1(numberOrZero(barcodeFood.protein_g))}g • C {round1(numberOrZero(barcodeFood.carbs_g))}g • F {round1(numberOrZero(barcodeFood.fat_g))}g
-                    </Text>
-                    <Pressable
-                      onPress={() => void addBarcodeFood()}
-                      style={[primaryButton, barcodeModalActionButton, { marginTop: 8 }]}
-                      accessibilityRole="button"
-                      accessibilityLabel={barcodeUsageMode === 'editor' ? 'Add barcode ingredient' : 'Add barcode food to diary'}
-                    >
-                      <Text style={primaryButtonText}>{barcodeUsageMode === 'editor' ? 'Add ingredient' : 'Add to diary'}</Text>
-                    </Pressable>
-                  </View>
-                ) : null}
-
-                <Pressable
-                  onPress={() => {
-                    setBarcodeOpen(false)
-                    setBarcodeLabelOpen(false)
-                  }}
-                  style={modalCancelButton}
-                  accessibilityRole="button"
-                  accessibilityLabel="Close barcode scanner"
-                >
-                  <Text style={modalCancelText}>Close</Text>
+              <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
+                <Pressable onPress={() => void saveBarcodeLabel()} style={[primaryButton, barcodeModalRowActionButton]}>
+                  <Text style={primaryButtonText}>Save label</Text>
                 </Pressable>
-              </>
-            )}
+                <Pressable onPress={() => setBarcodeLabelOpen(false)} style={[secondaryButton, barcodeModalRowActionButton]}>
+                  <Text style={secondaryButtonText}>Cancel</Text>
+                </Pressable>
+              </View>
+            </View>
           </View>
-        </View>
-      </Modal>
-
-      <Modal transparent visible={recommendedOpen} animationType="fade" onRequestClose={() => setRecommendedOpen(false)}>
-        <View style={modalBackdrop}>
-          <View style={modalCardLarge}>
-            <Text style={modalTitle}>Recommended meal</Text>
-            <Text style={{ color: theme.colors.muted }}>Category: {mealLabel(recommendedTargetMeal)}</Text>
-            <Text style={{ color: theme.colors.muted, marginTop: 2 }}>
-              Cost: {recommendedCostCredits} credit{recommendedCostCredits === 1 ? '' : 's'} per recommendation
-            </Text>
-
-            <View style={{ marginTop: 8, flexDirection: 'row', gap: 8 }}>
+        ) : (
+          <View style={barcodeScannerScreen}>
+            <View style={[barcodeScannerHeader, { paddingTop: Math.max(insets.top, 10) }]}>
               <Pressable
-                onPress={() => setRecommendedTab('ingredients')}
-                style={[chip, recommendedTab === 'ingredients' && chipActive]}
+                onPress={() => {
+                  setBarcodeOpen(false)
+                  setBarcodeLabelOpen(false)
+                  setBarcodeManualInputOpen(false)
+                  setBarcodeFood(null)
+                  barcodeScanLockRef.current = false
+                }}
+                style={barcodeScannerHeaderButton}
                 accessibilityRole="button"
-                accessibilityLabel="Show recommended meal ingredients"
+                accessibilityLabel="Close scanner"
               >
-                <Text style={[chipText, recommendedTab === 'ingredients' && chipTextActive]}>Ingredients</Text>
+                <MaterialCommunityIcons name="close" size={26} color="#1F2937" />
               </Pressable>
-              <Pressable
-                onPress={() => setRecommendedTab('recipe')}
-                style={[chip, recommendedTab === 'recipe' && chipActive]}
-                accessibilityRole="button"
-                accessibilityLabel="Show recommended meal recipe"
-              >
-                <Text style={[chipText, recommendedTab === 'recipe' && chipTextActive]}>Recipe</Text>
-              </Pressable>
-              <Pressable
-                onPress={() => setRecommendedTab('reason')}
-                style={[chip, recommendedTab === 'reason' && chipActive]}
-                accessibilityRole="button"
-                accessibilityLabel="Show recommended meal reason"
-              >
-                <Text style={[chipText, recommendedTab === 'reason' && chipTextActive]}>Reason</Text>
-              </Pressable>
+              <Text style={barcodeScannerHeaderTitle}>Scan Barcode</Text>
+              <View style={barcodeScannerHeaderButton} />
             </View>
 
-            <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
+            <View style={barcodeCameraArea}>
+              {cameraPermission?.granted ? (
+                <CameraView
+                  style={barcodeCameraPreview}
+                  facing="back"
+                  enableTorch={barcodeFlashOn}
+                  barcodeScannerSettings={{ barcodeTypes: BARCODE_TYPES }}
+                  onBarcodeScanned={barcodeLoading || barcodeFood ? undefined : handleBarcodeScanned}
+                  onMountError={(event) => setBarcodeCameraError(event?.message || 'Camera unavailable')}
+                />
+              ) : null}
+
+              {!cameraPermission?.granted ? (
+                <View style={barcodePermissionPanel}>
+                  <Text style={barcodeOverlayTitle}>Scan Barcode</Text>
+                  <Text style={barcodeOverlaySubtitle}>Camera access is needed to scan packaged foods.</Text>
+                  <Pressable
+                    onPress={() => void requestCameraPermission()}
+                    style={barcodePermissionButton}
+                    accessibilityRole="button"
+                    accessibilityLabel="Enable barcode camera"
+                  >
+                    <Text style={barcodePermissionButtonText}>Enable camera</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              <View pointerEvents="none" style={barcodeFrameOverlay}>
+                <View style={barcodeFrameTextBlock}>
+                  <Text style={barcodeOverlayTitle}>Scan Barcode</Text>
+                  <Text style={barcodeOverlaySubtitle}>Place barcode in the frame to scan</Text>
+                </View>
+                <View style={barcodeScanFrame} />
+                <View style={barcodeStatusPill}>
+                  <Text style={barcodeStatusText}>
+                    {barcodeLoading ? 'Looking up barcode...' : barcodeCameraError ? 'Camera unavailable' : 'Scanning...'}
+                  </Text>
+                </View>
+              </View>
+
+              {barcodeManualInputOpen ? (
+                <View style={barcodeManualPanel}>
+                  <Text style={barcodeManualTitle}>Type the barcode</Text>
+                  <View style={barcodeManualRow}>
+                    <TextInput
+                      value={barcodeCode}
+                      onChangeText={setBarcodeCode}
+                      placeholder="Enter barcode number"
+                      placeholderTextColor="#6B7280"
+                      keyboardType="number-pad"
+                      returnKeyType="search"
+                      onSubmitEditing={() => void lookupBarcode()}
+                      style={barcodeManualInput}
+                    />
+                    <Pressable
+                      onPress={() => void lookupBarcode()}
+                      style={barcodeManualSearchButton}
+                      accessibilityRole="button"
+                      accessibilityLabel={barcodeLoading ? 'Looking up barcode' : 'Search barcode'}
+                    >
+                      <Text style={barcodeManualSearchText}>{barcodeLoading ? 'Searching...' : 'Search'}</Text>
+                    </Pressable>
+                  </View>
+                  <Pressable
+                    onPress={() => {
+                      setBarcodeManualInputOpen(false)
+                      setBarcodeCode('')
+                    }}
+                    accessibilityRole="button"
+                    accessibilityLabel="Cancel barcode typing"
+                  >
+                    <Text style={barcodeManualCancelText}>Cancel</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+
+              {barcodeFood ? (
+                <View style={barcodeProductPanel}>
+                  <Text style={barcodeProductTitle}>{barcodeFood.name}</Text>
+                  <Text style={barcodeProductMeta}>
+                    {formatCalories(numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal), energyUnit)} • P {round1(numberOrZero(barcodeFood.protein_g))}g • C {round1(numberOrZero(barcodeFood.carbs_g))}g • F {round1(numberOrZero(barcodeFood.fat_g))}g
+                  </Text>
+                  <Pressable
+                    onPress={() => void addBarcodeFood()}
+                    style={barcodeProductButton}
+                    accessibilityRole="button"
+                    accessibilityLabel={barcodeUsageMode === 'editor' ? 'Add barcode ingredient' : 'Add barcode food to diary'}
+                  >
+                    <Text style={barcodeProductButtonText}>{barcodeUsageMode === 'editor' ? 'Add ingredient' : 'Add to diary'}</Text>
+                  </Pressable>
+                </View>
+              ) : null}
+            </View>
+
+            <View style={[barcodeBottomBar, { paddingBottom: Math.max(insets.bottom, 12) }]}>
+              <Pressable
+                onPress={() => setBarcodeFlashOn((prev) => !prev)}
+                style={barcodeBottomAction}
+                accessibilityRole="button"
+                accessibilityLabel={barcodeFlashOn ? 'Turn barcode flash off' : 'Turn barcode flash on'}
+              >
+                <MaterialCommunityIcons name="flash" size={22} color="#1F2937" />
+                <Text style={barcodeBottomActionText}>{barcodeFlashOn ? 'Flash On' : 'Flash'}</Text>
+              </Pressable>
+
+              <Pressable
+                onPress={() => setBarcodeManualInputOpen((prev) => !prev)}
+                style={barcodeBottomAction}
+                accessibilityRole="button"
+                accessibilityLabel={barcodeManualInputOpen ? 'Hide barcode typing' : 'Type barcode'}
+              >
+                <MaterialCommunityIcons name="barcode-scan" size={22} color="#1F2937" />
+                <Text style={barcodeBottomActionText}>{barcodeManualInputOpen ? 'Hide Input' : 'Type Barcode'}</Text>
+              </Pressable>
+            </View>
+          </View>
+        )}
+      </Modal>
+
+      <Modal visible={recommendedOpen} animationType="slide" onRequestClose={() => setRecommendedOpen(false)}>
+        <View style={{ flex: 1, backgroundColor: '#F9FAFB' }}>
+          <View
+            style={{
+              paddingHorizontal: 16,
+              paddingTop: Math.max(insets.top + 8, 18),
+              paddingBottom: 12,
+              borderBottomWidth: 1,
+              borderBottomColor: '#E5E7EB',
+              backgroundColor: '#FFFFFF',
+              flexDirection: 'row',
+              alignItems: 'center',
+              gap: 12,
+            }}
+          >
+            <Pressable
+              onPress={() => setRecommendedOpen(false)}
+              accessibilityRole="button"
+              accessibilityLabel="Back to Food Diary"
+              style={{ width: 44, minHeight: 44, alignItems: 'flex-start', justifyContent: 'center' }}
+            >
+              <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
+            </Pressable>
+            <View style={{ flex: 1 }}>
+              <Text style={{ color: '#111827', fontSize: 20, fontWeight: '900' }}>
+                AI Recommended {mealLabel(recommendedTargetMeal)}
+              </Text>
+              <Text style={{ color: '#6B7280', marginTop: 3, fontSize: 13 }}>{selectedDate}</Text>
+            </View>
+            <VoiceAssistantIconButton size={40} iconSize={20} onPress={openVoiceFromFoodOverlay} />
+          </View>
+
+          <ScrollView contentContainerStyle={{ padding: 16, paddingBottom: 36, gap: 14 }}>
+            {recommendedMeal ? (
               <Pressable
                 onPress={() => void generateRecommended()}
                 disabled={recommendedLoading}
-                style={[primaryButton, recommendedLoading && { opacity: 0.7 }]}
+                style={[primaryButton, { flex: 0, minHeight: 46 }, recommendedLoading && { opacity: 0.7 }]}
                 accessibilityRole="button"
-                accessibilityLabel={recommendedLoading ? 'Generating recommended meal' : 'Generate recommended meal'}
+                accessibilityLabel={recommendedLoading ? 'Generating another recommended meal' : 'Generate another recommended meal'}
               >
-                <Text style={primaryButtonText}>{recommendedLoading ? 'Generating...' : 'Generate / Regenerate'}</Text>
+                <Text style={primaryButtonText}>
+                  {recommendedLoading ? 'Generating...' : `Generate another (${recommendedCostCredits} credits)`}
+                </Text>
               </Pressable>
-              <Pressable
-                onPress={() => void addRecommendedToDiary()}
-                disabled={!recommendedMeal}
-                style={[secondaryButton, !recommendedMeal && { opacity: 0.5 }]}
-                accessibilityRole="button"
-                accessibilityLabel="Add recommended meal to diary"
-              >
-                <Text style={secondaryButtonText}>Add to diary</Text>
-              </Pressable>
-            </View>
-            {recommendedError ? (
-              <Text style={{ color: '#DC2626', fontWeight: '700', marginTop: 8 }}>{recommendedError}</Text>
             ) : null}
 
-            <ScrollView style={{ marginTop: 10, maxHeight: 300 }}>
-              {!recommendedMeal ? (
-                <Text style={{ color: theme.colors.muted }}>No recommendation generated yet.</Text>
-              ) : recommendedTab === 'ingredients' ? (
-                <View style={{ gap: 8 }}>
-                  {recommendedMeal.items.map((item, idx) => (
-                    <View key={`${item.name}-${idx}`} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10, backgroundColor: '#FBFDFC' }}>
-                      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{item.name}</Text>
-                      <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
-                        {formatCalories(numberOrZero(item.calories), energyUnit)} each serving
-                      </Text>
-                      <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Pressable
-                          onPress={() => updateRecommendedServing(idx, numberOrZero(item.servings) - 0.25)}
-                          style={miniSecondaryButton}
-                        >
-                          <Text style={miniSecondaryText}>-</Text>
-                        </Pressable>
-                        <TextInput
-                          value={String(round1(numberOrZero(item.servings) || 1))}
-                          onChangeText={(next) => updateRecommendedServing(idx, numberOrZero(next))}
-                          keyboardType="decimal-pad"
-                          style={[inputStyle, { flex: 1, textAlign: 'center' }]}
-                        />
-                        <Pressable
-                          onPress={() => updateRecommendedServing(idx, numberOrZero(item.servings) + 0.25)}
-                          style={miniSecondaryButton}
-                        >
-                          <Text style={miniSecondaryText}>+</Text>
-                        </Pressable>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              ) : recommendedTab === 'recipe' ? (
-                <View style={{ gap: 8 }}>
-                  {(recommendedMeal.recipe?.steps || []).map((step, idx) => (
-                    <Text key={`${idx}`} style={{ color: theme.colors.text }}>
-                      {idx + 1}. {step}
-                    </Text>
-                  ))}
-                  {(!recommendedMeal.recipe?.steps || recommendedMeal.recipe.steps.length === 0) ? (
-                    <Text style={{ color: theme.colors.muted }}>No recipe steps yet.</Text>
-                  ) : null}
-                </View>
-              ) : (
-                <Text style={{ color: theme.colors.text }}>{recommendedMeal.why || 'No reason text available.'}</Text>
-              )}
-            </ScrollView>
-
-            <View style={{ marginTop: 10 }}>
-              <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>History</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 6 }}>
-                {recommendedHistory.map((item) => (
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14 }}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
+                <Text style={{ color: '#111827', fontWeight: '900', fontSize: 16 }}>Credit usage</Text>
+                {recommendedMeal ? (
                   <Pressable
-                    key={item.id}
-                    onPress={() => setRecommendedMeal(item)}
-                    style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 6, backgroundColor: '#FBFDFC' }}
+                    onPress={() => setRecommendedExplainOpen(true)}
+                    style={{ borderRadius: 10, backgroundColor: '#F3F4F6', paddingHorizontal: 12, paddingVertical: 8 }}
+                    accessibilityRole="button"
+                    accessibilityLabel="About recommended meals"
                   >
-                    <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{item.mealName}</Text>
+                    <Text style={{ color: '#111827', fontWeight: '800' }}>About</Text>
                   </Pressable>
-                ))}
-              </ScrollView>
+                ) : null}
+              </View>
+              <Text style={{ color: '#374151', marginTop: 8, fontWeight: '800' }}>
+                {recommendedCostCredits} credit{recommendedCostCredits === 1 ? '' : 's'} per recommendation
+              </Text>
+              <Text style={{ color: '#6B7280', marginTop: 6 }}>Credits are only spent when a recommendation is generated.</Text>
             </View>
 
-            <Pressable
-              onPress={() => setRecommendedOpen(false)}
-              style={modalCancelButton}
-              accessibilityRole="button"
-              accessibilityLabel="Close recommended meal"
-            >
-              <Text style={modalCancelText}>Close</Text>
-            </Pressable>
-          </View>
+            {!recommendedMeal ? (
+              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14 }}>
+                <Text style={{ color: '#111827', fontWeight: '900', fontSize: 16 }}>About</Text>
+                <Text style={{ color: '#374151', marginTop: 8, fontWeight: '800' }}>Get a recommendation</Text>
+                <Text style={{ color: '#6B7280', marginTop: 6 }}>
+                  Generate an AI meal suggestion for {mealLabel(recommendedTargetMeal).toLowerCase()}.
+                </Text>
+                <Pressable
+                  onPress={() => void generateRecommended()}
+                  disabled={recommendedLoading}
+                  style={[primaryButton, { marginTop: 12, minHeight: 46 }, recommendedLoading && { opacity: 0.7 }]}
+                  accessibilityRole="button"
+                  accessibilityLabel={recommendedLoading ? 'Generating recommended meal' : 'Generate recommended meal'}
+                >
+                  <Text style={primaryButtonText}>
+                    {recommendedLoading ? 'Generating...' : `Generate (${recommendedCostCredits} credits)`}
+                  </Text>
+                </Pressable>
+                {recommendedError ? (
+                  <Text style={{ color: '#DC2626', fontWeight: '700', marginTop: 10 }}>{recommendedError}</Text>
+                ) : null}
+              </View>
+            ) : recommendedError ? (
+              <Text style={{ color: '#DC2626', fontWeight: '700' }}>{recommendedError}</Text>
+            ) : null}
+
+            {recommendedMeal
+              ? (() => {
+                  const tags = recommendedMealTags(recommendedMeal)
+                  const macroRows = recommendedMacroRows(recommendedMeal)
+                  return (
+                    <>
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14 }}>
+                        <Text style={{ color: '#6B7280', fontWeight: '800', fontSize: 12 }}>Meal</Text>
+                        <Text style={{ color: '#111827', fontSize: 20, lineHeight: 25, fontWeight: '900', marginTop: 4 }}>
+                          {recommendedMeal.mealName}
+                        </Text>
+                        <Text style={{ color: '#374151', marginTop: 7, fontWeight: '800' }}>{recommendedMacroLine(recommendedMeal)}</Text>
+                        <Text style={{ color: '#6B7280', marginTop: 3 }}>{recommendedSecondaryMacroLine(recommendedMeal)}</Text>
+
+                        <View style={{ gap: 8, marginTop: 14 }}>
+                          <Pressable
+                            onPress={openRecommendedBuildMeal}
+                            style={[primaryButton, { flex: 0, minHeight: 46 }]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Build this meal"
+                          >
+                            <Text style={primaryButtonText}>Build this meal</Text>
+                          </Pressable>
+                          <View style={{ flexDirection: 'row', gap: 8 }}>
+                            <Pressable
+                              onPress={() => void addRecommendedToDiary()}
+                              style={[secondaryButton, { minHeight: 44 }]}
+                              accessibilityRole="button"
+                              accessibilityLabel="Quick save recommended meal"
+                            >
+                              <Text style={secondaryButtonText}>Quick save</Text>
+                            </Pressable>
+                            <Pressable
+                              onPress={() => void saveRecommendedToFavorites()}
+                              disabled={recommendedSavingFavorite}
+                              style={[secondaryButton, { minHeight: 44 }, recommendedSavingFavorite && { opacity: 0.7 }]}
+                              accessibilityRole="button"
+                              accessibilityLabel="Save recommended meal to favorites"
+                            >
+                              <Text style={secondaryButtonText}>{recommendedSavingFavorite ? 'Saving...' : 'Save to favorites'}</Text>
+                            </Pressable>
+                          </View>
+                        </View>
+
+                        {tags.length > 0 ? (
+                          <View style={{ marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+                            {tags.map((tag) => (
+                              <View key={tag} style={{ borderRadius: 999, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 6 }}>
+                                <Text style={{ color: '#047857', fontSize: 12, fontWeight: '800' }}>{tag}</Text>
+                              </View>
+                            ))}
+                          </View>
+                        ) : null}
+                      </View>
+
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14 }}>
+                        <Text style={{ color: '#111827', fontWeight: '900', fontSize: 16 }}>Meal macro summary</Text>
+                        <View style={{ marginTop: 12, gap: 12 }}>
+                          {macroRows.map((row) => (
+                            <View key={row.label}>
+                              <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
+                                <Text style={{ color: '#374151', fontWeight: '800' }}>{row.label}</Text>
+                                <Text style={{ color: '#111827', fontWeight: '900' }}>{row.display}</Text>
+                              </View>
+                              <View style={{ height: 8, borderRadius: 999, backgroundColor: '#E5E7EB', overflow: 'hidden', marginTop: 6 }}>
+                                <View style={{ height: 8, width: `${row.percent}%`, borderRadius: 999, backgroundColor: row.color }} />
+                              </View>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14 }}>
+                        <View style={{ flexDirection: 'row', gap: 8 }}>
+                          <Pressable
+                            onPress={() => setRecommendedTab('ingredients')}
+                            style={[chip, recommendedTab === 'ingredients' && chipActive]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Show recommended meal ingredients"
+                          >
+                            <Text style={[chipText, recommendedTab === 'ingredients' && chipTextActive]}>Ingredients</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setRecommendedTab('recipe')}
+                            style={[chip, recommendedTab === 'recipe' && chipActive]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Show recommended meal recipe"
+                          >
+                            <Text style={[chipText, recommendedTab === 'recipe' && chipTextActive]}>Recipe</Text>
+                          </Pressable>
+                          <Pressable
+                            onPress={() => setRecommendedTab('reason')}
+                            style={[chip, recommendedTab === 'reason' && chipActive]}
+                            accessibilityRole="button"
+                            accessibilityLabel="Show recommended meal reason"
+                          >
+                            <Text style={[chipText, recommendedTab === 'reason' && chipTextActive]}>Reason</Text>
+                          </Pressable>
+                        </View>
+
+                        <View style={{ marginTop: 12, gap: 8 }}>
+                          {recommendedTab === 'ingredients' ? (
+                            recommendedMeal.items.map((item, idx) => {
+                              const expanded = recommendedExpandedIngredientIndex === idx
+                              return (
+                                <View
+                                  key={`${item.name}-${idx}`}
+                                  style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, backgroundColor: '#FBFDFC', overflow: 'hidden' }}
+                                >
+                                  <Pressable
+                                    onPress={() => setRecommendedExpandedIngredientIndex(expanded ? null : idx)}
+                                    style={{ padding: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}
+                                    accessibilityRole="button"
+                                    accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} ${item.name}`}
+                                  >
+                                    <View style={{ flex: 1 }}>
+                                      <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{item.name}</Text>
+                                      <Text style={{ color: theme.colors.muted, marginTop: 3, fontSize: 12 }}>{recommendedIngredientMeta(item)}</Text>
+                                      <Text style={{ color: theme.colors.text, marginTop: 4, fontWeight: '800', fontSize: 12 }}>
+                                        {formatCalories(numberOrZero(item.calories), energyUnit)} each serving
+                                      </Text>
+                                    </View>
+                                    <MaterialCommunityIcons name={expanded ? 'chevron-up' : 'chevron-down'} size={22} color="#6B7280" />
+                                  </Pressable>
+
+                                  {expanded ? (
+                                    <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', padding: 12, gap: 8 }}>
+                                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                                        <Pressable
+                                          onPress={() => updateRecommendedServing(idx, numberOrZero(item.servings) - 0.25)}
+                                          style={miniSecondaryButton}
+                                          accessibilityRole="button"
+                                          accessibilityLabel={`Reduce ${item.name}`}
+                                        >
+                                          <Text style={miniSecondaryText}>-</Text>
+                                        </Pressable>
+                                        <TextInput
+                                          value={String(round1(numberOrZero(item.servings) || 1))}
+                                          onChangeText={(next) => updateRecommendedServing(idx, numberOrZero(next))}
+                                          keyboardType="decimal-pad"
+                                          style={[inputStyle, { flex: 1, textAlign: 'center' }]}
+                                        />
+                                        <Pressable
+                                          onPress={() => updateRecommendedServing(idx, numberOrZero(item.servings) + 0.25)}
+                                          style={miniSecondaryButton}
+                                          accessibilityRole="button"
+                                          accessibilityLabel={`Increase ${item.name}`}
+                                        >
+                                          <Text style={miniSecondaryText}>+</Text>
+                                        </Pressable>
+                                      </View>
+                                    </View>
+                                  ) : null}
+                                </View>
+                              )
+                            })
+                          ) : recommendedTab === 'recipe' ? (
+                            (recommendedMeal.recipe?.steps || []).length > 0 ? (
+                              (recommendedMeal.recipe?.steps || []).map((step, idx) => (
+                                <Text key={`${idx}`} style={{ color: theme.colors.text }}>
+                                  {idx + 1}. {step}
+                                </Text>
+                              ))
+                            ) : (
+                              <Text style={{ color: theme.colors.muted }}>No recipe steps yet.</Text>
+                            )
+                          ) : (
+                            <Text style={{ color: theme.colors.text }}>{recommendedMeal.why || 'No reason text available.'}</Text>
+                          )}
+                        </View>
+                      </View>
+                    </>
+                  )
+                })()
+              : null}
+
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14 }}>
+              <Text style={{ color: '#111827', fontWeight: '900', fontSize: 16 }}>History</Text>
+              <Text style={{ color: '#6B7280', marginTop: 4 }}>Previously generated AI meals</Text>
+              <View style={{ marginTop: 12, gap: 8 }}>
+                {recommendedHistory.length === 0 ? (
+                  <Text style={{ color: '#6B7280' }}>No recommendations generated yet.</Text>
+                ) : (
+                  recommendedHistory.map((item) => (
+                    <Pressable
+                      key={item.id}
+                      onPress={() => {
+                        setRecommendedMeal(item)
+                        setRecommendedExpandedIngredientIndex(null)
+                        setRecommendedTab('ingredients')
+                      }}
+                      style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, backgroundColor: '#FBFDFC', padding: 12 }}
+                      accessibilityRole="button"
+                      accessibilityLabel={`Open ${item.mealName}`}
+                    >
+                      <Text style={{ color: '#111827', fontWeight: '900' }}>{item.mealName}</Text>
+                      <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>{recommendedMealMeta(item)}</Text>
+                      <Text style={{ color: '#111827', marginTop: 6, fontWeight: '800' }}>{recommendedMealCalories(item)} kcal</Text>
+                    </Pressable>
+                  ))
+                )}
+              </View>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
 
@@ -8125,6 +9354,260 @@ const barcodeModalActionButton = {
 
 const barcodeModalRowActionButton = {
   minHeight: 44,
+}
+
+const barcodeScannerScreen = {
+  flex: 1,
+  backgroundColor: '#000000',
+}
+
+const barcodeScannerHeader = {
+  minHeight: 66,
+  backgroundColor: '#FFFFFF',
+  borderBottomWidth: 1,
+  borderBottomColor: '#E5E7EB',
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'space-between' as const,
+  paddingHorizontal: 12,
+  paddingBottom: 10,
+}
+
+const barcodeScannerHeaderButton = {
+  width: 44,
+  height: 44,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+}
+
+const barcodeScannerHeaderTitle = {
+  color: '#111827',
+  fontSize: 18,
+  fontWeight: '800' as const,
+}
+
+const barcodeCameraArea = {
+  flex: 1,
+  backgroundColor: '#000000',
+  position: 'relative' as const,
+  overflow: 'hidden' as const,
+}
+
+const barcodeCameraPreview = {
+  position: 'absolute' as const,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+}
+
+const barcodeFrameOverlay = {
+  position: 'absolute' as const,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 24,
+}
+
+const barcodeFrameTextBlock = {
+  alignItems: 'center' as const,
+  marginBottom: 24,
+}
+
+const barcodeOverlayTitle = {
+  color: '#FFFFFF',
+  fontSize: 22,
+  fontWeight: '800' as const,
+  textAlign: 'center' as const,
+}
+
+const barcodeOverlaySubtitle = {
+  color: 'rgba(255,255,255,0.82)',
+  fontSize: 14,
+  fontWeight: '600' as const,
+  textAlign: 'center' as const,
+  marginTop: 4,
+}
+
+const barcodeScanFrame = {
+  width: 288,
+  maxWidth: '88%' as const,
+  height: 220,
+  borderRadius: 22,
+  borderWidth: 4,
+  borderColor: 'rgba(255,255,255,0.96)',
+  backgroundColor: 'rgba(0,0,0,0.12)',
+}
+
+const barcodeStatusPill = {
+  position: 'absolute' as const,
+  left: 0,
+  right: 0,
+  bottom: 24,
+  alignItems: 'center' as const,
+}
+
+const barcodeStatusText = {
+  overflow: 'hidden' as const,
+  borderRadius: 999,
+  backgroundColor: 'rgba(0,0,0,0.58)',
+  color: '#FFFFFF',
+  paddingHorizontal: 12,
+  paddingVertical: 5,
+  fontSize: 12,
+  fontWeight: '800' as const,
+}
+
+const barcodePermissionPanel = {
+  position: 'absolute' as const,
+  top: 0,
+  right: 0,
+  bottom: 0,
+  left: 0,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 28,
+  backgroundColor: '#000000',
+}
+
+const barcodePermissionButton = {
+  marginTop: 16,
+  borderRadius: 12,
+  backgroundColor: '#FFFFFF',
+  paddingHorizontal: 18,
+  paddingVertical: 11,
+}
+
+const barcodePermissionButtonText = {
+  color: '#111827',
+  fontWeight: '900' as const,
+}
+
+const barcodeManualPanel = {
+  position: 'absolute' as const,
+  left: 16,
+  right: 16,
+  bottom: 110,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  backgroundColor: 'rgba(255,255,255,0.96)',
+  padding: 14,
+  gap: 10,
+}
+
+const barcodeManualTitle = {
+  color: '#111827',
+  fontSize: 15,
+  fontWeight: '800' as const,
+}
+
+const barcodeManualRow = {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  gap: 8,
+}
+
+const barcodeManualInput = {
+  flex: 1,
+  minHeight: 42,
+  borderRadius: 10,
+  borderWidth: 1,
+  borderColor: '#D1D5DB',
+  backgroundColor: '#FFFFFF',
+  color: '#111827',
+  paddingHorizontal: 12,
+  fontSize: 16,
+  fontWeight: '700' as const,
+}
+
+const barcodeManualSearchButton = {
+  minHeight: 42,
+  borderRadius: 10,
+  backgroundColor: theme.colors.primary,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+  paddingHorizontal: 16,
+}
+
+const barcodeManualSearchText = {
+  color: theme.colors.primaryText,
+  fontWeight: '900' as const,
+}
+
+const barcodeManualCancelText = {
+  color: '#6B7280',
+  fontSize: 12,
+  fontWeight: '800' as const,
+  textDecorationLine: 'underline' as const,
+}
+
+const barcodeProductPanel = {
+  position: 'absolute' as const,
+  left: 16,
+  right: 16,
+  bottom: 110,
+  borderRadius: 18,
+  borderWidth: 1,
+  borderColor: '#E5E7EB',
+  backgroundColor: 'rgba(255,255,255,0.96)',
+  padding: 14,
+}
+
+const barcodeProductTitle = {
+  color: '#111827',
+  fontSize: 16,
+  fontWeight: '900' as const,
+}
+
+const barcodeProductMeta = {
+  color: '#6B7280',
+  marginTop: 4,
+  fontWeight: '700' as const,
+}
+
+const barcodeProductButton = {
+  marginTop: 10,
+  minHeight: 44,
+  borderRadius: 10,
+  backgroundColor: theme.colors.primary,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+}
+
+const barcodeProductButtonText = {
+  color: theme.colors.primaryText,
+  fontWeight: '900' as const,
+}
+
+const barcodeBottomBar = {
+  backgroundColor: '#F5F5F4',
+  borderTopWidth: 1,
+  borderTopColor: '#E5E7EB',
+  paddingTop: 14,
+  paddingHorizontal: 24,
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  justifyContent: 'space-evenly' as const,
+  gap: 24,
+}
+
+const barcodeBottomAction = {
+  flexDirection: 'row' as const,
+  alignItems: 'center' as const,
+  gap: 8,
+  paddingHorizontal: 10,
+  paddingVertical: 8,
+}
+
+const barcodeBottomActionText = {
+  color: '#1F2937',
+  fontSize: 13,
+  fontWeight: '900' as const,
+  textTransform: 'uppercase' as const,
 }
 
 const secondaryButton = {

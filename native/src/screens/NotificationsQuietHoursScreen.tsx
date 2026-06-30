@@ -1,15 +1,12 @@
-import React, { useEffect, useState } from 'react'
-import { Modal, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
+import React, { useEffect, useMemo, useState } from 'react'
+import { ActivityIndicator, Modal, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native'
 import { Feather } from '@expo/vector-icons'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
 
+import { API_BASE_URL } from '../config'
+import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
-
-const QUIET_ENABLED_KEY = 'quietHoursEnabled'
-const QUIET_START_KEY = 'quietHoursStart'
-const QUIET_END_KEY = 'quietHoursEnd'
 
 type QuietTimeKey = 'start' | 'end'
 
@@ -40,6 +37,14 @@ function formatDateToHHMM(value: Date) {
   const hour = String(value.getHours()).padStart(2, '0')
   const minute = String(value.getMinutes()).padStart(2, '0')
   return `${hour}:${minute}`
+}
+
+function detectDeviceTimezone() {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+  } catch {
+    return 'UTC'
+  }
 }
 
 function TimeRow({
@@ -82,34 +87,47 @@ function TimeRow({
 }
 
 export function NotificationsQuietHoursScreen() {
+  const { mode, session } = useAppMode()
   const [enabled, setEnabled] = useState(false)
   const [startTime, setStartTime] = useState('22:00')
   const [endTime, setEndTime] = useState('07:00')
-  const [loaded, setLoaded] = useState(false)
+  const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
+  const [saveState, setSaveState] = useState<'idle' | 'saved' | 'error'>('idle')
+  const [error, setError] = useState('')
   const [timePickerVisible, setTimePickerVisible] = useState(false)
   const [timePickerTarget, setTimePickerTarget] = useState<QuietTimeKey | null>(null)
   const [timePickerValue, setTimePickerValue] = useState(new Date())
+
+  const authHeaders = useMemo(() => {
+    if (mode !== 'signedIn' || !session?.token) return null
+    return { authorization: `Bearer ${session.token}` }
+  }, [mode, session?.token])
 
   useEffect(() => {
     let cancelled = false
 
     const load = async () => {
+      if (!authHeaders) {
+        setError('Please log in again to manage quiet hours.')
+        setLoading(false)
+        return
+      }
+
+      setLoading(true)
+      setError('')
       try {
-        const [savedEnabled, savedStart, savedEnd] = await Promise.all([
-          AsyncStorage.getItem(QUIET_ENABLED_KEY),
-          AsyncStorage.getItem(QUIET_START_KEY),
-          AsyncStorage.getItem(QUIET_END_KEY),
-        ])
-
+        const res = await fetch(`${API_BASE_URL}/api/notifications/quiet-hours`, { headers: authHeaders })
+        const data = await res.json().catch(() => ({} as any))
+        if (!res.ok) throw new Error(data?.error || 'Could not load quiet hours')
         if (cancelled) return
-
-        if (savedEnabled !== null) setEnabled(savedEnabled === 'true')
-        if (savedStart) setStartTime(normalizeTime(savedStart, '22:00'))
-        if (savedEnd) setEndTime(normalizeTime(savedEnd, '07:00'))
+        setEnabled(!!data?.enabled)
+        setStartTime(normalizeTime(data?.startTime, '22:00'))
+        setEndTime(normalizeTime(data?.endTime, '07:00'))
       } catch {
-        // ignore
+        if (!cancelled) setError('Could not load quiet hours.')
       } finally {
-        if (!cancelled) setLoaded(true)
+        if (!cancelled) setLoading(false)
       }
     }
 
@@ -117,17 +135,7 @@ export function NotificationsQuietHoursScreen() {
     return () => {
       cancelled = true
     }
-  }, [])
-
-  useEffect(() => {
-    if (!loaded) return
-
-    void AsyncStorage.multiSet([
-      [QUIET_ENABLED_KEY, enabled ? 'true' : 'false'],
-      [QUIET_START_KEY, startTime],
-      [QUIET_END_KEY, endTime],
-    ])
-  }, [enabled, startTime, endTime, loaded])
+  }, [authHeaders])
 
   const openTimePicker = (target: QuietTimeKey) => {
     if (!enabled) return
@@ -160,6 +168,42 @@ export function NotificationsQuietHoursScreen() {
     }
   }
 
+  const saveQuietHours = async () => {
+    if (!authHeaders) {
+      setSaveState('error')
+      setError('Please log in again to save quiet hours.')
+      return
+    }
+
+    setSaving(true)
+    setSaveState('idle')
+    setError('')
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/notifications/quiet-hours`, {
+        method: 'POST',
+        headers: {
+          ...authHeaders,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          enabled,
+          startTime,
+          endTime,
+          timezone: detectDeviceTimezone(),
+        }),
+      })
+      const data = await res.json().catch(() => ({} as any))
+      if (!res.ok) throw new Error(data?.error || 'Could not save quiet hours')
+      setSaveState('saved')
+      setTimeout(() => setSaveState('idle'), 1600)
+    } catch {
+      setSaveState('error')
+      setError('Could not save quiet hours.')
+    } finally {
+      setSaving(false)
+    }
+  }
+
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
@@ -176,35 +220,62 @@ export function NotificationsQuietHoursScreen() {
           <View style={{ gap: 6 }}>
             <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Quiet hours</Text>
             <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>
-              Pause reminders during set hours. Stored on this device for now.
+              Pause Health Coach alerts during your chosen hours.
             </Text>
           </View>
 
-          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <View style={{ flex: 1, paddingRight: 12 }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Enable quiet hours</Text>
-              <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12 }}>
-                Pause notifications overnight.
-              </Text>
+          {loading ? (
+            <View style={{ alignItems: 'center', paddingVertical: 24, gap: 8 }}>
+              <ActivityIndicator color={theme.colors.primary} />
+              <Text style={{ color: theme.colors.muted }}>Loading quiet hours...</Text>
             </View>
-            <Switch value={enabled} onValueChange={setEnabled} />
-          </View>
+          ) : (
+            <>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, paddingRight: 12 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Enable quiet hours</Text>
+                  <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12 }}>Pause alerts overnight.</Text>
+                </View>
+                <Switch value={enabled} onValueChange={setEnabled} />
+              </View>
 
-          <View style={{ gap: 12, opacity: enabled ? 1 : 0.5 }}>
-            <TimeRow
-              label="Quiet hours start"
-              value={startTime}
-              disabled={!enabled}
-              onPress={() => openTimePicker('start')}
-            />
+              <View style={{ gap: 12, opacity: enabled ? 1 : 0.5 }}>
+                <TimeRow
+                  label="Quiet hours start"
+                  value={startTime}
+                  disabled={!enabled}
+                  onPress={() => openTimePicker('start')}
+                />
 
-            <TimeRow
-              label="Quiet hours end"
-              value={endTime}
-              disabled={!enabled}
-              onPress={() => openTimePicker('end')}
-            />
-          </View>
+                <TimeRow
+                  label="Quiet hours end"
+                  value={endTime}
+                  disabled={!enabled}
+                  onPress={() => openTimePicker('end')}
+                />
+              </View>
+
+              <Pressable
+                onPress={() => void saveQuietHours()}
+                disabled={saving}
+                style={({ pressed }) => ({
+                  opacity: saving ? 0.65 : pressed ? 0.92 : 1,
+                  backgroundColor: theme.colors.primary,
+                  borderRadius: theme.radius.md,
+                  paddingVertical: 12,
+                  alignItems: 'center',
+                })}
+              >
+                <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>
+                  {saving ? 'Saving...' : 'Save quiet hours'}
+                </Text>
+              </Pressable>
+
+              {saveState === 'saved' ? <Text style={{ color: '#15803D', fontWeight: '800' }}>Quiet hours saved.</Text> : null}
+            </>
+          )}
+
+          {error ? <Text style={{ color: '#B91C1C', fontWeight: '700' }}>{error}</Text> : null}
         </View>
       </ScrollView>
 

@@ -1,21 +1,29 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
+
+async function getSymptomHistoryUser(request: NextRequest) {
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (nativeUserId) {
+    return prisma.user.findUnique({ where: { id: nativeUserId } })
+  }
+
+  const session = await getServerSession(authOptions)
+  const email = String(session?.user?.email || '').trim().toLowerCase()
+  if (!email) return null
+  return prisma.user.findUnique({ where: { email } })
+}
 
 export async function DELETE(
   request: NextRequest,
   { params }: { params: { id: string } }
 ) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.email) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    }
-
-    const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+    const user = await getSymptomHistoryUser(request)
     if (!user) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const analysisId = params.id

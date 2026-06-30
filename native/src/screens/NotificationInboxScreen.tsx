@@ -11,7 +11,6 @@ import {
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
-import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -277,11 +276,12 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
       }
 
       if (path.startsWith('/check-in')) {
-        openNativeTool(NATIVE_WEB_PAGES.dailyCheckIn.title, NATIVE_WEB_PAGES.dailyCheckIn.path)
+        navigation.navigate('DailyCheckIn', { tab: path.startsWith('/check-in/history') ? 'history' : 'today' })
         return
       }
       if (path.startsWith('/mood')) {
-        openNativeTool(NATIVE_WEB_PAGES.moodTracker.title, NATIVE_WEB_PAGES.moodTracker.path)
+        const tab = path.startsWith('/mood/history') ? 'history' : path.startsWith('/mood/journal') ? 'journal' : 'checkin'
+        navigation.navigate('MoodTracker', { tab })
         return
       }
       if (path.startsWith('/notifications/inbox')) {
