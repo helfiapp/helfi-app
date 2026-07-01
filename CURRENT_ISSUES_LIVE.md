@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 02 July 2026, 01:13 AM AEST
+- What changed: Restored the live website after `helfi.ai` had been pointed at the wrong Vercel app. Re-linked the real `helfi-app` project, restored the live settings, corrected the live database setting, redeployed, and updated the deployment checker so it refuses the wrong project in future.
+- Where to see it (page/link): https://helfi.ai/auth/signin and https://helfi.ai/dashboard
+- What to quickly test: Log in with the normal test account and confirm the dashboard opens.
+
+DEPLOYED:
 - LIVE or STAGING: TestFlight
 - Date/time: 30 June 2026, 10:25 AM AEST
 - What changed: Added iOS 1.0.0 build 24 to the Helfi Internal Testers group after Apple showed the upload as complete.

@@ -13,6 +13,16 @@ RUN_RENAME_GUARD="${RUN_RENAME_GUARD:-0}"
 MAX_WAIT=300  # Maximum wait time in seconds (5 minutes)
 POLL_INTERVAL=5  # Check every 5 seconds
 LIVE_DOMAINS=("helfi.ai" "www.helfi.ai")
+PROJECT_ID=""
+
+if [ -f ".vercel/project.json" ]; then
+  PROJECT_ID=$(python3 -c "import json; print(json.load(open('.vercel/project.json')).get('projectId',''))" 2>/dev/null)
+fi
+
+if [ -z "$PROJECT_ID" ]; then
+  echo "❌ Missing Vercel project ID. Run vercel link for the real helfi-app project first."
+  exit 1
+fi
 
 echo "🔍 Checking latest deployment status for Helfi production project..."
 echo "⏳ Waiting for deployment to complete (this may take 1-2 minutes)..."
@@ -31,7 +41,7 @@ while true; do
   fi
 
   RESPONSE=$(curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-    "https://api.vercel.com/v6/deployments?project=$PROJECT_SLUG&teamId=$TEAM_ID&target=$TARGET&limit=1")
+    "https://api.vercel.com/v6/deployments?projectId=$PROJECT_ID&teamId=$TEAM_ID&target=$TARGET&limit=1")
 
   if echo "$RESPONSE" | grep -q '"error"'; then
     echo "❌ Error checking deployment status:"
@@ -42,6 +52,14 @@ while true; do
   STATE=$(echo "$RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('deployments', [{}])[0].get('state', 'UNKNOWN'))" 2>/dev/null)
   URL=$(echo "$RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('deployments', [{}])[0].get('url', 'N/A'))" 2>/dev/null)
   READY_STATE=$(echo "$RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('deployments', [{}])[0].get('readyState', 'UNKNOWN'))" 2>/dev/null)
+  DEPLOYMENT_NAME=$(echo "$RESPONSE" | python3 -c "import sys, json; d=json.load(sys.stdin); print(d.get('deployments', [{}])[0].get('name', ''))" 2>/dev/null)
+
+  if [ "$DEPLOYMENT_NAME" != "$PROJECT_SLUG" ]; then
+    echo ""
+    echo "❌ Latest deployment is not the real helfi-app project: $DEPLOYMENT_NAME"
+    echo "   Refusing to verify or alias this deployment."
+    exit 1
+  fi
 
   # Only print state changes to avoid spam
   if [ "$STATE" != "$LAST_STATE" ]; then
