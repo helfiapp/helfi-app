@@ -60,6 +60,12 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(/Do not answer app-action requests from general knowledge/.test(__realtimeRouteSource), 'Realtime voice must not answer app actions as generic chat.')
   assert(/walking, running, steps, calories burned/.test(__realtimeRouteSource), 'Realtime voice must treat exercise steps/calories as app actions.')
   assert(/Do not invent or suggest a workout routine unless the user explicitly asks/.test(__realtimeRouteSource), 'Realtime voice must not turn exercise logging into invented workout routines.')
+  assert(__realtimeRouteSource.includes("'health_image_note'") && __realtimeRouteSource.includes("'insights'") && __realtimeRouteSource.includes("'navigate'"), 'Realtime voice tool schema must keep app handoff action names available.')
+  assert(normalizeRealtimeActionHint({ action: 'health_image_note', needsReview: false })?.action === 'app_handoff', 'Realtime health image note hints must map to the safe app handoff path.')
+  assert(normalizeRealtimeActionHint({ action: 'insights', needsReview: false })?.action === 'app_handoff', 'Realtime insights hints must map to the safe app handoff path.')
+  assert(normalizeRealtimeActionHint({ action: 'navigate', needsReview: false })?.action === 'app_handoff', 'Realtime navigation hints must map to the safe app handoff path.')
+  assert(normalizeRealtimeActionHint({ action: 'general_chat', needsReview: false })?.action === 'health_question', 'Realtime general chat hints must map to the safe health question path.')
+  assert(normalizeRealtimeActionHint({ action: 'health_journal', needsReview: true })?.action === 'journal', 'Realtime health journal hints must map to journal drafts.')
   if (__nativeSourcesAvailable) {
     assert(/conversation\.item\.input_audio_transcription\.completed/.test(__realtimeClientSource), 'Native realtime client must listen for spoken user transcripts.')
     assert(/response\.done/.test(__realtimeClientSource) && /response\.audio_transcript\.done/.test(__realtimeClientSource) && /response\.output_audio_transcript\.done/.test(__realtimeClientSource), 'Native realtime client must listen for completed assistant replies.')
