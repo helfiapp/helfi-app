@@ -42,6 +42,7 @@ function firstDeploymentUrl(output) {
 
 try {
   run('node', ['scripts/assert-talk-to-helfi-testflight-preflight.js'])
+  run('node', ['scripts/check-ios-distribution-signing.js'])
   run('node', ['scripts/check-vercel-ai-env.js'])
 } catch (error) {
   process.stderr.write(error?.stderr || error?.stdout || '')

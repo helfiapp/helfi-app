@@ -40,6 +40,7 @@ npm --prefix native run check:voice-assistant
 npm --prefix native run typecheck
 npm run check:talk-to-helfi-testflight
 npm --prefix native run check:talk-to-helfi-testflight
+node scripts/check-ios-distribution-signing.js
 npm run check:page-locks
 npm --prefix native run check:page-locks
 git diff --check
