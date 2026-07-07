@@ -1,6 +1,8 @@
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 
+const LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'
+
 type RealtimeCallbacks = {
   onStatus?: (status: string) => void
   onTranscript?: (text: string) => void
@@ -34,6 +36,11 @@ function sendRealtimeEvent(dataChannel: any, payload: Record<string, unknown>) {
   dataChannel.send(JSON.stringify(payload))
 }
 
+function realtimeApiBaseUrl() {
+  const isLocalDevHost = __DEV__ && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(API_BASE_URL)
+  return isLocalDevHost ? LIVE_REALTIME_API_BASE_URL : API_BASE_URL
+}
+
 export function hasNativeRealtimeVoiceSupport() {
   const rtc = requireWebRtc()
   return Boolean(rtc?.RTCPeerConnection && rtc?.mediaDevices)
@@ -45,7 +52,7 @@ export async function fetchHelfiRealtimeVoiceStatus(token: string): Promise<{
   code?: string
 }> {
   try {
-    const res = await fetch(`${API_BASE_URL}/api/native/voice-assistant/realtime`, {
+    const res = await fetch(`${realtimeApiBaseUrl()}/api/native/voice-assistant/realtime`, {
       method: 'GET',
       headers: buildNativeAuthHeaders(token),
     })
@@ -146,7 +153,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const offer = await pc.createOffer({})
   await pc.setLocalDescription(offer)
 
-  const res = await fetch(`${API_BASE_URL}/api/native/voice-assistant/realtime`, {
+  const res = await fetch(`${realtimeApiBaseUrl()}/api/native/voice-assistant/realtime`, {
     method: 'POST',
     headers: {
       ...buildNativeAuthHeaders(params.token),
