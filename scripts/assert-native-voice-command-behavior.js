@@ -1142,6 +1142,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert((misheardFavoriteMeal?.ingredients || []).length >= 2, 'Misheard voice meal logging must keep chicken and rice as separate review items.')
   const explicitFavoriteRequest = 'Log my saved Chicken Breast for lunch'
   assert(shouldUseFavoriteFood(explicitFavoriteRequest, chickenFavorite), 'Explicit saved/favourite wording must still use favourites.')
+  const clearFoodFavoriteRequest = 'Add chicken breast to lunch'
+  assert(shouldUseFavoriteFood(clearFoodFavoriteRequest, chickenFavorite), 'Clear food diary wording must still match named favourites even without saying favourite.')
   const pluralFavoriteRequest = "Please add Louis' breakfast from my favourites to breakfast in my food diary."
   const louieBreakfastFavorite = [{ label: "Louie's Breakfast", description: "Louie's Breakfast", meal: 'breakfast', nutrition: { calories: 315 } }]
   assert(shouldUseFavoriteFood(pluralFavoriteRequest, louieBreakfastFavorite), 'Plural favourites wording must still use the saved favourite fast path.')
@@ -1151,6 +1153,9 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
 	  const journalAfterLunchRequest = 'Write in my health journal that I felt tired after lunch today.'
 	  const lunchNamedFavorite = [{ label: 'For lunch', description: 'For lunch', meal: 'lunch', nutrition: { calories: 300 } }]
 	  assert(!shouldUseFavoriteFood(journalAfterLunchRequest, lunchNamedFavorite), 'Health journal wording must not be swallowed by a favourite named around lunch.')
+  assert(!shouldUseFavoriteFood('Log mood: tired after lunch', lunchNamedFavorite), 'Mood wording must not be swallowed by a meal-like favourite.')
+  assert(!shouldUseFavoriteFood('I had a headache after lunch', lunchNamedFavorite), 'Symptom wording must not be swallowed by a meal-like favourite.')
+  assert(!shouldUseFavoriteFood('Add 500 ml water', [{ label: '500', description: '500', meal: 'snacks', nutrition: { calories: 0 } }]), 'Water wording must not be swallowed by numeric favourites.')
 	  const foodContextHealthIntakeRequest = 'I take magnesium glycinate 200 mg at night and metformin 500 mg twice daily.'
 	  const misleadingDailyFavorite = [{ label: 'Daily to', description: 'Daily to', meal: 'breakfast', nutrition: { calories: 315 } }]
 	  assert(!shouldUseFavoriteFood(foodContextHealthIntakeRequest, misleadingDailyFavorite), 'Health Intake medication/supplement wording from Food Diary must not be swallowed by a favourite named Daily.')

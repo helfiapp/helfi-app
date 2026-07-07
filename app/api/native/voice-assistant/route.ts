@@ -1445,6 +1445,9 @@ function findRequestedFavorite(transcript: string, favorites: VoiceFoodFavorite[
 function shouldUseFavoriteFood(transcript: string, favorites: VoiceFoodFavorite[]) {
   const request = compactFoodMatchText(transcript)
   if (!request || favorites.length === 0) return false
+  const foodishFavoriteContext =
+    /\b(food|meal|breakfast|lunch|dinner|snacks?|favourites?|favorites?|saved foods?|saved meals?|eat|ate|eaten|diary)\b/i.test(transcript) ||
+    (/\b(add|log|record|track|put|input|save)\b/i.test(transcript) && /\b(to|for|as|into|in)\s+(?:my\s+)?(breakfast|lunch|dinner|snacks?|snack)\b/i.test(transcript))
   if (
     /\b(walk(?:ed|ing)?|run|running|ran|jog(?:ged|ging)?|bike(?:d|ing)?|cycl(?:e|ed|ing)|rode|riding|exercise(?:d)?|workout|steps?|step count)\b/i.test(transcript) &&
     /\b(burn(?:ed|t)?|calories?|kcal|steps?|walk(?:ed|ing)?|run|running|ran|jog(?:ged|ging)?)\b/i.test(transcript)
@@ -1457,9 +1460,10 @@ function shouldUseFavoriteFood(transcript: string, favorites: VoiceFoodFavorite[
     SUPPLEMENT_NAME_HINT_PATTERN.test(transcript) ||
     MEDICATION_NAME_HINT_PATTERN.test(transcript)
   if (!mentionsFavorite && looksLikeHealthIntake) return false
-  if (!mentionsFavorite && /\b(health journal|journal|mood|symptom|symptoms|medication|medicine|supplement|vitamin|health intake|health image|note)\b/i.test(transcript)) {
+  if (!mentionsFavorite && /\b(health journal|journal|mood|symptom|symptoms|headache|migraine|pain|nausea|dizzy|dizziness|fatigue|tired|medication|medicine|supplement|vitamin|health intake|health image|note)\b/i.test(transcript)) {
     return false
   }
+  if (!mentionsFavorite && !foodishFavoriteContext) return false
   const directFood = tryParseIngredientMealRequest(transcript) || tryParseDirectFoodRequest(transcript, { section: 'food', title: 'Food Diary' })
   if ((directFood?.ingredients || []).length > 1 && !mentionsFavorite) return false
   if (findRequestedFavorite(transcript, favorites)) return true
