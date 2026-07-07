@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 07 July 2026, 11:13 PM AEST
+- What changed: Fixed Talk to Helfi realtime exercise routing so walk/steps/calories requests are sent to the app action path instead of becoming invented workout chat. Exercise voice drafts now preserve spoken steps and calories.
+- Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
+- What to quickly test: In the iPhone simulator, open Talk to Helfi, start live voice, say “I did a walk and did 5,449 steps and burned 240 calories,” and confirm it prepares/logs an exercise action instead of suggesting a workout routine.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 07 July 2026, 08:13 PM AEST
 - What changed: Deployed Talk to Helfi realtime reply fixes so live voice explicitly requests spoken audio replies and captures assistant reply events.
 - Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
