@@ -62,6 +62,7 @@ assert(realtimeClient.includes('function stopMediaStreamTracks') && realtimeClie
 assert(realtimeClient.includes('stopTracks()') && realtimeClient.includes('pc.getTransceivers?.()'), 'Native realtime shutdown must stop WebRTC tracks and transceivers.')
 assert(realtimeClient.includes('enableRemoteAudioTrack') && realtimeClient.includes('track._setVolume?.(1)'), 'Native realtime must explicitly enable returned assistant audio tracks.')
 assert(realtimeClient.includes('handledToolCallIds') && voiceAssistant.includes('realtimeActionGuardRef'), 'Realtime app actions must be deduped in the client and UI layer.')
+assert(!realtimeRoute.includes("language: 'en'"), 'Realtime voice transcript config must not force English-only speech.')
 assert(voiceAssistant.includes('suppressSpokenReply: true'), 'Realtime app actions must not trigger duplicate fallback TTS playback.')
 assert(voiceAssistant.includes('safeToClaimSaved') && voiceAssistant.includes('function realtimeToolResult') && realtimeRoute.includes('safeToClaimSaved is not true'), 'Realtime app actions must return a safe spoken reply contract so the model cannot claim a review was saved.')
 assert(voiceAssistant.includes('realtimeVoiceConnectTimeoutRef') && voiceAssistant.includes('REALTIME_VOICE_CONNECT_TIMEOUT_MS = 30000') && voiceAssistant.includes('Live voice could not connect quickly enough'), 'Realtime startup must fail instead of hanging, but must allow slow WebRTC setup to finish.')

@@ -53,6 +53,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(isRejectingDraftText('не зачувувај'), 'Macedonian do-not-save must reject a reviewed draft.')
   assert(/any language, mixed languages, messy dictation/.test(__routeSource), 'AI command understanding must explicitly support any-language messy speech.')
   assert(__realtimeRouteSource.includes('transcription: {') && __realtimeRouteSource.includes('model: REALTIME_TRANSCRIPTION_MODEL'), 'Realtime voice must request input transcripts for the chat review after voice mode.')
+  assert(!__realtimeRouteSource.includes("language: 'en'"), 'Realtime voice transcripts must not force an English-only hint because Talk to Helfi supports messy and mixed-language speech.')
   assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
   assert(__realtimeRouteSource.includes("|| 'gpt-realtime-2.1'"), 'Realtime voice must default to the current documented OpenAI realtime model.')
   assert(__realtimeRouteSource.includes("type: 'semantic_vad'") && __realtimeRouteSource.includes("eagerness: 'low'") && __realtimeRouteSource.includes('interrupt_response: true'), 'Realtime voice turn-taking must use low-eagerness semantic VAD with natural interruption support.')

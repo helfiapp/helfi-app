@@ -133,7 +133,6 @@ function realtimeSessionConfig() {
       input: {
         transcription: {
           model: REALTIME_TRANSCRIPTION_MODEL,
-          language: 'en',
         },
         turn_detection: {
           type: 'semantic_vad',
