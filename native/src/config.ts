@@ -6,9 +6,11 @@ function normalizeApiBaseUrl(value: string | undefined): string {
   // Default to live so billing checkout always uses the working Stripe setup.
   if (!cleaned) return 'https://helfi.ai'
 
-  // Allow localhost during simulator/dev testing only.
+  // Localhost is opt-in only. Otherwise simulator/dev builds read the same live
+  // backend that Talk to Helfi writes to.
   const isLocalDevHost = /^(https?:\/\/localhost(:\d+)?|https?:\/\/127\.0\.0\.1(:\d+)?|http:\/\/10\.0\.2\.2(:\d+)?)$/i.test(cleaned)
-  if (isLocalDevHost && __DEV__) return cleaned
+  if (isLocalDevHost && __DEV__ && process.env.EXPO_PUBLIC_USE_LOCAL_API === 'true') return cleaned
+  if (isLocalDevHost) return 'https://helfi.ai'
 
   // Prevent accidental use of preview URLs in native app builds.
   // Preview deployments can have mismatched auth/billing behavior.

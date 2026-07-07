@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-07T10:07:54.589Z",
+  "generatedAt": "2026-07-07T10:12:29.014Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "bddc41af94cc818a2371937b3238662cc2ad3b52523aabf7d7c3f9993fd9ba44",
@@ -198,7 +198,7 @@
     "components/UsageMeter.tsx": "9c672d7b49a12a664187cdc7937996b57fc779e0222a96dc0a8e90ee7eed4a7f",
     "components/VoiceChat.tsx": "13fcee05c1bc320ff67eb717be0a70abd1ad000c5dac3bf53860e7bb352b2a74",
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
-    "native/src/config.ts": "81cfdb7a722c7b073eff5b1519268f6555fb0867f0737da0318b16810a43c7e6",
+    "native/src/config.ts": "b9081565de3694e029e92b1149e1412c8d5e322d5a2e2e68ba0963b6d0489428",
     "native/src/config/nativePageRoutes.ts": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f",
     "native/src/content/legal.ts": "338d30c5ace5fb8f1a3df72c824acb4dc886997002c6a265220e53d675a52bd9",
     "native/src/data/produceMeasurements.ts": "1c0985f90c573a5e84084497aa08e59354a67f6392c5c7127acf3bbac0470a13",
