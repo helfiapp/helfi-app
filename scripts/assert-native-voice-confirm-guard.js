@@ -224,6 +224,14 @@ if (
   failures.push('Realtime voice tool results must carry an explicit safe spoken reply and saved/not-saved instruction.')
 }
 
+if (
+  !/realtimeVoiceConnectedRef/.test(native) ||
+  !/realtimeVoiceConnectedRef\.current = true[\s\S]*?setRealtimeVoiceStatus\(\(current\) => \(current === 'speaking' \? 'speaking' : 'live'\)\)/.test(native) ||
+  !/if \(realtimeVoiceConnectedRef\.current\)[\s\S]*?setRealtimeVoiceStatus\(\(current\) => \(current === 'speaking' \? 'speaking' : 'live'\)\)/.test(native)
+) {
+  failures.push('Realtime voice must show Listening once WebRTC is ready and must not fall back to Connecting after it has connected.')
+}
+
 if (!/NOT_SAVED_MESSAGE\s*=\s*'No problem\. I have not saved anything\.'/.test(native) || (native.match(/requestVoiceReply\(NOT_SAVED_MESSAGE\)/g) || []).length < 3) {
   failures.push('Rejected or cancelled drafts with Spoken reply enabled must speak back that nothing was saved.')
 }

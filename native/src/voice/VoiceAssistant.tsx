@@ -1079,6 +1079,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
   const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceRunRef = useRef(0)
+  const realtimeVoiceConnectedRef = useRef(false)
   const realtimeVoiceConnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const realtimeActionGuardRef = useRef<RealtimeActionGuard | null>(null)
   const sendDraftRequestRef = useRef<DraftRequestHandler>(async () => ({ ok: false, message: 'Voice action is not ready yet.' }))
@@ -1231,6 +1232,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
 
   const stopRealtimeVoiceSession = useCallback(async () => {
     realtimeVoiceRunRef.current += 1
+    realtimeVoiceConnectedRef.current = false
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
     const abortController = realtimeVoiceAbortRef.current
@@ -1253,6 +1255,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const clearConversationMemory = useCallback(() => {
     spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
+    realtimeVoiceConnectedRef.current = false
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
@@ -1456,6 +1459,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const closePanel = useCallback(() => {
     spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
+    realtimeVoiceConnectedRef.current = false
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
@@ -1478,6 +1482,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       if (state === 'active') return
       spokenReplyRunRef.current += 1
       realtimeVoiceRunRef.current += 1
+      realtimeVoiceConnectedRef.current = false
       realtimeActionGuardRef.current = null
       clearRealtimeConnectTimeout()
       setContinuousVoiceSession(false)
@@ -2146,6 +2151,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setContinuousVoiceSession(true)
     const realtimeRunId = realtimeVoiceRunRef.current + 1
     realtimeVoiceRunRef.current = realtimeRunId
+    realtimeVoiceConnectedRef.current = false
     realtimeActionGuardRef.current = null
     const abortController = new AbortController()
     realtimeVoiceAbortRef.current?.abort()
@@ -2156,6 +2162,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     realtimeVoiceConnectTimeoutRef.current = setTimeout(() => {
       if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
       realtimeVoiceRunRef.current += 1
+      realtimeVoiceConnectedRef.current = false
       realtimeVoiceAbortRef.current?.abort()
       realtimeVoiceAbortRef.current = null
       realtimeVoiceStopRef.current = null
@@ -2184,22 +2191,30 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (status === 'live' || status === 'connected') {
               clearRealtimeConnectTimeout()
+              realtimeVoiceConnectedRef.current = true
               setRealtimeVoiceStatus('live')
               return
             }
             if (status === 'speaking') {
               clearRealtimeConnectTimeout()
+              realtimeVoiceConnectedRef.current = true
               setRealtimeVoiceStatus('speaking')
               return
             }
             if (status === 'closed' || status === 'disconnected') {
               clearRealtimeConnectTimeout()
+              realtimeVoiceConnectedRef.current = false
               setRealtimeVoiceStatus('closed')
               return
             }
             if (status === 'failed') {
               clearRealtimeConnectTimeout()
+              realtimeVoiceConnectedRef.current = false
               setRealtimeVoiceStatus('failed')
+              return
+            }
+            if (realtimeVoiceConnectedRef.current) {
+              setRealtimeVoiceStatus((current) => (current === 'speaking' ? 'speaking' : 'live'))
               return
             }
             setRealtimeVoiceStatus('connecting')
@@ -2249,6 +2264,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         await realtimeSession.stop().catch(() => {})
         return
       }
+      clearRealtimeConnectTimeout()
+      realtimeVoiceConnectedRef.current = true
+      setRealtimeVoiceStatus((current) => (current === 'speaking' ? 'speaking' : 'live'))
       realtimeVoiceStopRef.current = realtimeSession.stop
     } catch (error: any) {
       clearRealtimeConnectTimeout()
@@ -2256,6 +2274,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         realtimeVoiceAbortRef.current = null
       }
       if (realtimeVoiceRunRef.current !== realtimeRunId) return
+      realtimeVoiceConnectedRef.current = false
       setContinuousVoiceSession(false)
       setRealtimeVoiceStatus('failed')
       setRealtimeVoiceError(error?.message || 'Live voice could not start. Text and camera still work.')
@@ -2265,6 +2284,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const endVoiceSession = useCallback(() => {
     spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
+    realtimeVoiceConnectedRef.current = false
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
