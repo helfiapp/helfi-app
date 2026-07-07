@@ -54,6 +54,16 @@ function enableRemoteAudioTrack(track: any) {
   }
 }
 
+function stopMediaStreamTracks(stream: any) {
+  stream?.getTracks?.().forEach((track: any) => {
+    try {
+      track.stop?.()
+    } catch {
+      // Already stopped.
+    }
+  })
+}
+
 function realtimeEventId(payload: any) {
   return cleanText(payload?.response_id || payload?.response?.id || payload?.item_id || payload?.item?.id || payload?.id || payload?.event_id)
 }
@@ -149,6 +159,15 @@ export async function startHelfiRealtimeVoiceSession(params: {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
   })
   const localStream = await mediaDevices.getUserMedia({ audio: true, video: false })
+  if (params.signal?.aborted) {
+    stopMediaStreamTracks(localStream)
+    try {
+      pc.close()
+    } catch {
+      // Already closed.
+    }
+    throw new Error('Live voice session was stopped.')
+  }
   const remoteStreams: any[] = []
   localStream.getTracks().forEach((track: any) => pc.addTrack(track, localStream))
 
@@ -159,21 +178,9 @@ export async function startHelfiRealtimeVoiceSession(params: {
     callbacks.onStatus?.(status)
   }
   const stopTracks = () => {
-    localStream.getTracks().forEach((track: any) => {
-      try {
-        track.stop?.()
-      } catch {
-        // Already stopped.
-      }
-    })
+    stopMediaStreamTracks(localStream)
     remoteStreams.forEach((stream: any) => {
-      stream?.getTracks?.().forEach((track: any) => {
-        try {
-          track.stop?.()
-        } catch {
-          // Already stopped.
-        }
-      })
+      stopMediaStreamTracks(stream)
     })
     pc.getSenders?.().forEach((sender: any) => {
       try {

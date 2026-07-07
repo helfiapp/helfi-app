@@ -56,6 +56,7 @@ assert(vercelProductionEnvCheck.includes("'HELFI_VOICE_REALTIME_ENABLED'") && ve
 assert(voiceAssistant.includes('EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED') && voiceAssistant.includes('LIVE_VOICE_DISABLED_MESSAGE'), 'Native live voice must stay behind the build-time enable flag.')
 assert(realtimeRoute.includes('request.signal?.aborted') && realtimeRoute.includes('live_voice_cancelled'), 'Backend realtime startup must cancel cleanly before charging when the user closes voice.')
 assert(realtimeClient.includes('signal?: AbortSignal') && realtimeClient.includes('closeRealtimeConnection()'), 'Native realtime startup must be abortable and close the peer connection.')
+assert(realtimeClient.includes('function stopMediaStreamTracks') && realtimeClient.includes('if (params.signal?.aborted)') && realtimeClient.includes('stopMediaStreamTracks(localStream)'), 'Native realtime startup must stop microphone tracks if the user cancels while audio is still opening.')
 assert(realtimeClient.includes('stopTracks()') && realtimeClient.includes('pc.getTransceivers?.()'), 'Native realtime shutdown must stop WebRTC tracks and transceivers.')
 assert(realtimeClient.includes('enableRemoteAudioTrack') && realtimeClient.includes('track._setVolume?.(1)'), 'Native realtime must explicitly enable returned assistant audio tracks.')
 assert(realtimeClient.includes('handledToolCallIds') && voiceAssistant.includes('realtimeActionGuardRef'), 'Realtime app actions must be deduped in the client and UI layer.')
