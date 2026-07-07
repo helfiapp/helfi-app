@@ -18,6 +18,7 @@ const voiceRoute = read('app/api/native/voice-assistant/route.ts')
 const ttsRoute = read('app/api/native/voice-assistant/tts/route.ts')
 const voiceAssistant = read('native/src/voice/VoiceAssistant.tsx')
 const realtimeClient = read('native/src/voice/realtimeVoice.ts')
+const voiceConfig = read('lib/openai-voice-config.ts')
 const packageJson = JSON.parse(read('package.json'))
 const testflightBuilder = read('scripts/build-talk-to-helfi-testflight-ipa.sh')
 
@@ -33,10 +34,11 @@ assert(packageJson.scripts?.['build:talk-to-helfi-testflight:live']?.includes('l
 assert(testflightBuilder.includes('paused-safe|live-candidate') && testflightBuilder.includes('This script is local-only. It does not upload to TestFlight.'), 'Talk to Helfi IPA builder must separate paused and live candidates without Apple upload.')
 assert(testflightBuilder.includes('EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED="$LIVE_FLAG"'), 'Talk to Helfi live-candidate IPA must compile live voice with the explicit live flag.')
 
-assert(realtimeRoute.includes("const DEFAULT_VOICE = 'marin'"), 'Realtime voice must default to Marin, the closest available natural OpenAI API voice.')
-assert(voiceRoute.includes("const DEFAULT_VOICE = 'marin'"), 'Normal Talk to Helfi spoken replies must default to Marin.')
-assert(ttsRoute.includes("const DEFAULT_VOICE = 'marin'"), 'TTS route must default to Marin.')
-assert(realtimeRoute.includes('exactChatGptVoiceAvailable: false'), 'Realtime status must honestly report that exact ChatGPT voice names are not exposed by the API.')
+assert(voiceConfig.includes("const DEFAULT_HELFI_VOICE = 'marin'"), 'Talk to Helfi voices must default to Marin, the closest available natural OpenAI API voice.')
+assert(voiceConfig.includes("BEST_NATURAL_OPENAI_VOICES") && voiceConfig.includes("'marin'") && voiceConfig.includes("'cedar'"), 'Talk to Helfi voice selection must only prefer the best natural OpenAI API voices.')
+assert(realtimeRoute.includes('resolveHelfiRealtimeVoice()') && !realtimeRoute.includes('process.env.HELFI_VOICE_TTS_VOICE || DEFAULT_VOICE'), 'Realtime voice must not inherit an older TTS voice override such as Coral.')
+assert(voiceRoute.includes('resolveHelfiTtsVoice()') && ttsRoute.includes('resolveHelfiTtsVoice()'), 'Normal spoken replies must use the shared natural voice resolver.')
+assert(realtimeRoute.includes('exactChatGptVoiceAvailable()'), 'Realtime status must honestly report that exact ChatGPT voice names are not exposed by the API.')
 
 assert(realtimeRoute.includes('HELFI_VOICE_REALTIME_ENABLED') && realtimeRoute.includes('live_voice_paused'), 'Backend live voice must stay behind the server-side enable flag.')
 assert(voiceAssistant.includes('EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED') && voiceAssistant.includes('LIVE_VOICE_DISABLED_MESSAGE'), 'Native live voice must stay behind the build-time enable flag.')

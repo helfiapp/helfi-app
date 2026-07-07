@@ -20,6 +20,7 @@ source = source
   .filter((line) => !line.trim().startsWith('import '))
   .join('\n')
   .replace(/^export\s+/gm, '')
+source = `function resolveHelfiTtsVoice() { return 'marin' }\n${source}`
 
 const appended = `
 async function __runNativeVoiceCommandBehaviorAssertions() {

@@ -7,13 +7,13 @@ import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { CreditManager } from '@/lib/credit-system'
 import { logAiUsageEvent } from '@/lib/ai-usage-logger'
 import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
+import { exactChatGptVoiceAvailable, resolveHelfiRealtimeVoice } from '@/lib/openai-voice-config'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const REALTIME_MODEL = process.env.HELFI_VOICE_REALTIME_MODEL || 'gpt-realtime'
-const DEFAULT_VOICE = 'marin'
-const REALTIME_VOICE = process.env.HELFI_VOICE_REALTIME_VOICE || process.env.HELFI_VOICE_TTS_VOICE || DEFAULT_VOICE
+const REALTIME_VOICE = resolveHelfiRealtimeVoice()
 const REALTIME_TRANSCRIPTION_MODEL = process.env.HELFI_VOICE_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe'
 const REALTIME_SESSION_MIN_CREDITS = Number(process.env.HELFI_VOICE_REALTIME_SESSION_CREDITS || 10)
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
@@ -87,8 +87,8 @@ export async function GET(request: NextRequest) {
       available: true,
       model: REALTIME_MODEL,
       voice: REALTIME_VOICE,
-      exactChatGptVoiceAvailable: false,
-      voiceNote: 'ChatGPT app voices such as Juniper are not exposed as API voice names. Helfi is using the configured OpenAI API voice.',
+      exactChatGptVoiceAvailable: exactChatGptVoiceAvailable(),
+      voiceNote: 'ChatGPT app voices such as Juniper are not exposed as API voice names. Helfi is using Marin, the closest warm natural OpenAI API voice.',
     })
   } catch (error) {
     console.error('[native voice realtime] status failed', error)

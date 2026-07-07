@@ -16,6 +16,7 @@ import { signNativeVoiceDraft } from '@/lib/native-voice-review-token'
 import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
 import { createNativeVoicePromptHandoff } from '@/lib/native-voice-prompt-handoff'
 import { findHealthIntakeReviewMatch, type HealthIntakeReviewMatch } from '@/lib/health-intake-review-match'
+import { resolveHelfiTtsVoice } from '@/lib/openai-voice-config'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -25,7 +26,7 @@ const COMMAND_FAST_MODEL = process.env.HELFI_VOICE_COMMAND_FAST_MODEL || 'gpt-4o
 const FALLBACK_MODEL = process.env.HELFI_VOICE_COMMAND_FALLBACK_MODEL || 'gpt-5.2'
 const TRANSCRIBE_MODEL = process.env.HELFI_VOICE_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe'
 const TTS_MODEL = process.env.HELFI_VOICE_TTS_MODEL || 'gpt-4o-mini-tts'
-const DEFAULT_VOICE = 'marin'
+const TTS_VOICE = resolveHelfiTtsVoice()
 const SIMPLE_MIN_CREDITS = 3
 const VOICE_REPLY_MIN_CREDITS = 2
 const RECIPE_MIN_CREDITS = 10
@@ -4054,7 +4055,7 @@ async function speak(openai: OpenAI, text: string, userId: string) {
   })
   const response = await openai.audio.speech.create({
     model: TTS_MODEL,
-    voice: process.env.HELFI_VOICE_TTS_VOICE || DEFAULT_VOICE,
+    voice: TTS_VOICE,
     input: speechText,
     instructions:
       'Speak like a warm, calm health coach. Sound natural and conversational, with gentle energy and smooth pacing. Avoid a robotic or announcer style.',
