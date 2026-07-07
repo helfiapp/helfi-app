@@ -1030,6 +1030,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const autoSubmittedRef = useRef(0)
   const conversationTurnSeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
+  const spokenReplyRunRef = useRef(0)
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
   const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceRunRef = useRef(0)
@@ -1168,6 +1169,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const setVoiceReplyPreference = useCallback((value: boolean) => {
     setVoiceReply(value)
     if (!value) {
+      spokenReplyRunRef.current += 1
       setContinuousVoiceSession(false)
       setSpokenReplyStatus('idle')
     }
@@ -1204,6 +1206,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [clearRealtimeConnectTimeout])
 
   const clearConversationMemory = useCallback(() => {
+    spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
@@ -1221,11 +1224,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [clearRealtimeConnectTimeout, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
   const playAudio = useCallback(
-    async (audioUri?: string | null) => {
+    async (audioUri?: string | null, shouldKeepPlaying: () => boolean = () => true) => {
       if (!audioUri) return false
       try {
+        if (!shouldKeepPlaying()) return false
         await stopPlayback()
         const uri = await playableAudioUri(audioUri)
+        if (!shouldKeepPlaying()) return false
         await Audio.setAudioModeAsync({
           allowsRecordingIOS: false,
           playsInSilentModeIOS: true,
@@ -1233,11 +1238,17 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           shouldDuckAndroid: true,
         }).catch(() => {})
         const created = await Audio.Sound.createAsync({ uri }, { shouldPlay: true })
+        if (!shouldKeepPlaying()) {
+          await created.sound.unloadAsync().catch(() => {})
+          return false
+        }
         soundRef.current = created.sound
         created.sound.setOnPlaybackStatusUpdate((status: any) => {
           if (status?.didJustFinish) {
             setSpokenReplyStatus('idle')
-            resumeVoiceSessionListening()
+            if (shouldKeepPlaying()) {
+              resumeVoiceSessionListening()
+            }
           }
         })
         setSpokenReplyStatus('playing')
@@ -1254,17 +1265,26 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const requestVoiceReply = useCallback(
     async (text: string) => {
       if (!session?.token || !text.trim()) return false
+      const spokenReplyRunId = spokenReplyRunRef.current + 1
+      spokenReplyRunRef.current = spokenReplyRunId
+      const shouldKeepPlaying = () => (
+        spokenReplyRunRef.current === spokenReplyRunId &&
+        openRef.current &&
+        AppState.currentState === 'active'
+      )
       try {
         setSpokenReplyStatus('preparing')
         if (!(await hasAiDataSharingPermission())) {
-          setSpokenReplyStatus('idle')
+          if (shouldKeepPlaying()) setSpokenReplyStatus('idle')
           return false
         }
+        if (!shouldKeepPlaying()) return false
         const { res, data } = await fetchNativeVoiceTts((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-tts`, {
           method: 'POST',
           headers: buildNativeAuthHeaders(session.token, { json: true }),
           body: JSON.stringify({ text, aiConsentGranted: true }),
         }))
+        if (!shouldKeepPlaying()) return false
         if (!res.ok) {
           console.warn('[voice assistant] spoken reply request failed', res.status, cleanFavoriteText(data?.error || '', 160))
           setSpokenReplyStatus('unavailable')
@@ -1277,13 +1297,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           return (current || 0) + extra
         })
         if (data?.audio) {
-          return await playAudio(String(data.audio))
+          return await playAudio(String(data.audio), shouldKeepPlaying)
         }
         console.warn('[voice assistant] spoken reply response had no audio')
         setSpokenReplyStatus('unavailable')
         resumeVoiceSessionListening(900)
         return false
       } catch (error: any) {
+        if (!shouldKeepPlaying()) return false
         console.warn('[voice assistant] spoken reply request failed', String(error?.message || error || 'unknown error'))
         setSpokenReplyStatus('unavailable')
         resumeVoiceSessionListening(900)
@@ -1388,6 +1409,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [open, session?.token, voiceRecordingSupported])
 
   const closePanel = useCallback(() => {
+    spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
@@ -1409,6 +1431,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return
+      spokenReplyRunRef.current += 1
       realtimeVoiceRunRef.current += 1
       realtimeActionGuardRef.current = null
       clearRealtimeConnectTimeout()
@@ -2195,6 +2218,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [appendConversationTurns, checkingRealtimeVoice, clearRealtimeConnectTimeout, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, voiceRecordingSupported])
 
   const endVoiceSession = useCallback(() => {
+    spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
