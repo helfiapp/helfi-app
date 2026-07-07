@@ -6,6 +6,7 @@
     "check:page-locks": "node ../scripts/check-page-locks.js --scope=native-ui",
     "check:practitioner-lock": "bash scripts/check-practitioner-native-lock.sh",
     "check:voice-assistant": "node ../scripts/assert-native-voice-confirm-guard.js && node ../scripts/assert-native-voice-command-behavior.js",
+    "check:talk-to-helfi-testflight": "node ../scripts/assert-talk-to-helfi-testflight-preflight.js",
     "start": "npm run check:page-locks && npm run check:voice-assistant && npm run check:practitioner-lock && expo start",
     "android": "npm run check:page-locks && npm run check:voice-assistant && npm run check:practitioner-lock && expo run:android",
     "ios": "npm run check:page-locks && npm run check:voice-assistant && npm run check:practitioner-lock && expo run:ios",
