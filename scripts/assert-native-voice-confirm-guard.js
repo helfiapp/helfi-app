@@ -128,8 +128,11 @@ if (!/const \[voiceReply,\s*setVoiceReply\]\s*=\s*useState\(true\)/.test(native)
   failures.push('Talk to Helfi must default to spoken replies unless the user explicitly turns speech off.')
 }
 
-if (!/const shouldSpeakReply = Boolean\(options\?\.audioUri \|\| voiceReply\)/.test(native) || !/form\.append\('voiceReply',\s*shouldSpeakReply \? 'true' : 'false'\)/.test(native) || !/voiceReply:\s*shouldSpeakReply/.test(native)) {
+if (!/const shouldSpeakReply = !options\?\.suppressSpokenReply && Boolean\(options\?\.audioUri \|\| voiceReply\)/.test(native) || !/form\.append\('voiceReply',\s*shouldSpeakReply \? 'true' : 'false'\)/.test(native) || !/voiceReply:\s*shouldSpeakReply/.test(native)) {
   failures.push('Microphone requests in Talk to Helfi must speak back even if an old text-only preference exists.')
+}
+if (!/suppressSpokenReply:\s*true/.test(native)) {
+  failures.push('Realtime live voice app actions must not also play the fallback spoken-reply voice.')
 }
 
 if (
@@ -279,8 +282,8 @@ if (
   !/Draft currently being reviewed/.test(route) ||
   !/correcting the draft currently being reviewed/.test(route) ||
   !/preserve any details the user did not change/.test(route) ||
-  !/runJsonCommandModel\(aiIntentClient,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft\)/.test(route) ||
-  !/runJsonCommandModel\(openai,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft\)/.test(route)
+  !/runJsonCommandModel\(aiIntentClient,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft(?:,\s*realtimeActionHint)?\)/.test(route) ||
+  !/runJsonCommandModel\(openai,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft(?:,\s*realtimeActionHint)?\)/.test(route)
 ) {
   failures.push('Native Talk to Helfi must show the reviewed draft to AI so correction requests can revise it safely.')
 }

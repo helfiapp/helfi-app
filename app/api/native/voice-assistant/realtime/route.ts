@@ -12,10 +12,13 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const REALTIME_MODEL = process.env.HELFI_VOICE_REALTIME_MODEL || 'gpt-realtime'
-const REALTIME_VOICE = process.env.HELFI_VOICE_REALTIME_VOICE || process.env.HELFI_VOICE_TTS_VOICE || 'coral'
+const DEFAULT_VOICE = 'marin'
+const REALTIME_VOICE = process.env.HELFI_VOICE_REALTIME_VOICE || process.env.HELFI_VOICE_TTS_VOICE || DEFAULT_VOICE
 const REALTIME_TRANSCRIPTION_MODEL = process.env.HELFI_VOICE_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe'
 const REALTIME_SESSION_MIN_CREDITS = Number(process.env.HELFI_VOICE_REALTIME_SESSION_CREDITS || 10)
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
+const REALTIME_VOICE_ENABLED = process.env.HELFI_VOICE_REALTIME_ENABLED === 'true'
+const REALTIME_VOICE_PAUSED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
 
 function hasAiConsentFlag(value: unknown) {
   const text = String(value || '').trim().toLowerCase()
@@ -54,6 +57,14 @@ export async function GET(request: NextRequest) {
     const user = await resolveUser(request)
     if (!user) return NextResponse.json({ available: false, error: 'Unauthorized' }, { status: 401 })
 
+    if (!REALTIME_VOICE_ENABLED) {
+      return NextResponse.json({
+        available: false,
+        code: 'live_voice_paused',
+        message: REALTIME_VOICE_PAUSED_MESSAGE,
+      })
+    }
+
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({
         available: false,
@@ -76,6 +87,8 @@ export async function GET(request: NextRequest) {
       available: true,
       model: REALTIME_MODEL,
       voice: REALTIME_VOICE,
+      exactChatGptVoiceAvailable: false,
+      voiceNote: 'ChatGPT app voices such as Juniper are not exposed as API voice names. Helfi is using the configured OpenAI API voice.',
     })
   } catch (error) {
     console.error('[native voice realtime] status failed', error)
@@ -106,6 +119,9 @@ function realtimeSessionConfig() {
       'Do not answer app-action requests from general knowledge. The app tool must prepare the draft, save result, handoff, or clarification first.',
       'App actions include food, favourites/favorites, build meal, water, exercise, walking, running, steps, calories burned, symptoms, health journal, mood, Health Intake medication/supplement drafts, health image notes, insights, and navigation.',
       'For exercise logging such as "I did a walk", "I walked 5449 steps", or "I burned 240 calories", call request_helfi_action with action "exercise". Do not invent or suggest a workout routine unless the user explicitly asks for a routine or workout plan.',
+      'If the tool returns needsReview, tell the user briefly that the review is ready and ask if they want to save it. Do not say it was saved.',
+      'If the tool returns saved true, then and only then say it was saved.',
+      'If the tool returns an open_screen or handoff result, tell the user what app screen is ready.',
       'If the transcript is unclear, ask one short clarification instead of guessing or creating a routine.',
     ].join('\n'),
     audio: {
@@ -145,12 +161,14 @@ function realtimeSessionConfig() {
                 'food_build_meal',
                 'water',
                 'exercise',
+                'journal',
                 'symptom_note',
-                'health_journal',
-                'mood_journal',
+                'mood',
                 'health_intake_items',
                 'health_image_note',
+                'insights',
                 'navigate',
+                'general_chat',
                 'unknown',
               ],
             },
@@ -168,9 +186,16 @@ function realtimeSessionConfig() {
 }
 
 export async function POST(request: NextRequest) {
+  const abortController = new AbortController()
+  const abortRealtimeRequest = () => abortController.abort()
+  request.signal?.addEventListener?.('abort', abortRealtimeRequest)
   try {
     const user = await resolveUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+    if (!REALTIME_VOICE_ENABLED) {
+      return NextResponse.json({ error: REALTIME_VOICE_PAUSED_MESSAGE, code: 'live_voice_paused' }, { status: 503 })
+    }
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
@@ -205,6 +230,7 @@ export async function POST(request: NextRequest) {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         'OpenAI-Safety-Identifier': safetyIdentifier(user.id),
       },
+      signal: abortController.signal,
       body: form,
     })
 
@@ -212,6 +238,10 @@ export async function POST(request: NextRequest) {
     if (!realtimeRes.ok) {
       console.error('[native voice realtime] session failed', realtimeRes.status, answerSdp.slice(0, 400))
       return NextResponse.json({ error: 'Live voice session could not start' }, { status: 502 })
+    }
+
+    if (request.signal?.aborted) {
+      return NextResponse.json({ error: 'Live voice session was cancelled before it started.', code: 'live_voice_cancelled' }, { status: 499 })
     }
 
     const charged = await new CreditManager(user.id).chargeCents(chargeCents)
@@ -240,6 +270,9 @@ export async function POST(request: NextRequest) {
       },
     })
   } catch (error) {
+    if ((error as any)?.name === 'AbortError' || abortController.signal.aborted || request.signal?.aborted) {
+      return NextResponse.json({ error: 'Live voice session was cancelled before it started.', code: 'live_voice_cancelled' }, { status: 499 })
+    }
     if (isAiSafetyError(error)) {
       return NextResponse.json(
         { error: 'AI voice is temporarily paused because usage climbed too fast. Please try again shortly.' },
@@ -248,5 +281,7 @@ export async function POST(request: NextRequest) {
     }
     console.error('[native voice realtime] failed', error)
     return NextResponse.json({ error: 'Live voice session failed' }, { status: 500 })
+  } finally {
+    request.signal?.removeEventListener?.('abort', abortRealtimeRequest)
   }
 }

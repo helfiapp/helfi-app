@@ -115,9 +115,29 @@ type SpokenReplyStatus = 'idle' | 'preparing' | 'playing' | 'failed' | 'unavaila
 type BottleLabelImageAsset = { uri: string; fileName?: string | null; mimeType?: string | null }
 type StopRecordingOptions = { continueSession?: boolean }
 type RealtimeVoiceStatus = 'idle' | 'connecting' | 'live' | 'speaking' | 'closed' | 'failed' | 'fallback'
-type DraftRequestResult = { ok: boolean; message: string; saved?: boolean; needsReview?: boolean; action?: string }
-type DraftRequestOptions = { audioUri?: string; durationMillis?: number; transcriptOverride?: string; continuousVoice?: boolean }
+type RealtimeActionHint = { action?: string; needsReview?: boolean }
+type DraftRequestResult = {
+  ok: boolean
+  message: string
+  saved?: boolean
+  needsReview?: boolean
+  action?: string
+  status?: 'needs_clarification' | 'review_draft' | 'saved' | 'open_screen' | 'safe_refusal' | 'general_answer'
+}
+type DraftRequestOptions = {
+  audioUri?: string
+  durationMillis?: number
+  transcriptOverride?: string
+  continuousVoice?: boolean
+  realtimeActionHint?: RealtimeActionHint
+  suppressSpokenReply?: boolean
+}
 type DraftRequestHandler = (options?: DraftRequestOptions) => Promise<DraftRequestResult>
+type RealtimeActionGuard = {
+  key: string
+  startedAt: number
+  promise: Promise<DraftRequestResult>
+}
 
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
 const VOICE_REPLY_KEY = 'helfi_voice_reply_enabled_v1'
@@ -128,7 +148,9 @@ const MAX_VOICE_FAVORITES = 120
 const VOICE_ASSISTANT_OPENING_EVENT = 'helfi:voice-assistant-opening'
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
 const VOICE_ACCESS_FALLBACK_API_BASE_URL = 'https://helfi.ai'
-const SPOKEN_REPLY_VOICE_NAME = 'Coral'
+const SPOKEN_REPLY_VOICE_NAME = 'Marin'
+const LIVE_VOICE_ENABLED = process.env.EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED === 'true'
+const LIVE_VOICE_DISABLED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
 const NOT_SAVED_MESSAGE = 'No problem. I have not saved anything.'
 const VOICE_TURN_SILENCE_MS = 750
 const VOICE_TURN_MIN_MS = 650
@@ -148,6 +170,21 @@ function normalizeLaunchContext(input?: VoiceAssistantLaunchContext | null): Voi
     meal: cleanFavoriteText(input.meal || '', 40).toLowerCase() || undefined,
     date: ISO_DATE_PATTERN.test(date) ? date : undefined,
   }
+}
+
+function voiceResultStatusFromDraft(nextDraft: VoiceDraft | null, data?: any): DraftRequestResult['status'] {
+  if (data?.confirmNow) return 'saved'
+  if (data?.rejectNow) return 'general_answer'
+  if (!nextDraft) return 'general_answer'
+  if (nextDraft.canConfirm) return 'review_draft'
+  if (nextDraft.appTarget?.path) return 'open_screen'
+  if (/urgent|emergency|clinician|qualified health professional|not medical advice|not diagnose/i.test(nextDraft.confirmationMessage || '')) {
+    return 'safe_refusal'
+  }
+  if (/what|which|how much|please tell me|try naming/i.test(nextDraft.confirmationMessage || '')) {
+    return 'needs_clarification'
+  }
+  return 'general_answer'
 }
 
 function mealLabel(value?: string | null) {
@@ -979,6 +1016,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [realtimeVoiceStatus, setRealtimeVoiceStatus] = useState<RealtimeVoiceStatus>('idle')
   const [realtimeVoiceError, setRealtimeVoiceError] = useState('')
   const [realtimeVoiceAvailable, setRealtimeVoiceAvailable] = useState<boolean | null>(null)
+  const [realtimeVoiceName, setRealtimeVoiceName] = useState(SPOKEN_REPLY_VOICE_NAME)
   const [checkingRealtimeVoice, setCheckingRealtimeVoice] = useState(false)
   const [voiceReply, setVoiceReply] = useState(true)
   const [spokenReplyStatus, setSpokenReplyStatus] = useState<SpokenReplyStatus>('idle')
@@ -993,6 +1031,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const conversationTurnSeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
+  const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
+  const realtimeVoiceRunRef = useRef(0)
+  const realtimeVoiceConnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const realtimeActionGuardRef = useRef<RealtimeActionGuard | null>(null)
   const sendDraftRequestRef = useRef<DraftRequestHandler>(async () => ({ ok: false, message: 'Voice action is not ready yet.' }))
   const openRef = useRef(false)
   const voiceSessionActiveRef = useRef(false)
@@ -1029,6 +1071,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     }
     silenceStartedAtRef.current = 0
     heardSpeechInTurnRef.current = false
+  }, [])
+
+  const clearRealtimeConnectTimeout = useCallback(() => {
+    if (realtimeVoiceConnectTimeoutRef.current) {
+      clearTimeout(realtimeVoiceConnectTimeoutRef.current)
+      realtimeVoiceConnectTimeoutRef.current = null
+    }
   }, [])
 
   const makeConversationTurn = useCallback((role: VoiceConversationTurn['role'], value: unknown): VoiceConversationTurn | null => {
@@ -1134,6 +1183,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [])
 
   const stopRealtimeVoiceSession = useCallback(async () => {
+    realtimeVoiceRunRef.current += 1
+    realtimeActionGuardRef.current = null
+    clearRealtimeConnectTimeout()
+    const abortController = realtimeVoiceAbortRef.current
+    realtimeVoiceAbortRef.current = null
+    abortController?.abort()
     const stop = realtimeVoiceStopRef.current
     realtimeVoiceStopRef.current = null
     setRealtimeVoiceStatus('idle')
@@ -1146,9 +1201,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
     }).catch(() => {})
-  }, [])
+  }, [clearRealtimeConnectTimeout])
 
   const clearConversationMemory = useCallback(() => {
+    realtimeVoiceRunRef.current += 1
+    realtimeActionGuardRef.current = null
+    clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
     void stopRealtimeVoiceSession()
     setConversationTurns([])
@@ -1160,7 +1218,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setSpokenReplyStatus('idle')
     stopPlayback().catch(() => {})
     AsyncStorage.removeItem(VOICE_CONVERSATION_MEMORY_KEY).catch(() => {})
-  }, [setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+  }, [clearRealtimeConnectTimeout, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
   const playAudio = useCallback(
     async (audioUri?: string | null) => {
@@ -1274,6 +1332,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setRealtimeVoiceStatus('idle')
     setRealtimeVoiceError('')
     setRealtimeVoiceAvailable(null)
+    setRealtimeVoiceName(SPOKEN_REPLY_VOICE_NAME)
     setCheckingRealtimeVoice(false)
     setContinuousVoiceSession(false)
     setVoiceReplyPreference(true)
@@ -1291,12 +1350,21 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
 
   useEffect(() => {
     if (!open || !session?.token || !voiceRecordingSupported) return
+    if (!LIVE_VOICE_ENABLED) {
+      setRealtimeVoiceAvailable(false)
+      setRealtimeVoiceStatus('failed')
+      setRealtimeVoiceError(LIVE_VOICE_DISABLED_MESSAGE)
+      return
+    }
     let cancelled = false
     setCheckingRealtimeVoice(true)
     fetchHelfiRealtimeVoiceStatus(session.token)
       .then((status) => {
         if (cancelled) return
         setRealtimeVoiceAvailable(status.available)
+        if (status.voice) {
+          setRealtimeVoiceName(status.voice.charAt(0).toUpperCase() + status.voice.slice(1))
+        }
         if (status.available) {
           setRealtimeVoiceError('')
           setRealtimeVoiceStatus('idle')
@@ -1320,6 +1388,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [open, session?.token, voiceRecordingSupported])
 
   const closePanel = useCallback((options?: { keepPlayback?: boolean }) => {
+    realtimeVoiceRunRef.current += 1
+    realtimeActionGuardRef.current = null
+    clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
     void stopRealtimeVoiceSession()
     clearVoiceTurnTimers()
@@ -1334,7 +1405,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       stopPlayback().catch(() => {})
     }
     setOpen(false)
-  }, [clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+  }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
   const submitHealthIntakeBottleImage = useCallback(
     async (itemType: 'supplement' | 'medication', asset: BottleLabelImageAsset) => {
@@ -1662,6 +1733,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         return {
           ok: Boolean(saved),
           saved: Boolean(saved),
+          status: saved ? 'saved' : 'general_answer',
           message: saved?.result?.message || (saved ? 'Saved.' : 'I could not save that.'),
           action: draft.action,
         }
@@ -1675,13 +1747,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           void requestVoiceReply(NOT_SAVED_MESSAGE)
         }
         Alert.alert('Not saved', NOT_SAVED_MESSAGE)
-        return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, action: draft.action }
+        return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: draft.action }
       }
       const nextFollowUpTranscript = options?.audioUri || explicitNewCommand
         ? null
         : followUpTranscript(pendingFollowUpDraft, rawTypedTranscript)
       const typedTranscript = nextFollowUpTranscript || rawTypedTranscript
-      const shouldSpeakReply = Boolean(options?.audioUri || voiceReply)
+      const shouldSpeakReply = !options?.suppressSpokenReply && Boolean(options?.audioUri || voiceReply)
       if (!options?.audioUri && !typedTranscript) {
         Alert.alert('Nothing heard', 'Please record or type a request first.')
         return { ok: false, message: 'Nothing heard.' }
@@ -1724,6 +1796,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             form.append('conversationHistory', JSON.stringify(requestConversationHistory))
             if (confirmationDraftPayload) form.append('confirmationDraft', JSON.stringify(confirmationDraftPayload))
             if (followUpDraftPayload) form.append('followUpDraft', JSON.stringify(followUpDraftPayload))
+            if (options.realtimeActionHint?.action) form.append('realtimeActionHint', JSON.stringify(options.realtimeActionHint))
             form.append('aiConsentGranted', 'true')
             return fetch(`${baseUrl}/api/native-voice-assistant`, {
               method: 'POST',
@@ -1745,6 +1818,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               conversationHistory: requestConversationHistory,
               confirmationDraft: confirmationDraftPayload,
               followUpDraft: followUpDraftPayload,
+              realtimeActionHint: options?.realtimeActionHint?.action ? options.realtimeActionHint : undefined,
               aiConsentGranted: true,
             }),
           }))
@@ -1774,6 +1848,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           return {
             ok: Boolean(saved),
             saved: Boolean(saved),
+            status: saved ? 'saved' : 'general_answer',
             message: saved?.result?.message || (saved ? 'Saved.' : 'I could not save that.'),
             action: nextDraft.action,
           }
@@ -1785,7 +1860,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             void requestVoiceReply(NOT_SAVED_MESSAGE)
           }
           Alert.alert('Not saved', NOT_SAVED_MESSAGE)
-          return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, action: nextDraft?.action }
+          return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: nextDraft?.action }
         }
         if (shouldSpeakReply && nextDraft) {
           const speechText = nextDraft?.recipe?.text || nextDraft?.confirmationMessage || nextDraft?.summary || ''
@@ -1795,6 +1870,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           ok: true,
           saved: false,
           needsReview: Boolean(nextDraft?.canConfirm),
+          status: voiceResultStatusFromDraft(nextDraft, data),
           action: nextDraft?.action,
           message: assistantText || (nextDraft ? 'Review is ready.' : 'Done.'),
         }
@@ -1949,6 +2025,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [stopRecording])
 
   const startVoiceSession = useCallback(async () => {
+    if (!LIVE_VOICE_ENABLED) {
+      setRealtimeVoiceAvailable(false)
+      setRealtimeVoiceStatus('failed')
+      setRealtimeVoiceError(LIVE_VOICE_DISABLED_MESSAGE)
+      return
+    }
     if (!voiceRecordingSupported) {
       Alert.alert('Type your request instead', 'Voice input is iPhone only for now. You can type your request here on iPad.')
       return
@@ -1975,8 +2057,31 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     }
     setVoiceReplyPreference(true)
     setContinuousVoiceSession(true)
+    const realtimeRunId = realtimeVoiceRunRef.current + 1
+    realtimeVoiceRunRef.current = realtimeRunId
+    realtimeActionGuardRef.current = null
+    const abortController = new AbortController()
+    realtimeVoiceAbortRef.current?.abort()
+    realtimeVoiceAbortRef.current = abortController
     setRealtimeVoiceStatus('connecting')
     setRealtimeVoiceError('')
+    clearRealtimeConnectTimeout()
+    realtimeVoiceConnectTimeoutRef.current = setTimeout(() => {
+      if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+      realtimeVoiceRunRef.current += 1
+      realtimeVoiceAbortRef.current?.abort()
+      realtimeVoiceAbortRef.current = null
+      realtimeVoiceStopRef.current = null
+      setContinuousVoiceSession(false)
+      setRealtimeVoiceStatus('failed')
+      setRealtimeVoiceError('Live voice could not connect quickly enough. Please try again after it is rebuilt.')
+      void Audio.setAudioModeAsync({
+        allowsRecordingIOS: false,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: false,
+        shouldDuckAndroid: true,
+      }).catch(() => {})
+    }, 15000)
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -1986,51 +2091,94 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       }).catch(() => {})
       const realtimeSession = await startHelfiRealtimeVoiceSession({
         token: session.token,
+        signal: abortController.signal,
         callbacks: {
           onStatus: (status) => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (status === 'live' || status === 'connected') {
+              clearRealtimeConnectTimeout()
               setRealtimeVoiceStatus('live')
               return
             }
             if (status === 'speaking') {
+              clearRealtimeConnectTimeout()
               setRealtimeVoiceStatus('speaking')
               return
             }
             if (status === 'closed' || status === 'disconnected') {
+              clearRealtimeConnectTimeout()
               setRealtimeVoiceStatus('closed')
               return
             }
             if (status === 'failed') {
+              clearRealtimeConnectTimeout()
               setRealtimeVoiceStatus('failed')
               return
             }
             setRealtimeVoiceStatus('connecting')
           },
           onTranscript: (text) => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (!text) return
             setTranscript(text)
             appendConversationTurns([makeConversationTurn('user', text)])
           },
           onAssistantText: (text) => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (!text) return
             appendConversationTurns([makeConversationTurn('assistant', text)])
           },
           onActionRequest: (args) => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) {
+              return { ok: false, message: 'Live voice has stopped.' }
+            }
             const request = cleanFavoriteText(args.request || '', 2000)
             if (!request) return { ok: false, message: 'No app action was requested.' }
-            return sendDraftRequestRef.current({ transcriptOverride: request })
+            const action = cleanFavoriteText(args.action || '', 40)
+            const guardKey = `${action.toLowerCase()}|${request.toLowerCase()}|${Boolean(args.needsReview)}`
+            const guard = realtimeActionGuardRef.current
+            if (guard?.key === guardKey && Date.now() - guard.startedAt < 5000) {
+              return guard.promise
+            }
+            const promise = sendDraftRequestRef.current({
+              transcriptOverride: request,
+              suppressSpokenReply: true,
+              realtimeActionHint: {
+                action,
+                needsReview: Boolean(args.needsReview),
+              },
+            })
+            realtimeActionGuardRef.current = { key: guardKey, startedAt: Date.now(), promise }
+            promise.finally(() => {
+              if (realtimeActionGuardRef.current?.promise === promise) {
+                realtimeActionGuardRef.current = null
+              }
+            })
+            return promise
           },
         },
       })
+      if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current || !openRef.current) {
+        await realtimeSession.stop().catch(() => {})
+        return
+      }
       realtimeVoiceStopRef.current = realtimeSession.stop
     } catch (error: any) {
+      clearRealtimeConnectTimeout()
+      if (realtimeVoiceAbortRef.current === abortController) {
+        realtimeVoiceAbortRef.current = null
+      }
+      if (realtimeVoiceRunRef.current !== realtimeRunId) return
       setContinuousVoiceSession(false)
       setRealtimeVoiceStatus('failed')
       setRealtimeVoiceError(error?.message || 'Live voice could not start. Text and camera still work.')
     }
-  }, [appendConversationTurns, checkingRealtimeVoice, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, voiceRecordingSupported])
+  }, [appendConversationTurns, checkingRealtimeVoice, clearRealtimeConnectTimeout, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, voiceRecordingSupported])
 
   const endVoiceSession = useCallback(() => {
+    realtimeVoiceRunRef.current += 1
+    realtimeActionGuardRef.current = null
+    clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
     void stopRealtimeVoiceSession()
     clearVoiceTurnTimers()
@@ -2042,7 +2190,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setBusy(false)
     setSpokenReplyStatus('idle')
     stopPlayback().catch(() => {})
-  }, [clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+  }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
   const confirmDraft = useCallback(async () => {
     await saveDraft(draft)
@@ -2145,7 +2293,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setPendingFollowUpDraft(null)
     setSpokenReplyStatus('idle')
     setRealtimeVoiceStatus(realtimeVoiceUnavailable ? 'failed' : 'idle')
-    setRealtimeVoiceError(realtimeVoiceUnavailable ? 'Live voice is not available on this local server. Text and camera still work.' : '')
+    setRealtimeVoiceError(realtimeVoiceUnavailable ? LIVE_VOICE_DISABLED_MESSAGE : '')
   }, [clearConversationMemory, realtimeVoiceUnavailable])
 
   return (
@@ -2303,7 +2451,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                         ? 'Spoken reply unavailable'
                         : spokenReplyStatus === 'failed'
                         ? 'Could not play spoken reply'
-                        : `Voice: ${SPOKEN_REPLY_VOICE_NAME}`}
+                        : `Voice: ${realtimeVoiceName || SPOKEN_REPLY_VOICE_NAME}`}
                     </Text>
                   </View>
                 ) : null}

@@ -25,6 +25,7 @@ const COMMAND_FAST_MODEL = process.env.HELFI_VOICE_COMMAND_FAST_MODEL || 'gpt-4o
 const FALLBACK_MODEL = process.env.HELFI_VOICE_COMMAND_FALLBACK_MODEL || 'gpt-5.2'
 const TRANSCRIBE_MODEL = process.env.HELFI_VOICE_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe'
 const TTS_MODEL = process.env.HELFI_VOICE_TTS_MODEL || 'gpt-4o-mini-tts'
+const DEFAULT_VOICE = 'marin'
 const SIMPLE_MIN_CREDITS = 3
 const VOICE_REPLY_MIN_CREDITS = 2
 const RECIPE_MIN_CREDITS = 10
@@ -72,6 +73,11 @@ type VoiceLaunchContext = {
 type VoiceConversationTurn = {
   role: 'user' | 'assistant'
   text: string
+}
+
+type RealtimeActionHint = {
+  action: string
+  needsReview?: boolean
 }
 
 type HealthIntakeItemType = 'supplement' | 'medication'
@@ -518,6 +524,45 @@ function conversationHistoryLine(history: VoiceConversationTurn[]) {
     .map((turn) => `${turn.role === 'assistant' ? 'Helfi' : 'User'}: ${cleanText(turn.text, 220)}`)
     .filter(Boolean)
   return lines.length ? lines.join('\n') : 'No recent in-panel conversation.'
+}
+
+function normalizeRealtimeActionHint(raw: unknown): RealtimeActionHint | null {
+  const parsed =
+    typeof raw === 'string'
+      ? (() => {
+          try {
+            return JSON.parse(raw)
+          } catch {
+            return null
+          }
+        })()
+      : raw && typeof raw === 'object'
+      ? raw
+      : null
+  if (!parsed || typeof parsed !== 'object') return null
+  const action = cleanText((parsed as any).action, 40).toLowerCase()
+  if (!action) return null
+  const normalizedAction =
+    action === 'health_journal'
+      ? 'journal'
+      : action === 'mood_journal'
+      ? 'journal'
+      : action === 'health_image_note'
+      ? 'app_handoff'
+      : action === 'insights' || action === 'navigate'
+      ? 'app_handoff'
+      : action === 'general_chat'
+      ? 'health_question'
+      : action
+  return {
+    action: normalizedAction,
+    needsReview: Boolean((parsed as any).needsReview),
+  }
+}
+
+function realtimeActionHintLine(hint: RealtimeActionHint | null) {
+  if (!hint?.action) return 'No realtime app-action hint.'
+  return `action=${hint.action}, needsReview=${hint.needsReview ? 'true' : 'false'}`
 }
 
 function encodeQueryValue(value: unknown, max = 1000) {
@@ -3721,6 +3766,7 @@ async function runJsonCommandModel(
   launchContext: VoiceLaunchContext,
   conversationHistory: VoiceConversationTurn[] = [],
   reviewedDraft: any = null,
+  realtimeActionHint: RealtimeActionHint | null = null,
 ) {
   const messages = [
     {
@@ -3734,6 +3780,7 @@ async function runJsonCommandModel(
         'The language examples are only examples. If the user speaks another language, translate the intent internally and return the same structured JSON action fields.',
         'Output the JSON action fields in concise English where helpful. Keep journal and mood note content in the user\'s own words unless translation is needed for clarity.',
         'Use the current app section as helpful context, but never force the wrong action if the spoken request is clear.',
+        'If a realtime app-action hint is present, use it as a strong hint for the intended Helfi app area unless the newest spoken request clearly contradicts it.',
         'Use the recent in-panel Talk to Helfi conversation to resolve natural follow-ups, pronouns, and corrections, but do not save anything unless the newest spoken request clearly asks for it.',
         'If a draft is currently being reviewed and the newest request clearly means yes, save it, confirm it, looks good, or equivalent in any language, return action confirm_draft.',
         'If a draft is currently being reviewed and the newest request clearly means no, cancel, discard, do not save, or equivalent in any language, return action reject_draft.',
@@ -3770,7 +3817,7 @@ async function runJsonCommandModel(
     },
     {
       role: 'user' as const,
-      content: `Today is ${localDate}. Current app context: ${launchContextLine(launchContext)}.\nRecent Talk to Helfi conversation:\n${conversationHistoryLine(conversationHistory)}\nDraft currently being reviewed:\n${reviewedDraftContextLine(reviewedDraft)}\nNewest spoken request: ${transcript}`,
+      content: `Today is ${localDate}. Current app context: ${launchContextLine(launchContext)}.\nRealtime app-action hint: ${realtimeActionHintLine(realtimeActionHint)}.\nRecent Talk to Helfi conversation:\n${conversationHistoryLine(conversationHistory)}\nDraft currently being reviewed:\n${reviewedDraftContextLine(reviewedDraft)}\nNewest spoken request: ${transcript}`,
     },
   ]
 
@@ -4007,7 +4054,7 @@ async function speak(openai: OpenAI, text: string, userId: string) {
   })
   const response = await openai.audio.speech.create({
     model: TTS_MODEL,
-    voice: process.env.HELFI_VOICE_TTS_VOICE || 'coral',
+    voice: process.env.HELFI_VOICE_TTS_VOICE || DEFAULT_VOICE,
     input: speechText,
     instructions:
       'Speak like a warm, calm health coach. Sound natural and conversational, with gentle energy and smooth pacing. Avoid a robotic or announcer style.',
@@ -5020,6 +5067,7 @@ export async function POST(request: NextRequest) {
     let conversationHistory: VoiceConversationTurn[] = []
     let followUpDraft: any = null
     let confirmationDraft: any = null
+    let realtimeActionHint: RealtimeActionHint | null = null
     let aiConsentGranted = false
 
     if (contentType.includes('multipart/form-data')) {
@@ -5035,6 +5083,7 @@ export async function POST(request: NextRequest) {
       conversationHistory = parseConversationHistory(form.get('conversationHistory'))
       confirmationDraft = parseConfirmationDraft(form.get('confirmationDraft'))
       followUpDraft = parseFollowUpDraft(form.get('followUpDraft'))
+      realtimeActionHint = normalizeRealtimeActionHint(form.get('realtimeActionHint'))
       aiConsentGranted = hasAiConsentFlag(form.get('aiConsentGranted') || form.get('aiConsent'))
       const durationMillis = Number(form.get('durationMillis'))
       durationSeconds = Number.isFinite(durationMillis) && durationMillis > 0 ? durationMillis / 1000 : 30
@@ -5074,6 +5123,7 @@ export async function POST(request: NextRequest) {
       conversationHistory = parseConversationHistory(body?.conversationHistory || body?.conversation)
       confirmationDraft = parseConfirmationDraft(body?.confirmationDraft)
       followUpDraft = parseFollowUpDraft(body?.followUpDraft)
+      realtimeActionHint = normalizeRealtimeActionHint(body?.realtimeActionHint)
       aiConsentGranted = hasAiConsentFlag(body?.aiConsentGranted ?? body?.aiConsent)
     }
 
@@ -5644,7 +5694,7 @@ export async function POST(request: NextRequest) {
     }
     if (aiIntentClient && aiConsentGranted) {
       try {
-        const command = await runJsonCommandModel(aiIntentClient, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft)
+        const command = await runJsonCommandModel(aiIntentClient, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft, realtimeActionHint)
         const draftDecision = confirmationDraft ? aiDraftDecision(command.parsed) : null
         if (draftDecision) return buildAiDraftDecisionResponse(user.id, transcript, confirmationDraft, draftDecision, command, transcriptionCostCents)
         const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, aiIntentClient, tzOffsetMin, favorites, launchContext)
@@ -6082,7 +6132,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI sharing consent is required before this request can be sent to AI.' }, { status: 403 })
     }
 
-    const command = await runJsonCommandModel(openai, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft)
+    const command = await runJsonCommandModel(openai, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft, realtimeActionHint)
     const draftDecision = confirmationDraft ? aiDraftDecision(command.parsed) : null
     if (draftDecision) return buildAiDraftDecisionResponse(user.id, transcript, confirmationDraft, draftDecision, command, transcriptionCostCents)
     const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin, favorites, launchContext)

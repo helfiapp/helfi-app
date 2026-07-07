@@ -13,6 +13,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const TTS_MODEL = process.env.HELFI_VOICE_TTS_MODEL || 'gpt-4o-mini-tts'
+const DEFAULT_VOICE = 'marin'
 const VOICE_REPLY_MIN_CREDITS = 2
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
 
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
     const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
     const response = await openai.audio.speech.create({
       model: TTS_MODEL,
-      voice: process.env.HELFI_VOICE_TTS_VOICE || 'coral',
+      voice: process.env.HELFI_VOICE_TTS_VOICE || DEFAULT_VOICE,
       input: text,
       instructions:
         'Speak like a real, warm health coach in a natural conversational tone. Use gentle energy, smooth pacing, and subtle expression. Avoid sounding robotic, flat, or like an announcer.',

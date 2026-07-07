@@ -66,7 +66,8 @@ function extractAssistantText(payload: any) {
 
 function realtimeApiBaseUrl() {
   const isLocalDevHost = __DEV__ && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(API_BASE_URL)
-  return isLocalDevHost ? LIVE_REALTIME_API_BASE_URL : API_BASE_URL
+  const useLocalRealtime = process.env.EXPO_PUBLIC_USE_LOCAL_REALTIME === 'true'
+  return isLocalDevHost && !useLocalRealtime ? LIVE_REALTIME_API_BASE_URL : API_BASE_URL
 }
 
 export function hasNativeRealtimeVoiceSupport() {
@@ -78,6 +79,8 @@ export async function fetchHelfiRealtimeVoiceStatus(token: string): Promise<{
   available: boolean
   message?: string
   code?: string
+  voice?: string
+  model?: string
 }> {
   try {
     const res = await fetch(`${realtimeApiBaseUrl()}/api/native/voice-assistant/realtime`, {
@@ -89,6 +92,8 @@ export async function fetchHelfiRealtimeVoiceStatus(token: string): Promise<{
       available: Boolean(res.ok && data?.available),
       message: typeof data?.message === 'string' ? data.message : typeof data?.error === 'string' ? data.error : undefined,
       code: typeof data?.code === 'string' ? data.code : undefined,
+      voice: typeof data?.voice === 'string' ? data.voice : undefined,
+      model: typeof data?.model === 'string' ? data.model : undefined,
     }
   } catch {
     return {
@@ -101,8 +106,13 @@ export async function fetchHelfiRealtimeVoiceStatus(token: string): Promise<{
 
 export async function startHelfiRealtimeVoiceSession(params: {
   token: string
+  signal?: AbortSignal
   callbacks?: RealtimeCallbacks
 }): Promise<RealtimeSession> {
+  if (params.signal?.aborted) {
+    throw new Error('Live voice session was stopped.')
+  }
+
   const rtc = requireWebRtc()
   if (!rtc?.RTCPeerConnection || !rtc?.mediaDevices || !rtc?.RTCSessionDescription) {
     throw new Error('Live voice is not available in this build yet.')
@@ -120,8 +130,80 @@ export async function startHelfiRealtimeVoiceSession(params: {
   localStream.getTracks().forEach((track: any) => pc.addTrack(track, localStream))
 
   let dataChannel: any = null
+  let stopped = false
+  const emitStatus = (status: string) => {
+    if (stopped && status !== 'closed') return
+    callbacks.onStatus?.(status)
+  }
+  const stopTracks = () => {
+    localStream.getTracks().forEach((track: any) => {
+      try {
+        track.stop?.()
+      } catch {
+        // Already stopped.
+      }
+    })
+    remoteStreams.forEach((stream: any) => {
+      stream?.getTracks?.().forEach((track: any) => {
+        try {
+          track.stop?.()
+        } catch {
+          // Already stopped.
+        }
+      })
+    })
+    pc.getSenders?.().forEach((sender: any) => {
+      try {
+        sender.track?.stop?.()
+      } catch {
+        // Already stopped.
+      }
+    })
+    pc.getReceivers?.().forEach((receiver: any) => {
+      try {
+        receiver.track?.stop?.()
+      } catch {
+        // Already stopped.
+      }
+    })
+    pc.getTransceivers?.().forEach((transceiver: any) => {
+      try {
+        transceiver.stop?.()
+      } catch {
+        // Already stopped.
+      }
+    })
+  }
+  const closeRealtimeConnection = () => {
+    stopped = true
+    try {
+      if (dataChannel) {
+        dataChannel.onopen = null
+        dataChannel.onmessage = null
+        dataChannel.onerror = null
+        dataChannel.onclose = null
+      }
+      dataChannel?.close?.()
+    } catch {
+      // Already closed.
+    }
+    pc.ontrack = null
+    pc.onconnectionstatechange = null
+    stopTracks()
+    try {
+      pc.close()
+    } catch {
+      // Already closed.
+    }
+  }
+  const onAbort = () => {
+    closeRealtimeConnection()
+    callbacks.onStatus?.('closed')
+  }
+  params.signal?.addEventListener?.('abort', onAbort)
   const assistantTextById = new Map<string, string>()
   const completedAssistantIds = new Set<string>()
+  const handledToolCallIds = new Set<string>()
   const rememberAssistantText = (payload: any, append = false) => {
     const id = realtimeEventId(payload) || `response-${Date.now()}`
     const text = extractAssistantText(payload)
@@ -143,9 +225,10 @@ export async function startHelfiRealtimeVoiceSession(params: {
 
   dataChannel = pc.createDataChannel('oai-events')
   dataChannel.onopen = () => {
-    callbacks.onStatus?.('live')
+    emitStatus('live')
   }
   dataChannel.onmessage = (event: any) => {
+    if (stopped) return
     const payload = parseRealtimeJson(event?.data)
     if (!payload?.type) return
     if (payload.type === 'conversation.item.input_audio_transcription.completed') {
@@ -153,7 +236,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
       return
     }
     if (payload.type === 'response.created' || payload.type === 'response.output_item.added' || payload.type === 'response.audio.delta') {
-      callbacks.onStatus?.('speaking')
+      emitStatus('speaking')
       return
     }
     if (
@@ -162,7 +245,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
       payload.type === 'response.output_text.delta'
     ) {
       rememberAssistantText(payload, true)
-      callbacks.onStatus?.('speaking')
+      emitStatus('speaking')
       return
     }
     if (
@@ -173,24 +256,26 @@ export async function startHelfiRealtimeVoiceSession(params: {
       payload.type === 'response.output_item.done'
     ) {
       rememberAssistantText(payload)
-      callbacks.onStatus?.('live')
+      emitStatus('live')
       return
     }
     if (payload.type === 'response.done') {
       flushAssistantText(payload)
-      callbacks.onStatus?.('live')
+      emitStatus('live')
       return
     }
     if (payload.type === 'response.function_call_arguments.done' && payload.name === 'request_helfi_action') {
       const args = parseRealtimeJson(payload.arguments) || {}
       const callId = String(payload.call_id || '').trim()
+      if (callId && handledToolCallIds.has(callId)) return
+      if (callId) handledToolCallIds.add(callId)
       Promise.resolve(callbacks.onActionRequest?.({
         request: String(args.request || '').trim(),
         action: String(args.action || '').trim(),
         needsReview: Boolean(args.needsReview),
       }))
         .then((result) => {
-          if (!callId) return
+          if (!callId || stopped) return
           sendRealtimeEvent(dataChannel, {
             type: 'conversation.item.create',
             item: {
@@ -202,7 +287,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
           sendRealtimeEvent(dataChannel, { type: 'response.create' })
         })
         .catch((error) => {
-          if (!callId) return
+          if (!callId || stopped) return
           sendRealtimeEvent(dataChannel, {
             type: 'conversation.item.create',
             item: {
@@ -215,22 +300,31 @@ export async function startHelfiRealtimeVoiceSession(params: {
         })
     }
   }
-  dataChannel.onerror = () => callbacks.onStatus?.('failed')
-  dataChannel.onclose = () => callbacks.onStatus?.('closed')
+  dataChannel.onerror = () => emitStatus('failed')
+  dataChannel.onclose = () => emitStatus('closed')
 
   pc.onconnectionstatechange = () => {
-    callbacks.onStatus?.(String(pc.connectionState || 'connecting'))
+    emitStatus(String(pc.connectionState || 'connecting'))
   }
   pc.ontrack = (event: any) => {
+    if (stopped) return
     const stream = event?.streams?.[0]
     if (stream && !remoteStreams.includes(stream)) {
       remoteStreams.push(stream)
     }
-    callbacks.onStatus?.('live')
+    emitStatus('live')
   }
 
   const offer = await pc.createOffer({})
+  if (stopped || params.signal?.aborted) {
+    closeRealtimeConnection()
+    throw new Error('Live voice session was stopped.')
+  }
   await pc.setLocalDescription(offer)
+  if (stopped || params.signal?.aborted) {
+    closeRealtimeConnection()
+    throw new Error('Live voice session was stopped.')
+  }
 
   const res = await fetch(`${realtimeApiBaseUrl()}/api/native/voice-assistant/realtime`, {
     method: 'POST',
@@ -239,12 +333,13 @@ export async function startHelfiRealtimeVoiceSession(params: {
       'content-type': 'application/sdp',
       'x-helfi-ai-consent': 'true',
     },
+    signal: params.signal,
     body: String(offer.sdp || ''),
   })
   const answerSdp = await res.text()
   if (!res.ok) {
-    localStream.getTracks().forEach((track: any) => track.stop())
-    pc.close()
+    closeRealtimeConnection()
+    params.signal?.removeEventListener?.('abort', onAbort)
     let message = 'Live voice session could not start.'
     try {
       const json = JSON.parse(answerSdp)
@@ -255,27 +350,24 @@ export async function startHelfiRealtimeVoiceSession(params: {
     throw new Error(message)
   }
 
+  if (stopped) {
+    closeRealtimeConnection()
+    params.signal?.removeEventListener?.('abort', onAbort)
+    throw new Error('Live voice session was stopped.')
+  }
+
   await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }))
+  if (stopped || params.signal?.aborted) {
+    closeRealtimeConnection()
+    params.signal?.removeEventListener?.('abort', onAbort)
+    throw new Error('Live voice session was stopped.')
+  }
 
   return {
     stop: async () => {
+      params.signal?.removeEventListener?.('abort', onAbort)
       callbacks.onStatus?.('closed')
-      try {
-        dataChannel?.close?.()
-      } catch {
-        // Already closed.
-      }
-      localStream.getTracks().forEach((track: any) => track.stop())
-      remoteStreams.forEach((stream: any) => {
-        stream?.getTracks?.().forEach((track: any) => {
-          try {
-            track.stop?.()
-          } catch {
-            // Already stopped.
-          }
-        })
-      })
-      pc.close()
+      closeRealtimeConnection()
     },
   }
 }
