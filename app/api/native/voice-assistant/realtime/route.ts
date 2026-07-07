@@ -121,6 +121,8 @@ function realtimeSessionConfig() {
       'For exercise logging such as "I did a walk", "I walked 5449 steps", or "I burned 240 calories", call request_helfi_action with action "exercise". Do not invent or suggest a workout routine unless the user explicitly asks for a routine or workout plan.',
       'If the tool returns needsReview, tell the user briefly that the review is ready and ask if they want to save it. Do not say it was saved.',
       'If the tool returns saved true, then and only then say it was saved.',
+      'When the tool returns spokenReply and instruction, base your spoken answer on spokenReply and follow instruction exactly.',
+      'If safeToClaimSaved is not true, do not use words like saved, added, created, or logged as if the action already happened.',
       'If the tool returns an open_screen or handoff result, tell the user what app screen is ready.',
       'If the transcript is unclear, ask one short clarification instead of guessing or creating a routine.',
     ].join('\n'),

@@ -124,6 +124,11 @@ type DraftRequestResult = {
   action?: string
   status?: 'needs_clarification' | 'review_draft' | 'saved' | 'open_screen' | 'safe_refusal' | 'general_answer'
 }
+type RealtimeToolResult = DraftRequestResult & {
+  spokenReply: string
+  safeToClaimSaved: boolean
+  instruction: string
+}
 type DraftRequestOptions = {
   audioUri?: string
   durationMillis?: number
@@ -136,7 +141,7 @@ type DraftRequestHandler = (options?: DraftRequestOptions) => Promise<DraftReque
 type RealtimeActionGuard = {
   key: string
   startedAt: number
-  promise: Promise<DraftRequestResult>
+  promise: Promise<RealtimeToolResult>
 }
 
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
@@ -185,6 +190,46 @@ function voiceResultStatusFromDraft(nextDraft: VoiceDraft | null, data?: any): D
     return 'needs_clarification'
   }
   return 'general_answer'
+}
+
+function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
+  const status = result.status || (result.saved ? 'saved' : result.needsReview ? 'review_draft' : 'general_answer')
+  const saved = Boolean(result.saved && status === 'saved')
+  const needsReview = Boolean(result.needsReview || status === 'review_draft')
+  const spokenReply = cleanFavoriteText(
+    result.message ||
+      (saved
+        ? 'Saved.'
+        : needsReview
+        ? 'The review is ready. Do you want me to save it?'
+        : status === 'open_screen'
+        ? 'That screen is ready.'
+        : status === 'needs_clarification'
+        ? 'I need one detail first.'
+        : 'Done.'),
+    500,
+  )
+  const instruction = saved
+    ? 'You may say this was saved because the app confirmed a successful save.'
+    : needsReview
+    ? 'Say the review is ready and ask if the user wants to save it. Do not say it was saved, added, created, or logged.'
+    : status === 'open_screen'
+    ? 'Say the app screen is ready. Do not say anything was saved.'
+    : status === 'safe_refusal'
+    ? 'Give the safety message briefly. Do not claim an app action was saved.'
+    : status === 'needs_clarification'
+    ? 'Ask the clarification briefly. Do not guess and do not say anything was saved.'
+    : 'Answer briefly. Do not say anything was saved unless safeToClaimSaved is true.'
+  return {
+    ...result,
+    status,
+    saved,
+    needsReview,
+    message: spokenReply,
+    spokenReply,
+    safeToClaimSaved: saved,
+    instruction,
+  }
 }
 
 function mealLabel(value?: string | null) {
@@ -2189,7 +2234,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 action,
                 needsReview: Boolean(args.needsReview),
               },
-            })
+            }).then(realtimeToolResult)
             realtimeActionGuardRef.current = { key: guardKey, startedAt: Date.now(), promise }
             promise.finally(() => {
               if (realtimeActionGuardRef.current?.promise === promise) {

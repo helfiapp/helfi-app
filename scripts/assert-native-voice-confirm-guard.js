@@ -212,6 +212,18 @@ if (
   failures.push('Delayed spoken replies must be ignored after Talk to Helfi closes or the app goes into the background.')
 }
 
+if (
+  !/type RealtimeToolResult/.test(native) ||
+  !/safeToClaimSaved/.test(native) ||
+  !/spokenReply/.test(native) ||
+  !/instruction/.test(native) ||
+  !/function realtimeToolResult/.test(native) ||
+  !/sendDraftRequestRef\.current\([\s\S]*?\)\.then\(realtimeToolResult\)/.test(native) ||
+  !/safeToClaimSaved is not true/.test(fs.readFileSync(path.join(root, 'app/api/native/voice-assistant/realtime/route.ts'), 'utf8'))
+) {
+  failures.push('Realtime voice tool results must carry an explicit safe spoken reply and saved/not-saved instruction.')
+}
+
 if (!/NOT_SAVED_MESSAGE\s*=\s*'No problem\. I have not saved anything\.'/.test(native) || (native.match(/requestVoiceReply\(NOT_SAVED_MESSAGE\)/g) || []).length < 3) {
   failures.push('Rejected or cancelled drafts with Spoken reply enabled must speak back that nothing was saved.')
 }
