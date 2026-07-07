@@ -3,7 +3,10 @@
 # Usage: ./scripts/check-deployment-status.sh
 # Optional rename gate: RUN_RENAME_GUARD=1 ./scripts/check-deployment-status.sh
 
-VERCEL_TOKEN="${VERCEL_TOKEN:-2MLfXoXXv8hIaHIE7lQcdQ39}"
+if [ -z "${VERCEL_TOKEN:-}" ]; then
+  echo "❌ Missing VERCEL_TOKEN. Do not run deployment verification without an explicit token."
+  exit 1
+fi
 # Use the active Helfi team ID (see AGENT_START_HERE.md) and query by project slug.
 # NOTE: Project IDs have changed in the past; querying by slug is more robust.
 PROJECT_SLUG="helfi-app"
