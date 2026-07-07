@@ -95,6 +95,7 @@ function realtimeSessionConfig() {
   return {
     type: 'realtime',
     model: REALTIME_MODEL,
+    output_modalities: ['audio'],
     instructions: [
       'You are Talk to Helfi inside the Helfi health app.',
       'Speak naturally and briefly. Ask follow-up questions when needed.',

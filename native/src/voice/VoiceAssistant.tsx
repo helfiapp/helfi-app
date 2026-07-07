@@ -104,7 +104,7 @@ type VisionChoice = 'food-photo' | 'journal-photo' | 'health-image' | 'supplemen
 type SpokenReplyStatus = 'idle' | 'preparing' | 'playing' | 'failed' | 'unavailable'
 type BottleLabelImageAsset = { uri: string; fileName?: string | null; mimeType?: string | null }
 type StopRecordingOptions = { continueSession?: boolean }
-type RealtimeVoiceStatus = 'idle' | 'connecting' | 'live' | 'closed' | 'failed' | 'fallback'
+type RealtimeVoiceStatus = 'idle' | 'connecting' | 'live' | 'speaking' | 'closed' | 'failed' | 'fallback'
 type DraftRequestResult = { ok: boolean; message: string; saved?: boolean; needsReview?: boolean; action?: string }
 
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
@@ -1954,6 +1954,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               setRealtimeVoiceStatus('live')
               return
             }
+            if (status === 'speaking') {
+              setRealtimeVoiceStatus('speaking')
+              return
+            }
             if (status === 'closed' || status === 'disconnected') {
               setRealtimeVoiceStatus('closed')
               return
@@ -2128,7 +2132,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   <View style={styles.voiceCallScreen}>
                     <View style={styles.voiceCallTopLine}>
                       <Feather
-                        name={realtimeVoiceStatus === 'live' ? 'radio' : realtimeVoiceStatus === 'connecting' ? 'loader' : 'message-circle'}
+                        name={realtimeVoiceStatus === 'live' || realtimeVoiceStatus === 'speaking' ? 'radio' : realtimeVoiceStatus === 'connecting' ? 'loader' : 'message-circle'}
                         size={18}
                         color="#DDF7E1"
                       />
@@ -2136,7 +2140,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     </View>
                     <View style={styles.voiceOrb}>
                       <View style={styles.voiceOrbInner}>
-                        {realtimeVoiceStatus === 'live' ? (
+                        {realtimeVoiceStatus === 'live' || realtimeVoiceStatus === 'speaking' ? (
                           <View style={styles.voiceBarsLarge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
                             <View style={[styles.voiceBarLarge, styles.voiceBarLargeShort]} />
                             <View style={[styles.voiceBarLarge, styles.voiceBarLargeTall]} />
@@ -2154,6 +2158,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     <Text style={styles.voiceCallTitle}>
                       {realtimeVoiceStatus === 'connecting'
                         ? 'Connecting live voice'
+                        : realtimeVoiceStatus === 'speaking'
+                        ? 'Helfi is speaking'
                         : realtimeVoiceStatus === 'live'
                         ? 'Listening'
                         : realtimeVoiceStatus === 'failed'

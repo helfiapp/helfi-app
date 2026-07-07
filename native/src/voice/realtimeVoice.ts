@@ -36,6 +36,34 @@ function sendRealtimeEvent(dataChannel: any, payload: Record<string, unknown>) {
   dataChannel.send(JSON.stringify(payload))
 }
 
+function cleanText(value: unknown) {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function realtimeEventId(payload: any) {
+  return cleanText(payload?.response_id || payload?.response?.id || payload?.item_id || payload?.item?.id || payload?.id || payload?.event_id)
+}
+
+function collectTextFromContent(value: unknown): string[] {
+  if (!value || typeof value !== 'object') return []
+  if (Array.isArray(value)) return value.flatMap(collectTextFromContent)
+  const item = value as Record<string, unknown>
+  const text = cleanText(item.text || item.transcript)
+  const nested = collectTextFromContent(item.content || item.output)
+  return text ? [text, ...nested] : nested
+}
+
+function extractAssistantText(payload: any) {
+  const part = payload?.part && typeof payload.part === 'object' ? payload.part : null
+  const direct = cleanText(payload?.delta || payload?.transcript || payload?.text || part?.transcript || part?.text)
+  if (direct) return direct
+  const fromResponse = collectTextFromContent(payload?.response?.output)
+  if (fromResponse.length) return fromResponse.join(' ')
+  const fromItem = collectTextFromContent(payload?.item)
+  if (fromItem.length) return fromItem.join(' ')
+  return ''
+}
+
 function realtimeApiBaseUrl() {
   const isLocalDevHost = __DEV__ && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(API_BASE_URL)
   return isLocalDevHost ? LIVE_REALTIME_API_BASE_URL : API_BASE_URL
@@ -88,9 +116,31 @@ export async function startHelfiRealtimeVoiceSession(params: {
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
   })
   const localStream = await mediaDevices.getUserMedia({ audio: true, video: false })
+  const remoteStreams: any[] = []
   localStream.getTracks().forEach((track: any) => pc.addTrack(track, localStream))
 
   let dataChannel: any = null
+  const assistantTextById = new Map<string, string>()
+  const completedAssistantIds = new Set<string>()
+  const rememberAssistantText = (payload: any, append = false) => {
+    const id = realtimeEventId(payload) || `response-${Date.now()}`
+    const text = extractAssistantText(payload)
+    if (!text) return
+    const next = append ? cleanText(`${assistantTextById.get(id) || ''} ${text}`) : text
+    assistantTextById.set(id, next)
+    if (!append && !completedAssistantIds.has(id)) {
+      completedAssistantIds.add(id)
+      callbacks.onAssistantText?.(next)
+    }
+  }
+  const flushAssistantText = (payload: any) => {
+    const id = realtimeEventId(payload)
+    const text = extractAssistantText(payload) || (id ? assistantTextById.get(id) : '')
+    if (!text || completedAssistantIds.has(id || text)) return
+    completedAssistantIds.add(id || text)
+    callbacks.onAssistantText?.(text)
+  }
+
   dataChannel = pc.createDataChannel('oai-events')
   dataChannel.onopen = () => {
     callbacks.onStatus?.('live')
@@ -102,8 +152,33 @@ export async function startHelfiRealtimeVoiceSession(params: {
       callbacks.onTranscript?.(String(payload.transcript || '').trim())
       return
     }
-    if (payload.type === 'response.audio_transcript.done' || payload.type === 'response.output_text.done') {
-      callbacks.onAssistantText?.(String(payload.transcript || payload.text || '').trim())
+    if (payload.type === 'response.created' || payload.type === 'response.output_item.added' || payload.type === 'response.audio.delta') {
+      callbacks.onStatus?.('speaking')
+      return
+    }
+    if (
+      payload.type === 'response.audio_transcript.delta' ||
+      payload.type === 'response.output_audio_transcript.delta' ||
+      payload.type === 'response.output_text.delta'
+    ) {
+      rememberAssistantText(payload, true)
+      callbacks.onStatus?.('speaking')
+      return
+    }
+    if (
+      payload.type === 'response.audio_transcript.done' ||
+      payload.type === 'response.output_audio_transcript.done' ||
+      payload.type === 'response.output_text.done' ||
+      payload.type === 'response.content_part.done' ||
+      payload.type === 'response.output_item.done'
+    ) {
+      rememberAssistantText(payload)
+      callbacks.onStatus?.('live')
+      return
+    }
+    if (payload.type === 'response.done') {
+      flushAssistantText(payload)
+      callbacks.onStatus?.('live')
       return
     }
     if (payload.type === 'response.function_call_arguments.done' && payload.name === 'request_helfi_action') {
@@ -146,7 +221,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
   pc.onconnectionstatechange = () => {
     callbacks.onStatus?.(String(pc.connectionState || 'connecting'))
   }
-  pc.ontrack = () => {
+  pc.ontrack = (event: any) => {
+    const stream = event?.streams?.[0]
+    if (stream && !remoteStreams.includes(stream)) {
+      remoteStreams.push(stream)
+    }
     callbacks.onStatus?.('live')
   }
 
@@ -187,6 +266,15 @@ export async function startHelfiRealtimeVoiceSession(params: {
         // Already closed.
       }
       localStream.getTracks().forEach((track: any) => track.stop())
+      remoteStreams.forEach((stream: any) => {
+        stream?.getTracks?.().forEach((track: any) => {
+          try {
+            track.stop?.()
+          } catch {
+            // Already stopped.
+          }
+        })
+      })
       pc.close()
     },
   }

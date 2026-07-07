@@ -52,8 +52,15 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(isRejectingDraftText('не зачувувај'), 'Macedonian do-not-save must reject a reviewed draft.')
   assert(/any language, mixed languages, messy dictation/.test(__routeSource), 'AI command understanding must explicitly support any-language messy speech.')
   assert(__realtimeRouteSource.includes('transcription: {') && __realtimeRouteSource.includes('model: REALTIME_TRANSCRIPTION_MODEL'), 'Realtime voice must request input transcripts for the chat review after voice mode.')
+  assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
   if (__nativeSourcesAvailable) {
     assert(/conversation\.item\.input_audio_transcription\.completed/.test(__realtimeClientSource), 'Native realtime client must listen for spoken user transcripts.')
+    assert(/response\.done/.test(__realtimeClientSource) && /response\.audio_transcript\.done/.test(__realtimeClientSource) && /response\.output_audio_transcript\.done/.test(__realtimeClientSource), 'Native realtime client must listen for completed assistant replies.')
+    assert(/response\.audio_transcript\.delta/.test(__realtimeClientSource) && /response\.output_audio_transcript\.delta/.test(__realtimeClientSource) && /response\.output_text\.delta/.test(__realtimeClientSource), 'Native realtime client must track streaming assistant reply text.')
+    assert(__realtimeClientSource.includes('payload?.delta') && __realtimeClientSource.includes('part?.transcript'), 'Native realtime client must read assistant text from delta and content part events.')
+    assert(__realtimeClientSource.includes('const remoteStreams') && __realtimeClientSource.includes('remoteStreams.push(stream)'), 'Native realtime client must keep the assistant audio stream alive until the session ends.')
+    assert(__realtimeClientSource.includes("callbacks.onStatus?.('speaking')"), 'Native realtime client must expose when Helfi is speaking.')
+    assert(__voiceAssistantSource.includes("'speaking'") && __voiceAssistantSource.includes('Helfi is speaking'), 'Native live voice UI must show when Helfi is speaking.')
     assert(__realtimeClientSource.includes("LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'") && __realtimeClientSource.includes('realtimeApiBaseUrl'), 'Native realtime voice must fall back to live when local dev has no AI service.')
     assert(__voiceAssistantSource.includes('onTranscript: (text) => {') && __voiceAssistantSource.includes("appendConversationTurns([makeConversationTurn('user', text)])"), 'Native live voice transcripts must appear in the chat review after voice mode.')
   }
