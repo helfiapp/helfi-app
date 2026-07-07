@@ -156,6 +156,7 @@ const VOICE_ACCESS_FALLBACK_API_BASE_URL = 'https://helfi.ai'
 const SPOKEN_REPLY_VOICE_NAME = 'Marin'
 const LIVE_VOICE_ENABLED = process.env.EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED === 'true'
 const LIVE_VOICE_DISABLED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
+const REALTIME_VOICE_CONNECT_TIMEOUT_MS = 30000
 const NOT_SAVED_MESSAGE = 'No problem. I have not saved anything.'
 const VOICE_TURN_SILENCE_MS = 750
 const VOICE_TURN_MIN_MS = 650
@@ -2175,7 +2176,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         staysActiveInBackground: false,
         shouldDuckAndroid: true,
       }).catch(() => {})
-    }, 15000)
+    }, REALTIME_VOICE_CONNECT_TIMEOUT_MS)
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
