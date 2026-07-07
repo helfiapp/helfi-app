@@ -24,13 +24,19 @@ const rows = output
   .map((line) => line.trim())
   .filter(Boolean)
 
-const hasProductionOpenAiKey = rows.some((line) => {
-  if (!line.startsWith('OPENAI_API_KEY')) return false
-  return /\bProduction\b/.test(line)
-})
+const productionNames = new Set(
+  rows
+    .filter((line) => /\bProduction\b/.test(line))
+    .map((line) => line.split(/\s+/)[0])
+    .filter(Boolean),
+)
 
-if (!hasProductionOpenAiKey) {
+if (!productionNames.has('OPENAI_API_KEY')) {
   fail('Vercel Production is missing OPENAI_API_KEY. Talk to Helfi/live AI cannot work until this is restored.')
 }
 
-console.log('✅ Vercel Production OPENAI_API_KEY exists.')
+if (!productionNames.has('HELFI_VOICE_REALTIME_ENABLED')) {
+  fail('Vercel Production is missing HELFI_VOICE_REALTIME_ENABLED. Talk to Helfi live voice cannot work until this is restored.')
+}
+
+console.log('✅ Vercel Production OpenAI and live voice environment variables exist.')

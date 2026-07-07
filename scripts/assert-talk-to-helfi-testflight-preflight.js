@@ -21,6 +21,8 @@ const realtimeClient = read('native/src/voice/realtimeVoice.ts')
 const voiceConfig = read('lib/openai-voice-config.ts')
 const packageJson = JSON.parse(read('package.json'))
 const testflightBuilder = read('scripts/build-talk-to-helfi-testflight-ipa.sh')
+const vercelProductionEnvCheck = read('scripts/check-vercel-production-env.js')
+const vercelAiEnvCheck = read('scripts/check-vercel-ai-env.js')
 
 const buildNumber = Number(nativeAppJson?.expo?.ios?.buildNumber)
 const projectBuildNumbers = [...pbxproj.matchAll(/CURRENT_PROJECT_VERSION = (\d+);/g)].map((match) => Number(match[1]))
@@ -41,6 +43,7 @@ assert(voiceRoute.includes('resolveHelfiTtsVoice()') && ttsRoute.includes('resol
 assert(realtimeRoute.includes('exactChatGptVoiceAvailable()'), 'Realtime status must honestly report that exact ChatGPT voice names are not exposed by the API.')
 
 assert(realtimeRoute.includes('HELFI_VOICE_REALTIME_ENABLED') && realtimeRoute.includes('live_voice_paused'), 'Backend live voice must stay behind the server-side enable flag.')
+assert(vercelProductionEnvCheck.includes("'HELFI_VOICE_REALTIME_ENABLED'") && vercelAiEnvCheck.includes('HELFI_VOICE_REALTIME_ENABLED'), 'Production readiness checks must require the live voice backend flag by name.')
 assert(voiceAssistant.includes('EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED') && voiceAssistant.includes('LIVE_VOICE_DISABLED_MESSAGE'), 'Native live voice must stay behind the build-time enable flag.')
 assert(realtimeRoute.includes('request.signal?.aborted') && realtimeRoute.includes('live_voice_cancelled'), 'Backend realtime startup must cancel cleanly before charging when the user closes voice.')
 assert(realtimeClient.includes('signal?: AbortSignal') && realtimeClient.includes('closeRealtimeConnection()'), 'Native realtime startup must be abortable and close the peer connection.')
