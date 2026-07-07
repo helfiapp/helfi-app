@@ -66,6 +66,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__realtimeClientSource.includes("LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'") && __realtimeClientSource.includes('realtimeApiBaseUrl'), 'Native realtime voice must fall back to live when local dev has no AI service.')
     assert(__voiceAssistantSource.includes('onTranscript: (text) => {') && __voiceAssistantSource.includes("appendConversationTurns([makeConversationTurn('user', text)])"), 'Native live voice transcripts must appear in the chat review after voice mode.')
     assert(__voiceAssistantSource.includes('fetchNativeVoiceConfirm') && __voiceAssistantSource.includes('VOICE_ACCESS_FALLBACK_API_BASE_URL'), 'Native reviewed save/confirm must fall back to live when local dev has no usable backend.')
+    assert(__voiceAssistantSource.includes('conversationTurns.length > 0 && !showDraftCard'), 'Native review drafts must keep Save/Discard buttons visible instead of being hidden by the transcript view.')
   }
   assert(/Do not limit language understanding to the examples below/.test(__routeSource), 'AI command understanding must say examples are not language limits.')
   assert(/Arabic, Hindi, Japanese, Chinese, Greek, Turkish, and any other language/.test(__routeSource), 'AI command understanding must explicitly allow broad world languages beyond the local fallback examples.')

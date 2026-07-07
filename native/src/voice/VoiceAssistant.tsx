@@ -2119,7 +2119,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const visibleForUser = mode === 'signedIn' && Boolean(session?.token)
   const launchCopy = copyForLaunchContext(launchContext)
   const bottleCameraLabel = bottleCameraItemType === 'medication' ? 'medication' : 'supplement'
-  const showingConversationReview = !voiceSessionActive && conversationTurns.length > 0
+  const showingConversationReview = !voiceSessionActive && conversationTurns.length > 0 && !showDraftCard
   const realtimeVoiceUnavailable = realtimeVoiceAvailable === false
   const realtimeVoiceButtonDisabled = !voiceSessionActive && (busy || checkingRealtimeVoice || realtimeVoiceUnavailable || realtimeVoiceStatus === 'connecting')
   const realtimeVoiceButtonLabel = checkingRealtimeVoice
