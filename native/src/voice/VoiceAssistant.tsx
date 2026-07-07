@@ -863,6 +863,28 @@ async function fetchNativeVoiceTts(
   }
 }
 
+async function fetchNativeVoiceConfirm(
+  requestFactory: (baseUrl: string) => Promise<Response>,
+) {
+  let firstError: unknown = null
+  try {
+    const res = await requestFactory(API_BASE_URL)
+    const data: any = await res.json().catch(() => ({}))
+    if (!shouldRetryVoiceAssistantOnLive(data, undefined, res.status)) return { res, data }
+  } catch (error) {
+    firstError = error
+    if (!shouldRetryVoiceAssistantOnLive(null, error)) throw error
+  }
+
+  try {
+    const res = await requestFactory(VOICE_ACCESS_FALLBACK_API_BASE_URL)
+    const data: any = await res.json().catch(() => ({}))
+    return { res, data }
+  } catch (error) {
+    throw firstError || error
+  }
+}
+
 async function playableAudioUri(audioUri: string) {
   const match = /^data:(audio\/[^;]+);base64,(.+)$/s.exec(audioUri)
   if (!match) return audioUri
@@ -1481,12 +1503,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       if (!session?.token || !targetDraft?.canConfirm) return null
       setConfirming(true)
       try {
-        const res = await fetch(`${API_BASE_URL}/api/native-voice-assistant-confirm`, {
+        const { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
           method: 'POST',
           headers: buildNativeAuthHeaders(session.token, { json: true }),
           body: JSON.stringify({ draft: targetDraft }),
-        })
-        const data: any = await res.json().catch(() => ({}))
+        }))
         if (!res.ok) throw new Error(data?.error || 'Could not save that.')
         const resultKind = String(data?.result?.kind || '').toLowerCase()
         const changedDate = targetDraft.localDate || todayLocalDate()
