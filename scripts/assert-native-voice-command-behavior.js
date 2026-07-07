@@ -633,6 +633,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(walkedStepsDraft?.exercise?.steps === 5449, 'Walked steps/calories wording must keep the exact step count.')
   assert(walkedStepsDraft?.exercise?.caloriesKcal === 240, 'Walked steps/calories wording must keep the exact calories burned.')
   assert(walkedStepsDraft?.exercise?.distanceKm === 4.4, 'Walked steps without distance must estimate distance from steps.')
+  assert(!shouldUseFavoriteFood('I did a walk and did 5,449 steps and burned 240 calories', [{ label: '250', description: '250', meal: 'breakfast' }]), 'Exercise steps/calories wording must not match numeric favourite foods.')
 
   const exerciseContextDraft = tryParseExerciseRequest('walking for 30 minutes', exerciseContext)
   assert(exerciseContextDraft?.action === 'exercise', 'Exercise context must handle natural exercise wording without log/add.')

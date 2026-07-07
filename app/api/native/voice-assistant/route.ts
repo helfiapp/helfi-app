@@ -1445,6 +1445,12 @@ function findRequestedFavorite(transcript: string, favorites: VoiceFoodFavorite[
 function shouldUseFavoriteFood(transcript: string, favorites: VoiceFoodFavorite[]) {
   const request = compactFoodMatchText(transcript)
   if (!request || favorites.length === 0) return false
+  if (
+    /\b(walk(?:ed|ing)?|run|running|ran|jog(?:ged|ging)?|bike(?:d|ing)?|cycl(?:e|ed|ing)|rode|riding|exercise(?:d)?|workout|steps?|step count)\b/i.test(transcript) &&
+    /\b(burn(?:ed|t)?|calories?|kcal|steps?|walk(?:ed|ing)?|run|running|ran|jog(?:ged|ging)?)\b/i.test(transcript)
+  ) {
+    return false
+  }
   const mentionsFavorite = /\b(favourites?|favorites?|saved)\b/i.test(transcript)
   const looksLikeHealthIntake =
     HEALTH_INTAKE_RECORD_PATTERN.test(transcript) ||
