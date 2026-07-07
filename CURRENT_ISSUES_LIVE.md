@@ -1,5 +1,19 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 07 July 2026, 07:45 PM AEST
+- What changed: Deployed the Talk to Helfi realtime voice backend route, native live voice wiring, health-intake review safety fixes, transcript handling, and Vercel voice checks.
+- Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
+- What to quickly test: In the iPhone simulator, open Talk to Helfi against live, start live voice, confirm it no longer shows 404 or AI service not configured, then test a favourite food save and a medication/supplement review draft.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 06 July 2026, 12:48 PM AEST
+- What changed: Redeployed the current live Vercel build after restoring the missing Production `OPENAI_API_KEY`, so Talk to Helfi can read the repaired AI setting. No local app code was shipped.
+- Where to see it (page/link): https://helfi.ai and native iPhone app -> Food Diary -> Talk to Helfi.
+- What to quickly test: From Food Diary, open Talk to Helfi, use the microphone, and confirm it no longer shows `Try again` / `AI service not configured`.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 02 July 2026, 01:13 AM AEST
 - What changed: Restored the live website after `helfi.ai` had been pointed at the wrong Vercel app. Re-linked the real `helfi-app` project, restored the live settings, corrected the live database setting, redeployed, and updated the deployment checker so it refuses the wrong project in future.
 - Where to see it (page/link): https://helfi.ai/auth/signin and https://helfi.ai/dashboard
