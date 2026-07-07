@@ -1387,7 +1387,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     }
   }, [open, session?.token, voiceRecordingSupported])
 
-  const closePanel = useCallback((options?: { keepPlayback?: boolean }) => {
+  const closePanel = useCallback(() => {
     realtimeVoiceRunRef.current += 1
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
@@ -1402,10 +1402,31 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setPendingFollowUpDraft(null)
     setVisionChoicesOpen(false)
     setSpokenReplyStatus('idle')
-    if (!options?.keepPlayback) {
-      stopPlayback().catch(() => {})
-    }
+    stopPlayback().catch(() => {})
     setOpen(false)
+  }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', (state) => {
+      if (state === 'active') return
+      realtimeVoiceRunRef.current += 1
+      realtimeActionGuardRef.current = null
+      clearRealtimeConnectTimeout()
+      setContinuousVoiceSession(false)
+      void stopRealtimeVoiceSession()
+      clearVoiceTurnTimers()
+      setBottleCameraOpen(false)
+      if (recording) {
+        recording.stopAndUnloadAsync().catch(() => {})
+        setRecording(null)
+      }
+      setRecordingStarting(false)
+      recordingStoppingRef.current = false
+      setBusy(false)
+      setSpokenReplyStatus('idle')
+      stopPlayback().catch(() => {})
+    })
+    return () => subscription.remove()
   }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
   const submitHealthIntakeBottleImage = useCallback(

@@ -198,6 +198,10 @@ if (!/const closeCameraMode = useCallback/.test(native) || !/if \(voiceSessionAc
   failures.push('Closing live camera mode must also end live voice, so voice cannot continue hidden behind the camera overlay.')
 }
 
+if (!/AppState\.addEventListener\('change'/.test(native) || !/state === 'active'/.test(native) || !/setContinuousVoiceSession\(false\)[\s\S]*?stopRealtimeVoiceSession\(\)[\s\S]*?setBottleCameraOpen\(false\)[\s\S]*?stopPlayback\(\)\.catch/.test(native)) {
+  failures.push('Talk to Helfi must stop live voice, camera mode, and playback when the app goes inactive or into the background.')
+}
+
 if (!/NOT_SAVED_MESSAGE\s*=\s*'No problem\. I have not saved anything\.'/.test(native) || (native.match(/requestVoiceReply\(NOT_SAVED_MESSAGE\)/g) || []).length < 3) {
   failures.push('Rejected or cancelled drafts with Spoken reply enabled must speak back that nothing was saved.')
 }
