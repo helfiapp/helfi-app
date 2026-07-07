@@ -17,6 +17,8 @@ cd "$ROOT_DIR"
 
 BUILD_NUMBER="$(node -e "const app=require('./native/app.json'); process.stdout.write(String(app.expo.ios.buildNumber || ''))")"
 APP_VERSION="$(node -e "const app=require('./native/app.json'); process.stdout.write(String(app.expo.version || ''))")"
+BUNDLE_IDENTIFIER="$(node -e "const app=require('./native/app.json'); process.stdout.write(String(app.expo.ios.bundleIdentifier || ''))")"
+COMMIT_SHA="$(git rev-parse HEAD)"
 if [[ -z "$BUILD_NUMBER" || -z "$APP_VERSION" ]]; then
   echo "Could not read native app version/build number." >&2
   exit 1
@@ -63,5 +65,33 @@ xcodebuild \
   -exportPath "$EXPORT_PATH" \
   -exportOptionsPlist "$EXPORT_OPTIONS"
 
+TESTFLIGHT_MODE="$MODE" \
+TESTFLIGHT_LIVE_FLAG="$LIVE_FLAG" \
+TESTFLIGHT_APP_VERSION="$APP_VERSION" \
+TESTFLIGHT_BUILD_NUMBER="$BUILD_NUMBER" \
+TESTFLIGHT_BUNDLE_IDENTIFIER="$BUNDLE_IDENTIFIER" \
+TESTFLIGHT_COMMIT_SHA="$COMMIT_SHA" \
+TESTFLIGHT_EXPORT_PATH="$EXPORT_PATH" \
+node <<'NODE'
+const fs = require('fs')
+const path = require('path')
+
+const exportPath = process.env.TESTFLIGHT_EXPORT_PATH
+const manifest = {
+  mode: process.env.TESTFLIGHT_MODE,
+  liveVoiceEnabled: process.env.TESTFLIGHT_LIVE_FLAG === 'true',
+  apiBaseUrl: 'https://helfi.ai',
+  appVersion: process.env.TESTFLIGHT_APP_VERSION,
+  buildNumber: process.env.TESTFLIGHT_BUILD_NUMBER,
+  bundleIdentifier: process.env.TESTFLIGHT_BUNDLE_IDENTIFIER,
+  commitSha: process.env.TESTFLIGHT_COMMIT_SHA,
+  ipa: 'Helfi.ipa',
+  createdAt: new Date().toISOString(),
+}
+
+fs.writeFileSync(path.join(exportPath, 'Helfi-testflight-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+NODE
+
 echo "Local IPA created:"
 echo "${EXPORT_PATH}/Helfi.ipa"
+echo "${EXPORT_PATH}/Helfi-testflight-manifest.json"

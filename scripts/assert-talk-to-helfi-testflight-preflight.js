@@ -37,7 +37,9 @@ assert(packageJson.scripts?.['build:talk-to-helfi-testflight:paused']?.includes(
 assert(packageJson.scripts?.['build:talk-to-helfi-testflight:live']?.includes('live-candidate'), 'Package scripts must keep an explicit live-candidate local IPA builder.')
 assert(testflightBuilder.includes('paused-safe|live-candidate') && testflightBuilder.includes('This script is local-only. It does not upload to TestFlight.'), 'Talk to Helfi IPA builder must separate paused and live candidates without Apple upload.')
 assert(testflightBuilder.includes('EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED="$LIVE_FLAG"'), 'Talk to Helfi live-candidate IPA must compile live voice with the explicit live flag.')
+assert(testflightBuilder.includes('Helfi-testflight-manifest.json') && testflightBuilder.includes('TESTFLIGHT_COMMIT_SHA'), 'Talk to Helfi IPA builder must write a manifest tying the IPA to the current commit.')
 assert(testflightUploadReady.includes('githubCommitSha=') && testflightUploadReady.includes('helfi.ai') && testflightUploadReady.includes('not deployed to Vercel Production'), 'Talk to Helfi upload readiness must verify the live backend has the current commit before TestFlight upload.')
+assert(testflightUploadReady.includes('Helfi-testflight-manifest.json') && testflightUploadReady.includes('manifest.commitSha !== commitSha') && testflightUploadReady.includes("manifest.liveVoiceEnabled !== true"), 'Talk to Helfi upload readiness must verify the live IPA manifest before TestFlight upload.')
 
 assert(voiceConfig.includes("const DEFAULT_HELFI_VOICE = 'marin'"), 'Talk to Helfi voices must default to Marin, the closest available natural OpenAI API voice.')
 assert(voiceConfig.includes("BEST_NATURAL_OPENAI_VOICES") && voiceConfig.includes("'marin'") && voiceConfig.includes("'cedar'"), 'Talk to Helfi voice selection must only prefer the best natural OpenAI API voices.')
