@@ -44,6 +44,7 @@ import { ListYourPracticeScreen } from '../screens/ListYourPracticeScreen'
 import { ListYourPracticeStartScreen } from '../screens/ListYourPracticeStartScreen'
 import { NativeWebToolScreen } from '../screens/NativeWebToolScreen'
 import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
+import type { VoiceAssistantLaunchContext } from '../voice/VoiceAssistant'
 
 export type MainStackParamList = {
   Tabs: NavigatorScreenParams<MainTabParamList> | undefined
@@ -53,9 +54,23 @@ export type MainStackParamList = {
   Billing: undefined
   Devices: undefined
   Help: { activeTab?: NativeBottomNavKey } | undefined
-  HealthJournal: undefined
+  HealthJournal:
+    | {
+        initialTab?: 'entry' | 'history'
+        selectedDate?: string
+        voiceActionNonce?: number
+      }
+    | undefined
   HealthImageNotes: undefined
-  SymptomNotes: undefined
+  SymptomNotes:
+    | {
+        voiceAction?: 'prefill'
+        voiceActionNonce?: number
+        voiceSymptoms?: string[]
+        voiceDuration?: string
+        voiceNotes?: string
+      }
+    | undefined
   Notifications: undefined
   NotificationsInbox: undefined
   NotificationsAIInsights: undefined
@@ -72,6 +87,7 @@ export type MainStackParamList = {
     | {
         voiceAction?: string
         voiceMeal?: string
+        voiceRecipeDraft?: any
         voiceActionNonce?: number
       }
     | undefined
@@ -208,6 +224,42 @@ function activeTabForNativeWebPath(path: string): NativeBottomNavKey {
   return 'More'
 }
 
+function voiceContextForStackRoute(routeName: string, params?: any): VoiceAssistantLaunchContext {
+  if (routeName === 'Profile' || routeName === 'ProfilePhoto' || routeName === 'AccountSettings') return { section: 'profile', title: 'Profile' }
+  if (routeName === 'Billing') return { section: 'billing', title: 'Billing' }
+  if (routeName === 'Devices') return { section: 'devices', title: 'Devices' }
+  if (routeName === 'Help' || routeName === 'Support') return { section: 'support', title: 'Help & Support' }
+  if (routeName === 'HealthJournal') return { section: 'journal', title: 'Health Journal' }
+  if (routeName === 'SymptomNotes') return { section: 'symptoms', title: 'Symptom Notes' }
+  if (routeName === 'HealthImageNotes') return { section: 'health-image', title: 'Health Image Notes', mode: 'health-image' }
+  if (routeName === 'Notifications' || routeName.startsWith('Notifications') || routeName === 'Reminders') return { section: 'settings', title: 'Notifications' }
+  if (routeName === 'SmartHealthCoach') return { section: 'health-coach', title: 'Health Coach' }
+  if (routeName === 'PrivacySettings') return { section: 'settings', title: 'Privacy Settings' }
+  if (routeName === 'HealthSetup') return { section: 'health-intake', title: 'Health Intake' }
+  if (routeName === 'DailyCheckIn') return { section: 'check-in', title: "Today's Check-in" }
+  if (routeName === 'MoodTracker') return { section: 'mood', title: 'Mood Tracker' }
+  if (routeName === 'TrackCalories' || routeName === 'AddIngredient' || routeName === 'FoodAnalysis' || routeName === 'FoodDiarySettings') {
+    return { section: 'food', title: 'Food Diary', meal: typeof params?.meal === 'string' ? params.meal : 'breakfast' }
+  }
+  if (routeName === 'WaterIntake') return { section: 'water', title: 'Water Intake' }
+  if (routeName === 'Practitioners' || routeName === 'PractitionerAZ' || routeName === 'PractitionerProfile' || routeName === 'ListYourPractice' || routeName === 'ListYourPracticeStart') {
+    return { section: 'practitioner', title: 'Practitioners' }
+  }
+  if (routeName === 'NativeWebTool') {
+    const path = String(params?.path || '')
+    if (path.startsWith('/food')) return { section: 'food', title: 'Food Diary', meal: 'breakfast' }
+    if (path.startsWith('/insights')) return { section: 'insights', title: 'Insights' }
+    if (path.startsWith('/medical-images')) return { section: 'health-image', title: 'Health Image Notes', mode: 'health-image' }
+    if (path.startsWith('/symptoms')) return { section: 'symptoms', title: 'Symptom Notes' }
+    if (path.startsWith('/health-journal')) return { section: 'journal', title: 'Health Journal' }
+    if (path.startsWith('/onboarding')) return { section: 'health-intake', title: 'Health Intake' }
+    if (path.startsWith('/billing')) return { section: 'billing', title: 'Billing' }
+    if (path.startsWith('/settings') || path.startsWith('/notifications')) return { section: 'settings', title: 'Settings' }
+    return { section: 'more', title: String(params?.title || 'Helfi') }
+  }
+  return { section: 'generic', title: 'Helfi' }
+}
+
 function NativeWebToolWithBottomNav(props: React.ComponentProps<typeof NativeWebToolScreen>) {
   const path = String(props.route?.params?.path || '')
   return (
@@ -223,10 +275,12 @@ function NativeWebToolWithBottomNav(props: React.ComponentProps<typeof NativeWeb
 export function MainNavigator() {
   return (
     <Stack.Navigator
-      screenOptions={({ navigation }) => ({
+      screenOptions={({ navigation, route }) => ({
         headerBackVisible: false,
         headerLeft: () => <HeaderBackButton navigation={navigation} />,
-        headerRight: () => <VoiceAssistantIconButton size={36} iconSize={18} />,
+        headerRight: () => (
+          <VoiceAssistantIconButton size={36} iconSize={18} context={voiceContextForStackRoute(route.name, route.params)} />
+        ),
       })}
     >
       <Stack.Screen name="Tabs" component={MainTabs} options={{ headerShown: false }} />

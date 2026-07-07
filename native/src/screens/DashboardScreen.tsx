@@ -741,7 +741,7 @@ export function DashboardScreen() {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <VoiceAssistantIconButton size={36} iconSize={18} />
+            <VoiceAssistantIconButton size={36} iconSize={18} context={{ section: 'dashboard', title: 'Dashboard' }} />
             <Image source={require('../../assets/helfi-logo.png')} style={{ width: 108, height: 36 }} resizeMode="contain" />
           </View>
 

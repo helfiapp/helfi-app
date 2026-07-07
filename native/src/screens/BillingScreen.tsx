@@ -54,6 +54,8 @@ const usageDisplayList = [
   { label: 'Health image notes', key: 'medicalImageAnalysis', credits: 2 },
   { label: 'Insights generation', key: 'insightsGeneration', credits: 7 },
   { label: 'Talk to Helfi chat', key: 'chatLight', credits: 10 },
+  { label: 'Talk to Helfi voice action', key: 'talkToHealthyVoice', credits: 3 },
+  { label: 'Talk to Helfi spoken reply', key: 'talkToHealthySpokenReply', credits: 2 },
 ]
 
 const creditCostDisplayList = [

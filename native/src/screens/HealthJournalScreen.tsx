@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Image,
   Pressable,
   ScrollView,
@@ -10,13 +11,16 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useRoute } from '@react-navigation/native'
+import type { RouteProp } from '@react-navigation/native'
 import { Audio } from 'expo-av'
 import * as ImagePicker from 'expo-image-picker'
 import { Feather } from '@expo/vector-icons'
 
 import { API_BASE_URL } from '../config'
+import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -102,14 +106,22 @@ function mergeContentWithMediaNotes(content: string, summaries: string[]) {
   return [base, `Media notes (auto-summarized):\n${list}`].filter(Boolean).join('\n\n').trim()
 }
 
+function safeDateParam(value?: string | null) {
+  const raw = String(value || '').trim()
+  return /^\d{4}-\d{2}-\d{2}$/.test(raw) ? raw : ''
+}
+
 export function HealthJournalScreen() {
+  const route = useRoute<RouteProp<MainStackParamList, 'HealthJournal'>>()
   const { mode, session } = useAppMode()
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
     return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [mode, session?.token])
 
-  const [activeTab, setActiveTab] = useState<TabKey>('entry')
+  const routeInitialTab = route.params?.initialTab === 'history' ? 'history' : 'entry'
+  const routeInitialDate = safeDateParam(route.params?.selectedDate)
+  const [activeTab, setActiveTab] = useState<TabKey>(routeInitialTab)
   const [note, setNote] = useState('')
   const [saving, setSaving] = useState(false)
   const [notice, setNotice] = useState('')
@@ -118,7 +130,7 @@ export function HealthJournalScreen() {
   const [mediaBusy, setMediaBusy] = useState(false)
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
 
-  const [selectedDate, setSelectedDate] = useState(todayIso())
+  const [selectedDate, setSelectedDate] = useState(routeInitialDate || todayIso())
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
   const [entries, setEntries] = useState<JournalEntry[]>([])
@@ -164,6 +176,27 @@ export function HealthJournalScreen() {
     }, [activeTab, loadHistory]),
   )
 
+  useEffect(() => {
+    if (route.params?.initialTab === 'history') setActiveTab('history')
+    const nextDate = safeDateParam(route.params?.selectedDate)
+    if (nextDate) setSelectedDate(nextDate)
+  }, [route.params?.initialTab, route.params?.selectedDate, route.params?.voiceActionNonce])
+
+  useEffect(() => {
+    if (mode !== 'signedIn' || !session?.token) return
+    const subscription = DeviceEventEmitter.addListener('helfi:health-journal-changed', (payload?: any) => {
+      const changedDate = typeof payload?.localDate === 'string' ? payload.localDate : ''
+      if (changedDate && changedDate !== selectedDate) {
+        setSelectedDate(changedDate)
+        setActiveTab('history')
+        return
+      }
+      setActiveTab('history')
+      void loadHistory()
+    })
+    return () => subscription.remove()
+  }, [loadHistory, mode, selectedDate, session?.token])
+
   const extractMedia = async (kind: 'image' | 'audio', uri: string, fileName: string, mimeType: string) => {
     if (!authHeaders) throw new Error('Please sign in again.')
     const fallback = kind === 'image'
@@ -192,6 +225,12 @@ export function HealthJournalScreen() {
       return
     }
 
+    const allowed = await requestAiDataSharingPermission()
+    if (!allowed) {
+      setError('No media was sent. AI sharing permission is needed before photo or voice summaries.')
+      return
+    }
+
     const id = mediaId()
     setError('')
     setMedia((prev) => [
@@ -212,20 +251,38 @@ export function HealthJournalScreen() {
     }
   }
 
-  const pickPhoto = async () => {
+  const pickPhotoSource = async (source: 'camera' | 'library') => {
     try {
       setMediaBusy(true)
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync()
       if (!permission.granted) {
-        Alert.alert('Permission needed', 'Please allow photo library access to add images.')
+        Alert.alert('Permission needed', 'Please allow access to add images.')
         return
       }
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.85,
-        allowsEditing: false,
-      })
-      if (picked.canceled || picked.assets.length === 0) return
+      const picked =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.85,
+              allowsEditing: false,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.85,
+              allowsEditing: false,
+            })
+      if (picked.canceled || picked.assets.length === 0) {
+        if (source === 'camera') {
+          Alert.alert(
+            'No photo taken',
+            'If you are using the simulator, camera capture may not be available. Use Photo Library or test the camera on a real iPhone.',
+          )
+        }
+        return
+      }
       const asset = picked.assets[0]
       const fileName = asset.fileName || asset.uri.split('/').pop() || `health-journal-image-${Date.now()}.jpg`
       await addMediaItem('image', asset.uri, fileName, asset.mimeType || 'image/jpeg')
@@ -235,6 +292,23 @@ export function HealthJournalScreen() {
       setMediaBusy(false)
     }
   }
+
+  const pickPhoto = () => {
+    Alert.alert('Add journal photo', 'Choose where to get the photo from.', [
+      { text: 'Camera', onPress: () => void pickPhotoSource('camera') },
+      { text: 'Photo Library', onPress: () => void pickPhotoSource('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:journal-voice-action', (payload?: any) => {
+      if (String(payload?.action || '') !== 'pickPhoto') return
+      setActiveTab('entry')
+      void pickPhoto()
+    })
+    return () => subscription.remove()
+  }, [pickPhoto])
 
   const startRecording = async () => {
     if (recording) return

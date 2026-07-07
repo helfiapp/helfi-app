@@ -7,6 +7,7 @@ import { prisma } from '@/lib/prisma'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
 import { CreditManager, computeNextWalletResetAt } from '@/lib/credit-system'
 import { logServerCall } from '@/lib/server-call-tracker'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 // ABSOLUTE GUARD RAIL:
 // This endpoint powers the "Credits remaining" bar. Do NOT change credit
@@ -67,29 +68,36 @@ export async function GET(_req: NextRequest) {
     debugStage = 'resolve-session'
     let session = await getServerSession(authOptions)
     let userEmail: string | null = session?.user?.email ?? null
+    let userId: string | null = session?.user?.id ?? null
 
-    if (!userEmail) {
+    if (!userEmail || !userId) {
       try {
         const token = await getToken({
           req: _req,
           secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024',
         })
-        if (token?.email) {
+        if (!userEmail && token?.email) {
           userEmail = String(token.email)
         }
+        if (!userId && typeof token?.sub === 'string') userId = token.sub
+        if (!userId && typeof (token as any)?.id === 'string') userId = String((token as any).id)
       } catch (tokenError) {
         console.error('/api/credit/status - JWT fallback failed:', tokenError)
       }
     }
 
-    if (!userEmail) {
+    if (!userId) {
+      userId = await getUserIdFromNativeAuth(_req)
+    }
+
+    if (!userEmail && !userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     // 2) Load user with all fields needed for wallet + legacy credits
     debugStage = 'load-user'
     const user = await prisma.user.findUnique({
-      where: { email: userEmail },
+      where: userId ? { id: userId } : { email: userEmail as string },
       select: {
         id: true,
         // Legacy daily/additional credits
@@ -185,9 +193,18 @@ export async function GET(_req: NextRequest) {
     debugStage = 'compute-reset'
     const refreshAt = computeNextResetAt(isPremium ? user.subscription?.startDate ?? null : null)
 
-    // Get free credits status
-    const freeCreditsStatus = await getFreeCreditsStatus(user.id)
-    const exhaustedFreeCredits = await hasExhaustedFreeCredits(user.id)
+    // Get free credits status. If this optional part fails, keep returning the
+    // paid wallet status so real paid users are not blocked by Talk to Helfi.
+    let freeCreditsStatus: Awaited<ReturnType<typeof getFreeCreditsStatus>> | null = null
+    let exhaustedFreeCredits = false
+    let freeCreditsUnavailable = false
+    try {
+      freeCreditsStatus = await getFreeCreditsStatus(user.id)
+      exhaustedFreeCredits = await hasExhaustedFreeCredits(user.id)
+    } catch (freeCreditError) {
+      freeCreditsUnavailable = true
+      console.error('/api/credit/status - free credit status failed:', freeCreditError)
+    }
 
     return NextResponse.json({
       schemaVersion: 2,
@@ -216,6 +233,7 @@ export async function GET(_req: NextRequest) {
       },
       freeCredits: freeCreditsStatus,
       exhaustedFreeCredits,
+      freeCreditsUnavailable,
     })
   } catch (err: any) {
     console.error('Error in /api/credit/status:', err)
@@ -230,6 +248,7 @@ export async function GET(_req: NextRequest) {
       monthlyCapCents: 0,
       monthlyUsedCents: 0,
       topUps: [],
+      additionalAvailableCents: 0,
       totalAvailableCents: 0,
       credits: {
         total: 0,

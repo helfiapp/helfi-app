@@ -3,18 +3,20 @@ import { Pressable, StyleProp, ViewStyle } from 'react-native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 
 import { theme } from '../ui/theme'
-import { useVoiceAssistant } from './VoiceAssistant'
+import { useVoiceAssistant, type VoiceAssistantLaunchContext } from './VoiceAssistant'
 
 export function VoiceAssistantIconButton({
   size = 42,
   iconSize = 21,
   style,
   onPress,
+  context,
 }: {
   size?: number
   iconSize?: number
   style?: StyleProp<ViewStyle>
   onPress?: () => void
+  context?: VoiceAssistantLaunchContext
 }) {
   const { openVoiceAssistant } = useVoiceAssistant()
 
@@ -22,7 +24,7 @@ export function VoiceAssistantIconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Talk to Helfi"
-      onPress={onPress || (() => openVoiceAssistant({ source: 'button' }))}
+      onPress={onPress || (() => openVoiceAssistant({ source: 'button', context }))}
       style={({ pressed }) => [
         {
           width: size,

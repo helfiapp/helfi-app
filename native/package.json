@@ -5,10 +5,11 @@
   "scripts": {
     "check:page-locks": "node ../scripts/check-page-locks.js --scope=native-ui",
     "check:practitioner-lock": "bash scripts/check-practitioner-native-lock.sh",
-    "start": "npm run check:page-locks && npm run check:practitioner-lock && expo start",
-    "android": "npm run check:page-locks && npm run check:practitioner-lock && expo run:android",
-    "ios": "npm run check:page-locks && npm run check:practitioner-lock && expo run:ios",
-    "web": "npm run check:page-locks && npm run check:practitioner-lock && expo start --web",
+    "check:voice-assistant": "node ../scripts/assert-native-voice-confirm-guard.js && node ../scripts/assert-native-voice-command-behavior.js",
+    "start": "npm run check:page-locks && npm run check:voice-assistant && npm run check:practitioner-lock && expo start",
+    "android": "npm run check:page-locks && npm run check:voice-assistant && npm run check:practitioner-lock && expo run:android",
+    "ios": "npm run check:page-locks && npm run check:voice-assistant && npm run check:practitioner-lock && expo run:ios",
+    "web": "npm run check:page-locks && npm run check:voice-assistant && npm run check:practitioner-lock && expo start --web",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
@@ -40,6 +41,7 @@
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",
     "react-native-web": "^0.21.0",
+    "react-native-webrtc": "^124.0.7",
     "react-native-webview": "^13.16.1"
   },
   "devDependencies": {

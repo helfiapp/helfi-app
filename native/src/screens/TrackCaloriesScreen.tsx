@@ -24,7 +24,6 @@ import * as ImageManipulator from 'expo-image-manipulator'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { API_BASE_URL } from '../config'
-import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
 import { calculateDailyTargets } from '../lib/dailyTargets'
 import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
@@ -2606,13 +2605,40 @@ export function TrackCaloriesScreen() {
   }, [])
 
   const openVoiceFromFoodOverlay = useCallback(() => {
+    const context =
+      exerciseOpen
+        ? { section: 'exercise' as const, title: 'Exercise' }
+        : {
+            section: 'food' as const,
+            title: 'Food Diary',
+            date: selectedDate,
+            meal: favoritesOpen
+              ? favoritesTargetMeal
+              : recommendedOpen
+              ? recommendedTargetMeal
+              : combineOpen
+              ? combineTargetMeal
+              : topAddMeal,
+          }
     if (favoritesOpen) closeFavoritesFlow()
     setCombineOpen(false)
     setExerciseOpen(false)
     setTimeout(() => {
-      openVoiceAssistant({ source: 'button' })
+      openVoiceAssistant({ source: 'button', context })
     }, 120)
-  }, [closeFavoritesFlow, favoritesOpen, openVoiceAssistant])
+  }, [
+    closeFavoritesFlow,
+    combineOpen,
+    combineTargetMeal,
+    exerciseOpen,
+    favoritesOpen,
+    favoritesTargetMeal,
+    openVoiceAssistant,
+    recommendedOpen,
+    recommendedTargetMeal,
+    selectedDate,
+    topAddMeal,
+  ])
 
   useEffect(() => {
     const subscription = DeviceEventEmitter.addListener('helfi:voice-assistant-opening', () => {
@@ -2857,7 +2883,10 @@ export function TrackCaloriesScreen() {
     if (mode !== 'signedIn' || !session?.token) return
     const subscription = DeviceEventEmitter.addListener('helfi:food-log-changed', (payload?: any) => {
       const changedDate = typeof payload?.localDate === 'string' ? payload.localDate : ''
-      if (changedDate && changedDate !== selectedDate) return
+      if (changedDate && changedDate !== selectedDate) {
+        setSelectedDate(changedDate)
+        return
+      }
       void loadAll()
     })
     return () => subscription.remove()
@@ -3597,23 +3626,83 @@ export function TrackCaloriesScreen() {
     setFavoriteEditPortionControlEnabled(false)
   }
 
+  const recipeIngredientNutritionFallback = (line: string) => {
+    const text = normalizeFavoriteLabel(line).toLowerCase()
+    const gramMatch = text.match(/(\d+(?:\.\d+)?)\s*g\b/)
+    const tbspMatch = text.match(/(\d+(?:\.\d+)?)\s*tbsp\b/)
+    const cupMatch = text.match(/(\d+(?:\.\d+)?)\s*cup\b/)
+    const grams = Number(gramMatch?.[1]) || 0
+    const tablespoons = Number(tbspMatch?.[1]) || 0
+    const cups = Number(cupMatch?.[1]) || 0
+    const per100g = (calories: number, protein: number, carbs: number, fat: number, fiber = 0, sugar = 0) => {
+      const multiplier = grams > 0 ? grams / 100 : 1
+      return {
+        calories: Math.round(calories * multiplier),
+        protein_g: round1(protein * multiplier),
+        carbs_g: round1(carbs * multiplier),
+        fat_g: round1(fat * multiplier),
+        fiber_g: round1(fiber * multiplier),
+        sugar_g: round1(sugar * multiplier),
+      }
+    }
+    const perTablespoon = (calories: number, protein: number, carbs: number, fat: number, fiber = 0, sugar = 0) => {
+      const multiplier = tablespoons > 0 ? tablespoons : 1
+      return {
+        calories: Math.round(calories * multiplier),
+        protein_g: round1(protein * multiplier),
+        carbs_g: round1(carbs * multiplier),
+        fat_g: round1(fat * multiplier),
+        fiber_g: round1(fiber * multiplier),
+        sugar_g: round1(sugar * multiplier),
+      }
+    }
+    const perCup = (calories: number, protein: number, carbs: number, fat: number, fiber = 0, sugar = 0) => {
+      const multiplier = cups > 0 ? cups : 1
+      return {
+        calories: Math.round(calories * multiplier),
+        protein_g: round1(protein * multiplier),
+        carbs_g: round1(carbs * multiplier),
+        fat_g: round1(fat * multiplier),
+        fiber_g: round1(fiber * multiplier),
+        sugar_g: round1(sugar * multiplier),
+      }
+    }
+
+    if (/chickpeas|chick peas/.test(text)) return per100g(164, 8.9, 27.4, 2.6, 7.6, 4.8)
+    if (/brown rice/.test(text)) return per100g(111, 2.6, 23, 0.9, 1.8, 0.4)
+    if (/mixed vegetables?/.test(text)) return per100g(65, 3, 13, 0.3, 4, 4)
+    if (/olive oil/.test(text)) return perTablespoon(119, 0, 0, 13.5)
+    if (/chicken breast/.test(text)) return per100g(165, 31, 0, 3.6)
+    if (/salmon/.test(text)) return per100g(208, 20, 0, 13)
+    if (/sweet potato/.test(text)) return per100g(86, 1.6, 20.1, 0.1, 3, 4.2)
+    if (/\bpotato\b/.test(text)) return per100g(87, 1.9, 20.1, 0.1, 1.8, 0.9)
+    if (/broccoli/.test(text)) return per100g(35, 2.4, 7.2, 0.4, 3.3, 1.4)
+    if (/rolled oats|oats/.test(text)) return perCup(307, 10.7, 54.8, 5.3, 8.1, 0.8)
+    if (/greek yogurt|greek yoghurt/.test(text)) return per100g(59, 10.3, 3.6, 0.4, 0, 3.2)
+    if (/blueberries/.test(text)) return per100g(57, 0.7, 14.5, 0.3, 2.4, 10)
+    if (/chia/.test(text)) return perTablespoon(58, 2, 5, 3.7, 4.1, 0)
+
+    return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
+  }
+
   const buildImportedRecipeItems = (ingredients: string[]) =>
-    ingredients.slice(0, 80).map((line, index) =>
-      buildFavoriteAdjustItemFromSearchFood({
+    ingredients.slice(0, 80).map((line, index) => {
+      const nutrition = recipeIngredientNutritionFallback(line)
+      return buildFavoriteAdjustItemFromSearchFood({
         id: `recipe-import-${Date.now()}-${index}`,
         source: 'custom',
         name: line,
         serving_size: line,
         servings: 1,
-        calories: 0,
-        protein_g: 0,
-        carbs_g: 0,
-        fat_g: 0,
-        fiber_g: 0,
-        sugar_g: 0,
+        calories: nutrition.calories,
+        protein_g: nutrition.protein_g,
+        carbs_g: nutrition.carbs_g,
+        fat_g: nutrition.fat_g,
+        fiber_g: nutrition.fiber_g,
+        sugar_g: nutrition.sugar_g,
         __custom: true,
-      }),
-    )
+      })
+    })
 
   const buildRecommendedMealBuilderItems = (meal: RecommendedMeal) =>
     (meal.items || []).slice(0, 80).map((item, index) =>
@@ -4728,7 +4817,7 @@ export function TrackCaloriesScreen() {
     }
   }
 
-  const createFromImage = async (modeValue: 'camera' | 'library', meal: string, usageMode: 'diary' | 'editor' = 'diary') => {
+  const createFromImage = async (modeValue: 'camera' | 'library', meal: string, usageMode: 'diary' | 'editor' | 'voiceReview' = 'diary') => {
     if (!session?.token) return
 
     if (usageMode === 'editor') {
@@ -4783,6 +4872,14 @@ export function TrackCaloriesScreen() {
 
       const items = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
       if (items.length > 0) {
+        if (usageMode === 'voiceReview') {
+          openNativeMealBuilder(meal, {
+            name: items.length === 1 ? String(items[0]?.name || 'Photo analyzed meal') : 'Photo analyzed meal',
+            items: items.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)),
+          })
+          Alert.alert('Review before saving', 'I added the photo results to Build a meal. Please review them before saving.')
+          return
+        }
         let added = 0
         for (const item of items) {
           const ok = await createFoodEntry({
@@ -4828,6 +4925,27 @@ export function TrackCaloriesScreen() {
         Alert.alert('No food detected', 'Please try again with a clear photo of food.')
         return
       }
+      if (usageMode === 'voiceReview') {
+        openNativeMealBuilder(meal, {
+          name: String(summary?.name || 'Photo analyzed meal'),
+          items: [
+            buildFavoriteAdjustItemFromSearchFood({
+              id: `photo-${Date.now()}`,
+              name: String(summary?.name || 'Photo analyzed meal'),
+              serving_size: String(summary?.description || '1 serving'),
+              calories: numberOrZero(summary?.calories || summary?.calories_kcal),
+              protein_g: numberOrZero(summary?.protein || summary?.protein_g),
+              carbs_g: numberOrZero(summary?.carbs || summary?.carbs_g),
+              fat_g: numberOrZero(summary?.fat || summary?.fat_g),
+              fiber_g: numberOrZero(summary?.fiber || summary?.fiber_g),
+              sugar_g: numberOrZero(summary?.sugar || summary?.sugar_g),
+              __custom: true,
+            }),
+          ],
+        })
+        Alert.alert('Review before saving', 'I added the photo result to Build a meal. Please review it before saving.')
+        return
+      }
       const ok = await createFoodEntry({
         name: String(summary?.name || 'Photo analyzed meal'),
         meal,
@@ -4852,7 +4970,7 @@ export function TrackCaloriesScreen() {
     }
   }
 
-  const openFoodPhotoPicker = (meal: string, usageMode: 'diary' | 'editor' = 'diary') => {
+  const openFoodPhotoPicker = (meal: string, usageMode: 'diary' | 'editor' | 'voiceReview' = 'diary') => {
     Alert.alert('Add by photo', 'Choose where to get the food photo from.', [
       { text: 'Camera', onPress: () => void createFromImage('camera', meal, usageMode) },
       { text: 'Photo Library', onPress: () => void createFromImage('library', meal, usageMode) },
@@ -5155,11 +5273,17 @@ export function TrackCaloriesScreen() {
     return [mealLabel(String(meal.category || recommendedTargetMeal)), dateText].filter(Boolean).join(' • ')
   }
 
-  const openAskAIChat = () => {
-    const parent = navigation.getParent?.()
-    parent?.navigate?.('NativeWebTool', {
-      title: NATIVE_WEB_PAGES.talkToHelfi.title,
-      path: `/chat?context=food&date=${encodeURIComponent(selectedDate)}`,
+  const openAskHelfiMealAdvice = () => {
+    openVoiceAssistant({
+      source: 'button',
+      autoSubmit: true,
+      transcript: 'What should I eat based on calories and nutrients left today?',
+      context: {
+        section: 'food',
+        title: 'Food Diary',
+        meal: recommendedTargetMeal,
+        date: selectedDate,
+      },
     })
   }
 
@@ -5582,6 +5706,7 @@ export function TrackCaloriesScreen() {
     const mealRaw = typeof payload?.meal === 'string' ? payload.meal : 'breakfast'
     const meal = MEALS.some((item) => item.key === mealRaw) ? mealRaw : 'breakfast'
     const action = String(payload?.action || '')
+    const recipeDraft = payload?.recipeDraft && typeof payload.recipeDraft === 'object' ? payload.recipeDraft : null
     closeAllAddMenus()
     setTopAddMeal(meal)
     if (action === 'openAddFoodEntry') {
@@ -5597,10 +5722,19 @@ export function TrackCaloriesScreen() {
       return
     }
     if (action === 'openPhoto') {
-      openFoodPhotoPicker(meal)
+      openFoodPhotoPicker(meal, 'voiceReview')
       return
     }
     if (action === 'openBuildMeal') {
+      if (recipeDraft) {
+        openNativeMealBuilder(meal, {
+          name: typeof recipeDraft.title === 'string' ? recipeDraft.title : 'Recipe',
+          ingredients: Array.isArray(recipeDraft.ingredients) ? recipeDraft.ingredients.map((item: any) => String(item || '').trim()).filter(Boolean) : [],
+          steps: Array.isArray(recipeDraft.steps) ? recipeDraft.steps.map((item: any) => String(item || '').trim()).filter(Boolean) : [],
+          servings: Number.isFinite(Number(recipeDraft.servings)) ? Number(recipeDraft.servings) : null,
+        })
+        return
+      }
       openBuildMealTool(meal)
       return
     }
@@ -5624,12 +5758,13 @@ export function TrackCaloriesScreen() {
     const action = typeof route.params?.voiceAction === 'string' ? route.params.voiceAction : ''
     if (!action) return
     const meal = typeof route.params?.voiceMeal === 'string' ? route.params.voiceMeal : 'breakfast'
+    const recipeDraft = route.params?.voiceRecipeDraft && typeof route.params.voiceRecipeDraft === 'object' ? route.params.voiceRecipeDraft : null
     const timeout = setTimeout(() => {
-      openFoodVoiceAction({ action, meal })
-      navigation.setParams?.({ voiceAction: undefined, voiceMeal: undefined, voiceActionNonce: undefined })
+      openFoodVoiceAction({ action, meal, recipeDraft })
+      navigation.setParams?.({ voiceAction: undefined, voiceMeal: undefined, voiceRecipeDraft: undefined, voiceActionNonce: undefined })
     }, 150)
     return () => clearTimeout(timeout)
-  }, [mode, navigation, route.params?.voiceAction, route.params?.voiceActionNonce, route.params?.voiceMeal, session?.token])
+  }, [mode, navigation, route.params?.voiceAction, route.params?.voiceActionNonce, route.params?.voiceMeal, route.params?.voiceRecipeDraft, session?.token])
 
   const goToProfile = () => navigation.getParent()?.navigate('Profile')
   const goToAccountSettings = () => navigation.getParent()?.navigate('AccountSettings')
@@ -5792,7 +5927,12 @@ export function TrackCaloriesScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Talk to Helfi"
-              onPress={() => openVoiceAssistant({ source: 'button' })}
+              onPress={() =>
+                openVoiceAssistant({
+                  source: 'button',
+                  context: { section: 'food', title: 'Food Diary', meal: topAddMeal || 'breakfast', date: selectedDate },
+                })
+              }
               style={{
                 width: 42,
                 height: 42,
@@ -6111,8 +6251,8 @@ export function TrackCaloriesScreen() {
                 <Text style={[energyToggleText, energyUnit === 'kj' && energyToggleTextActive]}>kJ</Text>
               </Pressable>
             </View>
-            <Pressable onPress={openAskAIChat} style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, flexShrink: 0 }}>
-              <Text style={{ color: '#fff', fontWeight: '900' }}>Ask AI</Text>
+            <Pressable onPress={openAskHelfiMealAdvice} style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, flexShrink: 0 }}>
+              <Text style={{ color: '#fff', fontWeight: '900' }}>Ask Helfi</Text>
             </Pressable>
           </View>
         </View>

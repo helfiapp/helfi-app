@@ -1,4 +1,4 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -67,6 +67,19 @@ function formatDateTime(value?: string | null) {
   return date.toLocaleString()
 }
 
+const SAFE_SYMPTOM_NOTE_FALLBACK =
+  'General tracking note. Please discuss this with a qualified healthcare professional if you are concerned.'
+
+const riskyMedicalClaimPattern =
+  /\b(possible cause|possibly|may indicate|could indicate|suggests|suggesting|consistent with|likely|diagnosis|diagnose|treatment|treat|cure|antibiotic|dosage|dose)\b/i
+
+function safeText(value?: string | null, fallback = SAFE_SYMPTOM_NOTE_FALLBACK) {
+  const text = String(value || '').trim()
+  if (!text) return ''
+  if (riskyMedicalClaimPattern.test(text)) return fallback
+  return text
+}
+
 function mergeResult(data: any): SymptomResult {
   const analysisData = data?.analysisData && typeof data.analysisData === 'object' ? data.analysisData : {}
   return {
@@ -91,7 +104,16 @@ function mergeResult(data: any): SymptomResult {
   }
 }
 
-export function SymptomNotesScreen() {
+type SymptomNotesRouteParams = {
+  voiceAction?: 'prefill'
+  voiceActionNonce?: number
+  voiceSymptoms?: string[]
+  voiceDuration?: string
+  voiceNotes?: string
+  initialTab?: TabKey
+}
+
+export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesRouteParams } }) {
   const { mode, session } = useAppMode()
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
@@ -155,6 +177,31 @@ export function SymptomNotesScreen() {
       return () => {}
     }, [activeTab, loadHistory]),
   )
+
+  useEffect(() => {
+    const params = route?.params
+    if (params?.initialTab === 'history') {
+      setActiveTab('history')
+      setError('')
+      return
+    }
+    if (params?.voiceAction !== 'prefill') return
+    const symptoms = Array.isArray(params.voiceSymptoms)
+      ? params.voiceSymptoms.map((item) => String(item || '').trim()).filter(Boolean)
+      : []
+    if (symptoms.length) {
+      setSelectedSymptoms((prev) => Array.from(new Set([...prev, ...symptoms])))
+      setSymptomInput('')
+    }
+    if (typeof params.voiceDuration === 'string' && params.voiceDuration.trim()) {
+      setDuration(params.voiceDuration.trim())
+    }
+    if (typeof params.voiceNotes === 'string' && params.voiceNotes.trim()) {
+      setNotes(params.voiceNotes.trim())
+    }
+    setActiveTab('notes')
+    setError('')
+  }, [route?.params?.initialTab, route?.params?.voiceAction, route?.params?.voiceActionNonce])
 
   const createNotes = async () => {
     if (!jsonHeaders) {
@@ -253,7 +300,7 @@ export function SymptomNotesScreen() {
         {result.summary ? (
           <View style={styles.block}>
             <Text style={styles.blockTitle}>Summary</Text>
-            <Text style={styles.bodyText}>{result.summary}</Text>
+            <Text style={styles.bodyText}>{safeText(result.summary)}</Text>
           </View>
         ) : null}
         {result.possibleCauses?.length ? (
@@ -261,8 +308,8 @@ export function SymptomNotesScreen() {
             <Text style={styles.blockTitle}>Topics to discuss with a doctor</Text>
             {result.possibleCauses.map((item, index) => (
               <View key={`${item.name || 'topic'}-${index}`} style={styles.topicBox}>
-                <Text style={styles.topicTitle}>{item.name || 'Discussion topic'}</Text>
-                {item.whyLikely ? <Text style={styles.bodyText}>{item.whyLikely}</Text> : null}
+                <Text style={styles.topicTitle}>{safeText(item.name || 'Discussion topic', 'Discussion topic')}</Text>
+                {item.whyLikely ? <Text style={styles.bodyText}>{safeText(item.whyLikely)}</Text> : null}
               </View>
             ))}
           </View>
@@ -270,17 +317,17 @@ export function SymptomNotesScreen() {
         {result.redFlags?.length ? (
           <View style={styles.block}>
             <Text style={styles.urgentTitle}>When to seek urgent care</Text>
-            {result.redFlags.map((item, index) => <Text key={index} style={styles.urgentText}>- {item}</Text>)}
+            {result.redFlags.map((item, index) => <Text key={index} style={styles.urgentText}>- {safeText(item, 'Seek urgent care if symptoms feel severe or worrying.')}</Text>)}
           </View>
         ) : null}
         {result.nextSteps?.length ? (
           <View style={styles.block}>
             <Text style={styles.blockTitle}>Tracking notes and doctor questions</Text>
-            {result.nextSteps.map((item, index) => <Text key={index} style={styles.bodyText}>- {item}</Text>)}
+            {result.nextSteps.map((item, index) => <Text key={index} style={styles.bodyText}>- {safeText(item)}</Text>)}
           </View>
         ) : null}
         <Text style={styles.disclaimer}>
-          {result.disclaimer || 'This is not medical advice. Always seek a doctor\'s advice in addition to using this app and before making medical decisions.'}
+          {safeText(result.disclaimer, 'This is not medical advice. Always seek a doctor\'s advice in addition to using this app and before making medical decisions.') || 'This is not medical advice. Always seek a doctor\'s advice in addition to using this app and before making medical decisions.'}
         </Text>
       </View>
     )
@@ -422,7 +469,7 @@ export function SymptomNotesScreen() {
               </View>
               {symptoms.length ? <Text style={styles.bodyText}><Text style={styles.boldText}>Symptoms:</Text> {symptoms.join(', ')}</Text> : null}
               {item.duration ? <Text style={styles.bodyText}><Text style={styles.boldText}>Duration:</Text> {item.duration}</Text> : null}
-              {item.summary ? <Text style={styles.bodyText}>{item.summary}</Text> : null}
+              {item.summary ? <Text style={styles.bodyText}>{safeText(item.summary)}</Text> : null}
 
               {expanded ? (
                 <View style={{ gap: 8, marginTop: 10 }}>
@@ -436,23 +483,23 @@ export function SymptomNotesScreen() {
                     <View>
                       <Text style={styles.blockTitle}>Topics to discuss with a doctor</Text>
                       {details.possibleCauses.map((topic, index) => (
-                        <Text key={index} style={styles.bodyText}>- {topic.name || 'Discussion topic'}</Text>
+                        <Text key={index} style={styles.bodyText}>- {safeText(topic.name || 'Discussion topic', 'Discussion topic')}</Text>
                       ))}
                     </View>
                   ) : null}
                   {details.redFlags?.length ? (
                     <View>
                       <Text style={styles.urgentTitle}>When to seek urgent care</Text>
-                      {details.redFlags.map((flag, index) => <Text key={index} style={styles.urgentText}>- {flag}</Text>)}
+                      {details.redFlags.map((flag, index) => <Text key={index} style={styles.urgentText}>- {safeText(flag, 'Seek urgent care if symptoms feel severe or worrying.')}</Text>)}
                     </View>
                   ) : null}
                   {details.nextSteps?.length ? (
                     <View>
                       <Text style={styles.blockTitle}>Tracking notes and doctor questions</Text>
-                      {details.nextSteps.map((step, index) => <Text key={index} style={styles.bodyText}>- {step}</Text>)}
+                      {details.nextSteps.map((step, index) => <Text key={index} style={styles.bodyText}>- {safeText(step)}</Text>)}
                     </View>
                   ) : null}
-                  {details.disclaimer ? <Text style={styles.disclaimer}>{details.disclaimer}</Text> : null}
+                  {details.disclaimer ? <Text style={styles.disclaimer}>{safeText(details.disclaimer, 'This is not medical advice. Always seek a doctor\'s advice in addition to using this app and before making medical decisions.')}</Text> : null}
                 </View>
               ) : null}
             </View>

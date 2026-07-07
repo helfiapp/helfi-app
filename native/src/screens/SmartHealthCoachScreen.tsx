@@ -4,11 +4,11 @@ import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Switch, Text, T
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
-import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { useVoiceAssistant } from '../voice/VoiceAssistant'
 
 type TipItem = {
   id: string
@@ -76,6 +76,24 @@ const fallbackTimezones = [
   'America/Bogota',
   'America/Sao_Paulo',
 ]
+
+function cleanTipVoiceText(value: unknown, max = 500) {
+  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
+}
+
+function buildAskHelfiTipPrompt(tip: TipItem) {
+  const title = cleanTipVoiceText(tip.title, 180)
+  const body = cleanTipVoiceText(tip.body, 700)
+  const suggestedQuestion = cleanTipVoiceText(tip.suggestedQuestions?.[0], 220)
+  return [
+    'I have a question about this Helfi health coach tip.',
+    title ? `Title: ${title}` : '',
+    body ? `Tip: ${body}` : '',
+    `Question: ${suggestedQuestion || 'Can you explain what this means for me and what I should consider next?'}`,
+  ]
+    .filter(Boolean)
+    .join('\n')
+}
 
 function TabButton({
   label,
@@ -155,8 +173,9 @@ const buildTipBlocks = (body: string): TipBlock[] => {
 const normalizeTipTitle = (title: string) =>
   String(title || '').replace(/^Smart Health Coach:\s*/i, 'Health Coach: ')
 
-export function SmartHealthCoachScreen({ route, navigation }: { route: any; navigation: any }) {
+export function SmartHealthCoachScreen({ route }: { route: any; navigation: any }) {
   const { mode, session } = useAppMode()
+  const { openVoiceAssistant } = useVoiceAssistant()
   const initialTab: 'today' | 'history' = route?.params?.tab === 'history' ? 'history' : 'today'
 
   const [activeTab, setActiveTab] = useState<'today' | 'history'>(initialTab)
@@ -488,21 +507,17 @@ export function SmartHealthCoachScreen({ route, navigation }: { route: any; navi
     }
   }, [authHeaders, deletingHistory, expandedHistoryTipId, selectedHistoryTipIds])
 
-  const openAskAi = useCallback((_tip: TipItem) => {
-    const chatRoute = NATIVE_WEB_PAGES.talkToHelfi
-    const parent = navigation.getParent?.()
-    if (parent?.navigate) {
-      parent.navigate('NativeWebTool', {
-        title: chatRoute.title,
-        path: chatRoute.path,
-      })
-      return
-    }
-    navigation.navigate?.('NativeWebTool', {
-      title: chatRoute.title,
-      path: chatRoute.path,
+  const openAskHelfi = useCallback((tip: TipItem) => {
+    openVoiceAssistant({
+      source: 'button',
+      autoSubmit: true,
+      transcript: buildAskHelfiTipPrompt(tip),
+      context: {
+        section: 'health-coach',
+        title: 'Health Coach',
+      },
     })
-  }, [navigation])
+  }, [openVoiceAssistant])
 
   const onToggleEnabled = useCallback(
     (next: boolean) => {
@@ -792,7 +807,7 @@ export function SmartHealthCoachScreen({ route, navigation }: { route: any; navi
                           </Text>
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
                             <Pressable
-                              onPress={() => openAskAi(tip)}
+                              onPress={() => openAskHelfi(tip)}
                               style={({ pressed }) => ({
                                 opacity: pressed ? 0.9 : 1,
                                 backgroundColor: theme.colors.primary,
@@ -801,7 +816,7 @@ export function SmartHealthCoachScreen({ route, navigation }: { route: any; navi
                                 paddingVertical: 9,
                               })}
                             >
-                              <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>Ask AI</Text>
+                              <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>Ask Helfi</Text>
                             </Pressable>
 
                             <Pressable onPress={() => void handleClearTip(tip.id)}>
@@ -1026,7 +1041,7 @@ export function SmartHealthCoachScreen({ route, navigation }: { route: any; navi
                                 </Text>
                                 <View style={{ alignItems: 'flex-end' }}>
                                   <Pressable
-                                    onPress={() => openAskAi(tip)}
+                                    onPress={() => openAskHelfi(tip)}
                                     style={({ pressed }) => ({
                                       opacity: pressed ? 0.9 : 1,
                                       backgroundColor: theme.colors.primary,
@@ -1036,7 +1051,7 @@ export function SmartHealthCoachScreen({ route, navigation }: { route: any; navi
                                     })}
                                   >
                                     <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>
-                                      Ask AI
+                                      Ask Helfi
                                     </Text>
                                   </Pressable>
                                 </View>

@@ -11,6 +11,7 @@ import { SettingsScreen } from '../screens/SettingsScreen'
 import { TrackCaloriesScreen } from '../screens/TrackCaloriesScreen'
 import { getThemeColors, theme } from '../ui/theme'
 import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
+import type { VoiceAssistantLaunchContext } from '../voice/VoiceAssistant'
 
 export type MainTabParamList = {
   Dashboard: undefined
@@ -19,6 +20,7 @@ export type MainTabParamList = {
     | {
         voiceAction?: string
         voiceMeal?: string
+        voiceRecipeDraft?: any
         voiceActionNonce?: number
       }
     | undefined
@@ -27,6 +29,15 @@ export type MainTabParamList = {
 }
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
+
+function voiceContextForTab(routeName: string): VoiceAssistantLaunchContext {
+  if (routeName === 'Dashboard') return { section: 'dashboard', title: 'Dashboard' }
+  if (routeName === 'Insights') return { section: 'insights', title: 'Insights' }
+  if (routeName === 'Food') return { section: 'food', title: 'Food Diary', meal: 'breakfast' }
+  if (routeName === 'More') return { section: 'more', title: 'More' }
+  if (routeName === 'Settings') return { section: 'settings', title: 'Settings' }
+  return { section: 'generic', title: 'Helfi' }
+}
 
 export function MainTabs({ navigation }: { navigation: any }) {
   const colors = getThemeColors(useColorScheme())
@@ -50,6 +61,7 @@ export function MainTabs({ navigation }: { navigation: any }) {
           params: {
             voiceAction: target.action,
             voiceMeal: meal,
+            voiceRecipeDraft: target.recipeDraft || null,
             voiceActionNonce: Date.now(),
           },
         })
@@ -57,6 +69,7 @@ export function MainTabs({ navigation }: { navigation: any }) {
           DeviceEventEmitter.emit('helfi:food-voice-action', {
             action: target.action,
             meal,
+            recipeDraft: target.recipeDraft || null,
           })
         }
         setTimeout(emitFoodAction, 350)
@@ -75,12 +88,12 @@ export function MainTabs({ navigation }: { navigation: any }) {
   return (
     <Tab.Navigator
       initialRouteName="Food"
-      screenOptions={{
+      screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.card },
         headerTitleStyle: { color: colors.text },
         headerLeft: () => (
           <View style={{ marginLeft: 12 }}>
-            <VoiceAssistantIconButton size={36} iconSize={18} />
+            <VoiceAssistantIconButton size={36} iconSize={18} context={voiceContextForTab(route.name)} />
           </View>
         ),
         headerTitleAlign: 'center',
@@ -94,7 +107,7 @@ export function MainTabs({ navigation }: { navigation: any }) {
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
         tabBarLabelStyle: { fontWeight: '800', fontSize: theme.fontSize.navLabel },
-      }}
+      })}
     >
       <Tab.Screen
         name="Dashboard"

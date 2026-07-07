@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Image,
   Pressable,
   ScrollView,
@@ -63,7 +64,7 @@ const SAFE_IMAGE_NOTE_FALLBACK =
   'Older saved image note. Please review this image with a qualified healthcare professional if you are concerned.'
 
 const riskyMedicalClaimPattern =
-  /\b(possibly indicating|may indicate|could indicate|suggests|suggesting|consistent with|likely|viral infection|skin reaction|infection|cancer|melanoma|diagnosis|diagnose)\b/i
+  /\b(possibly indicating|may indicate|could indicate|suggests|suggesting|consistent with|likely|viral infection|skin reaction|infection|cancer|melanoma|diagnosis|diagnose|treat|treatment|cure)\b/i
 
 function safeText(value?: string | null, fallback = SAFE_IMAGE_NOTE_FALLBACK) {
   const text = String(value || '').trim()
@@ -108,9 +109,9 @@ export function HealthImageNotesScreen() {
 
   const [activeTab, setActiveTab] = useState<TabKey>('notes')
   const [image, setImage] = useState<ImageAsset | null>(null)
-  const [saveToHistory, setSaveToHistory] = useState(false)
   const [error, setError] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
+  const [savingHistory, setSavingHistory] = useState(false)
   const [result, setResult] = useState<ImageNoteResult | null>(null)
   const [hasAnalyzedImage, setHasAnalyzedImage] = useState(false)
   const [historySaved, setHistorySaved] = useState(false)
@@ -145,19 +146,37 @@ export function HealthImageNotesScreen() {
     }, [activeTab, loadHistory]),
   )
 
-  const pickImage = async () => {
+  const pickImageSource = useCallback(async (source: 'camera' | 'library') => {
     try {
-      const permission = await ImagePicker.requestMediaLibraryPermissionsAsync()
+      const permission =
+        source === 'camera'
+          ? await ImagePicker.requestCameraPermissionsAsync()
+          : await ImagePicker.requestMediaLibraryPermissionsAsync()
       if (!permission.granted) {
-        Alert.alert('Permission needed', 'Please allow photo library access to add images.')
+        Alert.alert('Permission needed', 'Please allow access to add images.')
         return
       }
-      const picked = await ImagePicker.launchImageLibraryAsync({
-        mediaTypes: ['images'],
-        quality: 0.85,
-        allowsEditing: false,
-      })
-      if (picked.canceled || picked.assets.length === 0) return
+      const picked =
+        source === 'camera'
+          ? await ImagePicker.launchCameraAsync({
+              mediaTypes: ['images'],
+              quality: 0.85,
+              allowsEditing: false,
+            })
+          : await ImagePicker.launchImageLibraryAsync({
+              mediaTypes: ['images'],
+              quality: 0.85,
+              allowsEditing: false,
+            })
+      if (picked.canceled || picked.assets.length === 0) {
+        if (source === 'camera') {
+          Alert.alert(
+            'No photo taken',
+            'If you are using the simulator, camera capture may not be available. Use Photo Library or test the camera on a real iPhone.',
+          )
+        }
+        return
+      }
       const asset = picked.assets[0]
       setImage({
         uri: asset.uri,
@@ -171,7 +190,24 @@ export function HealthImageNotesScreen() {
     } catch (e: any) {
       Alert.alert('Photo failed', e?.message || 'Please try again.')
     }
-  }
+  }, [])
+
+  const pickImage = useCallback(() => {
+    Alert.alert('Add health image note', 'Choose where to get the image from.', [
+      { text: 'Camera', onPress: () => void pickImageSource('camera') },
+      { text: 'Photo Library', onPress: () => void pickImageSource('library') },
+      { text: 'Cancel', style: 'cancel' },
+    ])
+  }, [pickImageSource])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:health-image-voice-action', (payload?: any) => {
+      if (String(payload?.action || '') !== 'pickImage') return
+      setActiveTab('notes')
+      void pickImage()
+    })
+    return () => subscription.remove()
+  }, [pickImage])
 
   const resetImage = () => {
     setImage(null)
@@ -205,7 +241,7 @@ export function HealthImageNotesScreen() {
     try {
       const form = new FormData()
       form.append('image', { uri: image.uri, name: image.fileName, type: image.mimeType } as any)
-      form.append('saveToHistory', saveToHistory ? 'true' : 'false')
+      form.append('saveToHistory', 'false')
       const res = await fetch(`${API_BASE_URL}/api/test-vision`, {
         method: 'POST',
         headers: authHeaders,
@@ -221,6 +257,42 @@ export function HealthImageNotesScreen() {
       setError(e?.message || 'Failed to create image notes')
     } finally {
       setIsAnalyzing(false)
+    }
+  }
+
+  const saveResultToHistory = async () => {
+    if (!authHeaders) {
+      setError('Please sign in again.')
+      return
+    }
+    if (!image || !result) {
+      setError('Create image notes before saving to history.')
+      return
+    }
+
+    setSavingHistory(true)
+    setError('')
+    try {
+      const form = new FormData()
+      form.append('image', { uri: image.uri, name: image.fileName, type: image.mimeType } as any)
+      form.append('analysis', JSON.stringify(result))
+      const res = await fetch(`${API_BASE_URL}/api/medical-images/history`, {
+        method: 'POST',
+        headers: authHeaders,
+        body: form,
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok || !data?.success) {
+        throw new Error(String(data?.message || data?.error || 'Failed to save image note'))
+      }
+      setHistorySaved(true)
+      if (data?.historyItem) {
+        setHistoryItems((prev) => [data.historyItem, ...prev.filter((item) => item.id !== data.historyItem.id)])
+      }
+    } catch (e: any) {
+      setError(e?.message || 'Failed to save image note')
+    } finally {
+      setSavingHistory(false)
     }
   }
 
@@ -294,17 +366,17 @@ export function HealthImageNotesScreen() {
       {data.redFlags?.length ? (
         <View style={styles.block}>
           <Text style={styles.urgentTitle}>When to seek urgent care</Text>
-          {data.redFlags.map((item, index) => <Text key={index} style={styles.urgentText}>- {item}</Text>)}
+          {data.redFlags.map((item, index) => <Text key={index} style={styles.urgentText}>- {safeText(item, 'Seek urgent care if symptoms feel severe or worrying.')}</Text>)}
         </View>
       ) : null}
       {data.nextSteps?.length ? (
         <View style={styles.block}>
           <Text style={styles.blockTitle}>Tracking notes and doctor questions</Text>
-          {data.nextSteps.map((item, index) => <Text key={index} style={styles.bodyText}>- {item}</Text>)}
+          {data.nextSteps.map((item, index) => <Text key={index} style={styles.bodyText}>- {safeText(item)}</Text>)}
         </View>
       ) : null}
       <Text style={styles.disclaimer}>
-        {data.disclaimer || 'These are general image notes only. They are not medical advice, diagnosis, or treatment. A qualified healthcare professional should review any health concern.'}
+        {safeText(data.disclaimer, 'These are general image notes only. They are not medical advice, diagnosis, or treatment. A qualified healthcare professional should review any health concern.') || 'These are general image notes only. They are not medical advice, diagnosis, or treatment. A qualified healthcare professional should review any health concern.'}
       </Text>
     </View>
   )
@@ -334,9 +406,9 @@ export function HealthImageNotesScreen() {
       </View>
 
       {!image ? (
-        <Pressable accessibilityRole="button" accessibilityLabel="Click to upload" onPress={pickImage} style={styles.uploadBox}>
-          <Text style={styles.uploadTitle}>Click to upload</Text>
-          <Text style={styles.smallText}>PNG, JPG, GIF up to 10MB</Text>
+        <Pressable accessibilityRole="button" accessibilityLabel="Add health image" onPress={pickImage} style={styles.uploadBox}>
+          <Text style={styles.uploadTitle}>Add health image</Text>
+          <Text style={styles.smallText}>Camera or photo library. PNG, JPG, GIF up to 10MB</Text>
         </Pressable>
       ) : (
         <View style={{ gap: 10 }}>
@@ -349,19 +421,6 @@ export function HealthImageNotesScreen() {
 
       {error ? <Text style={styles.errorText}>{error}</Text> : null}
 
-      <Pressable onPress={() => setSaveToHistory((value) => !value)} style={styles.checkboxRow}>
-        <View style={[styles.checkbox, saveToHistory && styles.checkboxOn]}>
-          {saveToHistory ? <Text style={styles.checkboxMark}>x</Text> : null}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={styles.bodyText}>Save this image note to my history</Text>
-          <Text style={styles.smallText}>
-            Saved image notes include the image and notes. You can delete them anytime. Leave this off to keep this image note private.
-          </Text>
-        </View>
-      </Pressable>
-      {historySaved ? <Text style={styles.successText}>Saved to history.</Text> : null}
-
       <Pressable
         accessibilityRole="button"
         accessibilityLabel="Create Image Notes"
@@ -373,7 +432,30 @@ export function HealthImageNotesScreen() {
       </Pressable>
       <Text style={styles.costText}>Cost: 2 credits per image notes request</Text>
 
-      {result ? renderResult(result) : null}
+      {result ? (
+        <View style={{ gap: 12 }}>
+          {renderResult(result)}
+          <View style={styles.reviewSaveBox}>
+            <Text style={styles.bodyText}>Review these notes before saving them to your history.</Text>
+            <Text style={styles.smallText}>
+              The image is still sent for AI note creation after you approve AI sharing. Saved image notes include the image and notes. You can delete them anytime.
+            </Text>
+            {historySaved ? (
+              <Text style={styles.successText}>Saved to history.</Text>
+            ) : (
+              <Pressable
+                accessibilityRole="button"
+                accessibilityLabel="Save image note to history"
+                onPress={() => void saveResultToHistory()}
+                disabled={savingHistory}
+                style={[styles.secondaryButton, savingHistory && { opacity: 0.55 }]}
+              >
+                <Text style={styles.secondaryButtonText}>{savingHistory ? 'Saving...' : 'Save to history'}</Text>
+              </Pressable>
+            )}
+          </View>
+        </View>
+      ) : null}
     </View>
   )
 
@@ -632,6 +714,14 @@ const styles = StyleSheet.create({
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
     backgroundColor: '#F9FAFB',
+    padding: 12,
+    gap: 10,
+  },
+  reviewSaveBox: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    backgroundColor: '#FFFFFF',
     padding: 12,
     gap: 10,
   },

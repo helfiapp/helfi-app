@@ -3,6 +3,7 @@ import {
   ActivityIndicator,
   AppState,
   Alert,
+  DeviceEventEmitter,
   Image,
   Pressable,
   ScrollView,
@@ -273,13 +274,23 @@ const JOURNAL_TEMPLATES: Array<{ name: string; body: string }> = [
 ]
 
 function todayLocalDate() {
-  return new Date().toISOString().slice(0, 10)
+  const now = new Date()
+  return [
+    now.getFullYear(),
+    String(now.getMonth() + 1).padStart(2, '0'),
+    String(now.getDate()).padStart(2, '0'),
+  ].join('-')
 }
 
 function shiftDays(localDate: string, deltaDays: number) {
-  const d = new Date(`${localDate}T00:00:00`)
-  d.setDate(d.getDate() + deltaDays)
-  return d.toISOString().slice(0, 10)
+  const [year, month, day] = String(localDate || '').split('-').map((part) => Number(part))
+  const date = new Date(year, Math.max(0, month - 1), day || 1, 12, 0, 0, 0)
+  date.setDate(date.getDate() + deltaDays)
+  return [
+    date.getFullYear(),
+    String(date.getMonth() + 1).padStart(2, '0'),
+    String(date.getDate()).padStart(2, '0'),
+  ].join('-')
 }
 
 function formatDateTime(value: string) {
@@ -545,14 +556,14 @@ export function MoodTrackerScreen() {
     }
   }, [authHeaders])
 
-  const loadJournalEntries = useCallback(async () => {
+  const loadJournalEntries = useCallback(async (searchOverride?: string) => {
     if (!authHeaders) {
       setJournalLoading(false)
       return
     }
     try {
       setJournalLoading(true)
-      const q = journalSearch.trim()
+      const q = (typeof searchOverride === 'string' ? searchOverride : journalSearch).trim()
       const url = q
         ? `${API_BASE_URL}/api/mood/journal/entries?limit=50&q=${encodeURIComponent(q)}`
         : `${API_BASE_URL}/api/mood/journal/entries?limit=50`
@@ -582,6 +593,27 @@ export function MoodTrackerScreen() {
       return () => {}
     }, [activeTab, loadContext, loadEntries, loadJournalEntries]),
   )
+
+  useEffect(() => {
+    if (!authHeaders) return
+    const moodSubscription = DeviceEventEmitter.addListener('helfi:mood-log-changed', () => {
+      setActiveTab('history')
+      setHistoryLoading(true)
+      setActivePointIndex(null)
+      setActiveSliceMood(null)
+      void loadEntries()
+      void loadContext()
+    })
+    const journalSubscription = DeviceEventEmitter.addListener('helfi:mood-journal-changed', () => {
+      setActiveTab('journal')
+      setJournalSearch('')
+      void loadJournalEntries('')
+    })
+    return () => {
+      moodSubscription.remove()
+      journalSubscription.remove()
+    }
+  }, [authHeaders, loadContext, loadEntries, loadJournalEntries])
 
   const saveEntry = async () => {
     if (!authHeaders) return

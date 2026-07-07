@@ -3,14 +3,17 @@ import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 const clamp = (value: number, min: number, max: number) => Math.min(Math.max(value, min), max)
 
 export async function GET(request: NextRequest) {
   let userEmail: string | null = null
+  let userId: string | null = null
   try {
     let session = await getServerSession(authOptions)
     userEmail = session?.user?.email ?? null
+    userId = typeof session?.user?.id === 'string' ? session.user.id : null
 
     if (!userEmail) {
       try {
@@ -26,11 +29,17 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    if (!userEmail) {
+    if (!userEmail && !userId) {
+      userId = await getUserIdFromNativeAuth(request)
+    }
+
+    if (!userEmail && !userId) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const user = await prisma.user.findUnique({ where: { email: userEmail } })
+    const user = userId
+      ? await prisma.user.findUnique({ where: { id: userId } })
+      : await prisma.user.findUnique({ where: { email: userEmail as string } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }

@@ -36,6 +36,12 @@ function parseVoiceAssistantUrl(rawUrl: string) {
       transcript: transcript.trim(),
       source: 'siri' as const,
       autoSubmit: transcript.trim().length > 0,
+      context: {
+        section: (url.searchParams.get('section') || 'generic') as any,
+        title: url.searchParams.get('title') || 'Siri',
+        mode: (url.searchParams.get('mode') || undefined) as any,
+        meal: url.searchParams.get('meal') || undefined,
+      },
     }
   } catch {
     return null

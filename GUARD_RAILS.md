@@ -3057,6 +3057,9 @@ Last stable deployment: `d1b55505` (2026-02-16)
 - `OPENAI_API_KEY` must not be exported into the agent/terminal environment.
 - `npm run build` must run `scripts/assert-no-local-openai-key.js` before building.
 - The live Vercel app may still use its production key.
+- Live AI features, including Talk to Helfi, must not be claimed working if Vercel Production is missing `OPENAI_API_KEY`.
+- `scripts/check-vercel-ai-env.js` and deployment verification must fail loudly when Vercel Production is missing `OPENAI_API_KEY`; the check must only verify presence and must never print the key value.
+- `scripts/check-vercel-production-env.js` must stay in deployment verification so missing required Production environment variables are caught before anyone claims live is healthy.
 
 **Do not do without owner approval:**
 - Do not export the live OpenAI key into the shell.

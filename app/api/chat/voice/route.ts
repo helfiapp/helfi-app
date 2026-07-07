@@ -1262,10 +1262,9 @@ export async function POST(req: NextRequest) {
     }
 
     const isPremium = isSubscriptionActive(user.subscription)
-    const now = new Date()
-    const hasPurchasedCredits = user.creditTopUps?.some(
-      (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
-    )
+    const cm = new CreditManager(user.id)
+    const wallet = await cm.getWalletStatus()
+    const hasPaidWalletAccess = isPremium || wallet.totalAvailableCents >= VOICE_CHAT_COST_CENTS
 
     // Get or create thread
     await ensureTalkToAITables()
@@ -1301,8 +1300,8 @@ export async function POST(req: NextRequest) {
     const threadAlreadyCharged = await getThreadChargeStatus(threadId)
     const shouldCharge = !threadAlreadyCharged
     const hasFreeChatCredits = shouldCharge ? await hasFreeCredits(user.id, 'VOICE_CHAT') : false
-    const allowViaFreeUse = shouldCharge && !isPremium && !hasPurchasedCredits && hasFreeChatCredits
-    if (shouldCharge && !isPremium && !hasPurchasedCredits && !hasFreeChatCredits) {
+    const allowViaFreeUse = shouldCharge && !hasPaidWalletAccess && hasFreeChatCredits
+    if (shouldCharge && !hasPaidWalletAccess && !hasFreeChatCredits) {
       return NextResponse.json(
         {
           error: 'Payment required',
@@ -1401,10 +1400,6 @@ export async function POST(req: NextRequest) {
       const title = question.length > 50 ? question.substring(0, 47) + '...' : question
       await updateThreadTitle(threadId, title)
     }
-
-    // Check wallet
-    const cm = new CreditManager(user.id)
-    const wallet = await cm.getWalletStatus()
 
     // If only estimating, return cost
     if (body?.estimateOnly) {

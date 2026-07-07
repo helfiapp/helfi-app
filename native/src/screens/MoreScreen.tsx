@@ -73,6 +73,9 @@ export function MoreScreen({ navigation }: { navigation: any }) {
   const openMoodTracker = () => {
     navigation.getParent()?.navigate('MoodTracker', { tab: 'checkin' })
   }
+  const openPractitioners = () => {
+    navigation.getParent()?.navigate('Practitioners')
+  }
 
   return (
     <Screen>
@@ -84,7 +87,11 @@ export function MoreScreen({ navigation }: { navigation: any }) {
         </Text>
 
         <View style={{ gap: 10 }}>
-          <Row icon={<Feather name="mic" size={18} color={theme.colors.muted} />} label="Talk to Helfi" onPress={() => openVoiceAssistant({ source: 'button' })} />
+          <Row
+            icon={<Feather name="mic" size={18} color={theme.colors.muted} />}
+            label="Talk to Helfi"
+            onPress={() => openVoiceAssistant({ source: 'button', context: { section: 'more', title: 'More' } })}
+          />
           <Row icon={<Feather name="book-open" size={18} color={theme.colors.muted} />} label="Health Journal" onPress={() => navigation.getParent()?.navigate('HealthJournal')} />
           <Row icon={<Feather name="bookmark" size={18} color={theme.colors.muted} />} label="Health Coach" onPress={() => navigation.getParent()?.navigate('SmartHealthCoach', { tab: 'today', activeTab: 'More' })} />
           <Row
@@ -96,6 +103,7 @@ export function MoreScreen({ navigation }: { navigation: any }) {
           <Row icon={<Feather name="clipboard" size={18} color={theme.colors.muted} />} label="Symptom Notes" onPress={() => navigation.getParent()?.navigate('SymptomNotes')} />
           <Row icon={<Feather name="image" size={18} color={theme.colors.muted} />} label="Health Image Notes" onPress={() => navigation.getParent()?.navigate('HealthImageNotes')} />
           <Row icon={<Feather name="clipboard" size={18} color={theme.colors.muted} />} label="Health Intake" onPress={() => openNativeTool(NATIVE_WEB_PAGES.healthIntake)} />
+          <Row icon={<Feather name="search" size={18} color={theme.colors.muted} />} label="Find a Practitioner" onPress={openPractitioners} />
         </View>
 
         <Text style={{ color: theme.colors.muted, fontWeight: '900', letterSpacing: 1, marginTop: theme.spacing.lg, marginBottom: 10 }}>

@@ -114,6 +114,8 @@ while true; do
         fi
 
         echo ""
+        node scripts/check-vercel-production-env.js
+        echo ""
         echo "✅ Deployment successful - changes are live!"
         echo "🌐 URL: https://$URL"
         echo "✅ Live domains verified: ${LIVE_DOMAINS[*]}"

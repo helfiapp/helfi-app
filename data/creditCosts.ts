@@ -7,6 +7,8 @@ export const CREDIT_DISPLAY = {
   medicalImageAnalysis: 2,
   insightsGeneration: 7,
   chatLight: 10,
+  talkToHealthyVoice: 3,
+  talkToHealthySpokenReply: 2,
   aiMealRecommendation: AI_MEAL_RECOMMENDATION_CREDITS,
   recipeImportUrl: RECIPE_IMPORT_URL_CREDITS,
   recipeImportPhoto: RECIPE_IMPORT_PHOTO_CREDITS,
@@ -18,6 +20,8 @@ export const usageDisplayList = [
   { label: 'Health image notes', key: 'medicalImageAnalysis', credits: CREDIT_DISPLAY.medicalImageAnalysis },
   { label: 'Insights generation', key: 'insightsGeneration', credits: CREDIT_DISPLAY.insightsGeneration },
   { label: 'Talk to Helfi chat', key: 'chatLight', credits: CREDIT_DISPLAY.chatLight },
+  { label: 'Talk to Helfi voice action', key: 'talkToHealthyVoice', credits: CREDIT_DISPLAY.talkToHealthyVoice },
+  { label: 'Talk to Helfi spoken reply', key: 'talkToHealthySpokenReply', credits: CREDIT_DISPLAY.talkToHealthySpokenReply },
 ]
 
 export const creditCostDisplayList = [
