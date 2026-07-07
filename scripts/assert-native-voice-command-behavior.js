@@ -9,10 +9,12 @@ const root = path.resolve(__dirname, '..')
 const routePath = path.join(root, 'app/api/native/voice-assistant/route.ts')
 const realtimeRoutePath = path.join(root, 'app/api/native/voice-assistant/realtime/route.ts')
 const voiceAssistantPath = path.join(root, 'native/src/voice/VoiceAssistant.tsx')
+const realtimeClientPath = path.join(root, 'native/src/voice/realtimeVoice.ts')
 
 let source = fs.readFileSync(routePath, 'utf8')
 const realtimeSource = fs.existsSync(realtimeRoutePath) ? fs.readFileSync(realtimeRoutePath, 'utf8') : ''
 const voiceAssistantSource = fs.existsSync(voiceAssistantPath) ? fs.readFileSync(voiceAssistantPath, 'utf8') : ''
+const realtimeClientSource = fs.existsSync(realtimeClientPath) ? fs.readFileSync(realtimeClientPath, 'utf8') : ''
 source = source
   .split('\n')
   .filter((line) => !line.trim().startsWith('import '))
@@ -50,8 +52,10 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(isRejectingDraftText('не зачувувај'), 'Macedonian do-not-save must reject a reviewed draft.')
   assert(/any language, mixed languages, messy dictation/.test(__routeSource), 'AI command understanding must explicitly support any-language messy speech.')
   assert(__realtimeRouteSource.includes('transcription: {') && __realtimeRouteSource.includes('model: REALTIME_TRANSCRIPTION_MODEL'), 'Realtime voice must request input transcripts for the chat review after voice mode.')
-  assert(/conversation\.item\.input_audio_transcription\.completed/.test(__realtimeClientSource), 'Native realtime client must listen for spoken user transcripts.')
-  assert(__voiceAssistantSource.includes('onTranscript: (text) => {') && __voiceAssistantSource.includes("appendConversationTurns([makeConversationTurn('user', text)])"), 'Native live voice transcripts must appear in the chat review after voice mode.')
+  if (__nativeSourcesAvailable) {
+    assert(/conversation\.item\.input_audio_transcription\.completed/.test(__realtimeClientSource), 'Native realtime client must listen for spoken user transcripts.')
+    assert(__voiceAssistantSource.includes('onTranscript: (text) => {') && __voiceAssistantSource.includes("appendConversationTurns([makeConversationTurn('user', text)])"), 'Native live voice transcripts must appear in the chat review after voice mode.')
+  }
   assert(/Do not limit language understanding to the examples below/.test(__routeSource), 'AI command understanding must say examples are not language limits.')
   assert(/Arabic, Hindi, Japanese, Chinese, Greek, Turkish, and any other language/.test(__routeSource), 'AI command understanding must explicitly allow broad world languages beyond the local fallback examples.')
   const postRequestFlow = __routeSource.slice(__routeSource.indexOf('const storedFavorites'))
@@ -1565,7 +1569,8 @@ const sandbox = {
   createNativeVoicePromptHandoff: async () => ({ token: 'test-private-token' }),
   __routeSource: source,
   __realtimeRouteSource: realtimeSource,
-  __realtimeClientSource: fs.existsSync(path.join(root, 'native/src/voice/realtimeVoice.ts')) ? fs.readFileSync(path.join(root, 'native/src/voice/realtimeVoice.ts'), 'utf8') : '',
+  __nativeSourcesAvailable: Boolean(voiceAssistantSource && realtimeClientSource),
+  __realtimeClientSource: realtimeClientSource,
   __voiceAssistantSource: voiceAssistantSource,
   prisma: {
     foodLibraryItem: {

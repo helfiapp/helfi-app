@@ -32,6 +32,15 @@ const medicationSearchPath = path.join(root, 'app/api/medication-search/route.ts
 const supplementSearchPath = path.join(root, 'app/api/supplement-search/route.ts')
 const userDataPath = path.join(root, 'app/api/user-data/route.ts')
 
+if (!fs.existsSync(nativePath)) {
+  if (process.env.VERCEL || process.env.VERCEL_ENV) {
+    console.log('Native voice confirm guard skipped on Vercel because native files are not uploaded.')
+    process.exit(0)
+  }
+  console.error(`Native voice confirm guard could not find ${nativePath}`)
+  process.exit(1)
+}
+
 const route = fs.readFileSync(routePath, 'utf8')
 const confirmRoute = fs.readFileSync(confirmRoutePath, 'utf8')
 const ttsRoute = fs.readFileSync(ttsRoutePath, 'utf8')
