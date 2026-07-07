@@ -53,6 +53,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(/any language, mixed languages, messy dictation/.test(__routeSource), 'AI command understanding must explicitly support any-language messy speech.')
   assert(__realtimeRouteSource.includes('transcription: {') && __realtimeRouteSource.includes('model: REALTIME_TRANSCRIPTION_MODEL'), 'Realtime voice must request input transcripts for the chat review after voice mode.')
   assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
+  assert(/call request_helfi_action before answering/.test(__realtimeRouteSource), 'Realtime voice must call the app action tool before answering app-action requests.')
+  assert(/Do not answer app-action requests from general knowledge/.test(__realtimeRouteSource), 'Realtime voice must not answer app actions as generic chat.')
   assert(/walking, running, steps, calories burned/.test(__realtimeRouteSource), 'Realtime voice must treat exercise steps/calories as app actions.')
   assert(/Do not invent or suggest a workout routine unless the user explicitly asks/.test(__realtimeRouteSource), 'Realtime voice must not turn exercise logging into invented workout routines.')
   if (__nativeSourcesAvailable) {
