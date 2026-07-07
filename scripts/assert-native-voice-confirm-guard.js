@@ -189,8 +189,13 @@ if (
   failures.push('Native spoken replies must write returned base64 audio through the legacy base64 writer and set playback audio mode.')
 }
 
-if (!/void requestVoiceReply\(String\(message\)\)/.test(native) || !/closePanel\(\{\s*keepPlayback:\s*voiceReply\s*\}\)/.test(native)) {
-  failures.push('Confirmed saves with Spoken reply enabled must update immediately and start save-completion talk-back without blocking the diary refresh.')
+const saveDraftBody = native.slice(native.indexOf('const saveDraft = useCallback'), native.indexOf('const sendDraftRequest = useCallback'))
+if (/requestVoiceReply\(String\(message\)\)/.test(saveDraftBody) || /closePanel\(\{\s*keepPlayback:\s*voiceReply\s*\}\)/.test(saveDraftBody) || !/closePanel\(\)/.test(saveDraftBody)) {
+  failures.push('Confirmed saves must close quietly and stop playback, so Talk to Helfi cannot keep talking after the user leaves the panel.')
+}
+
+if (!/const closeCameraMode = useCallback/.test(native) || !/if \(voiceSessionActiveRef\.current\)[\s\S]*?endVoiceSession\(\)/.test(native) || !/onRequestClose=\{closeCameraMode\}/.test(native)) {
+  failures.push('Closing live camera mode must also end live voice, so voice cannot continue hidden behind the camera overlay.')
 }
 
 if (!/NOT_SAVED_MESSAGE\s*=\s*'No problem\. I have not saved anything\.'/.test(native) || (native.match(/requestVoiceReply\(NOT_SAVED_MESSAGE\)/g) || []).length < 3) {

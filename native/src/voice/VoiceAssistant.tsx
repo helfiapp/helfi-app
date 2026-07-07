@@ -1394,6 +1394,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setContinuousVoiceSession(false)
     void stopRealtimeVoiceSession()
     clearVoiceTurnTimers()
+    setBottleCameraOpen(false)
     if (recording) {
       recording.stopAndUnloadAsync().catch(() => {})
       setRecording(null)
@@ -1705,11 +1706,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           setTimeout(emitSavedRefresh, 1000)
         }
         const message = data?.result?.message || 'Done.'
-        if (voiceReply) {
-          void requestVoiceReply(String(message))
-        }
         Alert.alert(options?.automatic ? 'Done' : 'Saved', message)
-        closePanel({ keepPlayback: voiceReply })
+        closePanel()
         return data
       } catch (error: any) {
         Alert.alert('Could not save', error?.message || 'Please try again.')
@@ -1718,7 +1716,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setConfirming(false)
       }
     },
-    [closePanel, requestVoiceReply, session?.token, voiceReply],
+    [closePanel, session?.token],
   )
 
   const sendDraftRequest = useCallback(
@@ -2182,6 +2180,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setContinuousVoiceSession(false)
     void stopRealtimeVoiceSession()
     clearVoiceTurnTimers()
+    setBottleCameraOpen(false)
     if (recording) {
       recording.stopAndUnloadAsync().catch(() => {})
       setRecording(null)
@@ -2191,6 +2190,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setSpokenReplyStatus('idle')
     stopPlayback().catch(() => {})
   }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+
+  const closeCameraMode = useCallback(() => {
+    setBottleCameraOpen(false)
+    if (voiceSessionActiveRef.current) {
+      endVoiceSession()
+    }
+  }, [endVoiceSession])
 
   const confirmDraft = useCallback(async () => {
     await saveDraft(draft)
@@ -2741,13 +2747,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               </View>
             </View>
           </Modal>
-          <Modal visible={bottleCameraOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={() => setBottleCameraOpen(false)}>
+          <Modal visible={bottleCameraOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeCameraMode}>
             <View style={styles.liveCameraPanel}>
               <View style={[styles.liveCameraHeader, { paddingTop: Math.max(insets.top, 12) }]}>
                 <Pressable
                   accessibilityRole="button"
                   accessibilityLabel="Close camera mode"
-                  onPress={() => setBottleCameraOpen(false)}
+                  onPress={closeCameraMode}
                   style={styles.liveCameraIconButton}
                 >
                   <Feather name="x" size={24} color="#FFFFFF" />
