@@ -48,6 +48,8 @@ assert(testflightSigningCheck.includes('security') && testflightSigningCheck.inc
 assert(voiceConfig.includes("const DEFAULT_HELFI_VOICE = 'marin'"), 'Talk to Helfi voices must default to Marin, the closest available natural OpenAI API voice.')
 assert(voiceConfig.includes("BEST_NATURAL_OPENAI_VOICES") && voiceConfig.includes("'marin'") && voiceConfig.includes("'cedar'"), 'Talk to Helfi voice selection must only prefer the best natural OpenAI API voices.')
 assert(realtimeRoute.includes('resolveHelfiRealtimeVoice()') && !realtimeRoute.includes('process.env.HELFI_VOICE_TTS_VOICE || DEFAULT_VOICE'), 'Realtime voice must not inherit an older TTS voice override such as Coral.')
+assert(realtimeRoute.includes("|| 'gpt-realtime-2.1'"), 'Realtime voice must default to the current documented OpenAI realtime model.')
+assert(realtimeRoute.includes("type: 'semantic_vad'") && realtimeRoute.includes("eagerness: 'low'") && realtimeRoute.includes('interrupt_response: true'), 'Realtime voice must use low-eagerness semantic VAD with interruption enabled.')
 assert(voiceRoute.includes('resolveHelfiTtsVoice()') && ttsRoute.includes('resolveHelfiTtsVoice()'), 'Normal spoken replies must use the shared natural voice resolver.')
 assert(realtimeRoute.includes('exactChatGptVoiceAvailable()'), 'Realtime status must honestly report that exact ChatGPT voice names are not exposed by the API.')
 

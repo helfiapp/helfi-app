@@ -54,6 +54,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(/any language, mixed languages, messy dictation/.test(__routeSource), 'AI command understanding must explicitly support any-language messy speech.')
   assert(__realtimeRouteSource.includes('transcription: {') && __realtimeRouteSource.includes('model: REALTIME_TRANSCRIPTION_MODEL'), 'Realtime voice must request input transcripts for the chat review after voice mode.')
   assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
+  assert(__realtimeRouteSource.includes("|| 'gpt-realtime-2.1'"), 'Realtime voice must default to the current documented OpenAI realtime model.')
+  assert(__realtimeRouteSource.includes("type: 'semantic_vad'") && __realtimeRouteSource.includes("eagerness: 'low'") && __realtimeRouteSource.includes('interrupt_response: true'), 'Realtime voice turn-taking must use low-eagerness semantic VAD with natural interruption support.')
   assert(__realtimeRouteSource.includes('HELFI_VOICE_REALTIME_ENABLED') && __realtimeRouteSource.includes('live_voice_paused'), 'Realtime voice backend must stay behind an explicit server-side enable flag.')
   assert(__realtimeRouteSource.includes('abortController') && __realtimeRouteSource.includes('live_voice_cancelled') && __realtimeRouteSource.includes('request.signal?.aborted'), 'Realtime voice backend must cancel aborted startup requests before charging.')
   assert(/call request_helfi_action before answering/.test(__realtimeRouteSource), 'Realtime voice must call the app action tool before answering app-action requests.')

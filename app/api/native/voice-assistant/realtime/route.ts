@@ -12,7 +12,7 @@ import { exactChatGptVoiceAvailable, resolveHelfiRealtimeVoice } from '@/lib/ope
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const REALTIME_MODEL = process.env.HELFI_VOICE_REALTIME_MODEL || 'gpt-realtime'
+const REALTIME_MODEL = process.env.HELFI_VOICE_REALTIME_MODEL || 'gpt-realtime-2.1'
 const REALTIME_VOICE = resolveHelfiRealtimeVoice()
 const REALTIME_TRANSCRIPTION_MODEL = process.env.HELFI_VOICE_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe'
 const REALTIME_SESSION_MIN_CREDITS = Number(process.env.HELFI_VOICE_REALTIME_SESSION_CREDITS || 10)
@@ -137,6 +137,7 @@ function realtimeSessionConfig() {
         },
         turn_detection: {
           type: 'semantic_vad',
+          eagerness: 'low',
           create_response: true,
           interrupt_response: true,
         },
