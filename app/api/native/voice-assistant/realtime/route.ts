@@ -54,6 +54,19 @@ function voicePaidAccessResponse() {
 
 export async function GET(request: NextRequest) {
   try {
+    if (request.nextUrl.searchParams.get('readiness') === '1') {
+      const enabled = REALTIME_VOICE_ENABLED
+      const configured = Boolean(process.env.OPENAI_API_KEY)
+      return NextResponse.json({
+        ready: enabled && configured,
+        code: !enabled ? 'live_voice_paused' : !configured ? 'ai_service_not_configured' : 'ready',
+        model: REALTIME_MODEL,
+        voice: REALTIME_VOICE,
+        exactChatGptVoiceAvailable: exactChatGptVoiceAvailable(),
+        voiceNote: 'ChatGPT app voices such as Juniper are not exposed as API voice names. Helfi is using Marin, the closest warm natural OpenAI API voice.',
+      })
+    }
+
     const user = await resolveUser(request)
     if (!user) return NextResponse.json({ available: false, error: 'Unauthorized' }, { status: 401 })
 
