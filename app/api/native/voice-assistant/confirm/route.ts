@@ -197,6 +197,12 @@ function clampInt(value: unknown, min: number, max: number, fallback: number) {
   return Math.max(min, Math.min(max, Math.round(n)))
 }
 
+function cleanPositiveNumber(value: unknown, max: number) {
+  const n = Number(String(value ?? '').replace(/,/g, ''))
+  if (!Number.isFinite(n) || n <= 0) return null
+  return Math.min(max, Math.round(n))
+}
+
 function makeManualDeviceId() {
   return `voice:${crypto.randomUUID()}`
 }
@@ -279,6 +285,8 @@ async function saveExercise(userId: string, draft: any) {
   const durationMinutes = clampInt(exercise.durationMinutes, 1, 24 * 60, 30)
   const distanceRaw = Number(exercise.distanceKm)
   const distanceKm = Number.isFinite(distanceRaw) && distanceRaw > 0 ? distanceRaw : null
+  const steps = cleanPositiveNumber(exercise.steps, 500000)
+  const spokenCalories = cleanPositiveNumber(exercise.caloriesKcal ?? exercise.calories, 10000)
   const date = localDate(draft?.localDate)
 
   if (!Number.isFinite(exerciseTypeId) || exerciseTypeId <= 0) {
@@ -297,11 +305,12 @@ async function saveExercise(userId: string, draft: any) {
   const health = await getHealthProfileForUser(userId)
   if (!health.weightKg) throw new Error('Please update your weight in Health Setup before saving exercise.')
 
-  const calories = calculateExerciseCalories({
+  const estimatedCalories = calculateExerciseCalories({
     met: inferred.met,
     weightKg: health.weightKg,
     durationMinutes: inferred.durationMinutes,
   })
+  const calories = spokenCalories ?? estimatedCalories
 
   const entry = await prisma.exerciseEntry.create({
     data: {
@@ -320,6 +329,9 @@ async function saveExercise(userId: string, draft: any) {
         source: 'native_voice_assistant',
         transcript: cleanText(draft?.transcript, 500),
         estimatedDuration: Boolean(exercise.estimatedDuration),
+        steps,
+        spokenCaloriesKcal: spokenCalories,
+        estimatedCaloriesKcal: estimatedCalories,
       },
     },
   })

@@ -53,6 +53,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(/any language, mixed languages, messy dictation/.test(__routeSource), 'AI command understanding must explicitly support any-language messy speech.')
   assert(__realtimeRouteSource.includes('transcription: {') && __realtimeRouteSource.includes('model: REALTIME_TRANSCRIPTION_MODEL'), 'Realtime voice must request input transcripts for the chat review after voice mode.')
   assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
+  assert(/walking, running, steps, calories burned/.test(__realtimeRouteSource), 'Realtime voice must treat exercise steps/calories as app actions.')
+  assert(/Do not invent or suggest a workout routine unless the user explicitly asks/.test(__realtimeRouteSource), 'Realtime voice must not turn exercise logging into invented workout routines.')
   if (__nativeSourcesAvailable) {
     assert(/conversation\.item\.input_audio_transcription\.completed/.test(__realtimeClientSource), 'Native realtime client must listen for spoken user transcripts.')
     assert(/response\.done/.test(__realtimeClientSource) && /response\.audio_transcript\.done/.test(__realtimeClientSource) && /response\.output_audio_transcript\.done/.test(__realtimeClientSource), 'Native realtime client must listen for completed assistant replies.')
@@ -624,6 +626,13 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(walkedDraft?.exercise?.name === 'walking', 'Walked 5k must be understood as walking.')
   assert(walkedDraft?.exercise?.distanceKm === 5, 'Walked 5k must keep the 5 km distance.')
   assert(walkedDraft?.exercise?.estimatedDuration === true, 'Walked 5k without minutes must mark time as estimated.')
+
+  const walkedStepsDraft = tryParseExerciseRequest('I did a walk and did 5,449 steps and burned 240 calories', dashboardContext)
+  assert(walkedStepsDraft?.action === 'exercise', 'Walked steps/calories wording must create an exercise draft.')
+  assert(walkedStepsDraft?.exercise?.name === 'walking', 'Walked steps/calories wording must be understood as walking.')
+  assert(walkedStepsDraft?.exercise?.steps === 5449, 'Walked steps/calories wording must keep the exact step count.')
+  assert(walkedStepsDraft?.exercise?.caloriesKcal === 240, 'Walked steps/calories wording must keep the exact calories burned.')
+  assert(walkedStepsDraft?.exercise?.distanceKm === 4.4, 'Walked steps without distance must estimate distance from steps.')
 
   const exerciseContextDraft = tryParseExerciseRequest('walking for 30 minutes', exerciseContext)
   assert(exerciseContextDraft?.action === 'exercise', 'Exercise context must handle natural exercise wording without log/add.')

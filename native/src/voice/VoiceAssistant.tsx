@@ -82,6 +82,16 @@ type VoiceDraft = {
     label?: string
     drinkType?: string | null
   }
+  exercise?: {
+    exerciseTypeId?: number
+    exerciseName?: string
+    durationMinutes?: number
+    distanceKm?: number | null
+    steps?: number | null
+    caloriesKcal?: number | null
+    intensity?: string | null
+    estimatedDuration?: boolean
+  }
   healthIntake?: {
 	    items?: Array<{
 	      type?: 'supplement' | 'medication' | string

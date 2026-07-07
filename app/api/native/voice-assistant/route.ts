@@ -101,6 +101,8 @@ type VoiceDraft = {
     exerciseName: string
     durationMinutes: number
     distanceKm?: number | null
+    steps?: number | null
+    caloriesKcal?: number | null
     intensity?: string | null
     estimatedDuration?: boolean
   }
@@ -1300,6 +1302,8 @@ function reviewedDraftContextLine(draft: any) {
       exerciseName: cleanText(draft.exercise.exerciseName || draft.exercise.name, 80),
       durationMinutes: draft.exercise.durationMinutes,
       distanceKm: draft.exercise.distanceKm,
+      steps: draft.exercise.steps,
+      caloriesKcal: draft.exercise.caloriesKcal,
       intensity: cleanText(draft.exercise.intensity, 40),
     }
   }
@@ -2537,6 +2541,12 @@ function tryParseDirectFoodRequest(transcript: string, launchContext?: VoiceLaun
   }
 }
 
+function parseVoiceNumber(value: string | undefined | null) {
+  const normalized = String(value || '').replace(/,/g, '').trim()
+  const parsed = Number(normalized)
+  return Number.isFinite(parsed) ? parsed : null
+}
+
 function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunchContext) {
   const raw = cleanText(transcript, 600)
   const lower = raw.toLowerCase()
@@ -2544,6 +2554,10 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
   const macedonianDistanceMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(км|километри?|километар|километра)/i)
   const durationMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|hour|hours|hr|hrs)\b/)
   const macedonianDurationMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(минути?|мин|часа|час)/i)
+  const stepsMatch = lower.match(/\b(\d[\d,]*(?:\.\d+)?)\s*(?:steps?|step count)\b/)
+  const caloriesMatch = lower.match(/\b(\d[\d,]*(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\b/)
+  const steps = parseVoiceNumber(stepsMatch?.[1])
+  const caloriesKcal = parseVoiceNumber(caloriesMatch?.[1])
   const inExerciseContext = launchContext?.section === 'exercise'
   const hasExerciseAction =
     /\b(log|add|record|track|did|done|completed|finished|went|ran|walked|walking|jogged|jogging|biked|biking|cycled|cycling|rode|riding|exercised)\b/.test(lower) ||
@@ -2553,11 +2567,13 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
     /\b(walk(?:ed|ing)?|run|running|ran|jog(?:ged|ging)?|gym|workout|bike(?:d|ing)?|cycl(?:e|ed|ing)|rode|riding|exercise(?:d)?)\b/.test(lower) ||
     /(пешач|одев|трч|џог|jог|теретана|вежб|велосипед|точак|возев)/i.test(raw) ||
     /(caminar|caminé|camine|caminata|correr|corrí|corri|gimnasio|entreno|bicicleta|bici|marcher|marché|marche|course|couru|vélo|velo|sport|entraînement|entrainement|camminare|camminato|corsa|correre|corso|palestra|allenamento|bicicletta|bici|andare in bici|caminhar|caminhei|corrida|correr|corri|academia|treino|bicicleta|gehen|gegangen|spazieren|laufen|gelaufen|rennen|gerannt|joggen|fitnessstudio|training|fahrrad|radfahren|rad gefahren)/i.test(raw)
-  if (!(hasExerciseAction && hasExerciseWords) && !(inExerciseContext && (hasExerciseWords || distanceMatch || macedonianDistanceMatch || durationMatch || macedonianDurationMatch))) return null
+  if (!(hasExerciseAction && (hasExerciseWords || steps || caloriesKcal)) && !(inExerciseContext && (hasExerciseWords || distanceMatch || macedonianDistanceMatch || durationMatch || macedonianDurationMatch || steps || caloriesKcal))) return null
   const distanceKm = distanceMatch
     ? Number(distanceMatch[1]) * (distanceMatch[2].startsWith('mi') || distanceMatch[2].startsWith('mile') ? 1.609 : 1)
     : macedonianDistanceMatch
     ? Number(macedonianDistanceMatch[1].replace(',', '.'))
+    : steps && hasExerciseWords
+    ? steps * 0.0008
     : null
   const durationRaw = durationMatch ? Number(durationMatch[1]) : macedonianDurationMatch ? Number(macedonianDurationMatch[1].replace(',', '.')) : null
   const durationMinutes = durationRaw
@@ -2592,6 +2608,8 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
       name,
       durationMinutes,
       distanceKm: distanceKm ? Math.round(distanceKm * 10) / 10 : null,
+      steps: steps && steps > 0 ? Math.round(steps) : null,
+      caloriesKcal: caloriesKcal && caloriesKcal > 0 ? Math.round(caloriesKcal) : null,
       intensity,
       estimatedDuration: !durationMatch && !macedonianDurationMatch,
     },
@@ -3719,7 +3737,7 @@ async function runJsonCommandModel(
         'If current section is symptoms or health-image, use safe tracking/handoff behavior only; do not diagnose, treat, or ask the user to show food.',
         'For clear low-risk logging requests, prepare a saveable draft for the user to review before saving. If important details are missing, ask one short follow-up question instead of guessing.',
         'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, health_intake_items, recipe, symptom_note, health_question, app_handoff, confirm_draft, reject_draft, unknown.',
-        'For exercise, infer the exercise name, duration, distance, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
+        'For exercise, infer the exercise name, duration, distance, steps, caloriesKcal, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
         'For journal, make a short title and journal content. If the user says health journal, include journalType "health"; if they say mood journal, include journalType "mood".',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
@@ -3737,7 +3755,7 @@ async function runJsonCommandModel(
         'If the user asks about symptoms, diagnosis, treatment, red flags, urgency, or health image review, use health_question. The app will show a safe general message and will not open a symptom notes or health image notes tool.',
         'For app_handoff, use only when the user clearly asks to open, show, find, or use a Helfi app area and does not ask to save/log/create data.',
         'Examples: "Додај две јаболка и 30 грама кикирики како ужина" => food_build_meal snacks with apple and peanuts; "Ajoute 500 ml d’eau" => water 500 ml; "Escribe en mi diario..." => journal; "Запиши дека денес имам главоболка" => symptom_note; "I have a question about this Helfi health coach tip..." => health_question.',
-        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"healthIntake":{"items":[{"type":"supplement","name":"vitamin D","dosage":"","timing":["Morning"]},{"type":"medication","name":"metformin","dosage":"","timing":[]}]},"symptom":{"symptoms":["headache"],"duration":"two hours","notes":"..."},"recipeRequest":"..."}',
+        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"steps":5449,"caloriesKcal":240,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"healthIntake":{"items":[{"type":"supplement","name":"vitamin D","dosage":"","timing":["Morning"]},{"type":"medication","name":"metformin","dosage":"","timing":[]}]},"symptom":{"symptoms":["headache"],"duration":"two hours","notes":"..."},"recipeRequest":"..."}',
       ].join('\n'),
     },
     {
@@ -4734,7 +4752,15 @@ async function normalizeDraft(
     const fallbackDuration = safeDistance && /walk/i.test(type.name) ? Math.max(10, Math.round(safeDistance * 12)) : 30
     const durationMinutes = clampNumber(exercise?.durationMinutes, 1, 24 * 60, fallbackDuration)
     const estimatedDuration = Boolean(exercise?.estimatedDuration || !Number.isFinite(Number(exercise?.durationMinutes)))
-    const summary = `${type.name}, ${durationMinutes} minutes${safeDistance ? `, ${safeDistance} km` : ''}`
+    const steps = clampNumber(exercise?.steps, 0, 500000, 0)
+    const caloriesKcal = clampNumber(exercise?.caloriesKcal ?? exercise?.calories, 0, 10000, 0)
+    const detailParts = [
+      `${type.name}, ${durationMinutes} minutes`,
+      safeDistance ? `${safeDistance} km` : '',
+      steps ? `${Math.round(steps).toLocaleString()} steps` : '',
+      caloriesKcal ? `${Math.round(caloriesKcal)} kcal` : '',
+    ].filter(Boolean)
+    const summary = detailParts.join(', ')
     return {
       aiCostCents,
       draft: {
@@ -4750,6 +4776,8 @@ async function normalizeDraft(
           exerciseName: type.name,
           durationMinutes,
           distanceKm: safeDistance,
+          steps: steps ? Math.round(steps) : null,
+          caloriesKcal: caloriesKcal ? Math.round(caloriesKcal) : null,
           intensity: cleanText(exercise?.intensity, 40) || null,
           estimatedDuration,
         },

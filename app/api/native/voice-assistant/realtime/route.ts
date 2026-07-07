@@ -103,6 +103,9 @@ function realtimeSessionConfig() {
       'Medication and supplement requests are review-first. Do not auto-save them.',
       'For medical concerns, help record notes and suggest speaking with a clinician. Do not diagnose or give treatment advice.',
       'When the user wants an app action, call the request_helfi_action tool with the user request and the intended safe action.',
+      'App actions include food, favourites/favorites, build meal, water, exercise, walking, running, steps, calories burned, symptoms, health journal, mood, Health Intake medication/supplement drafts, health image notes, insights, and navigation.',
+      'For exercise logging such as "I did a walk", "I walked 5449 steps", or "I burned 240 calories", call request_helfi_action with action "exercise". Do not invent or suggest a workout routine unless the user explicitly asks for a routine or workout plan.',
+      'If the transcript is unclear, ask one short clarification instead of guessing or creating a routine.',
     ].join('\n'),
     audio: {
       output: {
@@ -125,7 +128,7 @@ function realtimeSessionConfig() {
         type: 'function',
         name: 'request_helfi_action',
         description:
-          'Ask the Helfi app to prepare or perform a safe app action. The app must still enforce paid access, consent, review-first rules, and successful-save proof.',
+          'Ask the Helfi app to prepare or perform a safe app action. Use this for every logging, tracking, review, navigation, or app-control request, including exercise walks/steps/calories burned. The app must still enforce paid access, consent, review-first rules, and successful-save proof.',
         parameters: {
           type: 'object',
           properties: {
