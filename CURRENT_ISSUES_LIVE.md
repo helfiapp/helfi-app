@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 07 July 2026, 11:27 PM AEST
+- What changed: Tightened Talk to Helfi app-wide command understanding so the fast favourite-food path only runs for real food/favourite requests. Exercise, journal, mood, symptoms, water, and Health Intake wording can no longer be swallowed by a saved meal match.
+- Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
+- What to quickly test: In the iPhone simulator, ask for exercise, journal, mood, symptoms, water, Health Intake, and favourite-food actions. Confirm non-food requests do not become favourite meal replies.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 07 July 2026, 11:13 PM AEST
 - What changed: Fixed Talk to Helfi realtime exercise routing so walk/steps/calories requests are sent to the app action path instead of becoming invented workout chat. Exercise voice drafts now preserve spoken steps and calories.
 - Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
