@@ -69,6 +69,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__voiceAssistantSource.includes('onTranscript: (text) => {') && __voiceAssistantSource.includes("appendConversationTurns([makeConversationTurn('user', text)])"), 'Native live voice transcripts must appear in the chat review after voice mode.')
     assert(__voiceAssistantSource.includes('fetchNativeVoiceConfirm') && __voiceAssistantSource.includes('VOICE_ACCESS_FALLBACK_API_BASE_URL'), 'Native reviewed save/confirm must fall back to live when local dev has no usable backend.')
     assert(__voiceAssistantSource.includes('conversationTurns.length > 0 && !showDraftCard'), 'Native review drafts must keep Save/Discard buttons visible instead of being hidden by the transcript view.')
+    assert(__voiceAssistantSource.includes('sendDraftRequestRef.current({ transcriptOverride: request })'), 'Native realtime voice app actions must use the latest draft handler so follow-up commands like save it can see the current review draft.')
   }
   assert(/Do not limit language understanding to the examples below/.test(__routeSource), 'AI command understanding must say examples are not language limits.')
   assert(/Arabic, Hindi, Japanese, Chinese, Greek, Turkish, and any other language/.test(__routeSource), 'AI command understanding must explicitly allow broad world languages beyond the local fallback examples.')

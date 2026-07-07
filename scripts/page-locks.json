@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-07T13:31:00.035Z",
+  "generatedAt": "2026-07-07T13:39:02.859Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "bddc41af94cc818a2371937b3238662cc2ad3b52523aabf7d7c3f9993fd9ba44",
@@ -264,7 +264,7 @@
     "native/src/ui/Screen.tsx": "085e4c4a81c7bf61a60d4a29e4185fddc17ca49b8b9587fa489480fafed0d375",
     "native/src/ui/theme.ts": "2ad13419cce93504b968e07e6dc4252fcb22804a87ccfec5bd9a3768e11342bd",
     "native/src/voice/realtimeVoice.ts": "45035614d5c243c79cda5832153813a11df74a1e7afa94b90438a10abfd9e6f1",
-    "native/src/voice/VoiceAssistant.tsx": "e9424fbbf57710169e842f5495b0eff4d85e61a9a6e4fc37bbe1214eba3e70a2",
+    "native/src/voice/VoiceAssistant.tsx": "ce121ac459e381c2feeea2c5fce4239024ba5682a7d737ec27747efff27ea96b",
     "native/src/voice/VoiceAssistantIconButton.tsx": "9be7cd11cc7abffa4c8778de0740aeb1a4bad2b84f21073bc3db1ed7feaa2301"
   }
 }

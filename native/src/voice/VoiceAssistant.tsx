@@ -116,6 +116,8 @@ type BottleLabelImageAsset = { uri: string; fileName?: string | null; mimeType?:
 type StopRecordingOptions = { continueSession?: boolean }
 type RealtimeVoiceStatus = 'idle' | 'connecting' | 'live' | 'speaking' | 'closed' | 'failed' | 'fallback'
 type DraftRequestResult = { ok: boolean; message: string; saved?: boolean; needsReview?: boolean; action?: string }
+type DraftRequestOptions = { audioUri?: string; durationMillis?: number; transcriptOverride?: string; continuousVoice?: boolean }
+type DraftRequestHandler = (options?: DraftRequestOptions) => Promise<DraftRequestResult>
 
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
 const VOICE_REPLY_KEY = 'helfi_voice_reply_enabled_v1'
@@ -991,6 +993,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const conversationTurnSeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
+  const sendDraftRequestRef = useRef<DraftRequestHandler>(async () => ({ ok: false, message: 'Voice action is not ready yet.' }))
   const openRef = useRef(false)
   const voiceSessionActiveRef = useRef(false)
   const recordingStoppingRef = useRef(false)
@@ -1648,7 +1651,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   )
 
   const sendDraftRequest = useCallback(
-    async (options?: { audioUri?: string; durationMillis?: number; transcriptOverride?: string; continuousVoice?: boolean }): Promise<DraftRequestResult> => {
+    async (options?: DraftRequestOptions): Promise<DraftRequestResult> => {
       if (!session?.token) return { ok: false, message: 'Please sign in first.' }
       const rawTypedTranscript = (options?.transcriptOverride ?? transcript).trim()
       const explicitNewCommand = isExplicitNewVoiceCommand(rawTypedTranscript)
@@ -1809,6 +1812,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     },
     [appendConversationTurns, draft, launchContext, makeConversationTurn, pendingFollowUpDraft, requestConversationHistory, requestVoiceReply, resumeVoiceSessionListening, saveDraft, session?.token, transcript, voiceReply],
   )
+
+  useEffect(() => {
+    sendDraftRequestRef.current = sendDraftRequest
+  }, [sendDraftRequest])
 
   useEffect(() => {
     if (!open || !transcript || autoSubmittedRef.current === autoSubmitToken) return
@@ -2011,7 +2018,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           onActionRequest: (args) => {
             const request = cleanFavoriteText(args.request || '', 2000)
             if (!request) return { ok: false, message: 'No app action was requested.' }
-            return sendDraftRequest({ transcriptOverride: request })
+            return sendDraftRequestRef.current({ transcriptOverride: request })
           },
         },
       })
@@ -2021,7 +2028,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setRealtimeVoiceStatus('failed')
       setRealtimeVoiceError(error?.message || 'Live voice could not start. Text and camera still work.')
     }
-  }, [appendConversationTurns, checkingRealtimeVoice, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, sendDraftRequest, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, voiceRecordingSupported])
+  }, [appendConversationTurns, checkingRealtimeVoice, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, voiceRecordingSupported])
 
   const endVoiceSession = useCallback(() => {
     setContinuousVoiceSession(false)
