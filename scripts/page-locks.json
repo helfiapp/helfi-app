@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-07T16:35:20.999Z",
+  "generatedAt": "2026-07-07T16:40:35.716Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "bddc41af94cc818a2371937b3238662cc2ad3b52523aabf7d7c3f9993fd9ba44",
@@ -263,7 +263,7 @@
     "native/src/ui/HelfiTextField.tsx": "4e7c45b42f6e5858a689c6a2cca88d903b184800a32b788a7f2d46f4e6172dc3",
     "native/src/ui/Screen.tsx": "085e4c4a81c7bf61a60d4a29e4185fddc17ca49b8b9587fa489480fafed0d375",
     "native/src/ui/theme.ts": "2ad13419cce93504b968e07e6dc4252fcb22804a87ccfec5bd9a3768e11342bd",
-    "native/src/voice/realtimeVoice.ts": "f50e7fc5f4e1803ecea1d4c03de431a29d1b020a329079b014ae336a8f991df9",
+    "native/src/voice/realtimeVoice.ts": "06a046bf34b72f0ed1191a9e86532b016b5b7328f2b0d88a5eb67824bb7565f5",
     "native/src/voice/VoiceAssistant.tsx": "2b3fddee79a72f475b71c02ce94b6bf18368d45c7509de8264b19954877f4c10",
     "native/src/voice/VoiceAssistantIconButton.tsx": "9be7cd11cc7abffa4c8778de0740aeb1a4bad2b84f21073bc3db1ed7feaa2301"
   }

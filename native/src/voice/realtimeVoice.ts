@@ -40,6 +40,20 @@ function cleanText(value: unknown) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
 
+function enableRemoteAudioTrack(track: any) {
+  if (!track || track.kind !== 'audio') return
+  try {
+    track.enabled = true
+  } catch {
+    // Some native track wrappers expose this as read-only.
+  }
+  try {
+    track._setVolume?.(1)
+  } catch {
+    // Volume control is best-effort on react-native-webrtc.
+  }
+}
+
 function realtimeEventId(payload: any) {
   return cleanText(payload?.response_id || payload?.response?.id || payload?.item_id || payload?.item?.id || payload?.id || payload?.event_id)
 }
@@ -308,9 +322,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
   }
   pc.ontrack = (event: any) => {
     if (stopped) return
+    enableRemoteAudioTrack(event?.track)
     const stream = event?.streams?.[0]
     if (stream && !remoteStreams.includes(stream)) {
       remoteStreams.push(stream)
+      stream.getAudioTracks?.().forEach(enableRemoteAudioTrack)
     }
     emitStatus('live')
   }
