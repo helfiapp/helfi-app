@@ -78,7 +78,16 @@ function extractAssistantText(payload: any) {
   return ''
 }
 
+function localRealtimeApiBaseUrl() {
+  const raw = String(process.env.EXPO_PUBLIC_API_BASE_URL || '').trim().replace(/\/+$/, '')
+  const isLocalDevHost = __DEV__ && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(raw)
+  const useLocalRealtime = process.env.EXPO_PUBLIC_USE_LOCAL_REALTIME === 'true'
+  return isLocalDevHost && useLocalRealtime ? raw : ''
+}
+
 function realtimeApiBaseUrl() {
+  const localRealtimeBaseUrl = localRealtimeApiBaseUrl()
+  if (localRealtimeBaseUrl) return localRealtimeBaseUrl
   const isLocalDevHost = __DEV__ && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/i.test(API_BASE_URL)
   const useLocalRealtime = process.env.EXPO_PUBLIC_USE_LOCAL_REALTIME === 'true'
   return isLocalDevHost && !useLocalRealtime ? LIVE_REALTIME_API_BASE_URL : API_BASE_URL
