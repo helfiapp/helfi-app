@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 07 July 2026, 08:13 PM AEST
+- What changed: Deployed Talk to Helfi realtime reply fixes so live voice explicitly requests spoken audio replies and captures assistant reply events.
+- Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
+- What to quickly test: In the iPhone simulator, open Talk to Helfi, start live voice, say a short request, confirm Helfi speaks/responds and the transcript shows both You and Helfi after ending voice.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 07 July 2026, 07:45 PM AEST
 - What changed: Deployed the Talk to Helfi realtime voice backend route, native live voice wiring, health-intake review safety fixes, transcript handling, and Vercel voice checks.
 - Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
