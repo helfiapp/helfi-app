@@ -40,6 +40,28 @@ function cleanText(value: unknown) {
   return String(value || '').replace(/\s+/g, ' ').trim()
 }
 
+function normalizeEchoText(value: unknown) {
+  return cleanText(value)
+    .toLowerCase()
+    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim()
+}
+
+function likelyAssistantEcho(input: unknown, assistant: unknown, assistantAt: number) {
+  const heard = normalizeEchoText(input)
+  const recentReply = normalizeEchoText(assistant)
+  if (!heard || !recentReply || Date.now() - assistantAt > 5000) return false
+  if (['stop', 'cancel', 'done', 'save', 'yes', 'no'].includes(heard)) return false
+  if (heard.length < 5) return false
+  if (recentReply.includes(heard)) return true
+  const words = [...new Set(heard.split(' ').filter((word) => word.length > 2))]
+  if (!words.length) return false
+  const replyWords = new Set(recentReply.split(' '))
+  const overlap = words.filter((word) => replyWords.has(word)).length
+  return words.length <= 3 ? overlap === words.length : overlap / words.length >= 0.8
+}
+
 function enableRemoteAudioTrack(track: any) {
   if (!track || track.kind !== 'audio') return
   try {
@@ -158,7 +180,14 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const pc = new RTCPeerConnection({
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
   })
-  const localStream = await mediaDevices.getUserMedia({ audio: true, video: false })
+  const localStream = await mediaDevices.getUserMedia({
+    audio: {
+      echoCancellation: true,
+      noiseSuppression: true,
+      autoGainControl: true,
+    },
+    video: false,
+  })
   if (params.signal?.aborted) {
     stopMediaStreamTracks(localStream)
     try {
@@ -205,6 +234,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
     })
   }
   const closeRealtimeConnection = () => {
+    if (dataChannel?.readyState === 'open') {
+      sendRealtimeEvent(dataChannel, { type: 'response.cancel' })
+      sendRealtimeEvent(dataChannel, { type: 'output_audio_buffer.clear' })
+      sendRealtimeEvent(dataChannel, { type: 'input_audio_buffer.clear' })
+    }
     stopped = true
     try {
       if (dataChannel) {
@@ -234,12 +268,16 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const assistantTextById = new Map<string, string>()
   const completedAssistantIds = new Set<string>()
   const handledToolCallIds = new Set<string>()
+  let recentAssistantText = ''
+  let recentAssistantTextAt = 0
   const rememberAssistantText = (payload: any, append = false) => {
     const id = realtimeEventId(payload) || `response-${Date.now()}`
     const text = extractAssistantText(payload)
     if (!text) return
     const next = append ? cleanText(`${assistantTextById.get(id) || ''} ${text}`) : text
     assistantTextById.set(id, next)
+    recentAssistantText = next
+    recentAssistantTextAt = Date.now()
     if (!append && !completedAssistantIds.has(id)) {
       completedAssistantIds.add(id)
       callbacks.onAssistantText?.(next)
@@ -250,6 +288,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
     const text = extractAssistantText(payload) || (id ? assistantTextById.get(id) : '')
     if (!text || completedAssistantIds.has(id || text)) return
     completedAssistantIds.add(id || text)
+    recentAssistantText = text
+    recentAssistantTextAt = Date.now()
     callbacks.onAssistantText?.(text)
   }
 
@@ -262,7 +302,14 @@ export async function startHelfiRealtimeVoiceSession(params: {
     const payload = parseRealtimeJson(event?.data)
     if (!payload?.type) return
     if (payload.type === 'conversation.item.input_audio_transcription.completed') {
-      callbacks.onTranscript?.(String(payload.transcript || '').trim())
+      const transcript = String(payload.transcript || '').trim()
+      if (likelyAssistantEcho(transcript, recentAssistantText, recentAssistantTextAt)) {
+        sendRealtimeEvent(dataChannel, { type: 'response.cancel' })
+        sendRealtimeEvent(dataChannel, { type: 'output_audio_buffer.clear' })
+        emitStatus('live')
+        return
+      }
+      callbacks.onTranscript?.(transcript)
       return
     }
     if (payload.type === 'response.created' || payload.type === 'response.output_item.added' || payload.type === 'response.audio.delta') {

@@ -203,6 +203,24 @@ if (!/AppState\.addEventListener\('change'/.test(native) || !/state === 'active'
 }
 
 if (
+  !/realtimeActionAbortRef/.test(native) ||
+  !/draftRequestAbortRef/.test(native) ||
+  !/spokenReplyAbortRef/.test(native) ||
+  !/signal:\s*actionAbortController\.signal/.test(native) ||
+  !/requestSignal\?\.aborted/.test(native)
+) {
+  failures.push('Done and Close must cancel in-flight voice actions, normal voice requests, and spoken-reply network work.')
+}
+
+if (
+  !/function compactRecipeVoiceReply/.test(native) ||
+  !/function spokenReplyTextForDraft/.test(native) ||
+  !/Would you like me to tell you the ingredients and nutrients, or the cooking steps\?/.test(native)
+) {
+  failures.push('Spoken meal suggestions must stay brief and ask before reading ingredients, nutrients, or steps aloud.')
+}
+
+if (
   !/spokenReplyRunRef/.test(native) ||
   !/const shouldKeepPlaying = \(\) => \(/.test(native) ||
   !/openRef\.current[\s\S]*?AppState\.currentState === 'active'/.test(native) ||

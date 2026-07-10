@@ -3071,6 +3071,21 @@ Last stable deployment: `d1b55505` (2026-02-16)
 **If local AI testing is needed:**
 - Test through the actual Helfi app UI, not direct scripts or agent-side calls.
 
+## 8.1 Talk to Helfi Live Voice Safety and Brevity (July 2026 - LOCKED)
+
+**Must keep:**
+- Pressing Done or closing Talk to Helfi must immediately stop the microphone, assistant audio, connection, pending app actions, and pending voice requests.
+- Late connection or audio work must not restart after the user has stopped live voice.
+- Meal and recipe suggestions must be brief when spoken: say the meal name and one short reason, then ask whether the user wants ingredients and nutrients or cooking steps.
+- Keep the full meal or recipe detail visible in the transcript; do not read every ingredient, nutrient, macro, or step aloud unless the user asks.
+- Never say an item was saved, added, created, or logged unless the backend confirmed the save.
+- Medication and supplement changes remain review-first and must never auto-save.
+
+**Required checks after any Talk to Helfi voice change:**
+- `npm --prefix native run check:voice-assistant`
+- `npm run check:talk-to-helfi-testflight`
+- Prove on an iPhone that Done stays stopped and no late audio or microphone activity returns.
+
 ## 9. Rules for Future Modifications
 
 Before changing anything in the protected areas above, an agent **must**:

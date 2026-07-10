@@ -56,7 +56,10 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(!__realtimeRouteSource.includes("language: 'en'"), 'Realtime voice transcripts must not force an English-only hint because Talk to Helfi supports messy and mixed-language speech.')
   assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
   assert(__realtimeRouteSource.includes("|| 'gpt-realtime-2.1'"), 'Realtime voice must default to the current documented OpenAI realtime model.')
+  assert(__realtimeRouteSource.includes("reasoning: {") && __realtimeRouteSource.includes("effort: 'low'"), 'Realtime voice must use low reasoning effort for faster natural turn-taking.')
   assert(__realtimeRouteSource.includes("type: 'semantic_vad'") && __realtimeRouteSource.includes("eagerness: 'low'") && __realtimeRouteSource.includes('interrupt_response: true'), 'Realtime voice turn-taking must use low-eagerness semantic VAD with natural interruption support.')
+  assert(__realtimeRouteSource.includes("noise_reduction: {") && __realtimeRouteSource.includes("type: 'near_field'") && __realtimeRouteSource.includes('Avoid clipped, robotic, or repetitive phrasing'), 'Realtime voice must reduce close-microphone noise and explicitly request warm, natural speech.')
+  assert(__realtimeRouteSource.includes('Do not read the full ingredient list, nutrient breakdown, macros, or cooking steps unless the user asks'), 'Realtime meal suggestions must offer details instead of reading every ingredient and nutrient aloud.')
   assert(__realtimeRouteSource.includes('HELFI_VOICE_REALTIME_ENABLED') && __realtimeRouteSource.includes('live_voice_paused'), 'Realtime voice backend must stay behind an explicit server-side enable flag.')
   assert(__realtimeRouteSource.includes('abortController') && __realtimeRouteSource.includes('live_voice_cancelled') && __realtimeRouteSource.includes('request.signal?.aborted'), 'Realtime voice backend must cancel aborted startup requests before charging.')
   assert(/call request_helfi_action before answering/.test(__realtimeRouteSource), 'Realtime voice must call the app action tool before answering app-action requests.')
@@ -82,9 +85,14 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__realtimeClientSource.includes('signal: params.signal'), 'Native realtime client must pass its abort signal to the realtime startup request.')
     assert(__realtimeClientSource.includes('handledToolCallIds') && __realtimeClientSource.includes('handledToolCallIds.has(callId)'), 'Native realtime client must ignore duplicate realtime tool call IDs.')
     assert(__realtimeClientSource.includes('stopTracks()') && __realtimeClientSource.includes('pc.getReceivers?.()') && __realtimeClientSource.includes('pc.getTransceivers?.()'), 'Native realtime client must force-stop WebRTC tracks and transceivers on shutdown.')
+    assert(__realtimeClientSource.includes("type: 'response.cancel'") && __realtimeClientSource.includes("type: 'output_audio_buffer.clear'") && __realtimeClientSource.includes("type: 'input_audio_buffer.clear'"), 'Native realtime shutdown must cancel the current reply and clear queued input/output audio before closing WebRTC.')
+    assert(__realtimeClientSource.includes('function likelyAssistantEcho') && __realtimeClientSource.includes('recentAssistantTextAt') && __realtimeClientSource.includes("payload.type === 'conversation.item.input_audio_transcription.completed'"), 'Native realtime voice must suppress immediate assistant-audio echoes before they create repeating turns.')
+    assert(__realtimeClientSource.includes('echoCancellation: true') && __realtimeClientSource.includes('noiseSuppression: true') && __realtimeClientSource.includes('autoGainControl: true'), 'Native realtime microphone capture must request acoustic echo cancellation and noise control.')
     assert(__voiceAssistantSource.includes('realtimeVoiceAbortRef') && __voiceAssistantSource.includes('abortController?.abort()'), 'Native live voice Done/Close must abort connecting realtime sessions before they finish.')
     assert(__voiceAssistantSource.includes('realtimeVoiceRunRef') && __voiceAssistantSource.includes('Live voice has stopped.'), 'Native live voice callbacks must be ignored after Done/Close/New chat.')
     assert(__voiceAssistantSource.includes('realtimeActionGuardRef') && __voiceAssistantSource.includes('guardKey') && __voiceAssistantSource.includes('Date.now() - guard.startedAt < 5000'), 'Native live voice must dedupe repeated realtime app-action requests.')
+    assert(__voiceAssistantSource.includes('realtimeActionAbortRef') && __voiceAssistantSource.includes('signal: actionAbortController.signal') && __voiceAssistantSource.includes('draftRequestAbortRef') && __voiceAssistantSource.includes('spokenReplyAbortRef') && __voiceAssistantSource.includes('voiceImageAbortRef'), 'Done/Close must cancel in-flight realtime actions, image requests, normal voice requests, and spoken-reply network work.')
+    assert(__voiceAssistantSource.includes('function compactRecipeVoiceReply') && __voiceAssistantSource.includes('function spokenReplyTextForDraft') && __voiceAssistantSource.includes('Would you like me to tell you the ingredients and nutrients, or the cooking steps?'), 'Normal spoken meal suggestions must stay brief and ask before reading detailed recipe information.')
     assert(__voiceAssistantSource.includes('realtimeVoiceConnectTimeoutRef') && __voiceAssistantSource.includes('Live voice could not connect quickly enough'), 'Native live voice must fail fast instead of staying half-connected.')
     assert(__voiceAssistantSource.includes('EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED'), 'Native live voice must stay behind an explicit build-time enable flag.')
     assert(__voiceAssistantSource.includes("'speaking'") && __voiceAssistantSource.includes('Helfi is speaking'), 'Native live voice UI must show when Helfi is speaking.')
@@ -104,6 +112,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(aiDraftDecision({ action: 'confirm_draft' }) === 'confirm', 'AI draft decision must recognize confirm_draft.')
   assert(aiDraftDecision({ action: 'reject_draft' }) === 'reject', 'AI draft decision must recognize reject_draft.')
   assert(/Recent Talk to Helfi conversation/.test(__routeSource), 'AI command understanding must receive recent in-panel conversation context.')
+  assert(/buildGeneralHealthAnswer/.test(__routeSource) && /voice-assistant:general-answer/.test(__routeSource), 'General health questions must be answered inside the same Talk to Helfi conversation.')
   assert(/pronouns, and corrections/.test(__routeSource), 'AI command understanding must use conversation history for natural follow-ups and corrections.')
   assert(/Draft currently being reviewed/.test(__routeSource), 'AI command understanding must receive the current reviewed draft for correction requests.')
   assert(/preserve any details the user did not change/.test(__routeSource), 'AI command understanding must preserve unchanged draft details during corrections.')
@@ -1472,6 +1481,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
 
   const macedonianJournalHandoff = inferNativeWebTarget({}, 'Отвори здравствен дневник')
   assert(macedonianJournalHandoff?.title === 'Health Journal', 'Macedonian open-health-journal wording must open Health Journal.')
+  assert(macedonianJournalHandoff?.nativeTarget?.route === 'HealthJournal', 'Health Journal navigation must use the native Health Journal screen.')
 
   const macedonianSymptomHandoff = buildQuickToolDraft('Отвори симптоми', localDate)
   assert(macedonianSymptomHandoff?.action === 'app_handoff', 'Macedonian open-symptoms wording must create an app handoff, not a medical advice response.')
@@ -1495,6 +1505,15 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
 
   const germanInsightsHandoff = inferNativeWebTarget({}, 'Öffne Einblicke')
   assert(germanInsightsHandoff?.nativeTarget?.tab === 'Insights', 'German open-insights wording must open Insights.')
+
+  const healthInsightsHandoff = inferNativeWebTarget({}, 'Open my health insights')
+  assert(healthInsightsHandoff?.nativeTarget?.tab === 'Insights', 'Health Insights wording must open Insights instead of the generic chat page.')
+
+  const medicationHandoff = inferNativeWebTarget({}, 'Open my medications')
+  assert(medicationHandoff?.nativeTarget?.route === 'HealthSetup', 'Open-medications wording must open Health Intake.')
+
+  const supplementHandoff = inferNativeWebTarget({}, 'Show my supplements')
+  assert(supplementHandoff?.nativeTarget?.route === 'HealthSetup', 'Open-supplements wording must open Health Intake.')
 
   const spokenFoodPhoto = buildQuickToolDraft('Take a food photo for lunch', localDate)
   assert(spokenFoodPhoto?.action === 'app_handoff', 'Spoken food photo requests must create an app handoff.')

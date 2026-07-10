@@ -136,6 +136,7 @@ type DraftRequestOptions = {
   continuousVoice?: boolean
   realtimeActionHint?: RealtimeActionHint
   suppressSpokenReply?: boolean
+  signal?: AbortSignal
 }
 type DraftRequestHandler = (options?: DraftRequestOptions) => Promise<DraftRequestResult>
 type RealtimeActionGuard = {
@@ -193,11 +194,31 @@ function voiceResultStatusFromDraft(nextDraft: VoiceDraft | null, data?: any): D
   return 'general_answer'
 }
 
+function compactRecipeVoiceReply(value: unknown, fallback?: unknown) {
+  const plain = String(value || fallback || '')
+    .replace(/\*\*|__|#{1,6}\s*/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+  const beforeDetails = plain.split(/\b(?:ingredients?|approx(?:imate)?\s+macros?|macros?|nutrients?|nutrition|recipe|steps?|method|instructions?)\b/i)[0]
+  const title = cleanFavoriteText(beforeDetails.split(/[.!?]/)[0] || fallback || 'a meal that fits your day', 140)
+    .replace(/^[-–—•\d.)\s]+/, '')
+    .trim()
+  return `My suggestion is ${title || 'a meal that fits your day'}. Would you like me to tell you the ingredients and nutrients, or the cooking steps?`
+}
+
+function spokenReplyTextForDraft(nextDraft: VoiceDraft | null) {
+  if (!nextDraft) return ''
+  if (nextDraft.recipe?.text) {
+    return compactRecipeVoiceReply(nextDraft.recipe.text, nextDraft.summary)
+  }
+  return nextDraft.confirmationMessage || nextDraft.summary || ''
+}
+
 function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
   const status = result.status || (result.saved ? 'saved' : result.needsReview ? 'review_draft' : 'general_answer')
   const saved = Boolean(result.saved && status === 'saved')
   const needsReview = Boolean(result.needsReview || status === 'review_draft')
-  const spokenReply = cleanFavoriteText(
+  const defaultSpokenReply = cleanFavoriteText(
     result.message ||
       (saved
         ? 'Saved.'
@@ -210,6 +231,9 @@ function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
         : 'Done.'),
     500,
   )
+  const spokenReply = result.action === 'recipe' && !saved
+    ? compactRecipeVoiceReply(defaultSpokenReply)
+    : defaultSpokenReply
   const instruction = saved
     ? 'You may say this was saved because the app confirmed a successful save.'
     : needsReview
@@ -848,6 +872,10 @@ function fallbackNativeTargetForAppTarget(appTarget?: VoiceDraft['appTarget'] | 
   if (title.includes('water')) return { type: 'stack', route: 'WaterIntake' }
   if (title.includes('mood journal')) return { type: 'stack', route: 'MoodTracker', params: { tab: 'journal' } }
   if (title.includes('mood tracker') || title === 'mood') return { type: 'stack', route: 'MoodTracker', params: { tab: 'checkin' } }
+  if (title.includes('health journal') || path.startsWith('/health-journal')) return { type: 'stack', route: 'HealthJournal' }
+  if (title.includes('symptom') || path.startsWith('/symptoms')) return { type: 'stack', route: 'SymptomNotes' }
+  if (title.includes('health image') || path.startsWith('/medical-images')) return { type: 'stack', route: 'HealthImageNotes' }
+  if (title.includes('health intake') || path.startsWith('/onboarding')) return { type: 'stack', route: 'HealthSetup' }
   if (title.includes('billing') || path === '/billing') return { type: 'stack', route: 'Billing' }
   if (title.includes('practitioner')) return { type: 'stack', route: 'Practitioners' }
   return null
@@ -1009,7 +1037,7 @@ function normalizeVoiceFavorite(raw: any, source: 'saved' | 'library') {
   }
 }
 
-async function loadVoiceFavorites(sessionToken?: string | null) {
+async function loadVoiceFavorites(sessionToken?: string | null, signal?: AbortSignal) {
   const byLabel = new Map<string, any>()
   const add = (favorite: any) => {
     const normalized = normalizeVoiceFavorite(favorite, favorite?.__voiceSource === 'library' ? 'library' : 'saved')
@@ -1031,6 +1059,7 @@ async function loadVoiceFavorites(sessionToken?: string | null) {
     try {
       const res = await fetch(`${API_BASE_URL}/api/food-log/library?limit=200`, {
         headers: buildNativeAuthHeaders(sessionToken, { includeCookie: true }),
+        signal,
       })
       const data: any = await res.json().catch(() => ({}))
       const logs = Array.isArray(data?.logs) ? data.logs : []
@@ -1077,8 +1106,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const conversationTurnSeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
   const spokenReplyRunRef = useRef(0)
+  const spokenReplyAbortRef = useRef<AbortController | null>(null)
+  const draftRequestAbortRef = useRef<AbortController | null>(null)
+  const voiceImageAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
   const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
+  const realtimeActionAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceRunRef = useRef(0)
   const realtimeVoiceConnectedRef = useRef(false)
   const realtimeVoiceConnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1239,6 +1272,18 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     const abortController = realtimeVoiceAbortRef.current
     realtimeVoiceAbortRef.current = null
     abortController?.abort()
+    const actionAbortController = realtimeActionAbortRef.current
+    realtimeActionAbortRef.current = null
+    actionAbortController?.abort()
+    const draftAbortController = draftRequestAbortRef.current
+    draftRequestAbortRef.current = null
+    draftAbortController?.abort()
+    const spokenAbortController = spokenReplyAbortRef.current
+    spokenReplyAbortRef.current = null
+    spokenAbortController?.abort()
+    const imageAbortController = voiceImageAbortRef.current
+    voiceImageAbortRef.current = null
+    imageAbortController?.abort()
     const stop = realtimeVoiceStopRef.current
     realtimeVoiceStopRef.current = null
     setRealtimeVoiceStatus('idle')
@@ -1314,10 +1359,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const requestVoiceReply = useCallback(
     async (text: string) => {
       if (!session?.token || !text.trim()) return false
+      const spokenReplyAbortController = new AbortController()
+      spokenReplyAbortRef.current?.abort()
+      spokenReplyAbortRef.current = spokenReplyAbortController
       const spokenReplyRunId = spokenReplyRunRef.current + 1
       spokenReplyRunRef.current = spokenReplyRunId
       const shouldKeepPlaying = () => (
         spokenReplyRunRef.current === spokenReplyRunId &&
+        !spokenReplyAbortController.signal.aborted &&
         openRef.current &&
         AppState.currentState === 'active'
       )
@@ -1331,6 +1380,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         const { res, data } = await fetchNativeVoiceTts((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-tts`, {
           method: 'POST',
           headers: buildNativeAuthHeaders(session.token, { json: true }),
+          signal: spokenReplyAbortController.signal,
           body: JSON.stringify({ text, aiConsentGranted: true }),
         }))
         if (!shouldKeepPlaying()) return false
@@ -1358,6 +1408,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setSpokenReplyStatus('unavailable')
         resumeVoiceSessionListening(900)
         return false
+      } finally {
+        if (spokenReplyAbortRef.current === spokenReplyAbortController) {
+          spokenReplyAbortRef.current = null
+        }
       }
     },
     [playAudio, resumeVoiceSessionListening, session?.token],
@@ -1507,6 +1561,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     async (itemType: 'supplement' | 'medication', asset: BottleLabelImageAsset) => {
       if (!session?.token) return
 
+      const imageAbortController = new AbortController()
+      voiceImageAbortRef.current?.abort()
+      voiceImageAbortRef.current = imageAbortController
+
       try {
         const requestContext = normalizeLaunchContext(launchContext)
         const requestLocalDate = requestContext.date || todayLocalDate()
@@ -1530,8 +1588,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         const res = await fetch(`${API_BASE_URL}/api/analyze-supplement-image`, {
           method: 'POST',
           headers: buildNativeAuthHeaders(session.token),
+          signal: imageAbortController.signal,
           body: form,
         })
+        if (imageAbortController.signal.aborted) return
         const data: any = await res.json().catch(() => ({}))
         if (!res.ok) throw new Error(data?.error || 'Helfi could not read that label.')
         const nextDraft: VoiceDraft | null = data?.draft || null
@@ -1551,8 +1611,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           void requestVoiceReply(nextDraft.confirmationMessage || nextDraft.summary || '')
         }
       } catch (error: any) {
+        if (imageAbortController.signal.aborted || error?.name === 'AbortError') return
         Alert.alert('Try again', error?.message || 'Helfi could not read that label.')
       } finally {
+        if (voiceImageAbortRef.current === imageAbortController) {
+          voiceImageAbortRef.current = null
+        }
         setBusy(false)
       }
     },
@@ -1679,15 +1743,24 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   )
 
   const saveDraft = useCallback(
-    async (targetDraft: VoiceDraft | null, options?: { automatic?: boolean }) => {
+    async (targetDraft: VoiceDraft | null, options?: { automatic?: boolean; signal?: AbortSignal }) => {
       if (!session?.token || !targetDraft?.canConfirm) return null
+      if (options?.signal?.aborted) return null
+      const saveAbortController = options?.signal ? null : new AbortController()
+      if (saveAbortController) {
+        draftRequestAbortRef.current?.abort()
+        draftRequestAbortRef.current = saveAbortController
+      }
+      const saveSignal = options?.signal || saveAbortController?.signal
       setConfirming(true)
       try {
         const { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
           method: 'POST',
           headers: buildNativeAuthHeaders(session.token, { json: true }),
+          signal: saveSignal,
           body: JSON.stringify({ draft: targetDraft }),
         }))
+        if (saveSignal?.aborted) return null
         if (!res.ok) throw new Error(data?.error || 'Could not save that.')
         const resultKind = String(data?.result?.kind || '').toLowerCase()
         const changedDate = targetDraft.localDate || todayLocalDate()
@@ -1805,9 +1878,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         closePanel()
         return data
       } catch (error: any) {
+        if (saveSignal?.aborted || error?.name === 'AbortError') return null
         Alert.alert('Could not save', error?.message || 'Please try again.')
         return null
       } finally {
+        if (saveAbortController && draftRequestAbortRef.current === saveAbortController) {
+          draftRequestAbortRef.current = null
+        }
         setConfirming(false)
       }
     },
@@ -1817,12 +1894,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const sendDraftRequest = useCallback(
     async (options?: DraftRequestOptions): Promise<DraftRequestResult> => {
       if (!session?.token) return { ok: false, message: 'Please sign in first.' }
+      if (options?.signal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
       const rawTypedTranscript = (options?.transcriptOverride ?? transcript).trim()
       const explicitNewCommand = isExplicitNewVoiceCommand(rawTypedTranscript)
       const draftIsReviewOrHandoff = Boolean(draft?.canConfirm || draft?.appTarget?.path) && !explicitNewCommand
       if (!options?.audioUri && draft?.canConfirm && isConfirmingDraftText(rawTypedTranscript)) {
         setTranscript(rawTypedTranscript)
-        const saved = await saveDraft(draft)
+        const saved = await saveDraft(draft, { signal: options?.signal })
         return {
           ok: Boolean(saved),
           saved: Boolean(saved),
@@ -1858,11 +1936,20 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         return { ok: false, message: 'AI request was not sent because consent was not granted.' }
       }
 
+      if (options?.signal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
+      const draftRequestAbortController = options?.signal ? null : new AbortController()
+      if (draftRequestAbortController) {
+        draftRequestAbortRef.current?.abort()
+        draftRequestAbortRef.current = draftRequestAbortController
+      }
+      const requestSignal = options?.signal || draftRequestAbortController?.signal
+
       setBusy(true)
       setDraft(null)
       setChargedCredits(null)
       try {
-        const favorites = await loadVoiceFavorites(session.token)
+        const favorites = await loadVoiceFavorites(session.token, requestSignal)
+        if (requestSignal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
         const requestContext = normalizeLaunchContext(launchContext)
         const requestLocalDate = requestContext.date || todayLocalDate()
         const confirmationDraftPayload = !explicitNewCommand && draft?.canConfirm ? draft : null
@@ -1894,6 +1981,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             return fetch(`${baseUrl}/api/native-voice-assistant`, {
               method: 'POST',
               headers: buildNativeAuthHeaders(session.token),
+              signal: requestSignal,
               body: form,
             })
           })
@@ -1901,6 +1989,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           responseData = await fetchNativeVoiceAssistant((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant`, {
             method: 'POST',
             headers: buildNativeAuthHeaders(session.token, { json: true }),
+            signal: requestSignal,
             body: JSON.stringify({
               transcript: typedTranscript,
               localDate: requestLocalDate,
@@ -1918,6 +2007,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         }
 
         const { res, data } = responseData
+        if (requestSignal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
         if (!res.ok) {
           throw new Error(data?.error || 'Helfi could not process that request.')
         }
@@ -1937,7 +2027,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           makeConversationTurn('assistant', assistantText),
         ])
         if (data?.confirmNow && nextDraft?.canConfirm) {
-          const saved = await saveDraft(nextDraft)
+          const saved = await saveDraft(nextDraft, { signal: requestSignal })
           return {
             ok: Boolean(saved),
             saved: Boolean(saved),
@@ -1956,7 +2046,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: nextDraft?.action }
         }
         if (shouldSpeakReply && nextDraft) {
-          const speechText = nextDraft?.recipe?.text || nextDraft?.confirmationMessage || nextDraft?.summary || ''
+          const speechText = spokenReplyTextForDraft(nextDraft)
           void requestVoiceReply(String(speechText))
         }
         return {
@@ -1968,6 +2058,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           message: assistantText || (nextDraft ? 'Review is ready.' : 'Done.'),
         }
       } catch (error: any) {
+        if (requestSignal?.aborted || error?.name === 'AbortError') {
+          return { ok: false, message: 'Live voice has stopped.' }
+        }
         const message = error?.message || 'Helfi could not process that request.'
         if (options?.continuousVoice && /no speech|nothing heard/i.test(String(message))) {
           resumeVoiceSessionListening(600)
@@ -1976,6 +2069,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         }
         return { ok: false, message }
       } finally {
+        if (draftRequestAbortController && draftRequestAbortRef.current === draftRequestAbortController) {
+          draftRequestAbortRef.current = null
+        }
         setBusy(false)
       }
     },
@@ -2243,9 +2339,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             if (guard?.key === guardKey && Date.now() - guard.startedAt < 5000) {
               return guard.promise
             }
+            const actionAbortController = new AbortController()
+            realtimeActionAbortRef.current?.abort()
+            realtimeActionAbortRef.current = actionAbortController
             const promise = sendDraftRequestRef.current({
               transcriptOverride: request,
               suppressSpokenReply: true,
+              signal: actionAbortController.signal,
               realtimeActionHint: {
                 action,
                 needsReview: Boolean(args.needsReview),
@@ -2255,6 +2355,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             promise.finally(() => {
               if (realtimeActionGuardRef.current?.promise === promise) {
                 realtimeActionGuardRef.current = null
+              }
+              if (realtimeActionAbortRef.current === actionAbortController) {
+                realtimeActionAbortRef.current = null
               }
             })
             return promise

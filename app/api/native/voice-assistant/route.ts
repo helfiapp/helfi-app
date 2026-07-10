@@ -3986,6 +3986,47 @@ async function buildRecipe(
   return { text, costCents: wrapped.costCents, model: wrapped.completion.model || COMMAND_MODEL, snapshot }
 }
 
+async function buildGeneralHealthAnswer(
+  openai: OpenAI,
+  transcript: string,
+  userId: string,
+  localDate: string,
+  launchContext: VoiceLaunchContext,
+  conversationHistory: VoiceConversationTurn[] = [],
+) {
+  const wrapped = await chatCompletionWithCost(
+    openai,
+    {
+      model: COMMAND_MODEL,
+      max_tokens: 260,
+      temperature: 0.3,
+      messages: [
+        {
+          role: 'system',
+          content: [
+            'You are Talk to Helfi in a natural spoken conversation inside the Helfi health app.',
+            'Answer the newest general health, wellbeing, nutrition, fitness, sleep, or app question directly in plain language.',
+            'Keep the answer warm and concise: normally one or two short sentences, with at most one useful follow-up question.',
+            'Do not repeat the user\'s question, recite long lists, or read full ingredients, nutrients, macros, or recipe steps unless asked.',
+            'Never claim that app data was saved, added, created, changed, or logged.',
+            'Do not diagnose, interpret health images, or tell the user to start, stop, increase, reduce, or change medication or treatment.',
+            'For urgent warning signs, tell the user to contact local emergency services. Otherwise recommend a qualified health professional when personal medical advice is needed.',
+            'Use recent conversation only for natural context. If the request is unclear, ask one short clarification instead of guessing.',
+          ].join('\n'),
+        },
+        {
+          role: 'user',
+          content: `Today is ${localDate}. Current app context: ${launchContextLine(launchContext)}.\nRecent Talk to Helfi conversation:\n${conversationHistoryLine(conversationHistory)}\nNewest request: ${transcript}`,
+        },
+      ],
+    } as any,
+    { feature: 'voice-assistant:general-answer', userId },
+  )
+  const text = cleanText(wrapped.completion.choices?.[0]?.message?.content || '', 1200)
+  if (!text) throw new Error('Helfi could not answer that question')
+  return { text, costCents: wrapped.costCents, model: wrapped.completion.model || COMMAND_MODEL }
+}
+
 async function buildFoodCopyDraft(userId: string, localDate: string, meal: string) {
   const sourceDate = shiftLocalDate(localDate, -1)
   const normalizedMeal = meal || 'breakfast'
@@ -4270,7 +4311,7 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
     return nativeTarget('Mood Tracker', '/mood', 'Open Mood Tracker', { type: 'stack', route: 'MoodTracker', params: { tab: 'checkin' } })
   }
   if ((/\b(health journal|journal)\b/.test(raw) || /(здравствен(?:иот)?\s+дневник|дневник|gesundheitstagebuch|tagebuch)/i.test(raw)) && openOnly) {
-    return { title: 'Health Journal', path: '/health-journal', buttonLabel: 'Open Health Journal' }
+    return nativeTarget('Health Journal', '/health-journal', 'Open Health Journal', { type: 'stack', route: 'HealthJournal' })
   }
   if ((/\b(symptom notes|symptoms notes|symptom tracker|symptoms tracker)\b/.test(raw) || /(симптоми|белешки\s+за\s+симптоми|symptome|symptomnotizen)/i.test(raw)) && openOnly) {
     return nativeTarget('Symptom Notes', '/symptoms', 'Open Symptom Notes', { type: 'stack', route: 'SymptomNotes' })
@@ -4284,6 +4325,12 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
   if ((/\b(settings|account settings)\b/.test(raw) || /(поставки|сетинг|сметка|einstellungen|konto)/i.test(raw)) && openOnly) {
     return nativeTarget('Settings', '/settings', 'Open Settings', { type: 'tab', tab: 'Settings' })
   }
+  if ((/\b(health intake|medications?|medicines?|supplements?|vitamins?)\b/.test(raw) || /(лекови|лек|суплементи|витамини|medikamente|medizin|nahrungsergänzung|nahrungsergaenzung|vitamine)/i.test(raw)) && openOnly) {
+    return nativeTarget('Health Intake', '/onboarding?step=6', 'Open Health Intake', { type: 'stack', route: 'HealthSetup' })
+  }
+  if (/\b(insight|insights|coach)\b/.test(raw) || /(увид|увиди|коуч|тренер|einblick|einblicke|coach)/i.test(raw)) {
+    return nativeTarget('Insights', '/insights', 'Open Insights', { type: 'tab', tab: 'Insights' })
+  }
   if (/\b(chat|talk|ask|question|advice|health|supplement|medication|medicine|sleep|stress|energy|labs?|blood test)\b/.test(raw)) {
     return { title: 'Talk to Helfi', path: `/chat?voicePrompt=${encodeQueryValue(transcript, 1200)}`, buttonLabel: 'Open Talk to Helfi' }
   }
@@ -4292,9 +4339,6 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
   }
   if (/\b(practitioner|practitioners|doctor|clinic|specialist)\b/.test(raw)) {
     return nativeTarget('Practitioners', '/practitioners', 'Open Practitioners', { type: 'stack', route: 'Practitioners' })
-  }
-  if (/\b(insight|insights|coach)\b/.test(raw) || /(увид|увиди|коуч|тренер|einblick|einblicke|coach)/i.test(raw)) {
-    return nativeTarget('Insights', '/insights', 'Open Insights', { type: 'tab', tab: 'Insights' })
   }
   return null
 }
@@ -4666,6 +4710,7 @@ async function normalizeDraft(
   tzOffsetMin: number,
   favorites: VoiceFoodFavorite[],
   launchContext?: VoiceLaunchContext,
+  conversationHistory: VoiceConversationTurn[] = [],
 ): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
   if (hasSelfHarmRisk(transcript)) {
     return { aiCostCents: 0, draft: buildSelfHarmSupportDraft(transcript, localDate) }
@@ -4753,20 +4798,24 @@ async function normalizeDraft(
         draft: buildFoodRecommendationConversationDraft(transcript, localDate, launchContext, undefined, { diarySnapshot }),
       }
     }
+    const answer = await buildGeneralHealthAnswer(
+      openai,
+      transcript,
+      userId,
+      localDate,
+      launchContext || { section: 'generic', title: 'Helfi' },
+      conversationHistory,
+    )
     return {
-      aiCostCents,
+      aiCostCents: aiCostCents + answer.costCents,
+      usedModel: answer.model,
       draft: {
         action: 'health_question',
         transcript,
         localDate,
         summary: 'Talk to Helfi',
-        confirmationMessage: 'This is a health question. I can open Talk to Helfi with your question ready.',
+        confirmationMessage: answer.text,
         canConfirm: false,
-        appTarget: {
-          title: 'Talk to Helfi',
-          path: `/chat?voicePrompt=${encodeQueryValue(transcript, 1200)}`,
-          buttonLabel: 'Open Talk to Helfi',
-        },
       },
     }
   }
@@ -5698,7 +5747,7 @@ export async function POST(request: NextRequest) {
         const command = await runJsonCommandModel(aiIntentClient, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft, realtimeActionHint)
         const draftDecision = confirmationDraft ? aiDraftDecision(command.parsed) : null
         if (draftDecision) return buildAiDraftDecisionResponse(user.id, transcript, confirmationDraft, draftDecision, command, transcriptionCostCents)
-        const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, aiIntentClient, tzOffsetMin, favorites, launchContext)
+        const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, aiIntentClient, tzOffsetMin, favorites, launchContext, conversationHistory)
         let draft = normalized.draft
         if (draft.action === 'health_question' && isFoodRecommendationRequest(transcript, launchContext)) {
           const fallbackSnapshot = await buildFoodDiarySnapshot({ userId: user.id, localDate, tzOffsetMin }).catch(() => null)
@@ -6136,7 +6185,7 @@ export async function POST(request: NextRequest) {
     const command = await runJsonCommandModel(openai, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft, realtimeActionHint)
     const draftDecision = confirmationDraft ? aiDraftDecision(command.parsed) : null
     if (draftDecision) return buildAiDraftDecisionResponse(user.id, transcript, confirmationDraft, draftDecision, command, transcriptionCostCents)
-    const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin, favorites, launchContext)
+    const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin, favorites, launchContext, conversationHistory)
     let draft = normalized.draft
     let aiCostCents = transcriptionCostCents + command.wrapped.costCents + normalized.aiCostCents
     const isRecipe = draft.action === 'recipe'
