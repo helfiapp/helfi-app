@@ -1132,9 +1132,13 @@ export default function AddIngredientClient() {
       setError(null)
       return
     }
+    let hasCurrentSeed = false
     if (kind === 'single') {
       const instant = buildSingleFoodSuggestions(q)
-      if (instant.length > 0) setResults(instant)
+      if (instant.length > 0) {
+        hasCurrentSeed = true
+        setResults(instant)
+      }
     } else {
       void runInstantPackagedQuickSearch(q)
     }
@@ -1142,8 +1146,10 @@ export default function AddIngredientClient() {
     if (cached.length > 0) {
       const allowBrands = kind === 'packaged' && shouldShowBrandSuggestions(q)
       const mergedCached = allowBrands ? mergeBrandSuggestions(cached, brandSuggestionsRef.current) : kind === 'packaged' ? cached : mergeSearchSuggestions(cached, q)
+      hasCurrentSeed = true
       setResults(mergedCached)
     }
+    if (!hasCurrentSeed) setResults([])
     setLoading(true)
     searchDebounceRef.current = window.setTimeout(() => {
       runSearch(q, kind, sourceChoice, { preserveResults: true, skipQuickLocal: true })
@@ -1453,6 +1459,25 @@ export default function AddIngredientClient() {
       }
 
       const allowBrandSuggestions = k === 'packaged' && shouldShowBrandSuggestions(q)
+      const fullRequest = fetchItems(q)
+      if (k === 'single') {
+        const quick = await fetchItems(q, { localOnly: true })
+        if (quick.res.ok && seqRef.current === seq) {
+          const quickItems = (Array.isArray(quick.data?.items) ? quick.data.items : []).filter(
+            (item: NormalizedFoodItem) =>
+              item?.source === 'usda' || item?.source === 'fatsecret' || (item as any)?.__custom === true,
+          )
+          const quickFiltered = filterItemsForQuery(quickItems, q, k, { allowTypoFallback: true })
+          const quickMerged = mergeSearchSuggestions(
+            quickFiltered.length > 0 ? quickFiltered : quickItems,
+            q,
+          )
+          if (quickMerged.length > 0 && seqRef.current === seq) {
+            setResults(quickMerged)
+            searchCacheRef.current.set(cacheKey, { items: quickMerged, at: Date.now() })
+          }
+        }
+      }
       if (k === 'packaged' && !options?.skipQuickLocal) {
         const quickQuery = getQuickPackagedQuery(q)
         if (quickQuery.length >= 1) {
@@ -1470,7 +1495,7 @@ export default function AddIngredientClient() {
         }
       }
 
-      let { res, data } = await fetchItems(q)
+      let { res, data } = await fullRequest
       if (!res.ok) {
         const msg =
           typeof data?.error === 'string'
