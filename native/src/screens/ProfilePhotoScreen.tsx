@@ -182,7 +182,7 @@ export function ProfilePhotoScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text }}>Upload/Change Profile Photo</Text>
+          <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>Upload/Change Profile Photo</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>Changes are automatically saved.</Text>
 
           <View style={{ alignItems: 'center', marginTop: 18, marginBottom: 14 }}>
@@ -201,7 +201,7 @@ export function ProfilePhotoScreen() {
                   borderColor: theme.colors.border,
                 }}
               >
-                <Text style={{ fontSize: 36, fontWeight: '900', color: theme.colors.primary }}>{initial}</Text>
+                <Text style={{ fontSize: 36, fontWeight: '700', color: theme.colors.primary }}>{initial}</Text>
               </View>
             )}
           </View>

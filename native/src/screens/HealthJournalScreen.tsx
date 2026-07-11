@@ -23,6 +23,7 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type TabKey = 'entry' | 'history'
@@ -137,6 +138,7 @@ export function HealthJournalScreen() {
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingText, setEditingText] = useState('')
   const [editingSaving, setEditingSaving] = useState(false)
+  const [entryActions, setEntryActions] = useState<JournalEntry | null>(null)
 
   const mediaProcessing = media.some((item) => item.processing)
 
@@ -580,17 +582,7 @@ export function HealthJournalScreen() {
               <View key={entry.id} style={styles.card}>
                 <View style={styles.historyHeader}>
                   <Text style={styles.historyTitle}>{formatDayLabel(entry.localDate)} - {formatEntryTime(entry.createdAt)}</Text>
-                  <View style={styles.historyActions}>
-                    <Pressable onPress={() => {
-                      setEditingId(entry.id)
-                      setEditingText(entry.content)
-                    }}>
-                      <Text style={styles.editText}>Edit</Text>
-                    </Pressable>
-                    <Pressable onPress={() => deleteEntry(entry)}>
-                      <Text style={styles.deleteText}>Delete</Text>
-                    </Pressable>
-                  </View>
+                  <EntryActionsButton label="Note actions" onPress={() => setEntryActions(entry)} />
                 </View>
                 {editingId === entry.id ? (
                   <View style={{ gap: 10, marginTop: 12 }}>
@@ -620,6 +612,20 @@ export function HealthJournalScreen() {
           </View>
         )}
       </ScrollView>
+      <EntryActionsMenu
+        visible={entryActions != null}
+        onClose={() => setEntryActions(null)}
+        actions={[
+          { label: 'Edit entry', icon: 'edit-3', onPress: () => {
+            if (!entryActions) return
+            setEditingId(entryActions.id)
+            setEditingText(entryActions.content)
+          } },
+          { label: 'Delete entry', icon: 'trash-2', destructive: true, onPress: () => {
+            if (entryActions) deleteEntry(entryActions)
+          } },
+        ]}
+      />
     </Screen>
   )
 }
@@ -653,7 +659,7 @@ const styles = StyleSheet.create({
   },
   segmentText: {
     color: theme.colors.text,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   segmentTextActive: {
     color: '#FFFFFF',
@@ -677,7 +683,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: theme.colors.text,
     fontSize: 19,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   muted: {
     color: theme.colors.muted,
@@ -718,11 +724,11 @@ const styles = StyleSheet.create({
   },
   photoButtonText: {
     color: theme.colors.primary,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   voiceButtonText: {
     color: '#1D4ED8',
-    fontWeight: '900',
+    fontWeight: '700',
   },
   recordingButtonText: {
     color: '#FFFFFF',
@@ -745,12 +751,12 @@ const styles = StyleSheet.create({
   audioTitle: {
     color: theme.colors.text,
     fontSize: 12,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   audioPill: {
     color: theme.colors.muted,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   textArea: {
     minHeight: 132,
@@ -761,7 +767,7 @@ const styles = StyleSheet.create({
     padding: 12,
     color: theme.colors.text,
     textAlignVertical: 'top',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
   },
   mediaList: {
     gap: 8,
@@ -796,7 +802,7 @@ const styles = StyleSheet.create({
   },
   mediaName: {
     color: theme.colors.text,
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 13,
   },
   removeButton: {
@@ -806,7 +812,7 @@ const styles = StyleSheet.create({
   removeText: {
     color: theme.colors.danger,
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   warning: {
     marginTop: 10,
@@ -847,7 +853,7 @@ const styles = StyleSheet.create({
   },
   primaryText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '700',
   },
   secondaryButton: {
     borderRadius: 10,
@@ -858,7 +864,7 @@ const styles = StyleSheet.create({
   },
   secondaryText: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   disabled: {
     opacity: 0.6,
@@ -876,7 +882,7 @@ const styles = StyleSheet.create({
   },
   dateButtonText: {
     color: theme.colors.text,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   dateCenter: {
     flex: 1,
@@ -889,7 +895,7 @@ const styles = StyleSheet.create({
   },
   dateCenterText: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   refreshButton: {
     alignSelf: 'flex-start',
@@ -902,7 +908,7 @@ const styles = StyleSheet.create({
   },
   refreshText: {
     color: theme.colors.text,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   emptyBox: {
     borderWidth: 1,
@@ -930,7 +936,7 @@ const styles = StyleSheet.create({
   historyTitle: {
     flex: 1,
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   historyActions: {
     flexDirection: 'row',
@@ -938,11 +944,11 @@ const styles = StyleSheet.create({
   },
   editText: {
     color: theme.colors.primary,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   deleteText: {
     color: theme.colors.danger,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   entryContent: {
     marginTop: 12,

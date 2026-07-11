@@ -3,6 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 export const dynamic = 'force-dynamic'
 
@@ -106,10 +107,11 @@ function exerciseCaloriesToBonusMl(calories: number | null) {
 
 export async function GET(_req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session?.user?.id || (await getUserIdFromNativeAuth(_req))
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: userId },
     include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -153,10 +155,11 @@ export async function GET(_req: NextRequest) {
 
 export async function POST(req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session?.user?.id || (await getUserIdFromNativeAuth(req))
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const user = await prisma.user.findUnique({
-    where: { email: session.user.email },
+    where: { id: userId },
     include: { healthGoals: { orderBy: { updatedAt: 'desc' } } },
   })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
@@ -205,9 +208,10 @@ export async function POST(req: NextRequest) {
 
 export async function DELETE(_req: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.email) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const userId = session?.user?.id || (await getUserIdFromNativeAuth(_req))
+  if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const user = await prisma.user.findUnique({ where: { email: session.user.email } })
+  const user = await prisma.user.findUnique({ where: { id: userId } })
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   await prisma.healthGoal.deleteMany({ where: { userId: user.id, name: GOAL_NAME } })

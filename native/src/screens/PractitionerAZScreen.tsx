@@ -76,8 +76,8 @@ export function PractitionerAZScreen({ navigation }: { navigation: any }) {
   return (
     <Screen>
       <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
-        <Text style={{ fontSize: 12, fontWeight: '900', letterSpacing: 1, color: theme.colors.muted }}>BROWSE A-Z</Text>
-        <Text style={{ fontSize: 28, fontWeight: '900', color: theme.colors.text, marginTop: 6 }}>Categories A to Z</Text>
+        <Text style={{ fontSize: 12, fontWeight: '700', letterSpacing: 1, color: theme.colors.muted }}>BROWSE A-Z</Text>
+        <Text style={{ fontSize: 28, fontWeight: '700', color: theme.colors.text, marginTop: 6 }}>Categories A to Z</Text>
         <Text style={{ color: theme.colors.muted, marginTop: 6 }}>
           Scroll or tap a letter to jump to categories. You can also search quickly.
         </Text>
@@ -111,7 +111,7 @@ export function PractitionerAZScreen({ navigation }: { navigation: any }) {
               paddingVertical: 8,
             }}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Back to search</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Back to search</Text>
           </Pressable>
         </View>
 
@@ -134,7 +134,7 @@ export function PractitionerAZScreen({ navigation }: { navigation: any }) {
                 backgroundColor: selectedLetter === letter ? '#EAF8EA' : theme.colors.card,
               }}
             >
-              <Text style={{ color: selectedLetter === letter ? '#2E7D32' : theme.colors.text, fontWeight: '800', fontSize: 12 }}>{letter}</Text>
+              <Text style={{ color: selectedLetter === letter ? '#2E7D32' : theme.colors.text, fontWeight: '600', fontSize: 12 }}>{letter}</Text>
             </Pressable>
           ))}
         </ScrollView>
@@ -196,9 +196,9 @@ export function PractitionerAZScreen({ navigation }: { navigation: any }) {
                       justifyContent: 'center',
                     }}
                   >
-                    <Text style={{ color: '#2E7D32', fontWeight: '900' }}>{letter}</Text>
+                    <Text style={{ color: '#2E7D32', fontWeight: '700' }}>{letter}</Text>
                   </View>
-                  <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '900' }}>{letter}</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '700' }}>{letter}</Text>
                 </View>
 
                 <View style={{ gap: 8 }}>
@@ -214,7 +214,7 @@ export function PractitionerAZScreen({ navigation }: { navigation: any }) {
                         gap: 8,
                       }}
                     >
-                      <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 16 }}>{item.name}</Text>
+                      <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>{item.name}</Text>
                       {item.children.length > 0 ? (
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                           {item.children.map((child) => (

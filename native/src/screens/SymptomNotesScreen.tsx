@@ -16,6 +16,7 @@ import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type TabKey = 'notes' | 'history'
@@ -39,6 +40,8 @@ type SymptomHistoryItem = {
   analysisData?: SymptomResult | null
   createdAt?: string | null
 }
+
+type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 const QUICK_TAGS = [
   'Fever', 'Headache', 'Cough', 'Sore throat', 'Runny nose', 'Nasal congestion',
@@ -134,12 +137,18 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
   const [error, setError] = useState('')
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [result, setResult] = useState<SymptomResult | null>(null)
+  const [chatThreadId, setChatThreadId] = useState<string | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatBusy, setChatBusy] = useState(false)
+  const [chatError, setChatError] = useState('')
 
   const [historyItems, setHistoryItems] = useState<SymptomHistoryItem[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [historyActions, setHistoryActions] = useState<SymptomHistoryItem | null>(null)
 
   const addSymptom = useCallback((value?: string) => {
     const raw = String(value ?? symptomInput).trim()
@@ -231,10 +240,46 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
       setSelectedSymptoms(symptoms)
       setSymptomInput('')
       setResult(mergeResult(data))
+      setChatThreadId(null)
+      setChatMessages([])
+      setChatInput('')
+      setChatError('')
     } catch (e: any) {
       setError(e?.message || 'Failed to create symptom notes')
     } finally {
       setIsAnalyzing(false)
+    }
+  }
+
+  const sendFollowUp = async () => {
+    const message = chatInput.trim()
+    if (!message || !jsonHeaders || !result || chatBusy) return
+    setChatMessages((prev) => [...prev, { role: 'user', content: message }])
+    setChatInput('')
+    setChatError('')
+    setChatBusy(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/analyze-symptoms/chat`, {
+        method: 'POST',
+        headers: jsonHeaders,
+        body: JSON.stringify({
+          threadId: chatThreadId || undefined,
+          message,
+          symptoms: selectedSymptoms,
+          duration,
+          notes,
+          analysisResult: result,
+        }),
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(String(data?.message || data?.error || 'Could not send this question.'))
+      const assistant = String(data?.assistant || '').trim()
+      if (assistant) setChatMessages((prev) => [...prev, { role: 'assistant', content: assistant }])
+      if (data?.threadId) setChatThreadId(String(data.threadId))
+    } catch (e: any) {
+      setChatError(e?.message || 'Could not send this question.')
+    } finally {
+      setChatBusy(false)
     }
   }
 
@@ -329,6 +374,43 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
         <Text style={styles.disclaimer}>
           {safeText(result.disclaimer, 'This is not medical advice. Always seek a doctor\'s advice in addition to using this app and before making medical decisions.') || 'This is not medical advice. Always seek a doctor\'s advice in addition to using this app and before making medical decisions.'}
         </Text>
+        <View style={[styles.block, { marginTop: 14 }]}>
+          <Text style={styles.blockTitle}>Ask a follow-up question</Text>
+          <Text style={styles.smallText}>Continue the same conversation about these symptom notes.</Text>
+          {chatMessages.map((message, index) => (
+            <View
+              key={`${message.role}-${index}`}
+              style={{
+                alignSelf: message.role === 'user' ? 'flex-end' : 'stretch',
+                maxWidth: message.role === 'user' ? '86%' : '100%',
+                marginTop: 10,
+                borderRadius: 12,
+                padding: 11,
+                backgroundColor: message.role === 'user' ? '#DCFCE7' : '#F3F4F6',
+              }}
+            >
+              <Text style={styles.bodyText}>{message.content}</Text>
+            </View>
+          ))}
+          <View style={[styles.row, { marginTop: 12, alignItems: 'flex-end' }]}>
+            <TextInput
+              value={chatInput}
+              onChangeText={setChatInput}
+              placeholder="Ask about these notes"
+              placeholderTextColor="#9CA3AF"
+              multiline
+              style={[styles.input, { flex: 1, minHeight: 46, maxHeight: 110 }]}
+            />
+            <Pressable
+              onPress={() => void sendFollowUp()}
+              disabled={chatBusy || !chatInput.trim()}
+              style={[styles.addButton, (chatBusy || !chatInput.trim()) && { opacity: 0.55 }]}
+            >
+              {chatBusy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.addButtonText}>Send</Text>}
+            </Pressable>
+          </View>
+          {chatError ? <Text style={styles.errorText}>{chatError}</Text> : null}
+        </View>
       </View>
     )
   }
@@ -462,9 +544,7 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
                   <Pressable onPress={() => setExpandedId(expanded ? null : item.id)}>
                     <Text style={styles.linkText}>{expanded ? 'Hide details' : 'View details'}</Text>
                   </Pressable>
-                  <Pressable onPress={() => deleteHistoryItem(item)} disabled={deletingId === item.id}>
-                    <Text style={styles.deleteText}>{deletingId === item.id ? 'Deleting...' : 'Delete'}</Text>
-                  </Pressable>
+                  <EntryActionsButton label="Symptom note actions" onPress={() => setHistoryActions(item)} disabled={deletingId === item.id} />
                 </View>
               </View>
               {symptoms.length ? <Text style={styles.bodyText}><Text style={styles.boldText}>Symptoms:</Text> {symptoms.join(', ')}</Text> : null}
@@ -520,6 +600,13 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
           </>
         ) : renderHistory()}
       </ScrollView>
+      <EntryActionsMenu
+        visible={historyActions != null}
+        onClose={() => setHistoryActions(null)}
+        actions={[
+          { label: 'Delete entry', icon: 'trash-2', destructive: true, onPress: () => historyActions && void deleteHistoryItem(historyActions) },
+        ]}
+      />
     </Screen>
   )
 }
@@ -548,7 +635,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: theme.colors.text,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   tabTextActive: {
     color: '#FFFFFF',
@@ -564,7 +651,7 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: theme.colors.text,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   bodyText: {
     color: theme.colors.text,
@@ -579,7 +666,7 @@ const styles = StyleSheet.create({
   label: {
     color: theme.colors.text,
     fontSize: 14,
-    fontWeight: '900',
+    fontWeight: '700',
     marginTop: 2,
   },
   input: {
@@ -587,7 +674,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D1D5DB',
     borderRadius: theme.radius.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     color: theme.colors.text,
     paddingHorizontal: 12,
     paddingVertical: 10,
@@ -611,7 +698,7 @@ const styles = StyleSheet.create({
   },
   addButtonText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '700',
   },
   chipWrap: {
     flexDirection: 'row',
@@ -624,14 +711,14 @@ const styles = StyleSheet.create({
     borderRadius: 999,
     paddingHorizontal: 10,
     paddingVertical: 6,
-    backgroundColor: '#F3F4F6',
+    backgroundColor: theme.colors.bg,
   },
   quickChipSelected: {
     borderColor: '#BBE4C4',
     backgroundColor: '#E8F7EC',
   },
   quickChipText: {
-    color: '#374151',
+    color: theme.colors.muted,
     fontSize: 12,
     fontWeight: '700',
   },
@@ -649,7 +736,7 @@ const styles = StyleSheet.create({
   selectedChipText: {
     color: '#1E6F36',
     fontSize: 12,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   warningBox: {
     borderWidth: 1,
@@ -661,7 +748,7 @@ const styles = StyleSheet.create({
   },
   warningTitle: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   warningText: {
     color: '#5B4A12',
@@ -672,7 +759,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     padding: 12,
     gap: 4,
   },
@@ -686,7 +773,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 15,
   },
   secondaryButton: {
@@ -697,11 +784,11 @@ const styles = StyleSheet.create({
     minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
   },
   secondaryButtonText: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   costText: {
     color: theme.colors.muted,
@@ -715,12 +802,12 @@ const styles = StyleSheet.create({
   linkText: {
     color: theme.colors.primary,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   deleteText: {
     color: '#DC2626',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   historyHeader: {
     flexDirection: 'row',
@@ -732,7 +819,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     padding: 12,
     gap: 8,
   },
@@ -747,7 +834,7 @@ const styles = StyleSheet.create({
   },
   blockTitle: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 14,
   },
   topicBox: {
@@ -756,15 +843,15 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.sm,
     padding: 10,
     gap: 4,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
   },
   topicTitle: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   urgentTitle: {
     color: '#B91C1C',
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 14,
   },
   urgentText: {
@@ -776,14 +863,14 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.bg,
     color: theme.colors.muted,
     fontSize: 12,
     lineHeight: 17,
     padding: 10,
   },
   boldText: {
-    fontWeight: '900',
+    fontWeight: '700',
     color: theme.colors.text,
   },
 })

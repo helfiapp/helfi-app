@@ -8,6 +8,7 @@ import {
   ScrollView,
   StyleSheet,
   Text,
+  TextInput,
   View,
 } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
@@ -18,6 +19,7 @@ import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type TabKey = 'notes' | 'history'
@@ -45,6 +47,8 @@ type ImageHistoryItem = {
   createdAt?: string | null
   imageUrl?: string | null
 }
+
+type ChatMessage = { role: 'user' | 'assistant'; content: string }
 
 function formatDateTime(value?: string | null) {
   if (!value) return 'Unknown date'
@@ -113,6 +117,11 @@ export function HealthImageNotesScreen() {
   const [isAnalyzing, setIsAnalyzing] = useState(false)
   const [savingHistory, setSavingHistory] = useState(false)
   const [result, setResult] = useState<ImageNoteResult | null>(null)
+  const [chatThreadId, setChatThreadId] = useState<string | null>(null)
+  const [chatMessages, setChatMessages] = useState<ChatMessage[]>([])
+  const [chatInput, setChatInput] = useState('')
+  const [chatBusy, setChatBusy] = useState(false)
+  const [chatError, setChatError] = useState('')
   const [hasAnalyzedImage, setHasAnalyzedImage] = useState(false)
   const [historySaved, setHistorySaved] = useState(false)
 
@@ -121,6 +130,7 @@ export function HealthImageNotesScreen() {
   const [historyError, setHistoryError] = useState('')
   const [expandedId, setExpandedId] = useState<string | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [historyActions, setHistoryActions] = useState<ImageHistoryItem | null>(null)
 
   const loadHistory = useCallback(async () => {
     if (!authHeaders) return
@@ -251,12 +261,41 @@ export function HealthImageNotesScreen() {
       if (!res.ok) throw new Error(String(data?.message || data?.error || 'Failed to create image notes'))
       if (!data?.success) throw new Error('Invalid response from server')
       setResult(mergeResult(data))
+      setChatThreadId(null)
+      setChatMessages([])
+      setChatInput('')
+      setChatError('')
       setHasAnalyzedImage(true)
       setHistorySaved(Boolean(data?.historySaved))
     } catch (e: any) {
       setError(e?.message || 'Failed to create image notes')
     } finally {
       setIsAnalyzing(false)
+    }
+  }
+
+  const sendFollowUp = async () => {
+    const message = chatInput.trim()
+    if (!message || !authHeaders || !result || chatBusy) return
+    setChatMessages((prev) => [...prev, { role: 'user', content: message }])
+    setChatInput('')
+    setChatError('')
+    setChatBusy(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/medical-images/chat`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ threadId: chatThreadId || undefined, message, analysisResult: result }),
+      })
+      const data: any = await res.json().catch(() => ({}))
+      if (!res.ok) throw new Error(String(data?.message || data?.error || 'Could not send this question.'))
+      const assistant = String(data?.assistant || '').trim()
+      if (assistant) setChatMessages((prev) => [...prev, { role: 'assistant', content: assistant }])
+      if (data?.threadId) setChatThreadId(String(data.threadId))
+    } catch (e: any) {
+      setChatError(e?.message || 'Could not send this question.')
+    } finally {
+      setChatBusy(false)
     }
   }
 
@@ -389,7 +428,7 @@ export function HealthImageNotesScreen() {
         <Text style={styles.infoText}>
           Helfi can create simple notes about visible details in a health-related image so you can track changes and discuss them with a qualified healthcare professional.
         </Text>
-        <Text style={[styles.infoText, { fontWeight: '900' }]}>Useful for recording:</Text>
+        <Text style={[styles.infoText, { fontWeight: '700' }]}>Useful for recording:</Text>
         <Text style={styles.infoText}>- Visible skin changes you want to monitor</Text>
         <Text style={styles.infoText}>- Photos you want to discuss with a doctor</Text>
         <Text style={styles.infoText}>- Wound, nail, eye, or skin appearance notes</Text>
@@ -435,6 +474,43 @@ export function HealthImageNotesScreen() {
       {result ? (
         <View style={{ gap: 12 }}>
           {renderResult(result)}
+          <View style={styles.card}>
+            <Text style={styles.blockTitle}>Ask a follow-up question</Text>
+            <Text style={styles.smallText}>Continue the same conversation about these image notes.</Text>
+            {chatMessages.map((message, index) => (
+              <View
+                key={`${message.role}-${index}`}
+                style={{
+                  alignSelf: message.role === 'user' ? 'flex-end' : 'stretch',
+                  maxWidth: message.role === 'user' ? '86%' : '100%',
+                  marginTop: 10,
+                  borderRadius: 12,
+                  padding: 11,
+                  backgroundColor: message.role === 'user' ? '#DCFCE7' : '#F3F4F6',
+                }}
+              >
+                <Text style={styles.bodyText}>{message.content}</Text>
+              </View>
+            ))}
+            <View style={{ flexDirection: 'row', gap: 8, marginTop: 12, alignItems: 'flex-end' }}>
+              <TextInput
+                value={chatInput}
+                onChangeText={setChatInput}
+                placeholder="Ask about these notes"
+                placeholderTextColor="#9CA3AF"
+                multiline
+                style={[styles.input, { flex: 1, minHeight: 46, maxHeight: 110 }]}
+              />
+              <Pressable
+                onPress={() => void sendFollowUp()}
+                disabled={chatBusy || !chatInput.trim()}
+                style={[styles.primaryButton, { minWidth: 72, marginTop: 0 }, (chatBusy || !chatInput.trim()) && { opacity: 0.55 }]}
+              >
+                {chatBusy ? <ActivityIndicator color="#FFFFFF" size="small" /> : <Text style={styles.primaryButtonText}>Send</Text>}
+              </Pressable>
+            </View>
+            {chatError ? <Text style={styles.errorText}>{chatError}</Text> : null}
+          </View>
           <View style={styles.reviewSaveBox}>
             <Text style={styles.bodyText}>Review these notes before saving them to your history.</Text>
             <Text style={styles.smallText}>
@@ -490,9 +566,7 @@ export function HealthImageNotesScreen() {
                   <Pressable onPress={() => setExpandedId(expanded ? null : item.id)}>
                     <Text style={styles.linkText}>{expanded ? 'Hide details' : 'View details'}</Text>
                   </Pressable>
-                  <Pressable onPress={() => deleteHistoryItem(item)} disabled={deletingId === item.id}>
-                    <Text style={styles.deleteText}>{deletingId === item.id ? 'Deleting...' : 'Delete'}</Text>
-                  </Pressable>
+                  <EntryActionsButton label="Image note actions" onPress={() => setHistoryActions(item)} disabled={deletingId === item.id} />
                 </View>
               </View>
               <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
@@ -516,6 +590,13 @@ export function HealthImageNotesScreen() {
         {renderTabs()}
         {activeTab === 'notes' ? renderNotes() : renderHistory()}
       </ScrollView>
+      <EntryActionsMenu
+        visible={historyActions != null}
+        onClose={() => setHistoryActions(null)}
+        actions={[
+          { label: 'Delete entry', icon: 'trash-2', destructive: true, onPress: () => historyActions && void deleteHistoryItem(historyActions) },
+        ]}
+      />
     </Screen>
   )
 }
@@ -544,7 +625,7 @@ const styles = StyleSheet.create({
   },
   tabText: {
     color: theme.colors.text,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   tabTextActive: {
     color: '#FFFFFF',
@@ -560,14 +641,14 @@ const styles = StyleSheet.create({
   cardTitle: {
     color: theme.colors.text,
     fontSize: 20,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   block: {
     gap: 6,
   },
   blockTitle: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 14,
   },
   bodyText: {
@@ -604,7 +685,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     padding: 12,
     gap: 4,
   },
@@ -616,19 +697,19 @@ const styles = StyleSheet.create({
     borderRadius: theme.radius.md,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.bg,
     gap: 6,
   },
   uploadTitle: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 15,
   },
   preview: {
     width: '100%',
     height: 300,
     borderRadius: theme.radius.md,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.bg,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -636,7 +717,7 @@ const styles = StyleSheet.create({
     width: 96,
     height: 96,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.bg,
     borderWidth: 1,
     borderColor: theme.colors.border,
   },
@@ -646,7 +727,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.bg,
     padding: 12,
   },
   checkbox: {
@@ -657,7 +738,7 @@ const styles = StyleSheet.create({
     borderColor: '#9CA3AF',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     marginTop: 1,
   },
   checkboxOn: {
@@ -666,7 +747,7 @@ const styles = StyleSheet.create({
   },
   checkboxMark: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '700',
   },
   primaryButton: {
     minHeight: 44,
@@ -678,7 +759,7 @@ const styles = StyleSheet.create({
   },
   primaryButtonText: {
     color: '#FFFFFF',
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 15,
   },
   secondaryButton: {
@@ -689,11 +770,21 @@ const styles = StyleSheet.create({
     minHeight: 36,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
   },
   secondaryButtonText: {
     color: theme.colors.text,
-    fontWeight: '900',
+    fontWeight: '700',
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: theme.colors.border,
+    borderRadius: theme.radius.sm,
+    backgroundColor: theme.colors.card,
+    color: theme.colors.text,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    fontSize: 14,
   },
   costText: {
     color: theme.colors.muted,
@@ -702,7 +793,7 @@ const styles = StyleSheet.create({
   successText: {
     color: '#15803D',
     fontSize: 13,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   errorText: {
     color: '#B91C1C',
@@ -713,7 +804,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#F9FAFB',
+    backgroundColor: theme.colors.bg,
     padding: 12,
     gap: 10,
   },
@@ -721,7 +812,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     padding: 12,
     gap: 10,
   },
@@ -735,7 +826,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     padding: 12,
     gap: 10,
   },
@@ -748,16 +839,16 @@ const styles = StyleSheet.create({
   linkText: {
     color: theme.colors.primary,
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   deleteText: {
     color: '#DC2626',
     fontSize: 13,
-    fontWeight: '900',
+    fontWeight: '700',
   },
   urgentTitle: {
     color: '#B91C1C',
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 14,
   },
   urgentText: {
@@ -769,7 +860,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: theme.colors.border,
     borderRadius: theme.radius.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     color: theme.colors.muted,
     fontSize: 12,
     lineHeight: 17,

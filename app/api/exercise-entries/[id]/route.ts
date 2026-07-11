@@ -6,6 +6,7 @@ import { prisma } from '@/lib/prisma'
 import { calculateExerciseCalories } from '@/lib/exercise/calories'
 import { getHealthProfileForUser } from '@/lib/exercise/health-profile'
 import { inferMetAndLabel } from '@/lib/exercise/met'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 type RouteParams = {
   params: { id: string }
@@ -13,7 +14,8 @@ type RouteParams = {
 
 export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const userId = session?.user?.id || (await getUserIdFromNativeAuth(_request))
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -23,14 +25,14 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
   }
 
   const existing = await prisma.exerciseEntry.findUnique({ where: { id } })
-  if (!existing || existing.userId !== session.user.id) {
+  if (!existing || existing.userId !== userId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
 
   await prisma.exerciseEntry.delete({ where: { id } })
 
   const entries = await prisma.exerciseEntry.findMany({
-    where: { userId: session.user.id, localDate: existing.localDate },
+    where: { userId, localDate: existing.localDate },
     orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
   })
   const exerciseCalories = entries.reduce((sum, e) => sum + (Number(e.calories) || 0), 0)
@@ -40,7 +42,8 @@ export async function DELETE(_request: NextRequest, { params }: RouteParams) {
 
 export async function PATCH(request: NextRequest, { params }: RouteParams) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const userId = session?.user?.id || (await getUserIdFromNativeAuth(request))
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -53,7 +56,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     where: { id },
     include: { exerciseType: true },
   })
-  if (!existing || existing.userId !== session.user.id) {
+  if (!existing || existing.userId !== userId) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
   if (existing.source !== 'MANUAL') {
@@ -143,7 +146,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
     calories = effectiveOverride
   } else {
-    const health = await getHealthProfileForUser(session.user.id)
+    const health = await getHealthProfileForUser(userId)
     const weightToUse = health.weightKg
     if (!weightToUse) {
       return NextResponse.json(
@@ -193,7 +196,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
   })
 
   const entries = await prisma.exerciseEntry.findMany({
-    where: { userId: session.user.id, localDate: existing.localDate },
+    where: { userId, localDate: existing.localDate },
     orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
     include: { exerciseType: true },
   })

@@ -1,6 +1,7 @@
 import React, { useEffect } from 'react'
 import { DeviceEventEmitter, useColorScheme, View } from 'react-native'
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 
@@ -29,6 +30,7 @@ export type MainTabParamList = {
 }
 
 const Tab = createBottomTabNavigator<MainTabParamList>()
+const LAST_NATIVE_TAB_KEY = 'helfi:lastNativeTab'
 
 function voiceContextForTab(routeName: string): VoiceAssistantLaunchContext {
   if (routeName === 'Dashboard') return { section: 'dashboard', title: 'Dashboard' }
@@ -87,7 +89,12 @@ export function MainTabs({ navigation }: { navigation: any }) {
 
   return (
     <Tab.Navigator
-      initialRouteName="Food"
+      initialRouteName="Dashboard"
+      screenListeners={({ route }) => ({
+        focus: () => {
+          void AsyncStorage.setItem(LAST_NATIVE_TAB_KEY, route.name)
+        },
+      })}
       screenOptions={({ route }) => ({
         headerStyle: { backgroundColor: colors.card },
         headerTitleStyle: { color: colors.text },
@@ -106,7 +113,7 @@ export function MainTabs({ navigation }: { navigation: any }) {
         },
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.muted,
-        tabBarLabelStyle: { fontWeight: '800', fontSize: theme.fontSize.navLabel },
+        tabBarLabelStyle: { fontWeight: '600', fontSize: theme.fontSize.navLabel },
       })}
     >
       <Tab.Screen

@@ -33,7 +33,7 @@ function VisibilityOption({
         paddingVertical: 8,
       })}
     >
-      <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontWeight: '800', fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontWeight: '600', fontSize: 13 }}>{label}</Text>
     </Pressable>
   )
 }
@@ -96,14 +96,14 @@ export function PrivacySettingsScreen() {
           }}
         >
           <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Privacy controls</Text>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>Privacy controls</Text>
             <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>
               Manage privacy options from your profile menu.
             </Text>
           </View>
 
           <View style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12 }}>
-            <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Profile Visibility</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Profile Visibility</Text>
             <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Choose who can see your profile.</Text>
             <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               <VisibilityOption label="Private" selected={profileVisibility === 'private'} onPress={() => setProfileVisibility('private')} />
@@ -115,7 +115,7 @@ export function PrivacySettingsScreen() {
           <View style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Data Analytics</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Data Analytics</Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Share anonymous app usage data.</Text>
               </View>
               <Switch
@@ -139,7 +139,7 @@ export function PrivacySettingsScreen() {
               alignItems: 'center',
             })}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '800' }}>View full Privacy Policy</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '600' }}>View full Privacy Policy</Text>
           </Pressable>
         </View>
       </ScrollView>

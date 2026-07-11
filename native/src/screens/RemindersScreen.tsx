@@ -19,6 +19,12 @@ import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/dat
 
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import {
+  clearNativeReminders,
+  enableNativeNotifications,
+  getNativeNotificationsEnabled,
+  scheduleNativeReminders,
+} from '../lib/nativeNotifications'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -135,7 +141,7 @@ function SectionHeader({
   return (
     <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12 }}>
       <View style={{ flex: 1 }}>
-        <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>{title}</Text>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>{title}</Text>
         <Text style={{ marginTop: 4, fontSize: 13, color: theme.colors.muted, lineHeight: 18 }}>{subtitle}</Text>
       </View>
       {right}
@@ -156,7 +162,7 @@ function SelectRow({
 }) {
   return (
     <View style={{ gap: 8 }}>
-      <Text style={{ fontSize: 14, fontWeight: '800', color: theme.colors.text }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text }}>{label}</Text>
       <Pressable
         onPress={onPress}
         disabled={disabled}
@@ -173,7 +179,7 @@ function SelectRow({
           justifyContent: 'space-between',
         })}
       >
-        <Text style={{ fontWeight: '800', color: theme.colors.text }}>{value}</Text>
+        <Text style={{ fontWeight: '600', color: theme.colors.text }}>{value}</Text>
         <Feather name="chevron-down" size={18} color={theme.colors.muted} />
       </Pressable>
     </View>
@@ -193,7 +199,7 @@ function TimeRow({
 }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ fontSize: 14, fontWeight: '800', color: theme.colors.text }}>{label}</Text>
+      <Text style={{ fontSize: 14, fontWeight: '600', color: theme.colors.text }}>{label}</Text>
       <Pressable
         onPress={onPress}
         disabled={disabled}
@@ -212,7 +218,7 @@ function TimeRow({
         <Text
           style={{
             flex: 1,
-            fontWeight: '800',
+            fontWeight: '600',
             color: disabled ? '#9CA3AF' : theme.colors.text,
           }}
         >
@@ -246,7 +252,7 @@ function ActionButton({
         opacity: loading ? 0.6 : pressed ? 0.9 : 1,
       })}
     >
-      <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>{loading ? 'Saving...' : label}</Text>
+      <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>{loading ? 'Saving...' : label}</Text>
     </Pressable>
   )
 }
@@ -343,12 +349,9 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
 
   const loadPushPreference = useCallback(async () => {
     try {
-      const raw = await AsyncStorage.getItem(PUSH_NOTIFICATIONS_KEY)
-      if (!raw) return
-      const parsed = JSON.parse(raw)
-      if (typeof parsed?.enabled === 'boolean') {
-        setPushNotifications(parsed.enabled)
-      }
+      const enabled = await getNativeNotificationsEnabled()
+      setPushNotifications(enabled)
+      await AsyncStorage.setItem(PUSH_NOTIFICATIONS_KEY, JSON.stringify({ enabled, updatedAt: new Date().toISOString() }))
     } catch {
       // ignore
     }
@@ -454,6 +457,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
         checkinsSnapshotRef.current = toSnapshot(payload)
         checkinsDirtyRef.current = false
         setCheckinsUnsaved(false)
+        await scheduleNativeReminders(payload, moodRef.current)
 
         if (!options?.silent) {
           Alert.alert('Saved', 'Check-in reminders saved.')
@@ -503,6 +507,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
         moodDirtyRef.current = false
         setMoodUnsaved(false)
         await persistLocalMoodReminders(payload)
+        await scheduleNativeReminders(checkinsRef.current, payload)
         if (payload.enabled) {
           try {
             await AsyncStorage.setItem(MOOD_REMINDER_PROMPT_DONE_KEY, '1')
@@ -582,11 +587,22 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
   }, [focus, loading])
 
   const onTogglePush = async (enabled: boolean) => {
-    setPushNotifications(enabled)
+    let nextEnabled = enabled
+    if (enabled) {
+      nextEnabled = await enableNativeNotifications()
+      if (!nextEnabled) {
+        Alert.alert('Notifications are off', 'Allow notifications in your phone settings, then try again.')
+      } else {
+        await scheduleNativeReminders(checkinsRef.current, moodRef.current)
+      }
+    } else {
+      await clearNativeReminders()
+    }
+    setPushNotifications(nextEnabled)
     try {
       await AsyncStorage.setItem(
         PUSH_NOTIFICATIONS_KEY,
-        JSON.stringify({ enabled, updatedAt: new Date().toISOString() }),
+        JSON.stringify({ enabled: nextEnabled, updatedAt: new Date().toISOString() }),
       )
     } catch {
       // ignore
@@ -705,7 +721,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
 
         {!pushNotifications ? (
           <View style={{ backgroundColor: '#FFFBEB', borderWidth: 1, borderColor: '#FDE68A', borderRadius: 12, padding: 12 }}>
-            <Text style={{ color: '#92400E', fontWeight: '800' }}>Push notifications are off on this device.</Text>
+            <Text style={{ color: '#92400E', fontWeight: '600' }}>Push notifications are off on this device.</Text>
             <Text style={{ marginTop: 4, color: '#92400E' }}>
               Turn them on above so reminders can actually appear.
             </Text>
@@ -735,7 +751,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
               <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
                 <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Want more reminders? </Text>
                 <Pressable onPress={() => navigation.navigate('Billing')}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 12 }}>
+                  <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 12 }}>
                     Subscribe or buy credits
                   </Text>
                 </Pressable>
@@ -835,7 +851,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
               <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center' }}>
                 <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Want more reminders? </Text>
                 <Pressable onPress={() => navigation.navigate('Billing')}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 12 }}>
+                  <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 12 }}>
                     Subscribe or buy credits
                   </Text>
                 </Pressable>
@@ -958,16 +974,16 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
               }}
             >
               <Pressable onPress={closeTimePicker}>
-                <Text style={{ color: theme.colors.muted, fontWeight: '800' }}>Cancel</Text>
+                <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Cancel</Text>
               </Pressable>
-              <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Pick time</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Pick time</Text>
               <Pressable
                 onPress={() => {
                   applyPickedTime(timePickerValue)
                   closeTimePicker()
                 }}
               >
-                <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Done</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Done</Text>
               </Pressable>
             </View>
 
@@ -996,9 +1012,9 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
               gap: 12,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text }}>Timezone</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Timezone</Text>
             <Pressable onPress={() => setTzPickerVisible(false)}>
-              <Text style={{ fontWeight: '900', color: theme.colors.primary }}>Done</Text>
+              <Text style={{ fontWeight: '700', color: theme.colors.primary }}>Done</Text>
             </Pressable>
           </View>
 
@@ -1016,7 +1032,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
                 paddingHorizontal: 12,
                 paddingVertical: 12,
                 backgroundColor: theme.colors.card,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.colors.text,
               }}
             />
@@ -1036,7 +1052,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
                   backgroundColor: pressed ? '#EEF6F1' : theme.colors.bg,
                 })}
               >
-                <Text style={{ fontWeight: '900', color: theme.colors.text }}>{item}</Text>
+                <Text style={{ fontWeight: '700', color: theme.colors.text }}>{item}</Text>
               </Pressable>
             )}
           />
@@ -1064,7 +1080,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
               borderColor: theme.colors.border,
             }}
           >
-            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Upgrade for more reminders</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Upgrade for more reminders</Text>
             <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 20 }}>{upgradeModalMessage}</Text>
 
             <View style={{ marginTop: 16, flexDirection: 'row', justifyContent: 'flex-end', gap: 10 }}>
@@ -1079,7 +1095,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
                   paddingHorizontal: 16,
                 })}
               >
-                <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>OK</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>OK</Text>
               </Pressable>
 
               <Pressable
@@ -1095,7 +1111,7 @@ export function RemindersScreen({ navigation }: { navigation: any }) {
                   paddingHorizontal: 16,
                 })}
               >
-                <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>Upgrade</Text>
+                <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>Upgrade</Text>
               </Pressable>
             </View>
           </View>

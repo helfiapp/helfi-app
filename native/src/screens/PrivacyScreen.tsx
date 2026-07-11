@@ -16,17 +16,17 @@ export function PrivacyScreen({ navigation }: { navigation: any }) {
   }
 
   return (
-    <Screen style={{ backgroundColor: '#FFFFFF' }}>
+    <Screen style={{ backgroundColor: theme.colors.card }}>
       <View style={{ height: 52, flexDirection: 'row', alignItems: 'center', paddingHorizontal: theme.spacing.md }}>
         <Pressable onPress={() => navigation.goBack()} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 8, paddingRight: 12 })}>
-          <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: 16 }}>Back</Text>
+          <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 16 }}>Back</Text>
         </Pressable>
-        <Text style={{ flex: 1, textAlign: 'center', marginRight: 44, color: theme.colors.text, fontWeight: '900' }}>Privacy Policy</Text>
+        <Text style={{ flex: 1, textAlign: 'center', marginRight: 44, color: theme.colors.text, fontWeight: '700' }}>Privacy Policy</Text>
       </View>
 
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingHorizontal: theme.spacing.md, paddingBottom: theme.spacing.xl }}>
         <View style={{ alignItems: 'center', paddingTop: theme.spacing.lg }}>
-          <Text style={{ fontSize: 26, fontWeight: '900', color: theme.colors.text, textAlign: 'center' }}>{privacyPolicy.title}</Text>
+          <Text style={{ fontSize: 26, fontWeight: '700', color: theme.colors.text, textAlign: 'center' }}>{privacyPolicy.title}</Text>
           <Text style={{ marginTop: 6, fontSize: 14, color: theme.colors.muted, textAlign: 'center' }}>
             Last updated: {privacyPolicy.lastUpdated}
           </Text>
@@ -46,7 +46,7 @@ export function PrivacyScreen({ navigation }: { navigation: any }) {
         <View style={{ marginTop: theme.spacing.lg }}>
           {privacyPolicy.sections.map((section) => (
             <View key={section.title} style={{ marginBottom: theme.spacing.lg }}>
-              <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text, marginBottom: 8 }}>{section.title}</Text>
+              <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, marginBottom: 8 }}>{section.title}</Text>
 
               {section.paragraphs?.map((p) => (
                 <Text key={p} style={{ color: theme.colors.text, fontSize: 14, lineHeight: 20, marginBottom: 8 }}>
@@ -56,7 +56,7 @@ export function PrivacyScreen({ navigation }: { navigation: any }) {
 
               {section.subsections?.map((sub) => (
                 <View key={sub.title} style={{ marginTop: 10 }}>
-                  <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '900', marginBottom: 6 }}>{sub.title}</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '700', marginBottom: 6 }}>{sub.title}</Text>
                   {sub.paragraphs?.map((p) => (
                     <Text key={p} style={{ color: theme.colors.text, fontSize: 14, lineHeight: 20, marginBottom: 8 }}>
                       {p}
@@ -96,7 +96,7 @@ export function PrivacyScreen({ navigation }: { navigation: any }) {
             ))}
             {privacyPolicy.contactEmail ? (
               <Text style={{ textAlign: 'center' }}>
-                <Text onPress={onEmail} style={{ color: theme.colors.primary, fontWeight: '900' }}>
+                <Text onPress={onEmail} style={{ color: theme.colors.primary, fontWeight: '700' }}>
                   {privacyPolicy.contactEmail}
                 </Text>
               </Text>
@@ -106,7 +106,7 @@ export function PrivacyScreen({ navigation }: { navigation: any }) {
           <View style={{ marginTop: theme.spacing.lg, paddingTop: theme.spacing.lg, borderTopWidth: 1, borderTopColor: theme.colors.border }}>
             <Text style={{ color: theme.colors.text, fontSize: 14, lineHeight: 20, textAlign: 'center' }}>
               Contact:{' '}
-              <Text onPress={onEmail} style={{ color: theme.colors.primary, fontWeight: '900' }}>
+              <Text onPress={onEmail} style={{ color: theme.colors.primary, fontWeight: '700' }}>
                 {privacyPolicy.contactEmail}
               </Text>
             </Text>

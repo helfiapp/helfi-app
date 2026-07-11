@@ -30,7 +30,7 @@ function HelpCard({ icon, title, body, actionLabel, primary = false, onPress }: 
       }}
     >
       <Feather name={icon} size={22} color={primary ? theme.colors.primary : theme.colors.muted} />
-      <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '900' }}>{title}</Text>
+      <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>{title}</Text>
       <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>{body}</Text>
       <Pressable
         accessibilityRole="button"
@@ -45,7 +45,7 @@ function HelpCard({ icon, title, body, actionLabel, primary = false, onPress }: 
           backgroundColor: primary ? theme.colors.primary : '#F3F4F6',
         })}
       >
-        <Text style={{ color: primary ? '#FFFFFF' : theme.colors.text, fontWeight: '800' }}>{actionLabel}</Text>
+        <Text style={{ color: primary ? '#FFFFFF' : theme.colors.text, fontWeight: '600' }}>{actionLabel}</Text>
       </Pressable>
     </View>
   )
@@ -80,7 +80,7 @@ export function HelpScreen({ navigation }: { navigation: any; route?: any }) {
           }}
         >
           <View>
-            <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '900' }}>How can we help you?</Text>
+            <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700' }}>How can we help you?</Text>
             <Text style={{ color: theme.colors.muted, marginTop: 6 }}>Get help with your health journey</Text>
           </View>
 

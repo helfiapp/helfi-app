@@ -27,7 +27,7 @@ function Row({
       }}
     >
       <View style={{ flex: 1 }}>
-        <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{title}</Text>
+        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{title}</Text>
         <Text style={{ marginTop: 2, color: theme.colors.muted, fontSize: 12 }}>{subtitle}</Text>
       </View>
       <View
@@ -40,7 +40,7 @@ function Row({
           paddingVertical: 4,
         }}
       >
-        <Text style={{ color: '#15803D', fontWeight: '800', fontSize: 12 }}>On</Text>
+        <Text style={{ color: '#15803D', fontWeight: '600', fontSize: 12 }}>On</Text>
       </View>
     </View>
   )
@@ -61,7 +61,7 @@ export function NotificationsAccountSecurityScreen({ navigation }: { navigation:
           }}
         >
           <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Account alerts</Text>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>Account alerts</Text>
             <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>
               These alerts are always on to keep your account safe.
             </Text>
@@ -94,7 +94,7 @@ export function NotificationsAccountSecurityScreen({ navigation }: { navigation:
               alignItems: 'center',
             })}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Manage account settings</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Manage account settings</Text>
           </Pressable>
         </View>
       </ScrollView>

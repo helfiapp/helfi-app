@@ -174,7 +174,7 @@ function NativePractitionerRecommendationPanel({
       }}
     >
       <View style={{ paddingHorizontal: 14, marginBottom: 8 }}>
-        <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '900' }}>Practitioners near you</Text>
+        <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>Practitioners near you</Text>
         <Text style={{ color: theme.colors.muted, marginTop: 3, fontSize: 12 }}>
           Based on what you shared, these nearby practitioners may be relevant.
         </Text>
@@ -193,19 +193,19 @@ function NativePractitionerRecommendationPanel({
                 borderWidth: 1,
                 borderColor: '#CFE8D4',
                 borderRadius: theme.radius.md,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.colors.card,
                 padding: 12,
                 gap: 7,
               }}
             >
               <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 15 }}>{item.displayName}</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 15 }}>{item.displayName}</Text>
                   {category ? <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 2 }}>{category}</Text> : null}
                 </View>
                 {distance ? (
                   <View style={{ borderRadius: 999, backgroundColor: '#E4F6E8', paddingHorizontal: 8, paddingVertical: 4 }}>
-                    <Text style={{ color: '#24743A', fontWeight: '900', fontSize: 11 }}>{distance}</Text>
+                    <Text style={{ color: '#24743A', fontWeight: '700', fontSize: 11 }}>{distance}</Text>
                   </View>
                 ) : null}
               </View>
@@ -213,11 +213,11 @@ function NativePractitionerRecommendationPanel({
               {item.reason ? <Text style={{ color: theme.colors.text, fontSize: 12, lineHeight: 17 }}>{item.reason}</Text> : null}
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 2 }}>
                 <Pressable onPress={() => onOpenProfile(item)}>
-                  <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 13 }}>View profile</Text>
+                  <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 13 }}>View profile</Text>
                 </Pressable>
                 {hasContact ? (
                   <Pressable onPress={() => onOpenContact(item)}>
-                    <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 13 }}>
+                    <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 13 }}>
                       {item.websiteUrl ? 'Website or booking' : 'Call'}
                     </Text>
                   </Pressable>
@@ -445,7 +445,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
 
   return (
     <Screen>
-      <View style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+      <View style={{ flex: 1, backgroundColor: theme.colors.card }}>
         {requiresAiPermission && !aiPermissionGranted ? (
           <View
             style={{
@@ -456,7 +456,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
               backgroundColor: '#F7FAF9',
             }}
           >
-            <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '900', textAlign: 'center' }}>
+            <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700', textAlign: 'center' }}>
               Allow AI help?
             </Text>
             <Text style={{ color: theme.colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' }}>
@@ -472,13 +472,13 @@ export function NativeWebToolScreen({ route }: { route: any }) {
               }}
               style={{ marginTop: 8, minHeight: 48, borderRadius: 8, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>I agree</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>I agree</Text>
             </Pressable>
             <Pressable
               onPress={() => navigation.goBack()}
               style={{ minHeight: 48, borderRadius: 8, backgroundColor: '#E8F2EA', alignItems: 'center', justifyContent: 'center' }}
             >
-              <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Not now</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Not now</Text>
             </Pressable>
           </View>
         ) : failed ? (
@@ -491,7 +491,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
               gap: 12,
             }}
           >
-            <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900', textAlign: 'center' }}>Could not open this page</Text>
+            <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700', textAlign: 'center' }}>Could not open this page</Text>
             <Text style={{ color: theme.colors.muted, textAlign: 'center' }}>Please try again.</Text>
             <Pressable
               onPress={() => {
@@ -505,7 +505,7 @@ export function NativeWebToolScreen({ route }: { route: any }) {
                 backgroundColor: theme.colors.primary,
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>Retry</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Retry</Text>
             </Pressable>
           </View>
         ) : (

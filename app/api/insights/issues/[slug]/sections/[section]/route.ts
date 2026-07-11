@@ -1,4 +1,4 @@
-import { NextResponse } from 'next/server'
+import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import {
@@ -16,14 +16,16 @@ import {
   completeTargetedRefreshState,
   recordTargetedRefreshState,
 } from '@/lib/insights/targeted-refresh-idempotency'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 export async function GET(
-  _request: Request,
+  _request: NextRequest,
   context: { params: { slug: string; section: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = session?.user?.id || (await getUserIdFromNativeAuth(_request))
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -33,10 +35,10 @@ export async function GET(
     }
 
     // Check insights status for user-friendly messaging
-    const statusInfo = await checkInsightsStatus(session.user.id, context.params.slug, sectionParam)
+    const statusInfo = await checkInsightsStatus(userId, context.params.slug, sectionParam)
     const statusMessage = getStatusMessage(statusInfo.status, statusInfo.lastGenerated)
 
-    const result = await getIssueSection(session.user.id, context.params.slug, sectionParam)
+    const result = await getIssueSection(userId, context.params.slug, sectionParam)
     if (!result) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
@@ -91,12 +93,13 @@ export async function GET(
 }
 
 export async function POST(
-  _request: Request,
+  _request: NextRequest,
   context: { params: { slug: string; section: string } }
 ) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = session?.user?.id || (await getUserIdFromNativeAuth(_request))
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -117,7 +120,7 @@ export async function POST(
     // If force refresh requested, skip cache and regenerate
     if (forceRefresh) {
       const refreshState = await checkTargetedRefreshState({
-        userId: session.user.id,
+        userId: userId,
         changeTypes: [],
         affectedSections: [sectionParam],
         targetIssueSlugs: [context.params.slug],
@@ -135,7 +138,7 @@ export async function POST(
       }
 
       if (refreshState.shouldSkip) {
-        const quickResult = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+        const quickResult = await getIssueSection(userId, context.params.slug, sectionParam, {
           mode,
           range,
           force: false,
@@ -153,7 +156,7 @@ export async function POST(
 
       try {
         await recordTargetedRefreshState({
-          userId: session.user.id,
+          userId: userId,
           scope: refreshState.scope,
           payloadHash: refreshState.payloadHash,
           status: 'pending',
@@ -173,7 +176,7 @@ export async function POST(
           VALUES ($1, $2, $3, 'generating', NOW())
           ON CONFLICT ("userId", "issueSlug", "section")
           DO UPDATE SET "status" = 'generating', "updatedAt" = NOW()
-        `, session.user.id, context.params.slug, sectionParam)
+        `, userId, context.params.slug, sectionParam)
       } catch (error) {
         // Non-blocking - continue even if metadata update fails
         console.warn('[insights.api] Failed to mark as generating', error)
@@ -183,7 +186,7 @@ export async function POST(
       // Return immediately so user sees progress bar
       const backgroundRefresh = (async () => {
         try {
-          const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+          const result = await getIssueSection(userId, context.params.slug, sectionParam, {
             mode,
             range,
             force: true,
@@ -191,7 +194,7 @@ export async function POST(
           // Mark as fresh after completion
           if (result) {
             await completeTargetedRefreshState({
-              userId: session.user.id,
+              userId: userId,
               scope: refreshState.scope,
               payloadHash: refreshState.payloadHash,
             })
@@ -201,13 +204,13 @@ export async function POST(
                 VALUES ($1, $2, $3, 'fresh', '', NOW(), NOW())
                 ON CONFLICT ("userId", "issueSlug", "section")
                 DO UPDATE SET "status" = 'fresh', "lastGeneratedAt" = NOW(), "updatedAt" = NOW()
-              `, session.user.id, context.params.slug, sectionParam)
+              `, userId, context.params.slug, sectionParam)
             } catch (error) {
               console.warn('[insights.api] Failed to mark as fresh', error)
             }
           } else {
             await clearTargetedRefreshState({
-              userId: session.user.id,
+              userId: userId,
               scope: refreshState.scope,
               payloadHash: refreshState.payloadHash,
             })
@@ -215,12 +218,12 @@ export async function POST(
               await prisma.$executeRawUnsafe(`
                 UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
                 WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
-              `, session.user.id, context.params.slug, sectionParam)
+              `, userId, context.params.slug, sectionParam)
             } catch {}
           }
         } catch (error) {
           await clearTargetedRefreshState({
-            userId: session.user.id,
+            userId: userId,
             scope: refreshState.scope,
             payloadHash: refreshState.payloadHash,
           })
@@ -230,7 +233,7 @@ export async function POST(
             await prisma.$executeRawUnsafe(`
               UPDATE "InsightsMetadata" SET "status" = 'stale', "updatedAt" = NOW()
               WHERE "userId" = $1 AND "issueSlug" = $2 AND "section" = $3
-            `, session.user.id, context.params.slug, sectionParam)
+            `, userId, context.params.slug, sectionParam)
           } catch {}
         }
       })()
@@ -238,7 +241,7 @@ export async function POST(
       waitUntil(backgroundRefresh)
       
       // Return immediately with current cached result (if available) or empty response
-      const quickResult = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+      const quickResult = await getIssueSection(userId, context.params.slug, sectionParam, {
         mode,
         range,
         force: false, // Try to get cached/quick result for immediate display
@@ -254,7 +257,7 @@ export async function POST(
 
     // Fast path: Return quick result immediately, then upgrade in background
     // This prevents users from waiting a minute for generation
-    const quickResult = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+    const quickResult = await getIssueSection(userId, context.params.slug, sectionParam, {
       mode,
       range,
       force: false, // Don't force - use quick if available
@@ -267,7 +270,7 @@ export async function POST(
     }
 
     // Fallback: If no quick result available, do full build (but this should be rare)
-    const result = await getIssueSection(session.user.id, context.params.slug, sectionParam, {
+    const result = await getIssueSection(userId, context.params.slug, sectionParam, {
       mode,
       range,
       force: true,

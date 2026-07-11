@@ -24,6 +24,7 @@ const APPLE_HEALTH_CONNECTED_KEY = 'helfi_apple_health_connected_v1'
 const APPLE_HEALTH_MODE_KEY = 'helfi_apple_health_mode_v1' // 'real' | 'sample'
 const MOOD_REMINDERS_KEY = 'helfi_reminders_mood_v1'
 type WearableProvider = 'fitbit' | 'garmin'
+type DeviceInterestKey = 'googleFit' | 'oura' | 'polar' | 'huawei'
 type HealthSetupChips = {
   medications: boolean
   supplements: boolean
@@ -76,6 +77,8 @@ export function DashboardScreen() {
   const [fitbitBusy, setFitbitBusy] = useState(false)
   const [garminConnected, setGarminConnected] = useState(false)
   const [garminBusy, setGarminBusy] = useState(false)
+  const [deviceInterest, setDeviceInterest] = useState<Partial<Record<DeviceInterestKey, boolean>>>({})
+  const [deviceInterestBusy, setDeviceInterestBusy] = useState(false)
 
   const authHeaders = useMemo(() => {
     if (mode !== 'signedIn' || !session?.token) return null
@@ -343,6 +346,43 @@ export function DashboardScreen() {
     }
   }
 
+  const refreshDeviceInterest = async () => {
+    if (!authHeaders) {
+      setDeviceInterest({})
+      return
+    }
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/user-data`, { headers: authHeaders })
+      const data: any = await res.json().catch(() => ({}))
+      if (res.ok && data?.data?.deviceInterest && typeof data.data.deviceInterest === 'object') {
+        setDeviceInterest(data.data.deviceInterest)
+      }
+    } catch {
+      // Keep the last visible choice during a temporary network problem.
+    }
+  }
+
+  const toggleDeviceInterest = async (key: DeviceInterestKey) => {
+    if (!authHeaders || deviceInterestBusy) return
+    const previous = deviceInterest
+    const next = { ...previous, [key]: !previous[key] }
+    setDeviceInterest(next)
+    setDeviceInterestBusy(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/user-data`, {
+        method: 'POST',
+        headers: { ...authHeaders, 'content-type': 'application/json' },
+        body: JSON.stringify({ deviceInterest: next }),
+      })
+      if (!res.ok) throw new Error('save failed')
+    } catch {
+      setDeviceInterest(previous)
+      Alert.alert('Could not save', 'Please try again.')
+    } finally {
+      setDeviceInterestBusy(false)
+    }
+  }
+
   const createNativeDeviceOauthTicket = async (provider: WearableProvider) => {
     if (!authHeaders) {
       throw new Error('Not signed in')
@@ -410,6 +450,7 @@ export function DashboardScreen() {
       void refreshHealthSetupComplete()
       void refreshCreditAndPlan()
       void refreshWearableStatus()
+      void refreshDeviceInterest()
       return () => {}
     }, [authHeaders]),
   )
@@ -435,10 +476,6 @@ export function DashboardScreen() {
       return
     }
     navigation.navigate?.('Practitioners')
-  }
-
-  const onPressPlaceholder = (label: string) => {
-    Alert.alert(label, 'This will be wired up next.')
   }
 
   const onPressBilling = () => {
@@ -761,7 +798,7 @@ export function DashboardScreen() {
               }}
             >
               <Feather name="zap" size={16} color={theme.colors.primary} />
-              <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>{hasPremiumPlan ? 'Billing' : 'Upgrade'}</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>{hasPremiumPlan ? 'Billing' : 'Upgrade'}</Text>
             </Pressable>
 
             <View style={{ position: 'relative' }}>
@@ -781,7 +818,7 @@ export function DashboardScreen() {
                 {accountImage ? (
                   <Image source={{ uri: accountImage }} style={{ width: 34, height: 34, borderRadius: 17 }} />
                 ) : (
-                  <Text style={{ fontWeight: '900', color: theme.colors.primary }}>{profileInitial}</Text>
+                  <Text style={{ fontWeight: '700', color: theme.colors.primary }}>{profileInitial}</Text>
                 )}
               </Pressable>
 
@@ -801,7 +838,7 @@ export function DashboardScreen() {
                   }}
                 >
                   <View style={{ paddingHorizontal: 12, paddingBottom: 8, marginBottom: 6, borderBottomWidth: 1, borderBottomColor: theme.colors.border }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '800' }} numberOfLines={1}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>
                       {accountName}
                     </Text>
                     {!!accountEmail ? (
@@ -849,32 +886,32 @@ export function DashboardScreen() {
             </View>
 
             <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>Credits remaining</Text>
-            <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>{creditsRemaining == null ? '—' : creditsRemaining.toLocaleString()}</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 18 }}>{creditsRemaining == null ? '—' : creditsRemaining.toLocaleString()}</Text>
           </View>
         </View>
 
         <View style={{ alignItems: 'center', marginTop: 22 }}>
-          <Text style={{ fontSize: 18, fontWeight: '800', color: theme.colors.text }}>Dashboard</Text>
+          <Text style={{ fontSize: 18, fontWeight: '600', color: theme.colors.text }}>Dashboard</Text>
 
           {/* Keep this to two lines on phone */}
-          <Text style={{ marginTop: 14, fontSize: theme.fontSize.heroTitle, fontWeight: '900', color: theme.colors.text, textAlign: 'center', lineHeight: 32 }}>
+          <Text style={{ marginTop: 14, fontSize: theme.fontSize.heroTitle, fontWeight: '700', color: theme.colors.text, textAlign: 'center', lineHeight: 32 }}>
             Welcome to Your
           </Text>
-          <Text style={{ fontSize: theme.fontSize.heroTitle, fontWeight: '900', color: theme.colors.primary, textAlign: 'center', lineHeight: 32 }}>
+          <Text style={{ fontSize: theme.fontSize.heroTitle, fontWeight: '700', color: theme.colors.primary, textAlign: 'center', lineHeight: 32 }}>
             Health Dashboard
           </Text>
 
-          <Text style={{ marginTop: 8, fontSize: 16, fontWeight: '800', color: theme.colors.muted, textAlign: 'center' }}>
+          <Text style={{ marginTop: 8, fontSize: 16, fontWeight: '600', color: theme.colors.muted, textAlign: 'center' }}>
             Decisions Today Define Tomorrow!
           </Text>
         </View>
 
         <View style={{ marginTop: 22 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>Daily Tools</Text>
+            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '700', color: theme.colors.text }}>Daily Tools</Text>
 
             <Pressable onPress={goToMore}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>See all</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>See all</Text>
             </Pressable>
           </View>
 
@@ -922,9 +959,9 @@ export function DashboardScreen() {
         {/* Next sections (Dashboard continues below Daily Tools) */}
         <View style={{ marginTop: theme.spacing.xl }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>My Health</Text>
+            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '700', color: theme.colors.text }}>My Health</Text>
             <Pressable onPress={goToMore}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>See all</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>See all</Text>
             </Pressable>
           </View>
 
@@ -959,14 +996,14 @@ export function DashboardScreen() {
         </View>
 
         <View style={{ marginTop: theme.spacing.xl }}>
-          <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '900', color: theme.colors.text }}>Connect Your Devices</Text>
+          <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '700', color: theme.colors.text }}>Connect Your Devices</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted, lineHeight: 20 }}>
             Helfi can connect to Apple Health using HealthKit. Helfi does not use CareKit.
           </Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <Feather name="trending-up" size={18} color={theme.colors.primary} />
-            <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Enhanced Analytics Available</Text>
+            <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Enhanced Analytics Available</Text>
           </View>
 
           <View style={{ marginTop: theme.spacing.md, gap: 10 }}>
@@ -982,7 +1019,7 @@ export function DashboardScreen() {
                     gap: 6,
                   }}
                 >
-                  <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Apple Health / HealthKit</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Apple Health / HealthKit</Text>
                   {appleHealthAvailable ? (
                     <>
                       <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
@@ -1027,10 +1064,10 @@ export function DashboardScreen() {
               disabled={garminBusy}
               onPress={garminConnected ? onGarminDisconnect : onGarminConnect}
             />
-            <DeviceRow name="Google Fit" rightLabel="I'm interested" rightKind="interest" onPress={() => onPressPlaceholder('Google Fit')} />
-            <DeviceRow name="Oura Ring" rightLabel="I'm interested" rightKind="interest" onPress={() => onPressPlaceholder('Oura Ring')} />
-            <DeviceRow name="Polar" rightLabel="I'm interested" rightKind="interest" onPress={() => onPressPlaceholder('Polar')} />
-            <DeviceRow name="Huawei Health" rightLabel="I'm interested" rightKind="interest" onPress={() => onPressPlaceholder('Huawei Health')} />
+            <DeviceRow name="Google Fit" rightLabel={deviceInterest.googleFit ? 'Interested ✓' : "I'm interested"} rightKind="interest" disabled={deviceInterestBusy} onPress={() => void toggleDeviceInterest('googleFit')} />
+            <DeviceRow name="Oura Ring" rightLabel={deviceInterest.oura ? 'Interested ✓' : "I'm interested"} rightKind="interest" disabled={deviceInterestBusy} onPress={() => void toggleDeviceInterest('oura')} />
+            <DeviceRow name="Polar" rightLabel={deviceInterest.polar ? 'Interested ✓' : "I'm interested"} rightKind="interest" disabled={deviceInterestBusy} onPress={() => void toggleDeviceInterest('polar')} />
+            <DeviceRow name="Huawei Health" rightLabel={deviceInterest.huawei ? 'Interested ✓' : "I'm interested"} rightKind="interest" disabled={deviceInterestBusy} onPress={() => void toggleDeviceInterest('huawei')} />
           </View>
         </View>
 
@@ -1044,7 +1081,7 @@ export function DashboardScreen() {
 
         {mode !== 'signedIn' ? (
           <View style={{ marginTop: theme.spacing.xl, padding: theme.spacing.md, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, backgroundColor: theme.colors.card }}>
-            <Text style={{ fontWeight: '900', color: theme.colors.text }}>You’re signed out</Text>
+            <Text style={{ fontWeight: '700', color: theme.colors.text }}>You’re signed out</Text>
             <Text style={{ marginTop: 6, color: theme.colors.muted, lineHeight: 20 }}>
               Please go back to the login screen to sign in.
             </Text>
@@ -1101,7 +1138,7 @@ function WideActionCard({
       </View>
 
       <View style={{ flex: 1 }}>
-        <Text style={{ fontWeight: '900', color: theme.colors.text, fontSize: 15 }} numberOfLines={1}>
+        <Text style={{ fontWeight: '700', color: theme.colors.text, fontSize: 15 }} numberOfLines={1}>
           {title}
         </Text>
         <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 13, lineHeight: 18 }} numberOfLines={2}>
@@ -1122,7 +1159,7 @@ function WideActionCard({
           gap: 8,
         }}
       >
-        <Text style={{ fontWeight: '900', color: accentColor, fontSize: 12 }} numberOfLines={1}>
+        <Text style={{ fontWeight: '700', color: accentColor, fontSize: 12 }} numberOfLines={1}>
           {actionLabel}
         </Text>
         <Feather name="chevron-right" size={16} color={accentColor} />
@@ -1198,7 +1235,7 @@ function SmallActionCard({
         >
           {icon}
         </View>
-        <Text style={{ flex: 1, fontWeight: '900', color: theme.colors.text }} numberOfLines={1}>
+        <Text style={{ flex: 1, fontWeight: '700', color: theme.colors.text }} numberOfLines={1}>
           {title}
         </Text>
       </View>
@@ -1208,7 +1245,7 @@ function SmallActionCard({
       </Text>
 
       <View style={{ marginTop: 'auto', paddingTop: 10, flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-        <Text style={{ fontWeight: '900', color: accentColor, fontSize: 12 }}>Open</Text>
+        <Text style={{ fontWeight: '700', color: accentColor, fontSize: 12 }}>Open</Text>
         <Feather name="arrow-right" size={14} color={accentColor} />
       </View>
     </Pressable>
@@ -1256,7 +1293,7 @@ function DeviceRow({
             width: 40,
             height: 40,
             borderRadius: 12,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.colors.card,
             borderWidth: 1,
             borderColor: theme.colors.border,
             alignItems: 'center',
@@ -1272,7 +1309,7 @@ function DeviceRow({
           )}
         </View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontWeight: '900', color: theme.colors.text, fontSize: 16 }} numberOfLines={1}>
+          <Text style={{ fontWeight: '700', color: theme.colors.text, fontSize: 16 }} numberOfLines={1}>
             {name}
           </Text>
           {detail ? (
@@ -1294,7 +1331,7 @@ function DeviceRow({
           backgroundColor: isConnect ? theme.colors.primary : isDisconnect ? '#DC2626' : '#D8DEE4',
         })}
       >
-        <Text style={{ color: isConnect || isDisconnect ? '#FFFFFF' : '#485563', fontWeight: '900' }}>{rightLabel}</Text>
+        <Text style={{ color: isConnect || isDisconnect ? '#FFFFFF' : '#485563', fontWeight: '700' }}>{rightLabel}</Text>
       </Pressable>
     </View>
   )
@@ -1310,14 +1347,14 @@ function StatusCardIncomplete({ onPressContinue }: { onPressContinue: () => void
   return (
     <View
       style={{
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.colors.card,
         borderRadius: theme.radius.lg,
         borderWidth: 1,
         borderColor: theme.colors.border,
         padding: 16,
       }}
     >
-      <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text }}>Complete Your Health Setup</Text>
+      <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Complete Your Health Setup</Text>
       <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 20 }}>
         Finish your health profile to unlock daily check-ins and weekly health reports.
       </Text>
@@ -1333,7 +1370,7 @@ function StatusCardIncomplete({ onPressContinue }: { onPressContinue: () => void
           opacity: pressed ? 0.9 : 1,
         })}
       >
-        <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>Continue Health Setup</Text>
+        <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Continue Health Setup</Text>
       </Pressable>
     </View>
   )
@@ -1349,12 +1386,12 @@ function HealthSetupChip({ label }: { label: string }) {
         borderWidth: 1,
         borderColor: '#BCEFD2',
         borderRadius: 999,
-        backgroundColor: '#FFFFFF',
+        backgroundColor: theme.colors.card,
         paddingHorizontal: 12,
         paddingVertical: 7,
       }}
     >
-      <Text style={{ color: theme.colors.primary, fontWeight: '900', fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 12 }}>{label}</Text>
       <Feather name="check" size={13} color={theme.colors.primary} />
     </View>
   )
@@ -1387,7 +1424,7 @@ function StatusCardComplete({ onPressEdit, chips }: { onPressEdit: () => void; c
         <Feather name="check" size={28} color="#FFFFFF" />
       </View>
 
-      <Text style={{ marginTop: 14, fontSize: 26, fontWeight: '900', color: theme.colors.text, textAlign: 'center' }}>
+      <Text style={{ marginTop: 14, fontSize: 26, fontWeight: '700', color: theme.colors.text, textAlign: 'center' }}>
         Onboarding Complete
       </Text>
       <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 20, textAlign: 'center' }}>
@@ -1414,7 +1451,7 @@ function StatusCardComplete({ onPressEdit, chips }: { onPressEdit: () => void; c
           opacity: pressed ? 0.9 : 1,
         })}
       >
-        <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>Edit Health Info</Text>
+        <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Edit Health Info</Text>
       </Pressable>
     </View>
   )
@@ -1470,7 +1507,7 @@ function ToolCard({
         >
           {icon}
         </View>
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: '900', color: theme.colors.text }} numberOfLines={2}>
+        <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.text }} numberOfLines={2}>
           {title}
         </Text>
       </View>
@@ -1485,7 +1522,7 @@ function ToolCard({
           marginTop: 'auto',
           height: 32,
           borderRadius: 999,
-          backgroundColor: '#FFFFFF',
+          backgroundColor: theme.colors.card,
           borderWidth: 1,
           borderColor: `${accentColor}66`,
           flexDirection: 'row',
@@ -1495,7 +1532,7 @@ function ToolCard({
         }}
       >
         <Text
-          style={{ fontWeight: '900', color: accentColor, fontSize: 12, letterSpacing: 0.2 }}
+          style={{ fontWeight: '700', color: accentColor, fontSize: 12, letterSpacing: 0.2 }}
           numberOfLines={1}
           adjustsFontSizeToFit
           minimumFontScale={0.85}

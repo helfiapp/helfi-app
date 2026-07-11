@@ -153,13 +153,13 @@ export function LoginScreen() {
                     onPress={goBackFromPractitioner}
                     style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 8, paddingHorizontal: 4 })}
                   >
-                    <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Back</Text>
+                    <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Back</Text>
                   </Pressable>
                   <Pressable
                     onPress={goToDashboard}
                     style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 8, paddingHorizontal: 4 })}
                   >
-                    <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Back to dashboard</Text>
+                    <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Back to dashboard</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -167,7 +167,7 @@ export function LoginScreen() {
               <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
                 <Image source={require('../../assets/helfi-logo.png')} style={{ width: 92, height: 92 }} resizeMode="contain" />
 
-                <Text style={{ marginTop: theme.spacing.md, fontSize: 26, fontWeight: '900', color: theme.colors.text }}>
+                <Text style={{ marginTop: theme.spacing.md, fontSize: 26, fontWeight: '700', color: theme.colors.text }}>
                   {isPractitionerFlow ? 'Practitioner portal sign in' : 'Welcome to Helfi'}
                 </Text>
                 <Text style={{ marginTop: 6, fontSize: 14, color: theme.colors.muted, textAlign: 'center', lineHeight: 20 }}>
@@ -193,7 +193,7 @@ export function LoginScreen() {
                   })}
                 >
                   <FontAwesome name="apple" size={20} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>
                     {socialLoading === 'apple' ? 'Opening Apple...' : 'Continue with Apple'}
                   </Text>
                 </Pressable>
@@ -234,7 +234,7 @@ export function LoginScreen() {
 
               <View style={{ marginTop: -6, alignItems: 'flex-end' }}>
                 <Pressable onPress={openForgotPassword} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 6, paddingHorizontal: 4 })}>
-                  <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '800' }}>Forgot password?</Text>
+                  <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '600' }}>Forgot password?</Text>
                 </Pressable>
               </View>
 
@@ -280,7 +280,7 @@ export function LoginScreen() {
                   <Pressable onPress={openSignup} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, padding: 8 })}>
                     <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700' }}>
                       {isPractitionerFlow ? 'Need a practitioner account? ' : "Don't have an account? "}
-                      <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>
                         {isPractitionerFlow ? 'Create practitioner account' : 'Sign up'}
                       </Text>
                     </Text>
@@ -288,11 +288,11 @@ export function LoginScreen() {
 
                   <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 15 }}>
                     By continuing, you agree to our{' '}
-                    <Text onPress={openTerms} style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                    <Text onPress={openTerms} style={{ color: theme.colors.primary, fontWeight: '600' }}>
                       Terms of Service
                     </Text>{' '}
                     and{' '}
-                    <Text onPress={openPrivacy} style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                    <Text onPress={openPrivacy} style={{ color: theme.colors.primary, fontWeight: '600' }}>
                       Privacy Policy
                     </Text>
                     .

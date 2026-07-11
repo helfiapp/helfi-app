@@ -17,6 +17,7 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type SupportAttachment = {
@@ -173,7 +174,7 @@ function DropdownRow({
       })}
     >
       <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700' }}>{label}</Text>
-      <Text style={{ color: theme.colors.text, fontWeight: '900', marginTop: 3 }}>{value || 'Select an option'}</Text>
+      <Text style={{ color: theme.colors.text, fontWeight: '700', marginTop: 3 }}>{value || 'Select an option'}</Text>
     </Pressable>
   )
 }
@@ -202,6 +203,7 @@ export function SupportScreen() {
 
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null)
   const [ticketHistory, setTicketHistory] = useState<TicketHistoryItem[]>([])
+  const [ticketActions, setTicketActions] = useState<TicketHistoryItem | null>(null)
 
   const [chatMessage, setChatMessage] = useState('')
   const [chatAttachments, setChatAttachments] = useState<SupportAttachment[]>([])
@@ -644,13 +646,13 @@ export function SupportScreen() {
               }}
             >
               <View>
-                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Support Chat</Text>
+                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Support Chat</Text>
                 <Text style={{ color: isChatClosed ? '#9CA3AF' : '#10B981', fontSize: 12, fontWeight: '700' }}>
                   {isChatClosed ? 'Chat Closed' : 'Active Support'}
                 </Text>
               </View>
               <Pressable onPress={() => setShowChatView(false)}>
-                <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Back</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Back</Text>
               </Pressable>
             </View>
 
@@ -683,7 +685,7 @@ export function SupportScreen() {
                               })
                             }}
                           >
-                            <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>{att.name}</Text>
+                            <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>{att.name}</Text>
                           </Pressable>
                         ))}
                       </View>
@@ -707,7 +709,7 @@ export function SupportScreen() {
                           paddingHorizontal: 10,
                           paddingVertical: 6,
                           borderRadius: 999,
-                          backgroundColor: '#F3F4F6',
+                          backgroundColor: theme.colors.bg,
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 6,
@@ -717,7 +719,7 @@ export function SupportScreen() {
                           {att.name}
                         </Text>
                         <Pressable onPress={() => setChatAttachments((prev) => prev.filter((x) => x.url !== att.url))}>
-                          <Text style={{ color: theme.colors.muted, fontWeight: '900' }}>✕</Text>
+                          <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>✕</Text>
                         </Pressable>
                       </View>
                     ))}
@@ -755,7 +757,7 @@ export function SupportScreen() {
                       backgroundColor: theme.colors.card,
                     }}
                   >
-                    <Text style={{ color: theme.colors.text, fontWeight: '800' }}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
                       {uploadingChatAttachment ? 'Uploading...' : 'Attach photo'}
                     </Text>
                   </Pressable>
@@ -777,7 +779,7 @@ export function SupportScreen() {
                       backgroundColor: theme.colors.primary,
                     })}
                   >
-                    <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>
+                    <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>
                       {sendingChat ? 'Sending...' : 'Send'}
                     </Text>
                   </Pressable>
@@ -785,13 +787,13 @@ export function SupportScreen() {
 
                 {activeTicket ? (
                   <Pressable onPress={() => void endChat()} disabled={sendingChat} style={{ alignItems: 'flex-start', marginTop: 4 }}>
-                    <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>End chat</Text>
+                    <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>End chat</Text>
                   </Pressable>
                 ) : null}
               </View>
             ) : (
               <View style={{ borderTopWidth: 1, borderTopColor: theme.colors.border, padding: 14, gap: 10 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '900' }}>How was your support experience?</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '700' }}>How was your support experience?</Text>
                 <Text style={{ color: theme.colors.muted }}>Your feedback helps us improve.</Text>
 
                 {hasFeedback ? (
@@ -825,7 +827,7 @@ export function SupportScreen() {
                             paddingVertical: 10,
                           })}
                         >
-                          <Text style={{ color: feedbackRating === rating ? theme.colors.primaryText : theme.colors.text, fontWeight: '900' }}>
+                          <Text style={{ color: feedbackRating === rating ? theme.colors.primaryText : theme.colors.text, fontWeight: '700' }}>
                             {rating}
                           </Text>
                         </Pressable>
@@ -873,7 +875,7 @@ export function SupportScreen() {
                 gap: 12,
               }}
             >
-              <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '900' }}>Need help right now?</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '700' }}>Need help right now?</Text>
               <Text style={{ color: theme.colors.muted }}>Start a support chat and we’ll assist you straight away.</Text>
               <HelfiButton label="Start support chat" onPress={startSupportChat} />
             </View>
@@ -889,7 +891,7 @@ export function SupportScreen() {
                 gap: 10,
               }}
             >
-              <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '900' }}>Past tickets</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '700' }}>Past tickets</Text>
               <Text style={{ color: theme.colors.muted }}>View or delete previous support chats.</Text>
 
               {isLoadingHistory ? <Text style={{ color: theme.colors.muted }}>Loading tickets...</Text> : null}
@@ -910,12 +912,12 @@ export function SupportScreen() {
                         gap: 8,
                       }}
                     >
-                      <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{ticket.subject}</Text>
+                      <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{ticket.subject}</Text>
                       <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
                         {formatDateTime(ticket.updatedAt || ticket.createdAt)} • {ticket.status}
                       </Text>
 
-                      <View style={{ flexDirection: 'row', gap: 8 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <Pressable
                           onPress={() => void openTicket(ticket.id)}
                           style={{
@@ -928,23 +930,10 @@ export function SupportScreen() {
                             backgroundColor: '#ECFDF5',
                           }}
                         >
-                          <Text style={{ color: '#047857', fontWeight: '800' }}>View chat</Text>
+                          <Text style={{ color: '#047857', fontWeight: '600' }}>View chat</Text>
                         </Pressable>
 
-                        <Pressable
-                          onPress={() => void deleteTicket(ticket.id)}
-                          style={{
-                            flex: 1,
-                            borderWidth: 1,
-                            borderColor: '#FECACA',
-                            borderRadius: 999,
-                            paddingVertical: 8,
-                            alignItems: 'center',
-                            backgroundColor: '#FEF2F2',
-                          }}
-                        >
-                          <Text style={{ color: '#B91C1C', fontWeight: '800' }}>Delete</Text>
-                        </Pressable>
+                        <EntryActionsButton label={`Actions for ${ticket.subject}`} onPress={() => setTicketActions(ticket)} />
                       </View>
                     </View>
                   ))
@@ -961,7 +950,7 @@ export function SupportScreen() {
                 gap: 10,
               }}
             >
-              <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '900' }}>Contact Support</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '700' }}>Contact Support</Text>
               <Text style={{ color: theme.colors.muted }}>
                 Have a question or need help? Send us a message and we’ll get back to you as soon as possible.
               </Text>
@@ -976,7 +965,7 @@ export function SupportScreen() {
                     backgroundColor: '#ECFDF5',
                   }}
                 >
-                  <Text style={{ color: '#065F46', fontWeight: '800' }}>Support ticket submitted successfully.</Text>
+                  <Text style={{ color: '#065F46', fontWeight: '600' }}>Support ticket submitted successfully.</Text>
                   <Text style={{ color: '#047857', marginTop: 4 }}>You will receive a reply shortly.</Text>
                 </View>
               ) : null}
@@ -991,7 +980,7 @@ export function SupportScreen() {
                     backgroundColor: '#FEF2F2',
                   }}
                 >
-                  <Text style={{ color: '#991B1B', fontWeight: '800' }}>Error submitting ticket.</Text>
+                  <Text style={{ color: '#991B1B', fontWeight: '600' }}>Error submitting ticket.</Text>
                   <Text style={{ color: '#B91C1C', marginTop: 4 }}>Please try again.</Text>
                 </View>
               ) : null}
@@ -1007,7 +996,7 @@ export function SupportScreen() {
                     gap: 8,
                   }}
                 >
-                  <Text style={{ color: '#065F46', fontWeight: '800' }}>Would you like to chat with support now?</Text>
+                  <Text style={{ color: '#065F46', fontWeight: '600' }}>Would you like to chat with support now?</Text>
                   <Text style={{ color: '#047857' }}>You can start a live chat or just submit by email.</Text>
                   <View style={{ flexDirection: 'row', gap: 8 }}>
                     <Pressable
@@ -1020,7 +1009,7 @@ export function SupportScreen() {
                         backgroundColor: theme.colors.primary,
                       }}
                     >
-                      <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>Start chat now</Text>
+                      <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>Start chat now</Text>
                     </Pressable>
                     <Pressable
                       onPress={keepEmailOnly}
@@ -1034,7 +1023,7 @@ export function SupportScreen() {
                         backgroundColor: '#F0FDF4',
                       }}
                     >
-                      <Text style={{ color: '#166534', fontWeight: '800' }}>Just email me</Text>
+                      <Text style={{ color: '#166534', fontWeight: '600' }}>Just email me</Text>
                     </Pressable>
                   </View>
                 </View>
@@ -1166,7 +1155,7 @@ export function SupportScreen() {
                       backgroundColor: theme.colors.card,
                     }}
                   >
-                    <Text style={{ color: theme.colors.text, fontWeight: '800' }}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
                       {uploadingFormAttachment ? 'Uploading...' : 'Attach photo'}
                     </Text>
                   </Pressable>
@@ -1181,7 +1170,7 @@ export function SupportScreen() {
                           paddingHorizontal: 10,
                           paddingVertical: 6,
                           borderRadius: 999,
-                          backgroundColor: '#F3F4F6',
+                          backgroundColor: theme.colors.bg,
                           flexDirection: 'row',
                           alignItems: 'center',
                           gap: 6,
@@ -1191,7 +1180,7 @@ export function SupportScreen() {
                           {att.name}
                         </Text>
                         <Pressable onPress={() => setFormAttachments((prev) => prev.filter((x) => x.url !== att.url))}>
-                          <Text style={{ color: theme.colors.muted, fontWeight: '900' }}>✕</Text>
+                          <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>✕</Text>
                         </Pressable>
                       </View>
                     ))}
@@ -1215,7 +1204,7 @@ export function SupportScreen() {
                   borderTopColor: theme.colors.border,
                 }}
               >
-                <Text style={{ color: theme.colors.text, fontWeight: '900', marginBottom: 6 }}>Other Ways to Reach Us</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '700', marginBottom: 6 }}>Other Ways to Reach Us</Text>
                 <Text style={{ color: theme.colors.muted }}>Email: support@helfi.ai</Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Response Time: Usually within a few minutes</Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Business Hours: Monday - Friday, 9 AM - 5 PM (AEST)</Text>
@@ -1224,6 +1213,13 @@ export function SupportScreen() {
           </>
         )}
       </ScrollView>
+      <EntryActionsMenu
+        visible={ticketActions != null}
+        onClose={() => setTicketActions(null)}
+        actions={[
+          { label: 'Delete ticket', icon: 'trash-2', destructive: true, onPress: () => ticketActions && void deleteTicket(ticketActions.id) },
+        ]}
+      />
     </Screen>
   )
 }

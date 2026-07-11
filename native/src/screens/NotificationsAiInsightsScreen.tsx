@@ -80,7 +80,7 @@ function SelectRow({
 }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{label}</Text>
+      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{label}</Text>
       <Pressable
         onPress={onPress}
         style={({ pressed }) => ({
@@ -96,7 +96,7 @@ function SelectRow({
           justifyContent: 'space-between',
         })}
       >
-        <Text style={{ color: theme.colors.text, fontWeight: '800', flex: 1 }}>
+        <Text style={{ color: theme.colors.text, fontWeight: '600', flex: 1 }}>
           {value}
         </Text>
         <Feather name="chevron-down" size={18} color={theme.colors.muted} />
@@ -126,7 +126,7 @@ function ActionButton({
         alignItems: 'center',
       })}
     >
-      <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>
+      <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>
         {loading ? 'Saving...' : label}
       </Text>
     </Pressable>
@@ -446,13 +446,13 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
         >
           <View style={{ gap: 8 }}>
             <View style={{ gap: 6 }}>
-              <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Health Coach settings</Text>
+              <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>Health Coach settings</Text>
               <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>
                 Get proactive guidance based on your daily logs and habits.
               </Text>
             </View>
             <Pressable onPress={() => void openSmartCoach()} style={{ alignSelf: 'flex-end', paddingTop: 2 }}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Open Health Coach</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Open Health Coach</Text>
             </Pressable>
           </View>
 
@@ -464,7 +464,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Enable Health Coach</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Enable Health Coach</Text>
                   <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12 }}>
                     10 credits per alert. Up to 50 credits per day. Charges only apply when an alert is sent.
                   </Text>
@@ -513,9 +513,9 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
               gap: 12,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text }}>Timezone</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Timezone</Text>
             <Pressable onPress={() => setTimezonePickerOpen(false)}>
-              <Text style={{ fontWeight: '900', color: theme.colors.primary }}>Done</Text>
+              <Text style={{ fontWeight: '700', color: theme.colors.primary }}>Done</Text>
             </Pressable>
           </View>
 
@@ -533,7 +533,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
                 paddingHorizontal: 12,
                 paddingVertical: 12,
                 backgroundColor: theme.colors.card,
-                fontWeight: '800',
+                fontWeight: '600',
                 color: theme.colors.text,
               }}
             />
@@ -566,7 +566,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
                   <Text style={{ color: theme.colors.text, fontWeight: selected ? '900' : '700', flex: 1 }}>
                     {item}
                   </Text>
-                  {selected ? <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Selected</Text> : null}
+                  {selected ? <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Selected</Text> : null}
                 </Pressable>
               )
             }}
@@ -601,7 +601,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
               gap: 12,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>
               Enable Health Coach?
             </Text>
 
@@ -624,7 +624,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
                   borderColor: theme.colors.border,
                 })}
               >
-                <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Cancel</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={() => void confirmEnableSmartCoach()}
@@ -636,7 +636,7 @@ export function NotificationsAiInsightsScreen({ navigation }: { navigation: any 
                   backgroundColor: theme.colors.primary,
                 })}
               >
-                <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>Enable Smart Coach</Text>
+                <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>Enable Smart Coach</Text>
               </Pressable>
             </View>
           </View>

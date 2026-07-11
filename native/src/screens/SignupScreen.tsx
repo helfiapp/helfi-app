@@ -135,7 +135,7 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
             onPress={goToLogin}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 8, paddingRight: 12 })}
           >
-            <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: 16 }}>Back</Text>
+            <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 16 }}>Back</Text>
           </Pressable>
           <Text
             style={{
@@ -143,7 +143,7 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
               textAlign: 'center',
               marginRight: isPractitionerSignup ? 0 : 44,
               color: theme.colors.text,
-              fontWeight: '900',
+              fontWeight: '700',
             }}
           >
             {isPractitionerSignup ? 'Practitioner sign up' : 'Sign up'}
@@ -153,7 +153,7 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
               onPress={goToDashboard}
               style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 8, paddingLeft: 12 })}
             >
-              <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: 14 }}>Back to dashboard</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 14 }}>Back to dashboard</Text>
             </Pressable>
           ) : null}
         </View>
@@ -174,7 +174,7 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
               <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
                 <Image source={require('../../assets/helfi-logo.png')} style={{ width: 92, height: 92 }} resizeMode="contain" />
 
-                <Text style={{ marginTop: theme.spacing.md, fontSize: 26, fontWeight: '900', color: theme.colors.text }}>
+                <Text style={{ marginTop: theme.spacing.md, fontSize: 26, fontWeight: '700', color: theme.colors.text }}>
                   {isPractitionerSignup ? 'Practitioner portal - create account' : 'Create Account'}
                 </Text>
                 <Text style={{ marginTop: 6, fontSize: 14, color: theme.colors.muted, textAlign: 'center', lineHeight: 20 }}>
@@ -185,7 +185,7 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
                 <Pressable onPress={goToLogin} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 10, paddingHorizontal: 8 })}>
                   <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700' }}>
                     {isPractitionerSignup ? 'Already have a practitioner account? ' : 'Already have an account? '}
-                    <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Sign in</Text>
+                    <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Sign in</Text>
                   </Text>
                 </Pressable>
               </View>
@@ -207,7 +207,7 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
                   })}
                 >
                   <FontAwesome name="apple" size={20} color="#FFFFFF" />
-                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '800' }}>
+                  <Text style={{ color: '#FFFFFF', fontSize: 16, fontWeight: '600' }}>
                     {socialLoading === 'apple' ? 'Opening Apple...' : 'Continue with Apple'}
                   </Text>
                 </Pressable>
@@ -293,11 +293,11 @@ export function SignupScreen({ navigation, route }: { navigation: any; route?: a
                     </View>
                     <Text style={{ flex: 1, color: theme.colors.muted, fontSize: 12, lineHeight: 16 }}>
                       I agree to the{' '}
-                      <Text onPress={() => navigation.navigate('Terms')} style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                      <Text onPress={() => navigation.navigate('Terms')} style={{ color: theme.colors.primary, fontWeight: '600' }}>
                         Terms of Service
                       </Text>{' '}
                       and{' '}
-                      <Text onPress={() => navigation.navigate('Privacy')} style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                      <Text onPress={() => navigation.navigate('Privacy')} style={{ color: theme.colors.primary, fontWeight: '600' }}>
                         Privacy Policy
                       </Text>
                       .

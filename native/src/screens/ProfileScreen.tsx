@@ -104,7 +104,7 @@ function DropdownOption({
         opacity: pressed ? 0.85 : 1,
       })}
     >
-      <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontWeight: '800', fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontWeight: '600', fontSize: 13 }}>{label}</Text>
     </Pressable>
   )
 }
@@ -217,7 +217,7 @@ export function ProfileScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ backgroundColor: theme.colors.card, borderWidth: 1, borderColor: theme.colors.border, borderRadius: theme.radius.lg, padding: 16 }}>
-          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Profile Information</Text>
+          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '700', color: theme.colors.text }}>Profile Information</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>Auto-save enabled: Your changes save automatically when you leave this page.</Text>
 
           <Pressable
@@ -237,7 +237,7 @@ export function ProfileScreen() {
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Change Profile Photo</Text>
+            <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Change Profile Photo</Text>
           </Pressable>
 
           <Field

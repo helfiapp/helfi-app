@@ -139,7 +139,7 @@ function ActionButton({
         opacity: disabled ? 0.55 : 1,
       }}
     >
-      <Text style={{ color: colors.fg, fontWeight: '800', textAlign: 'center' }}>{label}</Text>
+      <Text style={{ color: colors.fg, fontWeight: '600', textAlign: 'center' }}>{label}</Text>
     </Pressable>
   )
 }
@@ -173,11 +173,11 @@ function PlanCard({
     >
       {popular ? (
         <View style={{ alignSelf: 'center', marginBottom: 8, backgroundColor: theme.colors.primary, borderRadius: 999, paddingHorizontal: 10, paddingVertical: 4 }}>
-          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '800' }}>Most Popular</Text>
+          <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Most Popular</Text>
         </View>
       ) : null}
-      <Text style={{ fontSize: 18, fontWeight: '800', color: theme.colors.text }}>{title}</Text>
-      <Text style={{ marginTop: 8, color: theme.colors.text, fontWeight: '800' }}>{wallet}</Text>
+      <Text style={{ fontSize: 18, fontWeight: '600', color: theme.colors.text }}>{title}</Text>
+      <Text style={{ marginTop: 8, color: theme.colors.text, fontWeight: '600' }}>{wallet}</Text>
       <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 12 }}>Credits refresh monthly. No rollover.</Text>
 
       <View style={{ marginTop: 12, gap: 6 }}>
@@ -216,7 +216,7 @@ function TopUpCard({
         padding: 12,
       }}
     >
-      <Text style={{ fontSize: 16, fontWeight: '800', color: theme.colors.text }}>{title}</Text>
+      <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>{title}</Text>
       <Text style={{ marginTop: 6, color: theme.colors.muted }}>{desc}</Text>
       <View style={{ marginTop: 12 }}>
         <ActionButton label={loading ? 'Processing...' : buttonLabel} onPress={onPress} disabled={loading} kind="primary" />
@@ -621,7 +621,7 @@ export function BillingScreen() {
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text }}>Subscription & Billing</Text>
+          <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '700', color: theme.colors.text }}>Subscription & Billing</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>Matches your web account billing.</Text>
 
           {credits.loading ? (
@@ -641,7 +641,7 @@ export function BillingScreen() {
             <>
               <View style={{ marginTop: 16, backgroundColor: '#F6FAF7', borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12 }}>
                 <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>Current plan</Text>
-                <Text style={{ marginTop: 4, fontSize: 20, fontWeight: '900', color: theme.colors.text }}>{isPremium ? 'Premium' : 'Free'}</Text>
+                <Text style={{ marginTop: 4, fontSize: 20, fontWeight: '700', color: theme.colors.text }}>{isPremium ? 'Premium' : 'Free'}</Text>
                 <Text style={{ marginTop: 2, color: theme.colors.muted }}>Credits remaining: {credits.creditsRemaining.toLocaleString()}</Text>
                 {credits.refreshAt ? (
                   <Text style={{ marginTop: 2, color: theme.colors.muted }}>
@@ -680,7 +680,7 @@ export function BillingScreen() {
           <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 2, borderColor: theme.colors.primary, padding: 16 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', gap: 10 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text }}>Current Subscription</Text>
+                <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>Current Subscription</Text>
                 <Text style={{ marginTop: 6, color: theme.colors.muted }}>
                   {subscription.tier}
                   {subscription.credits > 0 ? ` - ${subscription.credits.toLocaleString()} credits/month` : ''}
@@ -693,7 +693,7 @@ export function BillingScreen() {
               </View>
               <View>
                 <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'right' }}>Status</Text>
-                <Text style={{ color: theme.colors.primary, fontWeight: '900', textAlign: 'right' }}>Active</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '700', textAlign: 'right' }}>Active</Text>
               </View>
             </View>
 
@@ -716,7 +716,7 @@ export function BillingScreen() {
                   borderLeftColor: theme.colors.primary,
                 }}
               >
-                <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Cancellation scheduled</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Cancellation scheduled</Text>
                 <Text style={{ marginTop: 4, color: theme.colors.muted, lineHeight: 20 }}>
                   Your subscription remains active until the end of this billing period.
                 </Text>
@@ -785,7 +785,7 @@ export function BillingScreen() {
 
         {!loadingSubscription && !hasActiveSubscription ? (
           <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Previous purchases</Text>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Previous purchases</Text>
             <Text style={{ marginTop: 6, marginBottom: 12, color: theme.colors.muted }}>
               Restore subscriptions or credits bought with this {Platform.OS === 'ios' ? 'Apple ID' : Platform.OS === 'android' ? 'Google Play account' : 'store account'}.
             </Text>
@@ -799,16 +799,16 @@ export function BillingScreen() {
         ) : null}
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Plans</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Plans</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>
             Choose a monthly subscription plan. Subscriptions renew monthly until cancelled.
           </Text>
           <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <Pressable accessibilityRole="link" accessibilityLabel="Terms of Use" onPress={() => openExternalUrl(TERMS_URL)}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Terms of Use</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Terms of Use</Text>
             </Pressable>
             <Pressable accessibilityRole="link" accessibilityLabel="Privacy Policy" onPress={() => openExternalUrl(PRIVACY_URL)}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Privacy Policy</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Privacy Policy</Text>
             </Pressable>
           </View>
 
@@ -829,7 +829,7 @@ export function BillingScreen() {
         </View>
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Buy Extra Credits</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Buy Extra Credits</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>One-time credit top-ups.</Text>
           <View style={{ marginTop: 12, gap: 10 }}>
             {topUpCards.map((item) => (
@@ -846,7 +846,7 @@ export function BillingScreen() {
         </View>
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Billing History</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Billing History</Text>
           <View style={{ marginTop: 16, gap: 10 }}>
             {billingHistoryLoading ? <Text style={{ color: theme.colors.muted }}>Loading...</Text> : null}
             {!billingHistoryLoading && !!billingHistoryError ? <Text style={{ color: '#B91C1C' }}>{billingHistoryError}</Text> : null}
@@ -872,8 +872,8 @@ export function BillingScreen() {
                     }}
                   >
                     <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-                      <Text style={{ color: theme.colors.text, fontWeight: '800', flex: 1 }}>{item.title}</Text>
-                      <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>{item.amountText}</Text>
+                      <Text style={{ color: theme.colors.text, fontWeight: '600', flex: 1 }}>{item.title}</Text>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>{item.amountText}</Text>
                     </View>
                     <Text style={{ color: theme.colors.muted }}>{item.subtitle}</Text>
                     <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
@@ -887,7 +887,7 @@ export function BillingScreen() {
         </View>
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Your usage</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Your usage</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>See how many times you used each feature.</Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -956,7 +956,7 @@ export function BillingScreen() {
                       }}
                     >
                       <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{item.label}</Text>
-                      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>
+                      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
                         {count.toLocaleString()} {count === 1 ? 'time' : 'times'}
                       </Text>
                     </View>
@@ -968,7 +968,7 @@ export function BillingScreen() {
         </View>
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>AI feature credit costs</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>AI feature credit costs</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>Each AI action deducts credits from your wallet.</Text>
           <View style={{ marginTop: 12, gap: 8 }}>
             {creditCostDisplayList.map((item) => (
@@ -986,7 +986,7 @@ export function BillingScreen() {
                 }}
               >
                 <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{item.label}</Text>
-                <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>{item.credits} credits</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>{item.credits} credits</Text>
               </View>
             ))}
           </View>

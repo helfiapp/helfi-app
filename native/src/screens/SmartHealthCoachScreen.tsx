@@ -115,7 +115,7 @@ function TabButton({
         alignItems: 'center',
       }}
     >
-      <Text style={{ color: active ? theme.colors.primary : theme.colors.muted, fontWeight: '800' }}>
+      <Text style={{ color: active ? theme.colors.primary : theme.colors.muted, fontWeight: '600' }}>
         {label}
       </Text>
     </Pressable>
@@ -585,7 +585,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
           if (block.type === 'label') {
             return (
               <Text key={`label-${tip.id}-${index}`} style={{ color: theme.colors.text, lineHeight: 20 }}>
-                <Text style={{ fontWeight: '900' }}>{block.label}: </Text>
+                <Text style={{ fontWeight: '700' }}>{block.label}: </Text>
                 {block.text}
               </Text>
             )
@@ -728,7 +728,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
           <View style={{ padding: 16 }}>
             {activeTab === 'today' ? (
               <>
-                <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text, lineHeight: 28 }}>
+                <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text, lineHeight: 28 }}>
                   Today's Health Coach alerts
                 </Text>
                 <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 19 }}>
@@ -770,7 +770,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                           gap: 10,
                         }}
                       >
-                        <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 16 }}>
+                        <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>
                           {normalizeTipTitle(tip.title)}
                         </Text>
 
@@ -788,7 +788,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                             }}
                           >
                             <Text style={{ color: '#92400E', fontSize: 12, lineHeight: 18 }}>
-                              <Text style={{ fontWeight: '900' }}>Safety note: </Text>
+                              <Text style={{ fontWeight: '700' }}>Safety note: </Text>
                               {tip.safetyNote}
                             </Text>
                           </View>
@@ -816,7 +816,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                                 paddingVertical: 9,
                               })}
                             >
-                              <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>Ask Helfi</Text>
+                              <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>Ask Helfi</Text>
                             </Pressable>
 
                             <Pressable onPress={() => void handleClearTip(tip.id)}>
@@ -850,7 +850,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
               <>
                 <View style={{ flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 10 }}>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text, lineHeight: 28 }}>
+                    <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text, lineHeight: 28 }}>
                       Past Health Coach alerts
                     </Text>
                     <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 19 }}>
@@ -892,7 +892,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                         paddingVertical: 7,
                       })}
                     >
-                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '900' }}>
+                      <Text style={{ color: '#fff', fontSize: 12, fontWeight: '700' }}>
                         {deletingHistory
                           ? 'Deleting...'
                           : `Delete selected (${selectedHistoryTipIds.length})`}
@@ -981,12 +981,12 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                                     }}
                                   >
                                     {isSelected ? (
-                                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '900' }}>✓</Text>
+                                      <Text style={{ color: '#fff', fontSize: 10, fontWeight: '700' }}>✓</Text>
                                     ) : null}
                                   </View>
                                 ) : null}
                                 <Text
-                                  style={{ flex: 1, color: theme.colors.text, fontWeight: '800' }}
+                                  style={{ flex: 1, color: theme.colors.text, fontWeight: '600' }}
                                   numberOfLines={1}
                                 >
                                   {normalizeTipTitle(tip.title)}
@@ -1022,7 +1022,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                                   }}
                                 >
                                   <Text style={{ color: '#92400E', fontSize: 12, lineHeight: 18 }}>
-                                    <Text style={{ fontWeight: '900' }}>Safety note: </Text>
+                                    <Text style={{ fontWeight: '700' }}>Safety note: </Text>
                                     {tip.safetyNote}
                                   </Text>
                                 </View>
@@ -1050,7 +1050,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                                       paddingVertical: 9,
                                     })}
                                   >
-                                    <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>
+                                    <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>
                                       Ask Helfi
                                     </Text>
                                   </Pressable>
@@ -1079,7 +1079,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
             gap: 12,
           }}
         >
-          <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text, lineHeight: 28 }}>
+          <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text, lineHeight: 28 }}>
             Health Coach settings
           </Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>
@@ -1108,7 +1108,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                 }}
               />
             </View>
-            <Text style={{ color: theme.colors.text, fontWeight: '900', textAlign: 'right' }}>
+            <Text style={{ color: theme.colors.text, fontWeight: '700', textAlign: 'right' }}>
               {creditsRemaining.toLocaleString()}
             </Text>
           </View>
@@ -1121,7 +1121,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 18 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 18 }}>
                     Enable Health Coach
                   </Text>
                   <Text style={{ marginTop: 3, color: theme.colors.muted }}>
@@ -1137,7 +1137,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
               </Text>
 
               <View style={{ gap: 6 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Timezone</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Timezone</Text>
                 <TextInput
                   value={timezoneQuery}
                   onChangeText={(value) => {
@@ -1215,7 +1215,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                   marginTop: 4,
                 })}
               >
-                <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>
+                <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>
                   {savingSettings ? 'Saving...' : 'Save Health Coach settings'}
                 </Text>
               </Pressable>
@@ -1258,7 +1258,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
               gap: 12,
             }}
           >
-            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>
               Enable Health Coach?
             </Text>
 
@@ -1285,7 +1285,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                   borderColor: theme.colors.border,
                 })}
               >
-                <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Cancel</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Cancel</Text>
               </Pressable>
               <Pressable
                 onPress={() => void confirmEnableSmartCoach()}
@@ -1297,7 +1297,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
                   backgroundColor: theme.colors.primary,
                 })}
               >
-                <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>
+                <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>
                   Enable Health Coach
                 </Text>
               </Pressable>

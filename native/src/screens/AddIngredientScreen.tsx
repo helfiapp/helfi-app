@@ -1703,8 +1703,8 @@ export function AddIngredientScreen() {
   }
 
   return (
-    <Screen style={{ backgroundColor: '#FFFFFF' }}>
-      <View style={{ borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: '#FFFFFF' }}>
+    <Screen style={{ backgroundColor: theme.colors.card }}>
+      <View style={{ borderBottomWidth: 1, borderBottomColor: '#E5E7EB', backgroundColor: theme.colors.card }}>
         <View
           style={{
             paddingHorizontal: 16,
@@ -1720,10 +1720,10 @@ export function AddIngredientScreen() {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, width: 36, alignItems: 'flex-start' })}
           >
-            <Text style={{ fontSize: 18, color: '#111827' }}>←</Text>
+            <Text style={{ fontSize: 18, color: theme.colors.text }}>←</Text>
           </Pressable>
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Add ingredient</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Add ingredient</Text>
             <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>Add to {categoryLabel}</Text>
           </View>
           <Pressable
@@ -1732,7 +1732,7 @@ export function AddIngredientScreen() {
             onPress={() => navigation.goBack()}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, width: 36, alignItems: 'flex-end' })}
           >
-            <Text style={{ fontSize: 18, color: '#111827' }}>✕</Text>
+            <Text style={{ fontSize: 18, color: theme.colors.text }}>✕</Text>
           </Pressable>
         </View>
       </View>
@@ -1743,12 +1743,12 @@ export function AddIngredientScreen() {
             borderWidth: 1,
             borderColor: '#E5E7EB',
             borderRadius: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.colors.card,
             padding: 14,
             gap: 12,
           }}
         >
-          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
             Search foods (use the source buttons below if results look off)
           </Text>
 
@@ -1772,7 +1772,7 @@ export function AddIngredientScreen() {
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 paddingRight: 48,
-                color: '#111827',
+                color: theme.colors.text,
               }}
             />
             <Pressable
@@ -1793,7 +1793,7 @@ export function AddIngredientScreen() {
                 opacity: loading || query.trim().length === 0 ? 0.6 : pressed ? 0.85 : 1,
               })}
             >
-              {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>⌕</Text>}
+              {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>⌕</Text>}
             </Pressable>
           </View>
 
@@ -1886,7 +1886,7 @@ export function AddIngredientScreen() {
                         }}
                       >
                         <View style={{ flex: 1 }}>
-                          <Text style={{ fontSize: 14, fontWeight: '700', color: '#111827' }} numberOfLines={2}>
+                          <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }} numberOfLines={2}>
                             {display.title}
                             {display.showBrandSuffix && item.brand ? ` - ${item.brand}` : ''}
                           </Text>
@@ -1932,7 +1932,7 @@ export function AddIngredientScreen() {
             borderWidth: 1,
             borderColor: '#E5E7EB',
             borderRadius: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.colors.card,
             paddingHorizontal: 12,
             paddingVertical: 14,
           }}
@@ -1953,12 +1953,12 @@ export function AddIngredientScreen() {
             borderWidth: 1,
             borderColor: '#E5E7EB',
             borderRadius: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.colors.card,
             padding: 12,
             gap: 10,
           }}
         >
-          <Text style={{ fontSize: 18, fontWeight: '700', color: '#111827' }}>Or use AI food photo notes</Text>
+          <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Or use AI food photo notes</Text>
           <Text style={{ fontSize: 14, color: '#4B5563' }}>Take a clear photo of the food or package.</Text>
 
           <View>
@@ -1973,7 +1973,7 @@ export function AddIngredientScreen() {
                   }}
                 />
               </View>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151' }}>
+              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted }}>
                 {creditsRemaining !== null ? creditsRemaining.toLocaleString() : '—'}
               </Text>
             </View>
@@ -2014,7 +2014,7 @@ export function AddIngredientScreen() {
                 borderRadius: 10,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.colors.card,
                 alignItems: 'center',
                 justifyContent: 'center',
                 paddingHorizontal: 14,
@@ -2022,7 +2022,7 @@ export function AddIngredientScreen() {
                 opacity: pressed ? 0.9 : 1,
               })}
             >
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#374151' }}>Reset</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.muted }}>Reset</Text>
             </Pressable>
           </View>
         </View>
@@ -2050,12 +2050,12 @@ export function AddIngredientScreen() {
               borderRadius: 18,
               borderWidth: 1,
               borderColor: '#E5E7EB',
-              backgroundColor: '#FFFFFF',
+              backgroundColor: theme.colors.card,
               padding: 16,
             }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: '#111827' }}>Report missing item</Text>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>Report missing item</Text>
               <Pressable onPress={() => setMissingReportOpen(false)}>
                 <Text style={{ fontSize: 18, color: '#6B7280' }}>✕</Text>
               </Pressable>
@@ -2065,7 +2065,7 @@ export function AddIngredientScreen() {
               <Text style={{ fontSize: 12, color: '#6B7280' }}>Country: {userCountry || 'Unknown'}</Text>
 
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Item name *</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Item name *</Text>
                 <TextInput
                   value={missingReportName}
                   onChangeText={setMissingReportName}
@@ -2077,13 +2077,13 @@ export function AddIngredientScreen() {
                     borderRadius: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
-                    color: '#111827',
+                    color: theme.colors.text,
                   }}
                 />
               </View>
 
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Brand or chain</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Brand or chain</Text>
                 <TextInput
                   value={missingReportBrand}
                   onChangeText={setMissingReportBrand}
@@ -2095,13 +2095,13 @@ export function AddIngredientScreen() {
                     borderRadius: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
-                    color: '#111827',
+                    color: theme.colors.text,
                   }}
                 />
               </View>
 
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Size (optional)</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Size (optional)</Text>
                 <TextInput
                   value={missingReportSize}
                   onChangeText={setMissingReportSize}
@@ -2113,13 +2113,13 @@ export function AddIngredientScreen() {
                     borderRadius: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
-                    color: '#111827',
+                    color: theme.colors.text,
                   }}
                 />
               </View>
 
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: '#374151', marginBottom: 4 }}>Extra notes</Text>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Extra notes</Text>
                 <TextInput
                   value={missingReportNotes}
                   onChangeText={setMissingReportNotes}
@@ -2134,7 +2134,7 @@ export function AddIngredientScreen() {
                     paddingHorizontal: 12,
                     paddingVertical: 10,
                     minHeight: 84,
-                    color: '#111827',
+                    color: theme.colors.text,
                   }}
                 />
               </View>
@@ -2176,7 +2176,7 @@ export function AddIngredientScreen() {
           resetAdjustState()
         }}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: '#FFFFFF' }}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.card }}>
           <View
             style={{
               borderBottomWidth: 1,
@@ -2188,8 +2188,8 @@ export function AddIngredientScreen() {
               justifyContent: 'space-between',
             }}
           >
-            <Text style={{ fontSize: 22, color: '#111827' }}> </Text>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: '#111827' }}>Adjust ingredient</Text>
+            <Text style={{ fontSize: 22, color: theme.colors.text }}> </Text>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text }}>Adjust ingredient</Text>
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Close adjust ingredient"
@@ -2208,13 +2208,13 @@ export function AddIngredientScreen() {
             contentContainerStyle={{ paddingHorizontal: 16, paddingVertical: 14, gap: 12 }}
           >
             <View>
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#111827' }}>{adjustItem?.name || 'Food'}</Text>
+              <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text }}>{adjustItem?.name || 'Food'}</Text>
               {adjustItem?.brand ? <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>{adjustItem.brand}</Text> : null}
             </View>
 
             {adjustServingOptions.length > 0 ? (
               <View>
-                <Text style={{ fontSize: 14, color: '#374151', marginBottom: 6 }}>Base serving size</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.muted, marginBottom: 6 }}>Base serving size</Text>
                 <View ref={adjustServingTriggerRef}>
                   <Pressable
                     accessibilityRole="button"
@@ -2227,14 +2227,14 @@ export function AddIngredientScreen() {
                       borderRadius: 8,
                       paddingHorizontal: 12,
                       paddingVertical: 11,
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: theme.colors.card,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       opacity: pressed ? 0.9 : 1,
                     })}
                   >
-                    <Text style={{ color: '#111827', fontSize: 15, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                    <Text style={{ color: theme.colors.text, fontSize: 15, flex: 1, marginRight: 8 }} numberOfLines={1}>
                       {selectedServingLabel}
                     </Text>
                     <Text style={{ color: '#6B7280' }}>{adjustPickerMode === 'serving' ? '▴' : '▾'}</Text>
@@ -2244,7 +2244,7 @@ export function AddIngredientScreen() {
             ) : null}
 
             <View>
-              <Text style={{ fontSize: 14, color: '#374151', marginBottom: 6 }}>Amount</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.muted, marginBottom: 6 }}>Amount</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TextInput
                   value={adjustAmountInput}
@@ -2262,7 +2262,7 @@ export function AddIngredientScreen() {
                     borderRadius: 8,
                     paddingHorizontal: 10,
                     paddingVertical: 10,
-                    color: '#111827',
+                    color: theme.colors.text,
                     fontSize: 16,
                   }}
                 />
@@ -2278,14 +2278,14 @@ export function AddIngredientScreen() {
                       borderRadius: 8,
                       paddingHorizontal: 10,
                       paddingVertical: 10,
-                      backgroundColor: '#FFFFFF',
+                      backgroundColor: theme.colors.card,
                       flexDirection: 'row',
                       alignItems: 'center',
                       justifyContent: 'space-between',
                       opacity: pressed ? 0.9 : 1,
                     })}
                   >
-                    <Text style={{ color: '#111827', fontSize: 15, flex: 1, marginRight: 8 }} numberOfLines={1}>
+                    <Text style={{ color: theme.colors.text, fontSize: 15, flex: 1, marginRight: 8 }} numberOfLines={1}>
                       {activeUnitLabel}
                     </Text>
                     <Text style={{ color: '#6B7280' }}>{adjustPickerMode === 'unit' ? '▴' : '▾'}</Text>
@@ -2316,7 +2316,7 @@ export function AddIngredientScreen() {
                   }}
                 >
                   <Text style={{ fontSize: 12, color: '#4B5563' }}>
-                    {tile.label}: <Text style={{ color: '#111827', fontWeight: '700' }}>{tile.value}</Text>
+                    {tile.label}: <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{tile.value}</Text>
                   </Text>
                 </View>
               ))}
@@ -2355,7 +2355,7 @@ export function AddIngredientScreen() {
                   borderRadius: 9,
                   borderWidth: 1,
                   borderColor: '#E5E7EB',
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: theme.colors.card,
                   paddingHorizontal: 16,
                   paddingVertical: 11,
                   opacity: adjustSaving ? 0.65 : pressed ? 0.9 : 1,
@@ -2390,7 +2390,7 @@ export function AddIngredientScreen() {
                   borderWidth: 1,
                   borderColor: '#D1D5DB',
                   borderRadius: 8,
-                  backgroundColor: '#FFFFFF',
+                  backgroundColor: theme.colors.card,
                   shadowColor: '#000000',
                   shadowOpacity: 0.16,
                   shadowRadius: 8,
@@ -2419,7 +2419,7 @@ export function AddIngredientScreen() {
                               borderTopColor: '#E5E7EB',
                             })}
                           >
-                            <Text style={{ color: '#111827', fontSize: 15, fontWeight: isSelected ? '700' : '500' }}>
+                            <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: isSelected ? '700' : '500' }}>
                               {optionLabel}
                             </Text>
                           </Pressable>
@@ -2444,7 +2444,7 @@ export function AddIngredientScreen() {
                               backgroundColor: isSelected ? '#EFF6FF' : pressed ? '#F9FAFB' : '#FFFFFF',
                             })}
                           >
-                            <Text style={{ color: '#111827', fontSize: 15 }}>{unitText}</Text>
+                            <Text style={{ color: theme.colors.text, fontSize: 15 }}>{unitText}</Text>
                           </Pressable>
                         )
                       })}

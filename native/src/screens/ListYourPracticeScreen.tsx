@@ -40,7 +40,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
               paddingHorizontal: 10,
             }}
           >
-            <Text style={{ color: '#2E7D32', fontWeight: '900' }}>Back to dashboard</Text>
+            <Text style={{ color: '#2E7D32', fontWeight: '700' }}>Back to dashboard</Text>
           </Pressable>
         </View>
 
@@ -50,14 +50,14 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
             borderColor: '#D7EEE0',
             borderRadius: 16,
             padding: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.colors.card,
             gap: 10,
           }}
         >
-          <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>
+          <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
             PRACTITIONER DIRECTORY
           </Text>
-          <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: '900' }}>
+          <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: '700' }}>
             List your practice on Helfi
           </Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
@@ -74,7 +74,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
                 paddingHorizontal: 12,
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>Start your listing</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Start your listing</Text>
             </Pressable>
             <Pressable
               onPress={() => navigation.navigate('Practitioners')}
@@ -87,7 +87,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
                 paddingHorizontal: 12,
               }}
             >
-              <Text style={{ color: '#2E7D32', fontWeight: '900' }}>Find a practitioner</Text>
+              <Text style={{ color: '#2E7D32', fontWeight: '700' }}>Find a practitioner</Text>
             </Pressable>
           </View>
           <Text style={{ color: theme.colors.muted, fontSize: 13 }}>
@@ -99,7 +99,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
                   signupRouteName: 'Signup',
                 })
               }}
-              style={{ color: theme.colors.primary, fontWeight: '900' }}
+              style={{ color: theme.colors.primary, fontWeight: '700' }}
             >
               Sign in here
             </Text>
@@ -107,8 +107,8 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
           </Text>
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 8 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>What you get</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 8 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>What you get</Text>
           {WHAT_YOU_GET.map((line) => (
             <Text key={line} style={{ color: theme.colors.muted, lineHeight: 20 }}>
               • {line}
@@ -116,8 +116,8 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
           ))}
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 8 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Safety review</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 8 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Safety review</Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
             Every listing is reviewed for safety and fraud. If it looks good, it goes live and you are emailed right
             away. If it needs a closer look, the listing stays hidden until a staff member reviews it. We will email you
@@ -125,8 +125,8 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
           </Text>
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 8 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>How it works</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 8 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>How it works</Text>
           {HOW_IT_WORKS.map((line, index) => (
             <Text key={line} style={{ color: theme.colors.muted, lineHeight: 20 }}>
               {index + 1}. {line}
@@ -134,8 +134,8 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
           ))}
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 10 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Pricing (USD)</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 10 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Pricing (USD)</Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
             Listing subscription: 6 months free (starts after approval), then $4.95/month per listing.
           </Text>
@@ -162,16 +162,16 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
           </Text>
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 8 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Radius and visibility</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 8 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Radius and visibility</Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
             You choose how far you want to appear from your location: 5 km, 10 km, 25 km, or 50 km. The default is
             10 km. This keeps results fair and local, even for online-only listings.
           </Text>
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 8 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Boost fairness</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 8 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Boost fairness</Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
             Boosted listings rotate fairly within the same category and country. This means no one is permanently at
             the top, and visibility stays balanced.
@@ -179,7 +179,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
         </View>
 
         <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 16, backgroundColor: '#EEF9EE', padding: 16, gap: 10 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '900' }}>Ready to list your practice?</Text>
+          <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700' }}>Ready to list your practice?</Text>
           <Text style={{ color: theme.colors.muted }}>
             Start your listing now. It takes a few minutes, and approval is usually quick.
           </Text>
@@ -193,7 +193,7 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
                 paddingHorizontal: 12,
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>Start your listing</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Start your listing</Text>
             </Pressable>
             <Pressable
               onPress={() => navigation.navigate('Practitioners')}
@@ -201,12 +201,12 @@ export function ListYourPracticeScreen({ navigation }: { navigation: any }) {
                 borderRadius: theme.radius.md,
                 borderWidth: 1,
                 borderColor: '#9FD6A1',
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.colors.card,
                 paddingVertical: 10,
                 paddingHorizontal: 12,
               }}
             >
-              <Text style={{ color: '#2E7D32', fontWeight: '900' }}>See practitioners</Text>
+              <Text style={{ color: '#2E7D32', fontWeight: '700' }}>See practitioners</Text>
             </Pressable>
           </View>
         </View>

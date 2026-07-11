@@ -1,5 +1,6 @@
-import React from 'react'
-import { Pressable, Text, View } from 'react-native'
+import React, { useEffect, useState } from 'react'
+import { ActivityIndicator, Pressable, Text, View } from 'react-native'
+import AsyncStorage from '@react-native-async-storage/async-storage'
 import type { NavigatorScreenParams } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
 import { Feather } from '@expo/vector-icons'
@@ -43,8 +44,13 @@ import { PractitionerProfileScreen } from '../screens/PractitionerProfileScreen'
 import { ListYourPracticeScreen } from '../screens/ListYourPracticeScreen'
 import { ListYourPracticeStartScreen } from '../screens/ListYourPracticeStartScreen'
 import { NativeWebToolScreen } from '../screens/NativeWebToolScreen'
+import { InsightIssueScreen } from '../screens/InsightIssueScreen'
 import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
 import type { VoiceAssistantLaunchContext } from '../voice/VoiceAssistant'
+import { API_BASE_URL } from '../config'
+import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { useAppMode } from '../state/AppModeContext'
+import { theme } from '../ui/theme'
 
 export type MainStackParamList = {
   Tabs: NavigatorScreenParams<MainTabParamList> | undefined
@@ -127,9 +133,12 @@ export type MainStackParamList = {
   ListYourPractice: undefined
   ListYourPracticeStart: undefined
   NativeWebTool: { title?: string; path: string }
+  InsightIssue: { issue: any }
 }
 
 const Stack = createNativeStackNavigator<MainStackParamList>()
+const LAST_NATIVE_TAB_KEY = 'helfi:lastNativeTab'
+const SAFE_NATIVE_TABS = new Set<keyof MainTabParamList>(['Dashboard', 'Insights', 'Food', 'More', 'Settings'])
 
 function HeaderBackButton({ navigation }: { navigation: any }) {
   if (!navigation.canGoBack?.()) return null
@@ -215,6 +224,7 @@ const TrackCaloriesWithBottomNav = withBottomNav(TrackCaloriesScreen, 'Food')
 const AddIngredientWithBottomNav = withBottomNav(AddIngredientScreen, 'Food')
 const WaterIntakeWithBottomNav = withBottomNav(WaterIntakeScreen, 'Food')
 const FoodDiarySettingsWithBottomNav = withBottomNav(FoodDiarySettingsScreen, 'Settings')
+const InsightIssueWithBottomNav = withBottomNav(InsightIssueScreen, 'Insights')
 
 function activeTabForNativeWebPath(path: string): NativeBottomNavKey {
   if (path === '/dashboard') return 'Dashboard'
@@ -273,8 +283,50 @@ function NativeWebToolWithBottomNav(props: React.ComponentProps<typeof NativeWeb
 }
 
 export function MainNavigator() {
+  const { session } = useAppMode()
+  const [startRoute, setStartRoute] = useState<'Tabs' | 'HealthSetup' | null>(null)
+  const [initialTab, setInitialTab] = useState<keyof MainTabParamList>('Dashboard')
+
+  useEffect(() => {
+    let cancelled = false
+    const resolveStart = async () => {
+      const savedTab = await AsyncStorage.getItem(LAST_NATIVE_TAB_KEY).catch(() => null)
+      if (savedTab && SAFE_NATIVE_TABS.has(savedTab as keyof MainTabParamList) && !cancelled) {
+        setInitialTab(savedTab as keyof MainTabParamList)
+      }
+
+      if (!session?.token) {
+        if (!cancelled) setStartRoute('Tabs')
+        return
+      }
+
+      try {
+        const res = await fetch(`${API_BASE_URL}/api/health-setup-status`, {
+          headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
+        })
+        const data: any = await res.json().catch(() => ({}))
+        if (!cancelled) setStartRoute(res.ok && data?.complete !== true ? 'HealthSetup' : 'Tabs')
+      } catch {
+        if (!cancelled) setStartRoute('Tabs')
+      }
+    }
+    void resolveStart()
+    return () => {
+      cancelled = true
+    }
+  }, [session?.token])
+
+  if (!startRoute) {
+    return (
+      <View style={{ flex: 1, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.bg }}>
+        <ActivityIndicator size="large" color={theme.colors.primary} />
+      </View>
+    )
+  }
+
   return (
     <Stack.Navigator
+      initialRouteName={startRoute}
       screenOptions={({ navigation, route }) => ({
         headerBackVisible: false,
         headerLeft: () => <HeaderBackButton navigation={navigation} />,
@@ -283,7 +335,12 @@ export function MainNavigator() {
         ),
       })}
     >
-      <Stack.Screen name="Tabs" component={MainTabs} options={{ headerShown: false }} />
+      <Stack.Screen
+        name="Tabs"
+        component={MainTabs}
+        initialParams={{ screen: initialTab }}
+        options={{ headerShown: false }}
+      />
       <Stack.Screen name="Profile" component={ProfileWithBottomNav} options={{ title: 'Profile', headerTitleAlign: 'center', headerBackTitle: '' }} />
       <Stack.Screen
         name="AccountSettings"
@@ -550,6 +607,11 @@ export function MainNavigator() {
           headerTitleAlign: 'center',
           headerBackTitle: '',
         }}
+      />
+      <Stack.Screen
+        name="InsightIssue"
+        component={InsightIssueWithBottomNav}
+        options={{ title: 'Insight', headerTitleAlign: 'center', headerBackTitle: '' }}
       />
       <Stack.Screen
         name="NativeWebTool"

@@ -1,4 +1,4 @@
-import { ColorSchemeName, DynamicColorIOS, Platform } from 'react-native'
+import { ColorSchemeName, DynamicColorIOS, Platform, PlatformColor } from 'react-native'
 
 const lightColors = {
   bg: '#F7FAF9',
@@ -25,6 +25,12 @@ const darkColors = {
 function adaptiveColor(light: string, dark: string) {
   if (Platform.OS === 'ios') {
     return DynamicColorIOS({ light, dark })
+  }
+  if (Platform.OS === 'android') {
+    if (light === lightColors.text) return PlatformColor('?attr/textColorPrimary')
+    if (light === lightColors.muted) return PlatformColor('?attr/textColorSecondary')
+    if (light === lightColors.border) return PlatformColor('?attr/colorControlNormal')
+    if (light === lightColors.bg || light === lightColors.card) return PlatformColor('?attr/colorBackground')
   }
   return light
 }

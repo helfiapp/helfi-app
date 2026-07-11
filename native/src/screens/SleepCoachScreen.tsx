@@ -441,8 +441,8 @@ export function SleepCoachScreen() {
         <LinearGradient colors={['#102122', '#0F1E20']} style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 18 }}>
           <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
             <View>
-              <Text style={{ color: '#0DDEF2', fontSize: 11, fontWeight: '800', letterSpacing: 1.1 }}>SLEEP COACH</Text>
-              <Text style={{ color: '#F8FCFB', fontSize: 26, fontWeight: '900', marginTop: 4 }}>Good morning</Text>
+              <Text style={{ color: '#0DDEF2', fontSize: 11, fontWeight: '600', letterSpacing: 1.1 }}>SLEEP COACH</Text>
+              <Text style={{ color: '#F8FCFB', fontSize: 26, fontWeight: '700', marginTop: 4 }}>Good morning</Text>
             </View>
             <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: '#1B3237', alignItems: 'center', justifyContent: 'center', borderWidth: 1, borderColor: 'rgba(13,223,242,0.25)' }}>
               <Feather name="moon" size={18} color="#0DDEF2" />
@@ -469,7 +469,7 @@ export function SleepCoachScreen() {
                     }}
                   >
                     <Text style={{ color: active ? '#102122' : '#A7B6BA', fontSize: 12, fontWeight: '700' }}>{weekdayLabel(item.date)}</Text>
-                    <Text style={{ color: active ? '#102122' : '#F8FCFB', fontSize: 20, fontWeight: '900', marginTop: 4 }}>
+                    <Text style={{ color: active ? '#102122' : '#F8FCFB', fontSize: 20, fontWeight: '700', marginTop: 4 }}>
                       {toFriendlyDate(item.date).split(' ')[1] || '--'}
                     </Text>
                   </Pressable>
@@ -497,7 +497,7 @@ export function SleepCoachScreen() {
 
           {!loading && errorText ? (
             <View style={{ borderRadius: 14, borderWidth: 1, borderColor: '#EF4444', backgroundColor: 'rgba(239,68,68,0.15)', padding: 12, marginBottom: 10 }}>
-              <Text style={{ color: '#FECACA', fontWeight: '800' }}>{errorText}</Text>
+              <Text style={{ color: '#FECACA', fontWeight: '600' }}>{errorText}</Text>
             </View>
           ) : null}
 
@@ -522,11 +522,11 @@ export function SleepCoachScreen() {
                       />
                     </Svg>
                     <View style={{ position: 'absolute', alignItems: 'center' }}>
-                      <Text style={{ color: '#F8FCFB', fontSize: 48, fontWeight: '900' }}>{sleepScore}</Text>
+                      <Text style={{ color: '#F8FCFB', fontSize: 48, fontWeight: '700' }}>{sleepScore}</Text>
                       <Text style={{ color: '#96AAB0', fontWeight: '700' }}>/100</Text>
                     </View>
                   </View>
-                  <Text style={{ color: '#F8FCFB', fontSize: 22, fontWeight: '900' }}>{scoreText(sleepScore)}</Text>
+                  <Text style={{ color: '#F8FCFB', fontSize: 22, fontWeight: '700' }}>{scoreText(sleepScore)}</Text>
                   <Text style={{ color: '#96AAB0', marginTop: 6 }}>{scoreSubText(sleepScore)}</Text>
                 </View>
               </View>
@@ -538,7 +538,7 @@ export function SleepCoachScreen() {
               </View>
 
               <View style={{ marginTop: 14, backgroundColor: '#13292D', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
-                <Text style={{ color: '#F8FCFB', fontSize: 18, fontWeight: '900' }}>Sleep Stages</Text>
+                <Text style={{ color: '#F8FCFB', fontSize: 18, fontWeight: '700' }}>Sleep Stages</Text>
                 <Text style={{ color: '#98AEB3', marginTop: 4 }}>Overnight depth and REM pattern</Text>
 
                 <View style={{ marginTop: 14 }}>
@@ -559,8 +559,8 @@ export function SleepCoachScreen() {
           {!loading && !errorText && tab === 'summary' ? (
             <>
               <View style={{ backgroundColor: '#13292D', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
-                <Text style={{ color: '#0DDEF2', fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>WEEKLY OVERVIEW</Text>
-                <Text style={{ color: '#F8FCFB', fontSize: 34, fontWeight: '900', marginTop: 4 }}>{formatHours(summary?.average7Hours ?? null)}</Text>
+                <Text style={{ color: '#0DDEF2', fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>WEEKLY OVERVIEW</Text>
+                <Text style={{ color: '#F8FCFB', fontSize: 34, fontWeight: '700', marginTop: 4 }}>{formatHours(summary?.average7Hours ?? null)}</Text>
                 <Text style={{ color: '#96AAB0', marginTop: 4 }}>Consistency: {consistencyLabel(summary?.consistency || 'unknown')}</Text>
 
                 <View style={{ marginTop: 16, height: 170, borderRadius: 12, backgroundColor: '#0F2125', paddingHorizontal: 10, paddingTop: 16, paddingBottom: 10, flexDirection: 'row', alignItems: 'flex-end', gap: 8 }}>
@@ -576,26 +576,26 @@ export function SleepCoachScreen() {
                           }}
                         />
                       </View>
-                      <Text style={{ color: b.active ? '#0DDEF2' : '#8CA3A8', fontSize: 10, fontWeight: '800', marginTop: 8 }}>{b.label}</Text>
+                      <Text style={{ color: b.active ? '#0DDEF2' : '#8CA3A8', fontSize: 10, fontWeight: '600', marginTop: 8 }}>{b.label}</Text>
                     </View>
                   ))}
                 </View>
               </View>
 
               <View style={{ marginTop: 12, backgroundColor: '#0DDEF2', borderRadius: 14, padding: 12 }}>
-                <Text style={{ color: '#082025', fontWeight: '900', fontSize: 16 }}>Sleep Insight</Text>
+                <Text style={{ color: '#082025', fontWeight: '700', fontSize: 16 }}>Sleep Insight</Text>
                 <Text style={{ color: '#0A2A31', marginTop: 6, lineHeight: 20 }}>{sleepInsightText(summary)}</Text>
               </View>
 
               <View style={{ marginTop: 14, backgroundColor: '#13292D', borderRadius: 20, padding: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)' }}>
-                <Text style={{ color: '#F8FCFB', fontSize: 18, fontWeight: '900' }}>Sleep Quality Breakdown</Text>
+                <Text style={{ color: '#F8FCFB', fontSize: 18, fontWeight: '700' }}>Sleep Quality Breakdown</Text>
                 <View style={{ marginTop: 14, flexDirection: 'row', gap: 8 }}>
                   <QualityCard label="Deep" value={deepPct || 0} />
                   <QualityCard label="Efficiency" value={efficiencyPct || 0} />
                   <QualityCard label="Consistency" value={consistencyScore || 0} />
                 </View>
 
-                <Text style={{ marginTop: 18, color: '#F8FCFB', fontWeight: '900', fontSize: 16 }}>Sleep Cycles Breakdown</Text>
+                <Text style={{ marginTop: 18, color: '#F8FCFB', fontWeight: '700', fontSize: 16 }}>Sleep Cycles Breakdown</Text>
                 <Text style={{ color: '#8CA3A8', marginTop: 4 }}>Based on selected night</Text>
 
                 <View style={{ marginTop: 12, flexDirection: 'row', height: 14, borderRadius: 999, overflow: 'hidden' }}>
@@ -623,7 +623,7 @@ export function SleepCoachScreen() {
                   {criticalAlerts.length ? (
                     criticalAlerts.map((alert, idx) => (
                       <View key={`${alert.title}-${idx}`} style={{ backgroundColor: '#13292D', borderRadius: 14, borderWidth: 1, borderColor: alert.severity === 'high' ? '#EF4444' : '#F59E0B', padding: 12 }}>
-                        <Text style={{ color: '#F8FCFB', fontWeight: '900' }}>{alert.title}</Text>
+                        <Text style={{ color: '#F8FCFB', fontWeight: '700' }}>{alert.title}</Text>
                         <Text style={{ color: '#9BB1B7', marginTop: 6, lineHeight: 20 }}>{alert.message}</Text>
                       </View>
                     ))
@@ -638,10 +638,10 @@ export function SleepCoachScreen() {
               <View style={{ marginTop: 14, backgroundColor: '#13292D', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(13,223,242,0.25)', overflow: 'hidden' }}>
                 <View style={{ padding: 12, backgroundColor: 'rgba(13,223,242,0.12)', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View>
-                    <Text style={{ color: '#F8FCFB', fontWeight: '900', fontSize: 17 }}>Wind-Down Routine</Text>
+                    <Text style={{ color: '#F8FCFB', fontWeight: '700', fontSize: 17 }}>Wind-Down Routine</Text>
                     <Text style={{ color: '#A8C3C8', marginTop: 2, fontSize: 12 }}>Optimized for better recovery</Text>
                   </View>
-                  <Text style={{ color: '#0DDEF2', fontWeight: '900' }}>{routineProgress}%</Text>
+                  <Text style={{ color: '#0DDEF2', fontWeight: '700' }}>{routineProgress}%</Text>
                 </View>
 
                 <View style={{ padding: 12, gap: 8 }}>
@@ -657,7 +657,7 @@ export function SleepCoachScreen() {
                     <MaterialCommunityIcons name="brain" size={18} color="#102122" />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: '#F8FCFB', fontWeight: '900', fontSize: 16 }}>AI Coach Insight</Text>
+                    <Text style={{ color: '#F8FCFB', fontWeight: '700', fontSize: 16 }}>AI Coach Insight</Text>
                     <Text style={{ color: '#9CB2B8', marginTop: 6, lineHeight: 20 }}>{aiCoachMessage(summary, alerts)}</Text>
                   </View>
                 </View>
@@ -669,12 +669,12 @@ export function SleepCoachScreen() {
               </View>
 
               <View style={{ marginTop: 14, backgroundColor: '#13292D', borderRadius: 16, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', padding: 12 }}>
-                <Text style={{ color: '#F8FCFB', fontWeight: '900', fontSize: 18 }}>Listening Controls</Text>
+                <Text style={{ color: '#F8FCFB', fontWeight: '700', fontSize: 18 }}>Listening Controls</Text>
                 <Text style={{ color: '#98ADB3', marginTop: 6 }}>Optional phone listening and microphone test.</Text>
 
                 <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
                   <View style={{ flex: 1, paddingRight: 10 }}>
-                    <Text style={{ color: '#F8FCFB', fontWeight: '800' }}>Enable phone listening</Text>
+                    <Text style={{ color: '#F8FCFB', fontWeight: '600' }}>Enable phone listening</Text>
                     <Text style={{ color: '#9CB2B8', marginTop: 2, fontSize: 12 }}>Only runs when turned on.</Text>
                   </View>
                   <Switch
@@ -731,7 +731,7 @@ export function SleepCoachScreen() {
                     opacity: savingSettings ? 0.6 : pressed ? 0.9 : 1,
                   })}
                 >
-                  <Text style={{ color: '#0D1E22', fontWeight: '900' }}>{savingSettings ? 'Saving...' : 'Save sleep settings'}</Text>
+                  <Text style={{ color: '#0D1E22', fontWeight: '700' }}>{savingSettings ? 'Saving...' : 'Save sleep settings'}</Text>
                 </Pressable>
 
                 <Pressable
@@ -749,7 +749,7 @@ export function SleepCoachScreen() {
                     opacity: micBusy ? 0.6 : pressed ? 0.9 : 1,
                   })}
                 >
-                  <Text style={{ color: '#D7F6FA', fontWeight: '900' }}>{micBusy ? 'Checking microphone...' : 'Run microphone check'}</Text>
+                  <Text style={{ color: '#D7F6FA', fontWeight: '700' }}>{micBusy ? 'Checking microphone...' : 'Run microphone check'}</Text>
                 </Pressable>
               </View>
             </>
@@ -773,7 +773,7 @@ function TabButton({ label, active, onPress }: { label: string; active: boolean;
         justifyContent: 'center',
       }}
     >
-      <Text style={{ color: active ? '#102122' : '#9DB4BA', fontWeight: '900', fontSize: 13 }}>{label}</Text>
+      <Text style={{ color: active ? '#102122' : '#9DB4BA', fontWeight: '700', fontSize: 13 }}>{label}</Text>
     </Pressable>
   )
 }
@@ -783,7 +783,7 @@ function MetricCard({ title, value, icon }: { title: string; value: string; icon
     <View style={{ flex: 1, backgroundColor: '#13292D', borderRadius: 14, padding: 10, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', alignItems: 'center' }}>
       <Feather name={icon} size={18} color="#0DDEF2" />
       <Text style={{ color: '#8EA6AB', marginTop: 6, fontSize: 11, fontWeight: '700' }}>{title}</Text>
-      <Text style={{ color: '#F8FCFB', marginTop: 4, fontSize: 14, fontWeight: '900' }}>{value}</Text>
+      <Text style={{ color: '#F8FCFB', marginTop: 4, fontSize: 14, fontWeight: '700' }}>{value}</Text>
     </View>
   )
 }
@@ -794,7 +794,7 @@ function MiniStageBox({ label, value, icon }: { label: string; value: string; ic
       <MaterialCommunityIcons name={icon} size={18} color="#0DDEF2" />
       <View>
         <Text style={{ color: '#8EA8AD', fontSize: 11, fontWeight: '700' }}>{label}</Text>
-        <Text style={{ color: '#F8FCFB', fontWeight: '900', marginTop: 2 }}>{value}</Text>
+        <Text style={{ color: '#F8FCFB', fontWeight: '700', marginTop: 2 }}>{value}</Text>
       </View>
     </View>
   )
@@ -823,7 +823,7 @@ function MiniProgressRing({ value }: { value: number }) {
           transform="rotate(-90 41 41)"
         />
       </Svg>
-      <Text style={{ position: 'absolute', color: '#F8FCFB', fontWeight: '900', fontSize: 14 }}>{safeValue}%</Text>
+      <Text style={{ position: 'absolute', color: '#F8FCFB', fontWeight: '700', fontSize: 14 }}>{safeValue}%</Text>
     </View>
   )
 }
@@ -832,7 +832,7 @@ function QualityCard({ label, value }: { label: string; value: number }) {
   return (
     <View style={{ flex: 1, backgroundColor: '#0F2226', borderRadius: 12, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', padding: 10, alignItems: 'center' }}>
       <MiniProgressRing value={value} />
-      <Text style={{ color: '#9BB0B6', fontSize: 11, fontWeight: '800', marginTop: 8 }}>{label}</Text>
+      <Text style={{ color: '#9BB0B6', fontSize: 11, fontWeight: '600', marginTop: 8 }}>{label}</Text>
     </View>
   )
 }
@@ -844,7 +844,7 @@ function LegendRow({ color, label, value }: { color: string; label: string; valu
         <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: color }} />
         <Text style={{ color: '#9BB0B6', fontSize: 12 }}>{label}</Text>
       </View>
-      <Text style={{ color: '#F8FCFB', fontWeight: '800' }}>{value}</Text>
+      <Text style={{ color: '#F8FCFB', fontWeight: '600' }}>{value}</Text>
     </View>
   )
 }
@@ -866,7 +866,7 @@ function ChecklistRow({
         {checked ? <Feather name="check" size={14} color="#102122" /> : null}
       </View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: '#F8FCFB', fontWeight: '800' }}>{label}</Text>
+        <Text style={{ color: '#F8FCFB', fontWeight: '600' }}>{label}</Text>
         <Text style={{ color: '#98ADB3', marginTop: 2, fontSize: 12 }}>{subtitle}</Text>
       </View>
     </Pressable>
@@ -877,7 +877,7 @@ function MicroGraphCard({ title, value, bars }: { title: string; value: string; 
   return (
     <View style={{ flex: 1, backgroundColor: '#13292D', borderRadius: 14, borderWidth: 1, borderColor: 'rgba(255,255,255,0.06)', padding: 10 }}>
       <Text style={{ color: '#8FA6AC', fontSize: 11, fontWeight: '700' }}>{title}</Text>
-      <Text style={{ color: '#F8FCFB', fontWeight: '900', marginTop: 5 }}>{value}</Text>
+      <Text style={{ color: '#F8FCFB', fontWeight: '700', marginTop: 5 }}>{value}</Text>
       <View style={{ marginTop: 10, height: 36, flexDirection: 'row', alignItems: 'flex-end', gap: 4 }}>
         {bars.map((b, i) => (
           <View key={`${title}-${i}`} style={{ flex: 1, height: b, borderRadius: 3, backgroundColor: i === 2 ? '#0DDEF2' : 'rgba(13,223,242,0.28)' }} />
@@ -904,7 +904,7 @@ function DarkTimeRow({ label, value, onPress }: { label: string; value: string; 
       }}
     >
       <Text style={{ color: '#9CB2B8', fontWeight: '700' }}>{label}</Text>
-      <Text style={{ color: '#F8FCFB', fontWeight: '900' }}>{value}</Text>
+      <Text style={{ color: '#F8FCFB', fontWeight: '700' }}>{value}</Text>
     </Pressable>
   )
 }
@@ -925,7 +925,7 @@ function StaticDarkRow({ label, value }: { label: string; value: string }) {
       }}
     >
       <Text style={{ color: '#9CB2B8', fontWeight: '700' }}>{label}</Text>
-      <Text style={{ color: '#F8FCFB', fontWeight: '900', marginLeft: 8, flexShrink: 1, textAlign: 'right' }}>{value}</Text>
+      <Text style={{ color: '#F8FCFB', fontWeight: '700', marginLeft: 8, flexShrink: 1, textAlign: 'right' }}>{value}</Text>
     </View>
   )
 }

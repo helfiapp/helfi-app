@@ -8,6 +8,7 @@ export type NativeAuthUser = {
   email: string
   name?: string | null
   image?: string | null
+  isPractitioner?: boolean
 }
 
 export type NativeAuthSession = {

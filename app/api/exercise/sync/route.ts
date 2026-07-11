@@ -6,6 +6,7 @@ import { fitbitApiRequest, getFitbitUserId } from '@/lib/fitbit-api'
 import { ingestExerciseEntry } from '@/lib/exercise/ingest'
 import { parseFitbitActivitiesToIngest } from '@/lib/exercise/fitbit-workouts'
 import { extractGarminWorkouts } from '@/lib/exercise/garmin-workouts'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 const DATE_RE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -17,7 +18,8 @@ function normalizeLocalDate(input: string) {
 
 export async function POST(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const userId = session?.user?.id || (await getUserIdFromNativeAuth(request))
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -43,10 +45,10 @@ export async function POST(request: NextRequest) {
 
   if (wantFitbit) {
     try {
-      const fitbitUserId = await getFitbitUserId(session.user.id)
+      const fitbitUserId = await getFitbitUserId(userId)
       if (fitbitUserId) {
         const resp = await fitbitApiRequest(
-          session.user.id,
+          userId,
           `/1/user/${fitbitUserId}/activities/list.json?afterDate=${date}&sort=asc&offset=0&limit=100`,
         )
         if (resp?.ok) {
@@ -56,14 +58,14 @@ export async function POST(request: NextRequest) {
           await prisma.fitbitData.upsert({
             where: {
               userId_date_dataType: {
-                userId: session.user.id,
+                userId,
                 date: new Date(date),
                 dataType: 'activity',
               },
             },
             update: { value: payload, syncedAt: new Date() },
             create: {
-              userId: session.user.id,
+              userId,
               date: new Date(date),
               dataType: 'activity',
               value: payload,
@@ -73,7 +75,7 @@ export async function POST(request: NextRequest) {
           const workouts = parseFitbitActivitiesToIngest({ date, payload })
           for (const w of workouts as any[]) {
             const res = await ingestExerciseEntry({
-              userId: session.user.id,
+              userId,
               source: 'FITBIT',
               deviceId: `fitbit:${w.deviceId}`,
               localDate: date,
@@ -98,13 +100,13 @@ export async function POST(request: NextRequest) {
   if (wantGarmin) {
     try {
       const hasGarmin = await prisma.account.findFirst({
-        where: { userId: session.user.id, provider: 'garmin' },
+        where: { userId, provider: 'garmin' },
         select: { id: true },
       })
 
       if (hasGarmin) {
         const recent = await prisma.garminWebhookLog.findMany({
-          where: { userId: session.user.id },
+          where: { userId },
           orderBy: { receivedAt: 'desc' },
           take: 250,
         })
@@ -119,7 +121,7 @@ export async function POST(request: NextRequest) {
             }
 
             const res = await ingestExerciseEntry({
-              userId: session.user.id,
+              userId,
               source: 'GARMIN',
               deviceId: `garmin:${w.deviceId}`,
               localDate: date,
@@ -142,7 +144,7 @@ export async function POST(request: NextRequest) {
   }
 
   const entries = await prisma.exerciseEntry.findMany({
-    where: { userId: session.user.id, localDate: date },
+    where: { userId, localDate: date },
     orderBy: [{ startTime: 'asc' }, { createdAt: 'asc' }],
     include: { exerciseType: true },
   })

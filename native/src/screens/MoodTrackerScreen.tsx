@@ -27,6 +27,7 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type MoodEntry = {
@@ -467,6 +468,7 @@ export function MoodTrackerScreen() {
   const [journalPrompt, setJournalPrompt] = useState('')
   const [journalTemplate, setJournalTemplate] = useState('')
   const [editingJournalId, setEditingJournalId] = useState<string | null>(null)
+  const [journalEntryActions, setJournalEntryActions] = useState<JournalEntry | null>(null)
   const [journalImages, setJournalImages] = useState<string[]>([])
   const [journalAudio, setJournalAudio] = useState<JournalAudioClip[]>([])
   const [mediaBusy, setMediaBusy] = useState(false)
@@ -1285,9 +1287,27 @@ export function MoodTrackerScreen() {
       })
       const data: any = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(String(data?.error || 'Could not save journal entry'))
+      const savedId = String(editingJournalId || data?.id || '').trim()
+      const previous = journalEntries.find((entry) => String(entry.id) === savedId)
+      if (savedId) {
+        const savedEntry: JournalEntry = {
+          id: savedId,
+          localDate: journalDate,
+          title: journalTitle.trim(),
+          content: journalContent.trim(),
+          images: journalImages,
+          audio: audioToSave,
+          tags: journalTags,
+          prompt: journalPrompt,
+          template: journalTemplate,
+          createdAt: previous?.createdAt || new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }
+        setJournalEntries((prev) => [savedEntry, ...prev.filter((entry) => String(entry.id) !== savedId)])
+      }
+      const wasEditing = Boolean(editingJournalId)
       resetJournalForm()
-      await loadJournalEntries()
-      Alert.alert('Saved', editingJournalId ? 'Journal entry updated.' : 'Journal entry saved.')
+      Alert.alert('Saved', wasEditing ? 'Journal entry updated.' : 'Journal entry saved.')
     } catch (e: any) {
       Alert.alert('Save failed', e?.message || 'Please try again.')
     } finally {
@@ -1317,6 +1337,8 @@ export function MoodTrackerScreen() {
 
   const deleteJournalEntry = async (entryId: string) => {
     if (!authHeaders) return
+    const removed = journalEntries.find((entry) => String(entry.id) === String(entryId)) || null
+    setJournalEntries((prev) => prev.filter((entry) => String(entry.id) !== String(entryId)))
     try {
       const res = await fetch(`${API_BASE_URL}/api/mood/journal/entries/${encodeURIComponent(entryId)}`, {
         method: 'DELETE',
@@ -1325,8 +1347,12 @@ export function MoodTrackerScreen() {
       const data: any = await res.json().catch(() => ({}))
       if (!res.ok) throw new Error(String(data?.error || 'Could not delete entry'))
       if (editingJournalId === entryId) resetJournalForm()
-      await loadJournalEntries()
     } catch (e: any) {
+      if (removed) {
+        setJournalEntries((prev) =>
+          prev.some((entry) => String(entry.id) === String(entryId)) ? prev : [removed, ...prev],
+        )
+      }
       Alert.alert('Delete failed', e?.message || 'Please try again.')
     }
   }
@@ -1385,8 +1411,10 @@ export function MoodTrackerScreen() {
           })}
           <Pressable
             onPress={() => navigation.navigate('Reminders', { focus: 'mood' })}
+            accessibilityRole="button"
+            accessibilityLabel="Mood Preferences"
             style={({ pressed }) => ({
-              width: 44,
+              flex: 1,
               alignItems: 'center',
               justifyContent: 'center',
               opacity: pressed ? 0.8 : 1,
@@ -1394,7 +1422,7 @@ export function MoodTrackerScreen() {
               borderLeftColor: theme.colors.border,
             })}
           >
-            <Text style={{ fontSize: 18 }}>⚙️</Text>
+            <Text style={styles.tabText}>Preferences</Text>
           </Pressable>
         </View>
 
@@ -1402,7 +1430,7 @@ export function MoodTrackerScreen() {
           <>
             <View style={styles.card}>
               <View style={{ marginBottom: 6, alignItems: 'center', paddingHorizontal: 8 }}>
-                <Text style={{ textAlign: 'center', fontSize: 33, fontWeight: '900', color: theme.colors.text }}>
+                <Text style={{ textAlign: 'center', fontSize: 28, fontWeight: '700', color: theme.colors.text }}>
                   {`How are you feeling${firstName ? `, ${firstName}` : ''}?`}
                 </Text>
                 <Text style={{ textAlign: 'center', marginTop: 8, color: theme.colors.muted, fontWeight: '600', fontSize: 15 }}>
@@ -1434,7 +1462,7 @@ export function MoodTrackerScreen() {
                             borderRadius: 999,
                             alignItems: 'center',
                             justifyContent: 'center',
-                            backgroundColor: '#FFFFFF',
+                            backgroundColor: theme.colors.card,
                             borderWidth: selected ? 4 : 0,
                             borderColor: selected ? 'rgba(76,175,80,0.25)' : 'transparent',
                           }}
@@ -1454,9 +1482,9 @@ export function MoodTrackerScreen() {
                     <View style={styles.intensityIconCircle}>
                       <MaterialCommunityIcons name="lightning-bolt-outline" size={18} color={theme.colors.primary} />
                     </View>
-                    <Text style={{ fontSize: 16, fontWeight: '800', color: '#334155' }}>Intensity</Text>
+                    <Text style={{ fontSize: 16, fontWeight: '600', color: '#334155' }}>Intensity</Text>
                   </View>
-                  <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.primary }}>{intensityPercent}%</Text>
+                  <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.primary }}>{intensityPercent}%</Text>
                 </View>
 
                 <View style={{ marginTop: 4 }}>
@@ -1549,7 +1577,7 @@ export function MoodTrackerScreen() {
                       style={[styles.singleInput, { flex: 1, marginTop: 0 }]}
                     />
                     <Pressable onPress={addCustomFeeling} style={styles.smallActionButton}>
-                      <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Add</Text>
+                      <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Add</Text>
                     </Pressable>
                   </View>
                 ) : null}
@@ -1557,10 +1585,10 @@ export function MoodTrackerScreen() {
 
               <View style={{ marginTop: 16 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8, paddingHorizontal: 2 }}>
-                  <Text style={{ fontSize: 16, fontWeight: '800', color: '#334155' }}>What’s affecting you?</Text>
+                  <Text style={{ fontSize: 16, fontWeight: '600', color: '#334155' }}>What’s affecting you?</Text>
                   <Pressable onPress={() => setInfluencesExpanded((prev) => !prev)} style={styles.moreOptionsButton}>
                     <MaterialCommunityIcons name={influencesExpanded ? 'chevron-up' : 'chevron-down'} size={16} color={theme.colors.primary} />
-                    <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '800' }}>
+                    <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '600' }}>
                       {influencesExpanded ? 'Show less' : 'More options'}
                     </Text>
                   </Pressable>
@@ -1578,7 +1606,7 @@ export function MoodTrackerScreen() {
                             <Image source={{ uri: item.imageUrl }} style={styles.influenceImage} />
                           ) : (
                             <View style={styles.customInfluenceBadge}>
-                              <Text style={{ fontSize: 28, color: '#334155', fontWeight: '800' }}>
+                              <Text style={{ fontSize: 28, color: '#334155', fontWeight: '600' }}>
                                 {cleanedLabel.charAt(0).toUpperCase() || '•'}
                               </Text>
                             </View>
@@ -1590,7 +1618,7 @@ export function MoodTrackerScreen() {
                           ) : null}
                           {isCustom ? (
                             <View style={styles.customDot}>
-                              <Text style={{ color: '#334155', fontSize: 10, fontWeight: '800' }}>C</Text>
+                              <Text style={{ color: '#334155', fontSize: 10, fontWeight: '600' }}>C</Text>
                             </View>
                           ) : null}
                         </View>
@@ -1617,14 +1645,14 @@ export function MoodTrackerScreen() {
                       style={[styles.singleInput, { flex: 1, marginTop: 0 }]}
                     />
                     <Pressable onPress={addCustomInfluence} style={styles.smallActionButton}>
-                      <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Add</Text>
+                      <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Add</Text>
                     </Pressable>
                   </View>
                 ) : null}
               </View>
 
               <Pressable onPress={() => setDetailsOpen((prev) => !prev)} style={{ marginTop: 14 }}>
-                <Text style={{ color: '#334155', fontWeight: '800' }}>
+                <Text style={{ color: '#334155', fontWeight: '600' }}>
                   {detailsOpen ? '▾ Optional details' : '▸ Optional details'}
                 </Text>
               </Pressable>
@@ -1715,7 +1743,7 @@ export function MoodTrackerScreen() {
                   (selectedMood == null || entriesSaving) ? { opacity: 0.5 } : null,
                 ]}
               >
-                <Text style={{ color: '#FFFFFF', fontWeight: '900', fontSize: 18 }}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 18 }}>
                   {entriesSaving ? 'Saving...' : 'Log Mood'}
                 </Text>
                 <Feather name="arrow-right" size={22} color="#FFFFFF" />
@@ -1726,13 +1754,13 @@ export function MoodTrackerScreen() {
 
         {activeTab === 'history' ? (
           <View style={styles.card}>
-            <Text style={{ fontSize: 28, fontWeight: '900', color: theme.colors.text }}>Mood History</Text>
+            <Text style={{ fontSize: 28, fontWeight: '700', color: theme.colors.text }}>Mood History</Text>
             <Text style={{ marginTop: 6, color: theme.colors.muted }}>
               {visibleHistoryRangeLabel}
             </Text>
 
             <View style={{ marginTop: 12, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text, flex: 1 }}>
+              <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text, flex: 1 }}>
                 {moodSummaryFromAverage(overallAverage)}
               </Text>
               <Pressable
@@ -1753,7 +1781,7 @@ export function MoodTrackerScreen() {
             </View>
 
             {trendPct != null ? (
-              <Text style={{ marginTop: 4, color: theme.colors.primary, fontWeight: '800' }}>
+              <Text style={{ marginTop: 4, color: theme.colors.primary, fontWeight: '600' }}>
                 {trendPct >= 0 ? '▲' : '▼'} {Math.abs(trendPct).toFixed(0)}% vs previous period
               </Text>
             ) : null}
@@ -1962,7 +1990,7 @@ export function MoodTrackerScreen() {
                   .slice(0, 8)
                   .map((entry) => (
                     <View key={entry.id} style={styles.listRow}>
-                      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>
+                      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
                         {formatEntryDateLabel(entry.localDate)} · {moodEmoji(Number(entry.mood))} {moodLabel(Number(entry.mood))}
                       </Text>
                       <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12 }}>
@@ -1979,7 +2007,7 @@ export function MoodTrackerScreen() {
         {activeTab === 'journal' ? (
           <>
             <View style={styles.card}>
-              <Text style={{ fontSize: 28, fontWeight: '900', color: theme.colors.text }}>Mood Journal</Text>
+              <Text style={{ fontSize: 28, fontWeight: '700', color: theme.colors.text }}>Mood Journal</Text>
               <Text style={{ marginTop: 6, color: theme.colors.muted }}>
                 Write down your day, then save it to your mood history.
               </Text>
@@ -2033,7 +2061,7 @@ export function MoodTrackerScreen() {
                   style={[styles.singleInput, { flex: 1, marginTop: 0 }]}
                 />
                 <Pressable onPress={handleAddJournalTag} style={styles.smallActionButton}>
-                  <Text style={{ color: '#FFFFFF', fontWeight: '800' }}>Add</Text>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>Add</Text>
                 </Pressable>
               </View>
               {journalTags.length > 0 ? (
@@ -2104,7 +2132,7 @@ export function MoodTrackerScreen() {
                           justifyContent: 'center',
                         }}
                       >
-                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '900' }}>×</Text>
+                        <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>×</Text>
                       </Pressable>
                     </View>
                   ))}
@@ -2189,20 +2217,20 @@ export function MoodTrackerScreen() {
                   disabled={journalSaving}
                   style={[styles.primaryActionButton, { flex: 1, opacity: journalSaving ? 0.6 : 1 }]}
                 >
-                  <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>
                     {journalSaving ? 'Saving...' : editingJournalId ? 'Update entry' : 'Save entry'}
                   </Text>
                 </Pressable>
                 {editingJournalId ? (
                   <Pressable onPress={resetJournalForm} style={styles.secondaryActionButton}>
-                    <Text style={{ color: theme.colors.muted, fontWeight: '800' }}>Cancel</Text>
+                    <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Cancel</Text>
                   </Pressable>
                 ) : null}
               </View>
             </View>
 
             <View style={[styles.card, { marginTop: 12 }]}>
-              <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Saved journal entries</Text>
+              <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Saved journal entries</Text>
               <TextInput
                 value={journalSearch}
                 onChangeText={setJournalSearch}
@@ -2224,7 +2252,7 @@ export function MoodTrackerScreen() {
                     const audio = normalizeStringArray(entry.audio)
                     return (
                       <View key={entry.id} style={styles.listRow}>
-                        <Text style={{ color: theme.colors.text, fontWeight: '800' }}>
+                        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
                           {entry.title || 'Untitled entry'}
                         </Text>
                         <Text style={{ marginTop: 2, color: theme.colors.muted, fontSize: 12 }}>
@@ -2248,20 +2276,8 @@ export function MoodTrackerScreen() {
                             {tags.join(' · ')}
                           </Text>
                         ) : null}
-                        <View style={{ marginTop: 8, flexDirection: 'row', gap: 12 }}>
-                          <Pressable onPress={() => editJournalEntry(entry)}>
-                            <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Edit</Text>
-                          </Pressable>
-                          <Pressable
-                            onPress={() =>
-                              Alert.alert('Delete entry', 'Delete this journal entry?', [
-                                { text: 'Cancel', style: 'cancel' },
-                                { text: 'Delete', style: 'destructive', onPress: () => void deleteJournalEntry(entry.id) },
-                              ])
-                            }
-                          >
-                            <Text style={{ color: theme.colors.danger, fontWeight: '700' }}>Delete</Text>
-                          </Pressable>
+                        <View style={{ marginTop: 8, alignItems: 'flex-end' }}>
+                          <EntryActionsButton label="Journal entry actions" onPress={() => setJournalEntryActions(entry)} />
                         </View>
                       </View>
                     )
@@ -2272,6 +2288,21 @@ export function MoodTrackerScreen() {
           </>
         ) : null}
       </ScrollView>
+      <EntryActionsMenu
+        visible={journalEntryActions != null}
+        onClose={() => setJournalEntryActions(null)}
+        actions={[
+          { label: 'Edit entry', icon: 'edit-3', onPress: () => journalEntryActions && editJournalEntry(journalEntryActions) },
+          { label: 'Delete entry', icon: 'trash-2', destructive: true, onPress: () => {
+            if (!journalEntryActions) return
+            const targetId = journalEntryActions.id
+            Alert.alert('Delete entry', 'Delete this journal entry?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => void deleteJournalEntry(targetId) },
+            ])
+          } },
+        ]}
+      />
     </Screen>
   )
 }
@@ -2319,7 +2350,7 @@ const styles = StyleSheet.create({
   sectionTitle: {
     marginTop: 12,
     color: theme.colors.text,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   intensityCard: {
     marginTop: 12,
@@ -2359,7 +2390,7 @@ const styles = StyleSheet.create({
     borderRadius: 99,
     borderWidth: 4,
     borderColor: '#4CAF50',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     shadowColor: '#000000',
     shadowOpacity: 0.12,
     shadowRadius: 5,
@@ -2370,13 +2401,13 @@ const styles = StyleSheet.create({
     color: '#98A2B3',
     fontSize: 10,
     letterSpacing: 0.8,
-    fontWeight: '800',
+    fontWeight: '600',
   },
   feelingChip: {
     borderWidth: 1,
     borderColor: '#D0D5DD',
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     paddingHorizontal: 11,
     paddingVertical: 8,
     flexDirection: 'row',
@@ -2396,7 +2427,7 @@ const styles = StyleSheet.create({
   },
   feelingGroupBadgeText: {
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     letterSpacing: 0.5,
   },
   addChipButton: {
@@ -2404,7 +2435,7 @@ const styles = StyleSheet.create({
     borderColor: '#D0D5DD',
     borderStyle: 'dashed',
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     paddingHorizontal: 12,
     paddingVertical: 8,
     justifyContent: 'center',
@@ -2413,7 +2444,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D0D5DD',
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     paddingHorizontal: 10,
     paddingVertical: 6,
     flexDirection: 'row',
@@ -2443,7 +2474,7 @@ const styles = StyleSheet.create({
     width: 72,
     height: 72,
     borderRadius: 999,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
   },
   customInfluenceBadge: {
     width: 72,
@@ -2489,7 +2520,7 @@ const styles = StyleSheet.create({
   },
   influenceLabelActive: {
     color: '#0F172A',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   addInfluenceCircle: {
     width: 72,
@@ -2506,7 +2537,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#E4E7EC',
     borderRadius: 12,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
   },
   detailHeader: {
     paddingHorizontal: 12,
@@ -2549,7 +2580,7 @@ const styles = StyleSheet.create({
     borderWidth: 1,
     borderColor: '#D0D5DD',
     borderRadius: 8,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     alignItems: 'center',
     paddingVertical: 8,
   },
@@ -2563,7 +2594,7 @@ const styles = StyleSheet.create({
   },
   scaleButtonTextActive: {
     color: '#1F7A21',
-    fontWeight: '800',
+    fontWeight: '600',
   },
   noteInput: {
     marginTop: 10,
@@ -2629,7 +2660,7 @@ const styles = StyleSheet.create({
   summaryLabel: {
     color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     textTransform: 'uppercase',
   },
   summaryBig: {
@@ -2674,7 +2705,7 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     borderWidth: 1,
     borderColor: 'rgba(76,175,80,0.26)',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -2684,7 +2715,7 @@ const styles = StyleSheet.create({
   },
   journalMediaButtonText: {
     color: '#3A4B46',
-    fontWeight: '800',
+    fontWeight: '600',
     fontSize: 13,
   },
   journalMediaButtonTextActive: {
@@ -2718,7 +2749,7 @@ const styles = StyleSheet.create({
   yearMonthLabel: {
     color: theme.colors.muted,
     fontSize: 11,
-    fontWeight: '800',
+    fontWeight: '600',
     minWidth: 40,
   },
   singleInput: {

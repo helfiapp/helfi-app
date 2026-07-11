@@ -24,7 +24,7 @@ function FoodTile({ title, subtitle, onPress }: FoodTileProps) {
         padding: 14,
       })}
     >
-      <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text }}>{title}</Text>
+      <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>{title}</Text>
       <Text style={{ marginTop: 4, color: theme.colors.muted }}>{subtitle}</Text>
     </Pressable>
   )
@@ -45,7 +45,7 @@ export function FoodScreen() {
           gap: 12,
         }}
       >
-        <Text style={{ fontSize: 30, fontWeight: '900', color: theme.colors.text }}>Food</Text>
+        <Text style={{ fontSize: 28, fontWeight: '700', color: theme.colors.text }}>Food</Text>
         <Text style={{ color: theme.colors.muted }}>
           Real native food tools.
         </Text>

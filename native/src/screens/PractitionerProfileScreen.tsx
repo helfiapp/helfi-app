@@ -169,13 +169,13 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
               resizeMode="contain"
             />
           ) : null}
-          <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text }}>{listing.displayName}</Text>
+          <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>{listing.displayName}</Text>
           <Text style={{ color: theme.colors.muted }}>
             {listing.categoryName}
             {listing.subcategoryName ? ` · ${listing.subcategoryName}` : ''}
           </Text>
           {listing.serviceType ? (
-            <Text style={{ color: '#2E7D32', fontSize: 12, fontWeight: '900' }}>
+            <Text style={{ color: '#2E7D32', fontSize: 12, fontWeight: '700' }}>
               {String(listing.serviceType).replace('_', ' ')}
             </Text>
           ) : null}
@@ -195,28 +195,28 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
 
           {listing.phone ? (
             <View>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800' }}>Phone</Text>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>Phone</Text>
               <Pressable
                 onPress={() => {
                   void trackClick('call')
                   void openUrl(`tel:${listing.phone}`)
                 }}
               >
-                <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>{listing.phone}</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>{listing.phone}</Text>
               </Pressable>
             </View>
           ) : null}
 
           {listing.websiteUrl ? (
             <View>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800' }}>Website</Text>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>Website</Text>
               <Pressable
                 onPress={() => {
                   void trackClick('website')
                   void openUrl(listing.websiteUrl as string)
                 }}
               >
-                <Text style={{ color: theme.colors.primary, fontWeight: '800' }} numberOfLines={1}>
+                <Text style={{ color: theme.colors.primary, fontWeight: '600' }} numberOfLines={1}>
                   {listing.websiteUrl}
                 </Text>
               </Pressable>
@@ -225,35 +225,35 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
 
           {isValidEmail(listing.emailPublic) ? (
             <View>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800' }}>Email</Text>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>Email</Text>
               <Pressable
                 onPress={() => {
                   void trackClick('email')
                   void openUrl(`mailto:${listing.emailPublic}`)
                 }}
               >
-                <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>{listing.emailPublic}</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>{listing.emailPublic}</Text>
               </Pressable>
             </View>
           ) : null}
 
           {address ? (
             <View>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800' }}>Address</Text>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>Address</Text>
               <Text style={{ color: theme.colors.text }}>{address}</Text>
             </View>
           ) : null}
 
           {Array.isArray(listing.languages) && listing.languages.length > 0 ? (
             <View>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800' }}>Languages</Text>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>Languages</Text>
               <Text style={{ color: theme.colors.text }}>{listing.languages.join(', ')}</Text>
             </View>
           ) : null}
 
           {hoursNotes ? (
             <View>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800' }}>Opening hours</Text>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>Opening hours</Text>
               <Text style={{ color: theme.colors.text }}>{hoursNotes}</Text>
             </View>
           ) : null}
@@ -270,7 +270,7 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
                     paddingHorizontal: 10,
                   }}
                 >
-                  <Text style={{ color: '#2E7D32', fontWeight: '800', fontSize: 12 }}>{tag}</Text>
+                  <Text style={{ color: '#2E7D32', fontWeight: '600', fontSize: 12 }}>{tag}</Text>
                 </View>
               ))}
             </View>
@@ -288,7 +288,7 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
               gap: 8,
             }}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Map</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Map</Text>
             <Text style={{ color: theme.colors.muted }}>
               Open this location in your maps app for directions.
             </Text>
@@ -304,7 +304,7 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
                 paddingHorizontal: 12,
               }}
             >
-              <Text style={{ color: '#2E7D32', fontWeight: '900' }}>Open map</Text>
+              <Text style={{ color: '#2E7D32', fontWeight: '700' }}>Open map</Text>
             </Pressable>
           </View>
         ) : null}
@@ -320,7 +320,7 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
               gap: 8,
             }}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Photos</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Photos</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
               {galleryUrls.map((url, index) => (
                 <Pressable key={`${url}-${index}`} onPress={() => setLightboxIndex(index)} style={{ width: '48%' }}>
@@ -354,12 +354,12 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
               top: 40,
               right: 20,
               borderRadius: 999,
-              backgroundColor: '#FFFFFF',
+              backgroundColor: theme.colors.card,
               paddingVertical: 8,
               paddingHorizontal: 14,
             }}
           >
-            <Text style={{ color: '#111827', fontWeight: '900' }}>Close</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Close</Text>
           </Pressable>
           <Pressable
             onPress={() =>
@@ -370,7 +370,7 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
             }
             style={{ position: 'absolute', left: 10, padding: 12 }}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '900' }}>{'‹'}</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '700' }}>{'‹'}</Text>
           </Pressable>
           <Pressable
             onPress={() =>
@@ -381,7 +381,7 @@ export function PractitionerProfileScreen({ route }: { route: any }) {
             }
             style={{ position: 'absolute', right: 10, padding: 12 }}
           >
-            <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '900' }}>{'›'}</Text>
+            <Text style={{ color: '#FFFFFF', fontSize: 34, fontWeight: '700' }}>{'›'}</Text>
           </Pressable>
           <Pressable
             onPress={(event) => event.stopPropagation()}

@@ -13,6 +13,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { API_BASE_URL } from '../config'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type InboxItem = {
@@ -38,7 +39,7 @@ function ActionLink({
   const activeColor = danger ? '#DC2626' : theme.colors.text
   return (
     <Pressable onPress={onPress} disabled={disabled} style={{ opacity: disabled ? 0.35 : 1 }}>
-      <Text style={{ fontSize: 13, fontWeight: '800', color: activeColor }}>{label}</Text>
+      <Text style={{ fontSize: 13, fontWeight: '600', color: activeColor }}>{label}</Text>
     </Pressable>
   )
 }
@@ -86,6 +87,7 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
   const [busy, setBusy] = useState(false)
   const [items, setItems] = useState<InboxItem[]>([])
   const [selectedIds, setSelectedIds] = useState<string[]>([])
+  const [itemActions, setItemActions] = useState<InboxItem | null>(null)
   const [error, setError] = useState('')
 
   const unreadCount = useMemo(
@@ -187,11 +189,18 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          const ids = [...selectedIds]
+          const snapshot = items
           try {
             setDeleting(true)
-            await postInboxAction({ action: 'delete_selected', ids: selectedIds })
-            await loadInbox()
+            setItems((prev) => prev.filter((item) => !ids.includes(item.id)))
             setSelectedIds([])
+            const ok = await postInboxAction({ action: 'delete_selected', ids })
+            if (!ok) throw new Error('delete failed')
+          } catch {
+            setItems(snapshot)
+            setSelectedIds(ids)
+            Alert.alert('Delete failed', 'Please try again.')
           } finally {
             setDeleting(false)
           }
@@ -208,11 +217,16 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
         text: 'Delete all',
         style: 'destructive',
         onPress: async () => {
+          const snapshot = items
           try {
             setDeleting(true)
-            await postInboxAction({ action: 'delete_all' })
-            await loadInbox()
+            setItems([])
             setSelectedIds([])
+            const ok = await postInboxAction({ action: 'delete_all' })
+            if (!ok) throw new Error('delete failed')
+          } catch {
+            setItems(snapshot)
+            Alert.alert('Delete failed', 'Please try again.')
           } finally {
             setDeleting(false)
           }
@@ -229,11 +243,16 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
         text: 'Delete',
         style: 'destructive',
         onPress: async () => {
+          const snapshot = items
           try {
             setDeleting(true)
-            await postInboxAction({ action: 'delete_selected', ids: [id] })
-            await loadInbox()
+            setItems((prev) => prev.filter((item) => item.id !== id))
             setSelectedIds((prev) => prev.filter((entry) => entry !== id))
+            const ok = await postInboxAction({ action: 'delete_selected', ids: [id] })
+            if (!ok) throw new Error('delete failed')
+          } catch {
+            setItems(snapshot)
+            Alert.alert('Delete failed', 'Please try again.')
           } finally {
             setDeleting(false)
           }
@@ -356,7 +375,7 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
             padding: 16,
           }}
         >
-          <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text }}>Notification inbox</Text>
+          <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>Notification inbox</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted, lineHeight: 19 }}>
             Missed a pop-up? It will show here so you can open it later.
           </Text>
@@ -388,11 +407,11 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
 
           <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 14 }}>
             <Text style={{ color: theme.colors.muted }}>
-              Unread: <Text style={{ fontWeight: '800', color: theme.colors.text }}>{unreadCount}</Text>
+              Unread: <Text style={{ fontWeight: '600', color: theme.colors.text }}>{unreadCount}</Text>
             </Text>
             {selectedIds.length > 0 ? (
               <Text style={{ color: theme.colors.muted }}>
-                Selected: <Text style={{ fontWeight: '800', color: theme.colors.text }}>{selectedIds.length}</Text>
+                Selected: <Text style={{ fontWeight: '600', color: theme.colors.text }}>{selectedIds.length}</Text>
               </Text>
             ) : null}
           </View>
@@ -445,11 +464,11 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
                           justifyContent: 'center',
                         }}
                       >
-                        {selected ? <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>✓</Text> : null}
+                        {selected ? <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>✓</Text> : null}
                       </Pressable>
 
                       <View style={{ flex: 1 }}>
-                        <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 15 }}>{item.title}</Text>
+                        <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 15 }}>{item.title}</Text>
                         {item.body ? (
                           <Text style={{ marginTop: 4, color: theme.colors.muted, lineHeight: 18 }}>{item.body}</Text>
                         ) : null}
@@ -459,9 +478,7 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
                       </View>
 
                       <View style={{ alignItems: 'flex-end', gap: 8 }}>
-                        <Pressable onPress={() => deleteOne(item.id)} disabled={deleting}>
-                          <Text style={{ color: deleting ? '#FCA5A5' : '#DC2626', fontWeight: '800' }}>Delete</Text>
-                        </Pressable>
+                        <EntryActionsButton label={`Actions for ${item.title}`} onPress={() => setItemActions(item)} disabled={deleting} />
                         {unread ? (
                           <View
                             style={{
@@ -478,12 +495,12 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
                     <View style={{ marginTop: 10, flexDirection: 'row', gap: 16 }}>
                       {item.url ? (
                         <Pressable onPress={() => void handleOpen(item)}>
-                          <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>Open</Text>
+                          <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Open</Text>
                         </Pressable>
                       ) : null}
                       {unread ? (
                         <Pressable onPress={() => void markRead(item.id)}>
-                          <Text style={{ color: theme.colors.muted, fontWeight: '800' }}>Mark as read</Text>
+                          <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Mark as read</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -494,6 +511,13 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
           )}
         </View>
       </ScrollView>
+      <EntryActionsMenu
+        visible={itemActions != null}
+        onClose={() => setItemActions(null)}
+        actions={[
+          { label: 'Delete notification', icon: 'trash-2', destructive: true, onPress: () => itemActions && void deleteOne(itemActions.id) },
+        ]}
+      />
     </Screen>
   )
 }

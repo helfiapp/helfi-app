@@ -39,7 +39,7 @@ function Row({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
         <View style={{ width: 28, alignItems: 'center' }}>{icon}</View>
         <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 16, fontWeight: '900', color: theme.colors.text }}>{label}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>{label}</Text>
           <Text style={{ marginTop: 2, fontSize: 12, color: theme.colors.muted }} numberOfLines={2}>
             {subtitle}
           </Text>
@@ -60,7 +60,7 @@ export function NotificationsScreen({ navigation }: { navigation: any }) {
   return (
     <Screen>
       <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
-        <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text, marginBottom: 6 }}>
+        <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text, marginBottom: 6 }}>
           Notification settings
         </Text>
         <Text style={{ color: theme.colors.muted, lineHeight: 20, marginBottom: 12 }}>

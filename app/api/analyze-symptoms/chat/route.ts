@@ -9,6 +9,7 @@ import { logAIUsage } from '@/lib/ai-usage-logger'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
 import { consumeFreeCredit, hasFreeCredits } from '@/lib/free-credits'
 import { isSubscriptionActive } from '@/lib/subscription-utils'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import {
   getThread,
   createThread,
@@ -36,7 +37,8 @@ function buildTitle(text: string): string {
 export async function GET(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = session?.user?.id || (await getUserIdFromNativeAuth(req))
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const url = new URL(req.url)
@@ -44,7 +46,7 @@ export async function GET(req: NextRequest) {
     if (!threadId) {
       return NextResponse.json({ error: 'threadId required' }, { status: 400 })
     }
-    const thread = await getThread(session.user.id, threadId)
+    const thread = await getThread(userId, threadId)
     if (!thread) {
       return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
     }
@@ -59,7 +61,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
-    if (!session?.user?.id || !session.user.email) {
+    const userId = session?.user?.id || (await getUserIdFromNativeAuth(req))
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -104,19 +107,19 @@ export async function POST(req: NextRequest) {
 
     const requestedThreadId = typeof body?.threadId === 'string' ? body.threadId.trim() : ''
     let threadId = requestedThreadId
-    let thread = threadId ? await getThread(session.user.id, threadId) : null
+    let thread = threadId ? await getThread(userId, threadId) : null
 
     if (!thread) {
       const title = buildTitle(question)
-      const created = await createThread(session.user.id, hasContext ? contextPayload : undefined, title)
+      const created = await createThread(userId, hasContext ? contextPayload : undefined, title)
       threadId = created.id
       thread = { id: created.id, title, context: hasContext ? contextPayload : null }
     } else {
       if (hasContext) {
-        await updateThreadContext(session.user.id, threadId, contextPayload)
+        await updateThreadContext(userId, threadId, contextPayload)
       }
       if (!thread.title) {
-        await updateThreadTitle(session.user.id, threadId, buildTitle(question))
+        await updateThreadTitle(userId, threadId, buildTitle(question))
       }
     }
 
@@ -135,7 +138,7 @@ export async function POST(req: NextRequest) {
     if (!openai) {
       return NextResponse.json({ error: 'AI service not configured' }, { status: 500 })
     }
-    const user = await prisma.user.findUnique({ where: { id: session.user.id }, include: { subscription: true, creditTopUps: true } })
+    const user = await prisma.user.findUnique({ where: { id: userId }, include: { subscription: true, creditTopUps: true } })
     if (!user) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
@@ -248,7 +251,7 @@ export async function POST(req: NextRequest) {
       const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
       const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
       await appendMessage(threadId, 'assistant', text)
-      await updateThreadCost(session.user.id, threadId, wrapped.costCents, allowViaFreeUse)
+      await updateThreadCost(userId, threadId, wrapped.costCents, allowViaFreeUse)
       const enc = new TextEncoder()
       const chunks = text.match(/[\s\S]{1,200}/g) || ['']
       const costPayload = JSON.stringify({ costCents: wrapped.costCents, covered: allowViaFreeUse })
@@ -316,7 +319,7 @@ export async function POST(req: NextRequest) {
       const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
       const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
       await appendMessage(threadId, 'assistant', text)
-      await updateThreadCost(session.user.id, threadId, wrapped.costCents, allowViaFreeUse)
+      await updateThreadCost(userId, threadId, wrapped.costCents, allowViaFreeUse)
       return NextResponse.json({ assistant: text, costCents: wrapped.costCents, covered: allowViaFreeUse, threadId })
     }
   } catch (error) {

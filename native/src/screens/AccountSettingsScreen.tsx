@@ -305,7 +305,7 @@ export function AccountSettingsScreen() {
           }}
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-            <Text style={{ fontSize: 24, fontWeight: '900', color: theme.colors.text }}>Account Settings</Text>
+            <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>Account Settings</Text>
             <View>
               {saveStatus === 'saving' ? <Text style={{ color: '#2563EB', fontWeight: '700' }}>Saving...</Text> : null}
               {saveStatus === 'saved' ? <Text style={{ color: '#16A34A', fontWeight: '700' }}>Saved</Text> : null}
@@ -315,12 +315,12 @@ export function AccountSettingsScreen() {
 
           <View style={{ marginTop: 12, backgroundColor: '#EAF5EF', borderWidth: 1, borderColor: '#CBE8D7', borderRadius: 12, padding: 12 }}>
             <Text style={{ color: '#15803D', fontWeight: '700' }}>
-              <Text style={{ fontWeight: '900' }}>Auto-save enabled:</Text> Changes save automatically when you leave this page.
+              <Text style={{ fontWeight: '700' }}>Auto-save enabled:</Text> Changes save automatically when you leave this page.
             </Text>
           </View>
 
           <View style={{ marginTop: 16 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Account Information</Text>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>Account Information</Text>
             <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.muted, marginTop: 10, marginBottom: 8 }}>Full Name</Text>
             <TextInput
               value={accountData.fullName}
@@ -344,7 +344,7 @@ export function AccountSettingsScreen() {
               value={accountData.email}
               editable={false}
               style={{
-                backgroundColor: '#F3F4F6',
+                backgroundColor: theme.colors.bg,
                 borderWidth: 1,
                 borderColor: theme.colors.border,
                 borderRadius: theme.radius.md,
@@ -358,18 +358,18 @@ export function AccountSettingsScreen() {
           </View>
 
           <View style={{ marginTop: 18 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Security</Text>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>Security</Text>
             <View style={{ marginTop: 10, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12 }}>
-              <Text style={{ fontWeight: '800', color: theme.colors.text, fontSize: 18 }}>Password</Text>
+              <Text style={{ fontWeight: '600', color: theme.colors.text, fontSize: 18 }}>Password</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Change your account password</Text>
               <HelfiButton label="Change Password" onPress={() => setShowPasswordModal(true)} style={{ marginTop: 10 }} />
             </View>
           </View>
 
           <View style={{ marginTop: 18 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Account Actions</Text>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>Account Actions</Text>
             <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#FECACA', backgroundColor: '#FEF2F2', borderRadius: 12, padding: 12 }}>
-              <Text style={{ fontWeight: '800', color: '#991B1B', fontSize: 18 }}>Delete Account</Text>
+              <Text style={{ fontWeight: '600', color: '#991B1B', fontSize: 18 }}>Delete Account</Text>
               <Text style={{ color: '#991B1B', marginTop: 4 }}>Permanently delete your account and all data</Text>
               <HelfiButton label="Delete Account" onPress={() => setShowDeleteConfirm(true)} style={{ marginTop: 10 }} />
             </View>
@@ -379,8 +379,8 @@ export function AccountSettingsScreen() {
 
       <Modal visible={showPasswordModal} transparent animationType="fade" onRequestClose={closePasswordModal}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 }}>
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 }}>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Change Password</Text>
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: 14, padding: 16 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Change Password</Text>
             <View style={{ marginTop: 12 }}>
               <PasswordField
                 label="Current Password"
@@ -422,8 +422,8 @@ export function AccountSettingsScreen() {
 
       <Modal visible={showDeleteConfirm} transparent animationType="fade" onRequestClose={closeDeleteModal}>
         <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)', justifyContent: 'center', padding: 16 }}>
-          <View style={{ backgroundColor: '#FFFFFF', borderRadius: 14, padding: 16 }}>
-            <Text style={{ fontSize: 20, fontWeight: '900', color: '#991B1B' }}>Delete Account</Text>
+          <View style={{ backgroundColor: theme.colors.card, borderRadius: 14, padding: 16 }}>
+            <Text style={{ fontSize: 20, fontWeight: '700', color: '#991B1B' }}>Delete Account</Text>
             <Text style={{ marginTop: 10, color: theme.colors.muted }}>
               This action is irreversible. All your data will be permanently deleted including:
             </Text>

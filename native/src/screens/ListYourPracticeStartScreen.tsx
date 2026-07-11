@@ -38,7 +38,7 @@ export function ListYourPracticeStartScreen({ navigation }: { navigation: any })
               paddingHorizontal: 10,
             }}
           >
-            <Text style={{ color: '#2E7D32', fontWeight: '900' }}>Back to dashboard</Text>
+            <Text style={{ color: '#2E7D32', fontWeight: '700' }}>Back to dashboard</Text>
           </Pressable>
         </View>
 
@@ -48,14 +48,14 @@ export function ListYourPracticeStartScreen({ navigation }: { navigation: any })
             borderColor: '#D7EEE0',
             borderRadius: 16,
             padding: 16,
-            backgroundColor: '#FFFFFF',
+            backgroundColor: theme.colors.card,
             gap: 10,
           }}
         >
-          <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '800', letterSpacing: 1 }}>
+          <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', letterSpacing: 1 }}>
             LIST YOUR PRACTICE
           </Text>
-          <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: '900' }}>
+          <Text style={{ color: theme.colors.text, fontSize: 28, fontWeight: '700' }}>
             Start your practitioner listing
           </Text>
           <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
@@ -67,8 +67,8 @@ export function ListYourPracticeStartScreen({ navigation }: { navigation: any })
           </Text>
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 10 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>New to Helfi?</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 10 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>New to Helfi?</Text>
           <Text style={{ color: theme.colors.muted }}>
             Create your practitioner account and start your listing.
           </Text>
@@ -82,12 +82,12 @@ export function ListYourPracticeStartScreen({ navigation }: { navigation: any })
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>Create practitioner account</Text>
+            <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Create practitioner account</Text>
           </Pressable>
         </View>
 
-        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: '#FFFFFF', padding: 14, gap: 10 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900' }}>Already have an account?</Text>
+        <View style={{ borderWidth: 1, borderColor: '#D7EEE0', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14, gap: 10 }}>
+          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Already have an account?</Text>
           <Text style={{ color: theme.colors.muted }}>
             Sign in to manage your listing and boosts.
           </Text>
@@ -103,7 +103,7 @@ export function ListYourPracticeStartScreen({ navigation }: { navigation: any })
               alignItems: 'center',
             }}
           >
-            <Text style={{ color: '#2E7D32', fontWeight: '900' }}>Sign in</Text>
+            <Text style={{ color: '#2E7D32', fontWeight: '700' }}>Sign in</Text>
           </Pressable>
         </View>
 
@@ -112,7 +112,7 @@ export function ListYourPracticeStartScreen({ navigation }: { navigation: any })
             Not ready yet?{' '}
             <Text
               onPress={() => navigation.navigate('ListYourPractice')}
-              style={{ color: theme.colors.primary, fontWeight: '900' }}
+              style={{ color: theme.colors.primary, fontWeight: '700' }}
             >
               See what we offer
             </Text>

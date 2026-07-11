@@ -112,7 +112,7 @@ export function AnimatedSplashScreen({ navigation }: Props) {
               opacity: pressed ? 0.85 : 1,
             })}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 14 }}>Skip</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 14 }}>Skip</Text>
           </Pressable>
         ) : null}
       </View>

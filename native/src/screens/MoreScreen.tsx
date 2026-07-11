@@ -8,6 +8,7 @@ import { NATIVE_WEB_PAGES, type NativeWebPageRoute } from '../config/nativePageR
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 import { useVoiceAssistant } from '../voice/VoiceAssistant'
+import { useAppMode } from '../state/AppModeContext'
 
 function Row({
   icon,
@@ -41,7 +42,7 @@ function Row({
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12 }}>
         <View style={{ width: 22, alignItems: 'center' }}>{icon}</View>
         <View>
-          <Text style={{ fontSize: 16, fontWeight: '900', color: theme.colors.text }}>{label}</Text>
+          <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>{label}</Text>
           {subtitle ? (
             <Text style={{ marginTop: 2, fontSize: 12, color: theme.colors.muted }} numberOfLines={1}>
               {subtitle}
@@ -56,6 +57,7 @@ function Row({
 
 export function MoreScreen({ navigation }: { navigation: any }) {
   const { openVoiceAssistant } = useVoiceAssistant()
+  const { session } = useAppMode()
   const scrollRef = useRef<ScrollView>(null)
 
   useFocusEffect(
@@ -80,9 +82,9 @@ export function MoreScreen({ navigation }: { navigation: any }) {
   return (
     <Screen>
       <ScrollView ref={scrollRef} contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
-        <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '900', color: theme.colors.text, marginBottom: theme.spacing.md }}>More</Text>
+        <Text style={{ fontSize: theme.fontSize.pageTitle, fontWeight: '700', color: theme.colors.text, marginBottom: theme.spacing.md }}>More</Text>
 
-        <Text style={{ color: theme.colors.muted, fontWeight: '900', letterSpacing: 1, marginBottom: 10 }}>
+        <Text style={{ color: theme.colors.muted, fontWeight: '700', letterSpacing: 1, marginBottom: 10 }}>
           HEALTH & ANALYSIS
         </Text>
 
@@ -106,12 +108,19 @@ export function MoreScreen({ navigation }: { navigation: any }) {
           <Row icon={<Feather name="search" size={18} color={theme.colors.muted} />} label="Find a Practitioner" onPress={openPractitioners} />
         </View>
 
-        <Text style={{ color: theme.colors.muted, fontWeight: '900', letterSpacing: 1, marginTop: theme.spacing.lg, marginBottom: 10 }}>
+        <Text style={{ color: theme.colors.muted, fontWeight: '700', letterSpacing: 1, marginTop: theme.spacing.lg, marginBottom: 10 }}>
           ACCOUNT & SETTINGS
         </Text>
 
         <View style={{ gap: 10 }}>
           <Row icon={<Feather name="watch" size={18} color={theme.colors.muted} />} label="Devices" onPress={() => navigation.getParent()?.navigate('Devices')} />
+          {session?.user?.isPractitioner ? (
+            <Row
+              icon={<Feather name="briefcase" size={18} color={theme.colors.muted} />}
+              label="Manage my practice"
+              onPress={() => navigation.getParent()?.navigate('NativeWebTool', { title: 'Practitioner dashboard', path: '/practitioner' })}
+            />
+          ) : null}
           <Row icon={<Feather name="user" size={18} color={theme.colors.muted} />} label="Profile" onPress={() => navigation.getParent()?.navigate('Profile')} />
           <Row
             icon={<Feather name="settings" size={18} color={theme.colors.muted} />}

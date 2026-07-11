@@ -18,6 +18,7 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type WaterEntry = {
@@ -235,6 +236,7 @@ export function WaterIntakeScreen() {
   const [entries, setEntries] = useState<WaterEntry[]>([])
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [editingTimeEntry, setEditingTimeEntry] = useState<WaterEntry | null>(null)
+  const [entryActions, setEntryActions] = useState<WaterEntry | null>(null)
   const [editingTimeValue, setEditingTimeValue] = useState('')
   const [editingTimeSaving, setEditingTimeSaving] = useState(false)
   const [editingTimeError, setEditingTimeError] = useState<string | null>(null)
@@ -421,8 +423,13 @@ export function WaterIntakeScreen() {
     const data: any = await res.json().catch(() => ({}))
     if (!res.ok) throw new Error(String(data?.error || 'Could not save water entry.'))
 
-    const created = data?.entry || null
-    await loadEntries()
+    const created = data?.entry as WaterEntry | null
+    if (created?.id) {
+      setEntries((prev) =>
+        [created, ...prev.filter((entry) => String(entry.id) !== String(created.id))]
+          .sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+      )
+    }
     return created
   }
 
@@ -561,15 +568,23 @@ export function WaterIntakeScreen() {
 
   const deleteEntry = async (id: string) => {
     if (!session?.token) return
+    const removed = entries.find((entry) => String(entry.id) === String(id)) || null
     setDeletingId(id)
+    setEntries((prev) => prev.filter((entry) => String(entry.id) !== String(id)))
     try {
       const res = await fetch(`${API_BASE_URL}/api/water-log/${encodeURIComponent(id)}`, {
         method: 'DELETE',
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
       if (!res.ok) throw new Error('Could not delete this entry.')
-      await loadEntries()
     } catch (error: any) {
+      if (removed) {
+        setEntries((prev) =>
+          prev.some((entry) => String(entry.id) === String(id))
+            ? prev
+            : [...prev, removed].sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime()),
+        )
+      }
       Alert.alert('Delete failed', error?.message || 'Please try again.')
     } finally {
       setDeletingId(null)
@@ -661,7 +676,9 @@ export function WaterIntakeScreen() {
         body: JSON.stringify({ amount, unit: goalUnit }),
       })
       if (!res.ok) throw new Error('Could not update goal.')
-      await loadGoal()
+      const targetMl = goalUnit === 'l' ? amount * 1000 : goalUnit === 'oz' ? amount * 29.5735 : amount
+      setGoalTargetMl(Math.round(targetMl))
+      setGoalSource('custom')
       setGoalEditorOpen(false)
     } catch (error: any) {
       Alert.alert('Save failed', error?.message || 'Please try again.')
@@ -679,7 +696,8 @@ export function WaterIntakeScreen() {
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
       if (!res.ok) throw new Error('Could not reset goal.')
-      await loadGoal()
+      setGoalTargetMl(goalRecommendedMl)
+      setGoalSource('auto')
       setGoalEditorOpen(false)
     } catch (error: any) {
       Alert.alert('Reset failed', error?.message || 'Please try again.')
@@ -697,7 +715,7 @@ export function WaterIntakeScreen() {
   if (mode !== 'signedIn' || !session?.token) {
     return (
       <Screen style={{ alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 18 }}>Please sign in</Text>
+        <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 18 }}>Please sign in</Text>
         <Text style={{ color: theme.colors.muted, marginTop: 6, textAlign: 'center' }}>
           Water Intake is available after sign-in.
         </Text>
@@ -739,7 +757,7 @@ export function WaterIntakeScreen() {
 
         <View style={[cardStyle, { marginTop: 12 }]}> 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 18, fontWeight: '900', color: theme.colors.text, flex: 1 }}>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text, flex: 1 }}>
               Daily Hydration Summary
             </Text>
             <Pressable accessibilityRole="button" accessibilityLabel="Edit water goal" onPress={openGoalEditor} style={miniPrimaryButton}>
@@ -747,7 +765,7 @@ export function WaterIntakeScreen() {
             </Pressable>
           </View>
 
-          <Text style={{ marginTop: 8, color: theme.colors.text, fontSize: 28, fontWeight: '900' }}>
+          <Text style={{ marginTop: 8, color: theme.colors.text, fontSize: 28, fontWeight: '700' }}>
             {formatMl(totalMl)}
             {effectiveGoalMl ? <Text style={{ fontSize: 16, color: theme.colors.muted }}> / {formatMl(effectiveGoalMl)}</Text> : null}
           </Text>
@@ -777,7 +795,7 @@ export function WaterIntakeScreen() {
         </View>
 
         <View style={[cardStyle, { marginTop: 12 }]}>
-          <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Quick Add</Text>
+          <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 18 }}>Quick Add</Text>
 
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 8 }}>
             {DRINK_TYPES.map((drink) => (
@@ -816,7 +834,7 @@ export function WaterIntakeScreen() {
                     },
                   ]}
                 >
-                  <Text style={{ color: selected ? theme.colors.primaryText : theme.colors.text, fontWeight: '900' }}>
+                  <Text style={{ color: selected ? theme.colors.primaryText : theme.colors.text, fontWeight: '700' }}>
                     {formatNumber(preset.amount)}
                   </Text>
                   <Text style={{ color: selected ? theme.colors.primaryText : theme.colors.muted, fontSize: 11 }}>
@@ -829,7 +847,7 @@ export function WaterIntakeScreen() {
         </View>
 
         <View style={[cardStyle, { marginTop: 12 }]}>
-          <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18 }}>Custom Entry</Text>
+          <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 18 }}>Custom Entry</Text>
 
           <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
             <TextInput
@@ -869,7 +887,7 @@ export function WaterIntakeScreen() {
 
         <View style={[cardStyle, { marginTop: 12 }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 18, flex: 1 }}>Recent Logs</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 18, flex: 1 }}>Recent Logs</Text>
             <Text style={{ color: theme.colors.muted, fontWeight: '700', fontSize: 12 }}>History</Text>
           </View>
 
@@ -889,7 +907,7 @@ export function WaterIntakeScreen() {
                 borderColor: '#FECACA',
                 borderRadius: 10,
                 padding: 12,
-                backgroundColor: '#FFFFFF',
+                backgroundColor: theme.colors.card,
               }}
             >
               <Text style={{ color: '#DC2626', fontWeight: '700' }}>Could not load water entries. Tap to retry.</Text>
@@ -911,32 +929,20 @@ export function WaterIntakeScreen() {
                 >
                   <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                     <View style={{ flex: 1 }}>
-                      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{entry.label || 'Drink'}</Text>
+                      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{entry.label || 'Drink'}</Text>
                       <Text style={{ color: theme.colors.muted, marginTop: 2, fontSize: 12 }}>
                         {formatTime(entry.createdAt)}
                       </Text>
                     </View>
                     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>
+                      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
                         {formatAmount(entry.amount, normalizeUnit(entry.unit))}
                       </Text>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Edit ${entry.label || 'drink'} entry time`}
-                        onPress={() => openTimeEditor(entry)}
-                        style={miniSecondaryButton}
-                      >
-                        <Text style={miniSecondaryText}>Edit</Text>
-                      </Pressable>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={`Delete ${entry.label || 'drink'} entry`}
-                        onPress={() => void deleteEntry(entry.id)}
+                      <EntryActionsButton
+                        label={`Actions for ${entry.label || 'drink'}`}
+                        onPress={() => setEntryActions(entry)}
                         disabled={deletingId === entry.id}
-                        style={[miniDangerButton, deletingId === entry.id && { opacity: 0.5 }]}
-                      >
-                        <Text style={miniDangerText}>{deletingId === entry.id ? 'Deleting...' : 'Delete'}</Text>
-                      </Pressable>
+                      />
                     </View>
                   </View>
                 </View>
@@ -1007,7 +1013,7 @@ export function WaterIntakeScreen() {
             </View>
 
             <View style={drinkDetailSummaryCard}>
-              <Text style={{ color: theme.colors.text, fontWeight: '900' }}>{activeDrink}</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{activeDrink}</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 8, fontSize: 12 }}>
                 Amount: {formatAmount(drinkAmount, drinkUnit)}
               </Text>
@@ -1168,6 +1174,14 @@ export function WaterIntakeScreen() {
           </View>
         </View>
       </Modal>
+      <EntryActionsMenu
+        visible={entryActions != null}
+        onClose={() => setEntryActions(null)}
+        actions={[
+          { label: 'Edit entry time', icon: 'clock', onPress: () => entryActions && openTimeEditor(entryActions) },
+          { label: 'Delete entry', icon: 'trash-2', destructive: true, onPress: () => entryActions && void deleteEntry(entryActions.id) },
+        ]}
+      />
     </Screen>
   )
 }
@@ -1243,7 +1257,7 @@ const dateSegmentButtonActive = {
 
 const dateSegmentText = {
   color: theme.colors.text,
-  fontWeight: '800' as const,
+  fontWeight: '600' as const,
   fontSize: 14,
 }
 
@@ -1318,7 +1332,7 @@ const sheetCloseButton = {
 const sheetCloseText = {
   color: theme.colors.text,
   fontSize: 18,
-  fontWeight: '900' as const,
+  fontWeight: '700' as const,
 }
 
 const drinkDetailSummaryCard = {
@@ -1333,7 +1347,7 @@ const drinkDetailSummaryCard = {
 const modalTitle = {
   color: theme.colors.text,
   fontSize: 20,
-  fontWeight: '900' as const,
+  fontWeight: '700' as const,
 }
 
 const primaryButton = {
@@ -1347,7 +1361,7 @@ const primaryButton = {
 
 const primaryButtonText = {
   color: theme.colors.primaryText,
-  fontWeight: '900' as const,
+  fontWeight: '700' as const,
 }
 
 const secondaryButton = {
@@ -1363,7 +1377,7 @@ const secondaryButton = {
 
 const secondaryButtonText = {
   color: theme.colors.text,
-  fontWeight: '800' as const,
+  fontWeight: '600' as const,
 }
 
 const drinkOptionButton = {
@@ -1381,7 +1395,7 @@ const drinkOptionButton = {
 
 const drinkOptionText = {
   color: theme.colors.text,
-  fontWeight: '800' as const,
+  fontWeight: '600' as const,
   textAlign: 'center' as const,
 }
 
@@ -1394,7 +1408,7 @@ const miniPrimaryButton = {
 
 const miniPrimaryText = {
   color: theme.colors.primaryText,
-  fontWeight: '800' as const,
+  fontWeight: '600' as const,
 }
 
 const miniSecondaryButton = {

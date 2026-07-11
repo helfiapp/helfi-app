@@ -60,7 +60,7 @@ function TimeRow({
 }) {
   return (
     <View style={{ gap: 6 }}>
-      <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{label}</Text>
+      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{label}</Text>
       <Pressable
         onPress={onPress}
         disabled={disabled}
@@ -77,7 +77,7 @@ function TimeRow({
           justifyContent: 'space-between',
         })}
       >
-        <Text style={{ color: disabled ? '#9CA3AF' : theme.colors.text, fontWeight: '800', flex: 1 }}>
+        <Text style={{ color: disabled ? '#9CA3AF' : theme.colors.text, fontWeight: '600', flex: 1 }}>
           {value}
         </Text>
         <Feather name="clock" size={18} color={theme.colors.muted} />
@@ -218,7 +218,7 @@ export function NotificationsQuietHoursScreen() {
           }}
         >
           <View style={{ gap: 6 }}>
-            <Text style={{ fontSize: 22, fontWeight: '900', color: theme.colors.text }}>Quiet hours</Text>
+            <Text style={{ fontSize: 22, fontWeight: '700', color: theme.colors.text }}>Quiet hours</Text>
             <Text style={{ color: theme.colors.muted, lineHeight: 19 }}>
               Pause Health Coach alerts during your chosen hours.
             </Text>
@@ -233,7 +233,7 @@ export function NotificationsQuietHoursScreen() {
             <>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <View style={{ flex: 1, paddingRight: 12 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '800' }}>Enable quiet hours</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Enable quiet hours</Text>
                   <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12 }}>Pause alerts overnight.</Text>
                 </View>
                 <Switch value={enabled} onValueChange={setEnabled} />
@@ -266,12 +266,12 @@ export function NotificationsQuietHoursScreen() {
                   alignItems: 'center',
                 })}
               >
-                <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>
+                <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>
                   {saving ? 'Saving...' : 'Save quiet hours'}
                 </Text>
               </Pressable>
 
-              {saveState === 'saved' ? <Text style={{ color: '#15803D', fontWeight: '800' }}>Quiet hours saved.</Text> : null}
+              {saveState === 'saved' ? <Text style={{ color: '#15803D', fontWeight: '600' }}>Quiet hours saved.</Text> : null}
             </>
           )}
 
@@ -318,16 +318,16 @@ export function NotificationsQuietHoursScreen() {
               }}
             >
               <Pressable onPress={closeTimePicker}>
-                <Text style={{ color: theme.colors.muted, fontWeight: '800' }}>Cancel</Text>
+                <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Cancel</Text>
               </Pressable>
-              <Text style={{ color: theme.colors.text, fontWeight: '900' }}>Pick time</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Pick time</Text>
               <Pressable
                 onPress={() => {
                   applyPickedTime(timePickerValue)
                   closeTimePicker()
                 }}
               >
-                <Text style={{ color: theme.colors.primary, fontWeight: '900' }}>Done</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Done</Text>
               </Pressable>
             </View>
 

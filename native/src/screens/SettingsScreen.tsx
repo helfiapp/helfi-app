@@ -30,7 +30,7 @@ function SectionCard({ title, children }: { title: string; children: React.React
         padding: 14,
       }}
     >
-      <Text style={{ color: theme.colors.text, fontSize: theme.fontSize.sectionTitle, fontWeight: '900', marginBottom: 12 }}>{title}</Text>
+      <Text style={{ color: theme.colors.text, fontSize: theme.fontSize.sectionTitle, fontWeight: '700', marginBottom: 12 }}>{title}</Text>
       {children}
     </View>
   )
@@ -64,7 +64,7 @@ function LinkRow({
       })}
     >
       <View style={{ flex: 1 }}>
-        <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>{title}</Text>
+        <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>{title}</Text>
         <Text style={{ color: theme.colors.muted, marginTop: 3 }}>{subtitle}</Text>
       </View>
       <Feather name="chevron-right" size={18} color={theme.colors.muted} />
@@ -232,7 +232,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           <View style={{ gap: 14 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Dark Mode</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Dark Mode</Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 3 }}>Switch to dark theme</Text>
               </View>
               <Switch
@@ -246,7 +246,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
             {Platform.OS !== 'ios' ? (
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Haptic Tap Feedback</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Haptic Tap Feedback</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
                     Light vibration on nav taps (Android supported)
                   </Text>
@@ -261,7 +261,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
             ) : null}
 
             <View style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, padding: 12 }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>
                 Add Helfi to your Home Screen
               </Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4, lineHeight: 20 }}>
@@ -275,7 +275,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           <View style={{ gap: 10 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>
                   7-day report
                 </Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
@@ -305,7 +305,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                   paddingHorizontal: 2,
                 })}
               >
-                <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>
+                <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>
                   {weeklyReportsEnabled ? 'Turn off weekly reports' : 'Turn on weekly reports'}
                 </Text>
               </Pressable>
@@ -343,7 +343,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
         <SectionCard title="Privacy Settings">
           <View style={{ gap: 14 }}>
             <View>
-              <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Profile Visibility</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Profile Visibility</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Make your profile visible to others</Text>
             </View>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -367,7 +367,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
                       paddingVertical: 8,
                     })}
                   >
-                    <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontWeight: '800', fontSize: 13 }}>
+                    <Text style={{ color: selected ? theme.colors.primary : theme.colors.text, fontWeight: '600', fontSize: 13 }}>
                       {option.label}
                     </Text>
                   </Pressable>
@@ -377,7 +377,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Data Analytics</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Data Analytics</Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
                   Help us improve by sharing anonymous usage data
                 </Text>

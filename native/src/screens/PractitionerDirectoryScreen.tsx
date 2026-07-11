@@ -349,7 +349,7 @@ function Tile({
         style={{
           color: active ? '#2E7D32' : theme.colors.muted,
           fontSize: 12,
-          fontWeight: '800',
+          fontWeight: '600',
         }}
       >
         {label}
@@ -373,7 +373,7 @@ function PickerField({
 }) {
   return (
     <View>
-      <Text style={{ fontSize: 11, fontWeight: '900', color: '#9AA8BF', marginBottom: 6, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+      <Text style={{ fontSize: 11, fontWeight: '700', color: '#9AA8BF', marginBottom: 6, letterSpacing: 1.2, textTransform: 'uppercase' }}>
         {label}
       </Text>
       <Pressable
@@ -841,7 +841,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
     <Screen>
       <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl }}>
         <View style={{ gap: 10 }}>
-          <Text style={{ fontSize: 28, fontWeight: '900', color: theme.colors.text }}>
+          <Text style={{ fontSize: 28, fontWeight: '700', color: theme.colors.text }}>
             Your health, simplified and within reach.
           </Text>
           <Text style={{ color: theme.colors.muted }}>
@@ -859,7 +859,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 backgroundColor: theme.colors.card,
               }}
             >
-              <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 12 }}>Browse Categories A-Z</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 12 }}>Browse Categories A-Z</Text>
             </Pressable>
             <Pressable
               onPress={() => navigation.navigate('ListYourPractice')}
@@ -870,7 +870,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 backgroundColor: theme.colors.primary,
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '800', fontSize: 12 }}>List your practice</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '600', fontSize: 12 }}>List your practice</Text>
             </Pressable>
           </View>
         </View>
@@ -910,7 +910,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
           />
 
           <View>
-            <Text style={{ fontSize: 11, fontWeight: '900', color: '#9AA8BF', marginBottom: 6, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#9AA8BF', marginBottom: 6, letterSpacing: 1.2, textTransform: 'uppercase' }}>
               Search
             </Text>
             <TextInput
@@ -940,7 +940,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
 
           {suggestedMatches.length > 0 && (
             <View>
-              <Text style={{ fontSize: 12, fontWeight: '800', color: theme.colors.muted, marginBottom: 6 }}>Suggested categories</Text>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.muted, marginBottom: 6 }}>Suggested categories</Text>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                 {suggestedMatches.map((match) => (
                   <Tile
@@ -956,7 +956,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
           )}
 
           <View>
-            <Text style={{ fontSize: 11, fontWeight: '900', color: '#9AA8BF', marginBottom: 6, letterSpacing: 1.2, textTransform: 'uppercase' }}>
+            <Text style={{ fontSize: 11, fontWeight: '700', color: '#9AA8BF', marginBottom: 6, letterSpacing: 1.2, textTransform: 'uppercase' }}>
               Location
             </Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
@@ -1001,7 +1001,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 {locationLoading ? (
                   <ActivityIndicator size="small" color="#2E7D32" />
                 ) : (
-                  <Text style={{ color: '#2E7D32', fontWeight: '900' }}>Find</Text>
+                  <Text style={{ color: '#2E7D32', fontWeight: '700' }}>Find</Text>
                 )}
               </Pressable>
             </View>
@@ -1040,10 +1040,10 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flexWrap: 'wrap' }}>
             <Pressable onPress={handleUseCurrentLocation}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: 12 }}>Use my current location</Text>
+              <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 12 }}>Use my current location</Text>
             </Pressable>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-              <Text style={{ fontSize: 11, fontWeight: '900', color: '#9AA8BF', letterSpacing: 1.2, textTransform: 'uppercase' }}>Radius</Text>
+              <Text style={{ fontSize: 11, fontWeight: '700', color: '#9AA8BF', letterSpacing: 1.2, textTransform: 'uppercase' }}>Radius</Text>
               <Pressable
                 onPress={() => setPickerMode('radius')}
                 style={{
@@ -1059,7 +1059,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                   justifyContent: 'space-between',
                 }}
               >
-                <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '800' }}>{radiusKm} km</Text>
+                <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>{radiusKm} km</Text>
                 <Feather name="chevron-down" size={16} color="#7C8596" />
               </Pressable>
             </View>
@@ -1102,14 +1102,14 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 minWidth: 138,
               }}
             >
-              <Text style={{ color: '#FFFFFF', fontWeight: '900' }}>{loading ? 'Searching…' : 'Search now'}</Text>
+              <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{loading ? 'Searching…' : 'Search now'}</Text>
             </Pressable>
           </View>
         </View>
 
         <View style={{ marginTop: 18 }}>
           <Pressable onPress={() => setQuickAccessOpen((prev) => !prev)} style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-            <Text style={{ fontSize: 12, fontWeight: '900', color: theme.colors.muted }}>Quick Access Categories</Text>
+            <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted }}>Quick Access Categories</Text>
             <Text style={{ color: theme.colors.muted, fontSize: 14 }}>{quickAccessOpen ? '▲' : '▼'}</Text>
           </Pressable>
           {quickAccessOpen && (
@@ -1161,7 +1161,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 maxHeight: '70%',
               }}
             >
-              <Text style={{ fontSize: 16, fontWeight: '900', color: theme.colors.text, marginBottom: 10 }}>
+              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text, marginBottom: 10 }}>
                 {pickerTitle}
               </Text>
               <ScrollView showsVerticalScrollIndicator={false}>
@@ -1209,7 +1209,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
         </Modal>
 
         <View style={{ marginTop: 20 }}>
-          <Text style={{ fontSize: 20, fontWeight: '900', color: theme.colors.text }}>Search Results</Text>
+          <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Search Results</Text>
           <Text style={{ marginTop: 4, color: theme.colors.muted }}>Results stay here until you run a new search.</Text>
 
           {error ? (
@@ -1280,15 +1280,15 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                 }}
               >
                 <View style={{ flexDirection: 'row', alignItems: 'center', flexWrap: 'wrap', gap: 6 }}>
-                  <Text style={{ fontSize: 17, fontWeight: '900', color: theme.colors.text }}>{item.displayName}</Text>
+                  <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text }}>{item.displayName}</Text>
                   {item.isTopBoost ? (
                     <View style={{ backgroundColor: '#DDF5DE', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                      <Text style={{ color: '#2E7D32', fontSize: 11, fontWeight: '900' }}>Top boost</Text>
+                      <Text style={{ color: '#2E7D32', fontSize: 11, fontWeight: '700' }}>Top boost</Text>
                     </View>
                   ) : null}
                   {item.isBoosted && !item.isTopBoost ? (
                     <View style={{ backgroundColor: '#EEF9EE', borderRadius: 999, paddingHorizontal: 8, paddingVertical: 4 }}>
-                      <Text style={{ color: '#2E7D32', fontSize: 11, fontWeight: '900' }}>Boosted</Text>
+                      <Text style={{ color: '#2E7D32', fontSize: 11, fontWeight: '700' }}>Boosted</Text>
                     </View>
                   ) : null}
                 </View>
@@ -1300,7 +1300,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                   {item.description ? <Text style={{ color: theme.colors.text }}>{item.description}</Text> : null}
                 <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 14 }}>
                   <Pressable onPress={() => navigation.navigate('PractitionerProfile', { slug: item.slug, name: item.displayName })}>
-                    <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>View profile</Text>
+                    <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>View profile</Text>
                   </Pressable>
                   {item.phone ? (
                     <Pressable
@@ -1309,7 +1309,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                         void openUrl(`tel:${item.phone}`)
                       }}
                     >
-                      <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>Call</Text>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Call</Text>
                     </Pressable>
                   ) : null}
                   {item.websiteUrl ? (
@@ -1319,7 +1319,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                         void openUrl(item.websiteUrl as string)
                       }}
                     >
-                      <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>Website</Text>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Website</Text>
                     </Pressable>
                   ) : null}
                   {isValidEmail(item.emailPublic) ? (
@@ -1329,12 +1329,12 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
                         void openUrl(`mailto:${item.emailPublic}`)
                       }}
                     >
-                      <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>Email</Text>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Email</Text>
                     </Pressable>
                   ) : null}
                   {(item.lat != null && item.lng != null) || buildAddress(item) ? (
                     <Pressable onPress={() => openMapForResult(item)}>
-                      <Text style={{ color: theme.colors.primary, fontWeight: '800' }}>Map</Text>
+                      <Text style={{ color: theme.colors.primary, fontWeight: '600' }}>Map</Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -1353,7 +1353,7 @@ export function PractitionerDirectoryScreen({ navigation, route }: { navigation:
               padding: 14,
             }}
           >
-            <Text style={{ color: theme.colors.text, fontWeight: '900', marginBottom: 6 }}>Map view</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '700', marginBottom: 6 }}>Map view</Text>
             <Text style={{ color: theme.colors.muted, marginBottom: 8 }}>
               Tap any result&apos;s Map action to open directions in your maps app.
             </Text>

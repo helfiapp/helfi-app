@@ -11,7 +11,7 @@ import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 
 type WearableProvider = 'fitbit' | 'garmin'
-type InterestKey = 'googleFit' | 'oura' | 'polar'
+type InterestKey = 'googleFit' | 'oura' | 'polar' | 'huawei'
 
 type DeviceInterest = Partial<Record<InterestKey | 'garmin', boolean>>
 
@@ -20,7 +20,7 @@ function StatusPill({ connected }: { connected: boolean }) {
   return (
     <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
       <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: '#22C55E' }} />
-      <Text style={{ color: '#17803A', fontWeight: '800', fontSize: 12 }}>Connected</Text>
+      <Text style={{ color: '#17803A', fontWeight: '600', fontSize: 12 }}>Connected</Text>
     </View>
   )
 }
@@ -58,7 +58,7 @@ function ActionButton({
         opacity: disabled ? 0.55 : pressed ? 0.85 : 1,
       })}
     >
-      <Text style={{ color, fontWeight: '900', fontSize: 14 }}>{label}</Text>
+      <Text style={{ color, fontWeight: '700', fontSize: 14 }}>{label}</Text>
     </Pressable>
   )
 }
@@ -94,7 +94,7 @@ function WearableCard({
             {logo ? <Image source={logo} style={{ width: 44, height: 44 }} resizeMode="cover" /> : icon}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.colors.text, fontSize: 19, fontWeight: '900' }}>{title}</Text>
+            <Text style={{ color: theme.colors.text, fontSize: 19, fontWeight: '700' }}>{title}</Text>
             <Text style={{ color: theme.colors.muted, marginTop: 3, lineHeight: 19 }}>{subtitle}</Text>
           </View>
         </View>
@@ -136,7 +136,7 @@ function InterestCard({
     <View style={{ flex: 1, minWidth: 190, backgroundColor: selected ? '#EEF9F0' : '#F6F8F7', borderRadius: theme.radius.md, borderWidth: 1, borderColor: selected ? '#A7DDB0' : theme.colors.border, padding: 14, gap: 9 }}>
       <View style={{ alignItems: 'center', gap: 5 }}>
         <View style={{ height: 34, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
-        <Text style={{ color: theme.colors.text, fontWeight: '900', textAlign: 'center' }}>{title}</Text>
+        <Text style={{ color: theme.colors.text, fontWeight: '700', textAlign: 'center' }}>{title}</Text>
         <Text style={{ color: theme.colors.muted, fontSize: 12, textAlign: 'center' }}>{detail}</Text>
       </View>
       <ActionButton label={selected ? 'Interested' : "I'm interested"} kind={selected ? 'primary' : 'secondary'} disabled={busy} onPress={onPress} />
@@ -355,7 +355,7 @@ export function DevicesScreen() {
           />
 
           <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
-            <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '900', marginBottom: 14 }}>Other devices under review</Text>
+            <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700', marginBottom: 14 }}>Other devices under review</Text>
             <View style={{ flexDirection: width >= 700 ? 'row' : 'column', gap: 12 }}>
               <InterestCard
                 title="Google Fit"
@@ -380,6 +380,14 @@ export function DevicesScreen() {
                 selected={interest.polar === true}
                 busy={savingInterest}
                 onPress={() => toggleInterest('polar')}
+              />
+              <InterestCard
+                title="Huawei Health"
+                detail="Activity & wellness"
+                icon={<MaterialCommunityIcons name="heart-pulse" size={30} color={theme.colors.muted} />}
+                selected={interest.huawei === true}
+                busy={savingInterest}
+                onPress={() => toggleInterest('huawei')}
               />
             </View>
           </View>

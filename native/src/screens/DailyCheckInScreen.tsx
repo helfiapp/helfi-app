@@ -17,6 +17,7 @@ import { API_BASE_URL } from '../config'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
+import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
 
 type CheckInIssue = {
@@ -89,6 +90,7 @@ export function DailyCheckInScreen() {
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null)
   const [page, setPage] = useState(1)
   const [editingEntry, setEditingEntry] = useState<CheckInHistoryRow | null>(null)
+  const [entryActions, setEntryActions] = useState<CheckInHistoryRow | null>(null)
   const [editValue, setEditValue] = useState<number | null>(null)
   const [editNote, setEditNote] = useState('')
   const [historyActionLoading, setHistoryActionLoading] = useState(false)
@@ -593,7 +595,7 @@ export function DailyCheckInScreen() {
             padding: 14,
           }}
         >
-          <Text style={{ fontSize: 30, fontWeight: '900', color: theme.colors.text }}>Today's Check-in</Text>
+          <Text style={{ fontSize: 28, fontWeight: '700', color: theme.colors.text }}>Today's Check-in</Text>
           <Text style={{ marginTop: 4, color: theme.colors.muted }}>
             Rate how you went today. One tap per item, then Save.
           </Text>
@@ -636,7 +638,7 @@ export function DailyCheckInScreen() {
                       padding: 12,
                     }}
                   >
-                    <Text style={{ color: theme.colors.text, fontWeight: '800', marginBottom: 8 }}>{question}</Text>
+                    <Text style={{ color: theme.colors.text, fontWeight: '600', marginBottom: 8 }}>{question}</Text>
 
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6 }}>
                       {LABELS.map((label, idx) => {
@@ -733,7 +735,7 @@ export function DailyCheckInScreen() {
                   opacity: saving ? 0.6 : 1,
                 }}
               >
-                <Text style={{ color: theme.colors.primaryText, fontWeight: '900' }}>{saving ? 'Saving...' : "Save today's ratings"}</Text>
+                <Text style={{ color: theme.colors.primaryText, fontWeight: '700' }}>{saving ? 'Saving...' : "Save today's ratings"}</Text>
               </Pressable>
             </View>
           )}
@@ -749,7 +751,7 @@ export function DailyCheckInScreen() {
               padding: 14,
             }}
           >
-            <Text style={{ fontSize: 26, fontWeight: '900', color: theme.colors.text }}>Check-in History</Text>
+            <Text style={{ fontSize: 26, fontWeight: '700', color: theme.colors.text }}>Check-in History</Text>
             <Text style={{ marginTop: 6, color: theme.colors.muted, fontSize: 12 }}>
               Scale: 0 Really bad · 1 Bad · 2 Below average · 3 Average · 4 Above average · 5 Good · 6 Excellent
             </Text>
@@ -757,7 +759,7 @@ export function DailyCheckInScreen() {
             {issueNames.length > 0 ? (
               <View style={{ marginTop: 14 }}>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                  <Text style={{ color: theme.colors.muted, fontWeight: '800', fontSize: 12, textTransform: 'uppercase' }}>
+                  <Text style={{ color: theme.colors.muted, fontWeight: '600', fontSize: 12, textTransform: 'uppercase' }}>
                     Filter by Health Issue
                   </Text>
                   <Pressable onPress={toggleSelectAll}>
@@ -794,7 +796,7 @@ export function DailyCheckInScreen() {
 
             <View style={{ marginTop: 24 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 21, flexShrink: 1, paddingRight: 10 }}>
+                <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 21, flexShrink: 1, paddingRight: 10 }}>
                   Trends Over Time
                 </Text>
                 <Pressable
@@ -956,7 +958,7 @@ export function DailyCheckInScreen() {
               </View>
             ) : (
               <View style={{ marginTop: 12, gap: 10 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '900', fontSize: 26 }}>Check-in History</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 26 }}>Check-in History</Text>
                 {pagedGroups.map((group) => {
                   const isOpen = expandedGroupKey === group.key
                   return (
@@ -975,7 +977,7 @@ export function DailyCheckInScreen() {
                       style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                        <Text style={{ color: theme.colors.text, fontWeight: '800' }}>{group.dateLabel}</Text>
+                        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{group.dateLabel}</Text>
                         {group.timeLabel ? (
                           <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700' }}>{group.timeLabel}</Text>
                         ) : null}
@@ -1008,20 +1010,8 @@ export function DailyCheckInScreen() {
                                 Note: {entry.note}
                               </Text>
                             ) : null}
-                            <View style={{ marginTop: 8, flexDirection: 'row', gap: 12 }}>
-                              <Pressable onPress={() => openEditModal(entry)}>
-                                <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 12 }}>Edit</Text>
-                              </Pressable>
-                              <Pressable
-                                onPress={() =>
-                                  Alert.alert('Delete rating', 'Delete this rating?', [
-                                    { text: 'Cancel', style: 'cancel' },
-                                    { text: 'Delete', style: 'destructive', onPress: () => void deleteEntry(entry) },
-                                  ])
-                                }
-                              >
-                                <Text style={{ color: '#DC2626', fontWeight: '700', fontSize: 12 }}>Delete</Text>
-                              </Pressable>
+                            <View style={{ marginTop: 8, alignItems: 'flex-end' }}>
+                              <EntryActionsButton label={`Actions for ${entry.name}`} onPress={() => setEntryActions(entry)} />
                             </View>
 
                             {editingEntry &&
@@ -1097,7 +1087,7 @@ export function DailyCheckInScreen() {
                                     <Text style={{ color: theme.colors.muted, fontWeight: '700', fontSize: 12 }}>Cancel</Text>
                                   </Pressable>
                                   <Pressable onPress={() => void saveEdit()}>
-                                    <Text style={{ color: theme.colors.primary, fontWeight: '800', fontSize: 12 }}>
+                                    <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 12 }}>
                                       {historyActionLoading ? 'Saving...' : 'Save'}
                                     </Text>
                                   </Pressable>
@@ -1169,7 +1159,7 @@ export function DailyCheckInScreen() {
                       alignItems: 'center',
                     }}
                   >
-                    <Text style={{ color: '#DC2626', fontWeight: '800' }}>Reset All Data</Text>
+                    <Text style={{ color: '#DC2626', fontWeight: '600' }}>Reset All Data</Text>
                   </Pressable>
                 ) : null}
               </View>
@@ -1177,6 +1167,21 @@ export function DailyCheckInScreen() {
           </View>
         )}
       </ScrollView>
+      <EntryActionsMenu
+        visible={entryActions != null}
+        onClose={() => setEntryActions(null)}
+        actions={[
+          { label: 'Edit entry', icon: 'edit-3', onPress: () => entryActions && openEditModal(entryActions) },
+          { label: 'Delete entry', icon: 'trash-2', destructive: true, onPress: () => {
+            if (!entryActions) return
+            const target = entryActions
+            Alert.alert('Delete rating', 'Delete this rating?', [
+              { text: 'Cancel', style: 'cancel' },
+              { text: 'Delete', style: 'destructive', onPress: () => void deleteEntry(target) },
+            ])
+          } },
+        ]}
+      />
     </Screen>
   )
 }
@@ -1228,7 +1233,7 @@ const styles = StyleSheet.create({
     borderColor: '#9FB7B1',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: theme.colors.card,
   },
   checkboxBoxChecked: {
     borderColor: theme.colors.primary,
@@ -1236,7 +1241,7 @@ const styles = StyleSheet.create({
   },
   checkboxTick: {
     color: theme.colors.primary,
-    fontWeight: '900',
+    fontWeight: '700',
     fontSize: 12,
     lineHeight: 14,
   },

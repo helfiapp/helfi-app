@@ -1,7 +1,8 @@
 import React, { useEffect } from 'react'
 import { Linking } from 'react-native'
-import { NavigationContainer } from '@react-navigation/native'
+import { createNavigationContainerRef, NavigationContainer } from '@react-navigation/native'
 import { createNativeStackNavigator } from '@react-navigation/native-stack'
+import * as Notifications from 'expo-notifications'
 
 import { useAppMode } from '../state/AppModeContext'
 import { AuthNavigator } from './AuthNavigator'
@@ -15,6 +16,7 @@ export type RootStackParamList = {
 }
 
 const Stack = createNativeStackNavigator<RootStackParamList>()
+const navigationRef = createNavigationContainerRef<RootStackParamList>()
 
 function parseVoiceAssistantUrl(rawUrl: string) {
   try {
@@ -82,12 +84,27 @@ export function RootNavigator() {
     }
   }, [openVoiceAssistant])
 
+  useEffect(() => {
+    const openReminder = (response: Notifications.NotificationResponse | null) => {
+      const screen = String(response?.notification.request.content.data?.screen || '')
+      if (!screen || !navigationRef.isReady()) return
+      if (screen === 'MoodTracker' || screen === 'DailyCheckIn') {
+        const navigate = navigationRef.navigate as any
+        navigate('Main', { screen })
+      }
+    }
+
+    void Notifications.getLastNotificationResponseAsync().then(openReminder).catch(() => {})
+    const subscription = Notifications.addNotificationResponseReceivedListener(openReminder)
+    return () => subscription.remove()
+  }, [mode])
+
   // Don't mount the navigator until we've loaded session state.
   // If we render a navigator with zero screens, React Navigation will crash.
   if (!hydrated) return null
 
   return (
-    <NavigationContainer key={`${mode}:${session?.user?.id || 'signed-out'}`}>
+    <NavigationContainer ref={navigationRef} key={`${mode}:${session?.user?.id || 'signed-out'}`}>
       <Stack.Navigator screenOptions={{ headerShown: false }}>
         {mode === 'signedOut' ? <Stack.Screen name="Auth" component={AuthNavigator} /> : <Stack.Screen name="Main" component={MainNavigator} />}
       </Stack.Navigator>

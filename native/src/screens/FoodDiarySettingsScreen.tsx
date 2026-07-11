@@ -266,7 +266,7 @@ export function FoodDiarySettingsScreen() {
         >
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '900' }}>Health check prompts</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '700' }}>Health check prompts</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
                 Control when the food diary suggests a paid health check based on your goals and diet.
               </Text>
@@ -297,7 +297,7 @@ export function FoodDiarySettingsScreen() {
 
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Enable health check prompts</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Enable health check prompts</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Show the prompt before running a check.</Text>
             </View>
             <Switch
@@ -309,7 +309,7 @@ export function FoodDiarySettingsScreen() {
           </View>
 
           <View style={{ gap: 8 }}>
-            <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Prompt frequency</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Prompt frequency</Text>
             <Text style={{ color: theme.colors.muted }}>Only high risk is recommended.</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               {([
@@ -333,7 +333,7 @@ export function FoodDiarySettingsScreen() {
                       alignItems: 'center',
                     })}
                   >
-                    <Text style={{ color: selected ? '#FFFFFF' : theme.colors.text, fontWeight: '800', fontSize: 13 }}>
+                    <Text style={{ color: selected ? '#FFFFFF' : theme.colors.text, fontWeight: '600', fontSize: 13 }}>
                       {option.label}
                     </Text>
                   </Pressable>
@@ -343,7 +343,7 @@ export function FoodDiarySettingsScreen() {
           </View>
 
           <View style={{ gap: 8 }}>
-            <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>Daily cap</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Daily cap</Text>
             <Text style={{ color: theme.colors.muted }}>Limit how many prompts you see per day.</Text>
             <View style={{ flexDirection: 'row', gap: 8 }}>
               <Pressable
@@ -359,7 +359,7 @@ export function FoodDiarySettingsScreen() {
                   alignItems: 'center',
                 })}
               >
-                <Text style={{ color: !capEnabled ? '#FFFFFF' : theme.colors.text, fontWeight: '800' }}>No cap</Text>
+                <Text style={{ color: !capEnabled ? '#FFFFFF' : theme.colors.text, fontWeight: '600' }}>No cap</Text>
               </Pressable>
               <Pressable
                 onPress={() => queueSave({ ...settings, dailyCap: capValue })}
@@ -374,7 +374,7 @@ export function FoodDiarySettingsScreen() {
                   alignItems: 'center',
                 })}
               >
-                <Text style={{ color: capEnabled ? '#FFFFFF' : theme.colors.text, fontWeight: '800' }}>Set a cap</Text>
+                <Text style={{ color: capEnabled ? '#FFFFFF' : theme.colors.text, fontWeight: '600' }}>Set a cap</Text>
               </Pressable>
             </View>
 
@@ -405,7 +405,7 @@ export function FoodDiarySettingsScreen() {
 
           <View style={{ gap: 12 }}>
             <View>
-              <Text style={{ color: theme.colors.text, fontWeight: '800', fontSize: 16 }}>High-risk trigger levels</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>High-risk trigger levels</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
                 Adjust the thresholds that decide when a prompt appears.
               </Text>
