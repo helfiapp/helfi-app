@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 11 July 2026, 1:05 PM AEST
+- What changed: Fixed the full Food Diary audit set across web and native, including stale totals after saves, unsafe recipe matches, plain-food search defaults, solid-food serving units, Favorites sync and nutrition, kJ state, date switching, credits, typed barcode search, wording, and accessibility labels.
+- Where to see it (page/link): https://helfi.ai/food. Native source fixes are ready for the next iPhone/TestFlight build.
+- What to quickly test: Add a banana and sweetened coffee, switch to kJ, change dates, type barcode 9310560022376, open Favorites and confirm the choice screen, and import the pancake recipe without any unquantified ingredient becoming 100 g.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 07 July 2026, 11:27 PM AEST
 - What changed: Tightened Talk to Helfi app-wide command understanding so the fast favourite-food path only runs for real food/favourite requests. Exercise, journal, mood, symptoms, water, and Health Intake wording can no longer be swallowed by a saved meal match.
 - Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
