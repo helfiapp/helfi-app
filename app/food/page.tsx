@@ -8888,18 +8888,23 @@ const applyStructuredItems = (
     isLoadingHistory,
   ])
   // SEVERE LOCK (Desktop summary continuity):
-  // Keep the last stable summary entries visible while the next date is loading.
-  // Do not remove this fallback unless guard rails are updated and explicitly approved.
-  const [lastStableSummaryEntries, setLastStableSummaryEntries] = useState<any[]>(() => initialSummaryEntriesForDate)
+  // Keep the last stable summary visible while the same date reloads, but never
+  // show one date's totals under another date's heading.
+  const [lastStableSummary, setLastStableSummary] = useState<{ date: string; entries: any[] }>(() => ({
+    date: initialSelectedDate,
+    entries: initialSummaryEntriesForDate,
+  }))
   useEffect(() => {
     if (!summaryReady) return
-    setLastStableSummaryEntries(sourceEntries)
+    setLastStableSummary({ date: selectedDate, entries: sourceEntries })
   }, [summaryReady, sourceEntries, selectedDate])
   const summaryDisplayEntries = useMemo(() => {
     if (summaryReady) return sourceEntries
-    if (lastStableSummaryEntries.length > 0) return lastStableSummaryEntries
+    if (lastStableSummary.date === selectedDate && lastStableSummary.entries.length > 0) {
+      return lastStableSummary.entries
+    }
     return sourceEntries
-  }, [summaryReady, sourceEntries, lastStableSummaryEntries])
+  }, [summaryReady, sourceEntries, lastStableSummary, selectedDate])
   const summaryDisplayReady = summaryReady || summaryDisplayEntries.length > 0
   useEffect(() => {
     if (!debugMode) return
@@ -15395,11 +15400,11 @@ Please add nutritional information manually if needed.`);
         if (rawKs) favoriteIdByAlias.set(rawKs, favId)
       }
 
-      // Also treat ingredient item names as aliases. This helps keep renamed Favorites consistent
-      // even when older entries still have the long database/USDA ingredient name.
+      // A single-item favorite may use its database ingredient name as an alias.
+      // Multi-item meals must never claim each ingredient as an alias.
       try {
         const items = parseFavoriteItems(fav)
-        for (const it of Array.isArray(items) ? items : []) {
+        for (const it of Array.isArray(items) && items.length === 1 ? items : []) {
           const n = String((it as any)?.name || '').trim()
           if (!n) continue
           const k = normalizeKey(n)
@@ -15441,7 +15446,7 @@ Please add nutritional information manually if needed.`);
       }
       try {
         const favItems = parseFavoriteItems(fav)
-        ;(Array.isArray(favItems) ? favItems : []).forEach((item: any) => {
+        ;(Array.isArray(favItems) && favItems.length === 1 ? favItems : []).forEach((item: any) => {
           const itemId = typeof item?.id === 'string' ? String(item.id).trim() : ''
           if (favId && itemId && !favoriteIdByItemId.has(itemId)) {
             favoriteIdByItemId.set(itemId, favId)
@@ -15749,7 +15754,10 @@ Please add nutritional information manually if needed.`);
         lastUsedAt: resolveFavoriteLastUsedAtMs(fav),
         sortPriority: 1,
         sourceTag: 'Favorite',
-        calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
+        calories:
+          sanitizeNutritionTotals(
+            recalculateNutritionFromItems(parseFavoriteItems(fav) || []) || fav?.total || fav?.nutrition || null,
+          )?.calories ?? null,
         serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
       })
     })
@@ -15762,7 +15770,10 @@ Please add nutritional information manually if needed.`);
       lastUsedAt: resolveFavoriteLastUsedAtMs(fav),
       sortPriority: 1,
       sourceTag: 'Favorite',
-      calories: sanitizeNutritionTotals(fav?.total || fav?.nutrition || null)?.calories ?? null,
+      calories:
+        sanitizeNutritionTotals(
+          recalculateNutritionFromItems(parseFavoriteItems(fav) || []) || fav?.total || fav?.nutrition || null,
+        )?.calories ?? null,
       serving: fav?.items?.[0]?.serving_size || fav?.serving || '',
     }))
 
@@ -16361,6 +16372,11 @@ Please add nutritional information manually if needed.`);
     if (barcodeLookupInFlightRef.current) return
     const resumeScannerAfterLookup = () => {
       if (!showBarcodeScanner) return
+      if (showManualBarcodeInput) {
+        setBarcodeStatus('idle')
+        setBarcodeStatusHint('')
+        return
+      }
       if ((barcodeScannerRef.current as any)?.videoEl) {
         setBarcodeStatus('scanning')
         setBarcodeStatusHint('Scanning…')
@@ -16521,6 +16537,21 @@ Please add nutritional information manually if needed.`);
     }
   }
   // PROTECTED: FOOD_BARCODE_LOOKUP_FLOW END
+
+  const submitManualBarcode = async () => {
+    stopBarcodeScanner()
+    setBarcodeStatus('idle')
+    setBarcodeStatusHint('')
+    const deadline = Date.now() + 1500
+    while (barcodeLookupInFlightRef.current && Date.now() < deadline) {
+      await new Promise((resolve) => setTimeout(resolve, 50))
+    }
+    if (barcodeLookupInFlightRef.current) {
+      setBarcodeError('Please wait a moment, then tap Search again.')
+      return
+    }
+    await lookupBarcodeAndAdd(barcodeValue)
+  }
 
   const barcodeDetectLockRef = useRef(false)
   const lastRejectedBarcodeRef = useRef<{ code: string; at: number } | null>(null)
@@ -18671,7 +18702,10 @@ Please add nutritional information manually if needed.`);
 	    const adjustedTotals = adjusted.used ? adjusted.totals || null : null
 	    const hadPendingDrinkContext = hasPendingDrinkContext()
 	    const drinkMeta = consumePendingDrinkMeta(drinkOverride)
-	    const favoriteTotalsBase = adjustedTotals || favorite.nutrition || favorite.total || null
+	    const recalculatedFavoriteTotals = Array.isArray(repairedFinalItems)
+	      ? recalculateNutritionFromItems(repairedFinalItems)
+	      : null
+	    const favoriteTotalsBase = adjustedTotals || recalculatedFavoriteTotals || favorite.nutrition || favorite.total || null
 	    const guardedDrink = applyPendingDrinkSweetenerGuard({
 	      totals: favoriteTotalsBase,
 	      items: repairedFinalItems,
@@ -19690,7 +19724,6 @@ Please add nutritional information manually if needed.`);
       } catch {}
 
       setEditingEntry(safeFood);
-      setEnergyUnit('kcal')
       setSelectedAddCategory(normalizeCategory(safeFood?.meal || safeFood?.category || safeFood?.mealType) as any);
       try {
         // Keep an immutable copy to enable "Cancel changes"
@@ -28318,7 +28351,6 @@ Please add nutritional information manually if needed.`);
                           router.push(`/food/water?${qs.toString()}`)
                           return
                         }
-                        setEnergyUnit('kcal')
                         editFood(food)
                       }
 
@@ -28444,8 +28476,10 @@ Please add nutritional information manually if needed.`);
                                 {!isMobile && (
                                   <div className="relative entry-options-dropdown overflow-visible">
                                     <button
+                                      type="button"
                                       onMouseDown={handleOptionsToggle}
                                       className="p-1.5 sm:p-2 rounded-lg hover:bg-gray-200 transition-colors"
+                                      aria-label={`Open options for ${entryDisplayLabel}`}
                                     >
                                       <svg className="w-4 h-4 sm:w-5 sm:h-5 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
                                         <path d="M12 8c1.1 0 2-.9 2-2s-.9-2-2-2-2 .9-2 2 .9 2 2 2zm0 2c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2zm0 6c-1.1 0-2 .9-2 2s.9 2 2 2 2-.9 2-2-.9-2-2-2z"/>
@@ -28712,7 +28746,7 @@ Please add nutritional information manually if needed.`);
                                         </div>
                                         <div className="flex-1">
                                           <div className="text-base font-semibold text-gray-900">Favorites</div>
-                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(selectedAddCategory)}</div>
+                                          <div className="text-xs text-gray-500">Reuse a saved meal in {categoryLabel(selectedAddCategory)}</div>
                                         </div>
                                         <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -29081,7 +29115,7 @@ Please add nutritional information manually if needed.`);
                                         </div>
 	                                        <div className="flex-1">
 	                                          <div className="text-base font-semibold text-gray-900">Favorites</div>
-	                                          <div className="text-xs text-gray-500">Insert a saved meal in {categoryLabel(cat.key)}</div>
+	                                          <div className="text-xs text-gray-500">Reuse a saved meal in {categoryLabel(cat.key)}</div>
 	                                        </div>
 	                                        <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
 	                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
@@ -29419,7 +29453,7 @@ Please add nutritional information manually if needed.`);
                       const replaceIndex = favoritesReplaceTargetRef.current
                       if (replaceIndex !== null && replaceIndex !== undefined) return 'Replace this ingredient'
                       if (favoritesActionRef.current === 'analysis') return 'Add to this meal'
-                      return `Insert into ${categoryLabel(selectedAddCategory)}`
+                      return `Reuse a saved meal in ${categoryLabel(selectedAddCategory)}`
                     })()}
                   </div>
                 </div>
@@ -29427,6 +29461,7 @@ Please add nutritional information manually if needed.`);
                   type="button"
                   onClick={closeFavoritesPicker}
                   className="p-2 rounded-full hover:bg-gray-100"
+                  aria-label="Close favorites"
                 >
                   <span aria-hidden>✕</span>
                 </button>
@@ -29622,7 +29657,7 @@ Please add nutritional information manually if needed.`);
 	                            </button>
                             <button
                               type="button"
-                              onClick={() => runFavoriteAdd(item)}
+                              onClick={handleSelect}
                               className="px-3 flex items-center justify-center hover:bg-emerald-50 text-helfi-green text-sm font-semibold border-l border-gray-100"
                               aria-label={`Add ${item.label} to diary`}
                               title="Add to diary"
@@ -30134,7 +30169,8 @@ Please add nutritional information manually if needed.`);
                     onChange={(e) => setBarcodeValue(e.target.value)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter') {
-                        lookupBarcodeAndAdd(barcodeValue)
+                        e.preventDefault()
+                        void submitManualBarcode()
                       }
                     }}
                     placeholder="Enter barcode number"
@@ -30142,7 +30178,7 @@ Please add nutritional information manually if needed.`);
                   />
                   <button
                     type="button"
-                    onClick={() => lookupBarcodeAndAdd(barcodeValue)}
+                    onClick={() => void submitManualBarcode()}
                     className="px-4 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold shadow-sm hover:bg-emerald-700"
                   >
                     Search
@@ -30153,6 +30189,7 @@ Please add nutritional information manually if needed.`);
                   onClick={() => {
                     setShowManualBarcodeInput(false)
                     setBarcodeValue('')
+                    void startBarcodeScanner()
                   }}
                   className="text-xs text-gray-500 underline font-medium"
                 >
@@ -30201,7 +30238,15 @@ Please add nutritional information manually if needed.`);
               <button
                 type="button"
                 onClick={() => {
-                  setShowManualBarcodeInput((prev) => !prev)
+                  if (showManualBarcodeInput) {
+                    setShowManualBarcodeInput(false)
+                    void startBarcodeScanner()
+                  } else {
+                    stopBarcodeScanner()
+                    setBarcodeStatus('idle')
+                    setBarcodeStatusHint('')
+                    setShowManualBarcodeInput(true)
+                  }
                   setBarcodeError(null)
                   setTimeout(() => {
                     manualBarcodeInputRef.current?.focus()

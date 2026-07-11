@@ -2542,8 +2542,9 @@ export function TrackCaloriesScreen() {
       if (authHeaders) {
         const res = await fetch(`${API_BASE_URL}/api/user-data`, { headers: authHeaders })
         const data: any = await res.json().catch(() => ({}))
-        const serverFavorites = normalizeFavoriteList(data?.favorites)
-        nextFavorites = Array.isArray(data?.favorites) ? serverFavorites : localFavorites
+        const userData = data?.data || data || {}
+        const serverFavorites = normalizeFavoriteList(userData?.favorites)
+        nextFavorites = Array.isArray(userData?.favorites) ? serverFavorites : localFavorites
       }
 
       setFavorites(nextFavorites)
@@ -2819,9 +2820,10 @@ export function TrackCaloriesScreen() {
       const userData: any = await userDataRes.json().catch(() => ({}))
       if (!isCurrentRequest()) return
       if (userDataRes.ok) {
-        setDailyTargets(buildDailyTargetsFromUserData(userData))
-        if (Array.isArray(userData?.favorites)) {
-          const serverFavorites = normalizeFavoriteList(userData.favorites)
+        const userDataPayload = userData?.data || userData || {}
+        setDailyTargets(buildDailyTargetsFromUserData(userDataPayload))
+        if (Array.isArray(userDataPayload?.favorites)) {
+          const serverFavorites = normalizeFavoriteList(userDataPayload.favorites)
           setFavorites(serverFavorites)
         }
       } else {
@@ -7002,7 +7004,7 @@ export function TrackCaloriesScreen() {
                 <Text style={{ color: '#6B7280', marginTop: 4 }}>
                   {favoritesUsageMode === 'editor'
                     ? 'Add saved ingredients into this meal'
-                    : `Insert into ${mealLabel(favoritesTargetMeal)}`}
+                    : `Reuse a saved meal in ${mealLabel(favoritesTargetMeal)}`}
                 </Text>
               </View>
               <VoiceAssistantIconButton size={38} iconSize={19} style={{ marginLeft: 10 }} onPress={openVoiceFromFoodOverlay} />

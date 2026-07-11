@@ -1502,6 +1502,24 @@ const convertAmount = (
 
 const allowedUnitsForItem = (item?: BuilderItem) => {
   let units = [...DISPLAY_UNITS]
+  const normalizedName = normalizeFoodValue(String(item?.name || ''))
+  const isSolidProtein = /\b(chicken|turkey|duck|beef|steak|pork|bacon|ham|lamb|veal|fish|salmon|tuna|cod|tofu|tempeh)\b/.test(
+    normalizedName,
+  )
+  if (isSolidProtein) {
+    const volumeUnits = new Set<BuilderUnit>([
+      'ml',
+      'tsp',
+      'tbsp',
+      'quarter-cup',
+      'half-cup',
+      'three-quarter-cup',
+      'cup',
+      'pinch',
+      'handful',
+    ])
+    units = units.filter((unit) => !volumeUnits.has(unit))
+  }
   if (isEggFood(item?.name || '')) {
     const disallowed = new Set<BuilderUnit>([
       'ml',
@@ -1905,7 +1923,7 @@ export default function MealBuilderClient() {
   const amountBackupRef = useRef<Map<string, string>>(new Map())
   const amountWasClearedOnFocusRef = useRef<Set<string>>(new Set())
   const amountEditedAfterClearRef = useRef<Set<string>>(new Set())
-  const [kind, setKind] = useState<'packaged' | 'single'>('packaged')
+  const [kind, setKind] = useState<'packaged' | 'single'>('single')
   const [searchLoading, setSearchLoading] = useState(false)
   const [savingMeal, setSavingMeal] = useState(false)
   const [photoLoading, setPhotoLoading] = useState(false)
@@ -1916,6 +1934,18 @@ export default function MealBuilderClient() {
   const [loadedFavoriteId, setLoadedFavoriteId] = useState<string | null>(null)
   const [linkedFavoriteId, setLinkedFavoriteId] = useState<string>('')
   const [favoriteSaving, setFavoriteSaving] = useState(false)
+
+  const returnToDiary = (refresh = false, categoryOverride?: string) => {
+    const params = new URLSearchParams({
+      date: selectedDate,
+      category: normalizeCategory(categoryOverride || category),
+    })
+    if (refresh) {
+      params.set('refresh', '1')
+      params.set('refreshAt', String(Date.now()))
+    }
+    router.push(`/food?${params.toString()}`)
+  }
 
   const [items, setItems] = useState<BuilderItem[]>([])
   const itemsRef = useRef<BuilderItem[]>([])
@@ -3265,7 +3295,22 @@ export default function MealBuilderClient() {
 
     const lookupTokenSet = new Set(coreTokens)
     const candidateTokenSet = new Set(candidateTokens)
-    const requiredSpecificTokens = ['banana', 'egg', 'orange', 'apple', 'avocado', 'walnut']
+    const requiredSpecificTokens = [
+      'banana',
+      'egg',
+      'orange',
+      'apple',
+      'avocado',
+      'walnut',
+      'lemon',
+      'lime',
+      'chicken',
+      'turkey',
+      'beef',
+      'pork',
+      'salmon',
+      'tuna',
+    ]
     for (const token of requiredSpecificTokens) {
       if (lookupTokenSet.has(token) && !candidateTokenSet.has(token)) return false
     }
@@ -3909,6 +3954,21 @@ export default function MealBuilderClient() {
               if (lineNameKey) seenImportNames.add(lineNameKey)
               missing.push(line)
             }
+            publishProgress(currentLine)
+            continue
+          }
+          // A missing quantity must never silently become a 100 g serving. Keep
+          // it for manual review so optional garnishes and "to serve" items
+          // cannot radically inflate the recipe totals.
+          if (!(typeof parsed.amount === 'number' && Number.isFinite(parsed.amount) && parsed.amount > 0)) {
+            processedCount += 1
+            missingCount += 1
+            if (lineKey && !seenImportKeys.has(lineKey)) {
+              seenImportKeys.add(lineKey)
+              if (lineNameKey) seenImportNames.add(lineNameKey)
+              missing.push(line)
+            }
+            setRecipeImportMissing([...missing])
             publishProgress(currentLine)
             continue
           }
@@ -5830,7 +5890,7 @@ export default function MealBuilderClient() {
           )
         } catch {}
         clearDraft()
-        router.push('/food')
+        returnToDiary(true)
         return
       }
 
@@ -6038,7 +6098,7 @@ export default function MealBuilderClient() {
         }
 
         clearDraft()
-        router.push('/food')
+        returnToDiary(true)
         return
       }
 
@@ -6166,7 +6226,7 @@ export default function MealBuilderClient() {
       } catch {}
 
       clearDraft()
-      router.push('/food')
+      returnToDiary(true)
     } catch {
       setError('Saving failed. Please try again.')
     } finally {
@@ -6178,7 +6238,7 @@ export default function MealBuilderClient() {
   const handleFavoriteUpdatePromptCancel = () => {
     setFavoriteUpdatePrompt(null)
     clearDraft()
-    router.push('/food')
+    returnToDiary(false)
   }
 
   const handleFavoriteUpdatePromptAdd = async () => {
@@ -6233,7 +6293,7 @@ export default function MealBuilderClient() {
       }
       setFavoriteUpdatePrompt(null)
       clearDraft()
-      router.push('/food')
+      returnToDiary(true, favoriteUpdatePrompt.category)
     } catch {
       setError('Favorite was updated, but we could not add it to diary right now.')
     } finally {

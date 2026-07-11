@@ -116,14 +116,17 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
   const [eventTick, setEventTick] = useState(0)
 
   useEffect(() => {
-    const handler = () => setEventTick((v) => v + 1)
+    const handler = () => {
+      delete usageCache[String(featureName)]
+      setEventTick((v) => v + 1)
+    }
     try {
       window.addEventListener('credits:refresh', handler)
       return () => window.removeEventListener('credits:refresh', handler)
     } catch {
       return () => {}
     }
-  }, [])
+  }, [featureName])
 
   useEffect(() => {
     const fetchUsage = async () => {
@@ -132,7 +135,7 @@ export default function FeatureUsageDisplay({ featureName, featureLabel, refresh
         const now = Date.now()
         const lastFetchedAt = getLastUsageFetchAt(featureName)
         const allowForceRefresh = now - lastFetchedAt >= USAGE_EVENT_MIN_MS
-        const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0) && allowForceRefresh
+        const forceRefresh = eventTick > 0 || (Boolean((refreshTrigger || 0) > 0) && allowForceRefresh)
         const data = await fetchFeatureUsage(featureName, forceRefresh)
         if (data) {
           const value = data.featureUsage[featureName]

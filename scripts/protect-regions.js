@@ -379,7 +379,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
     startMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY START',
     endMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY END',
-    expectedHash: '02741ad65b59194464c02f1c2b3a109a86f9bf62b9558a0b86c7e571ec158131',
+    expectedHash: '692857c89afabc27c143e8e26f7c483a3218087745fbcbd08cbd3701c6efdbe6',
     allowEnvVar: 'ALLOW_MEAL_BUILDER_RECIPE_IMPORT_APPLY_EDIT',
     description: 'Meal builder recipe-import draft apply + serving inference flow',
   });
@@ -451,7 +451,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'page.tsx'),
     startMarker: 'PROTECTED: FOOD_BARCODE_LOOKUP_FLOW START',
     endMarker: 'PROTECTED: FOOD_BARCODE_LOOKUP_FLOW END',
-    expectedHash: 'f9e936baf0eb0efa7b0e075d7ed414eeeab67def541dba92fd311df75d4c128c',
+    expectedHash: 'ce4728abff357dba95344c2b0ea21eb60de24c5342780e4b6946933401cb6539',
     allowEnvVar: 'ALLOW_FOOD_BARCODE_LOOKUP_FLOW_EDIT',
     description: 'Food Diary barcode lookup + action routing flow',
   });

@@ -1580,6 +1580,16 @@ export default function AddIngredientClient() {
     return data
   }
 
+  const returnToDiaryAfterSave = () => {
+    const params = new URLSearchParams({
+      date: selectedDate,
+      category,
+      refresh: '1',
+      refreshAt: String(Date.now()),
+    })
+    router.push(`/food?${params.toString()}`)
+  }
+
   const computeServingsFromAmount = (
     amount: number,
     unit: MeasurementUnit,
@@ -1761,7 +1771,7 @@ export default function AddIngredientClient() {
         }
       } catch {}
       setAdjustItem(null)
-      router.push('/food')
+      returnToDiaryAfterSave()
     } catch (e: any) {
       setError(e?.message || 'Could not add that ingredient. Please try again.')
     } finally {
@@ -1859,7 +1869,7 @@ export default function AddIngredientClient() {
       try {
         window.dispatchEvent(new Event('credits:refresh'))
       } catch {}
-      router.push('/food')
+      returnToDiaryAfterSave()
     } catch (e: any) {
       setError(e?.message || 'Photo estimate failed. Please try again.')
     } finally {

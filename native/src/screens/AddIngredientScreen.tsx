@@ -972,7 +972,8 @@ export function AddIngredientScreen() {
         ])
         const data: any = await userRes.json().catch(() => ({}))
         if (cancelled) return
-        const nextCountry = String(data?.country || '').trim().toUpperCase()
+        const userData = data?.data || data || {}
+        const nextCountry = String(userData?.country || '').trim().toUpperCase()
         setUserCountry(nextCountry)
         if (creditRes) {
           const creditData: any = await creditRes.json().catch(() => ({}))

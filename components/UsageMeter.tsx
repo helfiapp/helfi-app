@@ -163,9 +163,9 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
   useEffect(() => {
     const handler = (event?: Event) => {
       const detail = (event as CustomEvent | null)?.detail as { force?: boolean } | null
+      const key = feature || 'all'
+      delete creditStatusCache[key]
       if (detail?.force) {
-        const key = feature || 'all'
-        delete creditStatusCache[key]
         if (userCacheKey) {
           clearStoredCreditStatus(userCacheKey, feature)
         }
@@ -236,7 +236,7 @@ export default function UsageMeter({ compact = false, showResetDate = false, inl
           readLastStoredCreditStatus(feature)?.fetchedAt ||
           0
         const allowForceRefresh = now - lastFetchedAt >= CREDIT_STATUS_EVENT_MIN_MS
-        const forceRefresh = Boolean((refreshTrigger || 0) > 0 || eventTick > 0) && allowForceRefresh
+        const forceRefresh = eventTick > 0 || (Boolean((refreshTrigger || 0) > 0) && allowForceRefresh)
         const data = await fetchCreditStatus(feature, forceRefresh)
         if (data) {
           applyCreditStatus(data)

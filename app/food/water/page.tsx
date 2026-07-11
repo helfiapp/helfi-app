@@ -959,6 +959,8 @@ export default function WaterIntakePage() {
     if (sourceCategory) {
       params.set('category', sourceCategory)
     }
+    params.set('refresh', '1')
+    params.set('refreshAt', String(Date.now()))
     const target = params.toString()
     router.push(target ? `/food?${target}` : '/food')
   }
