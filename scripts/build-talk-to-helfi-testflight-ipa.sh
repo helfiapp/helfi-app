@@ -2,8 +2,8 @@
 set -euo pipefail
 
 MODE="${1:-}"
-if [[ "$MODE" != "paused-safe" && "$MODE" != "live-candidate" ]]; then
-  echo "Usage: $0 paused-safe|live-candidate" >&2
+if [[ "$MODE" != "live-candidate" ]]; then
+  echo "Usage: $0 live-candidate" >&2
   exit 2
 fi
 
@@ -24,10 +24,7 @@ if [[ -z "$BUILD_NUMBER" || -z "$APP_VERSION" ]]; then
   exit 1
 fi
 
-LIVE_FLAG="false"
-if [[ "$MODE" == "live-candidate" ]]; then
-  LIVE_FLAG="true"
-fi
+LIVE_FLAG="true"
 
 ARCHIVE_PATH="native/ios/build/Helfi-${APP_VERSION}-${BUILD_NUMBER}-${MODE}.xcarchive"
 EXPORT_PATH="native/ios/build/TestFlightExport-${BUILD_NUMBER}-${MODE}"
@@ -64,7 +61,8 @@ xcodebuild \
   -exportArchive \
   -archivePath "$ARCHIVE_PATH" \
   -exportPath "$EXPORT_PATH" \
-  -exportOptionsPlist "$EXPORT_OPTIONS"
+  -exportOptionsPlist "$EXPORT_OPTIONS" \
+  -allowProvisioningUpdates
 
 TESTFLIGHT_MODE="$MODE" \
 TESTFLIGHT_LIVE_FLAG="$LIVE_FLAG" \

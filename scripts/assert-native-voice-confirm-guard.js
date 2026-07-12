@@ -10,6 +10,7 @@ const routePath = path.join(root, 'app/api/native/voice-assistant/route.ts')
 const confirmRoutePath = path.join(root, 'app/api/native/voice-assistant/confirm/route.ts')
 const ttsRoutePath = path.join(root, 'app/api/native/voice-assistant/tts/route.ts')
 const nativePath = path.join(root, 'native/src/voice/VoiceAssistant.tsx')
+const realtimePath = path.join(root, 'native/src/voice/realtimeVoice.ts')
 const healthImagePath = path.join(root, 'native/src/screens/HealthImageNotesScreen.tsx')
 const healthJournalPath = path.join(root, 'native/src/screens/HealthJournalScreen.tsx')
 const moodTrackerPath = path.join(root, 'native/src/screens/MoodTrackerScreen.tsx')
@@ -45,6 +46,7 @@ const route = fs.readFileSync(routePath, 'utf8')
 const confirmRoute = fs.readFileSync(confirmRoutePath, 'utf8')
 const ttsRoute = fs.readFileSync(ttsRoutePath, 'utf8')
 const native = fs.readFileSync(nativePath, 'utf8')
+const realtime = fs.readFileSync(realtimePath, 'utf8')
 const healthImage = fs.readFileSync(healthImagePath, 'utf8')
 const healthJournal = fs.readFileSync(healthJournalPath, 'utf8')
 const moodTracker = fs.readFileSync(moodTrackerPath, 'utf8')
@@ -68,6 +70,14 @@ const supplementSearch = fs.readFileSync(supplementSearchPath, 'utf8')
 const userData = fs.readFileSync(userDataPath, 'utf8')
 
 const failures = []
+
+if (!/const LIVE_VOICE_ENABLED = true/.test(native) || /process\.env\.EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED\s*===\s*'true'/.test(native)) {
+  failures.push('Talk to Helfi must default permanently to the approved single-screen live voice experience; a missing build flag must never restore the retired recorder UI.')
+}
+
+if (!/!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview \? \(\s*<View style=\{styles\.noticeBox\}>\s*<Text style=\{styles\.noticeTitle\}>Type-only on iPad<\/Text>/.test(native)) {
+  failures.push('The retired iPad/type-only notice must remain completely hidden from the approved live voice screen, including while it is connecting.')
+}
 
 if (/\bautoSave:\s*true\b/.test(route)) {
   failures.push('Native voice assistant drafts must not return autoSave: true.')
@@ -143,9 +153,9 @@ if (
   !/VOICE_TURN_SILENCE_MS/.test(native) ||
   !/didJustFinish[\s\S]*?resumeVoiceSessionListening/.test(native) ||
   !/setContinuousVoiceSession\(false\)[\s\S]*?setOpen\(false\)/.test(native) ||
-  !/End voice chat/.test(native)
+  !/accessibilityLabel="Done"[\s\S]*?onPress=\{\(\) => closePanel\(\)\}/.test(native)
 ) {
-  failures.push('Talk to Helfi must support continuous voice chat: listen, answer out loud, then listen again until the user ends voice chat.')
+  failures.push('Talk to Helfi must support continuous voice chat until the user taps Done, which must fully close and stop the session.')
 }
 
 if (
@@ -168,16 +178,26 @@ if (!/spokenReplyStatus/.test(native) || !/Preparing spoken reply/.test(native) 
 
 if (
   /Stop recording|Starting recording|Recording failed|Recording unavailable|Voice recording|recordingButton/.test(native) ||
-  !/Listening\.\.\./.test(native) ||
-  !/Voice chat is live/.test(native) ||
-  !/Hands-free conversation/.test(native) ||
-  !/Show Helfi/.test(native) ||
-  !/accessibilityLabel="Show Helfi with camera"/.test(native) ||
+  !/'Listening'/.test(native) ||
+  !/accessibilityLabel="Camera"/.test(native) ||
+  !/>Camera<\/Text>/.test(native) ||
+  !/presentationStyle="fullScreen"/.test(native) ||
+  !/Vibration\.vibrate\(\)/.test(native) ||
+  />Show Helfi<\/Text>|accessibilityLabel="Show Helfi with camera"/.test(native) ||
   !/Message Helfi/.test(native) ||
   /What you said/.test(native) ||
   !/voiceBars/.test(native)
 ) {
-  failures.push('Talk to Helfi voice input must feel like an ongoing assistant conversation, with an obvious camera/video affordance, not a recorder form.')
+  failures.push('Talk to Helfi must open as a simple full-screen voice conversation with immediate haptic feedback and a plainly named Camera control.')
+}
+
+if (
+  !/react-native-incall-manager/.test(realtime) ||
+  !/setForceSpeakerphoneOn\?\.\(true\)/.test(realtime) ||
+  !/setMicrophoneMuted/.test(realtime) ||
+  !/result\.needsReview[\s\S]{0,300}setContinuousVoiceSession\(false\)[\s\S]{0,300}stopRealtimeVoiceSession/.test(native)
+) {
+  failures.push('Realtime voice must use the main speaker, support mute, and leave the live call immediately when an app review is ready.')
 }
 
 if (
@@ -574,7 +594,7 @@ if (
   failures.push('Talk to Helfi text input and submit buttons must have stable test targets so the message box is not confused with Ask Helfi buttons.')
 }
 
-if (!/scroll:\s*\{\s*flex:\s*1\s*\}/.test(native) || !/contentWithFooterSpace/.test(native) || !/paddingBottom:\s*132/.test(native) || !/style=\{styles\.scroll\}\s*contentContainerStyle=\{\[styles\.content,\s*styles\.contentWithFooterSpace\]\}/.test(native)) {
+if (!/scroll:\s*\{\s*flex:\s*1\s*\}/.test(native) || !/contentWithFooterSpace/.test(native) || !/paddingBottom:\s*132/.test(native) || !/contentContainerStyle=\{showingLiveVoiceExperience\s*\?\s*styles\.liveVoiceContent\s*:\s*\[styles\.content,\s*styles\.contentWithFooterSpace\]\}/.test(native)) {
   failures.push('Talk to Helfi scroll content must keep enough bottom space so the follow-up Ask Helfi button is not hidden behind the footer.')
 }
 

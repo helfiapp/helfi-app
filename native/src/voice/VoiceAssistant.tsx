@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, Vibration, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
 import { CameraView, useCameraPermissions } from 'expo-camera'
@@ -12,7 +12,7 @@ import { hasAiDataSharingPermission, requestAiDataSharingPermission } from '../l
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { theme } from '../ui/theme'
-import { fetchHelfiRealtimeVoiceStatus, hasNativeRealtimeVoiceSupport, startHelfiRealtimeVoiceSession } from './realtimeVoice'
+import { hasNativeRealtimeVoiceSupport, startHelfiRealtimeVoiceSession } from './realtimeVoice'
 
 export type VoiceAssistantLaunchContext = {
   section?:
@@ -104,6 +104,11 @@ type VoiceDraft = {
   reviewToken?: string
 }
 
+type SaveSuccessNotice = {
+  title: string
+  message: string
+}
+
 type VoiceConversationTurn = {
   id: string
   role: 'user' | 'assistant'
@@ -155,7 +160,9 @@ const VOICE_ASSISTANT_OPENING_EVENT = 'helfi:voice-assistant-opening'
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
 const VOICE_ACCESS_FALLBACK_API_BASE_URL = 'https://helfi.ai'
 const SPOKEN_REPLY_VOICE_NAME = 'Marin'
-const LIVE_VOICE_ENABLED = process.env.EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED === 'true'
+// The owner-approved single-screen voice experience is the native default.
+// Do not gate it behind a build command: missing build flags previously restored the retired recorder UI.
+const LIVE_VOICE_ENABLED = true
 const LIVE_VOICE_DISABLED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
 const REALTIME_VOICE_CONNECT_TIMEOUT_MS = 30000
 const NOT_SAVED_MESSAGE = 'No problem. I have not saved anything.'
@@ -1075,6 +1082,7 @@ async function loadVoiceFavorites(sessionToken?: string | null, signal?: AbortSi
 export function VoiceAssistantProvider({ children }: { children: React.ReactNode }) {
   const { mode, session } = useAppMode()
   const insets = useSafeAreaInsets()
+  const { width: windowWidth } = useWindowDimensions()
   const [cameraPermission, requestCameraPermission] = useCameraPermissions()
   const [open, setOpen] = useState(false)
   const [transcript, setTranscript] = useState('')
@@ -1093,6 +1101,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [realtimeVoiceAvailable, setRealtimeVoiceAvailable] = useState<boolean | null>(null)
   const [realtimeVoiceName, setRealtimeVoiceName] = useState(SPOKEN_REPLY_VOICE_NAME)
   const [checkingRealtimeVoice, setCheckingRealtimeVoice] = useState(false)
+  const [voicePaidAccessGranted, setVoicePaidAccessGranted] = useState(false)
+  const [microphoneMuted, setMicrophoneMuted] = useState(false)
   const [voiceReply, setVoiceReply] = useState(true)
   const [spokenReplyStatus, setSpokenReplyStatus] = useState<SpokenReplyStatus>('idle')
   const [launchContext, setLaunchContext] = useState<VoiceAssistantLaunchContext>(DEFAULT_LAUNCH_CONTEXT)
@@ -1102,6 +1112,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [bottleCameraReady, setBottleCameraReady] = useState(false)
   const [bottleCameraError, setBottleCameraError] = useState('')
   const [autoSubmitToken, setAutoSubmitToken] = useState(0)
+  const [saveSuccessNotice, setSaveSuccessNotice] = useState<SaveSuccessNotice | null>(null)
   const autoSubmittedRef = useRef(0)
   const conversationTurnSeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
@@ -1110,12 +1121,22 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const draftRequestAbortRef = useRef<AbortController | null>(null)
   const voiceImageAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
+  const realtimeVoiceMuteRef = useRef<null | ((muted: boolean) => void)>(null)
   const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
   const realtimeActionAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceRunRef = useRef(0)
   const realtimeVoiceConnectedRef = useRef(false)
+
+  useEffect(() => {
+    if (!saveSuccessNotice) return
+    const timer = setTimeout(() => setSaveSuccessNotice(null), 2600)
+    return () => clearTimeout(timer)
+  }, [saveSuccessNotice])
   const realtimeVoiceConnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const realtimeActionGuardRef = useRef<RealtimeActionGuard | null>(null)
+  const realtimeAutoStartRef = useRef(false)
+  const voiceAccessGrantedAtRef = useRef(0)
+  const voiceAccessTokenRef = useRef('')
   const sendDraftRequestRef = useRef<DraftRequestHandler>(async () => ({ ok: false, message: 'Voice action is not ready yet.' }))
   const openRef = useRef(false)
   const voiceSessionActiveRef = useRef(false)
@@ -1125,7 +1146,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const voiceTurnMaxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stopRecordingRef = useRef<(options?: StopRecordingOptions) => Promise<void>>(async () => {})
   const startRecordingRef = useRef<() => Promise<void>>(async () => {})
-  const voiceRecordingSupported = !(Platform.OS === 'ios' && (Platform as any).isPad === true)
+  const voiceRecordingSupported = !(Platform.OS === 'ios' && windowWidth >= 700)
   const voiceMemoryUserId = cleanFavoriteText(session?.user?.id || '', 120)
 
   useEffect(() => {
@@ -1286,6 +1307,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     imageAbortController?.abort()
     const stop = realtimeVoiceStopRef.current
     realtimeVoiceStopRef.current = null
+    realtimeVoiceMuteRef.current = null
+    setMicrophoneMuted(false)
     setRealtimeVoiceStatus('idle')
     if (stop) {
       await stop().catch(() => {})
@@ -1430,9 +1453,16 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       Alert.alert('Log in needed', 'Please log in before using Talk to Helfi.')
       return false
     }
+    if (voiceAccessTokenRef.current === session.token && Date.now() - voiceAccessGrantedAtRef.current < 5 * 60 * 1000) {
+      return true
+    }
     try {
       const { res, data } = await fetchVoiceAccessStatus(session.token)
-      if (res.ok && hasPaidVoiceAccess(data)) return true
+      if (res.ok && hasPaidVoiceAccess(data)) {
+        voiceAccessTokenRef.current = session.token
+        voiceAccessGrantedAtRef.current = Date.now()
+        return true
+      }
       Alert.alert('Subscription needed', VOICE_PAID_ACCESS_MESSAGE, [
         { text: 'Not now', style: 'cancel' },
         { text: 'View plans', onPress: openVoiceBilling },
@@ -1445,7 +1475,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [mode, openVoiceBilling, session?.token])
 
   const openVoiceAssistant = useCallback(async (input?: OpenVoiceAssistantInput) => {
-    if (!(await ensureVoicePaidAccess())) return
+    Vibration.vibrate()
     DeviceEventEmitter.emit(VOICE_ASSISTANT_OPENING_EVENT)
     setDraft(null)
     setConversationTurns([])
@@ -1458,6 +1488,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setRealtimeVoiceAvailable(null)
     setRealtimeVoiceName(SPOKEN_REPLY_VOICE_NAME)
     setCheckingRealtimeVoice(false)
+    setVoicePaidAccessGranted(false)
+    setMicrophoneMuted(false)
+    realtimeAutoStartRef.current = false
     setContinuousVoiceSession(false)
     setVoiceReplyPreference(true)
     setTranscript(input?.transcript || '')
@@ -1466,50 +1499,29 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     if (!input?.transcript) {
       void loadConversationMemory()
     }
-    setTimeout(() => {
-      setOpen(true)
-      if (shouldAutoSubmit) setAutoSubmitToken((value) => value + 1)
-    }, 140)
+    setOpen(true)
+    if (shouldAutoSubmit) setAutoSubmitToken((value) => value + 1)
+    const hasAccess = await ensureVoicePaidAccess()
+    if (!hasAccess) {
+      setOpen(false)
+      return
+    }
+    setVoicePaidAccessGranted(true)
   }, [ensureVoicePaidAccess, loadConversationMemory, setContinuousVoiceSession, setVoiceReplyPreference])
 
   useEffect(() => {
-    if (!open || !session?.token || !voiceRecordingSupported) return
+    if (!open || !voicePaidAccessGranted || !session?.token || !voiceRecordingSupported) return
     if (!LIVE_VOICE_ENABLED) {
       setRealtimeVoiceAvailable(false)
       setRealtimeVoiceStatus('failed')
       setRealtimeVoiceError(LIVE_VOICE_DISABLED_MESSAGE)
       return
     }
-    let cancelled = false
-    setCheckingRealtimeVoice(true)
-    fetchHelfiRealtimeVoiceStatus(session.token)
-      .then((status) => {
-        if (cancelled) return
-        setRealtimeVoiceAvailable(status.available)
-        if (status.voice) {
-          setRealtimeVoiceName(status.voice.charAt(0).toUpperCase() + status.voice.slice(1))
-        }
-        if (status.available) {
-          setRealtimeVoiceError('')
-          setRealtimeVoiceStatus('idle')
-        } else {
-          setRealtimeVoiceStatus('failed')
-          setRealtimeVoiceError(status.message || 'Live voice is not available on this server. Text and camera still work.')
-        }
-      })
-      .catch(() => {
-        if (cancelled) return
-        setRealtimeVoiceAvailable(false)
-        setRealtimeVoiceStatus('failed')
-        setRealtimeVoiceError('Live voice status could not be checked. Text and camera still work.')
-      })
-      .finally(() => {
-        if (!cancelled) setCheckingRealtimeVoice(false)
-      })
-    return () => {
-      cancelled = true
-    }
-  }, [open, session?.token, voiceRecordingSupported])
+    setCheckingRealtimeVoice(false)
+    setRealtimeVoiceAvailable(true)
+    setRealtimeVoiceError('')
+    setRealtimeVoiceStatus('idle')
+  }, [open, session?.token, voicePaidAccessGranted, voiceRecordingSupported])
 
   const closePanel = useCallback(() => {
     spokenReplyRunRef.current += 1
@@ -1717,7 +1729,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       return
     }
 
-    setVisionChoicesOpen((value) => !value)
+    Alert.alert('Camera', 'What would you like to add?', [
+      { text: 'Food photo', onPress: () => openVisionChoice('food-photo') },
+      { text: 'Journal photo', onPress: () => openVisionChoice('journal-photo') },
+      { text: 'Health image note', onPress: () => openVisionChoice('health-image') },
+      { text: 'Cancel', style: 'cancel' },
+    ])
   }, [launchContext.section, openVisionChoice])
 
   const renderVisionChoice = useCallback(
@@ -1873,8 +1890,23 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           setTimeout(emitSavedRefresh, 450)
           setTimeout(emitSavedRefresh, 1000)
         }
-        const message = data?.result?.message || 'Done.'
-        Alert.alert(options?.automatic ? 'Done' : 'Saved', message)
+        const savedLabel = resultKind === 'exercise'
+          ? 'Exercise'
+          : resultKind === 'food'
+          ? 'Food'
+          : resultKind === 'water'
+          ? 'Water'
+          : 'Entry'
+        setSaveSuccessNotice({
+          title: `${savedLabel} saved`,
+          message: resultKind === 'exercise'
+            ? "Added to today's exercise."
+            : resultKind === 'food'
+            ? "Added to today's food diary."
+            : resultKind === 'water'
+            ? "Added to today's water intake."
+            : String(data?.result?.message || 'Your entry has been saved.'),
+        })
         closePanel()
         return data
       } catch (error: any) {
@@ -2350,7 +2382,16 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 action,
                 needsReview: Boolean(args.needsReview),
               },
-            }).then(realtimeToolResult)
+            }).then(realtimeToolResult).then((result) => {
+              if (result.needsReview) {
+                setContinuousVoiceSession(false)
+                setRealtimeVoiceStatus('idle')
+                setTimeout(() => {
+                  void stopRealtimeVoiceSession()
+                }, 120)
+              }
+              return result
+            })
             realtimeActionGuardRef.current = { key: guardKey, startedAt: Date.now(), promise }
             promise.finally(() => {
               if (realtimeActionGuardRef.current?.promise === promise) {
@@ -2372,6 +2413,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       realtimeVoiceConnectedRef.current = true
       setRealtimeVoiceStatus((current) => (current === 'speaking' ? 'speaking' : 'live'))
       realtimeVoiceStopRef.current = realtimeSession.stop
+      realtimeVoiceMuteRef.current = realtimeSession.setMicrophoneMuted
     } catch (error: any) {
       clearRealtimeConnectTimeout()
       if (realtimeVoiceAbortRef.current === abortController) {
@@ -2383,7 +2425,26 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setRealtimeVoiceStatus('failed')
       setRealtimeVoiceError(error?.message || 'Live voice could not start. Text and camera still work.')
     }
-  }, [appendConversationTurns, checkingRealtimeVoice, clearRealtimeConnectTimeout, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, voiceRecordingSupported])
+  }, [appendConversationTurns, checkingRealtimeVoice, clearRealtimeConnectTimeout, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
+
+  useEffect(() => {
+    if (!LIVE_VOICE_ENABLED || !open || !voicePaidAccessGranted || realtimeVoiceAvailable !== true || voiceSessionActiveRef.current) return
+    if (realtimeAutoStartRef.current) return
+    realtimeAutoStartRef.current = true
+    void startVoiceSession()
+  }, [open, realtimeVoiceAvailable, startVoiceSession, voicePaidAccessGranted])
+
+  const toggleRealtimeMicrophone = useCallback(() => {
+    const nextMuted = !microphoneMuted
+    realtimeVoiceMuteRef.current?.(nextMuted)
+    setMicrophoneMuted(nextMuted)
+    Vibration.vibrate()
+  }, [microphoneMuted])
+
+  const retryRealtimeVoice = useCallback(() => {
+    realtimeAutoStartRef.current = true
+    void startVoiceSession()
+  }, [startVoiceSession])
 
   const endVoiceSession = useCallback(() => {
     spokenReplyRunRef.current += 1
@@ -2495,6 +2556,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const launchCopy = copyForLaunchContext(launchContext)
   const bottleCameraLabel = bottleCameraItemType === 'medication' ? 'medication' : 'supplement'
   const showingConversationReview = !voiceSessionActive && conversationTurns.length > 0 && !showDraftCard
+  const showingLiveVoiceExperience = LIVE_VOICE_ENABLED && !showingConversationReview && !showDraftCard
   const realtimeVoiceUnavailable = realtimeVoiceAvailable === false
   const realtimeVoiceButtonDisabled = !voiceSessionActive && (busy || checkingRealtimeVoice || realtimeVoiceUnavailable || realtimeVoiceStatus === 'connecting')
   const realtimeVoiceButtonLabel = checkingRealtimeVoice
@@ -2521,9 +2583,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       {children}
       {visibleForUser && (
         <>
-          <Modal visible={open} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => closePanel()}>
-            <View style={styles.panel}>
-              <View style={styles.header}>
+          <Modal visible={open} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => closePanel()}>
+            <View style={[styles.panel, showingLiveVoiceExperience && styles.liveVoicePanel]}>
+              {!showingLiveVoiceExperience ? <View style={styles.header}>
                 <View>
                   <Text style={styles.title}>{launchCopy.title}</Text>
                   <Text style={styles.subtitle}>{launchCopy.subtitle}</Text>
@@ -2531,92 +2593,98 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => closePanel()} style={styles.iconButton}>
                   <Feather name="x" size={22} color={theme.colors.text} />
                 </Pressable>
-              </View>
+              </View> : null}
 
-              <ScrollView style={styles.scroll} contentContainerStyle={[styles.content, styles.contentWithFooterSpace]} keyboardShouldPersistTaps="handled">
-                {voiceSessionActive ? (
-                  <View style={styles.voiceCallScreen}>
-                    <View style={styles.voiceCallTopLine}>
-                      <Feather
-                        name={realtimeVoiceStatus === 'live' || realtimeVoiceStatus === 'speaking' ? 'radio' : realtimeVoiceStatus === 'connecting' ? 'loader' : 'message-circle'}
-                        size={18}
-                        color="#DDF7E1"
-                      />
-                      <Text style={styles.voiceCallEyebrow}>Realtime voice mode</Text>
-                    </View>
-                    <View style={styles.voiceOrb}>
-                      <View style={styles.voiceOrbInner}>
-                        {realtimeVoiceStatus === 'live' || realtimeVoiceStatus === 'speaking' ? (
-                          <View style={styles.voiceBarsLarge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-                            <View style={[styles.voiceBarLarge, styles.voiceBarLargeShort]} />
-                            <View style={[styles.voiceBarLarge, styles.voiceBarLargeTall]} />
-                            <View style={styles.voiceBarLarge} />
-                            <View style={[styles.voiceBarLarge, styles.voiceBarLargeTall]} />
-                            <View style={[styles.voiceBarLarge, styles.voiceBarLargeShort]} />
-                          </View>
-                        ) : realtimeVoiceStatus === 'connecting' || busy ? (
-                          <ActivityIndicator size="large" color="#FFFFFF" />
-                        ) : (
-                          <Feather name={realtimeVoiceStatus === 'failed' ? 'alert-circle' : 'mic'} size={42} color="#FFFFFF" />
-                        )}
+              <ScrollView
+                style={styles.scroll}
+                contentContainerStyle={showingLiveVoiceExperience ? styles.liveVoiceContent : [styles.content, styles.contentWithFooterSpace]}
+                keyboardShouldPersistTaps="handled"
+                scrollEnabled={!showingLiveVoiceExperience}
+              >
+                {voiceSessionActive || showingLiveVoiceExperience ? (
+                  <View style={[styles.voiceCallScreen, { paddingTop: Math.max(insets.top + 8, 24) }]}>
+                    <Text style={styles.voiceBrand}>Talk to Helfi</Text>
+                    <View style={styles.voiceCallStage}>
+                      <View style={styles.voiceOrb}>
+                        <View style={styles.voiceOrbInner}>
+                          {realtimeVoiceStatus === 'live' || realtimeVoiceStatus === 'speaking' ? (
+                            <View style={styles.voiceBarsLarge} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
+                              <View style={[styles.voiceBarLarge, styles.voiceBarLargeShort]} />
+                              <View style={[styles.voiceBarLarge, styles.voiceBarLargeTall]} />
+                              <View style={styles.voiceBarLarge} />
+                              <View style={[styles.voiceBarLarge, styles.voiceBarLargeTall]} />
+                              <View style={[styles.voiceBarLarge, styles.voiceBarLargeShort]} />
+                            </View>
+                          ) : !voicePaidAccessGranted || checkingRealtimeVoice || realtimeVoiceStatus === 'connecting' || busy ? (
+                            <ActivityIndicator size="large" color="#FFFFFF" />
+                          ) : (
+                            <Feather name={realtimeVoiceStatus === 'failed' ? 'alert-circle' : 'mic'} size={42} color="#FFFFFF" />
+                          )}
+                        </View>
                       </View>
+                      <Text style={styles.voiceCallTitle}>
+                        {!voicePaidAccessGranted || checkingRealtimeVoice || realtimeVoiceStatus === 'connecting'
+                          ? 'Connecting'
+                          : realtimeVoiceStatus === 'speaking'
+                          ? 'Speaking'
+                          : realtimeVoiceStatus === 'live'
+                          ? microphoneMuted ? 'Muted' : 'Listening'
+                          : realtimeVoiceStatus === 'failed'
+                          ? 'Could not connect'
+                          : busy
+                          ? 'Working on it'
+                          : 'Ready'}
+                      </Text>
                     </View>
-                    <Text style={styles.voiceCallTitle}>
-                      {realtimeVoiceStatus === 'connecting'
-                        ? 'Connecting live voice'
-                        : realtimeVoiceStatus === 'speaking'
-                        ? 'Helfi is speaking'
-                        : realtimeVoiceStatus === 'live'
-                        ? 'Listening'
-                        : realtimeVoiceStatus === 'failed'
-                        ? 'Live voice unavailable'
-                        : busy
-                        ? 'Working on it'
-                        : 'Ready'}
-                    </Text>
-                    <Text style={styles.voiceCallText}>Speak naturally. Helfi can answer out loud and you can interrupt while it talks.</Text>
-                    <Pressable
-                      accessibilityRole="button"
-                      accessibilityLabel="Show Helfi with camera"
-                      onPress={openContextVision}
-                      style={styles.voiceCallCameraButton}
-                    >
-                      <Feather name="video" size={20} color="#12351A" />
-                      <Text style={styles.voiceCallCameraText}>Show Helfi</Text>
-                    </Pressable>
-                    {voiceSessionActive && visionChoicesOpen ? (
-                      <View style={[styles.visionChoiceBox, styles.voiceCallVisionChoices]}>
-                        {launchContext.section === 'health-intake' ? (
-                          <>
-                            {renderVisionChoice('supplement-bottle', 'Supplement camera', 'Health Intake review', 'camera')}
-                            {renderVisionChoice('medication-bottle', 'Medication camera', 'Health Intake review', 'camera')}
-                          </>
-                        ) : (
-                          <>
-                            {renderVisionChoice('food-photo', 'Food photo', `${mealLabel(launchContext.meal)} entry`, 'camera')}
-                            {renderVisionChoice('journal-photo', 'Journal photo', 'Health journal', 'image')}
-                            {renderVisionChoice('health-image', 'Health image note', 'Record only, no diagnosis', 'file-text')}
-                          </>
-                        )}
+                    {!voiceSessionActive && realtimeVoiceStatus === 'failed' ? (
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel="Try live voice again"
+                        onPress={retryRealtimeVoice}
+                        style={styles.voiceRetryButton}
+                      >
+                        <Feather name="refresh-cw" size={20} color="#12351A" />
+                        <Text style={styles.voiceControlText}>Try again</Text>
+                      </Pressable>
+                    ) : null}
+                    <View style={[styles.voiceControls, { paddingBottom: Math.max(insets.bottom + 8, 20) }]}>
+                      <Pressable accessibilityRole="button" accessibilityLabel="Camera" onPress={openContextVision} style={styles.voiceControlItem}>
+                        <View style={styles.voiceControlCircle}>
+                          <Feather name="video" size={25} color="#12351A" />
+                        </View>
+                        <Text style={styles.voiceControlLabel}>Camera</Text>
+                      </Pressable>
+                      <Pressable
+                        accessibilityRole="button"
+                        accessibilityLabel={microphoneMuted ? 'Unmute microphone' : 'Mute microphone'}
+                        onPress={toggleRealtimeMicrophone}
+                        disabled={!voiceSessionActive}
+                        style={[styles.voiceControlItem, !voiceSessionActive && styles.voiceControlDisabled]}
+                      >
+                        <View style={styles.voiceControlCircle}>
+                          <Feather name={microphoneMuted ? 'mic-off' : 'mic'} size={25} color="#12351A" />
+                        </View>
+                        <Text style={styles.voiceControlLabel}>{microphoneMuted ? 'Unmute' : 'Mute'}</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button" accessibilityLabel="End voice chat" onPress={() => closePanel()} style={styles.voiceControlItem}>
+                        <View style={styles.voiceEndCircle}>
+                          <Feather name="x" size={31} color="#FFFFFF" />
+                        </View>
+                        <Text style={styles.voiceEndLabel}>End</Text>
+                      </Pressable>
+                    </View>
+                    {voiceSessionActive && launchContext.section === 'health-intake' && visionChoicesOpen ? (
+                      <View style={styles.voiceCallVisionChoices}>
+                        {renderVisionChoice('supplement-bottle', 'Supplement camera', 'Health Intake review', 'camera')}
+                        {renderVisionChoice('medication-bottle', 'Medication camera', 'Health Intake review', 'camera')}
                       </View>
                     ) : null}
                   </View>
                 ) : showingConversationReview ? (
                   <View style={styles.transcriptReview}>
                     <View style={styles.transcriptReviewHeader}>
-                      <View>
-                        <Text style={styles.transcriptReviewTitle}>Voice chat transcript</Text>
-                        <Text style={styles.transcriptReviewSubtitle}>This appears after the voice chat ends.</Text>
-                      </View>
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="New voice chat"
-                        onPress={restartVoiceSession}
-                        style={styles.newVoiceChatButton}
-                      >
-                        <Feather name="plus-circle" size={15} color="#FFFFFF" />
-                        <Text style={styles.newVoiceChatText}>New chat</Text>
-                      </Pressable>
+                      <Text style={styles.transcriptReviewTitle}>Voice chat ended</Text>
+                      <Text style={styles.transcriptReviewSubtitle}>Transcript</Text>
                     </View>
                     {conversationTurns.map((turn) => (
                       <View
@@ -2633,7 +2701,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview ? (
                 <View style={styles.replyRow}>
                   <Pressable
                     accessibilityRole="button"
@@ -2654,7 +2722,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 </View>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview && voiceReply ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview && voiceReply ? (
                   <View style={[styles.spokenReplyBox, (spokenReplyStatus === 'failed' || spokenReplyStatus === 'unavailable') && styles.spokenReplyFailed]}>
                     {spokenReplyStatus === 'preparing' ? <ActivityIndicator size="small" color="#226B2C" /> : null}
                     <Feather
@@ -2676,13 +2744,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview ? (
                 <View style={styles.contextBox}>
                   <Text style={styles.contextText}>{launchCopy.opener}</Text>
                 </View>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview && launchCopy.visionLabel ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview && launchCopy.visionLabel ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={launchCopy.visionLabel}
@@ -2694,7 +2762,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </Pressable>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview && visionChoicesOpen ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview && visionChoicesOpen ? (
                   <View style={styles.visionChoiceBox}>
                     {launchContext.section === 'health-intake' ? (
                       <>
@@ -2711,7 +2779,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview && voiceRecordingSupported ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview && voiceRecordingSupported ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={voiceSessionActive ? 'End live voice' : realtimeVoiceButtonLabel}
@@ -2752,7 +2820,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     )}
                   </Pressable>
                 ) : (
-                  !voiceSessionActive && !showingConversationReview ? (
+                  !LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview ? (
                   <View style={styles.noticeBox}>
                     <Text style={styles.noticeTitle}>Type-only on iPad</Text>
                     <Text style={styles.noticeText}>Voice input is iPhone only for now. Type your request below.</Text>
@@ -2766,7 +2834,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview && conversationTurns.length > 0 ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview && conversationTurns.length > 0 ? (
                   <View style={styles.conversationBox}>
                     <View style={styles.conversationHeader}>
                       <Text style={styles.label}>Conversation</Text>
@@ -2795,7 +2863,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!voiceSessionActive && !showingConversationReview ? (
+                {!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview ? (
                 <View style={styles.section}>
                   <Text style={styles.label}>Message Helfi</Text>
                   <TextInput
@@ -2873,17 +2941,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 )}
               </ScrollView>
 
-              <View style={[styles.footer, primaryFooterIsHandoff && styles.footerStacked, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
-                {voiceSessionActive ? (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel="End voice chat"
-                    onPress={endVoiceSession}
-                    style={[styles.confirmButton, styles.fullWidthFooterButton]}
-                  >
-                    <Text style={styles.confirmText}>End voice chat</Text>
-                  </Pressable>
-                ) : showingConversationReview ? (
+              {!showingLiveVoiceExperience ? <View style={[styles.footer, primaryFooterIsHandoff && styles.footerStacked, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+                {voiceSessionActive || showingLiveVoiceExperience ? null : showingConversationReview ? (
                   <>
                     <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={() => closePanel()} style={styles.cancelButton}>
                       <Text style={styles.cancelText}>Done</Text>
@@ -2925,20 +2984,22 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </>
                 ) : (
                   <>
-                    <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={() => closePanel()} style={styles.cancelButton}>
-                      <Text style={styles.cancelText}>Done</Text>
-                    </Pressable>
                     {!draftIsActionable ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel="Ask Helfi"
-                        testID="talk-to-helfi-footer-submit"
-                        onPress={() => sendDraftRequest()}
-                        disabled={busy || !transcript.trim()}
-                        style={[styles.confirmButton, (busy || !transcript.trim()) && styles.confirmDisabled]}
-                      >
-                        {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>Ask Helfi</Text>}
-                      </Pressable>
+                      <>
+                        <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={() => closePanel()} style={styles.cancelButton}>
+                          <Text style={styles.cancelText}>Done</Text>
+                        </Pressable>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Ask Helfi"
+                          testID="talk-to-helfi-footer-submit"
+                          onPress={() => sendDraftRequest()}
+                          disabled={busy || !transcript.trim()}
+                          style={[styles.confirmButton, (busy || !transcript.trim()) && styles.confirmDisabled]}
+                        >
+                          {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>Ask Helfi</Text>}
+                        </Pressable>
+                      </>
                     ) : null}
                     {draftIsActionable ? (
                       <Pressable accessibilityRole="button" accessibilityLabel={discardFooterLabel} onPress={rejectDraft} style={styles.discardButton}>
@@ -2958,7 +3019,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     ) : null}
                   </>
                 )}
-              </View>
+              </View> : null}
             </View>
           </Modal>
           <Modal visible={bottleCameraOpen} animationType="slide" presentationStyle="fullScreen" onRequestClose={closeCameraMode}>
@@ -3056,6 +3117,30 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               </View>
             </View>
           </Modal>
+          <Modal
+            transparent
+            visible={saveSuccessNotice != null}
+            animationType="fade"
+            presentationStyle="overFullScreen"
+            onRequestClose={() => setSaveSuccessNotice(null)}
+          >
+            <Pressable
+              accessibilityRole="button"
+              accessibilityLabel="Dismiss saved confirmation"
+              onPress={() => setSaveSuccessNotice(null)}
+              style={[styles.saveSuccessOverlay, { paddingTop: Math.max(insets.top + 12, 28) }]}
+            >
+              <View style={styles.saveSuccessCard}>
+                <View style={styles.saveSuccessIcon}>
+                  <Feather name="check" size={22} color="#FFFFFF" />
+                </View>
+                <View style={styles.saveSuccessCopy}>
+                  <Text style={styles.saveSuccessTitle}>{saveSuccessNotice?.title}</Text>
+                  <Text style={styles.saveSuccessMessage}>{saveSuccessNotice?.message}</Text>
+                </View>
+              </View>
+            </Pressable>
+          </Modal>
         </>
       )}
     </VoiceAssistantContext.Provider>
@@ -3071,7 +3156,32 @@ export function useVoiceAssistant() {
 }
 
 const styles = StyleSheet.create({
+  saveSuccessOverlay: { flex: 1, alignItems: 'center', paddingHorizontal: 16, backgroundColor: 'rgba(8, 21, 13, 0.08)' },
+  saveSuccessCard: {
+    width: '100%',
+    maxWidth: 430,
+    minHeight: 76,
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: '#B7E4C2',
+    backgroundColor: '#F2FBF4',
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 12,
+    shadowColor: '#102017',
+    shadowOpacity: 0.16,
+    shadowRadius: 18,
+    shadowOffset: { width: 0, height: 8 },
+    elevation: 8,
+  },
+  saveSuccessIcon: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#16803A', alignItems: 'center', justifyContent: 'center' },
+  saveSuccessCopy: { flex: 1 },
+  saveSuccessTitle: { color: '#12351A', fontSize: 17, fontWeight: '700' },
+  saveSuccessMessage: { color: '#476451', fontSize: 14, fontWeight: '700', marginTop: 2 },
   panel: { flex: 1, backgroundColor: '#F7FAF9' },
+  liveVoicePanel: { backgroundColor: '#FFFFFF' },
   scroll: { flex: 1 },
   header: {
     paddingHorizontal: 20,
@@ -3084,7 +3194,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
-  title: { fontSize: 24, fontWeight: '900', color: theme.colors.text },
+  title: { fontSize: 24, fontWeight: '700', color: theme.colors.text },
   subtitle: { marginTop: 4, color: theme.colors.muted, fontWeight: '700' },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF5F1' },
   liveCameraPanel: { flex: 1, backgroundColor: '#07110A' },
@@ -3108,8 +3218,8 @@ const styles = StyleSheet.create({
   },
   liveCameraIconSpacer: { width: 44, height: 44 },
   liveCameraTitleBlock: { flex: 1, alignItems: 'center', minWidth: 0 },
-  liveCameraTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '900' },
-  liveCameraSubtitle: { color: '#CFE8D4', fontSize: 12, fontWeight: '800', marginTop: 3 },
+  liveCameraTitle: { color: '#FFFFFF', fontSize: 18, fontWeight: '700' },
+  liveCameraSubtitle: { color: '#CFE8D4', fontSize: 12, fontWeight: '600', marginTop: 3 },
   liveCameraArea: { flex: 1, backgroundColor: '#000000', position: 'relative', overflow: 'hidden' },
   liveCameraPreview: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0 },
   liveCameraPermissionPanel: {
@@ -3126,10 +3236,10 @@ const styles = StyleSheet.create({
     gap: 10,
     zIndex: 3,
   },
-  liveCameraPermissionTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '900' },
+  liveCameraPermissionTitle: { color: '#FFFFFF', fontSize: 20, fontWeight: '700' },
   liveCameraPermissionText: { color: '#D9E8DD', textAlign: 'center', lineHeight: 20, fontWeight: '700' },
   liveCameraPrimaryButton: { marginTop: 6, borderRadius: 8, backgroundColor: '#FFFFFF', paddingHorizontal: 18, paddingVertical: 12 },
-  liveCameraPrimaryText: { color: '#102017', fontWeight: '900' },
+  liveCameraPrimaryText: { color: '#102017', fontWeight: '700' },
   liveCameraOverlay: {
     position: 'absolute',
     top: 0,
@@ -3141,8 +3251,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
   },
   liveCameraGuideText: { position: 'absolute', top: 34, left: 20, right: 20, alignItems: 'center' },
-  liveCameraGuideTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '900', textAlign: 'center' },
-  liveCameraGuideSubtitle: { color: '#DDF7E1', fontSize: 13, fontWeight: '800', textAlign: 'center', marginTop: 5 },
+  liveCameraGuideTitle: { color: '#FFFFFF', fontSize: 22, fontWeight: '700', textAlign: 'center' },
+  liveCameraGuideSubtitle: { color: '#DDF7E1', fontSize: 13, fontWeight: '600', textAlign: 'center', marginTop: 5 },
   liveCameraFrame: {
     width: '88%',
     aspectRatio: 1.18,
@@ -3168,7 +3278,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     gap: 8,
   },
-  liveCameraStatusText: { color: '#FFFFFF', fontWeight: '900', fontSize: 13 },
+  liveCameraStatusText: { color: '#FFFFFF', fontWeight: '700', fontSize: 13 },
   liveCameraFooter: { paddingTop: 16, paddingHorizontal: 18, backgroundColor: '#07110A', alignItems: 'center', gap: 10 },
   liveCameraVoiceButton: {
     width: '100%',
@@ -3182,67 +3292,56 @@ const styles = StyleSheet.create({
   },
   liveCameraVoiceListening: { backgroundColor: '#DDF7E1' },
   liveCameraVoiceDisabled: { opacity: 0.58 },
-  liveCameraVoiceText: { color: '#102017', fontSize: 17, fontWeight: '900' },
-  liveCameraSafetyText: { color: '#CFE8D4', textAlign: 'center', fontWeight: '800', fontSize: 12 },
+  liveCameraVoiceText: { color: '#102017', fontSize: 17, fontWeight: '700' },
+  liveCameraSafetyText: { color: '#CFE8D4', textAlign: 'center', fontWeight: '600', fontSize: 12 },
   content: { padding: 18, gap: 16 },
   contentWithFooterSpace: { paddingBottom: 132 },
+  liveVoiceContent: { flexGrow: 1 },
   voiceCallScreen: {
-    minHeight: 520,
-    borderRadius: 8,
-    backgroundColor: '#12351A',
+    flex: 1,
+    minHeight: 620,
+    backgroundColor: '#FFFFFF',
     alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 22,
-    paddingVertical: 28,
-    gap: 18,
+    paddingHorizontal: 20,
   },
-  voiceCallTopLine: {
-    minHeight: 34,
-    borderRadius: 17,
-    paddingHorizontal: 13,
-    backgroundColor: 'rgba(255,255,255,0.12)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  voiceCallEyebrow: { color: '#DDF7E1', fontWeight: '900', fontSize: 13 },
+  voiceBrand: { color: theme.colors.text, fontSize: 21, fontWeight: '700', textAlign: 'center' },
+  voiceCallStage: { flex: 1, width: '100%', alignItems: 'center', justifyContent: 'center', gap: 24 },
   voiceOrb: {
-    width: 178,
-    height: 178,
-    borderRadius: 89,
-    borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.32)',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    width: 224,
+    height: 224,
+    borderRadius: 112,
+    backgroundColor: '#E4F7E8',
     alignItems: 'center',
     justifyContent: 'center',
   },
   voiceOrbInner: {
-    width: 126,
-    height: 126,
-    borderRadius: 63,
+    width: 164,
+    height: 164,
+    borderRadius: 82,
     backgroundColor: '#41AD49',
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: '#2E7D35',
+    shadowOpacity: 0.22,
+    shadowRadius: 28,
+    shadowOffset: { width: 0, height: 12 },
+    elevation: 8,
   },
   voiceBarsLarge: { height: 56, minWidth: 82, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 7 },
   voiceBarLarge: { width: 7, height: 38, borderRadius: 7, backgroundColor: '#FFFFFF' },
   voiceBarLargeShort: { height: 22, opacity: 0.78 },
   voiceBarLargeTall: { height: 52, opacity: 0.95 },
-  voiceCallTitle: { color: '#FFFFFF', fontSize: 32, fontWeight: '900', textAlign: 'center' },
-  voiceCallText: { color: '#DDF7E1', fontSize: 16, lineHeight: 23, fontWeight: '800', textAlign: 'center' },
-  voiceCallCameraButton: {
-    minHeight: 48,
-    borderRadius: 24,
-    paddingHorizontal: 18,
-    backgroundColor: '#FFFFFF',
-    alignItems: 'center',
-    justifyContent: 'center',
-    flexDirection: 'row',
-    gap: 8,
-  },
-  voiceCallCameraText: { color: '#12351A', fontSize: 15, fontWeight: '900' },
-  voiceCallVisionChoices: { alignSelf: 'stretch', maxWidth: 420 },
+  voiceCallTitle: { color: theme.colors.text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  voiceControls: { width: '100%', maxWidth: 380, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  voiceControlItem: { width: 82, alignItems: 'center', justifyContent: 'flex-start', gap: 7 },
+  voiceControlCircle: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#F1F4F2', alignItems: 'center', justifyContent: 'center' },
+  voiceEndCircle: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#102017', alignItems: 'center', justifyContent: 'center' },
+  voiceControlLabel: { color: '#12351A', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  voiceEndLabel: { color: '#102017', fontSize: 13, fontWeight: '700', textAlign: 'center' },
+  voiceControlDisabled: { opacity: 0.42 },
+  voiceControlText: { color: '#12351A', fontSize: 12, fontWeight: '700' },
+  voiceRetryButton: { minHeight: 48, borderRadius: 24, paddingHorizontal: 20, backgroundColor: '#EEF8F0', alignItems: 'center', justifyContent: 'center', flexDirection: 'row', gap: 8, marginBottom: 14 },
+  voiceCallVisionChoices: { width: '100%', maxWidth: 420, marginBottom: 12 },
   transcriptReview: { gap: 10 },
   transcriptReviewHeader: {
     borderRadius: 8,
@@ -3250,13 +3349,10 @@ const styles = StyleSheet.create({
     borderColor: '#CFE8D4',
     backgroundColor: '#F2FBF4',
     padding: 12,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 10,
+    alignItems: 'flex-start',
   },
-  transcriptReviewTitle: { color: theme.colors.text, fontSize: 18, fontWeight: '900' },
-  transcriptReviewSubtitle: { color: theme.colors.muted, fontSize: 12, fontWeight: '800', marginTop: 3 },
+  transcriptReviewTitle: { color: theme.colors.text, fontSize: 18, fontWeight: '700' },
+  transcriptReviewSubtitle: { color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginTop: 3 },
   newVoiceChatButton: {
     minHeight: 38,
     borderRadius: 8,
@@ -3267,14 +3363,14 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 6,
   },
-  newVoiceChatText: { color: '#FFFFFF', fontSize: 12, fontWeight: '900' },
+  newVoiceChatText: { color: '#FFFFFF', fontSize: 12, fontWeight: '700' },
   transcriptBubble: { borderRadius: 8, padding: 12, borderWidth: 1 },
   transcriptUserBubble: { backgroundColor: '#EAF8EE', borderColor: '#CFE8D4' },
   transcriptHelfiBubble: { backgroundColor: '#FFFFFF', borderColor: theme.colors.border },
   replyRow: { flexDirection: 'row', backgroundColor: '#E8F2EA', borderRadius: 8, padding: 4 },
   segment: { flex: 1, minHeight: 42, borderRadius: 6, alignItems: 'center', justifyContent: 'center' },
   segmentActive: { backgroundColor: '#FFFFFF' },
-  segmentText: { color: theme.colors.muted, fontWeight: '800' },
+  segmentText: { color: theme.colors.muted, fontWeight: '600' },
   segmentTextActive: { color: theme.colors.text },
   spokenReplyBox: {
     minHeight: 42,
@@ -3288,7 +3384,7 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   spokenReplyFailed: { borderColor: '#F3C0BB', backgroundColor: '#FFF4F2' },
-  spokenReplyText: { color: '#226B2C', fontWeight: '900', fontSize: 13 },
+  spokenReplyText: { color: '#226B2C', fontWeight: '700', fontSize: 13 },
   spokenReplyFailedText: { color: '#B42318' },
   conversationBox: { gap: 8 },
   conversationHeader: { minHeight: 34, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
@@ -3302,14 +3398,14 @@ const styles = StyleSheet.create({
     gap: 6,
     backgroundColor: '#EEF8F0',
   },
-  newChatText: { color: '#226B2C', fontSize: 12, fontWeight: '900' },
+  newChatText: { color: '#226B2C', fontSize: 12, fontWeight: '700' },
   conversationBubble: { borderRadius: 8, padding: 10, borderWidth: 1 },
   userBubble: { backgroundColor: '#EEF8F0', borderColor: '#CFE8D4' },
   assistantBubble: { backgroundColor: '#FFFFFF', borderColor: theme.colors.border },
-  conversationRole: { color: theme.colors.muted, fontSize: 12, fontWeight: '900', marginBottom: 3 },
+  conversationRole: { color: theme.colors.muted, fontSize: 12, fontWeight: '700', marginBottom: 3 },
   conversationText: { color: theme.colors.text, fontSize: 14, lineHeight: 20 },
   contextBox: { borderRadius: 8, borderWidth: 1, borderColor: '#CFE8D4', backgroundColor: '#F2FBF4', padding: 12 },
-  contextText: { color: theme.colors.text, fontSize: 15, lineHeight: 21, fontWeight: '800' },
+  contextText: { color: theme.colors.text, fontSize: 15, lineHeight: 21, fontWeight: '600' },
   visionButton: {
     minHeight: 48,
     borderRadius: 8,
@@ -3321,7 +3417,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  visionText: { color: '#226B2C', fontWeight: '900', fontSize: 15 },
+  visionText: { color: '#226B2C', fontWeight: '700', fontSize: 15 },
   visionChoiceBox: {
     borderRadius: 8,
     borderWidth: 1,
@@ -3348,7 +3444,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   visionChoiceCopy: { flex: 1, minWidth: 0 },
-  visionChoiceTitle: { color: theme.colors.text, fontWeight: '900', fontSize: 15 },
+  visionChoiceTitle: { color: theme.colors.text, fontWeight: '700', fontSize: 15 },
   visionChoiceDetail: { color: theme.colors.muted, fontWeight: '700', fontSize: 12, marginTop: 2 },
   recordButton: {
     minHeight: 58,
@@ -3361,9 +3457,9 @@ const styles = StyleSheet.create({
   },
   listeningButton: { backgroundColor: '#226B2C' },
   disabled: { opacity: 0.65 },
-  recordText: { color: '#FFFFFF', fontWeight: '900', fontSize: 16 },
+  recordText: { color: '#FFFFFF', fontWeight: '700', fontSize: 16 },
   voiceButtonCopy: { alignItems: 'center', justifyContent: 'center', gap: 1 },
-  voiceHintText: { color: '#DDF7E1', fontWeight: '800', fontSize: 12 },
+  voiceHintText: { color: '#DDF7E1', fontWeight: '600', fontSize: 12 },
   voiceBars: { height: 28, minWidth: 38, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4 },
   voiceBar: { width: 4, height: 20, borderRadius: 4, backgroundColor: '#FFFFFF' },
   voiceBarDark: { width: 4, height: 20, borderRadius: 4, backgroundColor: '#102017' },
@@ -3380,7 +3476,7 @@ const styles = StyleSheet.create({
     padding: 18,
     gap: 8,
   },
-  voiceSessionTitle: { color: '#12351A', fontWeight: '900', fontSize: 22, textAlign: 'center' },
+  voiceSessionTitle: { color: '#12351A', fontWeight: '700', fontSize: 22, textAlign: 'center' },
   voiceSessionText: { color: '#3B5F43', fontWeight: '700', fontSize: 14, lineHeight: 20, textAlign: 'center' },
   liveVoiceErrorBox: {
     minHeight: 42,
@@ -3394,7 +3490,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  liveVoiceErrorText: { color: '#B42318', fontWeight: '800', lineHeight: 19, flex: 1 },
+  liveVoiceErrorText: { color: '#B42318', fontWeight: '600', lineHeight: 19, flex: 1 },
   liveVoiceUnavailableBox: {
     minHeight: 42,
     borderRadius: 8,
@@ -3407,12 +3503,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     gap: 8,
   },
-  liveVoiceUnavailableText: { color: '#226B2C', fontWeight: '800', lineHeight: 19, flex: 1 },
+  liveVoiceUnavailableText: { color: '#226B2C', fontWeight: '600', lineHeight: 19, flex: 1 },
   noticeBox: { borderRadius: 8, borderWidth: 1, borderColor: '#CFE8D4', backgroundColor: '#F2FBF4', padding: 12, gap: 4 },
-  noticeTitle: { color: theme.colors.text, fontWeight: '900' },
+  noticeTitle: { color: theme.colors.text, fontWeight: '700' },
   noticeText: { color: theme.colors.muted, lineHeight: 20 },
   section: { backgroundColor: '#FFFFFF', borderRadius: 8, borderWidth: 1, borderColor: '#DDE8E1', padding: 14, gap: 10 },
-  label: { color: theme.colors.text, fontSize: 14, fontWeight: '900' },
+  label: { color: theme.colors.text, fontSize: 14, fontWeight: '700' },
   input: {
     minHeight: 88,
     borderRadius: 8,
@@ -3427,8 +3523,8 @@ const styles = StyleSheet.create({
   },
   secondaryButton: { minHeight: 44, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#E8F2EA' },
   secondaryDisabled: { opacity: 0.5 },
-  secondaryText: { color: '#226B2C', fontWeight: '900' },
-  summary: { color: theme.colors.text, fontWeight: '900', fontSize: 16 },
+  secondaryText: { color: '#226B2C', fontWeight: '700' },
+  summary: { color: theme.colors.text, fontWeight: '700', fontSize: 16 },
   message: { color: theme.colors.text, lineHeight: 21 },
   entryList: { gap: 8, paddingTop: 4 },
   entryRow: { gap: 2 },
@@ -3448,10 +3544,10 @@ const styles = StyleSheet.create({
   footerRow: { flexDirection: 'row', gap: 12 },
   fullWidthFooterButton: { width: '100%', flex: 0 },
   cancelButton: { flex: 1, minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEF3F0' },
-  cancelText: { color: theme.colors.text, fontWeight: '900' },
-  discardButton: { flex: 1, minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#F4E7E7' },
-  discardText: { color: '#8A2D2D', fontWeight: '900' },
+  cancelText: { color: theme.colors.text, fontWeight: '700' },
+  discardButton: { flex: 1, minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#DC2626' },
+  discardText: { color: '#FFFFFF', fontWeight: '700' },
   confirmButton: { flex: 1, minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#41AD49' },
   confirmDisabled: { opacity: 0.45 },
-  confirmText: { color: '#FFFFFF', fontWeight: '900' },
+  confirmText: { color: '#FFFFFF', fontWeight: '700' },
 })

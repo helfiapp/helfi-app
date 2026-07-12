@@ -12,6 +12,7 @@ type RealtimeCallbacks = {
 
 type RealtimeSession = {
   stop: () => Promise<void>
+  setMicrophoneMuted: (muted: boolean) => void
 }
 
 function parseRealtimeJson(value: unknown) {
@@ -26,6 +27,15 @@ function parseRealtimeJson(value: unknown) {
 function requireWebRtc() {
   try {
     return require('react-native-webrtc')
+  } catch {
+    return null
+  }
+}
+
+function requireInCallManager() {
+  try {
+    const module = require('react-native-incall-manager')
+    return module?.default || module
   } catch {
     return null
   }
@@ -174,8 +184,16 @@ export async function startHelfiRealtimeVoiceSession(params: {
   }
 
   const { RTCPeerConnection, RTCSessionDescription, mediaDevices } = rtc
+  const inCallManager = requireInCallManager()
   const callbacks = params.callbacks || {}
   callbacks.onStatus?.('connecting')
+
+  try {
+    inCallManager?.start?.({ media: 'audio', auto: true })
+    inCallManager?.setForceSpeakerphoneOn?.(true)
+  } catch {
+    // WebRTC can still connect if the optional speaker routing helper is unavailable.
+  }
 
   const pc = new RTCPeerConnection({
     iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
@@ -258,6 +276,12 @@ export async function startHelfiRealtimeVoiceSession(params: {
       pc.close()
     } catch {
       // Already closed.
+    }
+    try {
+      inCallManager?.setForceSpeakerphoneOn?.(null)
+      inCallManager?.stop?.()
+    } catch {
+      // The audio route may already be released.
     }
   }
   const onAbort = () => {
@@ -391,6 +415,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
       remoteStreams.push(stream)
       stream.getAudioTracks?.().forEach(enableRemoteAudioTrack)
     }
+    try {
+      inCallManager?.setForceSpeakerphoneOn?.(true)
+    } catch {
+      // Keep the connected stream active even if route selection fails.
+    }
     emitStatus('live')
   }
 
@@ -443,6 +472,15 @@ export async function startHelfiRealtimeVoiceSession(params: {
   }
 
   return {
+    setMicrophoneMuted: (muted: boolean) => {
+      localStream.getAudioTracks?.().forEach((track: any) => {
+        try {
+          track.enabled = !muted
+        } catch {
+          // Some native track wrappers expose this as read-only.
+        }
+      })
+    },
     stop: async () => {
       params.signal?.removeEventListener?.('abort', onAbort)
       callbacks.onStatus?.('closed')

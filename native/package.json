@@ -39,6 +39,7 @@
     "react-native": "0.81.5",
     "react-native-health": "^1.19.0",
     "react-native-iap": "^14.7.12",
+    "react-native-incall-manager": "^4.2.1",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-screens": "~4.16.0",
     "react-native-svg": "15.12.1",

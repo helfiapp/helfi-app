@@ -866,6 +866,16 @@ Owner policy for this area (non-negotiable):
 - Water entries listed in **Food Diary** must expose **Edit Entry** in the kebab menu (desktop + mobile).
 - Editing a water entry must open a lightweight modal (amount + unit) and **PATCH** `/api/water-log/:id`.
 - Save must refresh the on‑screen list by updating `waterEntries` state (replace matching `id`, or prepend if missing).
+- Native Food Diary Water rows must use the same compact three-dot action button as the other diary rows.
+- Never place large visible Edit and Delete buttons directly inside a native Water row.
+- The three-dot sheet may expose only the existing Edit Entry, Delete, and Cancel actions; do not change Water save, delete, loading, ordering, calorie, favourites, or rename behaviour while changing this presentation.
+
+### Native list-row action menus (Jul 2026 – Locked)
+- Native list entries must not show separate visible **Edit** and **Delete** buttons in the row.
+- Put entry-level edit/delete actions behind one compact three-dot button, with a plain action sheet containing the existing actions and Cancel.
+- This rule covers Food Diary food, Water and Exercise rows, Health Journal, Daily Check-in history, Water Intake history, Mood Journal history, Health Image Notes, Symptom Notes, Notifications and Support ticket history.
+- This does not apply to a dedicated edit form's Delete control, Delete Account confirmation, or a bulk-selection action such as Delete selected.
+- Changing the presentation must not change the underlying edit, delete, save, loading, ordering, calorie, favourites or rename behaviour.
 
 **Restore steps if it breaks again:**
 1. File: `app/food/page.tsx`.

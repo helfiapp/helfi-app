@@ -22,7 +22,6 @@
     "check:native-voice-command-behavior": "node scripts/assert-native-voice-command-behavior.js",
     "check:talk-to-helfi-testflight": "node scripts/assert-talk-to-helfi-testflight-preflight.js",
     "check:talk-to-helfi-testflight-upload-ready": "node scripts/assert-talk-to-helfi-testflight-upload-ready.js",
-    "build:talk-to-helfi-testflight:paused": "bash scripts/build-talk-to-helfi-testflight-ipa.sh paused-safe",
     "build:talk-to-helfi-testflight:live": "bash scripts/build-talk-to-helfi-testflight-ipa.sh live-candidate",
     "check:vercel-ai-env": "node scripts/check-vercel-ai-env.js",
     "check:vercel-production-env": "node scripts/check-vercel-production-env.js",
