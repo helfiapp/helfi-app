@@ -31,10 +31,8 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  await ensureSmartCoachTables()
-
-  const rows = await prisma
-    .$queryRawUnsafe<
+  const loadQuietHours = () =>
+    prisma.$queryRawUnsafe<
       Array<{
         enabled: boolean
         starttime: string
@@ -47,15 +45,16 @@ export async function GET(req: NextRequest) {
        WHERE userId = $1`,
       user.id
     )
-    .catch(
-      () =>
-        [] as Array<{
-          enabled: boolean
-          starttime: string
-          endtime: string
-          timezone: string
-        }>
-    )
+
+  let rows
+  try {
+    rows = await loadQuietHours()
+  } catch {
+    // Existing installations should use the fast path above. Only run the
+    // legacy table setup when this table is genuinely missing.
+    await ensureSmartCoachTables()
+    rows = await loadQuietHours()
+  }
 
   if (!rows.length) {
     return NextResponse.json({
@@ -89,10 +88,9 @@ export async function POST(req: NextRequest) {
     Intl.DateTimeFormat().resolvedOptions().timeZone ||
     'UTC'
 
-  await ensureSmartCoachTables()
-
-  await prisma.$executeRawUnsafe(
-    `INSERT INTO NotificationQuietHours (userId, enabled, startTime, endTime, timezone, updatedAt)
+  const saveQuietHours = () =>
+    prisma.$executeRawUnsafe(
+      `INSERT INTO NotificationQuietHours (userId, enabled, startTime, endTime, timezone, updatedAt)
      VALUES ($1,$2,$3,$4,$5,NOW())
      ON CONFLICT (userId) DO UPDATE SET
        enabled = EXCLUDED.enabled,
@@ -100,12 +98,21 @@ export async function POST(req: NextRequest) {
        endTime = EXCLUDED.endTime,
        timezone = EXCLUDED.timezone,
        updatedAt = NOW()`,
-    user.id,
-    enabled,
-    startTime,
-    endTime,
-    timezone
-  )
+      user.id,
+      enabled,
+      startTime,
+      endTime,
+      timezone
+    )
+
+  try {
+    await saveQuietHours()
+  } catch {
+    // Keep first-time environments self-healing without slowing down every
+    // normal save with unrelated table and index checks.
+    await ensureSmartCoachTables()
+    await saveQuietHours()
+  }
 
   return NextResponse.json({
     success: true,
