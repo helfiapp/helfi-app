@@ -152,7 +152,7 @@ export default function CheckinHistoryPage() {
       const params = new URLSearchParams()
       if (startValue) params.set('start', startValue)
       if (endValue) params.set('end', endValue)
-      const res = await fetch(`/api/checkins/history?${params.toString()}`)
+      const res = await fetch(`/api/checkins/history?${params.toString()}`, { cache: 'no-store' })
       const data = await res.json()
       const history = Array.isArray(data?.history) ? data.history : []
       setRows(history)

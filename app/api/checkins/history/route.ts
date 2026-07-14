@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCheckinUser } from '@/app/api/checkins/_auth'
 
+export const dynamic = 'force-dynamic'
+export const revalidate = 0
+
 let checkinTablesEnsured = false
 
 async function ensureCheckinTables() {
@@ -55,7 +58,11 @@ export async function GET(req: NextRequest) {
        ORDER BY r.timestamp DESC, i.name ASC`,
       user.id, start, end
     )
-    return NextResponse.json({ history: rows })
+    console.info('[checkins history] loaded', { userId: user.id, start, end, count: rows.length })
+    return NextResponse.json(
+      { history: rows },
+      { headers: { 'Cache-Control': 'private, no-store, max-age=0' } },
+    )
   } catch (e) {
     console.error('checkins history error', e)
     return NextResponse.json({ error: 'Failed to load history' }, { status: 500 })
