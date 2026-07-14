@@ -5,11 +5,13 @@ Linear ticket: HEL-465
 Test account: `info@sonicweb.com.au`
 Environment: live web app, using the already-open signed-in Chrome browser
 
-Status: **Repair and live retest in progress.** Broad signed-in web coverage is recorded below. The confirmed web defects owned by AUDIT 1 now have local repairs and a successful full production build. They are not yet live; each affected user flow must be retested after deployment before the audit can be called complete.
+Status: **AUDIT 1 repair batch deployed and live-retested.** The original observations remain below as the audit baseline. The final live-retest table records the repaired result and supersedes the earlier “not deployed” wording for those defects.
 
-The Health Intake section-11 readback failure was investigated and reproduced again under paced testing. Section 11 loaded in 3.6 seconds and remained usable, but code inspection confirmed an automatic browser-location request plus unnecessary background loads that could make it appear frozen. Those triggers are repaired locally. Both Food Diary Add exercise buttons were also retested on the current live app and opened the exercise form correctly; that earlier result is now classified as a transient test failure rather than a current app defect.
+The Health Intake section-11 readback failure was investigated and reproduced again under paced testing. Section 11 loaded in 3.6 seconds and remained usable, but code inspection confirmed an automatic browser-location request plus unnecessary background loads that could make it appear frozen. Those triggers were repaired, deployed and live-retested. Both Food Diary Add exercise buttons were also retested on the current live app and opened the exercise form correctly; that earlier result is now classified as a transient test failure rather than a current app defect.
 
 Prior issue documents are historical test leads only. Every defect is confirmed again on the current live app before any repair is considered.
+
+Final production deployment: commit `73d5bcef`, deployment `dpl_AszwXL566bnDtkWttsyueNfhkH5H`, READY on 14 July 2026. Both `helfi.ai` and `www.helfi.ai` were verified against that exact deployment.
 
 ## Result labels
 
@@ -17,6 +19,30 @@ Prior issue documents are historical test leads only. Every defect is confirmed 
 - **Defect** — a problem was reproduced and supported by visible or saved evidence.
 - **Blocked** — the test could not be completed safely or needs owner action.
 - **Not run** — inventoried but not tested yet.
+
+## Final live repair retest
+
+| Area | Live user-flow evidence | Final result |
+|---|---|---:|
+| Health Intake | Section 1 loaded in about 2.9 seconds and Review loaded in about 3.2 seconds with saved information, Back and Confirm controls; no automatic location prompt appeared | Pass |
+| Today's Check-in and History | Saved all five tracked ratings as Average, returned to the dashboard, then History showed the 14 July 11:04 PM group with all five exact values and 23 history groups | Pass |
+| Symptom Notes credit charge | Balance was 857 before one temporary note and 856 after a fresh page load; the usage counter increased once. The temporary note was then deleted and the older 26 May entry remained | Pass — exactly 1 credit |
+| Profile bio | A non-empty value auto-saved with “All changes saved”; the original empty value was restored and remained empty after reload | Pass after cleanup |
+| Profile camera | Open Camera showed the camera modal and live controls before access completed; Stop Camera closed it without taking or saving a photo | Pass |
+| Settings PDF | Download health data kept Settings open and created a separate three-page PDF tab | Pass |
+| Mood identity and History actions | Header reads Mood Tracker; a saved entry exposed the three-dot menu with Edit and Delete; Delete showed a separate irreversible confirmation and was cancelled | Pass |
+| Devices | Interest controls acknowledged immediately and disabled only while saving; both temporary choices were restored. Fitbit exposed “Close Popup & Check Status” while connecting and returned to Connect Fitbit after closing | Pass after restoration |
+| Build a meal | Clicking Save meal with zero ingredients displayed “Add at least one ingredient first” next to the action and in an accessible alert | Pass |
+| Insights issue name | `/insights/issue/Stress%20levels` displayed “Stress levels” throughout and no `%20` user text | Pass |
+| Health Tracking | Both the page header and content heading read Health Tracking | Pass |
+| Quiet Hours | Saved enabled 00:00–12:00 state loaded correctly; Save completed and preserved the values. The database route now skips unrelated setup work on normal requests. A warm live reload completed in about 3.8 seconds; the first request after the new server woke up was slower | Pass, with cold-start delay recorded |
+| Notification accessibility | Delivery exposed named Email notifications and Push notifications checkboxes; Reminders and Quiet Hours controls also have readable labels | Pass |
+| Notification state handling | Source and targeted checks confirm failed push setup rolls back instead of falsely staying enabled. External push delivery itself was not re-sent in the final pass to avoid generating an unnecessary real notification | Pass for repaired state/error handling; external delivery not re-sent |
+| Health Coach settings | Quiet-hours persistence above confirms the repaired settings path. Current alerts and History empty states were also loaded | Pass for tested settings/history states |
+
+Deployment verification: local production build passed; Vercel production build passed; Vercel reported READY; both live domains resolved to the exact READY deployment.
+
+Coverage limitation: the audit exercised the full signed-in route and navigation inventory and all safe ordinary-user controls. It intentionally did not complete account deletion/reset, real purchases, practitioner application submission, support messages, third-party OAuth approvals, or destructive changes to existing medical files. Those are not safe to use merely to prove a button works. Missing Apple/Google/Stripe feature-specific production variables also prevent claiming every external integration has been proven end-to-end.
 
 ## Audit matrix
 
@@ -132,7 +158,7 @@ None recorded yet.
 - Targeted lint completed with no errors for every edited repair file.
 - Food Diary protected-region checks, date guard, practitioner lock, OpenAI-key safety check, web page locks, native voice guard checks and custom-food serving checks all passed.
 - Full production build completed successfully after the complete repair batch. Existing project-wide warnings and expected dynamic-route messages remain; there is no new build error.
-- No deployment had been performed at the time of this update. Real live-browser retest is still required after deployment.
+- Production deployment `dpl_AszwXL566bnDtkWttsyueNfhkH5H` completed READY. The repaired user flows and both live-domain aliases were verified as recorded in the final live-retest table above.
 
 ## AUDIT 2 parity handover
 
