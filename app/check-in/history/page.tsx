@@ -97,14 +97,14 @@ export default function CheckinHistoryPage() {
 
   const HISTORY_CACHE_TTL_MS = 5 * 60_000
   const buildHistoryCacheKey = (startValue: string, endValue: string) =>
-    `checkin-history:${startValue || 'all'}:${endValue || 'all'}`
+    `checkin-history-v2:${startValue || 'all'}:${endValue || 'all'}`
   const readHistoryCache = (key: string): HistoryCache | null => {
     if (typeof window === 'undefined') return null
     try {
       const raw = window.sessionStorage.getItem(key)
       if (!raw) return null
       const parsed = JSON.parse(raw)
-      if (!parsed?.rows || !Array.isArray(parsed.rows)) return null
+      if (!parsed?.rows || !Array.isArray(parsed.rows) || parsed.rows.length === 0) return null
       return parsed
     } catch {
       return null

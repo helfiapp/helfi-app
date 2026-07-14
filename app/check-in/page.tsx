@@ -162,6 +162,14 @@ export default function CheckInPage() {
         throw new Error(data?.detail || data?.error || 'Failed to save')
       }
       try {
+        for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+          const key = sessionStorage.key(index)
+          if (key?.startsWith('checkin-history:') || key?.startsWith('checkin-history-v2:')) {
+            sessionStorage.removeItem(key)
+          }
+        }
+      } catch {}
+      try {
         const CACHE_KEY = 'checkins:today:cache'
         const payloadRatings: Record<string, number | null> = {}
         for (const item of payload) payloadRatings[item.issueId] = item.value
@@ -175,12 +183,6 @@ export default function CheckInPage() {
             fetchedAt: Date.now(),
           }),
         )
-        for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
-          const key = sessionStorage.key(index)
-          if (key?.startsWith('checkin-history:')) {
-            sessionStorage.removeItem(key)
-          }
-        }
       } catch {}
       if (pendingId) {
         try {
