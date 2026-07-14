@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/lib/prisma'
 import crypto from 'crypto'
 import { deleteNotificationsByType } from '@/lib/notification-inbox'
@@ -168,7 +169,7 @@ export async function GET(req: NextRequest) {
   
   // Get the most recent check-in for today (show latest entry per issue)
   const allRatings: any[] = await prisma.$queryRawUnsafe(`
-    SELECT issueId, value, note, isNa, timestamp
+    SELECT issueId AS "issueId", value, note, isNa AS "isNa", timestamp
     FROM CheckinRatings 
     WHERE userId = $1 AND date = $2 
     ORDER BY timestamp DESC
@@ -217,19 +218,43 @@ export async function POST(req: NextRequest) {
     // try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ADD COLUMN IF NOT EXISTS isNa BOOLEAN DEFAULT false`) } catch(_) {}
     // try { await prisma.$executeRawUnsafe(`ALTER TABLE CheckinRatings ALTER COLUMN value DROP NOT NULL`) } catch(_) {}
     
-    for (const r of ratings as Array<{ issueId?: string, value?: number | null, note?: string, isNa?: boolean }>) {
-      if (!r?.issueId) continue
-      const clamped = (r.value === null || r.value === undefined) ? null : Math.max(0, Math.min(6, Number(r.value)))
-      const id = crypto.randomUUID()
-      await prisma.$executeRawUnsafe(
-        `DELETE FROM CheckinRatings WHERE userId = $1 AND issueId = $2 AND date = $3`,
-        user.id, r.issueId, today
-      )
-      await prisma.$queryRawUnsafe(
-        `INSERT INTO CheckinRatings (id, userId, issueId, date, timestamp, value, note, isNa) 
-         VALUES ($1, $2, $3, $4, NOW(), $5, $6, $7)`,
-        id, user.id, r.issueId, today, clamped, String(r.note || ''), !!r.isNa
-      )
+    const normalizedRatings = (ratings as Array<{ issueId?: string, value?: number | null, note?: string, isNa?: boolean }>)
+      .filter((rating) => Boolean(rating?.issueId))
+      .map((rating) => {
+        const numericValue = rating.value === null || rating.value === undefined
+          ? null
+          : Number(rating.value)
+        return {
+          id: crypto.randomUUID(),
+          issueId: String(rating.issueId),
+          value: numericValue === null || !Number.isFinite(numericValue)
+            ? null
+            : Math.max(0, Math.min(6, numericValue)),
+          note: String(rating.note || ''),
+          isNa: Boolean(rating.isNa),
+        }
+      })
+
+    if (normalizedRatings.length > 0) {
+      await prisma.$transaction(async (tx) => {
+        const issueIds = normalizedRatings.map((rating) => rating.issueId)
+        await tx.$executeRaw(
+          Prisma.sql`DELETE FROM CheckinRatings
+            WHERE userId = ${user.id}
+              AND date = ${today}
+              AND issueId IN (${Prisma.join(issueIds)})`
+        )
+
+        const values = normalizedRatings.map((rating) => Prisma.sql`(
+          ${rating.id}, ${user.id}, ${rating.issueId}, ${today}, NOW(),
+          ${rating.value}, ${rating.note}, ${rating.isNa}
+        )`)
+        await tx.$executeRaw(
+          Prisma.sql`INSERT INTO CheckinRatings
+            (id, userId, issueId, date, timestamp, value, note, isNa)
+            VALUES ${Prisma.join(values)}`
+        )
+      })
     }
     await deleteNotificationsByType(user.id, ['checkin_reminder']).catch(() => {})
     return NextResponse.json({ success: true })

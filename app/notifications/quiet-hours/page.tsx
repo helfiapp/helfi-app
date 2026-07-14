@@ -79,6 +79,7 @@ export default function QuietHoursNotificationsPage() {
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input
                     type="checkbox"
+                    aria-label="Enable quiet hours"
                     className="sr-only peer"
                     checked={enabled}
                     onChange={(e) => setEnabled(e.target.checked)}

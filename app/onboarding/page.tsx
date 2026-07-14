@@ -5344,7 +5344,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
   
   // Update insights popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
-  const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [supplementsToSave, setSupplementsToSave] = useState<any[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
@@ -5511,23 +5510,6 @@ function SupplementsStep({ onNext, onBack, initial, onNavigateToAnalysis, onPart
     window.addEventListener('beforeunload', beforeUnloadHandler);
     return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
   }, [beforeUnloadHandler]);
-
-  // Check for existing interaction analysis
-  useEffect(() => {
-    const checkExistingAnalysis = async () => {
-      try {
-        const response = await fetch('/api/interaction-history');
-        if (response.ok) {
-          const data = await response.json();
-          const analyses = data.analyses || [];
-          setHasExistingAnalysis(analyses.length > 0);
-        }
-      } catch (error) {
-        console.error('Error checking existing analysis:', error);
-      }
-    };
-    checkExistingAnalysis();
-  }, []);
 
   const handleUploadMethodChange = (method: 'manual' | 'photo') => {
     setUploadMethod(method);
@@ -6671,7 +6653,6 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
   
   // Update insights popup state
   const [showUpdatePopup, setShowUpdatePopup] = useState(false);
-  const [hasExistingAnalysis, setHasExistingAnalysis] = useState(false);
   const [medicationsToSave, setMedicationsToSave] = useState<any[]>([]);
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false);
   const [isGeneratingInsights, setIsGeneratingInsights] = useState(false);
@@ -6914,23 +6895,6 @@ function MedicationsStep({ onNext, onBack, initial, onNavigateToAnalysis, onRequ
     window.addEventListener('beforeunload', beforeUnloadHandler);
     return () => window.removeEventListener('beforeunload', beforeUnloadHandler);
   }, [beforeUnloadHandler]);
-
-  // Check for existing interaction analysis
-  useEffect(() => {
-    const checkExistingAnalysis = async () => {
-      try {
-        const response = await fetch('/api/interaction-history');
-        if (response.ok) {
-          const data = await response.json();
-          const analyses = data.analyses || [];
-          setHasExistingAnalysis(analyses.length > 0);
-        }
-      } catch (error) {
-        console.error('Error checking existing analysis:', error);
-      }
-    };
-    checkExistingAnalysis();
-  }, []);
 
   const handleUploadMethodChange = (method: 'manual' | 'photo') => {
     setUploadMethod(method);
@@ -8558,6 +8522,7 @@ function ReviewStep({ onBack, data }: { onBack: () => void, data: any }) {
       <PractitionerRecommendations
         sourceArea="onboarding"
         issueText={recommendationIssueText}
+        requestLocation={false}
       />
       
       <div className="flex justify-between">
@@ -8605,7 +8570,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
   const [isLoadingHistory, setIsLoadingHistory] = useState(true);
   const [showCreditModal, setShowCreditModal] = useState(false);
   const [creditInfo, setCreditInfo] = useState<any>(null);
-  const [userSubscriptionStatus, setUserSubscriptionStatus] = useState<'FREE' | 'PREMIUM' | null>(null);
   const [expandedInteractions, setExpandedInteractions] = useState<Set<string>>(new Set());
   const [expandedHistoryItems, setExpandedHistoryItems] = useState<Set<string>>(new Set());
   const [showAnalysisHistory, setShowAnalysisHistory] = useState(false); // Default collapsed as requested
@@ -8675,19 +8639,6 @@ function InteractionAnalysisStep({ onNext, onBack, initial, onAnalysisSettled, a
       setIsLoadingHistory(false);
     }
     
-    // Load user subscription status
-    try {
-      const userResponse = await fetch('/api/user-data');
-      if (userResponse.ok) {
-        const userData = await userResponse.json();
-        // Check if user has premium subscription
-        const isPremium = userData.subscription?.plan === 'PREMIUM';
-        setUserSubscriptionStatus(isPremium ? 'PREMIUM' : 'FREE');
-      }
-    } catch (error) {
-      console.error('Error loading user subscription status:', error);
-      setUserSubscriptionStatus('FREE'); // Default to free if error
-    }
   };
 
   const performAnalysis = async () => {
@@ -10054,9 +10005,13 @@ export default function Onboarding() {
             }
           }
           mergedForBaseline = nextForm;
-          formRef.current = nextForm;
-          setForm(nextForm);
-          setServerHydrationKey(Date.now());
+          const currentSnapshot = onboardingGuardSnapshotJson(formRef.current || {});
+          const nextSnapshot = onboardingGuardSnapshotJson(nextForm);
+          if (currentSnapshot !== nextSnapshot) {
+            formRef.current = nextForm;
+            setForm(nextForm);
+            setServerHydrationKey(Date.now());
+          }
           // Load profile image from the same API response
           if (userData.data.profileImage) {
             setProfileImage(userData.data.profileImage);

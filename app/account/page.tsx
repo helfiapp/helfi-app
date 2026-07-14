@@ -401,6 +401,7 @@ export default function AccountPage() {
                   />
                   <button
                     type="button"
+                    aria-label={showCurrentPassword ? 'Hide current password' : 'Show current password'}
                     onClick={() => setShowCurrentPassword(!showCurrentPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
                   >
@@ -429,6 +430,7 @@ export default function AccountPage() {
                   />
                   <button
                     type="button"
+                    aria-label={showNewPassword ? 'Hide new password' : 'Show new password'}
                     onClick={() => setShowNewPassword(!showNewPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
                   >
@@ -457,6 +459,7 @@ export default function AccountPage() {
                   />
                   <button
                     type="button"
+                    aria-label={showConfirmPassword ? 'Hide confirmed password' : 'Show confirmed password'}
                     onClick={() => setShowConfirmPassword(!showConfirmPassword)}
                     className="absolute inset-y-0 right-0 flex items-center pr-3 text-gray-400 hover:text-gray-600 transition-colors"
                   >

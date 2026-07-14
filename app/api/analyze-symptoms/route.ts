@@ -179,7 +179,6 @@ JSON rules:
     }
 
     // Immediate pre-charge (1 credit) before calling the model (skip for free trial)
-    let prechargedCents = 0
     if (!allowViaFreeUse) {
       try {
         const cm = new CreditManager(refreshedUser.id)
@@ -188,7 +187,6 @@ JSON rules:
         if (!okPre) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
         }
-        prechargedCents = immediate
       } catch {
         return NextResponse.json({ error: 'Billing error' }, { status: 402 })
       }
@@ -218,15 +216,9 @@ JSON rules:
       // ignore parsing error, we'll still return analysisText
     }
 
-    // Charge wallet and update counters (skip charge if allowed via free use)
-    if (!allowViaFreeUse) {
-      const cm = new CreditManager(refreshedUser.id)
-      const remainder = Math.max(0, wrapped.costCents - prechargedCents)
-      const ok = await cm.chargeCents(remainder)
-      if (!ok) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
-      }
-    }
+    // Symptom Notes has a fixed advertised price. The model's actual cost is
+    // still recorded below for internal tracking, but must not be charged to
+    // the user's wallet on top of the fixed pre-charge.
 
     // Update counters (for all users, not just premium)
     await prisma.user.update({

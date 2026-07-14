@@ -379,6 +379,7 @@ export default function Settings() {
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
+                    aria-label="Dark mode"
                     className="sr-only peer" 
                     checked={darkMode}
                                           onChange={(e) => {
@@ -399,6 +400,7 @@ export default function Settings() {
                   <label className="relative inline-flex items-center cursor-pointer">
                     <input 
                       type="checkbox" 
+                      aria-label="Haptic tap feedback"
                       className="sr-only peer" 
                       checked={hapticsEnabled}
                       onChange={(e) => {
@@ -545,6 +547,7 @@ export default function Settings() {
               <label className="relative inline-flex items-center cursor-pointer">
                 <input
                   type="checkbox"
+                  aria-label="Weekly health reports"
                   className="sr-only peer"
                   checked={!!weeklyReportsEnabled}
                   disabled={weeklyReportsLoading || weeklyReportsSaving || weeklyReportsEnabled === null}
@@ -630,15 +633,23 @@ export default function Settings() {
                 </div>
                 <button
                   onClick={async () => {
+                    const previewWindow = window.open('about:blank', '_blank')
+                    if (previewWindow) previewWindow.opener = null
                     try {
                       setExporting(true)
                       const res = await fetch('/api/export/pdf')
                       if (!res.ok) throw new Error('Export failed')
                       const blob = await res.blob()
                       const url = URL.createObjectURL(blob)
-                      setPdfUrl(url)
-                      setShowPdf(true)
+                      if (previewWindow) {
+                        previewWindow.location.href = url
+                        window.setTimeout(() => URL.revokeObjectURL(url), 60_000)
+                      } else {
+                        setPdfUrl(url)
+                        setShowPdf(true)
+                      }
                     } catch (e) {
+                      previewWindow?.close()
                       alert('Could not start export.')
                     } finally {
                       setExporting(false)
@@ -658,6 +669,7 @@ export default function Settings() {
                   <p className="text-sm text-gray-600 dark:text-gray-400">Make your profile visible to others</p>
                 </div>
                 <select 
+                  aria-label="Profile visibility"
                   className="px-3 py-1 border border-gray-300 dark:border-gray-600 rounded bg-white dark:bg-gray-700 text-gray-900 dark:text-white"
                   value={profileVisibility}
                   onChange={(e) => {
@@ -679,6 +691,7 @@ export default function Settings() {
                 <label className="relative inline-flex items-center cursor-pointer">
                   <input 
                     type="checkbox" 
+                    aria-label="Data analytics"
                     className="sr-only peer" 
                     checked={dataAnalytics}
                     onChange={(e) => {

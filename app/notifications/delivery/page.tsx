@@ -10,6 +10,7 @@ export default function NotificationDeliveryPage() {
   const [isIOS, setIsIOS] = useState(false)
   const [isInstalled, setIsInstalled] = useState(false)
   const [isNativeApp, setIsNativeApp] = useState(false)
+  const [pushStatus, setPushStatus] = useState('')
 
   useEffect(() => {
     try {
@@ -69,12 +70,21 @@ export default function NotificationDeliveryPage() {
       return
     }
 
-    setPushNotifications(enabled)
+    if (!enabled) {
+      setPushNotifications(false)
+      setPushStatus('Push notifications turned off')
+      try {
+        await fetch('/api/push/unsubscribe', { method: 'POST' })
+      } catch {}
+      return
+    }
 
-    if (enabled && 'Notification' in window) {
+    if ('Notification' in window) {
+      setPushStatus('Enabling push notifications…')
       const permission = await Notification.requestPermission()
       if (permission !== 'granted') {
         setPushNotifications(false)
+        setPushStatus('Push notifications were not enabled')
         alert('Push notifications were denied. Please enable them in your browser settings.')
         return
       }
@@ -82,6 +92,8 @@ export default function NotificationDeliveryPage() {
         const reg = (await navigator.serviceWorker.getRegistration()) || (await navigator.serviceWorker.register('/sw.js'))
         const vapid = await fetch('/api/push/vapid').then((r) => r.json()).catch(() => ({ publicKey: '' }))
         if (!vapid.publicKey) {
+          setPushNotifications(false)
+          setPushStatus('Push notifications are temporarily unavailable')
           alert('Notifications are not yet fully enabled by the server. Please try again later.')
           return
         }
@@ -89,22 +101,24 @@ export default function NotificationDeliveryPage() {
           userVisibleOnly: true,
           applicationServerKey: urlBase64ToUint8Array(vapid.publicKey),
         })
-        await fetch('/api/push/subscribe', {
+        const subscribeResponse = await fetch('/api/push/subscribe', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ subscription: sub }),
         })
+        if (!subscribeResponse.ok) throw new Error('Subscription could not be saved')
+        setPushNotifications(true)
+        setPushStatus('Push notifications enabled')
         alert('Notifications enabled')
       } catch (e) {
         console.error('push enable error', e)
+        setPushNotifications(false)
+        setPushStatus('Push notifications could not be enabled')
         alert('Could not enable notifications on this device.')
       }
-    }
-
-    if (!enabled) {
-      try {
-        await fetch('/api/push/unsubscribe', { method: 'POST' })
-      } catch {}
+    } else {
+      setPushNotifications(false)
+      setPushStatus('This browser does not support push notifications')
     }
   }
 
@@ -143,6 +157,7 @@ export default function NotificationDeliveryPage() {
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
+                aria-label="Email notifications"
                 className="sr-only peer"
                 checked={emailNotifications}
                 onChange={(e) => setEmailNotifications(e.target.checked)}
@@ -165,6 +180,7 @@ export default function NotificationDeliveryPage() {
             <label className={`relative inline-flex items-center ${pushNotificationsDisabled ? 'cursor-not-allowed' : 'cursor-pointer'}`}>
               <input
                 type="checkbox"
+                aria-label="Push notifications"
                 className="sr-only peer"
                 checked={pushNotifications}
                 disabled={pushNotificationsDisabled}
@@ -173,6 +189,8 @@ export default function NotificationDeliveryPage() {
               <div className={`w-11 h-6 ${pushNotificationsDisabled ? 'bg-gray-100 dark:bg-gray-600' : 'bg-gray-200'} peer-focus:outline-none peer-focus:ring-4 peer-focus:ring-helfi-green/20 rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:rounded-full after:h-5 after:w-5 after:transition-all ${pushNotificationsDisabled ? '' : 'peer-checked:bg-helfi-green'} ${pushNotificationsDisabled ? 'opacity-50' : ''}`}></div>
             </label>
           </div>
+
+          {pushStatus && <p className="text-sm text-gray-600 dark:text-gray-400" aria-live="polite">{pushStatus}</p>}
 
           {pushNotifications && (
             <div className="flex items-center justify-between">

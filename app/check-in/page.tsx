@@ -30,6 +30,7 @@ export default function CheckInPage() {
   const [na, setNa] = useState<Record<string, boolean>>({})
   const [issues, setIssues] = useState<UserIssue[]>([])
   const [loading, setLoading] = useState(true)
+  const [saving, setSaving] = useState(false)
   const pendingIdRef = useRef<string | null>(
     typeof window !== 'undefined'
       ? new URLSearchParams(window.location.search).get('notificationId')?.trim() || null
@@ -139,6 +140,8 @@ export default function CheckInPage() {
   }
 
   const handleSave = async () => {
+    if (saving) return
+    setSaving(true)
     try {
       const pendingId =
         pendingIdRef.current ||
@@ -172,6 +175,12 @@ export default function CheckInPage() {
             fetchedAt: Date.now(),
           }),
         )
+        for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+          const key = sessionStorage.key(index)
+          if (key?.startsWith('checkin-history:')) {
+            sessionStorage.removeItem(key)
+          }
+        }
       } catch {}
       if (pendingId) {
         try {
@@ -204,6 +213,8 @@ export default function CheckInPage() {
       alert('Saved today\'s ratings.')
     } catch (e: any) {
       alert(e?.message || 'Failed to save. Please try again.')
+    } finally {
+      setSaving(false)
     }
   }
 
@@ -346,7 +357,14 @@ export default function CheckInPage() {
 
         {!loading && (
           <div className="mt-6 flex justify-end">
-            <button onClick={handleSave} className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90">Save today's ratings</button>
+            <button
+              onClick={handleSave}
+              disabled={saving}
+              aria-live="polite"
+              className="bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 disabled:cursor-wait disabled:opacity-70"
+            >
+              {saving ? 'Saving…' : "Save today's ratings"}
+            </button>
           </div>
         )}
           </div>

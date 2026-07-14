@@ -234,7 +234,7 @@ export default function MoodCheckInPage() {
 
   return (
     <div className="min-h-screen bg-[#f8f9fa] dark:bg-gray-900 pb-28">
-      <PageHeader title="Daily Check‑In" backHref="/more" />
+      <PageHeader title="Mood Tracker" backHref="/more" />
       <MoodTabs />
 
       <main className="max-w-3xl mx-auto px-4 pt-6 pb-32 md:pb-6">

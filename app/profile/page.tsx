@@ -13,7 +13,7 @@ import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 export default function Profile() {
   const { data: session } = useSession()
   const { userData, profileImage, updateUserData, updateProfileImage, refreshData } = useUserData()
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [dropdownOpen, setDropdownOpen] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [profileData, setProfileData] = useState({
@@ -151,11 +151,18 @@ export default function Profile() {
       console.error('Error saving profile to database:', error)
       localStorage.setItem('profileData', JSON.stringify(payload))
       if (!options?.silent) {
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus('idle'), 2000)
+        setSaveStatus('error')
       }
     }
   }, [updateUserData])
+
+  useEffect(() => {
+    if (!hasInitializedRef.current || !hasUnsavedChanges) return
+    const timeoutId = window.setTimeout(() => {
+      void saveProfile({ payload: profileRef.current })
+    }, 800)
+    return () => window.clearTimeout(timeoutId)
+  }, [hasUnsavedChanges, profileData, saveProfile])
 
   useSaveOnLeave(() => {
     if (!dirtyRef.current) return
@@ -180,8 +187,11 @@ export default function Profile() {
             <h2 className="text-2xl font-bold text-gray-900">Profile Information</h2>
             
             {/* Auto-save Notice */}
-            <div className="text-sm text-gray-500">
-              Changes save when you leave this page
+            <div className={`text-sm ${saveStatus === 'error' ? 'text-red-600' : 'text-gray-500'}`} aria-live="polite">
+              {saveStatus === 'saving' && 'Saving changes…'}
+              {saveStatus === 'saved' && 'All changes saved'}
+              {saveStatus === 'error' && 'Could not save. Please try again.'}
+              {saveStatus === 'idle' && 'Changes save automatically'}
             </div>
           </div>
           
@@ -192,7 +202,7 @@ export default function Profile() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
               <p className="text-blue-700 text-sm">
-                <span className="font-medium">Auto-save enabled:</span> Your changes save automatically when you leave this page.
+                <span className="font-medium">Auto-save enabled:</span> Your changes save automatically as you type.
               </p>
             </div>
           </div>

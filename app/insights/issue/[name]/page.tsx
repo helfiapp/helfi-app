@@ -6,6 +6,13 @@ import { useParams, useSearchParams } from 'next/navigation'
 
 export default function IssueDetail() {
   const { name } = useParams() as { name?: string }
+  const rawName = String(name || '')
+  let issueName = rawName
+  try {
+    issueName = decodeURIComponent(rawName)
+  } catch {
+    issueName = rawName.replace(/%20/g, ' ')
+  }
   const search = useSearchParams()
   const tab = search.get('tab') || 'overview'
   const [item, setItem] = useState<any | null>(null)
@@ -21,12 +28,12 @@ export default function IssueDetail() {
     async function load() {
       try {
         setLoading(true)
-        const res = await fetch(`/api/insights/detail?issue=${encodeURIComponent(String(name||''))}`, { cache: 'no-cache' })
+        const res = await fetch(`/api/insights/detail?issue=${encodeURIComponent(issueName)}`, { cache: 'no-cache' })
         const js = await res.json().catch(()=>({}))
         const d = js?.data || {}
         setItem({
-          id: `issue:${name}`,
-          title: d.title || String(name || '').replace(/%20/g,' '),
+          id: `issue:${issueName}`,
+          title: d.title || issueName,
           summary: d.what || (tab === 'nutrition' ? 'Nutrition guidance for this issue.' : 'Recommendations for this issue.'),
           reason: d.reason,
           actions: Array.isArray(d.actions) ? d.actions : []
@@ -35,7 +42,7 @@ export default function IssueDetail() {
       } finally { setLoading(false) }
     }
     load()
-  }, [name, tab])
+  }, [issueName, tab])
 
   if (!item) return null
 
@@ -131,5 +138,4 @@ export default function IssueDetail() {
     </div>
   )
 }
-
 

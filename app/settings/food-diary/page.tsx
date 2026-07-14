@@ -222,6 +222,7 @@ export default function FoodDiarySettingsPage() {
             <label className="relative inline-flex items-center cursor-pointer">
               <input
                 type="checkbox"
+                aria-label="Enable health check prompts"
                 className="sr-only peer"
                 checked={settings.enabled}
                 onChange={(e) =>
@@ -304,6 +305,7 @@ export default function FoodDiarySettingsPage() {
               <div className="flex items-center gap-3">
                 <input
                   type="number"
+                  aria-label="Maximum health check prompts per day"
                   min={1}
                   max={10}
                   className="w-24 rounded-lg border border-gray-300 px-3 py-2 text-sm focus:border-helfi-green focus:ring-1 focus:ring-helfi-green dark:bg-gray-800 dark:border-gray-600 dark:text-white"

@@ -48,7 +48,7 @@ export async function GET(req: NextRequest) {
 
   try {
     const rows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT r.id, r.date, r.timestamp, r.issueId, i.name, i.polarity, r.value, r.note, r.isNa
+      `SELECT r.id, r.date, r.timestamp, r.issueId AS "issueId", i.name, i.polarity, r.value, r.note, r.isNa AS "isNa"
        FROM CheckinRatings r
        JOIN CheckinIssues i ON i.id = r.issueId
        WHERE r.userId = $1 AND r.date BETWEEN $2 AND $3

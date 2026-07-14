@@ -33,6 +33,7 @@ type Props = {
   sourceArea: 'onboarding' | 'chat' | 'image' | 'symptom-notes'
   className?: string
   compact?: boolean
+  requestLocation?: boolean
 }
 
 const LOCATION_KEY = 'helfi:practitionerLocation'
@@ -124,7 +125,13 @@ function postNativeRecommendationRequest(issueText: string, sourceArea: Props['s
   }
 }
 
-export default function PractitionerRecommendations({ issueText, sourceArea, className = '', compact = false }: Props) {
+export default function PractitionerRecommendations({
+  issueText,
+  sourceArea,
+  className = '',
+  compact = false,
+  requestLocation = true,
+}: Props) {
   const [results, setResults] = useState<PractitionerRecommendation[]>([])
   const [loaded, setLoaded] = useState(false)
   const trimmedIssueText = useMemo(() => String(issueText || '').trim(), [issueText])
@@ -146,7 +153,8 @@ export default function PractitionerRecommendations({ issueText, sourceArea, cla
         return
       }
 
-      const location = readSavedLocation() || (await getBrowserLocation())
+      const savedLocation = readSavedLocation()
+      const location = savedLocation || (requestLocation ? await getBrowserLocation() : null)
       if (!location || cancelled) {
         setLoaded(true)
         return
@@ -179,7 +187,7 @@ export default function PractitionerRecommendations({ issueText, sourceArea, cla
     return () => {
       cancelled = true
     }
-  }, [sourceArea, trimmedIssueText])
+  }, [requestLocation, sourceArea, trimmedIssueText])
 
   if (!loaded || results.length === 0) return null
 

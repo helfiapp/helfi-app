@@ -170,6 +170,9 @@ export default function ProfileImage() {
         return;
       }
 
+      setShowCamera(true);
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+
       const stream = await navigator.mediaDevices.getUserMedia({ 
         video: { 
           facingMode: 'user',
@@ -178,14 +181,17 @@ export default function ProfileImage() {
         }
       });
       
-      if (videoRef.current) {
-        videoRef.current.srcObject = stream;
-        videoRef.current.onloadedmetadata = () => {
-          videoRef.current?.play();
-        };
-        setShowCamera(true);
+      if (!videoRef.current) {
+        stream.getTracks().forEach((track) => track.stop());
+        throw new Error('Camera preview could not be opened.');
       }
-          } catch (error: any) {
+
+      videoRef.current.srcObject = stream;
+      videoRef.current.onloadedmetadata = () => {
+        videoRef.current?.play();
+      };
+    } catch (error: any) {
+        setShowCamera(false);
         console.error('Error accessing camera:', error);
         let errorMessage = 'Unable to access camera. ';
         

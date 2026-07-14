@@ -251,3 +251,55 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Failed to save entry' }, { status: 500 })
   }
 }
+
+export async function PATCH(req: NextRequest) {
+  const user = await getMoodUser(req)
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  const body = await req.json().catch(() => ({} as any))
+  const id = String(body?.id || '').trim()
+  const mood = clampInt(body?.mood, MOOD_MIN, MOOD_MAX)
+  if (!id || mood == null) return NextResponse.json({ error: 'Entry and mood are required' }, { status: 400 })
+
+  try {
+    await ensureMoodTables()
+    const updated = await prisma.$executeRawUnsafe(
+      `UPDATE MoodEntries
+       SET mood = $1, tags = $2::jsonb, note = $3
+       WHERE id = $4 AND userId = $5`,
+      mood,
+      JSON.stringify(normalizeTags(body?.tags)),
+      normalizeNote(body?.note),
+      id,
+      user.id,
+    )
+    if (!updated) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('mood entry update error', e)
+    return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 })
+  }
+}
+
+export async function DELETE(req: NextRequest) {
+  const user = await getMoodUser(req)
+  if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+
+  const body = await req.json().catch(() => ({} as any))
+  const id = String(body?.id || '').trim()
+  if (!id) return NextResponse.json({ error: 'Entry is required' }, { status: 400 })
+
+  try {
+    await ensureMoodTables()
+    const deleted = await prisma.$executeRawUnsafe(
+      `DELETE FROM MoodEntries WHERE id = $1 AND userId = $2`,
+      id,
+      user.id,
+    )
+    if (!deleted) return NextResponse.json({ error: 'Entry not found' }, { status: 404 })
+    return NextResponse.json({ success: true })
+  } catch (e) {
+    console.error('mood entry delete error', e)
+    return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 })
+  }
+}

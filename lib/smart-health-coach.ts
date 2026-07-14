@@ -56,7 +56,9 @@ export type SmartCoachQuietHours = {
   timezone: string
 }
 
-export async function ensureSmartCoachTables() {
+let smartCoachTablesPromise: Promise<void> | null = null
+
+async function createSmartCoachTables() {
   await prisma.$executeRawUnsafe(`
     CREATE TABLE IF NOT EXISTS HealthCoachAlertLog (
       id TEXT PRIMARY KEY,
@@ -110,6 +112,16 @@ export async function ensureSmartCoachTables() {
     CREATE INDEX IF NOT EXISTS idx_healthcoach_dispatchlock_user_time
     ON HealthCoachDispatchLock(userId, createdAt DESC)
   `).catch(() => {})
+}
+
+export async function ensureSmartCoachTables() {
+  if (!smartCoachTablesPromise) {
+    smartCoachTablesPromise = createSmartCoachTables().catch((error) => {
+      smartCoachTablesPromise = null
+      throw error
+    })
+  }
+  await smartCoachTablesPromise
 }
 
 export async function getSmartCoachQuietHours(userId: string): Promise<SmartCoachQuietHours> {

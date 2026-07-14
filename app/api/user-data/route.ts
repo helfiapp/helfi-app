@@ -390,7 +390,24 @@ export async function GET(request: NextRequest) {
       user = await prisma.user.findUnique({
       where: { email: userEmail },
         include: {
-          healthGoals: { orderBy: { updatedAt: 'desc' } },
+          healthGoals: scope === 'health-setup'
+            ? {
+                where: {
+                  name: {
+                    notIn: [
+                      '__TODAYS_FOODS_DATA__',
+                      '__FOOD_FAVORITES__',
+                      '__FOOD_FAVORITES__BACKUP__',
+                      '__FOOD_LIBRARY__',
+                      '__FOOD_NAME_OVERRIDES__',
+                      '__SUPPLEMENTS_BACKUP_DATA__',
+                      '__SUPPLEMENTS_EMERGENCY_BACKUP__',
+                    ],
+                  },
+                },
+                orderBy: { updatedAt: 'desc' },
+              }
+            : { orderBy: { updatedAt: 'desc' } },
           supplements: true,
           medications: true,
         }

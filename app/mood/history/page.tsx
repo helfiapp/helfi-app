@@ -170,6 +170,7 @@ export default function MoodHistoryPage() {
   const [expandedDays, setExpandedDays] = useState<Record<string, boolean>>({})
   const [recentEntries, setRecentEntries] = useState<MoodEntry[]>([])
   const [showAllEntries, setShowAllEntries] = useState(false)
+  const [openEntryMenu, setOpenEntryMenu] = useState<string | null>(null)
   const [savedAction, setSavedAction] = useState<SuggestedActionKind | null>(null)
   const [breathingActive, setBreathingActive] = useState(false)
   const [breathingSecondsLeft, setBreathingSecondsLeft] = useState(60)
@@ -602,6 +603,60 @@ export default function MoodHistoryPage() {
     } catch {}
   }
 
+  const clearMoodHistoryCache = () => {
+    try {
+      for (let index = sessionStorage.length - 1; index >= 0; index -= 1) {
+        const key = sessionStorage.key(index)
+        if (key?.startsWith('moodHistoryCache:')) sessionStorage.removeItem(key)
+      }
+    } catch {}
+  }
+
+  const editMoodEntry = async (entry: MoodEntry) => {
+    const moodInput = window.prompt('Mood score from 1 (terrible) to 7 (amazing):', String(entry.mood))
+    if (moodInput === null) return
+    const mood = Math.round(Number(moodInput))
+    if (!Number.isFinite(mood) || mood < 1 || mood > 7) {
+      alert('Please enter a number from 1 to 7.')
+      return
+    }
+    const note = window.prompt('Update your note (optional):', entry.note || '')
+    if (note === null) return
+    const res = await fetch('/api/mood/entries', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: entry.id, mood, note, tags: safeTags(entry.tags) }),
+    })
+    if (!res.ok) {
+      alert('Could not update this mood check-in.')
+      return
+    }
+    const applyUpdate = (item: MoodEntry) => item.id === entry.id ? { ...item, mood, note } : item
+    setEntries((current) => current.map(applyUpdate))
+    setRecentEntries((current) => current.map(applyUpdate))
+    clearMoodHistoryCache()
+    setOpenEntryMenu(null)
+    setBanner('Mood check-in updated.')
+  }
+
+  const deleteMoodEntry = async (entry: MoodEntry) => {
+    if (!window.confirm('Delete this mood check-in? This cannot be undone.')) return
+    const res = await fetch('/api/mood/entries', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id: entry.id }),
+    })
+    if (!res.ok) {
+      alert('Could not delete this mood check-in.')
+      return
+    }
+    setEntries((current) => current.filter((item) => item.id !== entry.id))
+    setRecentEntries((current) => current.filter((item) => item.id !== entry.id))
+    clearMoodHistoryCache()
+    setOpenEntryMenu(null)
+    setBanner('Mood check-in deleted.')
+  }
+
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-24">
       <PageHeader title="Mood" backHref="/mood" />
@@ -830,12 +885,26 @@ export default function MoodHistoryPage() {
                                   {group.entries.map((e) => (
                                     <div
                                       key={e.id}
-                                      className="inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2"
+                                      className="relative inline-flex items-center gap-2 rounded-full border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 px-3 py-2"
                                     >
                                       <span className="text-lg leading-none">{emojiForMoodValue(Number(e.mood))}</span>
                                       <span className="text-sm font-semibold text-gray-800 dark:text-gray-200">
                                         {formatTime(e.timestamp)}
                                       </span>
+                                      <button
+                                        type="button"
+                                        aria-label={`Actions for mood check-in at ${formatTime(e.timestamp)}`}
+                                        onClick={() => setOpenEntryMenu((current) => current === e.id ? null : e.id)}
+                                        className="rounded-full px-1 text-gray-500 hover:text-gray-900 dark:hover:text-white"
+                                      >
+                                        ⋯
+                                      </button>
+                                      {openEntryMenu === e.id && (
+                                        <div className="absolute right-0 top-full z-20 mt-1 min-w-28 overflow-hidden rounded-lg border border-gray-200 bg-white shadow-lg dark:border-gray-700 dark:bg-gray-900">
+                                          <button type="button" onClick={() => void editMoodEntry(e)} className="block w-full px-3 py-2 text-left text-sm hover:bg-gray-50 dark:hover:bg-gray-800">Edit</button>
+                                          <button type="button" onClick={() => void deleteMoodEntry(e)} className="block w-full px-3 py-2 text-left text-sm text-red-600 hover:bg-red-50 dark:hover:bg-gray-800">Delete</button>
+                                        </div>
+                                      )}
                                     </div>
                                   ))}
                                 </div>

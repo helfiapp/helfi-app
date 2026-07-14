@@ -168,7 +168,7 @@ export default function DevicesPage() {
     } catch {}
   }
 
-  const saveDeviceInterest = async (next: Record<string, boolean>) => {
+  const saveDeviceInterest = async (next: Record<string, boolean>, previous: Record<string, boolean>) => {
     try {
       setSavingInterest(true)
       const res = await fetch('/api/user-data', {
@@ -179,17 +179,20 @@ export default function DevicesPage() {
       if (!res.ok) {
         throw new Error('Device interest update failed')
       }
-      setDeviceInterest(next)
     } catch (e) {
       console.error('Failed to save device interest', e)
+      setDeviceInterest(previous)
+      alert('Could not save that choice. Please try again.')
     } finally {
       setSavingInterest(false)
     }
   }
 
   const toggleInterest = (key: string) => {
+    const previous = deviceInterest
     const next = { ...deviceInterest, [key]: !deviceInterest?.[key] }
-    saveDeviceInterest(next)
+    setDeviceInterest(next)
+    void saveDeviceInterest(next, previous)
   }
 
   const checkFitbitStatus = async () => {
@@ -705,10 +708,9 @@ export default function DevicesPage() {
                   </p>
                   <button
                     onClick={handleClosePopupAndCheck}
-                    disabled={checkingStatus}
-                    className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="text-xs px-3 py-1.5 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
                   >
-                    {checkingStatus ? 'Checking...' : 'Close Popup & Check Status'}
+                    Close Popup & Check Status
                   </button>
                 </div>
               </div>
