@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 15 July 2026, 11:53 AM AEST
+- What changed: Supported Helfi text, vision, food-photo, insight, and weekly-report AI features now use GPT-5.6 SOL. Food photos also retry safely when a valid detailed image request fails, without charging for failed attempts.
+- Where to see it (page/link): https://helfi.ai, especially Food Diary -> Food Photo Notes and Insights -> 7-day health report.
+- What to quickly test: Analyze a multi-food photo and confirm editable food cards appear; then open the 7-day health report and confirm the complete report loads.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 07 July 2026, 11:27 PM AEST
 - What changed: Tightened Talk to Helfi app-wide command understanding so the fast favourite-food path only runs for real food/favourite requests. Exercise, journal, mood, symptoms, water, and Health Intake wording can no longer be swallowed by a saved meal match.
 - Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
