@@ -3182,10 +3182,10 @@ CRITICAL REQUIREMENTS:
     const runOpenAICompletion = async (params: any) => chatCompletionWithCost(openai, params);
 
     // Call food analysis model (metered)
-    const runCompletion = async (runModel: string) =>
+    const runCompletion = async (runModel: string, runMessages: any[] = messages) =>
       runOpenAICompletion({
         model: runModel,
-        messages,
+        messages: runMessages,
         ...(runModel.toLowerCase().includes('gpt-5')
           ? { max_completion_tokens: maxTokens }
           : { max_tokens: maxTokens }),
@@ -3211,7 +3211,39 @@ CRITICAL REQUIREMENTS:
 
     let primaryUsageEvent: any = null;
 
-    const primary = await runCompletion(model);
+    let primary;
+    try {
+      primary = await runCompletion(model);
+    } catch (primaryErr: any) {
+      // A valid food photo can occasionally fail during the provider's
+      // high-detail image pass. Retry once with the same approved model and
+      // automatic image detail before showing an error to the user.
+      const retryMessages = imageDataUrl
+        ? messages.map((message: any) => ({
+            ...message,
+            content: Array.isArray(message?.content)
+              ? message.content.map((part: any) =>
+                  part?.type === 'image_url'
+                    ? {
+                        ...part,
+                        image_url: {
+                          ...part.image_url,
+                          detail: 'auto',
+                        },
+                      }
+                    : part,
+                )
+              : message?.content,
+          }))
+        : messages;
+      console.warn('Primary food analysis call failed; retrying once.', {
+        name: primaryErr?.name || 'Error',
+        status: primaryErr?.status || primaryErr?.statusCode || null,
+        code: primaryErr?.code || primaryErr?.error?.code || null,
+        imageDetailFallback: Boolean(imageDataUrl),
+      });
+      primary = await runCompletion(model, retryMessages);
+    }
     let response = primary.completion;
 
     if (imageDataUrl) {
