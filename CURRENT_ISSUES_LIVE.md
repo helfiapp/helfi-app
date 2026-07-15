@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 15 July 2026, 1:54 PM AEST
+- What changed: Weekly health reports now have clickable detail areas, animated charts on web and iPhone, and complete static print/PDF versions.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report
+- What to quickly test: Open a saved weekly report, tap several “Data used this week” tiles, open the charts, and check Print / Save as PDF.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 15 July 2026, 11:53 AM AEST
 - What changed: Supported Helfi text, vision, food-photo, insight, and weekly-report AI features now use GPT-5.6 SOL. Food photos also retry safely when a valid detailed image request fails, without charging for failed attempts.
 - Where to see it (page/link): https://helfi.ai, especially Food Diary -> Food Photo Notes and Insights -> 7-day health report.
