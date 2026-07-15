@@ -3,6 +3,7 @@ import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
 import {
   ensureReadyWeeklyReportNextDueInFuture,
+  getWeeklyReportChatActivity,
   getLatestWeeklyReport,
   getWeeklyReportById,
   getWeeklyReportState,
@@ -29,6 +30,9 @@ export default async function WeeklyReportPage({ searchParams }: WeeklyReportPag
     getWeeklyReportState(session.user.id),
   ])
   const state = await ensureReadyWeeklyReportNextDueInFuture(session.user.id, stateRaw, report)
+  const verifiedChatActivity = report
+    ? await getWeeklyReportChatActivity(session.user.id, report.periodStart, report.periodEnd)
+    : null
   const canManualReport = String(session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
   const reportsEnabled =
     Boolean(state?.reportsEnabled) ||
@@ -44,6 +48,7 @@ export default async function WeeklyReportPage({ searchParams }: WeeklyReportPag
       nextReportDueAt={state?.nextReportDueAt ?? null}
       canManualReport={canManualReport}
       reportsEnabled={reportsEnabled}
+      verifiedChatActivity={verifiedChatActivity}
     />
   )
 }

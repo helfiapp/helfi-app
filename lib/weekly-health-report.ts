@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { publishWithQStash, scheduleWeeklyReportNotificationWithQStash } from '@/lib/qstash'
 import { randomUUID } from 'crypto'
+import { ensureTalkToAITables } from '@/lib/talk-to-ai-chat-store'
 
 const REPORT_PERIOD_DAYS = 7
 
@@ -39,6 +40,74 @@ export type WeeklyReportState = {
   lastStatus: string | null
   reportsEnabled: boolean
   reportsEnabledAt: string | null
+}
+
+export type WeeklyReportChatActivity = {
+  verified: boolean
+  userMessageCount: number
+  activeDays: number
+  sourceBreakdown: {
+    general: { userMessageCount: number; activeDays: number }
+    food: { userMessageCount: number; activeDays: number }
+  }
+}
+
+export async function getWeeklyReportChatActivity(
+  userId: string,
+  periodStart: string,
+  periodEnd: string
+): Promise<WeeklyReportChatActivity> {
+  const empty = (verified: boolean): WeeklyReportChatActivity => ({
+    verified,
+    userMessageCount: 0,
+    activeDays: 0,
+    sourceBreakdown: {
+      general: { userMessageCount: 0, activeDays: 0 },
+      food: { userMessageCount: 0, activeDays: 0 },
+    },
+  })
+
+  const start = new Date(`${periodStart}T00:00:00.000Z`)
+  const endExclusive = new Date(`${periodEnd}T00:00:00.000Z`)
+  endExclusive.setUTCDate(endExclusive.getUTCDate() + 1)
+  if (Number.isNaN(start.getTime()) || Number.isNaN(endExclusive.getTime())) return empty(false)
+
+  try {
+    await ensureTalkToAITables()
+    const rows = await prisma.$queryRawUnsafe<Array<{ context: string; createdAt: Date }>>(
+      `SELECT COALESCE(t."context", 'general') AS "context", m."createdAt"
+       FROM "TalkToAIChatMessage" m
+       JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
+       WHERE t."userId" = $1
+         AND m."role" = 'user'
+         AND m."createdAt" >= $2
+         AND m."createdAt" < $3
+       ORDER BY m."createdAt" ASC
+       LIMIT 500`,
+      userId,
+      start,
+      endExclusive
+    )
+
+    const result = empty(true)
+    const allDays = new Set<string>()
+    const sourceDays = { general: new Set<string>(), food: new Set<string>() }
+    for (const row of rows) {
+      const source = row.context === 'food' ? 'food' : 'general'
+      const day = new Date(row.createdAt).toISOString().slice(0, 10)
+      result.userMessageCount += 1
+      result.sourceBreakdown[source].userMessageCount += 1
+      allDays.add(day)
+      sourceDays[source].add(day)
+    }
+    result.activeDays = allDays.size
+    result.sourceBreakdown.general.activeDays = sourceDays.general.size
+    result.sourceBreakdown.food.activeDays = sourceDays.food.size
+    return result
+  } catch (error) {
+    console.warn('[weekly-report] Failed to verify saved chat activity', error)
+    return empty(false)
+  }
 }
 
 let weeklyTablesEnsured = false

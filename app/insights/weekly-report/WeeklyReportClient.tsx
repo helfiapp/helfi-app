@@ -4,7 +4,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
-import type { WeeklyReportRecord } from '@/lib/weekly-health-report'
+import type { WeeklyReportChatActivity, WeeklyReportRecord } from '@/lib/weekly-health-report'
 import ReportVisuals from './ReportVisuals'
 
 const SECTIONS = [
@@ -37,6 +37,7 @@ type WeeklyReportClientProps = {
   nextReportDueAt: string | null
   canManualReport: boolean
   reportsEnabled?: boolean
+  verifiedChatActivity: WeeklyReportChatActivity | null
 }
 
 type DetailBucket = 'working' | 'suggested' | 'avoid'
@@ -273,7 +274,7 @@ function isReportNavKey(value: string | null): value is ReportNavKey {
   return REPORT_NAV_ITEMS.some((item) => item.key === value)
 }
 
-export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport, reportsEnabled = true }: WeeklyReportClientProps) {
+export default function WeeklyReportClient({ report, reports, nextReportDueAt, canManualReport, reportsEnabled = true, verifiedChatActivity }: WeeklyReportClientProps) {
   const [activeTab, setActiveTab] = useState<SectionKey>('overview')
   const [activeReportNav, setActiveReportNav] = useState<ReportNavKey>('summary')
   const [openDetailBucket, setOpenDetailBucket] = useState<DetailBucket | null>(null)
@@ -386,7 +387,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   }, [previousReport])
 
   const dataWarning = (parsedSummary as any)?.dataWarning as string | null
-  const talkToAiSummary = (parsedSummary as any)?.talkToAiSummary as
+  const storedTalkToAiSummary = (parsedSummary as any)?.talkToAiSummary as
     | {
         messageCount?: number
         userMessageCount?: number
@@ -400,10 +401,19 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         highlights?: Array<{ content?: string; createdAt?: string }>
       }
     | undefined
+  const talkToAiSummary = verifiedChatActivity?.verified
+    ? {
+        ...(storedTalkToAiSummary || {}),
+        userMessageCount: verifiedChatActivity.userMessageCount,
+        activeDays: verifiedChatActivity.activeDays,
+        sourceBreakdown: verifiedChatActivity.sourceBreakdown,
+      }
+    : storedTalkToAiSummary
+  const chatHistoryUnavailable = Boolean(verifiedChatActivity && !verifiedChatActivity.verified)
   const hasChatSourceBreakdown = Boolean(talkToAiSummary?.sourceBreakdown)
   const generalChatPromptCount = Number(talkToAiSummary?.sourceBreakdown?.general?.userMessageCount || 0)
   const foodChatPromptCount = Number(talkToAiSummary?.sourceBreakdown?.food?.userMessageCount || 0)
-  const coverage = (parsedSummary as any)?.coverage as
+  const storedCoverage = (parsedSummary as any)?.coverage as
     | {
         daysActive?: number
         totalEvents?: number
@@ -419,6 +429,16 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         medicalImageCount?: number
       }
     | undefined
+  const coverage = useMemo(() => {
+    if (!storedCoverage || !verifiedChatActivity?.verified) return storedCoverage
+    const previousChatCount = Number(storedCoverage.talkToAiCount || 0)
+    const totalEvents = Number(storedCoverage.totalEvents || 0)
+    return {
+      ...storedCoverage,
+      talkToAiCount: verifiedChatActivity.userMessageCount,
+      totalEvents: Math.max(0, totalEvents - previousChatCount + verifiedChatActivity.userMessageCount),
+    }
+  }, [storedCoverage, verifiedChatActivity])
   const hydrationSummary = (parsedSummary as any)?.hydrationSummary as
     | {
         entries?: number
@@ -1280,7 +1300,9 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         {talkToAiSummary ? (
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
-            {talkToAiSummary.userMessageCount ? (
+            {chatHistoryUnavailable ? (
+              <p className="mt-2 text-sm text-blue-800">Saved chat history could not be checked right now.</p>
+            ) : talkToAiSummary.userMessageCount ? (
               <p className="text-sm text-blue-800 mt-2">
                 {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
                 {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}
@@ -1291,7 +1313,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             ) : (
               <p className="mt-2 text-sm text-blue-800">No saved chats this week.</p>
             )}
-            {talkToAiSummary.userMessageCount ? (
+            {!chatHistoryUnavailable && talkToAiSummary.userMessageCount ? (
               <div className="mt-3 flex flex-wrap gap-2">
               {(!hasChatSourceBreakdown || generalChatPromptCount > 0) && (
                 <Link
@@ -1311,7 +1333,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
               )}
               </div>
             ) : null}
-            {talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
+            {!chatHistoryUnavailable && talkToAiSummary.userMessageCount && talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {talkToAiSummary.topics.map((topic, idx) => (
                   <span key={`${topic.topic}-${idx}`} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs text-blue-900">
@@ -1321,7 +1343,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
                 ))}
               </div>
             )}
-            {talkToAiSummary.highlights && talkToAiSummary.highlights.length > 0 && (
+            {!chatHistoryUnavailable && talkToAiSummary.userMessageCount && talkToAiSummary.highlights && talkToAiSummary.highlights.length > 0 && (
               <div className="mt-4 space-y-2">
                 {talkToAiSummary.highlights.slice(-3).map((item, idx) => (
                   <div key={`talk-${idx}`} className="rounded-xl border border-blue-100 bg-white p-3 text-sm text-blue-900">

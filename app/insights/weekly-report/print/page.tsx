@@ -1,7 +1,7 @@
 import { getServerSession } from 'next-auth'
 import { redirect } from 'next/navigation'
 import { authOptions } from '@/lib/auth'
-import { getWeeklyReportById } from '@/lib/weekly-health-report'
+import { getWeeklyReportById, getWeeklyReportChatActivity } from '@/lib/weekly-health-report'
 import WeeklyReportPrintClient from './weekly-report-print-client'
 
 interface WeeklyReportPrintPageProps {
@@ -28,6 +28,11 @@ export default async function WeeklyReportPrintPage({ searchParams }: WeeklyRepo
     redirect('/insights/weekly-report')
   }
 
-  return <WeeklyReportPrintClient report={report} />
-}
+  const verifiedChatActivity = await getWeeklyReportChatActivity(
+    session.user.id,
+    report.periodStart,
+    report.periodEnd
+  )
 
+  return <WeeklyReportPrintClient report={report} verifiedChatActivity={verifiedChatActivity} />
+}

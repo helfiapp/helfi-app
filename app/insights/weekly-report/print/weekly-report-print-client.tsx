@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
-import type { WeeklyReportRecord } from '@/lib/weekly-health-report'
+import type { WeeklyReportChatActivity, WeeklyReportRecord } from '@/lib/weekly-health-report'
 import ReportVisuals from '../ReportVisuals'
 
 const SECTIONS = [
@@ -136,7 +136,7 @@ function SectionBucket({ items }: { items: Array<{ name?: string; reason?: strin
   )
 }
 
-export default function WeeklyReportPrintClient({ report }: { report: WeeklyReportRecord }) {
+export default function WeeklyReportPrintClient({ report, verifiedChatActivity }: { report: WeeklyReportRecord; verifiedChatActivity: WeeklyReportChatActivity }) {
   const [autoPrinted, setAutoPrinted] = useState(false)
 
   const payload = useMemo(() => parseMaybeJson(report.report), [report.report])
@@ -149,13 +149,31 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
   const wins = Array.isArray((payload as any)?.wins) ? (payload as any).wins : []
   const gaps = Array.isArray((payload as any)?.gaps) ? (payload as any).gaps : []
 
-  const coverage = (parsedSummary as any)?.coverage
+  const storedCoverage = (parsedSummary as any)?.coverage
   const nutritionSummary = (parsedSummary as any)?.nutritionSummary
   const hydrationSummary = (parsedSummary as any)?.hydrationSummary
   const dailyStats = (parsedSummary as any)?.dailyStats
   const symptomSummary = (parsedSummary as any)?.symptomSummary
   const exerciseSummary = (parsedSummary as any)?.exerciseSummary
-  const talkToAiSummary = (parsedSummary as any)?.talkToAiSummary
+  const storedTalkToAiSummary = (parsedSummary as any)?.talkToAiSummary
+  const talkToAiSummary = verifiedChatActivity.verified
+    ? {
+        ...(storedTalkToAiSummary || {}),
+        userMessageCount: verifiedChatActivity.userMessageCount,
+        activeDays: verifiedChatActivity.activeDays,
+        sourceBreakdown: verifiedChatActivity.sourceBreakdown,
+      }
+    : storedTalkToAiSummary
+  const coverage = useMemo(() => {
+    if (!storedCoverage || !verifiedChatActivity.verified) return storedCoverage
+    const previousChatCount = Number(storedCoverage.talkToAiCount || 0)
+    const totalEvents = Number(storedCoverage.totalEvents || 0)
+    return {
+      ...storedCoverage,
+      talkToAiCount: verifiedChatActivity.userMessageCount,
+      totalEvents: Math.max(0, totalEvents - previousChatCount + verifiedChatActivity.userMessageCount),
+    }
+  }, [storedCoverage, verifiedChatActivity])
   const medicalImageSummary = (parsedSummary as any)?.medicalImageSummary
   const journalSummary = (parsedSummary as any)?.journalSummary
   const supplementsList = (parsedSummary as any)?.supplements
@@ -389,7 +407,9 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
         {talkToAiSummary ? (
           <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 print-avoid-break">
             <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
-            {talkToAiSummary.userMessageCount ? (
+            {!verifiedChatActivity.verified ? (
+              <p className="mt-2 text-sm text-blue-800">Saved chat history could not be checked right now.</p>
+            ) : talkToAiSummary.userMessageCount ? (
               <p className="mt-2 text-sm text-blue-800">
                 {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
                 {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}
@@ -400,7 +420,7 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
             ) : (
               <p className="mt-2 text-sm text-blue-800">No saved chats this week.</p>
             )}
-            {Array.isArray(talkToAiSummary.topics) && talkToAiSummary.topics.length > 0 ? (
+            {verifiedChatActivity.verified && talkToAiSummary.userMessageCount && Array.isArray(talkToAiSummary.topics) && talkToAiSummary.topics.length > 0 ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {talkToAiSummary.topics.map((topic: any, idx: number) => (
                   <span key={`topic-${idx}`} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs text-blue-900">
@@ -410,7 +430,7 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
                 ))}
               </div>
             ) : null}
-            {Array.isArray(talkToAiSummary.highlights) && talkToAiSummary.highlights.length > 0 ? (
+            {verifiedChatActivity.verified && talkToAiSummary.userMessageCount && Array.isArray(talkToAiSummary.highlights) && talkToAiSummary.highlights.length > 0 ? (
               <div className="mt-4 space-y-2">
                 {talkToAiSummary.highlights.slice(-6).map((item: any, idx: number) => (
                   <div key={`talk-${idx}`} className="rounded-xl border border-blue-100 bg-white p-3 text-sm text-blue-900 print-avoid-break">
