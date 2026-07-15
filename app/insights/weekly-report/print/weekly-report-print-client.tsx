@@ -386,13 +386,20 @@ export default function WeeklyReportPrintClient({ report }: { report: WeeklyRepo
           </div>
         ) : null}
 
-        {talkToAiSummary?.userMessageCount ? (
+        {talkToAiSummary ? (
           <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 print-avoid-break">
             <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
-            <p className="mt-2 text-sm text-blue-800">
-              {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
-              {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.
-            </p>
+            {talkToAiSummary.userMessageCount ? (
+              <p className="mt-2 text-sm text-blue-800">
+                {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
+                {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}
+                {talkToAiSummary.sourceBreakdown
+                  ? ` (${Number(talkToAiSummary.sourceBreakdown.general?.userMessageCount || 0)} General, ${Number(talkToAiSummary.sourceBreakdown.food?.userMessageCount || 0)} Food)`
+                  : ''}.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-blue-800">No saved chats this week.</p>
+            )}
             {Array.isArray(talkToAiSummary.topics) && talkToAiSummary.topics.length > 0 ? (
               <div className="mt-4 flex flex-wrap gap-2">
                 {talkToAiSummary.topics.map((topic: any, idx: number) => (

@@ -2459,7 +2459,7 @@ function shrinkModelPayload(payload: any, maxChars: number) {
 }
 
 function buildTalkToAiSummary(
-  messages: Array<{ role: string; content: string; createdAt: Date }>
+  messages: Array<{ role: string; content: string; createdAt: Date; context: string }>
 ) {
   if (!messages.length) {
     return {
@@ -2470,6 +2470,10 @@ function buildTalkToAiSummary(
       lastMessageAt: null,
       topics: [],
       highlights: [],
+      sourceBreakdown: {
+        general: { userMessageCount: 0, activeDays: 0 },
+        food: { userMessageCount: 0, activeDays: 0 },
+      },
     }
   }
 
@@ -2477,7 +2481,23 @@ function buildTalkToAiSummary(
   const userMessages = sorted.filter((m) => m.role === 'user')
   const assistantMessages = sorted.filter((m) => m.role === 'assistant')
   const days = new Set<string>()
-  sorted.forEach((m) => days.add(m.createdAt.toISOString().slice(0, 10)))
+  userMessages.forEach((m) => days.add(m.createdAt.toISOString().slice(0, 10)))
+
+  const sourceBreakdown = {
+    general: { userMessageCount: 0, activeDays: 0 },
+    food: { userMessageCount: 0, activeDays: 0 },
+  }
+  const sourceDays = {
+    general: new Set<string>(),
+    food: new Set<string>(),
+  }
+  userMessages.forEach((message) => {
+    const source = message.context === 'food' ? 'food' : 'general'
+    sourceBreakdown[source].userMessageCount += 1
+    sourceDays[source].add(message.createdAt.toISOString().slice(0, 10))
+  })
+  sourceBreakdown.general.activeDays = sourceDays.general.size
+  sourceBreakdown.food.activeDays = sourceDays.food.size
 
   const topicCounts = new Map<string, { topic: string; section: ReportSectionKey; count: number }>()
   userMessages.forEach((m) => {
@@ -2513,6 +2533,7 @@ function buildTalkToAiSummary(
     lastMessageAt: sorted[0]?.createdAt?.toISOString() || null,
     topics,
     highlights,
+    sourceBreakdown,
   }
 }
 
@@ -3686,13 +3707,13 @@ export async function POST(request: NextRequest) {
     console.warn('[weekly-report] Failed to build lab trends', error)
   }
 
-  let talkToAiMessages: Array<{ role: string; content: string; createdAt: Date }> = []
+  let talkToAiMessages: Array<{ role: string; content: string; createdAt: Date; context: string }> = []
   try {
     await ensureTalkToAITables()
     talkToAiMessages = await prisma.$queryRawUnsafe<
-      Array<{ role: string; content: string; createdAt: Date }>
+      Array<{ role: string; content: string; createdAt: Date; context: string }>
     >(
-        `SELECT m."role", m."content", m."createdAt"
+        `SELECT m."role", m."content", m."createdAt", COALESCE(t."context", 'general') AS "context"
          FROM "TalkToAIChatMessage" m
          JOIN "TalkToAIChatThread" t ON t."id" = m."threadId"
          WHERE t."userId" = $1 AND m."createdAt" >= $2 AND m."createdAt" <= $3
@@ -3783,7 +3804,7 @@ export async function POST(request: NextRequest) {
   moodRows?.forEach((m) => stamp(m.timestamp))
   symptomAnalyses?.forEach((s) => stamp(s.createdAt))
   labReports?.forEach((r) => stamp(r.createdAt))
-  talkToAiMessages?.forEach((m) => stamp(m.createdAt))
+  talkToAiMessages?.filter((message) => message.role === 'user').forEach((message) => stamp(message.createdAt))
   user.medicalImageAnalyses?.forEach((scan) => stamp(scan.createdAt))
 
   const coverage = {
@@ -3797,7 +3818,7 @@ export async function POST(request: NextRequest) {
       (user.exerciseEntries?.length || 0) +
       (moodRows?.length || 0) +
       (symptomAnalyses?.length || 0) +
-      (talkToAiMessages?.length || 0) +
+      talkToAiSummary.userMessageCount +
       (user.medicalImageAnalyses?.length || 0),
     foodCount: user.foodLogs?.length || 0,
     waterCount: user.waterLogs?.length || 0,
@@ -3807,7 +3828,7 @@ export async function POST(request: NextRequest) {
     symptomCount: symptomAnalyses?.length || 0,
     exerciseCount: (user.exerciseLogs?.length || 0) + (user.exerciseEntries?.length || 0),
     labCount: labReports?.length || 0,
-    talkToAiCount: talkToAiMessages?.length || 0,
+    talkToAiCount: talkToAiSummary.userMessageCount,
     medicalImageCount: user.medicalImageAnalyses?.length || 0,
     talkToAiUserCount: talkToAiSummary.userMessageCount,
     talkToAiDays: talkToAiSummary.activeDays,

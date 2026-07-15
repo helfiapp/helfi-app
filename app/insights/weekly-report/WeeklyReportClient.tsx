@@ -392,10 +392,17 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
         userMessageCount?: number
         assistantMessageCount?: number
         activeDays?: number
+        sourceBreakdown?: {
+          general?: { userMessageCount?: number; activeDays?: number }
+          food?: { userMessageCount?: number; activeDays?: number }
+        }
         topics?: Array<{ topic?: string; section?: string; count?: number }>
         highlights?: Array<{ content?: string; createdAt?: string }>
       }
     | undefined
+  const hasChatSourceBreakdown = Boolean(talkToAiSummary?.sourceBreakdown)
+  const generalChatPromptCount = Number(talkToAiSummary?.sourceBreakdown?.general?.userMessageCount || 0)
+  const foodChatPromptCount = Number(talkToAiSummary?.sourceBreakdown?.food?.userMessageCount || 0)
   const coverage = (parsedSummary as any)?.coverage as
     | {
         daysActive?: number
@@ -1270,21 +1277,40 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </div>
         )}
 
-        {talkToAiSummary?.userMessageCount ? (
+        {talkToAiSummary ? (
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
             <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
-            <p className="text-sm text-blue-800 mt-2">
-              {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
-              {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.
-            </p>
-            <div className="mt-3">
-              <Link
-                href="/chat-log"
-                className="inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
-              >
-                Open chat log
-              </Link>
-            </div>
+            {talkToAiSummary.userMessageCount ? (
+              <p className="text-sm text-blue-800 mt-2">
+                {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
+                {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}
+                {hasChatSourceBreakdown
+                  ? ` (${generalChatPromptCount} General, ${foodChatPromptCount} Food)`
+                  : ''}.
+              </p>
+            ) : (
+              <p className="mt-2 text-sm text-blue-800">No saved chats this week.</p>
+            )}
+            {talkToAiSummary.userMessageCount ? (
+              <div className="mt-3 flex flex-wrap gap-2">
+              {(!hasChatSourceBreakdown || generalChatPromptCount > 0) && (
+                <Link
+                  href="/chat?history=1"
+                  className="inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+                >
+                  Open General chat history
+                </Link>
+              )}
+              {(!hasChatSourceBreakdown || foodChatPromptCount > 0) && (
+                <Link
+                  href="/chat?context=food&history=1"
+                  className="inline-flex items-center rounded-full border border-blue-200 bg-white px-4 py-1.5 text-xs font-semibold text-blue-800 hover:bg-blue-100"
+                >
+                  Open Food chat history
+                </Link>
+              )}
+              </div>
+            ) : null}
             {talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
               <div className="mt-4 flex flex-wrap gap-2">
                 {talkToAiSummary.topics.map((topic, idx) => (
