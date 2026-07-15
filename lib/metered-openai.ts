@@ -71,7 +71,12 @@ export async function chatCompletionWithCost(
     delete next.max_tokens
     delete next.temperature
     if (modelName.includes('gpt-5.6') && !next.reasoning_effort) {
-      next.reasoning_effort = 'low'
+      // Most Helfi calls have small, user-facing response budgets. GPT-5.6
+      // counts reasoning tokens inside max_completion_tokens, so using "low"
+      // can consume the whole allowance and return no visible answer.
+      // Use the model's supported "none" setting by default; quality-first
+      // workflows such as weekly reports opt into more reasoning explicitly.
+      next.reasoning_effort = 'none'
     }
     if (Number.isFinite(maxCompletionTokens) && maxCompletionTokens > 0) {
       next.max_completion_tokens = maxCompletionTokens
@@ -154,4 +159,3 @@ function extractPromptText(messages: any[]): string {
     return '';
   }
 }
-

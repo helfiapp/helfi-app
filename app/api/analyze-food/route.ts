@@ -3140,7 +3140,10 @@ CRITICAL REQUIREMENTS:
     // Owner-approved single model for both text and image food analysis.
     const model = 'gpt-5.6-sol'
 
-    let maxTokens = feedbackDown ? 800 : 600;
+    // Multi-item food cards need enough visible output for the explanation,
+    // totals, and structured JSON. A smaller GPT-5 budget can end with no
+    // visible content on complex plates even when the image was understood.
+    let maxTokens = feedbackDown ? 1600 : 1200;
 
     // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
     if (BILLING_ENFORCED && !allowViaFreeUse) {
