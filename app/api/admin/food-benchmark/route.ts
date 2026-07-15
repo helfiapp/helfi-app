@@ -49,7 +49,7 @@ export async function POST(req: NextRequest) {
     const modelList =
       models.length > 0
         ? models.filter((m: any) => typeof m === 'string' && m.trim().length > 0).slice(0, 3)
-        : ['gpt-4o', 'gpt-5.2']
+        : ['gpt-5.6-sol']
 
     if (!imageUrl || !isSafeImageUrl(imageUrl)) {
       return NextResponse.json({ error: 'Provide a public https:// imageUrl' }, { status: 400 })
@@ -63,12 +63,16 @@ export async function POST(req: NextRequest) {
     const results: any[] = []
     for (const model of modelList) {
       const isGpt5Family = model.toLowerCase().includes('gpt-5')
-      const out = await chatCompletionWithCost(openai, {
-        model,
-        messages,
-        ...(isGpt5Family ? { max_completion_tokens: 700 } : { max_tokens: 700 }),
-        temperature: 0,
-      } as any)
+      const out = await chatCompletionWithCost(
+        openai,
+        {
+          model,
+          messages,
+          ...(isGpt5Family ? { max_completion_tokens: 700 } : { max_tokens: 700 }),
+          temperature: 0,
+        } as any,
+        { feature: 'admin:food-benchmark' }
+      )
       const text = out.completion.choices?.[0]?.message?.content?.trim?.() || ''
       const vendorCostCents = openaiCostCentsForTokens(model, {
         promptTokens: out.promptTokens,

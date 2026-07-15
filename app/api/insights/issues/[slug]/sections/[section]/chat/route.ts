@@ -186,7 +186,7 @@ export async function POST(
 
     if (wantsStream) {
       // Wallet pre-check using conservative estimate (max_tokens)
-      const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+      const model = 'gpt-5.6-sol'
       const promptText = [system, ...history.map((m) => m.content)].join('\n')
       let maxTokens = 500
       if (!allowViaFreeUse) {
@@ -251,7 +251,7 @@ export async function POST(
 
     // Non-streaming fallback
   {
-    const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+    const model = 'gpt-5.6-sol'
     const promptText = [system, ...history.map((m) => m.content)].join('\n')
     let maxTokens = 500
     if (!allowViaFreeUse) {

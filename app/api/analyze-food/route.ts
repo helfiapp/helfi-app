@@ -2839,7 +2839,10 @@ CRITICAL REQUIREMENTS:
       // For image analysis, request structured items and multi-detect by default
       wantStructured = true;
       preferMultiDetect = true;
-      visionDetail = labelScan || packagedMode ? "high" : "low";
+      // Food counts and small side dishes are easy to miss at low detail.
+      // Use high detail for every food photo so visible quantities and
+      // components are inspected before nutrition is estimated.
+      visionDetail = "high";
 
       const cleanedHint = String(analysisHint || '').trim();
       const hintBlock =
@@ -2880,6 +2883,8 @@ CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 Do NOT infer meal patterns. Only list components supported by visible evidence in the photo.
 
 PORTION CUES:
+- Before estimating weight or nutrition, count every clearly visible discrete item (for example eggs, patties, nuggets, slices, dumplings, or pieces of fruit). Re-check the full image once and state the total visible count explicitly in serving_size (for example "3 eggs").
+- For a clearly visible discrete count, nutrition must cover the FULL visible count, not one representative item. Example: 3 large fried eggs should be about 210 calories and 18g protein before any added cooking fat.
 - Use plate size, utensil size, and hand-size cues to estimate grams or household measures
 - Do not double count overlapping items; base your estimate on visible evidence
 - Ignore inedible items. Only include a drink if clearly visible as part of the meal
@@ -3132,29 +3137,8 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    // Main food model selection.
-    // Default is env-controlled; admin can set a per-user override via __FOOD_ANALYZER_MODEL__.
-    // Temperature is set to 0 for maximum consistency between runs on the same meal.
-    const envModelRaw = (process.env.OPENAI_FOOD_MODEL || '').trim()
-    const defaultModel = imageDataUrl
-      ? 'gpt-4o'
-      : (envModelRaw || 'gpt-5.2')
-    let model = defaultModel
-    try {
-      const goal = await prisma.healthGoal.findFirst({
-        where: { userId: currentUser.id, name: '__FOOD_ANALYZER_MODEL__' },
-        select: { category: true },
-      })
-      if (goal?.category) {
-        const parsed = JSON.parse(goal.category)
-        const override = typeof parsed?.model === 'string' ? parsed.model.trim() : ''
-        if (override === 'gpt-4o' || override === 'gpt-5.2') {
-          model = override
-        }
-      }
-    } catch (e) {
-      console.warn('Food analyzer model override lookup failed (non-fatal):', e)
-    }
+    // Owner-approved single model for both text and image food analysis.
+    const model = 'gpt-5.6-sol'
 
     let maxTokens = feedbackDown ? 800 : 600;
 
@@ -3273,7 +3257,7 @@ CRITICAL REQUIREMENTS:
 
     // Rare but real: models sometimes return a completion object with no content.
     // To avoid showing the user a blank "failed" screen, retry once and then fall
-    // back to gpt-4o for image analysis if needed.
+    // retry the same approved model once if needed.
     if (!analysis) {
       try {
         console.warn('⚠️ Model returned empty content; retrying once...');
@@ -3284,36 +3268,6 @@ CRITICAL REQUIREMENTS:
       } catch (retryErr) {
         console.warn('Retry attempt failed (non-fatal):', retryErr);
       }
-    }
-
-    if (!analysis && imageDataUrl && model !== 'gpt-4o') {
-        try {
-          console.warn('⚠️ Empty content after retry; falling back to gpt-4o for image analysis...');
-          const fallback = await runCompletion('gpt-4o');
-          totalCostCents += fallback.costCents;
-          response = fallback.completion;
-          analysis = extractAnalysisText(response);
-          logAiUsageEvent({
-            feature: 'food:image-analysis-fallback',
-            userId: currentUser.id || null,
-            userLabel: currentUser.email || null,
-            scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
-            model: 'gpt-4o',
-            promptTokens: fallback.promptTokens,
-            completionTokens: fallback.completionTokens,
-            costCents: fallback.costCents,
-            image: {
-              width: imageMeta?.width ?? null,
-              height: imageMeta?.height ?? null,
-              bytes: imageBytes,
-              mime: imageMime,
-            },
-            endpoint: '/api/analyze-food',
-            success: true,
-          }).catch(() => {});
-        } catch (fallbackErr) {
-          console.warn('gpt-4o fallback attempt failed (non-fatal):', fallbackErr);
-        }
     }
 
     if (!analysis) {
@@ -3450,7 +3404,7 @@ CRITICAL REQUIREMENTS:
         try {
           console.log('ℹ️ No ITEMS_JSON found, running lightweight items extractor (text-only)');
           const extractor = await chatCompletionWithCost(openai, {
-            model: 'gpt-4o-mini',
+            model: 'gpt-5.6-sol',
             messages: [
               {
                 role: 'user',
@@ -3475,7 +3429,7 @@ CRITICAL REQUIREMENTS:
             userId: currentUser.id || null,
             userLabel: currentUser.email || null,
             scanId: imageHash ? `food-${imageHash.slice(0, 8)}` : `food-${Date.now()}`,
-            model: 'gpt-4o-mini',
+            model: 'gpt-5.6-sol',
             promptTokens: extractor.promptTokens,
             completionTokens: extractor.completionTokens,
             costCents: extractor.costCents,
@@ -3618,7 +3572,7 @@ CRITICAL REQUIREMENTS:
           let componentBound: any = null;
             try {
               componentBound = await chatCompletionWithCost(openai, {
-                model: 'gpt-4o',
+                model: 'gpt-5.6-sol',
                 response_format: {
                   type: 'json_schema',
                   json_schema: buildComponentBoundSchema(listedComponents),
@@ -3630,7 +3584,7 @@ CRITICAL REQUIREMENTS:
             } catch (schemaErr) {
               console.warn('Component-bound schema follow-up failed; retrying with json_object.', schemaErr);
               componentBound = await chatCompletionWithCost(openai, {
-                model: 'gpt-4o',
+                model: 'gpt-5.6-sol',
                 response_format: { type: 'json_object' } as any,
                 messages: componentBoundMessages,
                 max_tokens: 420,
@@ -3725,7 +3679,7 @@ CRITICAL REQUIREMENTS:
             : '') +
           '\nAnalysis text:\n' +
           analysisTextForFollowUp;
-        const followUpModel = imageDataUrl ? 'gpt-4o' : 'gpt-4o-mini';
+        const followUpModel = imageDataUrl ? 'gpt-5.6-sol' : 'gpt-5.6-sol';
         const followUpMessages = imageDataUrl
           ? [
               {
@@ -3818,7 +3772,7 @@ CRITICAL REQUIREMENTS:
           analysisTextForFollowUp;
         console.warn('⚠️ Analyzer: forcing structured image follow-up (items missing).');
         const forcedFollowUp = await chatCompletionWithCost(openai, {
-              model: 'gpt-4o',
+              model: 'gpt-5.6-sol',
               response_format: { type: 'json_object' } as any,
               messages: [
                 {
@@ -3887,7 +3841,7 @@ CRITICAL REQUIREMENTS:
           : '';
         console.warn('⚠️ Analyzer: running final text-only structured fallback.');
         const fallback = await chatCompletionWithCost(openai, {
-          model: 'gpt-4o-mini',
+          model: 'gpt-5.6-sol',
           response_format: { type: 'json_object' } as any,
           messages: [
             {
@@ -3958,7 +3912,7 @@ CRITICAL REQUIREMENTS:
           try {
             const followUp = isImageAnalysis
               ? await chatCompletionWithCost(openai, {
-                  model: 'gpt-4o',
+                  model: 'gpt-5.6-sol',
                   response_format: { type: 'json_object' } as any,
                   messages: [
                     {
@@ -3985,7 +3939,7 @@ CRITICAL REQUIREMENTS:
                   temperature: 0,
                 } as any)
               : await chatCompletionWithCost(openai, {
-                  model: 'gpt-4o-mini',
+                  model: 'gpt-5.6-sol',
                   response_format: { type: 'json_object' } as any,
                   messages: [
                     {
@@ -4102,7 +4056,7 @@ CRITICAL REQUIREMENTS:
                 },
               ];
           const componentFollowUp = await chatCompletionWithCost(openai, {
-            model: 'gpt-4o',
+            model: 'gpt-5.6-sol',
             response_format: { type: 'json_schema', json_schema: buildComponentBoundSchema(forcedComponents) } as any,
             messages: componentMessages,
             max_tokens: 420,
@@ -4213,7 +4167,7 @@ CRITICAL REQUIREMENTS:
 
     if (labelScan && imageDataUrl) {
       try {
-        const labelModel = model === 'gpt-5.2' ? model : 'gpt-5.2'
+        const labelModel = model === 'gpt-5.6-sol' ? model : 'gpt-5.6-sol'
         const labelResult = await extractLabelPerServingFromImage(openai, imageDataUrl, labelModel)
         totalCostCents += labelResult.costCents
         const parsed = labelResult.parsed || {}
@@ -4557,7 +4511,7 @@ CRITICAL REQUIREMENTS:
             '- Return one item per distinct component.\n';
           console.warn('⚠️ Analyzer: totals too low; running consistency repair pass.');
           const repair = await chatCompletionWithCost(openai, {
-            model: 'gpt-4o',
+            model: 'gpt-5.6-sol',
             response_format: { type: 'json_object' } as any,
             messages: [
               {
@@ -4622,7 +4576,7 @@ CRITICAL REQUIREMENTS:
           '\nEarlier analysis text:\n' +
           (analysisTextForFollowUp || resp.analysis || '');
         const repair = await chatCompletionWithCost(openai, {
-          model: 'gpt-4o',
+          model: 'gpt-5.6-sol',
           response_format: {
             type: 'json_schema',
             json_schema: buildCardReadyItemsSchema(),
@@ -4862,7 +4816,7 @@ CRITICAL REQUIREMENTS:
             '  Why: ...';
 
           const alternatives = await chatCompletionWithCost(openai, {
-            model: 'gpt-4o-mini',
+            model: 'gpt-5.6-sol',
             messages: [{ role: 'user', content: alternativesPrompt }],
             max_tokens: 220,
             temperature: 0.2,

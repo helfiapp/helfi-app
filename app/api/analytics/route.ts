@@ -249,7 +249,7 @@ Keep response concise but actionable for app developers.
     }
     
     const response: any = await runChatCompletionWithLogging(openai, {
-      model: "gpt-4o-mini",
+      model: "gpt-5.6-sol",
       messages: [{ role: "user", content: prompt }],
       max_tokens: 800,
       temperature: 0.3

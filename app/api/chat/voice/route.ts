@@ -1172,7 +1172,7 @@ const runVoiceCompletionWithFallback = async (params: {
   let lastWrapped: Awaited<ReturnType<typeof chatCompletionWithCost>> | null = null
   let lastModel = ''
 
-  for (const modelName of uniqueModels(params.model, params.fallbackModel, 'gpt-4o')) {
+  for (const modelName of uniqueModels(params.model, params.fallbackModel, 'gpt-5.6-sol')) {
     try {
       const wrapped = await chatCompletionWithCost(params.openai, {
         model: modelName,
@@ -1375,8 +1375,8 @@ export async function POST(req: NextRequest) {
     const accept = (req.headers.get('accept') || '').toLowerCase()
     const wantsStream = accept.includes('text/event-stream')
 
-    const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
-    const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
+    const model = 'gpt-5.6-sol'
+    const fallbackModel = 'gpt-5.6-sol'
     // Add formatting reminder to user message for better compliance.
     // Food chat uses strict system prompts and should not be pushed to ask follow-up questions first.
     const trimmedQuestion = trimMessageContent(question)

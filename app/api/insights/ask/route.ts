@@ -122,7 +122,7 @@ export async function POST(request: NextRequest) {
       ? clientMessages.map((m: any) => ({ role: String(m.role || 'user'), content: String(m.content || '') })).slice(-12)
       : (question ? [{ role: 'user', content: String(question) }] : [])
 
-    const model = 'gpt-4o-mini'
+    const model = 'gpt-5.6-sol'
     const promptText = [baseSystem, ...history].map((m) => m.content).join('\n')
     let maxTokens = 400
     if (!allowViaFreeUse) {

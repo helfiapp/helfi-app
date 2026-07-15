@@ -76,6 +76,7 @@ export async function GET(req: NextRequest) {
 
     // Models to compare (you can add/remove in the UI)
     const simulations = [
+      simulate('gpt-5.6-sol'),
       simulate('gpt-4o'),
       simulate('gpt-5.2'),
       simulate('gpt-5-mini'),

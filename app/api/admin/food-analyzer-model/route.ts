@@ -6,8 +6,8 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const FOOD_MODEL_GOAL_NAME = '__FOOD_ANALYZER_MODEL__'
-const DEFAULT_MODEL = (process.env.OPENAI_FOOD_MODEL || 'gpt-5.2').trim()
-const ALLOWED_MODELS = new Set(['gpt-4o', 'gpt-5.2'])
+const DEFAULT_MODEL = 'gpt-5.6-sol'
+const ALLOWED_MODELS = new Set(['gpt-5.6-sol'])
 
 const normalizeEmail = (raw: string) => raw.trim().toLowerCase()
 

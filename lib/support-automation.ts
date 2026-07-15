@@ -9,7 +9,7 @@ import { buildSupportCodeContext } from '@/lib/support-code-search'
 import { getSupportAgentForTimestamp } from '@/lib/support-agents'
 import supportKnowledgeBase from '@/data/support-kb.json'
 
-const SUPPORT_AI_MODEL = 'gpt-5.2'
+const SUPPORT_AI_MODEL = 'gpt-5.6-sol'
 const SUPPORT_COPY_EMAIL = 'support@helfi.ai'
 const SUPPORT_VERIFICATION_TTL_MINUTES = 15
 const SYSTEM_IDENTITY_MARKER = '[SYSTEM] Identity verified'

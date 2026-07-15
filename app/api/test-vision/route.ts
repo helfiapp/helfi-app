@@ -317,7 +317,7 @@ export async function POST(req: NextRequest) {
     }
 
     const wrapped = await chatCompletionWithCost(openai, {
-      model: "gpt-4o",
+      model: "gpt-5.6-sol",
       messages: [
         {
           role: "system",
@@ -387,7 +387,7 @@ export async function POST(req: NextRequest) {
       scanId: `medical-${Date.now()}`,
       userId: user.id || null,
       userLabel: user.email || null,
-      model: "gpt-4o",
+      model: "gpt-5.6-sol",
       promptTokens: wrapped.promptTokens,
       completionTokens: wrapped.completionTokens,
       costCents: wrapped.costCents,

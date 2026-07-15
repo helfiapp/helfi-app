@@ -76,7 +76,7 @@ export async function screenAffiliateApplication(input: AffiliateScreeningInput)
     }
   }
 
-  const model = (process.env.AFFILIATE_SCREENING_MODEL || 'gpt-4o-mini').trim() || 'gpt-4o-mini'
+  const model = 'gpt-5.6-sol'
   const system = `You are an affiliate application screening service for a SaaS app.
 Return ONLY valid JSON with keys:
 - riskLevel: one of LOW|MEDIUM|HIGH

@@ -165,7 +165,7 @@ JSON rules:
     ]
 
     // Wallet pre-check (skip when allowed via one-time free use)
-    const model = 'gpt-4o'
+    const model = 'gpt-5.6-sol'
     const promptText = messages.map((m) => (typeof (m as any).content === 'string' ? (m as any).content : '')).join('\n')
     let maxTokens = 1200
     if (!allowViaFreeUse) {

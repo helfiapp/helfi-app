@@ -426,7 +426,7 @@ export async function POST(req: NextRequest) {
     const finalFallbackText = isNativeClient ? formatForNativePlainText(fallbackText) : fallbackText
 
     if (wantsStream) {
-      const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+      const model = 'gpt-5.6-sol'
       const promptText = [systemPrompt, ...history.map((m) => m.content), question].join('\n')
       let maxTokens = 800
       if (!allowViaFreeUse && !hasPaidAccess) {
@@ -556,7 +556,7 @@ export async function POST(req: NextRequest) {
 
     // Non-streaming fallback
     {
-      const model = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-4o-mini'
+      const model = 'gpt-5.6-sol'
       let maxTokens = 800
       // Pre-check
       if (!allowViaFreeUse && !hasPaidAccess) {

@@ -3,6 +3,7 @@ import { costCentsForTokens, estimateTokensFromText } from './cost-meter';
 import { reportCriticalError } from '@/lib/error-reporter';
 import { assertAiUsageAllowed } from '@/lib/ai-safety';
 import { getRunContext } from './run-context';
+import { HELFI_ANALYSIS_MODEL, isSpecialistOpenAIModel } from './ai-models';
 
 type CreateParams = Parameters<OpenAI['chat']['completions']['create']>[0];
 type AiCallContext = {
@@ -54,15 +55,24 @@ export async function chatCompletionWithCost(
     userId: context.userId ?? asyncContext?.meta?.userId ?? null,
     runId: context.runId ?? asyncContext?.runId ?? null,
   }
-  const modelName = String((params as any).model || '').toLowerCase()
+  const requestedModel = String((params as any).model || '').trim()
+  const keepRequestedModel =
+    mergedContext.feature === 'admin:food-benchmark' ||
+    isSpecialistOpenAIModel(requestedModel)
+  const effectiveModel = keepRequestedModel ? requestedModel : HELFI_ANALYSIS_MODEL
+  const effectiveParams: any = { ...params, model: effectiveModel }
+  const modelName = effectiveModel.toLowerCase()
   const isGpt5Family = modelName.includes('gpt-5')
   const normalizedParams = (() => {
-    if (!isGpt5Family) return params
-    const maxTokens = Number((params as any).max_tokens)
-    const maxCompletionTokens = Number((params as any).max_completion_tokens)
-    const next: any = { ...params }
+    if (!isGpt5Family) return effectiveParams
+    const maxTokens = Number(effectiveParams.max_tokens)
+    const maxCompletionTokens = Number(effectiveParams.max_completion_tokens)
+    const next: any = { ...effectiveParams }
     delete next.max_tokens
     delete next.temperature
+    if (modelName.includes('gpt-5.6') && !next.reasoning_effort) {
+      next.reasoning_effort = 'low'
+    }
     if (Number.isFinite(maxCompletionTokens) && maxCompletionTokens > 0) {
       next.max_completion_tokens = maxCompletionTokens
     } else if (Number.isFinite(maxTokens) && maxTokens > 0) {
@@ -79,7 +89,7 @@ export async function chatCompletionWithCost(
 
     // Try to use official usage first; if absent, fall back to a rough estimate.
     const usage = (completion as any).usage || {};
-    const model = (completion as any).model || (params as any).model || 'gpt-4o';
+    const model = (completion as any).model || effectiveModel || HELFI_ANALYSIS_MODEL;
     const promptTokens = Number(usage?.prompt_tokens || 0);
     const completionTokens = Number(usage?.completion_tokens || 0);
 
@@ -107,7 +117,7 @@ export async function chatCompletionWithCost(
       completionTokens,
     };
   } catch (error) {
-    const model = String((params as any).model || 'unknown')
+    const model = effectiveModel || 'unknown'
     const maxTokens =
       Number((params as any).max_tokens) ||
       Number((params as any).max_completion_tokens) ||
@@ -144,5 +154,4 @@ function extractPromptText(messages: any[]): string {
     return '';
   }
 }
-
 

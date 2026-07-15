@@ -257,7 +257,7 @@ export async function fetchOpenAIUsageTotals(args: { startDate: string; endDate:
 
 // Helper to compute cost at provider rate card for a batch of tokens.
 export function computeCostCentsFromTokens(model: string, promptTokens: number, completionTokens: number): number {
-  return openaiCostCentsForTokens(model || 'gpt-4o', {
+  return openaiCostCentsForTokens(model || 'gpt-5.6-sol', {
     promptTokens,
     completionTokens,
   })

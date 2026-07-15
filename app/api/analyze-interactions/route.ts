@@ -416,7 +416,7 @@ Be thorough but not alarmist. Provide actionable recommendations.`;
       return NextResponse.json({ error: 'AI service not configured' }, { status: 500 });
     }
 
-    const model = "gpt-5.2";
+    const model = "gpt-5.6-sol";
 
     let maxTokens = 2000;
     // Wallet pre-check (skip if allowed via free use)

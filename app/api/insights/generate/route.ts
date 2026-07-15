@@ -323,7 +323,7 @@ Lab guidance rules:
 Keep each insight skimmable but substantive. Do not return prose outside of the JSON array.
 
 Profile: ${profileText}`
-        const model = 'gpt-4o-mini'
+        const model = 'gpt-5.6-sol'
         const cm = new CreditManager(profile.id)
         const wallet = await cm.getWalletStatus()
         const maxTokens = capMaxTokensToBudget(model, prompt, 1000, wallet.totalAvailableCents)

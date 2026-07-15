@@ -4093,8 +4093,7 @@ export async function POST(request: NextRequest) {
   const llmPayloadJson = modelPayload.json
   const llmPayloadSize = modelPayload.size
 
-  const rawModel = String(process.env.OPENAI_WEEKLY_REPORT_MODEL || '').trim()
-  const model = rawModel.toLowerCase().includes('gpt-5.2') ? rawModel : 'gpt-5.2-chat-latest'
+  const model = 'gpt-5.6-sol'
   const weeklyLlmRaw = (process.env.ENABLE_WEEKLY_REPORT_LLM || '').toLowerCase().trim()
   const llmEnabled = weeklyLlmRaw ? weeklyLlmRaw === 'true' || weeklyLlmRaw === '1' || weeklyLlmRaw === 'yes' : true
   let reportPayload: any = null
@@ -4186,6 +4185,7 @@ ${llmPayloadJson}
         model,
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 2600,
+        reasoning_effort: 'medium',
         response_format: { type: 'json_object' },
       }
       if (!isGpt5) {

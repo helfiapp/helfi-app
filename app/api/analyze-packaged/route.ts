@@ -137,7 +137,7 @@ export async function POST(req: NextRequest) {
   const result: any = await runChatCompletionWithLogging(
     openai,
     {
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.6-sol',
       messages,
       max_tokens: 400,
       temperature: 0,
@@ -162,7 +162,7 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       userLabel: user.email || null,
       scanId: `packaged-${Date.now()}`,
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.6-sol',
       promptTokens: (result as any)?.promptTokens || 0,
       completionTokens: (result as any)?.completionTokens || 0,
       costCents: (result as any)?.costCents || 0,
@@ -181,7 +181,7 @@ export async function POST(req: NextRequest) {
       userId: user.id,
       userLabel: user.email || null,
       scanId: `packaged-${Date.now()}`,
-      model: 'gpt-4o-mini',
+      model: 'gpt-5.6-sol',
       promptTokens: (result as any)?.promptTokens || 0,
       completionTokens: (result as any)?.completionTokens || 0,
       costCents: (result as any)?.costCents || 0,

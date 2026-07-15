@@ -258,7 +258,7 @@ export async function POST(req: NextRequest) {
 
     if (photoMode === 'label') {
       const labelVision = await chatCompletionWithCost(openai, {
-        model: 'gpt-4o',
+        model: 'gpt-5.6-sol',
         messages: [
           {
             role: 'system',
@@ -343,7 +343,7 @@ export async function POST(req: NextRequest) {
         try {
           await logAIUsage({
             context: { feature: 'voice:label-photo:vision', userId: user.id },
-            model: 'gpt-4o',
+            model: 'gpt-5.6-sol',
             promptTokens: labelVision.promptTokens,
             completionTokens: labelVision.completionTokens,
             costCents: labelVision.costCents,
@@ -419,8 +419,8 @@ export async function POST(req: NextRequest) {
         }
       }
 
-      const assistantModel = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
-      const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
+      const assistantModel = 'gpt-5.6-sol'
+      const fallbackModel = 'gpt-5.6-sol'
 
       let assistantResult = await chatCompletionWithCost(openai, {
         model: assistantModel,
@@ -524,7 +524,7 @@ export async function POST(req: NextRequest) {
       try {
         await logAIUsage({
           context: { feature: 'voice:label-photo:vision', userId: user.id },
-          model: 'gpt-4o',
+          model: 'gpt-5.6-sol',
           promptTokens: labelVision.promptTokens,
           completionTokens: labelVision.completionTokens,
           costCents: labelVision.costCents,
@@ -552,7 +552,7 @@ export async function POST(req: NextRequest) {
     }
 
     const vision = await chatCompletionWithCost(openai, {
-      model: 'gpt-4o',
+      model: 'gpt-5.6-sol',
       messages: [
         {
           role: 'system',
@@ -635,8 +635,8 @@ export async function POST(req: NextRequest) {
       'After eating: ...',
     ].join('\n')
 
-    const assistantModel = process.env.OPENAI_INSIGHTS_MODEL || 'gpt-5.2'
-    const fallbackModel = process.env.OPENAI_FALLBACK_MODEL || 'gpt-4o'
+    const assistantModel = 'gpt-5.6-sol'
+    const fallbackModel = 'gpt-5.6-sol'
     let assistantResult = await chatCompletionWithCost(openai, {
       model: assistantModel,
       messages: [
@@ -723,7 +723,7 @@ export async function POST(req: NextRequest) {
     try {
       await logAIUsage({
         context: { feature: 'voice:fridge-photo:vision', userId: user.id },
-        model: 'gpt-4o',
+        model: 'gpt-5.6-sol',
         promptTokens: vision.promptTokens,
         completionTokens: vision.completionTokens,
         costCents: vision.costCents,

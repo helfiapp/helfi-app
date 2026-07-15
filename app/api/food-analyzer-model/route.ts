@@ -8,7 +8,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const FOOD_MODEL_GOAL_NAME = '__FOOD_ANALYZER_MODEL__'
-const ALLOWED_MODELS = new Set(['gpt-4o', 'gpt-5.2'])
+const ALLOWED_MODELS = new Set(['gpt-5.6-sol'])
 
 function normalizeModel(model: unknown): string | null {
   if (typeof model !== 'string') return null
@@ -58,7 +58,7 @@ export async function GET(req: NextRequest) {
     }
 
     return NextResponse.json({
-      model: model || 'gpt-4o',
+      model: model || 'gpt-5.6-sol',
       source: model ? 'user_override' : 'default',
     })
   } catch (err) {
@@ -75,7 +75,7 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({}))
     const model = normalizeModel(body?.model)
     if (!model) {
-      return NextResponse.json({ error: 'Invalid model (use gpt-4o or gpt-5.2)' }, { status: 400 })
+      return NextResponse.json({ error: 'Invalid model (use gpt-5.6-sol)' }, { status: 400 })
     }
 
     const payload = JSON.stringify({ model })

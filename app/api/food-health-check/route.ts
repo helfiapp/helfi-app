@@ -352,7 +352,7 @@ export async function POST(req: NextRequest) {
     const completion = await runChatCompletionWithLogging(
       openai,
       {
-        model: 'gpt-4o-mini',
+        model: 'gpt-5.6-sol',
         messages: [{ role: 'user', content: prompt }],
         max_tokens: 350,
         temperature: 0.4,

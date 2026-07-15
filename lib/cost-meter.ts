@@ -25,6 +25,12 @@ const envNumber = (key: string, fallback: number): number => {
 };
 
 const DEFAULT_PRICES: Record<string, ModelPrices> = {
+  // GPT-5.6 Sol standard pricing, checked against OpenAI pricing on 2026-07-15.
+  // Input: $5.00 / 1M tokens; Output: $30.00 / 1M tokens
+  'gpt-5.6-sol': {
+    inputCentsPer1k: envNumber('HELFI_PRICE_GPT56_SOL_INPUT_CENTS_PER_1K', 0.5),
+    outputCentsPer1k: envNumber('HELFI_PRICE_GPT56_SOL_OUTPUT_CENTS_PER_1K', 3.0),
+  },
   // GPT-5.5 standard short-context pricing, checked against OpenAI pricing on 2026-06-09.
   // Input: $5.00 / 1M tokens; Output: $30.00 / 1M tokens
   'gpt-5.5': {
@@ -85,6 +91,7 @@ export type TokenUsage = {
 
 function normalizeModelKey(model: string): string {
   const m = (model || '').toLowerCase();
+  if (m.includes('gpt-5.6-sol') || m === 'gpt-5.6') return 'gpt-5.6-sol';
   if (m.includes('gpt-5.5') && m.includes('pro')) return 'gpt-5.5-pro';
   if (m.includes('gpt-5.5')) return 'gpt-5.5';
   if (m.includes('gpt-5.2') && m.includes('pro')) return 'gpt-5.2-pro';
@@ -99,7 +106,7 @@ function normalizeModelKey(model: string): string {
 
 export function getModelPrices(model: string): ModelPrices {
   const key = model in DEFAULT_PRICES ? model : normalizeModelKey(model);
-  return DEFAULT_PRICES[key] || DEFAULT_PRICES['gpt-4o'];
+  return DEFAULT_PRICES[key] || DEFAULT_PRICES['gpt-5.6-sol'];
 }
 
 export function getBillingMarkupMultiplier() {
@@ -182,7 +189,6 @@ export function capMaxTokensToBudget(
   const maxCompletionTokens = Math.floor((usableBudget / (outputCentsPer1k * markup)) * 1000);
   return Math.max(0, Math.min(desiredMaxTokens, maxCompletionTokens));
 }
-
 
 
 

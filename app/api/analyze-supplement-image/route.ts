@@ -324,7 +324,7 @@ CRITICAL INSTRUCTIONS:
 
 Return only the final name string, no extra text.`;
 
-    const model = "gpt-4o";
+    const model = "gpt-5.6-sol";
     const cm = new CreditManager(user.id);
     const freeType: FreeCreditType = scanType === 'medication' ? 'MEDICATION_IMAGE' : 'SUPPLEMENT_IMAGE';
     const feature = imageNameFeature(scanType);

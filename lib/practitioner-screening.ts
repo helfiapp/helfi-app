@@ -89,7 +89,7 @@ export async function screenPractitionerListing(
     }
   }
 
-  const model = (process.env.PRACTITIONER_SCREENING_MODEL || 'gpt-4o-mini').trim() || 'gpt-4o-mini'
+  const model = 'gpt-5.6-sol'
   const system = `You are a fraud and scam screening assistant for a practitioner directory.
 Return ONLY valid JSON with keys:
 - riskLevel: one of LOW|MEDIUM|HIGH

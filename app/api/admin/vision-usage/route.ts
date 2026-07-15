@@ -11,7 +11,7 @@ const num = (value: any) => {
   return Number.isFinite(n) ? n : 0
 }
 
-const safeModel = (model?: string | null) => (model && model.trim()) || 'gpt-4o'
+const safeModel = (model?: string | null) => (model && model.trim()) || 'gpt-5.6-sol'
 
 export async function GET(req: NextRequest) {
   try {

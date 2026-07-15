@@ -130,7 +130,7 @@ export async function POST(request: NextRequest) {
     const completion = await runChatCompletionWithLogging(
       openai,
       {
-        model: process.env.OPENAI_RECIPE_IMPORT_MODEL || 'gpt-4o-mini',
+        model: 'gpt-5.6-sol',
         temperature: 0,
         max_tokens: 500,
         response_format: { type: 'json_object' } as any,

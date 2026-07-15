@@ -993,21 +993,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 })
   }
 
-  // Model selection mirrors the Food Analyzer override (optional).
-  let model = (process.env.OPENAI_FOOD_MODEL || 'gpt-4o').trim() || 'gpt-4o'
-  try {
-    const goal = await prisma.healthGoal.findFirst({
-      where: { userId: user.id, name: '__FOOD_ANALYZER_MODEL__' },
-      select: { category: true },
-    })
-    if (goal?.category) {
-      const parsed = JSON.parse(goal.category)
-      const override = typeof parsed?.model === 'string' ? parsed.model.trim() : ''
-      if (override === 'gpt-4o' || override === 'gpt-5.2') {
-        model = override
-      }
-    }
-  } catch {}
+  const model = 'gpt-5.6-sol'
 
   const { targets, profile, primaryGoal, selectedIssues, healthSituations, allergySettings } = await buildTargetsForUser(user as any)
   const logs = await loadFoodLogsForDate(user.id, date, Number.isFinite(tzOffsetMin) ? tzOffsetMin : 0)
@@ -1199,15 +1185,7 @@ export async function POST(req: NextRequest) {
   )
 
   const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
-  const modelFallbacks = Array.from(
-    new Set(
-      [
-        String(process.env.OPENAI_FOOD_MODEL_FALLBACK || '').trim(),
-        model === 'gpt-5.2' ? 'gpt-4.1-mini' : 'gpt-4o-mini',
-        'gpt-4.1-mini',
-      ].filter(Boolean),
-    ),
-  )
+  const modelFallbacks = ['gpt-5.6-sol']
   let record: RecommendedMealRecord | null = null
   const maxAttempts = 3
 

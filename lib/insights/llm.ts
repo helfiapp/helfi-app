@@ -91,7 +91,7 @@ async function createCompletion(
   )
 }
 
-const DEFAULT_INSIGHTS_MODEL = process.env.OPENAI_INSIGHTS_MODEL ?? 'gpt-4o-mini'
+const DEFAULT_INSIGHTS_MODEL = 'gpt-5.6-sol'
 
 const llmSectionSchema = z.object({
   summary: z.string().optional(),

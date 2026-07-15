@@ -41,7 +41,7 @@ const summarizeImage = async (client: OpenAI, file: File, userId: string) => {
   const completion: any = await runChatCompletionWithLogging(
     client,
     {
-      model: process.env.MOOD_MEDIA_IMAGE_MODEL || 'gpt-4o-mini',
+      model: 'gpt-5.6-sol',
       temperature: 0.2,
       max_tokens: 140,
       messages: [
