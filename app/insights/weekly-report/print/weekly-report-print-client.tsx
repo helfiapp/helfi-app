@@ -155,23 +155,22 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
   const dailyStats = (parsedSummary as any)?.dailyStats
   const symptomSummary = (parsedSummary as any)?.symptomSummary
   const exerciseSummary = (parsedSummary as any)?.exerciseSummary
-  const storedTalkToAiSummary = (parsedSummary as any)?.talkToAiSummary
   const talkToAiSummary = verifiedChatActivity.verified
     ? {
-        ...(storedTalkToAiSummary || {}),
         userMessageCount: verifiedChatActivity.userMessageCount,
         activeDays: verifiedChatActivity.activeDays,
         sourceBreakdown: verifiedChatActivity.sourceBreakdown,
       }
-    : storedTalkToAiSummary
+    : null
   const coverage = useMemo(() => {
-    if (!storedCoverage || !verifiedChatActivity.verified) return storedCoverage
+    if (!storedCoverage) return storedCoverage
     const previousChatCount = Number(storedCoverage.talkToAiCount || 0)
     const totalEvents = Number(storedCoverage.totalEvents || 0)
+    const verifiedCount = verifiedChatActivity.verified ? verifiedChatActivity.userMessageCount : 0
     return {
       ...storedCoverage,
-      talkToAiCount: verifiedChatActivity.userMessageCount,
-      totalEvents: Math.max(0, totalEvents - previousChatCount + verifiedChatActivity.userMessageCount),
+      talkToAiCount: verifiedCount,
+      totalEvents: Math.max(0, totalEvents - previousChatCount + verifiedCount),
     }
   }, [storedCoverage, verifiedChatActivity])
   const medicalImageSummary = (parsedSummary as any)?.medicalImageSummary
@@ -191,9 +190,9 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
       { label: 'Journal notes', value: Number(c.journalCount ?? 0) || 0 },
       { label: 'Health image notes', value: Number(c.medicalImageCount ?? 0) || 0 },
       { label: 'Lab uploads', value: Number(c.labCount ?? 0) || 0 },
-      { label: 'AI chats', value: Number(c.talkToAiCount ?? 0) || 0 },
+      { label: 'AI chats', value: verifiedChatActivity.verified ? (Number(c.talkToAiCount ?? 0) || 0) : 'Unavailable' },
     ]
-  }, [coverage])
+  }, [coverage, verifiedChatActivity.verified])
 
   const activityPercent = useMemo(() => {
     const daysActive = Math.min(7, Math.max(0, Number(coverage?.daysActive ?? 0) || 0))
@@ -284,8 +283,7 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
             ))}
           </div>
 
-          {Number(hydrationSummary?.entries ?? 0) > 0 ? (
-            <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-4 print-avoid-break">
+          <div className="mt-5 rounded-xl border border-sky-100 bg-sky-50 p-4 print-avoid-break">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm font-semibold text-sky-900">Hydration summary</div>
                 <div className="text-xs text-sky-700">
@@ -293,13 +291,17 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
                   days
                 </div>
               </div>
-              <div className="mt-2 text-sm text-sky-800">
-                {formatMl(Number(hydrationSummary?.totalMl ?? 0) || 0)} total •{' '}
-                {formatMl(Number(hydrationSummary?.dailyAverageMl ?? 0) || 0)} per day
-              </div>
+              {Number(hydrationSummary?.entries ?? 0) > 0 ? (
+                <div className="mt-2 text-sm text-sky-800">
+                  {formatMl(Number(hydrationSummary?.totalMl ?? 0) || 0)} total •{' '}
+                  {formatMl(Number(hydrationSummary?.dailyAverageMl ?? 0) || 0)} per day
+                </div>
+              ) : (
+                <div className="mt-2 text-sm text-sky-800">No water logs were saved for this week.</div>
+              )}
               {Array.isArray(hydrationSummary?.topDrinks) && hydrationSummary.topDrinks.length > 0 ? (
                 <div className="mt-3 flex flex-wrap gap-2">
-                  {hydrationSummary.topDrinks.slice(0, 6).map((drink: any, idx: number) => (
+                  {hydrationSummary.topDrinks.map((drink: any, idx: number) => (
                     <span
                       key={`${drink.label || 'drink'}-${idx}`}
                       className="rounded-full border border-sky-100 bg-white px-3 py-1 text-xs text-sky-800"
@@ -310,7 +312,6 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
                 </div>
               ) : null}
             </div>
-          ) : null}
         </div>
 
         {summaryPoints.length > 0 ? (
@@ -333,6 +334,7 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
           <p className="mt-1 text-sm text-slate-600">Charts that summarize your last 7 days. They improve as you log more.</p>
           <div className="mt-4">
             <ReportVisuals
+              printMode
               periodStart={report.periodStart}
               periodEnd={report.periodEnd}
               coverage={coverage}
@@ -356,7 +358,7 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
             </p>
             {Array.isArray(medicalImageSummary?.highlights) && medicalImageSummary.highlights.length > 0 ? (
               <div className="mt-4 space-y-3">
-                {medicalImageSummary.highlights.slice(0, 4).map((item: any, idx: number) => (
+                {medicalImageSummary.highlights.map((item: any, idx: number) => (
                   <div key={`medical-${idx}`} className="rounded-xl border border-sky-100 bg-white p-4 print-avoid-break">
                     <div className="text-xs font-semibold uppercase tracking-wide text-sky-700">
                       {[item?.date, item?.time].filter(Boolean).join(' • ') || 'Saved image note'}
@@ -366,7 +368,7 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
                     </div>
                     {Array.isArray(item?.possibleCauses) && item.possibleCauses.length > 0 ? (
                       <div className="mt-3 flex flex-wrap gap-2">
-                        {item.possibleCauses.slice(0, 3).map((cause: string, causeIdx: number) => (
+                        {item.possibleCauses.map((cause: string, causeIdx: number) => (
                           <span
                             key={`${cause}-${causeIdx}`}
                             className="rounded-full border border-sky-100 bg-sky-50 px-3 py-1 text-xs font-semibold text-sky-900"
@@ -378,7 +380,7 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
                     ) : null}
                     {Array.isArray(item?.nextSteps) && item.nextSteps.length > 0 ? (
                       <div className="mt-3 space-y-1 text-sm text-slate-700">
-                        {item.nextSteps.slice(0, 2).map((step: string, stepIdx: number) => (
+                        {item.nextSteps.map((step: string, stepIdx: number) => (
                           <p key={`medical-step-${idx}-${stepIdx}`}>{step}</p>
                         ))}
                       </div>
@@ -397,7 +399,7 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
               Changes are shown without judging good or bad. Share with your clinician if needed.
             </p>
             <div className="mt-4 space-y-3">
-              {labTrends.slice(0, 10).map((trend: any, idx: number) => (
+              {labTrends.map((trend: any, idx: number) => (
                 <div key={`lab-${idx}`} className="rounded-xl border border-slate-200 bg-slate-50 p-4 print-avoid-break">
                   <div className="font-semibold text-slate-900">{trend.name || 'Lab value'}</div>
                   <div className="mt-1 text-sm text-slate-700">
@@ -411,43 +413,22 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
           </div>
         ) : null}
 
-        {talkToAiSummary ? (
-          <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 print-avoid-break">
-            <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
+        <div className="mt-8 rounded-2xl border border-blue-100 bg-blue-50/40 p-6">
+            <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi activity</h2>
             {!verifiedChatActivity.verified ? (
               <p className="mt-2 text-sm text-blue-800">Saved chat history could not be checked right now.</p>
-            ) : talkToAiSummary.userMessageCount ? (
+            ) : talkToAiSummary?.userMessageCount ? (
               <p className="mt-2 text-sm text-blue-800">
-                {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
-                {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}
-                {talkToAiSummary.sourceBreakdown
+                {talkToAiSummary?.userMessageCount} chat {talkToAiSummary?.userMessageCount === 1 ? 'prompt' : 'prompts'}
+                {talkToAiSummary?.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}
+                {talkToAiSummary?.sourceBreakdown
                   ? ` (${Number(talkToAiSummary.sourceBreakdown.general?.userMessageCount || 0)} General, ${Number(talkToAiSummary.sourceBreakdown.food?.userMessageCount || 0)} Food)`
                   : ''}.
               </p>
             ) : (
               <p className="mt-2 text-sm text-blue-800">No saved chats this week.</p>
             )}
-            {verifiedChatActivity.verified && talkToAiSummary.userMessageCount && Array.isArray(talkToAiSummary.topics) && talkToAiSummary.topics.length > 0 ? (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {talkToAiSummary.topics.map((topic: any, idx: number) => (
-                  <span key={`topic-${idx}`} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs text-blue-900">
-                    {topic.topic}
-                    {topic.count ? ` • ${topic.count}` : ''}
-                  </span>
-                ))}
-              </div>
-            ) : null}
-            {verifiedChatActivity.verified && talkToAiSummary.userMessageCount && Array.isArray(talkToAiSummary.highlights) && talkToAiSummary.highlights.length > 0 ? (
-              <div className="mt-4 space-y-2">
-                {talkToAiSummary.highlights.slice(-6).map((item: any, idx: number) => (
-                  <div key={`talk-${idx}`} className="rounded-xl border border-blue-100 bg-white p-3 text-sm text-blue-900 print-avoid-break">
-                    {item.content}
-                  </div>
-                ))}
-              </div>
-            ) : null}
           </div>
-        ) : null}
 
         {(wins.length > 0 || gaps.length > 0) ? (
           <div className="mt-8 grid gap-6 md:grid-cols-2 print:grid-cols-2">

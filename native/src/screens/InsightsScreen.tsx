@@ -13,6 +13,7 @@ import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { WeeklyReportDataExplorer } from '../components/WeeklyReportDataExplorer'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -566,6 +567,7 @@ function Pill({ label, active, onPress }: { label: string; active: boolean; onPr
 export function InsightsScreen({ navigation }: { navigation: any }) {
   const { mode, session } = useAppMode()
   const scrollRef = useRef<ScrollView | null>(null)
+  const scrollOffsetRef = useRef(0)
   const [loading, setLoading] = useState(true)
   const [refreshing, setRefreshing] = useState(false)
   const [error, setError] = useState('')
@@ -576,6 +578,8 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
   const [lastLoadedAt, setLastLoadedAt] = useState<string | null>(null)
   const [countdown, setCountdown] = useState<ReportCountdown | null>(null)
   const [selectedReportId, setSelectedReportId] = useState<string | null>(null)
+  const [verifiedChatActivity, setVerifiedChatActivity] = useState<any>(null)
+  const [chatVerificationState, setChatVerificationState] = useState<'loading' | 'verified' | 'unavailable'>('loading')
   const [reportNav, setReportNav] = useState<ReportNavKey>('summary')
   const [activeSection, setActiveSection] = useState<SectionKey>('overview')
   const [openDetailBucket, setOpenDetailBucket] = useState<DetailBucket | null>(null)
@@ -607,6 +611,41 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     if (!reports.length) return null
     return reports.find((item) => item.id === selectedReportId) || null
   }, [reports, selectedReportId])
+
+  useEffect(() => {
+    let cancelled = false
+    if (!authHeaders || !selectedReport?.id || selectedReport.status !== 'READY') {
+      setVerifiedChatActivity(null)
+      setChatVerificationState('loading')
+      return () => { cancelled = true }
+    }
+
+    setVerifiedChatActivity(null)
+    setChatVerificationState('loading')
+    fetch(`${API_BASE_URL}/api/reports/weekly/chat-activity?reportId=${encodeURIComponent(selectedReport.id)}`, { headers: authHeaders })
+      .then(async (response) => {
+        const data = await response.json().catch(() => ({}))
+        if (!response.ok) throw new Error(data?.error || 'Could not check saved chats.')
+        return data?.activity
+      })
+      .then((activity) => {
+        if (cancelled) return
+        if (activity?.verified !== true) {
+          setVerifiedChatActivity(null)
+          setChatVerificationState('unavailable')
+          return
+        }
+        setVerifiedChatActivity(activity)
+        setChatVerificationState('verified')
+      })
+      .catch(() => {
+        if (cancelled) return
+        setVerifiedChatActivity(null)
+        setChatVerificationState('unavailable')
+      })
+
+    return () => { cancelled = true }
+  }, [authHeaders, selectedReport?.id, selectedReport?.status])
 
   const loadData = useCallback(
     async (quiet = false) => {
@@ -873,10 +912,10 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     else navigation.navigate(screen, params)
   }
 
-  const openChatLog = () => {
+  const openChatLog = (context: 'general' | 'food' = 'general') => {
     goToStackScreen('NativeWebTool', {
       title: 'Chat History',
-      path: '/chat?history=1',
+      path: context === 'food' ? '/chat?context=food&history=1' : '/chat?history=1',
     })
   }
 
@@ -886,14 +925,32 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
   const previousReport = useMemo(() => reports.find((item) => item.id !== selectedReport?.id && item.status === 'READY' && item.dataSummary) || null, [reports, selectedReport?.id])
   const previousParsedSummary = useMemo(() => parseMaybeJson(previousReport?.dataSummary), [previousReport?.dataSummary])
 
-  const coverage = parsedSummary?.coverage || {}
+  const storedCoverage = parsedSummary?.coverage || {}
   const nutritionSummary = parsedSummary?.nutritionSummary || {}
   const hydrationSummary = parsedSummary?.hydrationSummary || {}
   const symptomSummary = parsedSummary?.symptomSummary || {}
   const exerciseSummary = parsedSummary?.exerciseSummary || {}
   const medicalImageSummary = parsedSummary?.medicalImageSummary || {}
   const journalSummary = parsedSummary?.journalSummary || {}
-  const talkToAiSummary = parsedSummary?.talkToAiSummary || {}
+  const talkToAiSummary = useMemo(() => {
+    if (chatVerificationState !== 'verified' || !verifiedChatActivity) {
+      return { userMessageCount: 0, activeDays: 0, sourceBreakdown: { general: { userMessageCount: 0, activeDays: 0 }, food: { userMessageCount: 0, activeDays: 0 } } }
+    }
+    return {
+      userMessageCount: Number(verifiedChatActivity.userMessageCount || 0),
+      activeDays: Number(verifiedChatActivity.activeDays || 0),
+      sourceBreakdown: verifiedChatActivity.sourceBreakdown,
+    }
+  }, [chatVerificationState, verifiedChatActivity])
+  const coverage = useMemo(() => {
+    const oldChatCount = Number(storedCoverage?.talkToAiCount || 0)
+    const verifiedCount = chatVerificationState === 'verified' ? Number(verifiedChatActivity?.userMessageCount || 0) : 0
+    return {
+      ...storedCoverage,
+      talkToAiCount: verifiedCount,
+      totalEvents: Math.max(0, Number(storedCoverage?.totalEvents || 0) - oldChatCount + verifiedCount),
+    }
+  }, [chatVerificationState, storedCoverage, verifiedChatActivity?.userMessageCount])
   const dailyStats = Array.isArray(parsedSummary?.dailyStats) ? parsedSummary.dailyStats : []
   const supplementsList = Array.isArray(parsedSummary?.supplements) ? parsedSummary.supplements : []
   const medicationsList = Array.isArray(parsedSummary?.medications) ? parsedSummary.medications : []
@@ -1372,18 +1429,17 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           </View>
         </Card>
       ) : null}
-      {reports.length > 1 ? (
-        <Card>
-          <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>Previous reports</Text>
-          <View style={{ gap: 10, marginTop: 12 }}>
-            {reports.slice(0, 5).map((item) => (
-              <Pressable key={item.id} onPress={() => openReport(item.id)} style={({ pressed }) => ({ opacity: pressed ? 0.86 : 1 })}>
-                <InfoItem title={formatDateRange(item.periodStart, item.periodEnd)} body={`Generated ${formatDateForLocale(item.createdAt)}`} />
-              </Pressable>
-            ))}
-          </View>
-        </Card>
-      ) : null}
+      <WeeklyReportDataExplorer
+        periodStart={selectedReport?.periodStart || ''}
+        periodEnd={selectedReport?.periodEnd || ''}
+        coverage={coverage}
+        summary={parsedSummary}
+        sections={displaySections}
+        talkToAiSummary={talkToAiSummary}
+        chatState={chatVerificationState}
+        onOpenChat={openChatLog}
+        onRequestScroll={(windowY, animated) => scrollRef.current?.scrollTo({ y: Math.max(0, scrollOffsetRef.current + windowY - 105), animated })}
+      />
     </View>
   )
 
@@ -1494,18 +1550,31 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           </View>
         </Card>
       ) : null}
-      {talkToAiSummary?.userMessageCount ? (
+      {chatVerificationState === 'loading' ? (
         <Card tone="sky">
-          <Text style={{ color: '#075985', fontSize: 18, fontWeight: '700' }}>Talk to Helfi highlights</Text>
+          <Text style={{ color: '#075985', fontSize: 18, fontWeight: '700' }}>Talk to Helfi activity</Text>
+          <Text style={{ color: '#075985', marginTop: 5 }}>Checking the real saved chat history for this report week…</Text>
+        </Card>
+      ) : chatVerificationState === 'unavailable' ? (
+        <Card tone="amber">
+          <Text style={{ color: '#92400E', fontSize: 18, fontWeight: '700' }}>Saved chats could not be checked</Text>
+          <Text style={{ color: '#92400E', marginTop: 5, lineHeight: 20 }}>Helfi is not showing the older generated count as fact. Please try opening this report again later.</Text>
+        </Card>
+      ) : talkToAiSummary?.userMessageCount ? (
+        <Card tone="sky">
+          <Text style={{ color: '#075985', fontSize: 18, fontWeight: '700' }}>Talk to Helfi activity</Text>
           <Text style={{ color: '#075985', marginTop: 5 }}>{talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}{talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}.</Text>
-          <View style={{ alignSelf: 'flex-start', marginTop: 10 }}>
-            <SecondaryButton label="Open chat log" onPress={openChatLog} />
-          </View>
-          <View style={{ gap: 8, marginTop: 10 }}>
-            {(talkToAiSummary.highlights || []).slice(-3).map((item: any, idx: number) => <InfoItem key={`talk-${idx}`} title={item.content || 'Chat highlight'} />)}
+          <View style={{ alignSelf: 'flex-start', gap: 8, marginTop: 10 }}>
+            {Number(talkToAiSummary?.sourceBreakdown?.general?.userMessageCount || 0) > 0 ? <SecondaryButton label="Open General chat log" onPress={() => openChatLog('general')} /> : null}
+            {Number(talkToAiSummary?.sourceBreakdown?.food?.userMessageCount || 0) > 0 ? <SecondaryButton label="Open Food chat log" onPress={() => openChatLog('food')} /> : null}
           </View>
         </Card>
-      ) : null}
+      ) : (
+        <Card tone="sky">
+          <Text style={{ color: '#075985', fontSize: 18, fontWeight: '700' }}>Talk to Helfi activity</Text>
+          <Text style={{ color: '#075985', marginTop: 5 }}>No saved chats this week.</Text>
+        </Card>
+      )}
       {medicalImageSummary?.entries ? (
         <Card tone="sky">
           <Text style={{ color: '#075985', fontSize: 18, fontWeight: '700' }}>Health image notes</Text>
@@ -1727,6 +1796,8 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     <Screen>
       <ScrollView
         ref={scrollRef}
+        onScroll={(event) => { scrollOffsetRef.current = event.nativeEvent.contentOffset.y }}
+        scrollEventThrottle={16}
         contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl, gap: 14 }}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={theme.colors.primary} />}
       >

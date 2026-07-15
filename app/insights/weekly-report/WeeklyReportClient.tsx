@@ -6,6 +6,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ChevronDownIcon, ChevronUpIcon } from '@heroicons/react/24/outline'
 import type { WeeklyReportChatActivity, WeeklyReportRecord } from '@/lib/weekly-health-report'
 import ReportVisuals from './ReportVisuals'
+import WeeklyDataExplorer from './WeeklyDataExplorer'
 
 const SECTIONS = [
   { key: 'overview', label: 'Overview' },
@@ -387,28 +388,13 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
   }, [previousReport])
 
   const dataWarning = (parsedSummary as any)?.dataWarning as string | null
-  const storedTalkToAiSummary = (parsedSummary as any)?.talkToAiSummary as
-    | {
-        messageCount?: number
-        userMessageCount?: number
-        assistantMessageCount?: number
-        activeDays?: number
-        sourceBreakdown?: {
-          general?: { userMessageCount?: number; activeDays?: number }
-          food?: { userMessageCount?: number; activeDays?: number }
-        }
-        topics?: Array<{ topic?: string; section?: string; count?: number }>
-        highlights?: Array<{ content?: string; createdAt?: string }>
-      }
-    | undefined
   const talkToAiSummary = verifiedChatActivity?.verified
     ? {
-        ...(storedTalkToAiSummary || {}),
         userMessageCount: verifiedChatActivity.userMessageCount,
         activeDays: verifiedChatActivity.activeDays,
         sourceBreakdown: verifiedChatActivity.sourceBreakdown,
       }
-    : storedTalkToAiSummary
+    : undefined
   const chatHistoryUnavailable = Boolean(verifiedChatActivity && !verifiedChatActivity.verified)
   const hasChatSourceBreakdown = Boolean(talkToAiSummary?.sourceBreakdown)
   const generalChatPromptCount = Number(talkToAiSummary?.sourceBreakdown?.general?.userMessageCount || 0)
@@ -430,13 +416,14 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
       }
     | undefined
   const coverage = useMemo(() => {
-    if (!storedCoverage || !verifiedChatActivity?.verified) return storedCoverage
+    if (!storedCoverage) return storedCoverage
     const previousChatCount = Number(storedCoverage.talkToAiCount || 0)
     const totalEvents = Number(storedCoverage.totalEvents || 0)
+    const verifiedCount = verifiedChatActivity?.verified ? verifiedChatActivity.userMessageCount : 0
     return {
       ...storedCoverage,
-      talkToAiCount: verifiedChatActivity.userMessageCount,
-      totalEvents: Math.max(0, totalEvents - previousChatCount + verifiedChatActivity.userMessageCount),
+      talkToAiCount: verifiedCount,
+      totalEvents: Math.max(0, totalEvents - previousChatCount + verifiedCount),
     }
   }, [storedCoverage, verifiedChatActivity])
   const hydrationSummary = (parsedSummary as any)?.hydrationSummary as
@@ -1226,6 +1213,18 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             </div>
           </div>
         )}
+
+        <div className="mt-6">
+          <WeeklyDataExplorer
+            periodStart={report.periodStart}
+            periodEnd={report.periodEnd}
+            coverage={coverage}
+            summary={parsedSummary}
+            sections={displaySections}
+            talkToAiSummary={talkToAiSummary}
+            chatHistoryUnavailable={chatHistoryUnavailable}
+          />
+        </div>
         </div>
 
         <div id="visuals" className={`mt-6 ${reportPageClass('visuals')}`}>
@@ -1297,12 +1296,12 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
           </div>
         )}
 
-        {talkToAiSummary ? (
+        {(talkToAiSummary || chatHistoryUnavailable) ? (
           <div className="mt-6 rounded-2xl border border-blue-100 bg-blue-50/40 p-6 shadow-sm">
-            <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi highlights</h2>
+            <h2 className="text-lg font-semibold text-blue-900">Talk to Helfi activity</h2>
             {chatHistoryUnavailable ? (
               <p className="mt-2 text-sm text-blue-800">Saved chat history could not be checked right now.</p>
-            ) : talkToAiSummary.userMessageCount ? (
+            ) : talkToAiSummary?.userMessageCount ? (
               <p className="text-sm text-blue-800 mt-2">
                 {talkToAiSummary.userMessageCount} chat {talkToAiSummary.userMessageCount === 1 ? 'prompt' : 'prompts'}
                 {talkToAiSummary.activeDays ? ` across ${talkToAiSummary.activeDays} days` : ''}
@@ -1313,7 +1312,7 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
             ) : (
               <p className="mt-2 text-sm text-blue-800">No saved chats this week.</p>
             )}
-            {!chatHistoryUnavailable && talkToAiSummary.userMessageCount ? (
+            {!chatHistoryUnavailable && talkToAiSummary?.userMessageCount ? (
               <div className="mt-3 flex flex-wrap gap-2">
               {(!hasChatSourceBreakdown || generalChatPromptCount > 0) && (
                 <Link
@@ -1333,25 +1332,6 @@ export default function WeeklyReportClient({ report, reports, nextReportDueAt, c
               )}
               </div>
             ) : null}
-            {!chatHistoryUnavailable && talkToAiSummary.userMessageCount && talkToAiSummary.topics && talkToAiSummary.topics.length > 0 && (
-              <div className="mt-4 flex flex-wrap gap-2">
-                {talkToAiSummary.topics.map((topic, idx) => (
-                  <span key={`${topic.topic}-${idx}`} className="rounded-full border border-blue-100 bg-white px-3 py-1 text-xs text-blue-900">
-                    {topic.topic}
-                    {topic.count ? ` • ${topic.count}` : ''}
-                  </span>
-                ))}
-              </div>
-            )}
-            {!chatHistoryUnavailable && talkToAiSummary.userMessageCount && talkToAiSummary.highlights && talkToAiSummary.highlights.length > 0 && (
-              <div className="mt-4 space-y-2">
-                {talkToAiSummary.highlights.slice(-3).map((item, idx) => (
-                  <div key={`talk-${idx}`} className="rounded-xl border border-blue-100 bg-white p-3 text-sm text-blue-900">
-                    {item.content}
-                  </div>
-                ))}
-              </div>
-            )}
           </div>
         ) : null}
 

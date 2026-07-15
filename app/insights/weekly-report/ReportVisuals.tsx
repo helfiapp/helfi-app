@@ -1,6 +1,6 @@
 'use client'
 
-import { useMemo, type ReactNode } from 'react'
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from 'react'
 import { Bar, Doughnut, Line } from 'react-chartjs-2'
 import {
   Chart as ChartJS,
@@ -17,6 +17,8 @@ import {
 } from 'chart.js'
 
 ChartJS.register(CategoryScale, LinearScale, PointElement, LineElement, BarElement, ArcElement, Tooltip, Legend, Filler)
+
+const PrintModeContext = createContext(false)
 
 type DailyStat = {
   date: string
@@ -163,9 +165,10 @@ function ChartDisclosure({
   summary: string
   children: ReactNode
 }) {
+  const printMode = useContext(PrintModeContext)
   return (
-    <details className="group min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
-      <summary className="flex cursor-pointer list-none items-center gap-3">
+    <details open={printMode || undefined} className="group min-w-0 rounded-3xl border border-slate-200 bg-white p-5 shadow-sm">
+      <summary className={printMode ? 'hidden' : 'flex cursor-pointer list-none items-center gap-3'}>
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-xl font-semibold text-helfi-green group-open:hidden">+</span>
         <span className="hidden h-10 w-10 shrink-0 place-items-center rounded-full border border-slate-200 text-xl font-semibold text-slate-600 group-open:grid">-</span>
         <div className="min-w-0 pr-2">
@@ -191,7 +194,18 @@ export default function ReportVisuals(props: {
   medicalImageSummary?: MedicalImageSummary
   journalSummary?: JournalSummary
   previousSummary?: PreviousSummary | null
+  printMode?: boolean
 }) {
+  const [reduceMotion, setReduceMotion] = useState(false)
+
+  useEffect(() => {
+    const query = window.matchMedia('(prefers-reduced-motion: reduce)')
+    const update = () => setReduceMotion(query.matches)
+    update()
+    query.addEventListener?.('change', update)
+    return () => query.removeEventListener?.('change', update)
+  }, [])
+
   const periodStartKey = toDateKey(props.periodStart) || ''
   const periodEndKey = toDateKey(props.periodEnd) || ''
 
@@ -351,6 +365,7 @@ export default function ReportVisuals(props: {
   const baseLineOptions: ChartOptions<'line'> = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: reduceMotion ? false : { duration: 650, easing: 'easeOutQuart' },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -376,6 +391,7 @@ export default function ReportVisuals(props: {
   const baseBarOptions: ChartOptions<'bar'> = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: reduceMotion ? false : { duration: 650, easing: 'easeOutQuart' },
     plugins: {
       legend: { display: false },
       tooltip: {
@@ -397,6 +413,7 @@ export default function ReportVisuals(props: {
   const donutOptions: ChartOptions<'doughnut'> = {
     responsive: true,
     maintainAspectRatio: false,
+    animation: reduceMotion ? false : { duration: 700, easing: 'easeOutQuart' },
     cutout: '68%',
     plugins: {
       legend: {
@@ -428,6 +445,7 @@ export default function ReportVisuals(props: {
   const journalHighlights = Array.isArray(props.journalSummary?.highlights) ? props.journalSummary?.highlights : []
 
   return (
+    <PrintModeContext.Provider value={Boolean(props.printMode)}>
     <div className="space-y-6">
       <div className="grid gap-4 lg:grid-cols-3 print:grid-cols-2">
         <ChartDisclosure
@@ -929,5 +947,6 @@ export default function ReportVisuals(props: {
         </ChartDisclosure>
       </div>
     </div>
+    </PrintModeContext.Provider>
   )
 }

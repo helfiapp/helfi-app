@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-14T12:55:33.811Z",
+  "generatedAt": "2026-07-15T03:35:43.734Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -198,6 +198,7 @@
     "components/UsageMeter.tsx": "c031540fcb357f17144674e6a8fddb2f15af88887d56b0c743cec2ad6f1eb9a0",
     "components/VoiceChat.tsx": "13fcee05c1bc320ff67eb717be0a70abd1ad000c5dac3bf53860e7bb352b2a74",
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
+    "native/src/components/WeeklyReportDataExplorer.tsx": "e9552ed655d48736cbe00946ae20c9d580389f2469463dd22f20b6e69e496e51",
     "native/src/config.ts": "b9081565de3694e029e92b1149e1412c8d5e322d5a2e2e68ba0963b6d0489428",
     "native/src/config/nativePageRoutes.ts": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f",
     "native/src/content/legal.ts": "338d30c5ace5fb8f1a3df72c824acb4dc886997002c6a265220e53d675a52bd9",
@@ -231,7 +232,7 @@
     "native/src/screens/HealthSetupScreen.tsx": "69e9adaa420a14b38092c4f0329feeb269f03684586bd0cb4ef9ea6837a7b2db",
     "native/src/screens/HelpScreen.tsx": "d79343411824cc17dd9ade0779186125e348b2a5397d7e9d500d30da48477af4",
     "native/src/screens/InsightIssueScreen.tsx": "cd05119b977dd53441bbf44699e13b0e7a7f90bf5d46dcf1ce6e23ba1a3edb33",
-    "native/src/screens/InsightsScreen.tsx": "a9e384e2c1d91ec97d72cbac455b5a84bab96b5f853d08ac4379714cf478d997",
+    "native/src/screens/InsightsScreen.tsx": "605a82be43c7948581b635f283edd4fe2fed7f07d64a28034d68a4734534ad24",
     "native/src/screens/ListYourPracticeScreen.tsx": "5eedb259e82ab4d1615761e73583fd94238364c9248f9751b2eaaf8e32b60d24",
     "native/src/screens/ListYourPracticeStartScreen.tsx": "8372074b031b1ec1aa66031e2ba79df027f295ebf08fd7c21506de0d2fb30188",
     "native/src/screens/LoginScreen.tsx": "537568706fafe73e9f92047732850e406863c08afa73ab3a938d5cbfac2a93c4",
