@@ -216,11 +216,18 @@ export default function WeeklyReportPrintClient({ report, verifiedChatActivity }
   }, [autoPrinted])
 
   return (
-    <div className="min-h-screen bg-white text-slate-900">
+    <div className="min-h-screen bg-white text-slate-900 print:min-h-0">
       <style jsx global>{`
         @media print {
           @page {
             margin: 14mm;
+          }
+          html,
+          body,
+          body > div {
+            height: auto !important;
+            min-height: 0 !important;
+            overflow: visible !important;
           }
           .print-avoid-break {
             break-inside: avoid;
