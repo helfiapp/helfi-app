@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 17 July 2026, 11:30 AM AEST
+- What changed: Finished the Talk to Helfi safety and reliability repair, including exact dates, no invented exercise/mood/water values, correction before saving, and safe retries without duplicate writes. The native Health Coach loading display was also repaired for the next iOS build.
+- Where to see it (page/link): https://helfi.ai and the native app's Talk to Helfi flow after the next TestFlight build is installed.
+- What to quickly test: In Talk to Helfi, try an exercise without a duration, a vague mood request, yesterday's date, correction before save, and a failed-save retry; confirm the app asks for missing facts and saves only once.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 15 July 2026, 1:54 PM AEST
 - What changed: Weekly health reports now have clickable detail areas, animated charts on web and iPhone, and complete static print/PDF versions.
 - Where to see it (page/link): https://helfi.ai/insights/weekly-report

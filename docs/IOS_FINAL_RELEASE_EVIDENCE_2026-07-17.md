@@ -20,12 +20,12 @@ No row may remain `PRELIMINARY`, `UNTESTED`, or `BLOCKED` when the build is decl
 
 | Screen / flow | Exact control or action | Device / build | Result | Observable evidence | Defect / repair | Final retest |
 | --- | --- | --- | --- | --- | --- | --- |
-| Repository | Inspect all modified, deleted, and untracked files | Main checkout at `bab37499` plus saved work | PASS - CURRENT SOURCE | Only one Git worktree exists; all saved Talk to Helfi, evidence, mockup, and secret-backup cleanup files preserved | No files discarded | Repeat before final commit |
+| Repository | Inspect all modified, deleted, and untracked files | Main checkout at `3d4f59cc` | PASS - CURRENT SOURCE | Only one Git worktree exists; saved Talk to Helfi work, Health Coach repair, audit evidence, and secret-backup cleanup committed; App Store artwork and temporary evidence preserved locally and accounted for | No files discarded | Repeat before final build commit |
 | Web/API compile | Run full production build | Current source, Mac | PASS - CURRENT SOURCE | Production build completed; existing warnings only | None | Repeat after final changes |
 | Native compile | Run native type check and simulator build | Current source, iPhone 17 Pro Max simulator | PASS - CURRENT SOURCE | Type check passed; Xcode simulator build succeeded with zero errors | None | Repeat for final archive |
 | Page locks | Run web and native lock checks | Current source | PASS - CURRENT SOURCE | 268 total locks and 72 native locks passed | Health Coach and saved voice hashes refreshed only | Repeat before commit/upload |
 | Talk to Helfi safety | Run voice behaviour, confirm guard, and TestFlight preflight | Current source | PASS - CURRENT SOURCE | All three checks passed | Saved voice work preserved and verified | Repeat before upload |
-| Production web/API | Push one release task, wait for Vercel READY, verify both live domains | Final release commit | UNTESTED | No new deployment yet | Pending | Required |
+| Production web/API | Push one release task, wait for Vercel READY, verify both live domains | Commit `3d4f59cc` / Vercel `dpl_FJw71SB42URaScCd5Mk2LKyMFEen` | PASS - CURRENT SOURCE | Deployment READY; `helfi.ai` and `www.helfi.ai` both point to it; live voice readiness returns ready, Marin, `gpt-realtime-2.1` | Stale live aliases were reassigned to the new READY deployment | Repeat readiness before upload |
 | Final archive | Archive exact committed source as build 27 or higher | Xcode / App Store upload | UNTESTED | Project is still build 26 | Pending build-number change | Required |
 | TestFlight identity | Confirm processed build, source commit, version, tester assignment | App Store Connect | BLOCKED | App Store Connect is signed out; passkey verification did not complete | External Apple sign-in required | Required |
 
