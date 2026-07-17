@@ -4,7 +4,7 @@ Linear owner ticket: HEL-470
 
 Release source: `master` in `/Volumes/U34 Bolt/HELFI APP/helfi-app`
 
-Final App Store build: not created yet (must be build 27 or higher)
+Final App Store build candidate: 27 (archive/upload still pending)
 
 ## Status rules
 
@@ -26,7 +26,7 @@ No row may remain `PRELIMINARY`, `UNTESTED`, or `BLOCKED` when the build is decl
 | Page locks | Run web and native lock checks | Current source | PASS - CURRENT SOURCE | 268 total locks and 72 native locks passed | Health Coach and saved voice hashes refreshed only | Repeat before commit/upload |
 | Talk to Helfi safety | Run voice behaviour, confirm guard, and TestFlight preflight | Current source | PASS - CURRENT SOURCE | All three checks passed | Saved voice work preserved and verified | Repeat before upload |
 | Production web/API | Push one release task, wait for Vercel READY, verify both live domains | Commit `3d4f59cc` / Vercel `dpl_FJw71SB42URaScCd5Mk2LKyMFEen` | PASS - CURRENT SOURCE | Deployment READY; `helfi.ai` and `www.helfi.ai` both point to it; live voice readiness returns ready, Marin, `gpt-realtime-2.1` | Stale live aliases were reassigned to the new READY deployment | Repeat readiness before upload |
-| Final archive | Archive exact committed source as build 27 or higher | Xcode / App Store upload | UNTESTED | Project is still build 26 | Pending build-number change | Required |
+| Final archive | Archive exact committed source as build 27 or higher | Xcode / App Store upload | UNTESTED | Project source is now build 27; archive not created yet | Pending archive and upload | Required |
 | TestFlight identity | Confirm processed build, source commit, version, tester assignment | App Store Connect | BLOCKED | App Store Connect is signed out; passkey verification did not complete | External Apple sign-in required | Required |
 
 ## Account, navigation, and layout

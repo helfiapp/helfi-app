@@ -15,7 +15,7 @@
       "ios": {
         "supportsTablet": true,
         "bundleIdentifier": "ai.helfi.app",
-        "buildNumber": "26",
+        "buildNumber": "27",
         "associatedDomains": [
           "applinks:helfi.ai",
           "applinks:www.helfi.ai"
