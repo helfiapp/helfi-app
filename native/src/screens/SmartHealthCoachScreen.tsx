@@ -204,7 +204,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
   const [focusSupplements, setFocusSupplements] = useState(true)
   const [focusLifestyle, setFocusLifestyle] = useState(true)
 
-  const [creditsRemaining, setCreditsRemaining] = useState(0)
+  const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null)
   const [usageFillPct, setUsageFillPct] = useState(0)
 
   const [timezoneOptions, setTimezoneOptions] = useState<string[]>(fallbackTimezones)
@@ -1109,7 +1109,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
               />
             </View>
             <Text style={{ color: theme.colors.text, fontWeight: '700', textAlign: 'right' }}>
-              {creditsRemaining.toLocaleString()}
+              {creditsRemaining == null ? 'Loading…' : creditsRemaining.toLocaleString()}
             </Text>
           </View>
 

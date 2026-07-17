@@ -14,6 +14,22 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 - If `scripts/assert-no-local-openai-key.js` blocks you, stop. Do not bypass it.
 - Never paste the key into chat, Linear, logs, tickets, docs, or screenshots.
 
+## Local Secret Backup (macOS Keychain)
+
+Production secrets must never be stored in repo files. Some values are backed up in macOS Keychain so future agents can restore Vercel env vars without recreating keys.
+
+Rules:
+- Never paste secret values into chat, Linear, docs, screenshots, logs, or commits.
+- Never print secret values in terminal output.
+- Use Keychain Access or the macOS `security` command only when restoring a value into the real account or Vercel UI.
+- For OpenAI, keep following the warning above. Do not use the saved key for direct OpenAI scripts or one-off tests.
+
+Known Keychain items:
+- `HELFI_OPENAI_API_KEY_VERCEL_PRODUCTION` account `helfi-production`
+- `HELFI_ENV_APPLE_IAP_BUNDLE_ID` account `helfi-production`
+- `HELFI_ENV_GOOGLE_PLAY_PACKAGE_NAME` account `helfi-production`
+- `HELFI_ENV_STRIPE_PRICE_PRACTITIONER_LISTING` account `helfi-production`
+
 ## Communication Rules
 
 1. The owner is not a developer or coder. Always respond in simple, easy-to-understand English and avoid technical language.

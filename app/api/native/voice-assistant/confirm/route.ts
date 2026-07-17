@@ -30,7 +30,13 @@ async function resolveUser(request: NextRequest) {
 
 function localDate(value: unknown) {
   const text = String(value || '').trim()
-  return /^\d{4}-\d{2}-\d{2}$/.test(text) ? text : new Date().toISOString().slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(text)) throw new Error('Review date is missing or invalid.')
+  const [year, month, day] = text.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  if (date.getUTCFullYear() !== year || date.getUTCMonth() !== month - 1 || date.getUTCDate() !== day) {
+    throw new Error('Review date is missing or invalid.')
+  }
+  return text
 }
 
 function cleanText(value: unknown, max = 1000) {
@@ -246,6 +252,17 @@ async function markReviewTokenUsed(userId: string, draft: any) {
   }
 }
 
+async function releaseReviewToken(userId: string, draft: any) {
+  const token = String(draft?.reviewToken || '')
+  if (!token) return
+  await prisma.verificationToken.deleteMany({
+    where: {
+      identifier: usedReviewTokenIdentifier(userId),
+      token: usedReviewTokenDigest(token),
+    },
+  })
+}
+
 function normalizeWaterUnit(value: unknown): 'ml' | 'l' | 'oz' {
   const raw = String(value || '').trim().toLowerCase()
   if (raw === 'l' || raw.includes('litre') || raw.includes('liter')) return 'l'
@@ -282,7 +299,11 @@ function sweetenerMacros(sweetener: any) {
 async function saveExercise(userId: string, draft: any) {
   const exercise = draft?.exercise || {}
   const exerciseTypeId = Number(exercise.exerciseTypeId)
-  const durationMinutes = clampInt(exercise.durationMinutes, 1, 24 * 60, 30)
+  const durationRaw = Number(exercise.durationMinutes)
+  if (!Number.isFinite(durationRaw) || durationRaw < 1) {
+    throw new Error('Exercise duration is missing. Continue talking and tell Helfi how long it took before saving.')
+  }
+  const durationMinutes = Math.min(24 * 60, Math.round(durationRaw))
   const distanceRaw = Number(exercise.distanceKm)
   const distanceKm = Number.isFinite(distanceRaw) && distanceRaw > 0 ? distanceRaw : null
   const steps = cleanPositiveNumber(exercise.steps, 500000)
@@ -341,7 +362,11 @@ async function saveExercise(userId: string, draft: any) {
 
 async function saveMood(userId: string, draft: any) {
   const moodDraft = draft?.mood || {}
-  const mood = clampInt(moodDraft.mood, 1, 7, 4)
+  const moodRaw = Number(moodDraft.mood)
+  if (!Number.isFinite(moodRaw) || moodRaw < 1 || moodRaw > 7) {
+    throw new Error('Mood value is missing. Continue talking and tell Helfi how you are feeling before saving.')
+  }
+  const mood = Math.round(moodRaw)
   const tags = Array.isArray(moodDraft.tags)
     ? moodDraft.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 12)
     : []
@@ -369,7 +394,7 @@ async function saveMood(userId: string, draft: any) {
 async function saveJournal(userId: string, draft: any) {
   const journal = draft?.journal || {}
   const title = cleanText(journal.title || 'Voice journal note', 120)
-  const content = cleanText(journal.content || draft?.transcript, 20000)
+  const content = cleanText(journal.content, 20000)
   const journalType = String(journal.journalType || journal.type || '').toLowerCase() === 'health' || /\bhealth journal\b/i.test(String(draft?.transcript || ''))
     ? 'health'
     : 'mood'
@@ -417,8 +442,7 @@ async function saveSymptomNote(userId: string, draft: any) {
   const symptoms = Array.isArray(symptom.symptoms)
     ? symptom.symptoms.map((item: any) => cleanText(item, 80)).filter(Boolean).slice(0, 12)
     : []
-  const fallback = cleanText(draft?.transcript, 160)
-  const safeSymptoms = symptoms.length ? symptoms : fallback ? [fallback] : []
+  const safeSymptoms = symptoms
   if (!safeSymptoms.length) throw new Error('Symptom note is empty')
 
   const duration = cleanText(symptom.duration, 120) || null
@@ -968,15 +992,22 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'This Talk to Helfi review was already saved. Please create a new review if you need another change.' }, { status: 409 })
     }
 
-    if (draft.action === 'exercise') result = await saveExercise(user.id, draft)
-    else if (draft.action === 'mood') result = await saveMood(user.id, draft)
-    else if (draft.action === 'journal') result = await saveJournal(user.id, draft)
-    else if (draft.action === 'water') result = await saveWater(user.id, draft)
-    else if (draft.action === 'symptom_note') result = await saveSymptomNote(user.id, draft)
-    else if (draft.action === 'health_intake_items') result = await saveHealthIntakeItems(user.id, draft)
-    else if (draft.action === 'food_copy_previous') result = await copyPreviousFood(user.id, draft)
-    else if (draft.action === 'food_favorite') result = await saveFavoriteFood(user.id, draft)
-    else if (draft.action === 'food_build_meal') result = await saveBuiltMeal(user.id, draft)
+    try {
+      if (draft.action === 'exercise') result = await saveExercise(user.id, draft)
+      else if (draft.action === 'mood') result = await saveMood(user.id, draft)
+      else if (draft.action === 'journal') result = await saveJournal(user.id, draft)
+      else if (draft.action === 'water') result = await saveWater(user.id, draft)
+      else if (draft.action === 'symptom_note') result = await saveSymptomNote(user.id, draft)
+      else if (draft.action === 'health_intake_items') result = await saveHealthIntakeItems(user.id, draft)
+      else if (draft.action === 'food_copy_previous') result = await copyPreviousFood(user.id, draft)
+      else if (draft.action === 'food_favorite') result = await saveFavoriteFood(user.id, draft)
+      else if (draft.action === 'food_build_meal') result = await saveBuiltMeal(user.id, draft)
+    } catch (error) {
+      await releaseReviewToken(user.id, draft).catch((releaseError) => {
+        console.error('[native voice assistant] failed to release review token after save error', releaseError)
+      })
+      throw error
+    }
 
     return NextResponse.json({ success: true, result })
   } catch (error: any) {

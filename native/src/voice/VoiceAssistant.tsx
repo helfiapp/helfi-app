@@ -495,8 +495,19 @@ function followUpExerciseTranscript(draft: VoiceDraft | null, answerRaw: string)
   if (draft?.action !== 'exercise' || draft.canConfirm) return null
   const answer = cleanFavoriteText(answerRaw, 600)
   const message = cleanFavoriteText(draft.confirmationMessage || '', 220)
-  if (!answer || !/What exercise should I log/i.test(message)) return null
-  return `log exercise: ${answer}`
+  if (!answer) return null
+  if (/What exercise should I log/i.test(message)) return `log exercise: ${answer}`
+  if (/How long did the .+ take/i.test(message)) {
+    const exercise = draft.exercise
+    const details = [
+      `log ${cleanFavoriteText(exercise?.exerciseName || 'exercise', 80)} for ${answer}`,
+      exercise?.distanceKm ? `${exercise.distanceKm} km` : '',
+      exercise?.steps ? `${exercise.steps} steps` : '',
+      exercise?.caloriesKcal ? `${exercise.caloriesKcal} calories` : '',
+    ].filter(Boolean)
+    return details.join(', ')
+  }
+  return null
 }
 
 function followUpMoodTranscript(draft: VoiceDraft | null, answerRaw: string) {
@@ -546,7 +557,7 @@ function isPendingFollowUpDraft(draft: VoiceDraft | null) {
     return true
   }
   if (
-    (draft.action === 'exercise' && /What exercise should I log/i.test(draft.confirmationMessage || '')) ||
+    (draft.action === 'exercise' && /What exercise should I log|How long did the .+ take/i.test(draft.confirmationMessage || '')) ||
     (draft.action === 'mood' && /How are you feeling/i.test(draft.confirmationMessage || '')) ||
     (draft.action === 'journal' && /What would you like me to write in the journal/i.test(draft.confirmationMessage || ''))
   ) {
@@ -1102,6 +1113,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [realtimeVoiceName, setRealtimeVoiceName] = useState(SPOKEN_REPLY_VOICE_NAME)
   const [checkingRealtimeVoice, setCheckingRealtimeVoice] = useState(false)
   const [voicePaidAccessGranted, setVoicePaidAccessGranted] = useState(false)
+  const [reviewCorrectionActive, setReviewCorrectionActive] = useState(false)
   const [microphoneMuted, setMicrophoneMuted] = useState(false)
   const [voiceReply, setVoiceReply] = useState(true)
   const [spokenReplyStatus, setSpokenReplyStatus] = useState<SpokenReplyStatus>('idle')
@@ -1474,6 +1486,22 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     }
   }, [mode, openVoiceBilling, session?.token])
 
+  useEffect(() => {
+    const token = session?.token
+    if (mode !== 'signedIn' || !token || voiceAccessTokenRef.current === token) return
+    let cancelled = false
+    void fetchVoiceAccessStatus(token)
+      .then(({ res, data }) => {
+        if (cancelled || !res.ok || !hasPaidVoiceAccess(data)) return
+        voiceAccessTokenRef.current = token
+        voiceAccessGrantedAtRef.current = Date.now()
+      })
+      .catch(() => {})
+    return () => {
+      cancelled = true
+    }
+  }, [mode, session?.token])
+
   const openVoiceAssistant = useCallback(async (input?: OpenVoiceAssistantInput) => {
     Vibration.vibrate()
     DeviceEventEmitter.emit(VOICE_ASSISTANT_OPENING_EVENT)
@@ -1489,6 +1517,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setRealtimeVoiceName(SPOKEN_REPLY_VOICE_NAME)
     setCheckingRealtimeVoice(false)
     setVoicePaidAccessGranted(false)
+    setReviewCorrectionActive(false)
     setMicrophoneMuted(false)
     realtimeAutoStartRef.current = false
     setContinuousVoiceSession(false)
@@ -1900,11 +1929,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setSaveSuccessNotice({
           title: `${savedLabel} saved`,
           message: resultKind === 'exercise'
-            ? "Added to today's exercise."
+            ? 'Added to your exercise log.'
             : resultKind === 'food'
-            ? "Added to today's food diary."
+            ? 'Added to your food diary.'
             : resultKind === 'water'
-            ? "Added to today's water intake."
+            ? 'Added to your water intake.'
             : String(data?.result?.message || 'Your entry has been saved.'),
         })
         closePanel()
@@ -1977,13 +2006,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       const requestSignal = options?.signal || draftRequestAbortController?.signal
 
       setBusy(true)
-      setDraft(null)
+      if (!draftIsReviewOrHandoff) setDraft(null)
       setChargedCredits(null)
       try {
         const favorites = await loadVoiceFavorites(session.token, requestSignal)
         if (requestSignal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
         const requestContext = normalizeLaunchContext(launchContext)
-        const requestLocalDate = requestContext.date || todayLocalDate()
+        const requestLocalDate = (!explicitNewCommand && pendingFollowUpDraft?.localDate) || requestContext.date || todayLocalDate()
         const confirmationDraftPayload = !explicitNewCommand && draft?.canConfirm ? draft : null
         const followUpDraftPayload = !explicitNewCommand && !nextFollowUpTranscript
           ? isPendingFollowUpDraft(pendingFollowUpDraft)
@@ -2046,6 +2075,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setTranscript(String(data?.transcript || typedTranscript || '').trim())
         const nextDraft = data?.draft || null
         setDraft(nextDraft)
+        if (nextDraft?.canConfirm || data?.confirmNow || data?.rejectNow) setReviewCorrectionActive(false)
         setPendingFollowUpDraft(isPendingFollowUpDraft(nextDraft) ? nextDraft : null)
         setChargedCredits(Number.isFinite(Number(data?.chargedCredits)) ? Number(data.chargedCredits) : null)
         const assistantText = nextDraft
@@ -2383,6 +2413,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 needsReview: Boolean(args.needsReview),
               },
             }).then(realtimeToolResult).then((result) => {
+              if (result.needsReview || result.saved) {
+                setReviewCorrectionActive(false)
+              }
               if (result.needsReview) {
                 setContinuousVoiceSession(false)
                 setRealtimeVoiceStatus('idle')
@@ -2453,6 +2486,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     realtimeActionGuardRef.current = null
     clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
+    setReviewCorrectionActive(false)
     void stopRealtimeVoiceSession()
     clearVoiceTurnTimers()
     setBottleCameraOpen(false)
@@ -2478,6 +2512,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [draft, saveDraft])
 
   const rejectDraft = useCallback(() => {
+    setReviewCorrectionActive(false)
     setDraft(null)
     setPendingFollowUpDraft(null)
     setTranscript('')
@@ -2489,6 +2524,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       stopPlayback().catch(() => {})
     }
   }, [requestVoiceReply, stopPlayback, voiceReply])
+
+  const continueTalkingAboutDraft = useCallback(async () => {
+    if (!draft) return
+    setReviewCorrectionActive(true)
+    await startVoiceSession()
+    if (!voiceSessionActiveRef.current) setReviewCorrectionActive(false)
+  }, [draft, startVoiceSession])
 
 	  const openAppTarget = useCallback(() => {
 	    const path = draft?.appTarget?.path
@@ -2538,7 +2580,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
 	  }, [closePanel, draft, openHealthIntakeCameraMode])
 
   const draftIsActionable = Boolean(draft?.canConfirm || draft?.appTarget?.path)
-  const showDraftCard = Boolean(draft && draftIsActionable)
+  const showDraftCard = Boolean(draft && draftIsActionable && !reviewCorrectionActive)
   const primaryFooterIsHandoff = Boolean(draft?.appTarget?.path && !draft?.canConfirm)
   const primaryFooterLabel = primaryFooterIsHandoff ? draft?.appTarget?.buttonLabel || 'Open Helfi tool' : 'Save this'
   const primaryFooterDisabled = !draft || confirming || (!draft.canConfirm && !primaryFooterIsHandoff)
@@ -2555,7 +2597,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const visibleForUser = mode === 'signedIn' && Boolean(session?.token)
   const launchCopy = copyForLaunchContext(launchContext)
   const bottleCameraLabel = bottleCameraItemType === 'medication' ? 'medication' : 'supplement'
-  const showingConversationReview = !voiceSessionActive && conversationTurns.length > 0 && !showDraftCard
+  const showingConversationReview = !voiceSessionActive && conversationTurns.length > 0 && !showDraftCard && !reviewCorrectionActive
   const showingLiveVoiceExperience = LIVE_VOICE_ENABLED && !showingConversationReview && !showDraftCard
   const realtimeVoiceUnavailable = realtimeVoiceAvailable === false
   const realtimeVoiceButtonDisabled = !voiceSessionActive && (busy || checkingRealtimeVoice || realtimeVoiceUnavailable || realtimeVoiceStatus === 'connecting')
@@ -2941,7 +2983,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 )}
               </ScrollView>
 
-              {!showingLiveVoiceExperience ? <View style={[styles.footer, primaryFooterIsHandoff && styles.footerStacked, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
+              {!showingLiveVoiceExperience ? <View style={[styles.footer, (primaryFooterIsHandoff || draftIsActionable) && styles.footerStacked, { paddingBottom: Math.max(16, insets.bottom + 8) }]}>
                 {voiceSessionActive || showingLiveVoiceExperience ? null : showingConversationReview ? (
                   <>
                     <Pressable accessibilityRole="button" accessibilityLabel="Done" onPress={() => closePanel()} style={styles.cancelButton}>
@@ -3002,20 +3044,32 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                       </>
                     ) : null}
                     {draftIsActionable ? (
-                      <Pressable accessibilityRole="button" accessibilityLabel={discardFooterLabel} onPress={rejectDraft} style={styles.discardButton}>
-                        <Text style={styles.discardText}>{discardFooterLabel}</Text>
-                      </Pressable>
-                    ) : null}
-                    {draftIsActionable ? (
-                      <Pressable
-                        accessibilityRole="button"
-                        accessibilityLabel={primaryFooterLabel}
-                        onPress={primaryFooterPress}
-                        disabled={primaryFooterDisabled}
-                        style={[styles.confirmButton, primaryFooterDisabled && styles.confirmDisabled]}
-                      >
-                        {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>{primaryFooterLabel}</Text>}
-                      </Pressable>
+                      <>
+                        <Pressable
+                          accessibilityRole="button"
+                          accessibilityLabel="Continue talking"
+                          onPress={continueTalkingAboutDraft}
+                          disabled={busy || confirming}
+                          style={[styles.continueTalkingButton, (busy || confirming) && styles.secondaryDisabled]}
+                        >
+                          <Feather name="mic" size={18} color="#0B3B2E" />
+                          <Text style={styles.continueTalkingText}>Continue talking</Text>
+                        </Pressable>
+                        <View style={styles.footerRow}>
+                          <Pressable accessibilityRole="button" accessibilityLabel={discardFooterLabel} onPress={rejectDraft} style={styles.discardButton}>
+                            <Text style={styles.discardText}>{discardFooterLabel}</Text>
+                          </Pressable>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={primaryFooterLabel}
+                            onPress={primaryFooterPress}
+                            disabled={primaryFooterDisabled}
+                            style={[styles.confirmButton, primaryFooterDisabled && styles.confirmDisabled]}
+                          >
+                            {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>{primaryFooterLabel}</Text>}
+                          </Pressable>
+                        </View>
+                      </>
                     ) : null}
                   </>
                 )}
@@ -3542,6 +3596,19 @@ const styles = StyleSheet.create({
   },
   footerStacked: { flexDirection: 'column' },
   footerRow: { flexDirection: 'row', gap: 12 },
+  continueTalkingButton: {
+    width: '100%',
+    minHeight: 48,
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+    flexDirection: 'row',
+    gap: 8,
+    backgroundColor: '#E8F2EA',
+    borderWidth: 1,
+    borderColor: '#C8DDCE',
+  },
+  continueTalkingText: { color: '#0B3B2E', fontWeight: '700' },
   fullWidthFooterButton: { width: '100%', flex: 0 },
   cancelButton: { flex: 1, minHeight: 48, borderRadius: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EEF3F0' },
   cancelText: { color: theme.colors.text, fontWeight: '700' },

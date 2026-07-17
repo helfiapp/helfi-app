@@ -14,6 +14,34 @@ DEPLOYED:
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 15 July 2026, 10:51 AM AEST
+- What changed: Weekly reports now verify real saved General and Food chats before showing chat activity, use the correct saved-history links, and produce the complete PDF instead of cutting off after page 1.
+- Where to see it (page/link): https://helfi.ai/insights/weekly-report
+- What to quickly test: Open the saved demo report and confirm it says “No saved chats this week”; then open Print / Save as PDF and confirm the full multi-page report is present.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 14 July 2026, 11:26 PM AEST
+- What changed: Deployed the AUDIT 1 web repair batch, including Health Intake responsiveness, check-in save/history, symptom one-credit charging, profile saves/camera, Mood edit/delete, device feedback, Settings PDF behaviour, accessibility labels, meal validation, decoded insight names, and faster Quiet Hours database access.
+- Where to see it (page/link): https://helfi.ai
+- What to quickly test: Health Intake review; save Today's Check-in and open History; create one Symptom Note and confirm exactly one credit is used; save Quiet Hours; open Mood History actions; open Settings PDF; and try Save meal with no ingredients.
+
+DEPLOYED:
+- LIVE or STAGING: TestFlight
+- Date/time: 13 July 2026, 12:18 AM AEST
+- What changed: Helfi 1.0.0 build 26 was uploaded, processed, and assigned to Helfi Internal Testers. Build 25 was removed from tester access so TestFlight serves the corrected latest voice build.
+- Where to see it (page/link): Apple TestFlight -> Helfi AI -> build 26.
+- What to quickly test: Install or update to build 26, verify build number 26, tap the green voice button and confirm the old Stop recording / Run command screen is absent; then test connecting speed, audible volume, review/save flow, and Camera/Mute/End spacing.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 10 July 2026, 11:00 AM AEST
+- What changed: Optimized Talk to Helfi live voice for warmer shorter replies, lower latency, stronger interruption and echo control, complete Done shutdown, direct general answers, and native navigation to Health Journal, Symptoms, Health Intake, and Insights. Live voice now uses gpt-realtime-2.1 with Marin and is enabled in Production.
+- Where to see it (page/link): https://helfi.ai and the native iPhone app -> Talk to Helfi.
+- What to quickly test: On the iPhone, have a natural back-and-forth conversation, interrupt Helfi, press Done while it is speaking, confirm it stays silent, then test exercise exact values, favourite breakfast, journal, mood, symptom note, and a medication/supplement review without auto-save.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 07 July 2026, 11:27 PM AEST
 - What changed: Tightened Talk to Helfi app-wide command understanding so the fast favourite-food path only runs for real food/favourite requests. Exercise, journal, mood, symptoms, water, and Health Intake wording can no longer be swallowed by a saved meal match.
 - Where to see it (page/link): https://helfi.ai and native iPhone app -> Talk to Helfi.
@@ -2990,3 +3018,9 @@ DEPLOYED:
 - What changed: Fixed renamed Favorites sometimes reverting back to long USDA names after refresh (we now always load the newest saved Favorites + name-override record).
 - Where to see it (page/link): Food Diary (`/food`) and “Add from favorites” list.
 - What to quickly test: Rename a Favorite to “Chicken breast”, refresh the page, confirm Favorites + Food Diary lists stay short (no long USDA title).
+DEPLOYED:
+- LIVE: https://helfi.ai
+- Date/time: 11 July 2026, 5:35 pm Melbourne time
+- What changed: Full native-to-web parity release, led by the complete Food Diary editor and instant diary updates.
+- Where to see it: Native app screens and supporting live APIs.
+- What to quickly test: Edit a single banana, then delete water and exercise entries.

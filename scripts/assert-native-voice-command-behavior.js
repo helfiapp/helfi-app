@@ -569,6 +569,9 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   const macedonianWaterNeedsAmount = tryParseWaterRequest('Додај вода', localDate, waterContext)
   assert(macedonianWaterNeedsAmount?.action === 'water', 'Macedonian water wording without amount must create a water follow-up draft.')
   assert(macedonianWaterNeedsAmount?.canConfirm === false, 'Macedonian water wording without amount must ask a follow-up before saving.')
+  const vagueGlassOfWater = tryParseWaterRequest('Log a glass of water', localDate, waterContext)
+  assert(vagueGlassOfWater?.canConfirm === false, 'A glass of water without a stated size must ask for the amount instead of assuming 250 ml.')
+  assert(vagueGlassOfWater?.water == null, 'A glass of water without a stated size must not create a fabricated water amount.')
   const macedonianWaterAmountFollowUp = followUpTranscript(macedonianWaterNeedsAmount, '500 мл')
   assert(/log 500 ml Water/i.test(macedonianWaterAmountFollowUp || ''), 'Macedonian water follow-up must understand ml amount.')
 
@@ -643,6 +646,9 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
 
   const journalClarification = buildQuickClarificationDraft('add a journal note', localDate)
   assert(journalClarification?.action === 'journal', 'Vague journal requests must create a follow-up draft.')
+  const missingJournalContent = await normalizeDraft({ action: 'journal', journal: {} }, 'Add a journal note', localDate, 'test-user', {}, 0, [])
+  assert(missingJournalContent?.draft?.canConfirm === false, 'Journal actions without note content must ask a follow-up instead of saving command words as the note.')
+  assert(missingJournalContent?.draft?.journal == null, 'Journal actions without note content must not manufacture journal content.')
   const journalFollowUp = followUpTranscript(journalClarification, 'денес се чувствувам подобро')
   assert(/write journal note: денес се чувствувам подобро/i.test(journalFollowUp || ''), 'Journal follow-up must combine the answer with the pending journal request.')
   const parsedJournalFollowUp = tryParseJournalRequest(journalFollowUp || '', dashboardContext)
@@ -662,15 +668,54 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(walkedDraft?.action === 'exercise', 'Walked 5k wording must create an exercise draft.')
   assert(walkedDraft?.exercise?.name === 'walking', 'Walked 5k must be understood as walking.')
   assert(walkedDraft?.exercise?.distanceKm === 5, 'Walked 5k must keep the 5 km distance.')
-  assert(walkedDraft?.exercise?.estimatedDuration === true, 'Walked 5k without minutes must mark time as estimated.')
+  assert(walkedDraft?.exercise?.durationMinutes == null, 'Walked 5k without minutes must leave duration missing for clarification.')
+  assert(walkedDraft?.exercise?.estimatedDuration === false, 'Walked 5k without minutes must not manufacture an estimated duration.')
 
   const walkedStepsDraft = tryParseExerciseRequest('I did a walk and did 5,449 steps and burned 240 calories', dashboardContext)
   assert(walkedStepsDraft?.action === 'exercise', 'Walked steps/calories wording must create an exercise draft.')
   assert(walkedStepsDraft?.exercise?.name === 'walking', 'Walked steps/calories wording must be understood as walking.')
   assert(walkedStepsDraft?.exercise?.steps === 5449, 'Walked steps/calories wording must keep the exact step count.')
   assert(walkedStepsDraft?.exercise?.caloriesKcal === 240, 'Walked steps/calories wording must keep the exact calories burned.')
-  assert(walkedStepsDraft?.exercise?.distanceKm === 4.4, 'Walked steps without distance must estimate distance from steps.')
+  assert(walkedStepsDraft?.exercise?.distanceKm == null, 'Walked steps without distance must not manufacture a distance.')
+  assert(walkedStepsDraft?.exercise?.durationMinutes == null, 'Walked steps without duration must not manufacture a duration.')
   assert(!shouldUseFavoriteFood('I did a walk and did 5,449 steps and burned 240 calories', [{ label: '250', description: '250', meal: 'breakfast' }]), 'Exercise steps/calories wording must not match numeric favourite foods.')
+
+  assert(resolveRequestedActionDate('Log a walk yesterday', localDate) === '2026-07-01', 'Yesterday must target the previous local calendar day for app actions.')
+  assert(resolveRequestedActionDate('I walked two days ago', localDate) === '2026-06-30', 'Two days ago must target the correct local calendar day.')
+  assert(resolveRequestedActionDate('Add the same breakfast as yesterday', localDate) === localDate, 'Yesterday used as a copied-meal source must not move the new entry to yesterday.')
+  assert(resolveRequestedActionDate("Add yesterday's breakfast again", localDate) === localDate, 'Yesterday possessive meal-copy wording must keep today as the target date.')
+  assert(resolveRequestedActionDate('Registra una caminata ayer', localDate) === '2026-07-01', 'Spanish yesterday must target the previous local calendar day.')
+  assert(resolveRequestedActionDate('Notiere meine Stimmung gestern', localDate) === '2026-07-01', 'German yesterday must target the previous local calendar day.')
+  assert(resolveRequestedActionDate('Запиши го ова во дневникот вчера', localDate) === '2026-07-01', 'Macedonian yesterday must target the previous local calendar day.')
+  assert(resolveRequestedActionDate('记录昨天的步数', localDate) === '2026-07-01', 'Chinese yesterday must target the previous local calendar day.')
+  assert(/return localDate as an exact YYYY-MM-DD/.test(__routeSource), 'AI action understanding must return an exact requested date for every save action.')
+  assert(/Never estimate or infer duration, distance, steps, calories, speed, or intensity/.test(__routeSource), 'Exercise understanding must explicitly prohibit invented values.')
+
+  const missingDurationReview = await normalizeDraft(
+    { action: 'exercise', exercise: { name: 'walking', durationMinutes: 25, distanceKm: 2, steps: 2500, caloriesKcal: 100, intensity: 'moderate' } },
+    'Log a walk yesterday with 2,500 steps and 100 calories',
+    '2026-07-01',
+    'test-user',
+    {},
+    0,
+    [],
+  )
+  assert(missingDurationReview?.draft?.action === 'exercise', 'Exercise values with missing duration must stay in the exercise flow.')
+  assert(missingDurationReview?.draft?.canConfirm === false, 'Exercise with required duration missing must ask a follow-up instead of showing a saveable review.')
+  assert(missingDurationReview?.draft?.localDate === '2026-07-01', 'Exercise clarification must preserve the resolved yesterday date.')
+  assert(missingDurationReview?.draft?.exercise?.steps === 2500, 'Exercise clarification must preserve the exact stated steps.')
+  assert(missingDurationReview?.draft?.exercise?.caloriesKcal === 100, 'Exercise clarification must preserve the exact stated calories.')
+  assert(missingDurationReview?.draft?.exercise?.distanceKm == null, 'Exercise clarification must not invent distance.')
+  assert(missingDurationReview?.draft?.exercise?.durationMinutes == null, 'Exercise clarification must not invent duration.')
+  assert(missingDurationReview?.draft?.exercise?.intensity == null, 'Exercise clarification must discard model-invented intensity.')
+  const completedDurationCommand = followUpTranscript(missingDurationReview?.draft, '25 minutes')
+  const completedDurationExercise = tryParseExerciseRequest(completedDurationCommand || '', dashboardContext)
+  assert(/2500 steps/.test(completedDurationCommand || ''), 'Exercise duration follow-up must preserve the original steps.')
+  assert(/100 calories/.test(completedDurationCommand || ''), 'Exercise duration follow-up must preserve the original calories.')
+  assert(completedDurationExercise?.exercise?.durationMinutes === 25, 'Exercise duration follow-up must apply the spoken duration.')
+  assert(completedDurationExercise?.exercise?.steps === 2500, 'Exercise duration follow-up must keep exact steps in the corrected draft.')
+  assert(completedDurationExercise?.exercise?.caloriesKcal === 100, 'Exercise duration follow-up must keep exact calories in the corrected draft.')
+  assert(completedDurationExercise?.exercise?.distanceKm == null, 'Exercise duration follow-up must still avoid invented distance.')
 
   const exerciseContextDraft = tryParseExerciseRequest('walking for 30 minutes', exerciseContext)
   assert(exerciseContextDraft?.action === 'exercise', 'Exercise context must handle natural exercise wording without log/add.')
@@ -682,6 +727,20 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(correctedExercise?.exercise?.name === 'walking', 'Reviewed exercise correction must preserve the exercise type.')
   assert(correctedExercise?.canConfirm === true, 'Reviewed exercise correction must return a new reviewable draft.')
   assert(correctedExercise?.autoSave === false, 'Reviewed exercise correction must not auto-save the changed draft.')
+  const reviewedExerciseWithFacts = {
+    ...reviewedExerciseDraft,
+    localDate,
+    exercise: { ...reviewedExerciseDraft?.exercise, steps: 2500, caloriesKcal: 100, distanceKm: null },
+  }
+  const correctedExerciseFacts = await buildReviewedDraftCorrection(reviewedExerciseWithFacts, 'change it to 3,000 steps and 120 calories', localDate)
+  assert(correctedExerciseFacts?.exercise?.steps === 3000, 'Reviewed exercise correction must update steps from the user correction.')
+  assert(correctedExerciseFacts?.exercise?.caloriesKcal === 120, 'Reviewed exercise correction must update calories from the user correction.')
+  assert(correctedExerciseFacts?.exercise?.durationMinutes === 30, 'Reviewed exercise correction must preserve unchanged duration from the signed draft.')
+  assert(correctedExerciseFacts?.exercise?.distanceKm == null, 'Reviewed exercise correction must not invent a distance.')
+  const correctedExerciseDate = await buildReviewedDraftCorrection(reviewedExerciseWithFacts, 'No, that was yesterday', '2026-07-01')
+  assert(correctedExerciseDate?.localDate === '2026-07-01', 'Reviewed exercise correction must update the date without regenerating exercise facts.')
+  assert(correctedExerciseDate?.exercise?.steps === 2500, 'Date-only exercise correction must preserve signed steps.')
+  assert(correctedExerciseDate?.exercise?.caloriesKcal === 100, 'Date-only exercise correction must preserve signed calories.')
 
   const macedonianWalk = tryParseExerciseRequest('Запиши дека пешачев 5 км после ручек', dashboardContext)
   assert(macedonianWalk?.action === 'exercise', 'Macedonian walking wording must create an exercise draft.')
@@ -727,6 +786,18 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(dashboardMood?.action === 'mood', 'Log my mood wording must create a mood draft.')
   assert(dashboardMood?.mood?.mood === 3, 'Stressed mood wording must map to a lower mood score.')
   assert(dashboardMood?.mood?.tags?.includes('stressed'), 'Stressed mood wording must keep a stressed tag.')
+
+  const missingMoodDetails = await normalizeDraft({ action: 'mood', mood: {} }, 'Log my mood', localDate, 'test-user', {}, 0, [])
+  assert(missingMoodDetails?.draft?.canConfirm === false, 'Mood actions without a stated feeling must ask a follow-up instead of inventing a neutral score.')
+  assert(missingMoodDetails?.draft?.mood == null, 'Mood actions without a stated feeling must not create a fabricated mood value.')
+  const noteOnlyMood = await normalizeDraft({ action: 'mood', mood: { mood: 4, note: 'Work was hard', tags: ['work'] } }, 'Add a mood note that work was hard', localDate, 'test-user', {}, 0, [])
+  assert(noteOnlyMood?.draft?.canConfirm === false, 'A mood note without a mood value must ask how the user felt instead of inventing 4/7.')
+  assert(noteOnlyMood?.draft?.mood == null, 'A note-only mood request must not create a fabricated neutral mood score.')
+
+  const hallucinatedDateMood = await normalizeDraft({ action: 'mood', localDate: '2026-12-31', mood: { mood: 3, tags: ['stressed'], note: 'Stressed' } }, 'Log that I feel stressed', localDate, 'test-user', {}, 0, [])
+  assert(hallucinatedDateMood?.draft?.localDate === localDate, 'A model date must be ignored when the user did not state any date.')
+  const invalidDateMood = await normalizeDraft({ action: 'mood', localDate: '2026-99-99', mood: { mood: 3, tags: ['stressed'], note: 'Stressed' } }, 'Log that I felt stressed yesterday', '2026-07-01', 'test-user', {}, 0, [])
+  assert(invalidDateMood?.draft?.localDate === '2026-07-01', 'An impossible model calendar date must be rejected.')
 
   const moodContextDraft = tryParseMoodRequest('better today after sleep', moodContext)
   assert(moodContextDraft?.action === 'mood', 'Mood context must handle natural mood text without saying mood.')
@@ -1644,6 +1715,9 @@ const sandbox = {
   __realtimeClientSource: realtimeClientSource,
   __voiceAssistantSource: voiceAssistantSource,
   prisma: {
+    exerciseType: {
+      findFirst: async () => ({ id: 1, name: 'Walking', category: 'Cardio', met: 3.5 }),
+    },
     foodLibraryItem: {
       findMany: async () => [],
     },

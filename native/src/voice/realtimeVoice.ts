@@ -186,7 +186,12 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const { RTCPeerConnection, RTCSessionDescription, mediaDevices } = rtc
   const inCallManager = requireInCallManager()
   const callbacks = params.callbacks || {}
+  const connectStartedAt = Date.now()
+  const reportConnectStage = (stage: string, detail = '') => {
+    console.info(`[voice realtime timing] ${stage} ${Date.now() - connectStartedAt}ms${detail ? ` ${detail}` : ''}`)
+  }
   callbacks.onStatus?.('connecting')
+  reportConnectStage('start')
 
   try {
     inCallManager?.start?.({ media: 'audio', auto: true })
@@ -206,6 +211,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     },
     video: false,
   })
+  reportConnectStage('microphone-ready')
   if (params.signal?.aborted) {
     stopMediaStreamTracks(localStream)
     try {
@@ -429,6 +435,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     throw new Error('Live voice session was stopped.')
   }
   await pc.setLocalDescription(offer)
+  reportConnectStage('local-offer-ready')
   if (stopped || params.signal?.aborted) {
     closeRealtimeConnection()
     throw new Error('Live voice session was stopped.')
@@ -445,6 +452,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     body: String(offer.sdp || ''),
   })
   const answerSdp = await res.text()
+  reportConnectStage('server-answer-received', res.headers?.get?.('server-timing') || '')
   if (!res.ok) {
     closeRealtimeConnection()
     params.signal?.removeEventListener?.('abort', onAbort)
@@ -465,6 +473,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
   }
 
   await pc.setRemoteDescription(new RTCSessionDescription({ type: 'answer', sdp: answerSdp }))
+  reportConnectStage('remote-answer-applied')
   if (stopped || params.signal?.aborted) {
     closeRealtimeConnection()
     params.signal?.removeEventListener?.('abort', onAbort)

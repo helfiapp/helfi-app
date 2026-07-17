@@ -106,7 +106,7 @@ type VoiceDraft = {
   exercise?: {
     exerciseTypeId: number
     exerciseName: string
-    durationMinutes: number
+    durationMinutes?: number
     distanceKm?: number | null
     steps?: number | null
     caloriesKcal?: number | null
@@ -355,6 +355,58 @@ function shiftLocalDate(localDate: string, deltaDays: number) {
   const date = new Date(Date.UTC(year, month - 1, day))
   date.setUTCDate(date.getUTCDate() + deltaDays)
   return date.toISOString().slice(0, 10)
+}
+
+function isValidLocalDate(value: string) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false
+  const [year, month, day] = value.split('-').map(Number)
+  const date = new Date(Date.UTC(year, month - 1, day))
+  return date.getUTCFullYear() === year && date.getUTCMonth() === month - 1 && date.getUTCDate() === day
+}
+
+function transcriptHasDateEvidence(value: string) {
+  const text = cleanText(value, 1200).toLowerCase()
+  return (
+    /\b(?:today|yesterday|tomorrow|last night|days? ago|hoy|ayer|mañana|anoche|hier|demain|gestern|morgen|oggi|ieri|domani|hoje|ontem|amanhã)\b/.test(text) ||
+    /\b\d{4}-\d{2}-\d{2}\b/.test(text) ||
+    /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b/.test(text) ||
+    /(денес|вчера|утре|昨日|今日|明日|昨天|今天|明天|أمس|اليوم|غدًا|غدا)/.test(text)
+  )
+}
+
+function resolveRequestedActionDate(transcript: string, baseLocalDate: string) {
+  const text = cleanText(transcript, 1200).toLowerCase()
+  if (!text) return baseLocalDate
+
+  // In "the same meal as yesterday", yesterday identifies the source meal,
+  // not the date where the new entry should be saved.
+  const previousMealReference =
+    /\b(?:same|copy|repeat)\b[\s\S]{0,80}\b(?:yesterday|previous day)\b/.test(text) ||
+    /\b(?:yesterday|previous day)(?:'s)?\b[\s\S]{0,80}\b(?:breakfast|lunch|dinner|snack|meal|food)\b[\s\S]{0,40}\b(?:again|same|copy|repeat)\b/.test(text)
+  if (previousMealReference) return baseLocalDate
+  const yesterday =
+    /\b(?:yesterday|last night|ayer|anoche|hier|gestern|ieri|ontem)\b/.test(text) ||
+    /(вчера|синоќа|昨日|昨天|昨晚|أمس|البارحة)/.test(text)
+  const today =
+    /\b(?:today|this morning|this afternoon|tonight|hoy|aujourd'hui|heute|oggi|hoje)\b/.test(text) ||
+    /(денес|今日|今天|اليوم)/.test(text)
+  const twoDaysAgo =
+    /\b(?:day before yesterday|anteayer|avant-hier|vorgestern|l'altro ieri|anteontem)\b/.test(text) ||
+    /(завчера|一昨日|前天|أول أمس)/.test(text)
+  if (twoDaysAgo) return shiftLocalDate(baseLocalDate, -2)
+  if (yesterday) return shiftLocalDate(baseLocalDate, -1)
+  if (today) return baseLocalDate
+
+  const daysAgo = text.match(/\b(\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+days?\s+ago\b/)
+  if (daysAgo) {
+    const words: Record<string, number> = {
+      one: 1, two: 2, three: 3, four: 4, five: 5,
+      six: 6, seven: 7, eight: 8, nine: 9, ten: 10,
+    }
+    const count = words[daysAgo[1]] || Number(daysAgo[1])
+    if (Number.isFinite(count) && count > 0) return shiftLocalDate(baseLocalDate, -count)
+  }
+  return baseLocalDate
 }
 
 function cleanText(value: unknown, max = 1000) {
@@ -1094,10 +1146,6 @@ function parseWaterAmount(text: string): { amount: number; unit: 'ml' | 'l' | 'o
     const unit = normalizeWaterUnit(macedonianExplicit[2])
     if (Number.isFinite(amount) && amount > 0 && unit) return { amount, unit, amountMl: waterAmountToMl(amount, unit) }
   }
-  if (/\b(glass|cup)\b/.test(lower)) return { amount: 250, unit: 'ml', amountMl: 250 }
-  if (/\b(bottle)\b/.test(lower)) return { amount: 600, unit: 'ml', amountMl: 600 }
-  if (/(чаша|шоља|шоља)/i.test(text)) return { amount: 250, unit: 'ml', amountMl: 250 }
-  if (/(шише)/i.test(text)) return { amount: 600, unit: 'ml', amountMl: 600 }
   return null
 }
 
@@ -1870,8 +1918,19 @@ function followUpExerciseTranscript(draft: any, answerRaw: string) {
   if (draft?.action !== 'exercise' || draft?.canConfirm) return null
   const answer = cleanText(answerRaw, 600)
   const message = cleanText(draft?.confirmationMessage, 220)
-  if (!answer || !/What exercise should I log/i.test(message)) return null
-  return `log exercise: ${answer}`
+  if (!answer) return null
+  if (/What exercise should I log/i.test(message)) return `log exercise: ${answer}`
+  if (/How long did the .+ take/i.test(message)) {
+    const exercise = draft?.exercise || {}
+    const details = [
+      `log ${cleanText(exercise.exerciseName || 'exercise', 80)} for ${answer}`,
+      exercise.distanceKm ? `${exercise.distanceKm} km` : '',
+      exercise.steps ? `${exercise.steps} steps` : '',
+      exercise.caloriesKcal ? `${exercise.caloriesKcal} calories` : '',
+    ].filter(Boolean)
+    return details.join(', ')
+  }
+  return null
 }
 
 function followUpMoodTranscript(draft: any, answerRaw: string) {
@@ -2261,20 +2320,40 @@ function buildReviewedExerciseCorrection(draft: any, answerRaw: string, localDat
   if (draft?.action !== 'exercise' || !draft?.canConfirm || !draft?.exercise) return null
   const raw = cleanText(answerRaw, 800)
   const durationMinutes = extractExerciseDurationMinutes(raw)
-  if (!durationMinutes || !hasReviewedCorrectionWords(raw)) return null
+  const stepsMatch = raw.match(/\b(\d[\d,]*(?:\.\d+)?)\s*(?:steps?|step count)\b/i)
+  const caloriesMatch = raw.match(/\b(\d[\d,]*(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\b/i)
+  const distanceMatch = raw.match(/\b(\d+(?:\.\d+)?)\s*(km|kilometres?|kilometers?|mi|miles?)\b/i)
+  const steps = parseVoiceNumber(stepsMatch?.[1])
+  const caloriesKcal = parseVoiceNumber(caloriesMatch?.[1])
+  const distanceKm = distanceMatch
+    ? Number(distanceMatch[1]) * (/^mi|mile/i.test(distanceMatch[2]) ? 1.609 : 1)
+    : null
+  const dateChanged = isValidLocalDate(localDate) && localDate !== cleanText(draft.localDate, 20)
+  const hasFieldCorrection = Boolean(durationMinutes || steps || caloriesKcal || distanceKm)
+  if ((!hasFieldCorrection && !dateChanged) || (!hasReviewedCorrectionWords(raw) && !dateChanged)) return null
 
   const exercise = {
     ...draft.exercise,
-    durationMinutes,
+    ...(durationMinutes ? { durationMinutes } : {}),
+    ...(steps ? { steps: Math.round(steps) } : {}),
+    ...(caloriesKcal ? { caloriesKcal: Math.round(caloriesKcal) } : {}),
+    ...(distanceKm ? { distanceKm: Math.round(distanceKm * 10) / 10 } : {}),
     estimatedDuration: false,
   }
-  const distanceLine = exercise.distanceKm ? `, ${exercise.distanceKm} km` : ''
+  const details = [
+    cleanText(exercise.exerciseName, 80) || 'exercise',
+    exercise.durationMinutes ? `${exercise.durationMinutes} minutes` : '',
+    exercise.distanceKm ? `${exercise.distanceKm} km` : '',
+    exercise.steps ? `${Math.round(exercise.steps).toLocaleString()} steps` : '',
+    exercise.caloriesKcal ? `${Math.round(exercise.caloriesKcal)} kcal` : '',
+  ].filter(Boolean)
+  const summary = details.join(', ')
   return {
     action: 'exercise',
     transcript: raw,
     localDate,
-    summary: `${cleanText(exercise.name, 80) || 'exercise'}, ${durationMinutes} minutes${distanceLine}`,
-    confirmationMessage: `I can update this exercise draft to ${durationMinutes} minutes. Review it, then tap Confirm to save.`,
+    summary,
+    confirmationMessage: `I can update this exercise draft to ${summary}. Review it, then tap Confirm to save.`,
     canConfirm: true,
     autoSave: false,
     exercise,
@@ -2628,21 +2707,11 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
     ? Number(distanceMatch[1]) * (distanceMatch[2].startsWith('mi') || distanceMatch[2].startsWith('mile') ? 1.609 : 1)
     : macedonianDistanceMatch
     ? Number(macedonianDistanceMatch[1].replace(',', '.'))
-    : steps && hasExerciseWords
-    ? steps * 0.0008
     : null
   const durationRaw = durationMatch ? Number(durationMatch[1]) : macedonianDurationMatch ? Number(macedonianDurationMatch[1].replace(',', '.')) : null
   const durationMinutes = durationRaw
     ? durationRaw * (/hour|hr|час/.test(durationMatch?.[2] || macedonianDurationMatch?.[2] || '') ? 60 : 1)
-    : distanceKm
-    ? lower.includes('run') || /трч|џог|jог|corr|couru|course|correre|corso|corsa|correr|corri|corrida|laufen|gelaufen|rennen|gerannt|joggen/i.test(raw)
-      ? Math.max(10, Math.round(distanceKm * 7))
-      : lower.includes('bike') || lower.includes('cycling') || lower.includes('cycle') || lower.includes('ride') || lower.includes('rode') || /велосипед|точак|возев|bicicleta|bici|vélo|velo|bicicletta|bici|bicicleta|fahrrad|radfahren|rad gefahren/i.test(raw)
-      ? Math.max(10, Math.round(distanceKm * 4))
-      : Math.max(10, Math.round(distanceKm * 12))
-    : lower.includes('gym') || lower.includes('workout') || /теретана|вежб|gimnasio|entreno|sport|entraînement|entrainement|palestra|allenamento|academia|treino|fitnessstudio|training/i.test(raw)
-    ? 45
-    : 30
+    : null
   const name = /\b(run|ran|running|jog|jogged|jogging)\b/.test(lower) || /трч|џог|jог|corr|couru|course|correre|corso|corsa|correr|corri|corrida|laufen|gelaufen|rennen|gerannt|joggen/i.test(raw)
     ? 'running'
     : lower.includes('bike') || lower.includes('cycling') || lower.includes('cycle') || lower.includes('ride') || lower.includes('rode') || /велосипед|точак|возев|bicicleta|bici|vélo|velo|bicicletta|bici|bicicleta|fahrrad|radfahren|rad gefahren/i.test(raw)
@@ -2667,7 +2736,7 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
       steps: steps && steps > 0 ? Math.round(steps) : null,
       caloriesKcal: caloriesKcal && caloriesKcal > 0 ? Math.round(caloriesKcal) : null,
       intensity,
-      estimatedDuration: !durationMatch && !macedonianDurationMatch,
+      estimatedDuration: false,
     },
   }
 }
@@ -3794,8 +3863,9 @@ async function runJsonCommandModel(
         'If current section is health-coach, treat the supplied tip/question as context for a health_question unless the user clearly asks to save a note or log data.',
         'If current section is symptoms or health-image, use safe tracking/handoff behavior only; do not diagnose, treat, or ask the user to show food.',
         'For clear low-risk logging requests, prepare a saveable draft for the user to review before saving. If important details are missing, ask one short follow-up question instead of guessing.',
+        'For any logging or save action, if the user states a date, return localDate as an exact YYYY-MM-DD calculated from Today. Otherwise use null. Preserve relative dates such as yesterday in every language. For food_copy_previous, yesterday describes the source meal and localDate must remain null.',
         'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, health_intake_items, recipe, symptom_note, health_question, app_handoff, confirm_draft, reject_draft, unknown.',
-        'For exercise, infer the exercise name, duration, distance, steps, caloriesKcal, and intensity from any natural wording. If duration is missing, estimate a practical duration and mark estimatedDuration true.',
+        'For exercise, preserve only values the user actually stated. Never estimate or infer duration, distance, steps, calories, speed, or intensity. Use null for anything omitted. If a required value is missing, ask one short clarification before creating a review.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
         'For journal, make a short title and journal content. If the user says health journal, include journalType "health"; if they say mood journal, include journalType "mood".',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
@@ -3813,7 +3883,7 @@ async function runJsonCommandModel(
         'If the user asks about symptoms, diagnosis, treatment, red flags, urgency, or health image review, use health_question. The app will show a safe general message and will not open a symptom notes or health image notes tool.',
         'For app_handoff, use only when the user clearly asks to open, show, find, or use a Helfi app area and does not ask to save/log/create data.',
         'Examples: "Додај две јаболка и 30 грама кикирики како ужина" => food_build_meal snacks with apple and peanuts; "Ajoute 500 ml d’eau" => water 500 ml; "Escribe en mi diario..." => journal; "Запиши дека денес имам главоболка" => symptom_note; "I have a question about this Helfi health coach tip..." => health_question.',
-        'Shape: {"action":"...","summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":60,"distanceKm":5,"steps":5449,"caloriesKcal":240,"estimatedDuration":true},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"healthIntake":{"items":[{"type":"supplement","name":"vitamin D","dosage":"","timing":["Morning"]},{"type":"medication","name":"metformin","dosage":"","timing":[]}]},"symptom":{"symptoms":["headache"],"duration":"two hours","notes":"..."},"recipeRequest":"..."}',
+        'Shape: {"action":"...","localDate":null,"summary":"...","confirmationMessage":"...","exercise":{"name":"walking","durationMinutes":null,"distanceKm":null,"steps":5449,"caloriesKcal":240,"estimatedDuration":false},"mood":{"mood":2,"tags":["sad"],"note":"..."},"journal":{"title":"...","content":"...","tags":["..."],"journalType":"mood"},"food":{"meal":"breakfast","mealName":"Breakfast","draftText":"...","ingredients":[{"name":"egg","quantity":2,"unit":"each","display":"two eggs"}]},"water":{"amount":500,"unit":"ml","label":"Water"},"healthIntake":{"items":[{"type":"supplement","name":"vitamin D","dosage":"","timing":["Morning"]},{"type":"medication","name":"metformin","dosage":"","timing":[]}]},"symptom":{"symptoms":["headache"],"duration":"two hours","notes":"..."},"recipeRequest":"..."}',
       ].join('\n'),
     },
     {
@@ -4207,6 +4277,19 @@ function normalizeMood(value: any) {
     tags: Array.isArray(value?.tags) ? value.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 8) : [],
     note: cleanText(value?.note, 600),
   }
+}
+
+function explicitMoodFromTranscript(transcript: string, launchContext?: VoiceLaunchContext) {
+  const raw = cleanText(transcript, 600)
+  const lower = raw.toLowerCase()
+  const numeric = lower.match(/\b(?:mood\s*(?:is|was|as)?\s*)?([1-7])\s*(?:\/|out of\s*)7\b/)
+  if (numeric) return { mood: Number(numeric[1]), tags: [] as string[], note: raw }
+  const hasFeelingEvidence =
+    /\b(?:terrible|awful|low|sad|down|angry|upset|anxious|anxiety|stressed|stress|overwhelmed|calm|great|happy|good|better|excellent|amazing|feel|feeling|felt)\b/.test(lower) ||
+    /(се чувствувам|таж|лошо|анксиозн|стрес|преплавен|лут|вознемирен|смирен|мирно|среќ|добро|подобро|одлично)/i.test(raw) ||
+    /\b(?:me siento|triste|ansioso|ansiosa|estresado|estresada|feliz|bien|mejor|tranquilo|tranquila|je me sens|anxieux|anxieuse|stressé|stressée|heureux|heureuse|mieux|calme|mi sento|stressato|stressata|felice|bene|meglio|me sinto|estressado|estressada|bem|melhor|ich fühle mich|ich fuehle mich|traurig|ängstlich|aengstlich|gestresst|glücklich|gluecklich|gut|besser|ruhig|wütend|wuetend)\b/i.test(raw)
+  if (!hasFeelingEvidence) return null
+  return tryParseMoodRequest(raw, launchContext)?.mood || null
 }
 
 function inferNativeWebTarget(parsed: any, transcript: string) {
@@ -4712,11 +4795,19 @@ async function normalizeDraft(
   launchContext?: VoiceLaunchContext,
   conversationHistory: VoiceConversationTurn[] = [],
 ): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
+  const parsedAction = cleanText(parsed?.action, 40).toLowerCase()
+  const parsedLocalDate = cleanText(parsed?.localDate, 20)
+  if (
+    parsedAction !== 'food_copy_previous' &&
+    isValidLocalDate(parsedLocalDate) &&
+    transcriptHasDateEvidence(transcript)
+  ) {
+    localDate = parsedLocalDate
+  }
   if (hasSelfHarmRisk(transcript)) {
     return { aiCostCents: 0, draft: buildSelfHarmSupportDraft(transcript, localDate) }
   }
   if (isSymptomTrackingRequest(transcript)) {
-    const parsedAction = cleanText(parsed?.action, 40).toLowerCase()
     return { aiCostCents: 0, draft: buildSymptomNotesHandoffDraft(transcript, localDate, parsedAction === 'symptom_note' ? parsed : undefined) }
   }
   if (isMedicalSafetyRequest(transcript)) {
@@ -4839,7 +4930,24 @@ async function normalizeDraft(
   }
 
   if (action === 'exercise') {
-    const exercise = parsed?.exercise || {}
+    const explicitExercise = tryParseExerciseRequest(transcript, launchContext)?.exercise
+    if (!explicitExercise) {
+      return {
+        aiCostCents,
+        draft: {
+          action: 'exercise',
+          transcript,
+          localDate,
+          summary: 'Exercise details needed',
+          confirmationMessage: 'What exercise should I log, and for how long?',
+          canConfirm: false,
+          autoSave: false,
+        },
+      }
+    }
+    // Model output can classify the action, but only deterministic values found
+    // in the user's own words may enter an exercise review.
+    const exercise = explicitExercise
     const type = await findExerciseType(exercise?.name || parsed?.summary || transcript)
     if (!type) {
       return {
@@ -4856,11 +4964,39 @@ async function normalizeDraft(
     }
     const distanceKm = Number(exercise?.distanceKm)
     const safeDistance = Number.isFinite(distanceKm) && distanceKm > 0 ? Math.round(distanceKm * 10) / 10 : null
-    const fallbackDuration = safeDistance && /walk/i.test(type.name) ? Math.max(10, Math.round(safeDistance * 12)) : 30
-    const durationMinutes = clampNumber(exercise?.durationMinutes, 1, 24 * 60, fallbackDuration)
-    const estimatedDuration = Boolean(exercise?.estimatedDuration || !Number.isFinite(Number(exercise?.durationMinutes)))
+    const durationRaw = Number(exercise?.durationMinutes)
+    const durationMinutes = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.min(24 * 60, Math.round(durationRaw)) : null
+    const estimatedDuration = false
     const steps = clampNumber(exercise?.steps, 0, 500000, 0)
-    const caloriesKcal = clampNumber(exercise?.caloriesKcal ?? exercise?.calories, 0, 10000, 0)
+    const caloriesKcal = clampNumber(exercise?.caloriesKcal, 0, 10000, 0)
+    if (!durationMinutes) {
+      const provided = [
+        steps ? `${Math.round(steps).toLocaleString()} steps` : '',
+        caloriesKcal ? `${Math.round(caloriesKcal)} kcal` : '',
+        safeDistance ? `${safeDistance} km` : '',
+      ].filter(Boolean).join(', ')
+      return {
+        aiCostCents,
+        draft: {
+          action: 'exercise',
+          transcript,
+          localDate,
+          summary: provided ? `${type.name}, ${provided}` : type.name,
+          confirmationMessage: `How long did the ${type.name} take? I will keep the details you already gave me.`,
+          canConfirm: false,
+          autoSave: false,
+          exercise: {
+            exerciseTypeId: type.id,
+            exerciseName: type.name,
+            distanceKm: safeDistance,
+            steps: steps ? Math.round(steps) : null,
+            caloriesKcal: caloriesKcal ? Math.round(caloriesKcal) : null,
+            intensity: cleanText(exercise?.intensity, 40) || null,
+            estimatedDuration: false,
+          },
+        },
+      }
+    }
     const detailParts = [
       `${type.name}, ${durationMinutes} minutes`,
       safeDistance ? `${safeDistance} km` : '',
@@ -4875,7 +5011,7 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary,
-        confirmationMessage: `I can log ${summary}.${estimatedDuration ? ' I estimated the time.' : ''} Review it, then tap Confirm to save.`,
+        confirmationMessage: `I can log ${summary}. Review it, then tap Confirm to save.`,
         canConfirm: true,
         autoSave: false,
         exercise: {
@@ -4893,7 +5029,22 @@ async function normalizeDraft(
   }
 
   if (action === 'mood') {
-    const mood = normalizeMood(parsed?.mood || {})
+    const explicitMood = explicitMoodFromTranscript(transcript, launchContext)
+    if (!explicitMood) {
+      return {
+        aiCostCents,
+        draft: {
+          action: 'mood',
+          transcript,
+          localDate,
+          summary: 'Mood details needed',
+          confirmationMessage: 'How are you feeling, and would you like me to add any note?',
+          canConfirm: false,
+          autoSave: false,
+        },
+      }
+    }
+    const mood = normalizeMood(explicitMood)
     const summary = `Mood ${mood.mood}/7${mood.tags.length ? `, ${mood.tags.join(', ')}` : ''}`
     return {
       aiCostCents,
@@ -4912,7 +5063,21 @@ async function normalizeDraft(
 
   if (action === 'journal') {
     const journal = parsed?.journal || {}
-    const content = cleanText(journal?.content || transcript, 2000)
+    const content = cleanText(journal?.content, 2000)
+    if (!content) {
+      return {
+        aiCostCents,
+        draft: {
+          action: 'journal',
+          transcript,
+          localDate,
+          summary: 'Journal note needed',
+          confirmationMessage: 'What would you like me to write in the journal?',
+          canConfirm: false,
+          autoSave: false,
+        },
+      }
+    }
     const title = cleanText(journal?.title || 'Voice journal note', 120)
     const tags = Array.isArray(journal?.tags) ? journal.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 8) : []
     const journalTypeRaw = String(journal?.journalType || journal?.type || '').toLowerCase()
@@ -5183,8 +5348,13 @@ export async function POST(request: NextRequest) {
       confirmationDraft = null
       followUpDraft = null
     }
+    const activeDraftDate = !explicitNewCommand
+      ? cleanText(confirmationDraft?.localDate || followUpDraft?.localDate, 20)
+      : ''
+    if (/^\d{4}-\d{2}-\d{2}$/.test(activeDraftDate)) localDate = activeDraftDate
     transcript = explicitNewCommand ? transcript : followUpTranscript(followUpDraft, transcript) || transcript
     if (!transcript) return NextResponse.json({ error: 'No speech found' }, { status: 400 })
+    localDate = resolveRequestedActionDate(transcript, localDate)
     if (wantsVoiceReply && !aiConsentGranted) {
       return NextResponse.json({ error: 'AI sharing consent is required before spoken replies can be created.' }, { status: 403 })
     }

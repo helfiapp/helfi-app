@@ -219,6 +219,7 @@ function realtimeSessionConfig() {
 }
 
 export async function POST(request: NextRequest) {
+  const requestStartedAt = Date.now()
   const abortController = new AbortController()
   const abortRealtimeRequest = () => abortController.abort()
   request.signal?.addEventListener?.('abort', abortRealtimeRequest)
@@ -242,21 +243,25 @@ export async function POST(request: NextRequest) {
     if (!sdp.trim()) return NextResponse.json({ error: 'Missing realtime session offer' }, { status: 400 })
 
     const chargeCents = Math.max(1, REALTIME_SESSION_MIN_CREDITS)
-    const wallet = await new CreditManager(user.id).getWalletStatus()
+    const walletAndGuardStartedAt = Date.now()
+    const [wallet] = await Promise.all([
+      new CreditManager(user.id).getWalletStatus(),
+      assertAiUsageAllowed({
+        feature: 'voice-assistant:realtime-session',
+        userId: user.id,
+      }),
+    ])
+    const walletAndGuardMs = Date.now() - walletAndGuardStartedAt
     if (!hasPaidVoiceWalletAccess(wallet)) return voicePaidAccessResponse()
     if (wallet.totalAvailableCents < chargeCents) {
       return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: wallet.totalAvailableCents }, { status: 402 })
     }
 
-    await assertAiUsageAllowed({
-      feature: 'voice-assistant:realtime-session',
-      userId: user.id,
-    })
-
     const form = new FormData()
     form.set('sdp', sdp)
     form.set('session', JSON.stringify(realtimeSessionConfig()))
 
+    const openAiStartedAt = Date.now()
     const realtimeRes = await fetch('https://api.openai.com/v1/realtime/calls', {
       method: 'POST',
       headers: {
@@ -266,6 +271,7 @@ export async function POST(request: NextRequest) {
       signal: abortController.signal,
       body: form,
     })
+    const openAiMs = Date.now() - openAiStartedAt
 
     const answerSdp = await realtimeRes.text()
     if (!realtimeRes.ok) {
@@ -277,11 +283,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Live voice session was cancelled before it started.', code: 'live_voice_cancelled' }, { status: 499 })
     }
 
+    const chargeStartedAt = Date.now()
     const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+    const chargeMs = Date.now() - chargeStartedAt
     if (!charged) {
       return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: wallet.totalAvailableCents }, { status: 402 })
     }
 
+    const usageLogStartedAt = Date.now()
     await logAiUsageEvent({
       feature: 'voice-assistant:realtime-session',
       userId: user.id,
@@ -293,6 +302,9 @@ export async function POST(request: NextRequest) {
       success: true,
       detail: `charged ${chargeCents} credits; created realtime voice session`,
     })
+    const usageLogMs = Date.now() - usageLogStartedAt
+
+    const totalMs = Date.now() - requestStartedAt
 
     return new NextResponse(answerSdp, {
       status: 200,
@@ -300,6 +312,7 @@ export async function POST(request: NextRequest) {
         'content-type': 'application/sdp',
         'x-helfi-charged-credits': String(chargeCents),
         'x-helfi-realtime-model': REALTIME_MODEL,
+        'server-timing': `wallet_guard;dur=${walletAndGuardMs}, openai;dur=${openAiMs}, charge;dur=${chargeMs}, usage_log;dur=${usageLogMs}, total;dur=${totalMs}`,
       },
     })
   } catch (error) {

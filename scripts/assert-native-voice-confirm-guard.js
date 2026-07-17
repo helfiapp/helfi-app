@@ -603,13 +603,28 @@ if (!/!\s*draftIsActionable\s*\?\s*\(/.test(native) || !/accessibilityLabel="Ask
 }
 
 if (
-  !/const showDraftCard\s*=\s*Boolean\(draft\s*&&\s*draftIsActionable\)/.test(native) ||
+  !/const showDraftCard\s*=\s*Boolean\(draft\s*&&\s*draftIsActionable\s*&&\s*!reviewCorrectionActive\)/.test(native) ||
   !/!\s*voiceSessionActive\s*&&\s*!\s*showingConversationReview\s*&&\s*showDraftCard\s*&&\s*draft\s*&&/.test(native) ||
   !/voiceCallScreen/.test(native) ||
   !/transcriptReview/.test(native) ||
   /summary:\s*'Ready to build meal'/.test(route)
 ) {
   failures.push('Talk to Helfi must not show a draft-style meal card before the user clearly asks to build the meal.')
+}
+
+if (
+  !/accessibilityLabel="Continue talking"/.test(native) ||
+  !/const continueTalkingAboutDraft = useCallback/.test(native) ||
+  !/setReviewCorrectionActive\(true\)[\s\S]*?await startVoiceSession\(\)/.test(native) ||
+  !/confirmationDraftPayload = !explicitNewCommand && draft\?\.canConfirm \? draft : null/.test(native) ||
+  !/const endVoiceSession = useCallback[\s\S]*?setReviewCorrectionActive\(false\)/.test(native) ||
+  !/if \(!draftIsReviewOrHandoff\) setDraft\(null\)/.test(native)
+) {
+  failures.push('Reviewed actions must let the user continue the same live conversation, preserve the old draft on failure, and restore it when correction mode ends.')
+}
+
+if (/Added to today(?:'s|’s) (?:exercise|food diary|water intake)/i.test(native)) {
+  failures.push('A voice save confirmation must not claim an entry was added today when the reviewed action may target another date.')
 }
 
 if (!/draft\?\.action === 'recipe' && !draft\?\.canConfirm/.test(native) || !/form\.append\('followUpDraft'/.test(native) || !/followUpDraft:\s*followUpDraftPayload/.test(native)) {
@@ -880,9 +895,10 @@ if (
   !/markReviewTokenUsed\(user\.id,\s*draft\)/.test(confirmRoute) ||
   !/prisma\.verificationToken\.create/.test(confirmRoute) ||
   !/P2002/.test(confirmRoute) ||
-  !/already saved/i.test(confirmRoute)
+  !/already saved/i.test(confirmRoute) ||
+  !/releaseReviewToken\(user\.id,\s*draft\)/.test(confirmRoute)
 ) {
-  failures.push('Confirm route must keep one-use Talk to Helfi review tokens to prevent duplicate saves.')
+  failures.push('Confirm route must keep one-use Talk to Helfi review tokens to prevent duplicates and release failed saves for a safe retry.')
 }
 
 if (
