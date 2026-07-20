@@ -89,6 +89,7 @@ type VoiceDraft = {
     distanceKm?: number | null
     steps?: number | null
     caloriesKcal?: number | null
+    speedKph?: number | null
     intensity?: string | null
     estimatedDuration?: boolean
   }
@@ -127,6 +128,7 @@ type DraftRequestResult = {
   saved?: boolean
   needsReview?: boolean
   action?: string
+  reviewPrompt?: string
   status?: 'needs_clarification' | 'review_draft' | 'saved' | 'open_screen' | 'safe_refusal' | 'general_answer'
 }
 type RealtimeToolResult = DraftRequestResult & {
@@ -221,16 +223,40 @@ function spokenReplyTextForDraft(nextDraft: VoiceDraft | null) {
   return nextDraft.confirmationMessage || nextDraft.summary || ''
 }
 
+function reviewPromptForDraft(nextDraft: VoiceDraft | null) {
+  if (!nextDraft?.canConfirm) return spokenReplyTextForDraft(nextDraft)
+  const date = cleanFavoriteText(nextDraft.localDate || '', 20)
+  let exactSummary = cleanFavoriteText(nextDraft.summary || nextDraft.confirmationMessage || '', 900)
+  if (nextDraft.action === 'exercise' && nextDraft.exercise) {
+    const exercise = nextDraft.exercise
+    exactSummary = [
+      cleanFavoriteText(exercise.exerciseName || '', 100) || 'exercise',
+      exercise.durationMinutes ? `${exercise.durationMinutes} minutes` : '',
+      exercise.distanceKm ? `${exercise.distanceKm} km` : '',
+      exercise.speedKph ? `${exercise.speedKph} km/h` : '',
+      exercise.steps ? `${Math.round(exercise.steps).toLocaleString()} steps` : '',
+      exercise.caloriesKcal ? `${Math.round(exercise.caloriesKcal)} calories` : '',
+    ].filter(Boolean).join(', ')
+  } else if (nextDraft.action === 'water' && nextDraft.water) {
+    exactSummary = `${nextDraft.water.amount || ''} ${nextDraft.water.unit || ''} ${nextDraft.water.label || nextDraft.water.drinkType || 'water'}`.replace(/\s+/g, ' ').trim()
+  } else if ((nextDraft.action === 'food_build_meal' || nextDraft.action === 'food_favorite' || nextDraft.action === 'food_copy_previous') && nextDraft.food) {
+    const items = nextDraft.food.entries?.map((entry) => entry.description ? `${entry.name}, ${entry.description}` : entry.name).filter(Boolean).join('; ')
+    exactSummary = [mealLabel(nextDraft.food.meal), items || nextDraft.food.draftText || nextDraft.summary].filter(Boolean).join(': ')
+  }
+  const datedSummary = date ? `${exactSummary}, dated ${date}` : exactSummary
+  return `Here is what I am about to save: ${datedSummary}. Would you like me to save that for you?`
+}
+
 function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
   const status = result.status || (result.saved ? 'saved' : result.needsReview ? 'review_draft' : 'general_answer')
   const saved = Boolean(result.saved && status === 'saved')
   const needsReview = Boolean(result.needsReview || status === 'review_draft')
   const defaultSpokenReply = cleanFavoriteText(
-    result.message ||
+    result.reviewPrompt || result.message ||
       (saved
         ? 'Saved.'
         : needsReview
-        ? 'The review is ready. Do you want me to save it?'
+        ? 'Would you like me to save that for you?'
         : status === 'open_screen'
         ? 'That screen is ready.'
         : status === 'needs_clarification'
@@ -244,7 +270,7 @@ function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
   const instruction = saved
     ? 'You may say this was saved because the app confirmed a successful save.'
     : needsReview
-    ? 'Say the review is ready and ask if the user wants to save it. Do not say it was saved, added, created, or logged.'
+    ? 'Read spokenReply exactly, including the exact proposal summary and the exact final question. Then automatically listen for a natural yes, no, or correction. Do not say it was saved, added, created, or logged.'
     : status === 'open_screen'
     ? 'Say the app screen is ready. Do not say anything was saved.'
     : status === 'safe_refusal'
@@ -502,6 +528,7 @@ function followUpExerciseTranscript(draft: VoiceDraft | null, answerRaw: string)
     const details = [
       `log ${cleanFavoriteText(exercise?.exerciseName || 'exercise', 80)} for ${answer}`,
       exercise?.distanceKm ? `${exercise.distanceKm} km` : '',
+      exercise?.speedKph ? `${exercise.speedKph} km/h` : '',
       exercise?.steps ? `${exercise.steps} steps` : '',
       exercise?.caloriesKcal ? `${exercise.caloriesKcal} calories` : '',
     ].filter(Boolean)
@@ -1125,6 +1152,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [bottleCameraError, setBottleCameraError] = useState('')
   const [autoSubmitToken, setAutoSubmitToken] = useState(0)
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<SaveSuccessNotice | null>(null)
+  const [saveError, setSaveError] = useState('')
   const autoSubmittedRef = useRef(0)
   const conversationTurnSeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
@@ -1134,6 +1162,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const voiceImageAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
   const realtimeVoiceMuteRef = useRef<null | ((muted: boolean) => void)>(null)
+  const realtimeVoicePromptRef = useRef<null | ((instruction: string) => void)>(null)
   const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
   const realtimeActionAbortRef = useRef<AbortController | null>(null)
   const realtimeVoiceRunRef = useRef(0)
@@ -1147,6 +1176,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const realtimeVoiceConnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const realtimeActionGuardRef = useRef<RealtimeActionGuard | null>(null)
   const realtimeAutoStartRef = useRef(false)
+  const pendingVoiceDeleteRef = useRef(false)
+  const pendingReviewAnswerRef = useRef(false)
+  const reviewSilenceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const voiceAccessGrantedAtRef = useRef(0)
   const voiceAccessTokenRef = useRef('')
   const sendDraftRequestRef = useRef<DraftRequestHandler>(async () => ({ ok: false, message: 'Voice action is not ready yet.' }))
@@ -1191,6 +1223,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     if (realtimeVoiceConnectTimeoutRef.current) {
       clearTimeout(realtimeVoiceConnectTimeoutRef.current)
       realtimeVoiceConnectTimeoutRef.current = null
+    }
+  }, [])
+
+  const clearReviewSilenceTimer = useCallback(() => {
+    if (reviewSilenceTimerRef.current) {
+      clearTimeout(reviewSilenceTimerRef.current)
+      reviewSilenceTimerRef.current = null
     }
   }, [])
 
@@ -1320,6 +1359,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     const stop = realtimeVoiceStopRef.current
     realtimeVoiceStopRef.current = null
     realtimeVoiceMuteRef.current = null
+    realtimeVoicePromptRef.current = null
+    pendingReviewAnswerRef.current = false
+    clearReviewSilenceTimer()
     setMicrophoneMuted(false)
     setRealtimeVoiceStatus('idle')
     if (stop) {
@@ -1331,7 +1373,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
     }).catch(() => {})
-  }, [clearRealtimeConnectTimeout])
+  }, [clearRealtimeConnectTimeout, clearReviewSilenceTimer])
+
+  const clearConversationData = useCallback(() => {
+    setConversationTurns([])
+    setPendingFollowUpDraft(null)
+    setDraft(null)
+    setReviewCorrectionActive(false)
+    setSaveError('')
+    setTranscript('')
+    setChargedCredits(null)
+    setVisionChoicesOpen(false)
+    AsyncStorage.removeItem(VOICE_CONVERSATION_MEMORY_KEY).catch(() => {})
+  }, [])
 
   const clearConversationMemory = useCallback(() => {
     spokenReplyRunRef.current += 1
@@ -1341,16 +1395,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     clearRealtimeConnectTimeout()
     setContinuousVoiceSession(false)
     void stopRealtimeVoiceSession()
-    setConversationTurns([])
-    setPendingFollowUpDraft(null)
-    setDraft(null)
-    setTranscript('')
-    setChargedCredits(null)
-    setVisionChoicesOpen(false)
+    clearConversationData()
     setSpokenReplyStatus('idle')
+    setRecordingStarting(false)
+    recordingStoppingRef.current = false
+    setBusy(false)
+    setConfirming(false)
     stopPlayback().catch(() => {})
-    AsyncStorage.removeItem(VOICE_CONVERSATION_MEMORY_KEY).catch(() => {})
-  }, [clearRealtimeConnectTimeout, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+  }, [clearConversationData, clearRealtimeConnectTimeout, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+
+  const deleteChatAndClose = useCallback(() => {
+    clearConversationMemory()
+    setOpen(false)
+  }, [clearConversationMemory])
 
   const playAudio = useCallback(
     async (audioUri?: string | null, shouldKeepPlaying: () => boolean = () => true) => {
@@ -1567,8 +1624,16 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setRecording(null)
     }
     setPendingFollowUpDraft(null)
+    setDraft(null)
+    setReviewCorrectionActive(false)
+    setTranscript('')
+    setChargedCredits(null)
     setVisionChoicesOpen(false)
     setSpokenReplyStatus('idle')
+    setRecordingStarting(false)
+    recordingStoppingRef.current = false
+    setBusy(false)
+    setConfirming(false)
     stopPlayback().catch(() => {})
     setOpen(false)
   }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
@@ -1592,8 +1657,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setRecordingStarting(false)
       recordingStoppingRef.current = false
       setBusy(false)
+      setDraft(null)
+      setPendingFollowUpDraft(null)
+      setReviewCorrectionActive(false)
+      setTranscript('')
+      setChargedCredits(null)
       setSpokenReplyStatus('idle')
       stopPlayback().catch(() => {})
+      setOpen(false)
     })
     return () => subscription.remove()
   }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
@@ -1789,7 +1860,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   )
 
   const saveDraft = useCallback(
-    async (targetDraft: VoiceDraft | null, options?: { automatic?: boolean; signal?: AbortSignal }) => {
+    async (targetDraft: VoiceDraft | null, options?: { automatic?: boolean; signal?: AbortSignal; closeOnSuccess?: boolean }) => {
       if (!session?.token || !targetDraft?.canConfirm) return null
       if (options?.signal?.aborted) return null
       const saveAbortController = options?.signal ? null : new AbortController()
@@ -1799,6 +1870,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       }
       const saveSignal = options?.signal || saveAbortController?.signal
       setConfirming(true)
+      setSaveError('')
       try {
         const { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
           method: 'POST',
@@ -1936,11 +2008,18 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             ? 'Added to your water intake.'
             : String(data?.result?.message || 'Your entry has been saved.'),
         })
-        closePanel()
+        setDraft(null)
+        setPendingFollowUpDraft(null)
+        setReviewCorrectionActive(false)
+        setTranscript('')
+        setChargedCredits(null)
+        if (options?.closeOnSuccess !== false) closePanel()
         return data
       } catch (error: any) {
         if (saveSignal?.aborted || error?.name === 'AbortError') return null
-        Alert.alert('Could not save', error?.message || 'Please try again.')
+        const message = error?.message || 'Please check your internet connection and try again.'
+        setSaveError(message)
+        Alert.alert('Could not save', message)
         return null
       } finally {
         if (saveAbortController && draftRequestAbortRef.current === saveAbortController) {
@@ -1961,7 +2040,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       const draftIsReviewOrHandoff = Boolean(draft?.canConfirm || draft?.appTarget?.path) && !explicitNewCommand
       if (!options?.audioUri && draft?.canConfirm && isConfirmingDraftText(rawTypedTranscript)) {
         setTranscript(rawTypedTranscript)
-        const saved = await saveDraft(draft, { signal: options?.signal })
+        const saved = await saveDraft(draft, { signal: options?.signal, closeOnSuccess: !options?.realtimeActionHint?.action })
         return {
           ok: Boolean(saved),
           saved: Boolean(saved),
@@ -1975,7 +2054,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setDraft(null)
         setPendingFollowUpDraft(null)
         setChargedCredits(null)
-        if (voiceReply) {
+        if (voiceReply && !options?.suppressSpokenReply) {
           void requestVoiceReply(NOT_SAVED_MESSAGE)
         }
         Alert.alert('Not saved', NOT_SAVED_MESSAGE)
@@ -2074,6 +2153,15 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         }
         setTranscript(String(data?.transcript || typedTranscript || '').trim())
         const nextDraft = data?.draft || null
+        if (nextDraft?.action === 'exercise') {
+          setLaunchContext({ section: 'exercise', title: 'Exercise', date: nextDraft.localDate })
+        } else if (nextDraft?.action === 'water') {
+          setLaunchContext({ section: 'water', title: 'Water Intake', date: nextDraft.localDate })
+        } else if (nextDraft?.action === 'mood') {
+          setLaunchContext({ section: 'mood', title: 'Mood Tracker', date: nextDraft.localDate })
+        } else if (nextDraft?.action === 'journal') {
+          setLaunchContext({ section: 'journal', title: 'Health Journal', date: nextDraft.localDate })
+        }
         setDraft(nextDraft)
         if (nextDraft?.canConfirm || data?.confirmNow || data?.rejectNow) setReviewCorrectionActive(false)
         setPendingFollowUpDraft(isPendingFollowUpDraft(nextDraft) ? nextDraft : null)
@@ -2115,6 +2203,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           ok: true,
           saved: false,
           needsReview: Boolean(nextDraft?.canConfirm),
+          reviewPrompt: nextDraft?.canConfirm ? reviewPromptForDraft(nextDraft) : undefined,
           status: voiceResultStatusFromDraft(nextDraft, data),
           action: nextDraft?.action,
           message: assistantText || (nextDraft ? 'Review is ready.' : 'Done.'),
@@ -2363,13 +2452,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             if (status === 'closed' || status === 'disconnected') {
               clearRealtimeConnectTimeout()
               realtimeVoiceConnectedRef.current = false
-              setRealtimeVoiceStatus('closed')
+              setContinuousVoiceSession(false)
+              setRealtimeVoiceStatus(status === 'disconnected' ? 'failed' : 'closed')
+              if (status === 'disconnected') {
+                setRealtimeVoiceError('The voice connection was interrupted. Check your internet or Bluetooth audio, then tap Try again.')
+              }
               return
             }
             if (status === 'failed') {
               clearRealtimeConnectTimeout()
               realtimeVoiceConnectedRef.current = false
+              setContinuousVoiceSession(false)
               setRealtimeVoiceStatus('failed')
+              setRealtimeVoiceError('Voice audio was interrupted. Check your internet, speaker, or Bluetooth connection, then tap Try again.')
               return
             }
             if (realtimeVoiceConnectedRef.current) {
@@ -2381,13 +2476,30 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           onTranscript: (text) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (!text) return
+            clearReviewSilenceTimer()
+            pendingReviewAnswerRef.current = false
+            setRealtimeVoiceError('')
             setTranscript(text)
             appendConversationTurns([makeConversationTurn('user', text)])
           },
           onAssistantText: (text) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (!text) return
+            if (pendingVoiceDeleteRef.current) {
+              pendingVoiceDeleteRef.current = false
+              clearConversationData()
+              return
+            }
             appendConversationTurns([makeConversationTurn('assistant', text)])
+            if (pendingReviewAnswerRef.current) {
+              clearReviewSilenceTimer()
+              reviewSilenceTimerRef.current = setTimeout(() => {
+                if (!pendingReviewAnswerRef.current || !voiceSessionActiveRef.current || !openRef.current) return
+                pendingReviewAnswerRef.current = false
+                setRealtimeVoiceError("I didn't hear an answer. Please say yes, no, or tell me what to change.")
+                realtimeVoicePromptRef.current?.("Say exactly: I didn't hear an answer. Please say yes, no, or tell me what to change. Then listen again.")
+              }, 12000)
+            }
           },
           onActionRequest: (args) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) {
@@ -2396,6 +2508,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             const request = cleanFavoriteText(args.request || '', 2000)
             if (!request) return { ok: false, message: 'No app action was requested.' }
             const action = cleanFavoriteText(args.action || '', 40)
+            if (action === 'delete_conversation' || /\bdelete (?:this |the )?(?:chat|conversation)\b/i.test(request)) {
+              pendingVoiceDeleteRef.current = true
+              clearConversationData()
+              return {
+                ok: true,
+                saved: false,
+                status: 'general_answer',
+                message: 'This conversation has been deleted. Saved health records were not changed.',
+                spokenReply: 'This conversation has been deleted. Your saved health records were not changed.',
+                safeToClaimSaved: false,
+                instruction: 'Briefly confirm that only this conversation was deleted and saved health records were not changed.',
+              }
+            }
             const guardKey = `${action.toLowerCase()}|${request.toLowerCase()}|${Boolean(args.needsReview)}`
             const guard = realtimeActionGuardRef.current
             if (guard?.key === guardKey && Date.now() - guard.startedAt < 5000) {
@@ -2416,13 +2541,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               if (result.needsReview || result.saved) {
                 setReviewCorrectionActive(false)
               }
-              if (result.needsReview) {
-                setContinuousVoiceSession(false)
-                setRealtimeVoiceStatus('idle')
-                setTimeout(() => {
-                  void stopRealtimeVoiceSession()
-                }, 120)
-              }
+              pendingReviewAnswerRef.current = Boolean(result.needsReview)
               return result
             })
             realtimeActionGuardRef.current = { key: guardKey, startedAt: Date.now(), promise }
@@ -2447,6 +2566,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setRealtimeVoiceStatus((current) => (current === 'speaking' ? 'speaking' : 'live'))
       realtimeVoiceStopRef.current = realtimeSession.stop
       realtimeVoiceMuteRef.current = realtimeSession.setMicrophoneMuted
+      realtimeVoicePromptRef.current = realtimeSession.promptAssistant
     } catch (error: any) {
       clearRealtimeConnectTimeout()
       if (realtimeVoiceAbortRef.current === abortController) {
@@ -2456,9 +2576,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       realtimeVoiceConnectedRef.current = false
       setContinuousVoiceSession(false)
       setRealtimeVoiceStatus('failed')
-      setRealtimeVoiceError(error?.message || 'Live voice could not start. Text and camera still work.')
+      const reason = cleanFavoriteText(error?.message || '', 260)
+      setRealtimeVoiceError(reason || 'Live voice could not start. Check your internet, microphone, speaker, or Bluetooth connection, then tap Try again.')
     }
-  }, [appendConversationTurns, checkingRealtimeVoice, clearRealtimeConnectTimeout, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
+  }, [appendConversationTurns, checkingRealtimeVoice, clearConversationData, clearRealtimeConnectTimeout, clearReviewSilenceTimer, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
 
   useEffect(() => {
     if (!LIVE_VOICE_ENABLED || !open || !voicePaidAccessGranted || realtimeVoiceAvailable !== true || voiceSessionActiveRef.current) return
@@ -2512,25 +2633,32 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [draft, saveDraft])
 
   const rejectDraft = useCallback(() => {
+    spokenReplyRunRef.current += 1
+    spokenReplyAbortRef.current?.abort()
+    spokenReplyAbortRef.current = null
+    draftRequestAbortRef.current?.abort()
+    draftRequestAbortRef.current = null
+    voiceImageAbortRef.current?.abort()
+    voiceImageAbortRef.current = null
+    realtimeActionAbortRef.current?.abort()
+    realtimeActionAbortRef.current = null
+    setContinuousVoiceSession(false)
+    clearVoiceTurnTimers()
+    void stopRealtimeVoiceSession()
+    stopPlayback().catch(() => {})
     setReviewCorrectionActive(false)
     setDraft(null)
     setPendingFollowUpDraft(null)
     setTranscript('')
     setChargedCredits(null)
-    if (voiceReply) {
-      void requestVoiceReply(NOT_SAVED_MESSAGE)
-    } else {
-      setSpokenReplyStatus('idle')
-      stopPlayback().catch(() => {})
-    }
-  }, [requestVoiceReply, stopPlayback, voiceReply])
-
-  const continueTalkingAboutDraft = useCallback(async () => {
-    if (!draft) return
-    setReviewCorrectionActive(true)
-    await startVoiceSession()
-    if (!voiceSessionActiveRef.current) setReviewCorrectionActive(false)
-  }, [draft, startVoiceSession])
+    setSaveError('')
+    setSpokenReplyStatus('idle')
+    setRecordingStarting(false)
+    recordingStoppingRef.current = false
+    setBusy(false)
+    setConfirming(false)
+    setOpen(false)
+  }, [clearVoiceTurnTimers, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
 	  const openAppTarget = useCallback(() => {
 	    const path = draft?.appTarget?.path
@@ -2632,9 +2760,15 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   <Text style={styles.title}>{launchCopy.title}</Text>
                   <Text style={styles.subtitle}>{launchCopy.subtitle}</Text>
                 </View>
-                <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => closePanel()} style={styles.iconButton}>
-                  <Feather name="x" size={22} color={theme.colors.text} />
-                </Pressable>
+                <View style={styles.headerActions}>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Delete chat" onPress={deleteChatAndClose} style={styles.deleteChatButton}>
+                    <Feather name="trash-2" size={16} color="#B42318" />
+                    <Text style={styles.deleteChatText}>Delete chat</Text>
+                  </Pressable>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => closePanel()} style={styles.iconButton}>
+                    <Feather name="x" size={22} color={theme.colors.text} />
+                  </Pressable>
+                </View>
               </View> : null}
 
               <ScrollView
@@ -2677,6 +2811,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                           ? 'Working on it'
                           : 'Ready'}
                       </Text>
+                      {realtimeVoiceError ? <Text style={styles.voiceCallError}>{realtimeVoiceError}</Text> : null}
                     </View>
                     {!voiceSessionActive && realtimeVoiceStatus === 'failed' ? (
                       <Pressable
@@ -2695,6 +2830,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                           <Feather name="video" size={25} color="#12351A" />
                         </View>
                         <Text style={styles.voiceControlLabel}>Camera</Text>
+                      </Pressable>
+                      <Pressable accessibilityRole="button" accessibilityLabel="Delete chat" onPress={deleteChatAndClose} style={styles.voiceControlItem}>
+                        <View style={styles.voiceControlCircle}>
+                          <Feather name="trash-2" size={24} color="#B42318" />
+                        </View>
+                        <Text style={styles.voiceControlLabel}>Delete chat</Text>
                       </Pressable>
                       <Pressable
                         accessibilityRole="button"
@@ -2938,7 +3079,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   <View style={styles.section}>
                     <Text style={styles.label}>{draftIsActionable ? "Helfi's plan" : 'Helfi'}</Text>
                     <Text style={styles.summary}>{draft.summary}</Text>
-                    <Text style={styles.message}>{draft.recipe?.text || draft.confirmationMessage}</Text>
+                    <Text style={styles.message}>{draft.canConfirm ? reviewPromptForDraft(draft) : draft.recipe?.text || draft.confirmationMessage}</Text>
                     {draft.food?.entries?.length ? (
                       <View style={styles.entryList}>
                         {draft.food.entries.map((entry, index) => (
@@ -2979,6 +3120,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     {chargedCredits !== null && (
                       <Text style={styles.creditText}>Charged: {chargedCredits} credits</Text>
                     )}
+                    {saveError ? (
+                      <View style={styles.liveVoiceErrorBox}>
+                        <Feather name="alert-circle" size={18} color="#B42318" />
+                        <Text style={styles.liveVoiceErrorText}>Save failed: {saveError} Your review is still here; try Save this again.</Text>
+                      </View>
+                    ) : null}
                   </View>
                 )}
               </ScrollView>
@@ -3045,16 +3192,6 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     ) : null}
                     {draftIsActionable ? (
                       <>
-                        <Pressable
-                          accessibilityRole="button"
-                          accessibilityLabel="Continue talking"
-                          onPress={continueTalkingAboutDraft}
-                          disabled={busy || confirming}
-                          style={[styles.continueTalkingButton, (busy || confirming) && styles.secondaryDisabled]}
-                        >
-                          <Feather name="mic" size={18} color="#0B3B2E" />
-                          <Text style={styles.continueTalkingText}>Continue talking</Text>
-                        </Pressable>
                         <View style={styles.footerRow}>
                           <Pressable accessibilityRole="button" accessibilityLabel={discardFooterLabel} onPress={rejectDraft} style={styles.discardButton}>
                             <Text style={styles.discardText}>{discardFooterLabel}</Text>
@@ -3248,6 +3385,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     backgroundColor: '#FFFFFF',
   },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  deleteChatButton: { minHeight: 42, paddingHorizontal: 10, borderRadius: 21, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF1F0' },
+  deleteChatText: { color: '#B42318', fontSize: 13, fontWeight: '700' },
   title: { fontSize: 24, fontWeight: '700', color: theme.colors.text },
   subtitle: { marginTop: 4, color: theme.colors.muted, fontWeight: '700' },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF5F1' },
@@ -3386,6 +3526,7 @@ const styles = StyleSheet.create({
   voiceBarLargeShort: { height: 22, opacity: 0.78 },
   voiceBarLargeTall: { height: 52, opacity: 0.95 },
   voiceCallTitle: { color: theme.colors.text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
+  voiceCallError: { marginTop: 10, maxWidth: 320, color: '#B42318', fontSize: 14, fontWeight: '700', lineHeight: 20, textAlign: 'center' },
   voiceControls: { width: '100%', maxWidth: 380, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   voiceControlItem: { width: 82, alignItems: 'center', justifyContent: 'flex-start', gap: 7 },
   voiceControlCircle: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#F1F4F2', alignItems: 'center', justifyContent: 'center' },

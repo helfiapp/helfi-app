@@ -13,6 +13,7 @@ type RealtimeCallbacks = {
 type RealtimeSession = {
   stop: () => Promise<void>
   setMicrophoneMuted: (muted: boolean) => void
+  promptAssistant: (instruction: string) => void
 }
 
 function parseRealtimeJson(value: unknown) {
@@ -416,6 +417,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
   pc.ontrack = (event: any) => {
     if (stopped) return
     enableRemoteAudioTrack(event?.track)
+    if (event?.track) {
+      event.track.onended = () => {
+        if (!stopped) emitStatus('failed')
+      }
+    }
     const stream = event?.streams?.[0]
     if (stream && !remoteStreams.includes(stream)) {
       remoteStreams.push(stream)
@@ -481,6 +487,16 @@ export async function startHelfiRealtimeVoiceSession(params: {
   }
 
   return {
+    promptAssistant: (instruction: string) => {
+      if (stopped || !cleanText(instruction)) return
+      sendRealtimeEvent(dataChannel, {
+        type: 'response.create',
+        response: {
+          instructions: cleanText(instruction),
+          output_modalities: ['audio'],
+        },
+      })
+    },
     setMicrophoneMuted: (muted: boolean) => {
       localStream.getAudioTracks?.().forEach((track: any) => {
         try {

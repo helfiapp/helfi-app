@@ -305,7 +305,13 @@ async function saveExercise(userId: string, draft: any) {
   }
   const durationMinutes = Math.min(24 * 60, Math.round(durationRaw))
   const distanceRaw = Number(exercise.distanceKm)
-  const distanceKm = Number.isFinite(distanceRaw) && distanceRaw > 0 ? distanceRaw : null
+  const speedRaw = Number(exercise.speedKph)
+  const speedKph = Number.isFinite(speedRaw) && speedRaw > 0 ? Math.round(speedRaw * 10) / 10 : null
+  const distanceKm = Number.isFinite(distanceRaw) && distanceRaw > 0
+    ? distanceRaw
+    : speedKph
+    ? Math.round((speedKph * durationMinutes / 60) * 1000) / 1000
+    : null
   const steps = cleanPositiveNumber(exercise.steps, 500000)
   const spokenCalories = cleanPositiveNumber(exercise.caloriesKcal ?? exercise.calories, 10000)
   const date = localDate(draft?.localDate)
@@ -351,6 +357,7 @@ async function saveExercise(userId: string, draft: any) {
         transcript: cleanText(draft?.transcript, 500),
         estimatedDuration: Boolean(exercise.estimatedDuration),
         steps,
+        speedKph,
         spokenCaloriesKcal: spokenCalories,
         estimatedCaloriesKcal: estimatedCalories,
       },
@@ -989,7 +996,19 @@ export async function POST(request: NextRequest) {
     if (!supportedAction) return NextResponse.json({ error: 'This action is not supported yet.' }, { status: 400 })
     const tokenWasFresh = await markReviewTokenUsed(user.id, draft)
     if (!tokenWasFresh) {
-      return NextResponse.json({ error: 'This Talk to Helfi review was already saved. Please create a new review if you need another change.' }, { status: 409 })
+      const replayKind = draft.action === 'food_copy_previous' || draft.action === 'food_favorite' || draft.action === 'food_build_meal'
+        ? 'food'
+        : draft.action === 'health_intake_items'
+        ? 'health_intake'
+        : draft.action
+      return NextResponse.json({
+        success: true,
+        idempotentReplay: true,
+        result: {
+          kind: replayKind,
+          message: 'This was already saved. Nothing was duplicated.',
+        },
+      })
     }
 
     try {

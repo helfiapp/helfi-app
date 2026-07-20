@@ -110,6 +110,7 @@ type VoiceDraft = {
     distanceKm?: number | null
     steps?: number | null
     caloriesKcal?: number | null
+    speedKph?: number | null
     intensity?: string | null
     estimatedDuration?: boolean
   }
@@ -1398,6 +1399,7 @@ function reviewedDraftContextLine(draft: any) {
       distanceKm: draft.exercise.distanceKm,
       steps: draft.exercise.steps,
       caloriesKcal: draft.exercise.caloriesKcal,
+      speedKph: draft.exercise.speedKph,
       intensity: cleanText(draft.exercise.intensity, 40),
     }
   }
@@ -2322,14 +2324,18 @@ function buildReviewedExerciseCorrection(draft: any, answerRaw: string, localDat
   const durationMinutes = extractExerciseDurationMinutes(raw)
   const stepsMatch = raw.match(/\b(\d[\d,]*(?:\.\d+)?)\s*(?:steps?|step count)\b/i)
   const caloriesMatch = raw.match(/\b(\d[\d,]*(?:\.\d+)?)\s*(?:kcal|calories?|cals?)\b/i)
-  const distanceMatch = raw.match(/\b(\d+(?:\.\d+)?)\s*(km|kilometres?|kilometers?|mi|miles?)\b/i)
+  const speedMatch = raw.match(/\b(\d+(?:\.\d+)?)\s*(km\s*\/\s*h|kph|kilometres?\s+per\s+hour|kilometers?\s+per\s+hour|mph|miles?\s+per\s+hour)\b/i)
+  const distanceMatch = raw.match(/\b(\d+(?:\.\d+)?)\s*(km|kilometres?|kilometers?|mi|miles?)\b(?!\s*(?:\/|per)\s*(?:h|hr|hour))/i)
   const steps = parseVoiceNumber(stepsMatch?.[1])
   const caloriesKcal = parseVoiceNumber(caloriesMatch?.[1])
+  const speedKph = speedMatch
+    ? Number(speedMatch[1]) * (/mph|miles?/i.test(speedMatch[2]) ? 1.60934 : 1)
+    : null
   const distanceKm = distanceMatch
     ? Number(distanceMatch[1]) * (/^mi|mile/i.test(distanceMatch[2]) ? 1.609 : 1)
     : null
   const dateChanged = isValidLocalDate(localDate) && localDate !== cleanText(draft.localDate, 20)
-  const hasFieldCorrection = Boolean(durationMinutes || steps || caloriesKcal || distanceKm)
+  const hasFieldCorrection = Boolean(durationMinutes || steps || caloriesKcal || distanceKm || speedKph)
   if ((!hasFieldCorrection && !dateChanged) || (!hasReviewedCorrectionWords(raw) && !dateChanged)) return null
 
   const exercise = {
@@ -2338,12 +2344,14 @@ function buildReviewedExerciseCorrection(draft: any, answerRaw: string, localDat
     ...(steps ? { steps: Math.round(steps) } : {}),
     ...(caloriesKcal ? { caloriesKcal: Math.round(caloriesKcal) } : {}),
     ...(distanceKm ? { distanceKm: Math.round(distanceKm * 10) / 10 } : {}),
+    ...(speedKph ? { speedKph: Math.round(speedKph * 10) / 10 } : {}),
     estimatedDuration: false,
   }
   const details = [
     cleanText(exercise.exerciseName, 80) || 'exercise',
     exercise.durationMinutes ? `${exercise.durationMinutes} minutes` : '',
     exercise.distanceKm ? `${exercise.distanceKm} km` : '',
+    exercise.speedKph ? `${exercise.speedKph} km/h` : '',
     exercise.steps ? `${Math.round(exercise.steps).toLocaleString()} steps` : '',
     exercise.caloriesKcal ? `${Math.round(exercise.caloriesKcal)} kcal` : '',
   ].filter(Boolean)
@@ -2685,7 +2693,11 @@ function parseVoiceNumber(value: string | undefined | null) {
 function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunchContext) {
   const raw = cleanText(transcript, 600)
   const lower = raw.toLowerCase()
-  const distanceMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(k|km|kilometre|kilometer|kilometres|kilometers|mi|mile|miles)\b/)
+  const speedMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(km\s*\/\s*h|kph|kilometres?\s+per\s+hour|kilometers?\s+per\s+hour|mph|miles?\s+per\s+hour)\b/)
+  const speedKph = speedMatch
+    ? Number(speedMatch[1]) * (/mph|miles?/i.test(speedMatch[2]) ? 1.60934 : 1)
+    : null
+  const distanceMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(k|km|kilometre|kilometer|kilometres|kilometers|mi|mile|miles)\b(?!\s*(?:\/|per)\s*(?:h|hr|hour))/)
   const macedonianDistanceMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(км|километри?|километар|километра)/i)
   const durationMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|hour|hours|hr|hrs)\b/)
   const macedonianDurationMatch = lower.match(/(\d+(?:[.,]\d+)?)\s*(минути?|мин|часа|час)/i)
@@ -2735,6 +2747,7 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
       distanceKm: distanceKm ? Math.round(distanceKm * 10) / 10 : null,
       steps: steps && steps > 0 ? Math.round(steps) : null,
       caloriesKcal: caloriesKcal && caloriesKcal > 0 ? Math.round(caloriesKcal) : null,
+      speedKph: speedKph && speedKph > 0 ? Math.round(speedKph * 10) / 10 : null,
       intensity,
       estimatedDuration: false,
     },
@@ -4963,9 +4976,11 @@ async function normalizeDraft(
       }
     }
     const distanceKm = Number(exercise?.distanceKm)
-    const safeDistance = Number.isFinite(distanceKm) && distanceKm > 0 ? Math.round(distanceKm * 10) / 10 : null
     const durationRaw = Number(exercise?.durationMinutes)
     const durationMinutes = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.min(24 * 60, Math.round(durationRaw)) : null
+    const speedRaw = Number(exercise?.speedKph)
+    const speedKph = Number.isFinite(speedRaw) && speedRaw > 0 ? Math.round(speedRaw * 10) / 10 : null
+    const safeDistance = Number.isFinite(distanceKm) && distanceKm > 0 ? Math.round(distanceKm * 10) / 10 : null
     const estimatedDuration = false
     const steps = clampNumber(exercise?.steps, 0, 500000, 0)
     const caloriesKcal = clampNumber(exercise?.caloriesKcal, 0, 10000, 0)
@@ -4974,6 +4989,7 @@ async function normalizeDraft(
         steps ? `${Math.round(steps).toLocaleString()} steps` : '',
         caloriesKcal ? `${Math.round(caloriesKcal)} kcal` : '',
         safeDistance ? `${safeDistance} km` : '',
+        speedKph ? `${speedKph} km/h` : '',
       ].filter(Boolean).join(', ')
       return {
         aiCostCents,
@@ -4991,6 +5007,7 @@ async function normalizeDraft(
             distanceKm: safeDistance,
             steps: steps ? Math.round(steps) : null,
             caloriesKcal: caloriesKcal ? Math.round(caloriesKcal) : null,
+            speedKph,
             intensity: cleanText(exercise?.intensity, 40) || null,
             estimatedDuration: false,
           },
@@ -5000,6 +5017,7 @@ async function normalizeDraft(
     const detailParts = [
       `${type.name}, ${durationMinutes} minutes`,
       safeDistance ? `${safeDistance} km` : '',
+      speedKph ? `${speedKph} km/h` : '',
       steps ? `${Math.round(steps).toLocaleString()} steps` : '',
       caloriesKcal ? `${Math.round(caloriesKcal)} kcal` : '',
     ].filter(Boolean)
@@ -5021,6 +5039,7 @@ async function normalizeDraft(
           distanceKm: safeDistance,
           steps: steps ? Math.round(steps) : null,
           caloriesKcal: caloriesKcal ? Math.round(caloriesKcal) : null,
+          speedKph,
           intensity: cleanText(exercise?.intensity, 40) || null,
           estimatedDuration,
         },
@@ -5230,16 +5249,7 @@ async function buildAiDraftDecisionResponse(
   transcriptionCostCents: number,
 ) {
   const aiCostCents = transcriptionCostCents + Number(command?.wrapped?.costCents || 0)
-  const chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
-  const freshWallet = await new CreditManager(userId).getWalletStatus()
-  if (freshWallet.totalAvailableCents < chargeCents) {
-    return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-  }
-
-  const charged = await new CreditManager(userId).chargeCents(chargeCents)
-  if (!charged) {
-    return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-  }
+  const chargeCents = 0
 
   await logAiUsageEvent({
     feature: decision === 'confirm' ? 'voice-assistant:ai-confirm-command' : 'voice-assistant:ai-reject-command',
@@ -5250,7 +5260,7 @@ async function buildAiDraftDecisionResponse(
     completionTokens: command?.wrapped?.completionTokens || 0,
     costCents: chargeCents,
     success: true,
-    detail: `charged ${chargeCents} credits; AI classified reviewed draft ${decision}`,
+    detail: `no extra user charge; AI classified reviewed draft ${decision}; vendor estimate ${aiCostCents}`,
   })
 
   return NextResponse.json({
@@ -5380,16 +5390,7 @@ export async function POST(request: NextRequest) {
     }
 
     if (confirmationDraft && isConfirmingDraftText(transcript)) {
-      const chargeCents = Math.max(SIMPLE_MIN_CREDITS, transcriptionCostCents)
-      const freshWallet = await new CreditManager(user.id).getWalletStatus()
-      if (freshWallet.totalAvailableCents < chargeCents) {
-        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-      }
-
-      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
-      if (!charged) {
-        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-      }
+      const chargeCents = 0
 
       await logAiUsageEvent({
         feature: 'voice-assistant:confirm-command',
@@ -5400,7 +5401,7 @@ export async function POST(request: NextRequest) {
         completionTokens: 0,
         costCents: chargeCents,
         success: true,
-        detail: `charged ${chargeCents} credits; confirmed reviewed voice draft`,
+        detail: 'no extra user charge; confirmed reviewed voice draft',
       })
 
       return NextResponse.json({
@@ -5415,30 +5416,18 @@ export async function POST(request: NextRequest) {
     }
 
     if (confirmationDraft && isRejectingDraftText(transcript)) {
-      const chargeCents = transcriptionCostCents > 0 ? Math.max(SIMPLE_MIN_CREDITS, transcriptionCostCents) : 0
-      if (chargeCents > 0) {
-        const freshWallet = await new CreditManager(user.id).getWalletStatus()
-        if (freshWallet.totalAvailableCents < chargeCents) {
-          return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-        }
-
-        const charged = await new CreditManager(user.id).chargeCents(chargeCents)
-        if (!charged) {
-          return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-        }
-
-        await logAiUsageEvent({
-          feature: 'voice-assistant:reject-command',
-          userId: user.id,
-          endpoint: '/api/native/voice-assistant',
-          model: TRANSCRIBE_MODEL,
-          promptTokens: 0,
-          completionTokens: 0,
-          costCents: chargeCents,
-          success: true,
-          detail: `charged ${chargeCents} credits; rejected reviewed voice draft`,
-        })
-      }
+      const chargeCents = 0
+      await logAiUsageEvent({
+        feature: 'voice-assistant:reject-command',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: transcriptionCostCents > 0 ? TRANSCRIBE_MODEL : 'local-reject-router',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: 'no extra user charge; rejected reviewed voice draft',
+      })
 
       return NextResponse.json({
         success: true,
@@ -5454,29 +5443,8 @@ export async function POST(request: NextRequest) {
     const correctedDraft = confirmationDraft ? await buildReviewedDraftCorrection(confirmationDraft, transcript, localDate) : null
     if (correctedDraft) {
       let aiCostCents = transcriptionCostCents
-      let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
+      const chargeCents = 0
       let audio: string | null = null
-
-      if (wantsVoiceReply) {
-        const openai = getOpenAIClient()
-        if (openai) {
-          const tts = await speak(openai, correctedDraft.confirmationMessage, user.id)
-          audio = tts.audio
-          const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
-          chargeCents += voiceCharge
-          aiCostCents += tts.costCents
-        }
-      }
-
-      const freshWallet = await new CreditManager(user.id).getWalletStatus()
-      if (freshWallet.totalAvailableCents < chargeCents) {
-        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-      }
-
-      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
-      if (!charged) {
-        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
-      }
 
       await logAiUsageEvent({
         feature: 'voice-assistant:correction-command',
@@ -5487,7 +5455,7 @@ export async function POST(request: NextRequest) {
         completionTokens: 0,
         costCents: chargeCents,
         success: true,
-        detail: `charged ${chargeCents} credits; revised reviewed voice draft without saving`,
+        detail: `no extra user charge; revised reviewed voice draft without saving; vendor estimate ${aiCostCents}`,
       })
 
       return NextResponse.json({
@@ -5926,23 +5894,23 @@ export async function POST(request: NextRequest) {
         if (draft.action === 'unknown') throw new Error('AI intent router returned unknown')
         let aiCostCents = transcriptionCostCents + command.wrapped.costCents + normalized.aiCostCents
         const isRecipe = draft.action === 'recipe'
-        let chargeCents = Math.max(isRecipe ? RECIPE_MIN_CREDITS : SIMPLE_MIN_CREDITS, aiCostCents)
+        let chargeCents = confirmationDraft ? 0 : Math.max(isRecipe ? RECIPE_MIN_CREDITS : SIMPLE_MIN_CREDITS, aiCostCents)
         let audio: string | null = null
 
         if (wantsVoiceReply) {
           const tts = await speak(aiIntentClient, draft.recipe?.text || draft.confirmationMessage, user.id)
           audio = tts.audio
           const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
-          chargeCents += voiceCharge
+          if (!confirmationDraft) chargeCents += voiceCharge
           aiCostCents += tts.costCents
         }
 
         const freshWallet = await new CreditManager(user.id).getWalletStatus()
-        if (freshWallet.totalAvailableCents < chargeCents) {
+        if (chargeCents > 0 && freshWallet.totalAvailableCents < chargeCents) {
           return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
         }
 
-        const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+        const charged = chargeCents === 0 || await new CreditManager(user.id).chargeCents(chargeCents)
         if (!charged) {
           return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
         }
@@ -5956,7 +5924,9 @@ export async function POST(request: NextRequest) {
           completionTokens: command.wrapped.completionTokens,
           costCents: chargeCents,
           success: true,
-          detail: `charged ${chargeCents} credits; AI-first intent router; vendor estimate ${aiCostCents}`,
+          detail: confirmationDraft
+            ? `no extra user charge for reviewed-draft follow-up; vendor estimate ${aiCostCents}`
+            : `charged ${chargeCents} credits; AI-first intent router; vendor estimate ${aiCostCents}`,
         })
 
         return NextResponse.json({
@@ -6359,23 +6329,23 @@ export async function POST(request: NextRequest) {
     let draft = normalized.draft
     let aiCostCents = transcriptionCostCents + command.wrapped.costCents + normalized.aiCostCents
     const isRecipe = draft.action === 'recipe'
-    let chargeCents = Math.max(isRecipe ? RECIPE_MIN_CREDITS : SIMPLE_MIN_CREDITS, aiCostCents)
+    let chargeCents = confirmationDraft ? 0 : Math.max(isRecipe ? RECIPE_MIN_CREDITS : SIMPLE_MIN_CREDITS, aiCostCents)
     let audio: string | null = null
 
     if (wantsVoiceReply) {
       const tts = await speak(openai, draft.recipe?.text || draft.confirmationMessage, user.id)
       audio = tts.audio
       const voiceCharge = Math.max(VOICE_REPLY_MIN_CREDITS, tts.costCents)
-      chargeCents += voiceCharge
+      if (!confirmationDraft) chargeCents += voiceCharge
       aiCostCents += tts.costCents
     }
 
     const freshWallet = await new CreditManager(user.id).getWalletStatus()
-    if (freshWallet.totalAvailableCents < chargeCents) {
+    if (chargeCents > 0 && freshWallet.totalAvailableCents < chargeCents) {
       return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
     }
 
-    const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+    const charged = chargeCents === 0 || await new CreditManager(user.id).chargeCents(chargeCents)
     if (!charged) {
       return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
     }
@@ -6389,7 +6359,9 @@ export async function POST(request: NextRequest) {
       completionTokens: command.wrapped.completionTokens,
       costCents: chargeCents,
       success: true,
-      detail: `charged ${chargeCents} credits; vendor estimate ${aiCostCents}`,
+      detail: confirmationDraft
+        ? `no extra user charge for reviewed-draft follow-up; vendor estimate ${aiCostCents}`
+        : `charged ${chargeCents} credits; vendor estimate ${aiCostCents}`,
     })
 
     return NextResponse.json({

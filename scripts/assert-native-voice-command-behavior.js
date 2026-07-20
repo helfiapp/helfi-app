@@ -678,6 +678,14 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(walkedStepsDraft?.exercise?.caloriesKcal === 240, 'Walked steps/calories wording must keep the exact calories burned.')
   assert(walkedStepsDraft?.exercise?.distanceKm == null, 'Walked steps without distance must not manufacture a distance.')
   assert(walkedStepsDraft?.exercise?.durationMinutes == null, 'Walked steps without duration must not manufacture a duration.')
+
+  const walkedSpeedDraft = tryParseExerciseRequest('I walked for 30 minutes at 5 km/h, did 5,449 steps, and burned 240 calories yesterday', dashboardContext)
+  assert(walkedSpeedDraft?.exercise?.name === 'walking', 'Walking with a spoken speed must stay an exercise action.')
+  assert(walkedSpeedDraft?.exercise?.durationMinutes === 30, 'Walking must keep the exact spoken duration.')
+  assert(walkedSpeedDraft?.exercise?.speedKph === 5, 'Walking must keep the exact spoken speed.')
+  assert(walkedSpeedDraft?.exercise?.distanceKm == null, 'A spoken speed must not be mistaken for a spoken distance.')
+  assert(walkedSpeedDraft?.exercise?.steps === 5449, 'Walking must keep the exact spoken steps.')
+  assert(walkedSpeedDraft?.exercise?.caloriesKcal === 240, 'Walking must keep the exact spoken calories.')
   assert(!shouldUseFavoriteFood('I did a walk and did 5,449 steps and burned 240 calories', [{ label: '250', description: '250', meal: 'breakfast' }]), 'Exercise steps/calories wording must not match numeric favourite foods.')
 
   assert(resolveRequestedActionDate('Log a walk yesterday', localDate) === '2026-07-01', 'Yesterday must target the previous local calendar day for app actions.')

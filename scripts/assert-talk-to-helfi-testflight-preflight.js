@@ -81,6 +81,11 @@ assert(voiceAssistant.includes('realtimeVoiceConnectedRef') && voiceAssistant.in
 assert(voiceRoute.includes('Realtime app-action hint') && voiceRoute.includes('realtimeActionHint'), 'Realtime tool hints must feed the shared app-action brain.')
 assert(voiceRoute.includes('buildGeneralHealthAnswer') && voiceRoute.includes("feature: 'voice-assistant:general-answer'"), 'Talk to Helfi must answer general questions in the same conversation instead of always handing off to another screen.')
 assert(realtimeRoute.includes('Do not answer app-action requests from general knowledge'), 'Realtime voice must route app actions through Helfi tools, not generic chat.')
+assert(realtimeRoute.includes('polite, discreet butler') && realtimeRoute.includes('Would you like me to save that for you?'), 'Realtime voice must use the requested polite-butler style and exact save question.')
+assert(realtimeRoute.includes("'delete_conversation'") && voiceAssistant.includes('accessibilityLabel="Delete chat"'), 'Talk to Helfi must support visible and spoken conversation deletion.')
+assert(voiceAssistant.includes('reviewPromptForDraft') && !voiceAssistant.includes('accessibilityLabel="Continue talking"'), 'A review must be read aloud and automatically keep listening without a Continue talking button.')
+assert(voiceAssistant.includes('spokenReplyAbortRef.current?.abort()') && voiceAssistant.includes('draftRequestAbortRef.current?.abort()'), "Don't save and close paths must cancel speech and pending work.")
+assert(voiceRoute.includes('no extra user charge; confirmed reviewed voice draft') && voiceRoute.includes('no extra user charge; revised reviewed voice draft'), 'Confirmation and correction turns must not charge the user again.')
 
 if (failures.length) {
   console.error('Talk to Helfi TestFlight preflight failed:')

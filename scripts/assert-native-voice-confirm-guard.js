@@ -195,9 +195,10 @@ if (
   !/react-native-incall-manager/.test(realtime) ||
   !/setForceSpeakerphoneOn\?\.\(true\)/.test(realtime) ||
   !/setMicrophoneMuted/.test(realtime) ||
-  !/result\.needsReview[\s\S]{0,300}setContinuousVoiceSession\(false\)[\s\S]{0,300}stopRealtimeVoiceSession/.test(native)
+  /result\.needsReview[\s\S]{0,300}setContinuousVoiceSession\(false\)[\s\S]{0,300}stopRealtimeVoiceSession/.test(native) ||
+  !/Would you like me to save that for you\?/.test(native)
 ) {
-  failures.push('Realtime voice must use the main speaker, support mute, and leave the live call immediately when an app review is ready.')
+  failures.push('Realtime voice must use the main speaker, support mute, read the exact review question, and stay live to hear the answer.')
 }
 
 if (
@@ -270,8 +271,8 @@ if (
   failures.push('Realtime voice must show Listening once WebRTC is ready and must not fall back to Connecting after it has connected.')
 }
 
-if (!/NOT_SAVED_MESSAGE\s*=\s*'No problem\. I have not saved anything\.'/.test(native) || (native.match(/requestVoiceReply\(NOT_SAVED_MESSAGE\)/g) || []).length < 3) {
-  failures.push('Rejected or cancelled drafts with Spoken reply enabled must speak back that nothing was saved.')
+if (!/const rejectDraft = useCallback[\s\S]*?spokenReplyAbortRef\.current\?\.abort\(\)[\s\S]*?draftRequestAbortRef\.current\?\.abort\(\)[\s\S]*?stopRealtimeVoiceSession\(\)[\s\S]*?stopPlayback\(\)\.catch[\s\S]*?setOpen\(false\)/.test(native)) {
+  failures.push("The visible Don't save control must stop speech, listening, pending work, and close the unsaved conversation.")
 }
 
 if (!/const draftIsReviewOrHandoff\s*=\s*Boolean\(draft\?\.canConfirm\s*\|\|\s*draft\?\.appTarget\?\.path\)/.test(native) || !/draftIsReviewOrHandoff\s*&&\s*draft\s*&&\s*isRejectingDraftText\(rawTypedTranscript\)/.test(native)) {
@@ -613,14 +614,33 @@ if (
 }
 
 if (
-  !/accessibilityLabel="Continue talking"/.test(native) ||
-  !/const continueTalkingAboutDraft = useCallback/.test(native) ||
-  !/setReviewCorrectionActive\(true\)[\s\S]*?await startVoiceSession\(\)/.test(native) ||
+  /accessibilityLabel="Continue talking"/.test(native) ||
+  !/reviewPromptForDraft/.test(native) ||
+  !/reviewPrompt:\s*nextDraft\?\.canConfirm/.test(native) ||
   !/confirmationDraftPayload = !explicitNewCommand && draft\?\.canConfirm \? draft : null/.test(native) ||
-  !/const endVoiceSession = useCallback[\s\S]*?setReviewCorrectionActive\(false\)/.test(native) ||
   !/if \(!draftIsReviewOrHandoff\) setDraft\(null\)/.test(native)
 ) {
-  failures.push('Reviewed actions must let the user continue the same live conversation, preserve the old draft on failure, and restore it when correction mode ends.')
+  failures.push('Reviewed actions must automatically continue listening for yes, no, or a correction without a Continue talking button.')
+}
+
+if (!/accessibilityLabel="Delete chat"/.test(native) || !/delete_conversation/.test(native) || !/clearConversationData/.test(native) || !/Saved health records were not changed/.test(native)) {
+  failures.push('Talk to Helfi must offer visible and spoken conversation deletion without touching saved health records.')
+}
+
+if (!/idempotentReplay:\s*true/.test(confirmRoute) || !/Nothing was duplicated/.test(confirmRoute)) {
+  failures.push('Repeated save confirmation must return success without creating a duplicate record.')
+}
+
+if (!/reviewSilenceTimerRef/.test(native) || !/I didn't hear an answer\. Please say yes, no, or tell me what to change\./.test(native) || !/promptAssistant/.test(realtime)) {
+  failures.push('Silence after a save question must produce a visible and spoken retry prompt.')
+}
+
+if (!/const chargeCents = 0[\s\S]*?no extra user charge; confirmed reviewed voice draft/.test(route) || !/no extra user charge; revised reviewed voice draft/.test(route)) {
+  failures.push('Confirmation and correction turns must not create another user charge.')
+}
+
+if (!/speedMatch/.test(route) || !/speedKph/.test(route) || !/setLaunchContext\(\{ section: 'exercise', title: 'Exercise'/.test(native) || !/speedKph/.test(confirmRoute)) {
+  failures.push('Walking and exercise requests must stay in Exercise context and preserve an explicitly spoken speed through the saved record.')
 }
 
 if (/Added to today(?:'s|’s) (?:exercise|food diary|water intake)/i.test(native)) {
