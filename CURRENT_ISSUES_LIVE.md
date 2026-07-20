@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 20 July 2026, 10:39 PM AEST
+- What changed: Repaired the owner-reported Talk to Helfi build 28 problems. Voice output now routes to the iPhone loudspeaker, slow connections fail clearly after 8 seconds, common health actions prepare faster, and the app shows live progress while it listens, understands, prepares, and saves. Walks with exact steps or calories now estimate the missing duration instead of repeatedly asking for it, while preserving the exact stated values.
+- Where to see it (page/link): https://helfi.ai and the native iPhone Talk to Helfi flow after build 29 is installed.
+- What to quickly test: Start Talk to Helfi and check connection speed and volume; log a walk using exact steps and calories without giving a duration; watch the live activity; correct one value; approve once; confirm one Exercise entry with the exact date and values. Also test Don't save, Delete chat, backgrounding, poor internet, and a Bluetooth route change.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 20 July 2026, 8:15 PM AEST
 - What changed: Talk to Helfi now reads back the exact proposed health action, asks “Would you like me to save that for you?”, listens automatically for yes, no, or corrections, prevents duplicate saves and extra confirmation charges, and safely stops speech/listening when discarded or closed. It also adds Delete chat, clearer retry messages, and correct exercise routing with exact values.
 - Where to see it (page/link): https://helfi.ai and the native iPhone app's Talk to Helfi flow after build 28 is installed.

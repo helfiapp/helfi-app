@@ -6,7 +6,9 @@ Voice task ticket: HEL-471
 
 Release source: `master` in `/Volumes/U34 Bolt/HELFI APP/helfi-app`
 
-Final App Store build candidate: 28 (uploaded, processed, assigned to internal testers, and installed on the physical iPhone)
+Current installed App Store build: 28 (uploaded, processed, assigned to internal testers, and installed on the physical iPhone)
+
+Replacement build candidate: 29 (source repaired and deployed; archive, upload, installation, and final device retest in progress)
 
 ## Status rules
 
@@ -30,6 +32,7 @@ No row may remain `PRELIMINARY`, `UNTESTED`, or `BLOCKED` when the build is decl
 | Production web/API | Push one release task, wait for Vercel READY, verify both live domains | Commit `d3c6783e` / Vercel `dpl_AU6Z6BUCh2rs3Td5xvBVzqkCFTMT` | PASS - CURRENT SOURCE | Deployment READY; `helfi.ai` and `www.helfi.ai` both point to the exact deployment; live TestFlight upload-readiness passed | Stale live aliases were reassigned through the Vercel API | Repeat readiness only if source changes |
 | Final archive | Archive exact committed source as build 28 | Xcode / commit `d3c6783e` | PASS - FINAL BUILD | Archive and 33 MB App Store package created; Xcode uploaded `1.0.0 (28)` successfully at 8:20 PM AEST | Apple accepted the package; third-party React/Hermes dSYM warnings remain for crash-detail quality | Complete |
 | TestFlight identity | Confirm processed build, source commit, version, tester assignment, install, and open | App Store Connect and physical iPhone 14 Pro Max | PASS - FINAL BUILD | App Store Connect shows build 28 Complete; build 28 is assigned to Helfi Internal Testers (2); TestFlight offered `Version 1.0.0 (28)`; exact build installed and opened while the test account remained signed in | Earlier Apple sign-in/build 26 blocker resolved | Complete |
+| Build 29 repair source | Repeat compile, voice guards, page locks, and production deployment after the owner's build 28 retest | Commit `bb02a167` | PASS - CURRENT SOURCE | Native and web type checks, focused voice checks, TestFlight preflights, 268 web/shared locks, 72 native locks, whitespace check, and the full production build passed. Vercel deployment `dpl_G47anWCDc4T473JezyRCVCWpjFBy` is READY and both live domains point to it. | Loudspeaker routing, 8-second connection timeout, faster common-action preparation, visible live activity, and walk-duration estimation from exact steps/calories added | Archive and repeat on uploaded build 29 |
 
 ## Account, navigation, and layout
 
