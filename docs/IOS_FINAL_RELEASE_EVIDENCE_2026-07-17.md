@@ -2,9 +2,11 @@
 
 Linear owner ticket: HEL-470
 
+Voice task ticket: HEL-471
+
 Release source: `master` in `/Volumes/U34 Bolt/HELFI APP/helfi-app`
 
-Final App Store build candidate: 27 (archive/upload still pending)
+Final App Store build candidate: 28 (uploaded, processed, assigned to internal testers, and installed on the physical iPhone)
 
 ## Status rules
 
@@ -20,20 +22,20 @@ No row may remain `PRELIMINARY`, `UNTESTED`, or `BLOCKED` when the build is decl
 
 | Screen / flow | Exact control or action | Device / build | Result | Observable evidence | Defect / repair | Final retest |
 | --- | --- | --- | --- | --- | --- | --- |
-| Repository | Inspect all modified, deleted, and untracked files | Main checkout at `3d4f59cc` | PASS - CURRENT SOURCE | Only one Git worktree exists; saved Talk to Helfi work, Health Coach repair, audit evidence, and secret-backup cleanup committed; App Store artwork and temporary evidence preserved locally and accounted for | No files discarded | Repeat before final build commit |
+| Repository | Inspect all modified, deleted, and untracked files | Main checkout at `d3c6783e` | PASS - CURRENT SOURCE | Only one Git worktree exists; VOICE TWEAKS source is committed and pushed; existing App Store artwork, temporary evidence, and earlier evidence edits remain preserved | No files discarded | Repeat before any later release commit |
 | Web/API compile | Run full production build | Current source, Mac | PASS - CURRENT SOURCE | Production build completed; existing warnings only | None | Repeat after final changes |
 | Native compile | Run native type check and simulator build | Current source, iPhone 17 Pro Max simulator | PASS - CURRENT SOURCE | Type check passed; Xcode simulator build succeeded with zero errors | None | Repeat for final archive |
 | Page locks | Run web and native lock checks | Current source | PASS - CURRENT SOURCE | 268 total locks and 72 native locks passed | Health Coach and saved voice hashes refreshed only | Repeat before commit/upload |
-| Talk to Helfi safety | Run voice behaviour, confirm guard, and TestFlight preflight | Current source | PASS - CURRENT SOURCE | All three checks passed | Saved voice work preserved and verified | Repeat before upload |
-| Production web/API | Push one release task, wait for Vercel READY, verify both live domains | Commit `3d4f59cc` / Vercel `dpl_FJw71SB42URaScCd5Mk2LKyMFEen` | PASS - CURRENT SOURCE | Deployment READY; `helfi.ai` and `www.helfi.ai` both point to it; live voice readiness returns ready, Marin, `gpt-realtime-2.1` | Stale live aliases were reassigned to the new READY deployment | Repeat readiness before upload |
-| Final archive | Archive exact committed source as build 27 or higher | Xcode / App Store upload | UNTESTED | Project source is now build 27; archive not created yet | Pending archive and upload | Required |
-| TestFlight identity | Confirm processed build, source commit, version, tester assignment | App Store Connect | BLOCKED | App Store Connect is signed out; passkey verification did not complete | External Apple sign-in required | Required |
+| Talk to Helfi safety | Run voice behaviour, confirm guard, TestFlight preflight, upload-readiness, type checks, and page locks | Commit `d3c6783e` | PASS - CURRENT SOURCE | Voice guards, command behaviour, preflight, upload-readiness, web/native type checks, 268 total locks, 72 native locks, and the full production build passed | Voice-first review, automatic reply listening, idempotent save retry, delete chat, full cleanup, exact exercise routing, and visible/spoken errors added | Repeat only if source changes |
+| Production web/API | Push one release task, wait for Vercel READY, verify both live domains | Commit `d3c6783e` / Vercel `dpl_AU6Z6BUCh2rs3Td5xvBVzqkCFTMT` | PASS - CURRENT SOURCE | Deployment READY; `helfi.ai` and `www.helfi.ai` both point to the exact deployment; live TestFlight upload-readiness passed | Stale live aliases were reassigned through the Vercel API | Repeat readiness only if source changes |
+| Final archive | Archive exact committed source as build 28 | Xcode / commit `d3c6783e` | PASS - FINAL BUILD | Archive and 33 MB App Store package created; Xcode uploaded `1.0.0 (28)` successfully at 8:20 PM AEST | Apple accepted the package; third-party React/Hermes dSYM warnings remain for crash-detail quality | Complete |
+| TestFlight identity | Confirm processed build, source commit, version, tester assignment, install, and open | App Store Connect and physical iPhone 14 Pro Max | PASS - FINAL BUILD | App Store Connect shows build 28 Complete; build 28 is assigned to Helfi Internal Testers (2); TestFlight offered `Version 1.0.0 (28)`; exact build installed and opened while the test account remained signed in | Earlier Apple sign-in/build 26 blocker resolved | Complete |
 
 ## Account, navigation, and layout
 
 | Screen / flow | Exact control or action | Device / build | Result | Observable evidence | Defect / repair | Final retest |
 | --- | --- | --- | --- | --- | --- | --- |
-| Sign-in | Fresh open, remain signed in, force-close, reopen | Physical iPhone / final build | UNTESTED | Test account remains signed in on current simulator only | None known | Required |
+| Sign-in | Replace the installed app through TestFlight, open final build, remain signed in | Physical iPhone 14 Pro Max / build 28 | PASS - FINAL BUILD | Build 28 opened directly to the signed-in Food Diary without asking the owner to log in | None found in this path | Force-close/reopen still required for the wider release audit |
 | Sign-in | Same persistence and no old-account data | Physical iPad / final build | BLOCKED | No physical iPad connected | External physical iPad required | Required |
 | Dashboard | Load, credits, every card, loading/error/success, safe area | Physical iPhone + iPad / final build | UNTESTED | Earlier simulator evidence only | None known | Required |
 | Main navigation | Dashboard, Insights, Food, More, Settings; back/cancel routes | Physical iPhone + iPad / final build | UNTESTED | Current simulator tabs open | None known | Required |
@@ -100,17 +102,18 @@ No row may remain `PRELIMINARY`, `UNTESTED`, or `BLOCKED` when the build is decl
 
 | Screen / flow | Exact control or action | Device / build | Result | Observable evidence | Defect / repair | Final retest |
 | --- | --- | --- | --- | --- | --- | --- |
-| Automated safety | Dates, no invented values, clarification, correction, save/discard, duplicate-save retry | Current source | PASS - CURRENT SOURCE | Native voice confirm guard and command behaviour checks pass | Saved unfinished owner work integrated | Repeat final source |
-| Connection | Open, Connecting, Listening, understandable error, retry | Physical iPhone + iPad / final build | UNTESTED | Current simulator reached Connecting/Listening earlier | Production API must be deployed first | Required |
-| Review controls | Continue talking, correct, Save this, Discard, Done | Physical iPhone + iPad / final build | UNTESTED | Code and automated checks only | New correction flow | Required |
+| Automated safety | Dates, no invented values, exact spoken review, automatic yes/no/correction, delete, discard cleanup, no extra confirmation charge, and duplicate-save retry | Commit `d3c6783e` | PASS - CURRENT SOURCE | Native voice confirm guard, command behaviour, TestFlight preflight, and upload-readiness checks pass | Complete VOICE TWEAKS guard coverage added | Repeat only if source changes |
+| Connection | Open, Connecting, Listening, understandable error, retry | Physical iPhone 14 Pro Max / build 28 | BLOCKED | Build 28 reaches Connecting and Listening, but iPhone Mirroring repeatedly displays Apple’s system warning: “iPhone microphone is not available from Mac.” | This is an Apple mirroring limitation, not an app error | Owner must speak on the unlocked phone while mirroring is disconnected |
+| Review controls | Automatic reply listening plus fallback Save this / Don't save; Done/End | Physical iPhone 14 Pro Max / build 28 | BLOCKED | End closes immediately; the obsolete Continue talking control is absent. Save/Don't save cannot be reached because Apple blocks microphone input while mirrored | Voice-first controls and safe cleanup implemented | Owner voice pass required |
 | Correct dates | Today/yesterday/two days ago and copied-yesterday meal source | Physical iPhone + iPad / final build | UNTESTED | Automated checks pass | New exact-date handling | Required |
 | Exercise | Missing duration follow-up; exact duration/distance/steps/calories; correction/save/discard | Physical iPhone + iPad / final build | UNTESTED | Automated checks pass | Guessed exercise values removed | Required |
 | Mood/journal/water | Missing-value follow-up, exact review, correction/save/discard | Physical iPhone + iPad / final build | UNTESTED | Automated checks pass | Guessed mood/water/journal values removed | Required |
 | Medication/supplement | Camera/library or speech, review/correct/save/discard, no auto-save | Physical iPhone + iPad / final build | UNTESTED | Earlier code checks only | Review-first path preserved | Required |
-| Duplicate protection | Interrupt/fail a save, retry once, confirm one record and one charge | Physical iPhone + iPad / final build | UNTESTED | Token release and one-use guard pass in code tests | Failed saves can retry without duplicate write | Required |
-| Audio output | Speaker, receiver, Bluetooth, volume buttons, mute/unmute | Physical iPhone + iPad / final build | UNTESTED | None | Physical-only | Required |
-| Interruption | Speak over Helfi, phone/audio interruption, background/foreground, silence | Physical iPhone + iPad / final build | UNTESTED | None | Physical-only | Required |
-| Done shutdown | Tap Done while connecting/listening/speaking; confirm mic/audio stay stopped | Physical iPhone + iPad / final build | UNTESTED | Automated guard only | Critical voice lock | Required |
+| Duplicate protection | Interrupt/fail a save, retry once, confirm one record and no extra confirmation charge | Physical iPhone + iPad / final build | BLOCKED | One-use review tokens, successful idempotent replay, and zero-charge confirmation/correction guards pass; physical voice save is blocked by Apple mirroring | Failed saves can retry without duplicate writes | Owner voice pass required |
+| Delete chat | Tap visible Delete chat while connecting and confirm only the conversation closes | Physical iPhone 14 Pro Max / build 28 | PASS - FINAL BUILD | Delete chat is visible, closes the voice screen immediately, and returns to the unchanged Food Diary | New transcript/draft-only delete path verified | Voice command still requires owner voice pass |
+| Audio output | Speaker, receiver, Bluetooth, volume buttons, mute/unmute | Physical iPhone 14 Pro Max / build 28 | BLOCKED | Apple disables the iPhone microphone during Mac mirroring; no Bluetooth route is connected | Clear route/interruption errors are implemented and guarded in source | Owner physical audio-route pass required |
+| Interruption | Speak over Helfi, phone/audio interruption, background/foreground, silence | Physical iPhone 14 Pro Max / build 28 | BLOCKED | App Switcher/backgrounding closes the active voice screen immediately and returns safely to Food Diary; speech/silence and Bluetooth parts are blocked by Apple mirroring | Safe AppState cleanup verified on final build | Owner voice/audio pass required |
+| Done shutdown | Tap End while connecting/listening/speaking; confirm mic/audio stay stopped | Physical iPhone 14 Pro Max / build 28 | BLOCKED | End closes immediately while connecting; automated guards cover speaking/listening cancellation, but live speaking could not be reached | Critical voice cleanup repaired | Owner speaking-state pass required |
 
 ## Billing and Apple sandbox purchases
 
@@ -132,7 +135,7 @@ No row may remain `PRELIMINARY`, `UNTESTED`, or `BLOCKED` when the build is decl
 | Screen / flow | Exact control or action | Device / build | Result | Observable evidence | Defect / repair | Final retest |
 | --- | --- | --- | --- | --- | --- | --- |
 | Rejection state | Read current Apple rejection and resolution state | App Store Connect | BLOCKED | Existing Chrome is signed out; passkey verification is stuck | Owner Apple authentication may be required | Required |
-| Build selection | Select exact final processed build 27 or higher | App Store Connect | UNTESTED | Build not uploaded | Pending | Required |
+| Build selection | Process and assign exact final build 28 without submitting for review | App Store Connect | PASS - FINAL BUILD | Build 28 is Complete and assigned to Helfi Internal Testers; it was installed from TestFlight on the physical iPhone | No Submit for Review action was taken | Complete for TestFlight |
 | Version/screenshots | Verify version and all iPhone/iPad screenshot slots | App Store Connect | UNTESTED | Old handover is not fresh evidence | Pending | Required |
 | Metadata | Description, keywords, category, support/marketing/terms/privacy links | App Store Connect | UNTESTED | Old handover is not fresh evidence | Pending | Required |
 | Privacy/age/content rights | Verify every saved answer and published privacy state | App Store Connect | UNTESTED | Old handover is not fresh evidence | Pending | Required |
@@ -144,8 +147,8 @@ No row may remain `PRELIMINARY`, `UNTESTED`, or `BLOCKED` when the build is decl
 ## Current blockers
 
 1. A physical iPad is not connected to this Mac. Simulator results cannot satisfy the owner's physical-iPad acceptance requirement.
-2. App Store Connect is signed out in the existing Chrome session. Passkey sign-in began but did not complete, so fresh Apple state cannot yet be read or prepared.
-3. Apple sandbox purchases need action-time confirmation immediately before each purchase flow.
+2. Apple sandbox purchases need action-time confirmation immediately before each purchase flow.
+3. On the connected physical iPhone, Apple’s iPhone Mirroring blocks microphone input from the Mac. This prevents an unattended spoken yes/no/correction/save/discard/Bluetooth pass on build 28. The owner must run the short voice pass directly on the unlocked phone while mirroring is disconnected.
 
 ## Preserved local working files
 

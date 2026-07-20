@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 20 July 2026, 8:15 PM AEST
+- What changed: Talk to Helfi now reads back the exact proposed health action, asks “Would you like me to save that for you?”, listens automatically for yes, no, or corrections, prevents duplicate saves and extra confirmation charges, and safely stops speech/listening when discarded or closed. It also adds Delete chat, clearer retry messages, and correct exercise routing with exact values.
+- Where to see it (page/link): https://helfi.ai and the native iPhone app's Talk to Helfi flow after build 28 is installed.
+- What to quickly test: Ask to log a walk with date, time, steps, speed, and calories; correct one value; say yes; confirm it saves once in Exercise. Then test no, Delete chat, the fallback buttons, backgrounding, and a failed-network retry.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 17 July 2026, 11:30 AM AEST
 - What changed: Finished the Talk to Helfi safety and reliability repair, including exact dates, no invented exercise/mood/water values, correction before saving, and safe retries without duplicate writes. The native Health Coach loading display was also repaired for the next iOS build.
 - Where to see it (page/link): https://helfi.ai and the native app's Talk to Helfi flow after the next TestFlight build is installed.
