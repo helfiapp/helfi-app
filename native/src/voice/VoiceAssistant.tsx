@@ -151,6 +151,11 @@ type RealtimeActionGuard = {
   startedAt: number
   promise: Promise<RealtimeToolResult>
 }
+type VoiceActivityItem = {
+  id: number
+  text: string
+  state: 'active' | 'done' | 'error'
+}
 
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
 const VOICE_REPLY_KEY = 'helfi_voice_reply_enabled_v1'
@@ -166,7 +171,7 @@ const SPOKEN_REPLY_VOICE_NAME = 'Marin'
 // Do not gate it behind a build command: missing build flags previously restored the retired recorder UI.
 const LIVE_VOICE_ENABLED = true
 const LIVE_VOICE_DISABLED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
-const REALTIME_VOICE_CONNECT_TIMEOUT_MS = 30000
+const REALTIME_VOICE_CONNECT_TIMEOUT_MS = 8000
 const NOT_SAVED_MESSAGE = 'No problem. I have not saved anything.'
 const VOICE_TURN_SILENCE_MS = 750
 const VOICE_TURN_MIN_MS = 650
@@ -231,7 +236,7 @@ function reviewPromptForDraft(nextDraft: VoiceDraft | null) {
     const exercise = nextDraft.exercise
     exactSummary = [
       cleanFavoriteText(exercise.exerciseName || '', 100) || 'exercise',
-      exercise.durationMinutes ? `${exercise.durationMinutes} minutes` : '',
+      exercise.durationMinutes ? `${exercise.estimatedDuration ? 'about ' : ''}${exercise.durationMinutes} minutes` : '',
       exercise.distanceKm ? `${exercise.distanceKm} km` : '',
       exercise.speedKph ? `${exercise.speedKph} km/h` : '',
       exercise.steps ? `${Math.round(exercise.steps).toLocaleString()} steps` : '',
@@ -1153,8 +1158,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [autoSubmitToken, setAutoSubmitToken] = useState(0)
   const [saveSuccessNotice, setSaveSuccessNotice] = useState<SaveSuccessNotice | null>(null)
   const [saveError, setSaveError] = useState('')
+  const [voiceActivity, setVoiceActivity] = useState<VoiceActivityItem[]>([])
   const autoSubmittedRef = useRef(0)
   const conversationTurnSeqRef = useRef(0)
+  const voiceActivitySeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
   const spokenReplyRunRef = useRef(0)
   const spokenReplyAbortRef = useRef<AbortController | null>(null)
@@ -1200,6 +1207,18 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const setContinuousVoiceSession = useCallback((value: boolean) => {
     voiceSessionActiveRef.current = value
     setVoiceSessionActive(value)
+  }, [])
+
+  const addVoiceActivity = useCallback((text: string, state: VoiceActivityItem['state'] = 'active') => {
+    const safeText = cleanFavoriteText(text, 180)
+    if (!safeText) return
+    setVoiceActivity((current) => {
+      const last = current[current.length - 1]
+      if (last?.text === safeText && last.state === state) return current
+      voiceActivitySeqRef.current += 1
+      const settled = current.map((item) => item.state === 'active' ? { ...item, state: 'done' as const } : item)
+      return [...settled, { id: voiceActivitySeqRef.current, text: safeText, state }].slice(-5)
+    })
   }, [])
 
   const resumeVoiceSessionListening = useCallback((delayMs = 450) => {
@@ -1562,6 +1581,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const openVoiceAssistant = useCallback(async (input?: OpenVoiceAssistantInput) => {
     Vibration.vibrate()
     DeviceEventEmitter.emit(VOICE_ASSISTANT_OPENING_EVENT)
+    setVoiceActivity([])
+    addVoiceActivity('Opening Talk to Helfi')
     setDraft(null)
     setConversationTurns([])
     setPendingFollowUpDraft(null)
@@ -1593,7 +1614,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       return
     }
     setVoicePaidAccessGranted(true)
-  }, [ensureVoicePaidAccess, loadConversationMemory, setContinuousVoiceSession, setVoiceReplyPreference])
+  }, [addVoiceActivity, ensureVoicePaidAccess, loadConversationMemory, setContinuousVoiceSession, setVoiceReplyPreference])
 
   useEffect(() => {
     if (!open || !voicePaidAccessGranted || !session?.token || !voiceRecordingSupported) return
@@ -1869,6 +1890,16 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         draftRequestAbortRef.current = saveAbortController
       }
       const saveSignal = options?.signal || saveAbortController?.signal
+      const saveDestination = targetDraft.action === 'exercise'
+        ? 'exercise log'
+        : targetDraft.action.startsWith('food_')
+        ? 'food diary'
+        : targetDraft.action === 'water'
+        ? 'water intake'
+        : targetDraft.action === 'mood'
+        ? 'mood history'
+        : 'health record'
+      addVoiceActivity(`Saving to your ${saveDestination}`)
       setConfirming(true)
       setSaveError('')
       try {
@@ -2008,6 +2039,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             ? 'Added to your water intake.'
             : String(data?.result?.message || 'Your entry has been saved.'),
         })
+        addVoiceActivity(`Saved to your ${saveDestination}`, 'done')
         setDraft(null)
         setPendingFollowUpDraft(null)
         setReviewCorrectionActive(false)
@@ -2018,6 +2050,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       } catch (error: any) {
         if (saveSignal?.aborted || error?.name === 'AbortError') return null
         const message = error?.message || 'Please check your internet connection and try again.'
+        addVoiceActivity('Save failed — ready to retry', 'error')
         setSaveError(message)
         Alert.alert('Could not save', message)
         return null
@@ -2028,7 +2061,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setConfirming(false)
       }
     },
-    [closePanel, session?.token],
+    [addVoiceActivity, closePanel, session?.token],
   )
 
   const sendDraftRequest = useCallback(
@@ -2085,6 +2118,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       const requestSignal = options?.signal || draftRequestAbortController?.signal
 
       setBusy(true)
+      addVoiceActivity('Understanding your request')
       if (!draftIsReviewOrHandoff) setDraft(null)
       setChargedCredits(null)
       try {
@@ -2153,6 +2187,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         }
         setTranscript(String(data?.transcript || typedTranscript || '').trim())
         const nextDraft = data?.draft || null
+        if (nextDraft?.canConfirm) {
+          addVoiceActivity('Review ready — waiting for your answer', 'done')
+        } else if (nextDraft) {
+          addVoiceActivity('Response ready', 'done')
+        }
         if (nextDraft?.action === 'exercise') {
           setLaunchContext({ section: 'exercise', title: 'Exercise', date: nextDraft.localDate })
         } else if (nextDraft?.action === 'water') {
@@ -2213,6 +2252,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           return { ok: false, message: 'Live voice has stopped.' }
         }
         const message = error?.message || 'Helfi could not process that request.'
+        addVoiceActivity('Request failed — ready to retry', 'error')
         if (options?.continuousVoice && /no speech|nothing heard/i.test(String(message))) {
           resumeVoiceSessionListening(600)
         } else {
@@ -2226,7 +2266,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setBusy(false)
       }
     },
-    [appendConversationTurns, draft, launchContext, makeConversationTurn, pendingFollowUpDraft, requestConversationHistory, requestVoiceReply, resumeVoiceSessionListening, saveDraft, session?.token, transcript, voiceReply],
+    [addVoiceActivity, appendConversationTurns, draft, launchContext, makeConversationTurn, pendingFollowUpDraft, requestConversationHistory, requestVoiceReply, resumeVoiceSessionListening, saveDraft, session?.token, transcript, voiceReply],
   )
 
   useEffect(() => {
@@ -2365,6 +2405,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [stopRecording])
 
   const startVoiceSession = useCallback(async () => {
+    addVoiceActivity('Starting microphone and speaker')
     if (!LIVE_VOICE_ENABLED) {
       setRealtimeVoiceAvailable(false)
       setRealtimeVoiceStatus('failed')
@@ -2417,6 +2458,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setContinuousVoiceSession(false)
       setRealtimeVoiceStatus('failed')
       setRealtimeVoiceError('Live voice could not connect quickly enough. Please try again after it is rebuilt.')
+      addVoiceActivity('Connection timed out — tap Try again', 'error')
       void Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
         playsInSilentModeIOS: true,
@@ -2435,18 +2477,33 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         token: session.token,
         signal: abortController.signal,
         callbacks: {
+          onConnectStage: (stage) => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+            const message = stage === 'microphone-ready'
+              ? 'Microphone ready — connecting securely'
+              : stage === 'local-offer-ready'
+              ? 'Contacting Helfi voice'
+              : stage === 'server-answer-received'
+              ? 'Voice service answered'
+              : stage === 'remote-answer-applied'
+              ? 'Voice connection ready'
+              : ''
+            if (message) addVoiceActivity(message, stage === 'remote-answer-applied' ? 'done' : 'active')
+          },
           onStatus: (status) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (status === 'live' || status === 'connected') {
               clearRealtimeConnectTimeout()
               realtimeVoiceConnectedRef.current = true
               setRealtimeVoiceStatus('live')
+              addVoiceActivity('Connected — listening', 'done')
               return
             }
             if (status === 'speaking') {
               clearRealtimeConnectTimeout()
               realtimeVoiceConnectedRef.current = true
               setRealtimeVoiceStatus('speaking')
+              addVoiceActivity('Helfi is speaking')
               return
             }
             if (status === 'closed' || status === 'disconnected') {
@@ -2456,6 +2513,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               setRealtimeVoiceStatus(status === 'disconnected' ? 'failed' : 'closed')
               if (status === 'disconnected') {
                 setRealtimeVoiceError('The voice connection was interrupted. Check your internet or Bluetooth audio, then tap Try again.')
+                addVoiceActivity('Connection interrupted — ready to retry', 'error')
               }
               return
             }
@@ -2465,6 +2523,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               setContinuousVoiceSession(false)
               setRealtimeVoiceStatus('failed')
               setRealtimeVoiceError('Voice audio was interrupted. Check your internet, speaker, or Bluetooth connection, then tap Try again.')
+              addVoiceActivity('Audio interrupted — ready to retry', 'error')
               return
             }
             if (realtimeVoiceConnectedRef.current) {
@@ -2480,6 +2539,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             pendingReviewAnswerRef.current = false
             setRealtimeVoiceError('')
             setTranscript(text)
+            addVoiceActivity(`Heard: “${cleanFavoriteText(text, 80)}”`, 'done')
             appendConversationTurns([makeConversationTurn('user', text)])
           },
           onAssistantText: (text) => {
@@ -2508,6 +2568,18 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             const request = cleanFavoriteText(args.request || '', 2000)
             if (!request) return { ok: false, message: 'No app action was requested.' }
             const action = cleanFavoriteText(args.action || '', 40)
+            const actionLabel = action === 'exercise'
+              ? 'exercise entry'
+              : action.startsWith('food_')
+              ? 'food entry'
+              : action === 'water'
+              ? 'water entry'
+              : action === 'mood'
+              ? 'mood entry'
+              : action === 'journal'
+              ? 'journal entry'
+              : 'app action'
+            addVoiceActivity(`Preparing ${actionLabel}`)
             if (action === 'delete_conversation' || /\bdelete (?:this |the )?(?:chat|conversation)\b/i.test(request)) {
               pendingVoiceDeleteRef.current = true
               clearConversationData()
@@ -2579,7 +2651,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       const reason = cleanFavoriteText(error?.message || '', 260)
       setRealtimeVoiceError(reason || 'Live voice could not start. Check your internet, microphone, speaker, or Bluetooth connection, then tap Try again.')
     }
-  }, [appendConversationTurns, checkingRealtimeVoice, clearConversationData, clearRealtimeConnectTimeout, clearReviewSilenceTimer, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
+  }, [addVoiceActivity, appendConversationTurns, checkingRealtimeVoice, clearConversationData, clearRealtimeConnectTimeout, clearReviewSilenceTimer, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
 
   useEffect(() => {
     if (!LIVE_VOICE_ENABLED || !open || !voicePaidAccessGranted || realtimeVoiceAvailable !== true || voiceSessionActiveRef.current) return
@@ -2596,9 +2668,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [microphoneMuted])
 
   const retryRealtimeVoice = useCallback(() => {
+    addVoiceActivity('Retrying voice connection')
     realtimeAutoStartRef.current = true
     void startVoiceSession()
-  }, [startVoiceSession])
+  }, [addVoiceActivity, startVoiceSession])
 
   const endVoiceSession = useCallback(() => {
     spokenReplyRunRef.current += 1
@@ -2633,6 +2706,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [draft, saveDraft])
 
   const rejectDraft = useCallback(() => {
+    addVoiceActivity('Draft discarded — nothing saved', 'done')
     spokenReplyRunRef.current += 1
     spokenReplyAbortRef.current?.abort()
     spokenReplyAbortRef.current = null
@@ -2658,7 +2732,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setBusy(false)
     setConfirming(false)
     setOpen(false)
-  }, [clearVoiceTurnTimers, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+  }, [addVoiceActivity, clearVoiceTurnTimers, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
 	  const openAppTarget = useCallback(() => {
 	    const path = draft?.appTarget?.path
@@ -2812,6 +2886,27 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                           : 'Ready'}
                       </Text>
                       {realtimeVoiceError ? <Text style={styles.voiceCallError}>{realtimeVoiceError}</Text> : null}
+                      {voiceActivity.length > 0 ? (
+                        <View style={styles.voiceActivityCard} accessibilityLabel="Live Helfi activity">
+                          <Text style={styles.voiceActivityTitle}>Live activity</Text>
+                          {voiceActivity.map((item) => (
+                            <View key={item.id} style={styles.voiceActivityRow}>
+                              {item.state === 'active' ? (
+                                <ActivityIndicator size="small" color="#226B2C" />
+                              ) : (
+                                <Feather
+                                  name={item.state === 'error' ? 'alert-circle' : 'check-circle'}
+                                  size={16}
+                                  color={item.state === 'error' ? '#B42318' : '#226B2C'}
+                                />
+                              )}
+                              <Text style={[styles.voiceActivityText, item.state === 'error' && styles.voiceActivityErrorText]}>
+                                {item.text}
+                              </Text>
+                            </View>
+                          ))}
+                        </View>
+                      ) : null}
                     </View>
                     {!voiceSessionActive && realtimeVoiceStatus === 'failed' ? (
                       <Pressable
@@ -2823,6 +2918,20 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                         <Feather name="refresh-cw" size={20} color="#12351A" />
                         <Text style={styles.voiceControlText}>Try again</Text>
                       </Pressable>
+                    ) : null}
+                    {voiceSessionActive && draft?.canConfirm ? (
+                      <View style={styles.voiceReviewFallback}>
+                        <Text style={styles.voiceReviewFallbackTitle}>Ready to save</Text>
+                        <Text style={styles.voiceReviewFallbackSummary} numberOfLines={2}>{draft.summary}</Text>
+                        <View style={styles.voiceReviewFallbackButtons}>
+                          <Pressable accessibilityRole="button" accessibilityLabel="Don't save" onPress={rejectDraft} style={styles.voiceReviewDiscardButton}>
+                            <Text style={styles.voiceReviewDiscardText}>Don't save</Text>
+                          </Pressable>
+                          <Pressable accessibilityRole="button" accessibilityLabel="Save this" onPress={() => void confirmDraft()} disabled={confirming} style={[styles.voiceReviewSaveButton, confirming && styles.confirmDisabled]}>
+                            {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.voiceReviewSaveText}>Save this</Text>}
+                          </Pressable>
+                        </View>
+                      </View>
                     ) : null}
                     <View style={[styles.voiceControls, { paddingBottom: Math.max(insets.bottom + 8, 20) }]}>
                       <Pressable accessibilityRole="button" accessibilityLabel="Camera" onPress={openContextVision} style={styles.voiceControlItem}>
@@ -3527,6 +3636,39 @@ const styles = StyleSheet.create({
   voiceBarLargeTall: { height: 52, opacity: 0.95 },
   voiceCallTitle: { color: theme.colors.text, fontSize: 24, fontWeight: '700', textAlign: 'center' },
   voiceCallError: { marginTop: 10, maxWidth: 320, color: '#B42318', fontSize: 14, fontWeight: '700', lineHeight: 20, textAlign: 'center' },
+  voiceActivityCard: {
+    width: '100%',
+    maxWidth: 390,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CFE8D4',
+    backgroundColor: '#F5FBF6',
+    paddingHorizontal: 14,
+    paddingVertical: 12,
+    gap: 8,
+  },
+  voiceActivityTitle: { color: '#12351A', fontSize: 13, fontWeight: '800' },
+  voiceActivityRow: { minHeight: 20, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  voiceActivityText: { flex: 1, color: '#355B3D', fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  voiceActivityErrorText: { color: '#B42318' },
+  voiceReviewFallback: {
+    width: '100%',
+    maxWidth: 390,
+    marginBottom: 12,
+    borderRadius: 14,
+    borderWidth: 1,
+    borderColor: '#CFE8D4',
+    backgroundColor: '#FFFFFF',
+    padding: 12,
+    gap: 7,
+  },
+  voiceReviewFallbackTitle: { color: '#12351A', fontSize: 14, fontWeight: '800' },
+  voiceReviewFallbackSummary: { color: '#476451', fontSize: 13, fontWeight: '700', lineHeight: 18 },
+  voiceReviewFallbackButtons: { flexDirection: 'row', gap: 10 },
+  voiceReviewDiscardButton: { flex: 1, minHeight: 42, borderRadius: 21, backgroundColor: '#F2F4F2', alignItems: 'center', justifyContent: 'center' },
+  voiceReviewDiscardText: { color: '#B42318', fontSize: 14, fontWeight: '800' },
+  voiceReviewSaveButton: { flex: 1, minHeight: 42, borderRadius: 21, backgroundColor: '#16803A', alignItems: 'center', justifyContent: 'center' },
+  voiceReviewSaveText: { color: '#FFFFFF', fontSize: 14, fontWeight: '800' },
   voiceControls: { width: '100%', maxWidth: 380, paddingHorizontal: 22, flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
   voiceControlItem: { width: 82, alignItems: 'center', justifyContent: 'flex-start', gap: 7 },
   voiceControlCircle: { width: 66, height: 66, borderRadius: 33, backgroundColor: '#F1F4F2', alignItems: 'center', justifyContent: 'center' },

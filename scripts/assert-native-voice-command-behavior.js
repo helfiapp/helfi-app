@@ -10,17 +10,20 @@ const routePath = path.join(root, 'app/api/native/voice-assistant/route.ts')
 const realtimeRoutePath = path.join(root, 'app/api/native/voice-assistant/realtime/route.ts')
 const voiceAssistantPath = path.join(root, 'native/src/voice/VoiceAssistant.tsx')
 const realtimeClientPath = path.join(root, 'native/src/voice/realtimeVoice.ts')
+const voiceDurationPath = path.join(root, 'lib/exercise/voice-duration.ts')
 
 let source = fs.readFileSync(routePath, 'utf8')
 const realtimeSource = fs.existsSync(realtimeRoutePath) ? fs.readFileSync(realtimeRoutePath, 'utf8') : ''
 const voiceAssistantSource = fs.existsSync(voiceAssistantPath) ? fs.readFileSync(voiceAssistantPath, 'utf8') : ''
 const realtimeClientSource = fs.existsSync(realtimeClientPath) ? fs.readFileSync(realtimeClientPath, 'utf8') : ''
+let voiceDurationSource = fs.readFileSync(voiceDurationPath, 'utf8')
+voiceDurationSource = voiceDurationSource.replace(/^export\s+/gm, '')
 source = source
   .split('\n')
   .filter((line) => !line.trim().startsWith('import '))
   .join('\n')
   .replace(/^export\s+/gm, '')
-source = `function resolveHelfiTtsVoice() { return 'marin' }\n${source}`
+source = `function resolveHelfiTtsVoice() { return 'marin' }\n${voiceDurationSource}\n${source}`
 
 const appended = `
 async function __runNativeVoiceCommandBehaviorAssertions() {
@@ -57,7 +60,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
   assert(__realtimeRouteSource.includes("|| 'gpt-realtime-2.1'"), 'Realtime voice must default to the current documented OpenAI realtime model.')
   assert(__realtimeRouteSource.includes("reasoning: {") && __realtimeRouteSource.includes("effort: 'low'"), 'Realtime voice must use low reasoning effort for faster natural turn-taking.')
-  assert(__realtimeRouteSource.includes("type: 'semantic_vad'") && __realtimeRouteSource.includes("eagerness: 'low'") && __realtimeRouteSource.includes('interrupt_response: true'), 'Realtime voice turn-taking must use low-eagerness semantic VAD with natural interruption support.')
+  assert(__realtimeRouteSource.includes("type: 'semantic_vad'") && __realtimeRouteSource.includes("eagerness: 'high'") && __realtimeRouteSource.includes('interrupt_response: true'), 'Realtime voice turn-taking must use fast semantic VAD with natural interruption support.')
   assert(__realtimeRouteSource.includes("noise_reduction: {") && __realtimeRouteSource.includes("type: 'near_field'") && __realtimeRouteSource.includes('Avoid clipped, robotic, or repetitive phrasing'), 'Realtime voice must reduce close-microphone noise and explicitly request warm, natural speech.')
   assert(__realtimeRouteSource.includes('Do not read the full ingredient list, nutrient breakdown, macros, or cooking steps unless the user asks'), 'Realtime meal suggestions must offer details instead of reading every ingredient and nutrient aloud.')
   assert(__realtimeRouteSource.includes('HELFI_VOICE_REALTIME_ENABLED') && __realtimeRouteSource.includes('live_voice_paused'), 'Realtime voice backend must stay behind an explicit server-side enable flag.')
@@ -79,6 +82,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__realtimeClientSource.includes('payload?.delta') && __realtimeClientSource.includes('part?.transcript'), 'Native realtime client must read assistant text from delta and content part events.')
     assert(__realtimeClientSource.includes('const remoteStreams') && __realtimeClientSource.includes('remoteStreams.push(stream)'), 'Native realtime client must keep the assistant audio stream alive until the session ends.')
     assert(__realtimeClientSource.includes('enableRemoteAudioTrack') && __realtimeClientSource.includes('track._setVolume?.(1)') && __realtimeClientSource.includes('stream.getAudioTracks?.().forEach(enableRemoteAudioTrack)'), 'Native realtime client must explicitly enable returned assistant audio tracks.')
+    assert(__realtimeClientSource.includes('setSpeakerphoneOn?.(true)') && __realtimeClientSource.includes('setForceSpeakerphoneOn?.(true)'), 'Native realtime client must explicitly route voice to the loudspeaker at full phone volume.')
     assert(__realtimeClientSource.includes("emitStatus('speaking')"), 'Native realtime client must expose when Helfi is speaking.')
     assert(__realtimeClientSource.includes('signal?: AbortSignal') && __realtimeClientSource.includes("params.signal?.addEventListener?.('abort', onAbort)"), 'Native realtime client must support aborting an in-progress live voice connection.')
     assert(__realtimeClientSource.includes('function stopMediaStreamTracks') && __realtimeClientSource.includes('if (params.signal?.aborted)') && __realtimeClientSource.includes('stopMediaStreamTracks(localStream)'), 'Native realtime client must stop microphone tracks if the user cancels while startup is still opening audio.')
@@ -697,7 +701,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(resolveRequestedActionDate('Запиши го ова во дневникот вчера', localDate) === '2026-07-01', 'Macedonian yesterday must target the previous local calendar day.')
   assert(resolveRequestedActionDate('记录昨天的步数', localDate) === '2026-07-01', 'Chinese yesterday must target the previous local calendar day.')
   assert(/return localDate as an exact YYYY-MM-DD/.test(__routeSource), 'AI action understanding must return an exact requested date for every save action.')
-  assert(/Never estimate or infer duration, distance, steps, calories, speed, or intensity/.test(__routeSource), 'Exercise understanding must explicitly prohibit invented values.')
+  assert(/If duration is omitted but steps or calories were stated/.test(__routeSource), 'Exercise understanding must allow a clearly labelled duration estimate from exact spoken steps or calories.')
 
   const missingDurationReview = await normalizeDraft(
     { action: 'exercise', exercise: { name: 'walking', durationMinutes: 25, distanceKm: 2, steps: 2500, caloriesKcal: 100, intensity: 'moderate' } },
@@ -709,21 +713,28 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     [],
   )
   assert(missingDurationReview?.draft?.action === 'exercise', 'Exercise values with missing duration must stay in the exercise flow.')
-  assert(missingDurationReview?.draft?.canConfirm === false, 'Exercise with required duration missing must ask a follow-up instead of showing a saveable review.')
-  assert(missingDurationReview?.draft?.localDate === '2026-07-01', 'Exercise clarification must preserve the resolved yesterday date.')
-  assert(missingDurationReview?.draft?.exercise?.steps === 2500, 'Exercise clarification must preserve the exact stated steps.')
-  assert(missingDurationReview?.draft?.exercise?.caloriesKcal === 100, 'Exercise clarification must preserve the exact stated calories.')
-  assert(missingDurationReview?.draft?.exercise?.distanceKm == null, 'Exercise clarification must not invent distance.')
-  assert(missingDurationReview?.draft?.exercise?.durationMinutes == null, 'Exercise clarification must not invent duration.')
-  assert(missingDurationReview?.draft?.exercise?.intensity == null, 'Exercise clarification must discard model-invented intensity.')
-  const completedDurationCommand = followUpTranscript(missingDurationReview?.draft, '25 minutes')
-  const completedDurationExercise = tryParseExerciseRequest(completedDurationCommand || '', dashboardContext)
-  assert(/2500 steps/.test(completedDurationCommand || ''), 'Exercise duration follow-up must preserve the original steps.')
-  assert(/100 calories/.test(completedDurationCommand || ''), 'Exercise duration follow-up must preserve the original calories.')
-  assert(completedDurationExercise?.exercise?.durationMinutes === 25, 'Exercise duration follow-up must apply the spoken duration.')
-  assert(completedDurationExercise?.exercise?.steps === 2500, 'Exercise duration follow-up must keep exact steps in the corrected draft.')
-  assert(completedDurationExercise?.exercise?.caloriesKcal === 100, 'Exercise duration follow-up must keep exact calories in the corrected draft.')
-  assert(completedDurationExercise?.exercise?.distanceKm == null, 'Exercise duration follow-up must still avoid invented distance.')
+  assert(missingDurationReview?.draft?.canConfirm === true, 'Exercise with exact steps or calories must become reviewable without forcing a duration follow-up.')
+  assert(missingDurationReview?.draft?.localDate === '2026-07-01', 'Estimated exercise review must preserve the resolved yesterday date.')
+  assert(missingDurationReview?.draft?.exercise?.steps === 2500, 'Estimated exercise review must preserve the exact stated steps.')
+  assert(missingDurationReview?.draft?.exercise?.caloriesKcal === 100, 'Estimated exercise review must preserve the exact stated calories.')
+  assert(missingDurationReview?.draft?.exercise?.distanceKm == null, 'Estimated exercise review must not invent distance.')
+  assert(missingDurationReview?.draft?.exercise?.durationMinutes === 25, 'Walking steps must produce the expected rough duration at 100 steps per minute.')
+  assert(missingDurationReview?.draft?.exercise?.estimatedDuration === true, 'A duration derived from steps must be labelled as estimated.')
+  assert(/about 25 minutes/.test(missingDurationReview?.draft?.summary || ''), 'The visible exercise summary must say the calculated duration is approximate.')
+  assert(missingDurationReview?.draft?.exercise?.intensity == null, 'Estimated exercise review must discard model-invented intensity.')
+  const caloriesOnlyReview = await normalizeDraft(
+    { action: 'exercise', exercise: { name: 'walking', caloriesKcal: 240 } },
+    'Log a walk where I burned 240 calories',
+    localDate,
+    'test-user',
+    {},
+    0,
+    [],
+  )
+  assert(caloriesOnlyReview?.draft?.canConfirm === true, 'Walking calories alone must produce a review without asking for duration.')
+  assert(caloriesOnlyReview?.draft?.exercise?.durationMinutes === 48, 'Walking calories alone must calculate the expected rough duration.')
+  assert(caloriesOnlyReview?.draft?.exercise?.caloriesKcal === 240, 'Calories-only exercise review must preserve the exact stated calories.')
+  assert(caloriesOnlyReview?.draft?.exercise?.estimatedDuration === true, 'Calories-only duration must be labelled as estimated.')
 
   const exerciseContextDraft = tryParseExerciseRequest('walking for 30 minutes', exerciseContext)
   assert(exerciseContextDraft?.action === 'exercise', 'Exercise context must handle natural exercise wording without log/add.')

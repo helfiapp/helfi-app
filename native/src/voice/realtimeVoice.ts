@@ -5,6 +5,7 @@ const LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'
 
 type RealtimeCallbacks = {
   onStatus?: (status: string) => void
+  onConnectStage?: (stage: string) => void
   onTranscript?: (text: string) => void
   onAssistantText?: (text: string) => void
   onActionRequest?: (args: { request?: string; action?: string; needsReview?: boolean }) => Promise<unknown> | unknown
@@ -190,6 +191,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const connectStartedAt = Date.now()
   const reportConnectStage = (stage: string, detail = '') => {
     console.info(`[voice realtime timing] ${stage} ${Date.now() - connectStartedAt}ms${detail ? ` ${detail}` : ''}`)
+    callbacks.onConnectStage?.(stage)
   }
   callbacks.onStatus?.('connecting')
   reportConnectStage('start')
@@ -197,6 +199,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
   try {
     inCallManager?.start?.({ media: 'audio', auto: true })
     inCallManager?.setForceSpeakerphoneOn?.(true)
+    inCallManager?.setSpeakerphoneOn?.(true)
   } catch {
     // WebRTC can still connect if the optional speaker routing helper is unavailable.
   }
@@ -326,6 +329,12 @@ export async function startHelfiRealtimeVoiceSession(params: {
 
   dataChannel = pc.createDataChannel('oai-events')
   dataChannel.onopen = () => {
+    try {
+      inCallManager?.setForceSpeakerphoneOn?.(true)
+      inCallManager?.setSpeakerphoneOn?.(true)
+    } catch {
+      // Keep voice live if the optional route helper cannot be reapplied.
+    }
     emitStatus('live')
   }
   dataChannel.onmessage = (event: any) => {
@@ -429,6 +438,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     }
     try {
       inCallManager?.setForceSpeakerphoneOn?.(true)
+      inCallManager?.setSpeakerphoneOn?.(true)
     } catch {
       // Keep the connected stream active even if route selection fails.
     }

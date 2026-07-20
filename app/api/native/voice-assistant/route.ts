@@ -17,6 +17,7 @@ import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
 import { createNativeVoicePromptHandoff } from '@/lib/native-voice-prompt-handoff'
 import { findHealthIntakeReviewMatch, type HealthIntakeReviewMatch } from '@/lib/health-intake-review-match'
 import { resolveHelfiTtsVoice } from '@/lib/openai-voice-config'
+import { estimateVoiceExerciseDurationMinutes } from '@/lib/exercise/voice-duration'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -2338,18 +2339,27 @@ function buildReviewedExerciseCorrection(draft: any, answerRaw: string, localDat
   const hasFieldCorrection = Boolean(durationMinutes || steps || caloriesKcal || distanceKm || speedKph)
   if ((!hasFieldCorrection && !dateChanged) || (!hasReviewedCorrectionWords(raw) && !dateChanged)) return null
 
+  const nextSteps = steps ? Math.round(steps) : draft.exercise.steps
+  const nextCaloriesKcal = caloriesKcal ? Math.round(caloriesKcal) : draft.exercise.caloriesKcal
+  const estimatedCorrectionDuration = !durationMinutes && (steps || caloriesKcal)
+    ? estimateVoiceExerciseDurationMinutes({
+        exerciseName: draft.exercise.exerciseName,
+        steps: nextSteps,
+        caloriesKcal: nextCaloriesKcal,
+      })
+    : null
   const exercise = {
     ...draft.exercise,
-    ...(durationMinutes ? { durationMinutes } : {}),
-    ...(steps ? { steps: Math.round(steps) } : {}),
-    ...(caloriesKcal ? { caloriesKcal: Math.round(caloriesKcal) } : {}),
+    ...(durationMinutes ? { durationMinutes } : estimatedCorrectionDuration ? { durationMinutes: estimatedCorrectionDuration } : {}),
+    ...(steps ? { steps: nextSteps } : {}),
+    ...(caloriesKcal ? { caloriesKcal: nextCaloriesKcal } : {}),
     ...(distanceKm ? { distanceKm: Math.round(distanceKm * 10) / 10 } : {}),
     ...(speedKph ? { speedKph: Math.round(speedKph * 10) / 10 } : {}),
-    estimatedDuration: false,
+    estimatedDuration: durationMinutes ? false : estimatedCorrectionDuration ? true : Boolean(draft.exercise.estimatedDuration),
   }
   const details = [
     cleanText(exercise.exerciseName, 80) || 'exercise',
-    exercise.durationMinutes ? `${exercise.durationMinutes} minutes` : '',
+    exercise.durationMinutes ? `${exercise.estimatedDuration ? 'about ' : ''}${exercise.durationMinutes} minutes` : '',
     exercise.distanceKm ? `${exercise.distanceKm} km` : '',
     exercise.speedKph ? `${exercise.speedKph} km/h` : '',
     exercise.steps ? `${Math.round(exercise.steps).toLocaleString()} steps` : '',
@@ -3878,7 +3888,7 @@ async function runJsonCommandModel(
         'For clear low-risk logging requests, prepare a saveable draft for the user to review before saving. If important details are missing, ask one short follow-up question instead of guessing.',
         'For any logging or save action, if the user states a date, return localDate as an exact YYYY-MM-DD calculated from Today. Otherwise use null. Preserve relative dates such as yesterday in every language. For food_copy_previous, yesterday describes the source meal and localDate must remain null.',
         'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, health_intake_items, recipe, symptom_note, health_question, app_handoff, confirm_draft, reject_draft, unknown.',
-        'For exercise, preserve only values the user actually stated. Never estimate or infer duration, distance, steps, calories, speed, or intensity. Use null for anything omitted. If a required value is missing, ask one short clarification before creating a review.',
+        'For exercise, preserve every value the user stated. Never invent distance, steps, calories, speed, or intensity. If duration is omitted but steps or calories were stated, the app will calculate and clearly label an approximate duration; do not ask for duration in that case. Otherwise use null for omitted values and ask one short clarification only when needed.',
         'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
         'For journal, make a short title and journal content. If the user says health journal, include journalType "health"; if they say mood journal, include journalType "mood".',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
@@ -4977,13 +4987,17 @@ async function normalizeDraft(
     }
     const distanceKm = Number(exercise?.distanceKm)
     const durationRaw = Number(exercise?.durationMinutes)
-    const durationMinutes = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.min(24 * 60, Math.round(durationRaw)) : null
+    const explicitDurationMinutes = Number.isFinite(durationRaw) && durationRaw > 0 ? Math.min(24 * 60, Math.round(durationRaw)) : null
     const speedRaw = Number(exercise?.speedKph)
     const speedKph = Number.isFinite(speedRaw) && speedRaw > 0 ? Math.round(speedRaw * 10) / 10 : null
     const safeDistance = Number.isFinite(distanceKm) && distanceKm > 0 ? Math.round(distanceKm * 10) / 10 : null
-    const estimatedDuration = false
     const steps = clampNumber(exercise?.steps, 0, 500000, 0)
     const caloriesKcal = clampNumber(exercise?.caloriesKcal, 0, 10000, 0)
+    const estimatedDurationMinutes = explicitDurationMinutes
+      ? null
+      : estimateVoiceExerciseDurationMinutes({ exerciseName: type.name, steps, caloriesKcal })
+    const durationMinutes = explicitDurationMinutes || estimatedDurationMinutes
+    const estimatedDuration = Boolean(!explicitDurationMinutes && estimatedDurationMinutes)
     if (!durationMinutes) {
       const provided = [
         steps ? `${Math.round(steps).toLocaleString()} steps` : '',
@@ -5015,7 +5029,7 @@ async function normalizeDraft(
       }
     }
     const detailParts = [
-      `${type.name}, ${durationMinutes} minutes`,
+      `${type.name}, ${estimatedDuration ? 'about ' : ''}${durationMinutes} minutes`,
       safeDistance ? `${safeDistance} km` : '',
       speedKph ? `${speedKph} km/h` : '',
       steps ? `${Math.round(steps).toLocaleString()} steps` : '',
@@ -5029,7 +5043,7 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary,
-        confirmationMessage: `I can log ${summary}. Review it, then tap Confirm to save.`,
+        confirmationMessage: `I can log ${summary}. Would you like me to save that for you?`,
         canConfirm: true,
         autoSave: false,
         exercise: {
@@ -5880,6 +5894,61 @@ export async function POST(request: NextRequest) {
         voiceReply: Boolean(audio),
       })
     }
+
+    let fastRealtimeDraft: VoiceDraft | null = null
+    if (realtimeActionHint?.action === 'exercise') {
+      const parsedExercise = tryParseExerciseRequest(transcript, launchContext)
+      if (parsedExercise) {
+        fastRealtimeDraft = (await normalizeDraft(parsedExercise, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory)).draft
+      }
+    } else if (realtimeActionHint?.action === 'water') {
+      fastRealtimeDraft = tryParseWaterRequest(transcript, localDate, launchContext)
+    } else if (realtimeActionHint?.action === 'journal') {
+      const parsedJournal = tryParseJournalRequest(transcript, launchContext)
+      if (parsedJournal) {
+        fastRealtimeDraft = (await normalizeDraft(parsedJournal, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory)).draft
+      }
+    } else if (realtimeActionHint?.action === 'mood') {
+      const parsedMood = tryParseMoodRequest(transcript, launchContext)
+      if (parsedMood) {
+        fastRealtimeDraft = (await normalizeDraft(parsedMood, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory)).draft
+      }
+    } else if (realtimeActionHint?.action === 'food_build_meal' || realtimeActionHint?.action === 'food_draft') {
+      const parsedFood = tryParseIngredientMealRequest(transcript) || tryParseDirectFoodRequest(transcript, launchContext)
+      if (parsedFood) fastRealtimeDraft = await buildVoiceMealDraft(parsedFood, transcript, localDate)
+    }
+
+    if (fastRealtimeDraft) {
+      const chargeCents = Math.max(SIMPLE_MIN_CREDITS, transcriptionCostCents)
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+      const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+      if (!charged) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+      await logAiUsageEvent({
+        feature: 'voice-assistant:fast-realtime-action',
+        userId: user.id,
+        endpoint: '/api/native/voice-assistant',
+        model: 'fast-realtime-action-router',
+        promptTokens: 0,
+        completionTokens: 0,
+        costCents: chargeCents,
+        success: true,
+        detail: `charged ${chargeCents} credits; prepared deterministic realtime ${fastRealtimeDraft.action} draft without a second AI request`,
+      })
+      return NextResponse.json({
+        success: true,
+        transcript,
+        draft: await sealReviewDraft(user.id, fastRealtimeDraft),
+        audio: null,
+        chargedCredits: chargeCents,
+        voiceReply: false,
+      })
+    }
+
     if (aiIntentClient && aiConsentGranted) {
       try {
         const command = await runJsonCommandModel(aiIntentClient, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft, realtimeActionHint)

@@ -26,9 +26,10 @@ function hasAiConsentFlag(value: unknown) {
 }
 
 async function resolveUser(request: NextRequest) {
-  const session = await getServerSession(authOptions).catch(() => null)
+  const hasNativeToken = Boolean(request.headers.get('x-native-token') || request.headers.get('authorization'))
+  const nativeUserId = hasNativeToken ? await getUserIdFromNativeAuth(request) : null
+  const session = nativeUserId ? null : await getServerSession(authOptions).catch(() => null)
   const sessionUserId = typeof session?.user?.id === 'string' ? session.user.id : null
-  const nativeUserId = sessionUserId ? null : await getUserIdFromNativeAuth(request)
   const userId = sessionUserId || nativeUserId
   if (!userId) return null
   return prisma.user.findUnique({
@@ -170,7 +171,7 @@ function realtimeSessionConfig() {
         },
         turn_detection: {
           type: 'semantic_vad',
-          eagerness: 'low',
+          eagerness: 'high',
           create_response: true,
           interrupt_response: true,
         },

@@ -8,6 +8,7 @@ import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { calculateExerciseCalories } from '@/lib/exercise/calories'
 import { getHealthProfileForUser } from '@/lib/exercise/health-profile'
 import { inferMetAndLabel } from '@/lib/exercise/met'
+import { estimateVoiceExerciseDurationMinutes } from '@/lib/exercise/voice-duration'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { ensureHealthJournalSchema } from '@/lib/health-journal-db'
 import { deleteNotificationsByType, deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
@@ -300,17 +301,22 @@ async function saveExercise(userId: string, draft: any) {
   const exercise = draft?.exercise || {}
   const exerciseTypeId = Number(exercise.exerciseTypeId)
   const durationRaw = Number(exercise.durationMinutes)
-  if (!Number.isFinite(durationRaw) || durationRaw < 1) {
+  const estimatedFallbackDuration = estimateVoiceExerciseDurationMinutes({
+    exerciseName: exercise.exerciseName,
+    steps: exercise.steps,
+    caloriesKcal: exercise.caloriesKcal ?? exercise.calories,
+  })
+  if ((!Number.isFinite(durationRaw) || durationRaw < 1) && !estimatedFallbackDuration) {
     throw new Error('Exercise duration is missing. Continue talking and tell Helfi how long it took before saving.')
   }
-  const durationMinutes = Math.min(24 * 60, Math.round(durationRaw))
+  const durationMinutes = Number.isFinite(durationRaw) && durationRaw >= 1
+    ? Math.min(24 * 60, Math.round(durationRaw))
+    : estimatedFallbackDuration as number
   const distanceRaw = Number(exercise.distanceKm)
   const speedRaw = Number(exercise.speedKph)
   const speedKph = Number.isFinite(speedRaw) && speedRaw > 0 ? Math.round(speedRaw * 10) / 10 : null
   const distanceKm = Number.isFinite(distanceRaw) && distanceRaw > 0
     ? distanceRaw
-    : speedKph
-    ? Math.round((speedKph * durationMinutes / 60) * 1000) / 1000
     : null
   const steps = cleanPositiveNumber(exercise.steps, 500000)
   const spokenCalories = cleanPositiveNumber(exercise.caloriesKcal ?? exercise.calories, 10000)
@@ -355,7 +361,7 @@ async function saveExercise(userId: string, draft: any) {
       rawPayload: {
         source: 'native_voice_assistant',
         transcript: cleanText(draft?.transcript, 500),
-        estimatedDuration: Boolean(exercise.estimatedDuration),
+        estimatedDuration: Boolean(exercise.estimatedDuration || (!Number.isFinite(durationRaw) && estimatedFallbackDuration)),
         steps,
         speedKph,
         spokenCaloriesKcal: spokenCalories,

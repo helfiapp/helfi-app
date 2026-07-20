@@ -194,11 +194,24 @@ if (
 if (
   !/react-native-incall-manager/.test(realtime) ||
   !/setForceSpeakerphoneOn\?\.\(true\)/.test(realtime) ||
+  !/setSpeakerphoneOn\?\.\(true\)/.test(realtime) ||
   !/setMicrophoneMuted/.test(realtime) ||
   /result\.needsReview[\s\S]{0,300}setContinuousVoiceSession\(false\)[\s\S]{0,300}stopRealtimeVoiceSession/.test(native) ||
   !/Would you like me to save that for you\?/.test(native)
 ) {
   failures.push('Realtime voice must use the main speaker, support mute, read the exact review question, and stay live to hear the answer.')
+}
+
+if (!/const REALTIME_VOICE_CONNECT_TIMEOUT_MS = 8000/.test(native) || !/eagerness:\s*'high'/.test(fs.readFileSync(path.join(root, 'app/api/native/voice-assistant/realtime/route.ts'), 'utf8'))) {
+  failures.push('Talk to Helfi must use fast turn-taking and stop a slow connection attempt within eight seconds.')
+}
+
+if (!/Live activity/.test(native) || !/Understanding your request/.test(native) || !/Review ready — waiting for your answer/.test(native) || !/Saving to your/.test(native)) {
+  failures.push('Talk to Helfi must visibly show its live connection, preparation, review, and save activity instead of appearing frozen.')
+}
+
+if (!/voiceSessionActive && draft\?\.canConfirm/.test(native) || !/styles\.voiceReviewFallback/.test(native)) {
+  failures.push("Save this and Don't save must remain visible as accessible fallback controls while voice review is listening for an answer.")
 }
 
 if (
