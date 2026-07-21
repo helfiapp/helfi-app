@@ -171,7 +171,8 @@ const SPOKEN_REPLY_VOICE_NAME = 'Marin'
 // Do not gate it behind a build command: missing build flags previously restored the retired recorder UI.
 const LIVE_VOICE_ENABLED = true
 const LIVE_VOICE_DISABLED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
-const REALTIME_VOICE_CONNECT_TIMEOUT_MS = 8000
+const REALTIME_VOICE_SERVER_TIMEOUT_MS = 12000
+const REALTIME_VOICE_MEDIA_TIMEOUT_MS = 4000
 const NOT_SAVED_MESSAGE = 'No problem. I have not saved anything.'
 const VOICE_TURN_SILENCE_MS = 750
 const VOICE_TURN_MIN_MS = 650
@@ -2447,8 +2448,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     realtimeVoiceAbortRef.current = abortController
     setRealtimeVoiceStatus('connecting')
     setRealtimeVoiceError('')
-    clearRealtimeConnectTimeout()
-    realtimeVoiceConnectTimeoutRef.current = setTimeout(() => {
+    const failSlowConnection = () => {
       if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
       realtimeVoiceRunRef.current += 1
       realtimeVoiceConnectedRef.current = false
@@ -2457,7 +2457,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       realtimeVoiceStopRef.current = null
       setContinuousVoiceSession(false)
       setRealtimeVoiceStatus('failed')
-      setRealtimeVoiceError('Live voice could not connect quickly enough. Please try again after it is rebuilt.')
+      setRealtimeVoiceError('Live voice took too long to connect. Please tap Try again.')
       addVoiceActivity('Connection timed out — tap Try again', 'error')
       void Audio.setAudioModeAsync({
         allowsRecordingIOS: false,
@@ -2465,7 +2465,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         staysActiveInBackground: false,
         shouldDuckAndroid: true,
       }).catch(() => {})
-    }, REALTIME_VOICE_CONNECT_TIMEOUT_MS)
+    }
+    const armRealtimeConnectTimeout = (delayMs: number) => {
+      clearRealtimeConnectTimeout()
+      realtimeVoiceConnectTimeoutRef.current = setTimeout(failSlowConnection, delayMs)
+    }
+    armRealtimeConnectTimeout(REALTIME_VOICE_SERVER_TIMEOUT_MS)
     try {
       await Audio.setAudioModeAsync({
         allowsRecordingIOS: true,
@@ -2479,12 +2484,15 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         callbacks: {
           onConnectStage: (stage) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+            if (stage === 'server-answer-received') {
+              armRealtimeConnectTimeout(REALTIME_VOICE_MEDIA_TIMEOUT_MS)
+            }
             const message = stage === 'microphone-ready'
               ? 'Microphone ready — connecting securely'
               : stage === 'local-offer-ready'
               ? 'Contacting Helfi voice'
               : stage === 'server-answer-received'
-              ? 'Voice service answered'
+              ? 'Voice service answered — finishing connection'
               : stage === 'remote-answer-applied'
               ? 'Voice connection ready'
               : ''

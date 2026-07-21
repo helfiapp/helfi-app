@@ -202,8 +202,17 @@ if (
   failures.push('Realtime voice must use the main speaker, support mute, read the exact review question, and stay live to hear the answer.')
 }
 
-if (!/const REALTIME_VOICE_CONNECT_TIMEOUT_MS = 8000/.test(native) || !/eagerness:\s*'high'/.test(fs.readFileSync(path.join(root, 'app/api/native/voice-assistant/realtime/route.ts'), 'utf8'))) {
-  failures.push('Talk to Helfi must use fast turn-taking and stop a slow connection attempt within eight seconds.')
+const realtimeRoute = fs.readFileSync(path.join(root, 'app/api/native/voice-assistant/realtime/route.ts'), 'utf8')
+if (
+  !/const REALTIME_VOICE_SERVER_TIMEOUT_MS = 12000/.test(native) ||
+  !/const REALTIME_VOICE_MEDIA_TIMEOUT_MS = 4000/.test(native) ||
+  !/armRealtimeConnectTimeout\(REALTIME_VOICE_MEDIA_TIMEOUT_MS\)/.test(native) ||
+  !/eagerness:\s*'high'/.test(realtimeRoute) ||
+  !/preferredRegion = 'syd1'/.test(realtimeRoute) ||
+  !/Promise\.all\(\[resolveUser\(request\), request\.text\(\)\]\)/.test(realtimeRoute) ||
+  !/typeof waitUntil === 'function'/.test(realtimeRoute)
+) {
+  failures.push('Talk to Helfi must use fast turn-taking, the Australian voice region, parallel request preparation, background logging, and stage-aware connection limits.')
 }
 
 if (!/Live activity/.test(native) || !/Understanding your request/.test(native) || !/Review ready — waiting for your answer/.test(native) || !/Saving to your/.test(native)) {

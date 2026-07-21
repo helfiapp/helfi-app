@@ -76,23 +76,44 @@ export async function assertAiUsageAllowed(context: AiGuardContext = {}) {
   const runId = typeof context.runId === 'string' && context.runId.trim() ? context.runId.trim() : null
   const feature = typeof context.feature === 'string' && context.feature.trim() ? context.feature.trim() : 'unknown'
 
-  await throwIfCircuitOpen(
-    GLOBAL_SCOPE,
-    'AI calls are temporarily paused across Helfi while we stop an unusual usage spike.'
-  )
+  await Promise.all([
+    throwIfCircuitOpen(
+      GLOBAL_SCOPE,
+      'AI calls are temporarily paused across Helfi while we stop an unusual usage spike.'
+    ),
+    userId
+      ? throwIfCircuitOpen(
+          `openai-user:${userId}`,
+          'AI calls are temporarily paused for this account while we stop an unusual usage spike.'
+        )
+      : Promise.resolve(),
+  ])
 
-  if (userId) {
-    await throwIfCircuitOpen(
-      `openai-user:${userId}`,
-      'AI calls are temporarily paused for this account while we stop an unusual usage spike.'
-    )
-  }
-
-  const globalRecent = await prisma.aIUsageEvent.aggregate({
-    where: { createdAt: { gte: recentFrom }, success: true },
-    _count: { _all: true },
-    _sum: { costCents: true },
-  })
+  const [globalRecent, userRecent, runRecent] = await Promise.all([
+    prisma.aIUsageEvent.aggregate({
+      where: { createdAt: { gte: recentFrom }, success: true },
+      _count: { _all: true },
+      _sum: { costCents: true },
+    }),
+    userId
+      ? prisma.aIUsageEvent.aggregate({
+          where: {
+            userId,
+            createdAt: { gte: recentFrom },
+            success: true,
+          },
+          _count: { _all: true },
+          _sum: { costCents: true },
+        })
+      : Promise.resolve(null),
+    runId
+      ? prisma.aIUsageEvent.aggregate({
+          where: { runId, success: true },
+          _count: { _all: true },
+          _sum: { costCents: true },
+        })
+      : Promise.resolve(null),
+  ])
 
   const globalCalls = Number(globalRecent._count?._all || 0)
   const globalCostCents = Number(globalRecent._sum?.costCents || 0)
@@ -113,17 +134,7 @@ export async function assertAiUsageAllowed(context: AiGuardContext = {}) {
     })
   }
 
-  if (userId) {
-    const userRecent = await prisma.aIUsageEvent.aggregate({
-      where: {
-        userId,
-        createdAt: { gte: recentFrom },
-        success: true,
-      },
-      _count: { _all: true },
-      _sum: { costCents: true },
-    })
-
+  if (userId && userRecent) {
     const userCalls = Number(userRecent._count?._all || 0)
     const userCostCents = Number(userRecent._sum?.costCents || 0)
     if (userCalls >= AI_GUARD_USER_MAX_CALLS || userCostCents >= AI_GUARD_USER_MAX_COST_CENTS) {
@@ -144,13 +155,7 @@ export async function assertAiUsageAllowed(context: AiGuardContext = {}) {
     }
   }
 
-  if (runId) {
-    const runRecent = await prisma.aIUsageEvent.aggregate({
-      where: { runId, success: true },
-      _count: { _all: true },
-      _sum: { costCents: true },
-    })
-
+  if (runId && runRecent) {
     const runCalls = Number(runRecent._count?._all || 0)
     const runCostCents = Number(runRecent._sum?.costCents || 0)
     if (runCalls >= AI_GUARD_RUN_MAX_CALLS || runCostCents >= AI_GUARD_RUN_MAX_COST_CENTS) {

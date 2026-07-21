@@ -11,6 +11,7 @@ import { exactChatGptVoiceAvailable, resolveHelfiRealtimeVoice } from '@/lib/ope
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+export const preferredRegion = 'syd1'
 
 const REALTIME_MODEL = process.env.HELFI_VOICE_REALTIME_MODEL || 'gpt-realtime-2.1'
 const REALTIME_VOICE = resolveHelfiRealtimeVoice()
@@ -28,9 +29,10 @@ function hasAiConsentFlag(value: unknown) {
 async function resolveUser(request: NextRequest) {
   const hasNativeToken = Boolean(request.headers.get('x-native-token') || request.headers.get('authorization'))
   const nativeUserId = hasNativeToken ? await getUserIdFromNativeAuth(request) : null
+  if (nativeUserId) return { id: nativeUserId }
   const session = nativeUserId ? null : await getServerSession(authOptions).catch(() => null)
   const sessionUserId = typeof session?.user?.id === 'string' ? session.user.id : null
-  const userId = sessionUserId || nativeUserId
+  const userId = sessionUserId
   if (!userId) return null
   return prisma.user.findUnique({
     where: { id: userId },
@@ -229,7 +231,7 @@ export async function POST(request: NextRequest) {
   const abortRealtimeRequest = () => abortController.abort()
   request.signal?.addEventListener?.('abort', abortRealtimeRequest)
   try {
-    const user = await resolveUser(request)
+    const [user, sdp] = await Promise.all([resolveUser(request), request.text()])
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
     if (!REALTIME_VOICE_ENABLED) {
@@ -244,23 +246,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI sharing consent is required before live voice can start.' }, { status: 403 })
     }
 
-    const sdp = await request.text()
     if (!sdp.trim()) return NextResponse.json({ error: 'Missing realtime session offer' }, { status: 400 })
 
     const chargeCents = Math.max(1, REALTIME_SESSION_MIN_CREDITS)
-    const walletAndGuardStartedAt = Date.now()
-    const [wallet] = await Promise.all([
-      new CreditManager(user.id).getWalletStatus(),
-      assertAiUsageAllowed({
-        feature: 'voice-assistant:realtime-session',
-        userId: user.id,
-      }),
-    ])
-    const walletAndGuardMs = Date.now() - walletAndGuardStartedAt
-    if (!hasPaidVoiceWalletAccess(wallet)) return voicePaidAccessResponse()
-    if (wallet.totalAvailableCents < chargeCents) {
-      return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: wallet.totalAvailableCents }, { status: 402 })
-    }
+    const guardStartedAt = Date.now()
+    await assertAiUsageAllowed({
+      feature: 'voice-assistant:realtime-session',
+      userId: user.id,
+    })
+    const guardMs = Date.now() - guardStartedAt
 
     const form = new FormData()
     form.set('sdp', sdp)
@@ -292,11 +286,15 @@ export async function POST(request: NextRequest) {
     const charged = await new CreditManager(user.id).chargeCents(chargeCents)
     const chargeMs = Date.now() - chargeStartedAt
     if (!charged) {
-      return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: wallet.totalAvailableCents }, { status: 402 })
+      const wallet = await new CreditManager(user.id).getWalletStatus().catch(() => null)
+      return NextResponse.json({
+        error: 'Insufficient credits',
+        estimatedCost: chargeCents,
+        availableCredits: Number(wallet?.totalAvailableCents || 0),
+      }, { status: 402 })
     }
 
-    const usageLogStartedAt = Date.now()
-    await logAiUsageEvent({
+    const usageLog = logAiUsageEvent({
       feature: 'voice-assistant:realtime-session',
       userId: user.id,
       endpoint: '/api/native/voice-assistant/realtime',
@@ -307,7 +305,12 @@ export async function POST(request: NextRequest) {
       success: true,
       detail: `charged ${chargeCents} credits; created realtime voice session`,
     })
-    const usageLogMs = Date.now() - usageLogStartedAt
+    const waitUntil = (globalThis as any).waitUntil
+    if (typeof waitUntil === 'function') {
+      waitUntil(usageLog)
+    } else {
+      void usageLog
+    }
 
     const totalMs = Date.now() - requestStartedAt
 
@@ -317,7 +320,7 @@ export async function POST(request: NextRequest) {
         'content-type': 'application/sdp',
         'x-helfi-charged-credits': String(chargeCents),
         'x-helfi-realtime-model': REALTIME_MODEL,
-        'server-timing': `wallet_guard;dur=${walletAndGuardMs}, openai;dur=${openAiMs}, charge;dur=${chargeMs}, usage_log;dur=${usageLogMs}, total;dur=${totalMs}`,
+        'server-timing': `guard;dur=${guardMs}, openai;dur=${openAiMs}, charge;dur=${chargeMs}, total;dur=${totalMs}`,
       },
     })
   } catch (error) {
