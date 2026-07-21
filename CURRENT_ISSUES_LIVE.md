@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE + local iPhone build
+- Date/time: 21 July 2026, 3:35 PM AEST
+- What changed: Replaced the native iOS icon with a clean 1024×1024 render from the approved vector master on the 6 TB drive, renamed the native app label to “Helfi AI” so it is distinguishable from the old web shortcut, and installed local build 31 on the connected iPhone without opening it. No TestFlight or App Store review action was taken.
+- Where to see it (page/link): The iPhone App Library/search result named “Helfi AI”; source commit `c4e42e84` is also deployed at https://helfi.ai.
+- What to quickly test: Search the iPhone for “Helfi AI” and confirm the new sharp green-leaf icon is visible separately from the old “Helfi” web shortcut.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 21 July 2026, 1:14 PM AEST
 - What changed: Repaired the build 29 Talk to Helfi connection failure seen on the physical iPhone. The mistaken 8-second whole-connection cutoff was removed, the live voice connection was moved to Sydney, and unnecessary waiting before the voice service answers was removed. Build 30 was created from the deployed source and installed directly on the physical iPhone; it was not uploaded to TestFlight.
