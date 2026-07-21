@@ -1,5 +1,15 @@
 # Talk to Helfi Status - 2026-07-03
 
+## 2026-07-21 Physical iPhone Connection Repair
+
+- Physical iPhone build 29 failed while opening live voice because the app stopped the entire connection after 8 seconds. The owner supplied a screenshot showing the failure at `Contacting Helfi voice`.
+- The live voice route now runs in Sydney, prepares authentication and the request together, and returns the voice answer before non-essential usage logging finishes.
+- The native app now uses separate server-answer and final media-connection checks instead of one short cutoff that can cancel a valid connection while it is still finishing.
+- The deployed live service is READY and its public voice readiness check passes.
+- Native build 30 was built from commit `0c3dd4fe` and installed directly on the connected physical iPhone. It was not uploaded to TestFlight.
+- Automated voice guards, native and root typechecks, page locks, the full web build, the iOS archive, and export all passed.
+- The owner still needs to perform the direct microphone and loudspeaker retest on build 30 because iPhone Mirroring prevents a real microphone test from the Mac.
+
 ## 2026-07-07 Talk to HELFI 8 Note
 
 - A local WebRTC realtime voice route and native realtime voice wiring were added.

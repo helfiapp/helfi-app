@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
+- Date/time: 21 July 2026, 1:14 PM AEST
+- What changed: Repaired the build 29 Talk to Helfi connection failure seen on the physical iPhone. The mistaken 8-second whole-connection cutoff was removed, the live voice connection was moved to Sydney, and unnecessary waiting before the voice service answers was removed. Build 30 was created from the deployed source and installed directly on the physical iPhone; it was not uploaded to TestFlight.
+- Where to see it (page/link): https://helfi.ai and the locally installed native iPhone build 30.
+- What to quickly test: Open Talk to Helfi on the iPhone and confirm it connects promptly instead of showing the build 29 timeout. Then speak a short request and confirm the microphone and loudspeaker work. This physical voice retest is still required before the repair is considered fully accepted.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE
 - Date/time: 20 July 2026, 10:39 PM AEST
 - What changed: Repaired the owner-reported Talk to Helfi build 28 problems. Voice output now routes to the iPhone loudspeaker, slow connections fail clearly after 8 seconds, common health actions prepare faster, and the app shows live progress while it listens, understands, prepares, and saves. Walks with exact steps or calories now estimate the missing duration instead of repeatedly asking for it, while preserving the exact stated values.
 - Where to see it (page/link): https://helfi.ai and the native iPhone Talk to Helfi flow after build 29 is installed.
