@@ -1066,7 +1066,7 @@ Critical note:
 - `public/favicon.ico`
 - `public/logo.svg`
 - Icon references in `app/layout.tsx` (manifest + icons array)
-- Current cache-busted web/PWA copies use the `-v20260721` suffix, with the approved native-quality 1024px Apple touch icon at `public/apple-touch-icon-v20260722b-1024.png`. They must remain byte-for-byte renders of the protected outputs above; the changed filenames prevent iOS from reusing the old blurry icon.
+- Current cache-busted web/PWA copies use the `-v20260721` suffix, with the approved native-quality 1024px Apple touch icon at `public/apple-touch-icon-v20260722c-1024.png`. They must remain byte-for-byte renders of the protected outputs above; the changed filenames prevent iOS from reusing the old blurry icon.
 
 **Guard rails:**
 - Do **not** downscale from raster PNGs; regenerate from `FAVICON-01.svg` to avoid blur.  
@@ -2293,7 +2293,7 @@ If this ever breaks, restore by:
 - `public/manifest.json` → `start_url` must stay `/auth/signin`, `scope` `/`, icons point to local leaf assets.
 - `middleware.ts` → when a valid session exists and the path is `/auth/signin` **or `/`**, it must redirect server-side to `/pwa-entry` before rendering the login/marketing page.
 - `app/pwa-entry/page.tsx` → sole server-side router that sends signed-in users to onboarding (if incomplete) or their last page/dashboard; no extra client-side redirects here.
-- `app/layout.tsx` → manifest link + icons point at the current local cache-busted copies: `/manifest-v20260722b.json`, `/icons/app-192-v20260721.png`, `/icons/app-512-v20260721.png`, and `/apple-touch-icon-v20260722b-1024.png`. The 1024px Apple asset must also keep the explicit `apple-touch-icon-precomposed` link so iOS uses the approved artwork without softening it. The active manifest keeps the `/pwa-entry` route and `/` scope; its `?icon=v20260722b` identity marker exists only to stop iOS reusing an older installed bitmap and must not be removed without a physical iPhone retest.
+- `app/layout.tsx` → manifest link + icons point at the current local cache-busted copies: `/manifest-v20260722c.json`, `/icons/app-192-v20260721.png`, `/icons/app-512-v20260721.png`, and `/apple-touch-icon-v20260722c-1024.png`. The Apple icon must be offered only through the explicit `apple-touch-icon-precomposed` link; do not add a competing ordinary Apple touch icon because Safari may choose it and soften the artwork. The active manifest keeps the `/pwa-entry` route and `/` scope; its `?icon=v20260722c` identity marker exists only to stop iOS reusing an older installed bitmap and must not be removed without a physical iPhone retest.
 - `public/icons/app-192.png`, `public/icons/app-512.png`, `public/apple-touch-icon.png` → green leaf icons; do not swap to remote/CDN.
 
 **Do not change any of the above without explicit user approval.** This combo is the only proven fix after multiple failed attempts.
