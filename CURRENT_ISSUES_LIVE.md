@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 21 July 2026, 3:49 PM AEST
+- What changed: Updated the web app's main logo, browser icon, Apple Home Screen icon, PWA icons, and admin icons from the approved high-resolution vector masters on the 6 TB drive. No pages, routing, service worker, or app behaviour changed.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai
+- What to quickly test: Refresh the website and confirm the sharp green-leaf branding appears. Existing iPhone web shortcuts may need to be removed and added to the Home Screen again because iOS can keep the old cached icon.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE + local iPhone build
 - Date/time: 21 July 2026, 3:35 PM AEST
 - What changed: Replaced the native iOS icon with a clean 1024×1024 render from the approved vector master on the 6 TB drive, renamed the native app label to “Helfi AI” so it is distinguishable from the old web shortcut, and installed local build 31 on the connected iPhone without opening it. No TestFlight or App Store review action was taken.
