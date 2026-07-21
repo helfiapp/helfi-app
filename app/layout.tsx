@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     'practitioner directory',
   ],
   applicationName: 'Helfi',
-  manifest: '/manifest-v20260722.json',
+  manifest: '/manifest-v20260722b.json',
   robots: {
     index: true,
     follow: true,
@@ -95,7 +95,7 @@ export const metadata: Metadata = {
       },
     ],
     apple: [
-      { url: '/apple-touch-icon-v20260722-1024.png', sizes: '1024x1024' },
+      { url: '/apple-touch-icon-v20260722b-1024.png', sizes: '1024x1024' },
     ],
   },
 }
@@ -123,7 +123,7 @@ export default function RootLayout({
         <link
           rel="apple-touch-icon-precomposed"
           sizes="1024x1024"
-          href="/apple-touch-icon-v20260722-1024.png"
+          href="/apple-touch-icon-v20260722b-1024.png"
         />
         <link
           rel="stylesheet"
