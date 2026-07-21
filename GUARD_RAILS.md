@@ -1066,6 +1066,7 @@ Critical note:
 - `public/favicon.ico`
 - `public/logo.svg`
 - Icon references in `app/layout.tsx` (manifest + icons array)
+- Current cache-busted web/PWA copies use the `-v20260721` suffix. They must remain byte-for-byte renders of the protected outputs above; the changed filenames prevent iOS from reusing the old blurry icon.
 
 **Guard rails:**
 - Do **not** downscale from raster PNGs; regenerate from `FAVICON-01.svg` to avoid blur.  
@@ -2292,7 +2293,7 @@ If this ever breaks, restore by:
 - `public/manifest.json` → `start_url` must stay `/auth/signin`, `scope` `/`, icons point to local leaf assets.
 - `middleware.ts` → when a valid session exists and the path is `/auth/signin` **or `/`**, it must redirect server-side to `/pwa-entry` before rendering the login/marketing page.
 - `app/pwa-entry/page.tsx` → sole server-side router that sends signed-in users to onboarding (if incomplete) or their last page/dashboard; no extra client-side redirects here.
-- `app/layout.tsx` → manifest link + icons pointing at `/icons/app-192.png`, `/icons/app-512.png`, and `/apple-touch-icon.png`.
+- `app/layout.tsx` → manifest link + icons point at the current local cache-busted copies: `/manifest-v20260721.json`, `/icons/app-192-v20260721.png`, `/icons/app-512-v20260721.png`, and `/apple-touch-icon-v20260721.png`.
 - `public/icons/app-192.png`, `public/icons/app-512.png`, `public/apple-touch-icon.png` → green leaf icons; do not swap to remote/CDN.
 
 **Do not change any of the above without explicit user approval.** This combo is the only proven fix after multiple failed attempts.
@@ -2306,7 +2307,7 @@ If this ever breaks, restore by:
 1) Set `start_url` back to `/auth/signin` in `public/manifest.json` (keep `scope: "/"`).  
 2) Ensure `middleware.ts` redirects signed-in hits on `/auth/signin` or `/` to `/pwa-entry`.  
 3) Keep `/pwa-entry` server-only routing; don’t add client-side effects.  
-4) Keep `app/layout.tsx` manifest/icons pointing to local leaf assets; ensure the three icon files are present and correct.
+4) Keep `app/layout.tsx` manifest/icons pointing to local leaf assets; ensure the active versioned icon files are present and exact copies of the approved vector renders.
 
 ### Why locked
 - Changing start_url/scope or removing the middleware redirect reintroduces login flashes, wrong landing pages, or the grey URL bar.  

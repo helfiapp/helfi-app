@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     'practitioner directory',
   ],
   applicationName: 'Helfi',
-  manifest: '/manifest.json',
+  manifest: '/manifest-v20260721.json',
   robots: {
     index: true,
     follow: true,
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     description: defaultDescription,
     images: [
       {
-        url: absoluteUrl('/icons/app-1024.png'),
+        url: absoluteUrl('/icons/app-1024-v20260721.png'),
         width: 1024,
         height: 1024,
         alt: 'Helfi app',
@@ -74,28 +74,28 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: defaultTitle,
     description: defaultDescription,
-    images: [absoluteUrl('/icons/app-1024.png')],
+    images: [absoluteUrl('/icons/app-1024-v20260721.png')],
   },
   icons: {
     icon: [
       {
-        url: '/favicon.ico',
+        url: '/favicon-v20260721.ico',
         sizes: '32x32',
         type: 'image/x-icon',
       },
       {
-        url: '/icons/app-192.png',
+        url: '/icons/app-192-v20260721.png',
         sizes: '192x192',
         type: 'image/png',
       },
       {
-        url: '/icons/app-512.png',
+        url: '/icons/app-512-v20260721.png',
         sizes: '512x512',
         type: 'image/png',
       },
     ],
     apple: [
-      { url: '/apple-touch-icon.png', sizes: '180x180' },
+      { url: '/apple-touch-icon-v20260721.png', sizes: '180x180' },
     ],
   },
 }
