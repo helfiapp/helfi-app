@@ -15,7 +15,7 @@
       "ios": {
         "supportsTablet": true,
         "bundleIdentifier": "ai.helfi.app",
-        "buildNumber": "31",
+        "buildNumber": "32",
         "associatedDomains": [
           "applinks:helfi.ai",
           "applinks:www.helfi.ai"
@@ -52,7 +52,8 @@
       "expo-notifications",
       "expo-apple-authentication",
       "react-native-iap",
-      "expo-web-browser"
+      "expo-web-browser",
+      "./plugins/with-transparent-ios-app-icon"
     ]
   }
 }
