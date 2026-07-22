@@ -1070,7 +1070,7 @@ Critical note:
 
 **Guard rails:**
 - Resize each required size directly from the approved 1600x1600 PNG with no effects, padding, gradients, colour changes, or redesign, and ensure every final PNG is fully opaque.
-- Native iOS packaging must keep `native/plugins/with-transparent-ios-app-icon.js`; despite its historical filename, it copies the complete generated iOS icon set after Expo processing so Expo cannot substitute it. The set must include both 120px (`@2x`) and 180px (`@3x`) Home Screen icons; shipping only 120px makes the icon fuzzy on `@3x` iPhones.
+- Native iOS packaging must keep `native/plugins/with-transparent-ios-app-icon.js`; despite its historical filename, it copies both the complete legacy PNG icon set and `native/assets/HelfiFlat.icon` after Expo processing so Expo cannot substitute either. The Apple Icon Composer package is the active iOS 26 icon, uses the exact opaque 1024px resize as one full-canvas layer, and must keep specular off, translucency off, shadow at 0%, and blur at 0%. The legacy set remains the fallback for older iOS and must include both 120px (`@2x`) and 180px (`@3x`) Home Screen icons.
 - Dark backgrounds (e.g., sidebar) must use `helfi-01-06.*`; light backgrounds use `helfi-01-01.*`.  
 - If branding changes are needed, update **all** outputs above in one sweep (PWA icons, apple-touch, favicon, logo.svg, manifests) and confirm with the user.  
 - Service worker notifications should continue using the packaged icon (`/icons/app-192.png`) unless the user approves a different path.

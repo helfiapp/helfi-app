@@ -10,6 +10,7 @@
 		13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = 13B07FB51A68108700A75B9A /* Images.xcassets */; };
 		29FE91E71C3D76E0A74AA543 /* PrivacyInfo.xcprivacy in Resources */ = {isa = PBXBuildFile; fileRef = 035C6036B823F8CC177615D8 /* PrivacyInfo.xcprivacy */; };
 		3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */ = {isa = PBXBuildFile; fileRef = AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */; };
+		C0DE00000000000000000004 /* HelfiFlat.icon in Resources */ = {isa = PBXBuildFile; fileRef = C0DE00000000000000000003 /* HelfiFlat.icon */; };
 		A32A7B1F3175E3C2A022D242 /* ExpoModulesProvider.swift in Sources */ = {isa = PBXBuildFile; fileRef = 3DDC4D80D0DE9E63FA588AED /* ExpoModulesProvider.swift */; };
 		B24158480EA125AB14539D14 /* libPods-Helfi.a in Frameworks */ = {isa = PBXBuildFile; fileRef = C4AEAA412C18F5A76DDC75BD /* libPods-Helfi.a */; };
 		BB2F792D24A3F905000567C9 /* Expo.plist in Resources */ = {isa = PBXBuildFile; fileRef = BB2F792C24A3F905000567C9 /* Expo.plist */; };
@@ -27,6 +28,7 @@
 		AA286B85B6C04FC6940260E9 /* SplashScreen.storyboard */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = file.storyboard; name = SplashScreen.storyboard; path = Helfi/SplashScreen.storyboard; sourceTree = "<group>"; };
 		BB2F792C24A3F905000567C9 /* Expo.plist */ = {isa = PBXFileReference; fileEncoding = 4; lastKnownFileType = text.plist.xml; path = Expo.plist; sourceTree = "<group>"; };
 		C0DE00000000000000000001 /* VoiceAssistantIntents.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = VoiceAssistantIntents.swift; path = Helfi/VoiceIntents/VoiceAssistantIntents.swift; sourceTree = "<group>"; };
+		C0DE00000000000000000003 /* HelfiFlat.icon */ = {isa = PBXFileReference; lastKnownFileType = folder.iconcomposer.icon; name = HelfiFlat.icon; path = Helfi/HelfiFlat.icon; sourceTree = "<group>"; };
 		C4AEAA412C18F5A76DDC75BD /* libPods-Helfi.a */ = {isa = PBXFileReference; explicitFileType = archive.ar; includeInIndex = 0; path = "libPods-Helfi.a"; sourceTree = BUILT_PRODUCTS_DIR; };
 		ED297162215061F000B7C4FE /* JavaScriptCore.framework */ = {isa = PBXFileReference; lastKnownFileType = wrapper.framework; name = JavaScriptCore.framework; path = System/Library/Frameworks/JavaScriptCore.framework; sourceTree = SDKROOT; };
 		F11748412D0307B40044C1D9 /* AppDelegate.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; name = AppDelegate.swift; path = Helfi/AppDelegate.swift; sourceTree = "<group>"; };
@@ -61,6 +63,7 @@
 			children = (
 				F11748412D0307B40044C1D9 /* AppDelegate.swift */,
 				C0DE00000000000000000001 /* VoiceAssistantIntents.swift */,
+				C0DE00000000000000000003 /* HelfiFlat.icon */,
 				F11748442D0722820044C1D9 /* Helfi-Bridging-Header.h */,
 				BB2F792B24A3F905000567C9 /* Supporting */,
 				13B07FB51A68108700A75B9A /* Images.xcassets */,
@@ -202,6 +205,7 @@
 			buildActionMask = 2147483647;
 			files = (
 				BB2F792D24A3F905000567C9 /* Expo.plist in Resources */,
+				C0DE00000000000000000004 /* HelfiFlat.icon in Resources */,
 				13B07FBF1A68108700A75B9A /* Images.xcassets in Resources */,
 				3E461D99554A48A4959DE609 /* SplashScreen.storyboard in Resources */,
 				29FE91E71C3D76E0A74AA543 /* PrivacyInfo.xcprivacy in Resources */,
@@ -354,11 +358,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = F8662676E6B9EA4BECC52E78 /* Pods-Helfi.debug.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = HelfiFlat;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Helfi/Helfi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = Z54KD5Q94J;
 				ENABLE_BITCODE = NO;
 				GCC_PREPROCESSOR_DEFINITIONS = (
@@ -392,11 +396,11 @@
 			isa = XCBuildConfiguration;
 			baseConfigurationReference = 7DC5FE0013D63727523BA591 /* Pods-Helfi.release.xcconfig */;
 			buildSettings = {
-				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
+				ASSETCATALOG_COMPILER_APPICON_NAME = HelfiFlat;
 				CLANG_ENABLE_MODULES = YES;
 				CODE_SIGN_ENTITLEMENTS = Helfi/Helfi.entitlements;
 				CODE_SIGN_STYLE = Automatic;
-				CURRENT_PROJECT_VERSION = 35;
+				CURRENT_PROJECT_VERSION = 36;
 				DEVELOPMENT_TEAM = Z54KD5Q94J;
 				INFOPLIST_FILE = Helfi/Info.plist;
 				IPHONEOS_DEPLOYMENT_TARGET = 15.1;
