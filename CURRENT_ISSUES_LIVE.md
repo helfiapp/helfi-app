@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE + local iPhone build
+- Date/time: 22 July 2026, 1:50 PM AEST
+- What changed: Replaced the normal Helfi web shortcut and native iPhone app icons with sharp renders made only from the approved transparent FAVICON.png master. Removed the old fuzzy white shortcut, installed native build 32 directly on the physical iPhone, and kept Helfi Admin unchanged. No TestFlight or App Store action was taken.
+- Where to see it (page/link): https://helfi.ai, https://www.helfi.ai, and the physical iPhone Home Screen; source commit `b42f793b`.
+- What to quickly test: On the last iPhone Home Screen page, confirm both “Helfi” and “Helfi AI” show the same sharp approved green leaf and open correctly. The transparent areas follow the iPhone's selected icon appearance. Confirm “Helfi Admin” remains unchanged on the previous page.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 22 July 2026, 11:55 AM AEST
 - What changed: Corrected the earlier wrong-source icon. The web and iPhone shortcut icons are now rendered directly from the approved 7092px vectorized favicon master on the 6 TB drive, with a fresh web-app identity so iOS cannot reuse the old inset artwork. No native/TestFlight app was changed.
