@@ -1,9 +1,9 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE
-- Date/time: 22 July 2026, 3:31 AM AEST
-- What changed: Replaced the iPhone web shortcut artwork with the exact approved 1024-pixel native-quality icon, removed the competing older Apple icon link, and gave the web app a fresh identity so iOS cannot reuse the fuzzy cached image. No page behaviour or native app was changed.
-- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; source commit `a06a9262`.
-- What to quickly test: The refreshed “Helfi” shortcut has already been added to the physical iPhone’s last Home Screen page. Tap it and confirm it opens the signed-in Helfi website.
+- Date/time: 22 July 2026, 11:55 AM AEST
+- What changed: Corrected the earlier wrong-source icon. The web and iPhone shortcut icons are now rendered directly from the approved 7092px vectorized favicon master on the 6 TB drive, with a fresh web-app identity so iOS cannot reuse the old inset artwork. No native/TestFlight app was changed.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; source commit `e7c89ee9`.
+- What to quickly test: The wrong shortcut was removed and the corrected flat vector shortcut was installed and opened successfully on the physical iPhone. It is visible on the last Home Screen page.
 
 DEPLOYED:
 - LIVE or STAGING: LIVE
