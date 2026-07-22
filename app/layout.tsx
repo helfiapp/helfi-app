@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     'practitioner directory',
   ],
   applicationName: 'Helfi',
-  manifest: '/manifest-v20260722c.json',
+  manifest: '/manifest-vector-v20260722.json',
   robots: {
     index: true,
     follow: true,
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     description: defaultDescription,
     images: [
       {
-        url: absoluteUrl('/icons/app-1024-v20260721.png'),
+        url: absoluteUrl('/apple-touch-icon-vector-v20260722-1024.png'),
         width: 1024,
         height: 1024,
         alt: 'Helfi app',
@@ -74,7 +74,7 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: defaultTitle,
     description: defaultDescription,
-    images: [absoluteUrl('/icons/app-1024-v20260721.png')],
+    images: [absoluteUrl('/apple-touch-icon-vector-v20260722-1024.png')],
   },
   icons: {
     icon: [
@@ -84,12 +84,12 @@ export const metadata: Metadata = {
         type: 'image/x-icon',
       },
       {
-        url: '/icons/app-192-v20260721.png',
+        url: '/icons/helfi-vector-v20260722-192.png',
         sizes: '192x192',
         type: 'image/png',
       },
       {
-        url: '/icons/app-512-v20260721.png',
+        url: '/icons/helfi-vector-v20260722-512.png',
         sizes: '512x512',
         type: 'image/png',
       },
@@ -120,7 +120,7 @@ export default function RootLayout({
         <link
           rel="apple-touch-icon-precomposed"
           sizes="1024x1024"
-          href="/apple-touch-icon-v20260722c-1024.png"
+          href="/apple-touch-icon-vector-v20260722-1024.png"
         />
         <link
           rel="stylesheet"
