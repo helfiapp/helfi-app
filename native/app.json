@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "Helfi AI",
+    "name": "Helfi",
     "slug": "helfi",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -15,7 +15,7 @@
       "ios": {
         "supportsTablet": true,
         "bundleIdentifier": "ai.helfi.app",
-        "buildNumber": "34",
+        "buildNumber": "35",
         "associatedDomains": [
           "applinks:helfi.ai",
           "applinks:www.helfi.ai"

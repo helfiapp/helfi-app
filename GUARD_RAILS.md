@@ -1066,10 +1066,10 @@ Critical note:
 - `public/favicon.ico`
 - `public/logo.svg`
 - Icon references in `app/layout.tsx` (manifest + icons array)
-- The current normal Helfi web/PWA and native iOS icons come from the owner-approved `FAVICON.svg` at `/Volumes/G-DRIVE 6T/HELFI/LOGOS/VECTORIZED/FAVICON/FAVICON.svg` (matching 7092px PNG: `FAVICON.png`). At the owner's 22 July 2026 correction, the active normal Helfi outputs use the fresh `helfi-approved-vector-v20260722f` filenames and the exact approved leaf as an opaque icon. Keep the approved leaf shape and `#61b147` green. Do not use a black background or the older inset/gradient leaf.
+- The current normal Helfi web/PWA and native iOS icons come only from the owner-approved, non-transparent 1600x1600 PNG at `/Volumes/G-DRIVE 6T/HELFI/LOGOS/VECTORIZED/FAVICON/IOS NON TRANSPARENT.png` (SHA-256 `2ca273024a7a4ce178604960cde3725b5e86ecc0b5a412bb14d43b9a912a1894`). At the owner's 22 July 2026 correction, the active normal web outputs use the fresh `helfi-ios-nontransparent-v20260722g` filenames. Keep the supplied pixels, white background, leaf shape, and green colour unchanged. Do not use a black background, transparency, effects, an online generator, or the older inset/gradient leaf.
 
 **Guard rails:**
-- Generate each required size from the approved vector at full quality, preserving `#61b147`, and ensure every final PNG is fully opaque.
+- Resize each required size directly from the approved 1600x1600 PNG with no effects, padding, gradients, colour changes, or redesign, and ensure every final PNG is fully opaque.
 - Native iOS packaging must keep `native/plugins/with-transparent-ios-app-icon.js`; despite its historical filename, it copies the complete generated iOS icon set after Expo processing so Expo cannot substitute it. The set must include both 120px (`@2x`) and 180px (`@3x`) Home Screen icons; shipping only 120px makes the icon fuzzy on `@3x` iPhones.
 - Dark backgrounds (e.g., sidebar) must use `helfi-01-06.*`; light backgrounds use `helfi-01-01.*`.  
 - If branding changes are needed, update **all** outputs above in one sweep (PWA icons, apple-touch, favicon, logo.svg, manifests) and confirm with the user.  
@@ -2294,7 +2294,7 @@ If this ever breaks, restore by:
 - `public/manifest.json` → `start_url` must stay `/auth/signin`, `scope` `/`, icons point to local leaf assets.
 - `middleware.ts` → when a valid session exists and the path is `/auth/signin` **or `/`**, it must redirect server-side to `/pwa-entry` before rendering the login/marketing page.
 - `app/pwa-entry/page.tsx` → sole server-side router that sends signed-in users to onboarding (if incomplete) or their last page/dashboard; no extra client-side redirects here.
-- `app/layout.tsx` → the normal Helfi shortcut uses `/manifest-helfi-approved-vector-v20260722f.json`, `/icons/helfi-approved-vector-v20260722f-192.png`, `/icons/helfi-approved-vector-v20260722f-512.png`, and the standard `/apple-touch-icon-helfi-approved-vector-v20260722f-180.png` link. Do not use `apple-touch-icon-precomposed`. The active manifest keeps the `/pwa-entry` route and `/` scope; its fresh `?icon=helfi-approved-vector-v20260722f` identity prevents iOS reusing an older installed bitmap and must not be removed without a physical iPhone retest.
+- `app/layout.tsx` → the normal Helfi Web shortcut uses `/manifest-helfi-ios-nontransparent-v20260722g.json`, `/icons/helfi-ios-nontransparent-v20260722g-192.png`, `/icons/helfi-ios-nontransparent-v20260722g-512.png`, and the standard `/apple-touch-icon-helfi-ios-nontransparent-v20260722g-180.png` link. Do not use `apple-touch-icon-precomposed`. The active manifest keeps the `/pwa-entry` route and `/` scope; its fresh `?icon=helfi-ios-nontransparent-v20260722g` identity prevents iOS reusing an older installed bitmap and must not be removed without a physical iPhone retest. The installed web shortcut name is `Helfi Web`; the native iOS app name is `Helfi`.
 - `public/icons/app-192.png`, `public/icons/app-512.png`, `public/apple-touch-icon.png` → green leaf icons; do not swap to remote/CDN.
 
 **Do not change any of the above without explicit user approval.** This combo is the only proven fix after multiple failed attempts.

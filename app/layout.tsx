@@ -42,7 +42,7 @@ export const metadata: Metadata = {
     'practitioner directory',
   ],
   applicationName: 'Helfi',
-  manifest: '/manifest-helfi-approved-vector-v20260722f.json',
+  manifest: '/manifest-helfi-ios-nontransparent-v20260722g.json',
   robots: {
     index: true,
     follow: true,
@@ -63,7 +63,7 @@ export const metadata: Metadata = {
     description: defaultDescription,
     images: [
       {
-        url: absoluteUrl('/icons/helfi-approved-vector-v20260722f-1024.png'),
+        url: absoluteUrl('/icons/helfi-ios-nontransparent-v20260722g-1024.png'),
         width: 1024,
         height: 1024,
         alt: 'Helfi app',
@@ -74,22 +74,22 @@ export const metadata: Metadata = {
     card: 'summary_large_image',
     title: defaultTitle,
     description: defaultDescription,
-    images: [absoluteUrl('/icons/helfi-approved-vector-v20260722f-1024.png')],
+    images: [absoluteUrl('/icons/helfi-ios-nontransparent-v20260722g-1024.png')],
   },
   icons: {
     icon: [
       {
-        url: '/favicon-v20260721.ico',
+        url: '/icons/helfi-ios-nontransparent-v20260722g-32.png',
         sizes: '32x32',
-        type: 'image/x-icon',
+        type: 'image/png',
       },
       {
-        url: '/icons/helfi-approved-vector-v20260722f-192.png',
+        url: '/icons/helfi-ios-nontransparent-v20260722g-192.png',
         sizes: '192x192',
         type: 'image/png',
       },
       {
-        url: '/icons/helfi-approved-vector-v20260722f-512.png',
+        url: '/icons/helfi-ios-nontransparent-v20260722g-512.png',
         sizes: '512x512',
         type: 'image/png',
       },
@@ -115,12 +115,12 @@ export default function RootLayout({
       <head>
         <meta name="apple-mobile-web-app-capable" content="yes" />
         <meta name="apple-mobile-web-app-status-bar-style" content="default" />
-        <meta name="apple-mobile-web-app-title" content="Helfi" />
+        <meta name="apple-mobile-web-app-title" content="Helfi Web" />
         <meta name="mobile-web-app-capable" content="yes" />
         <link
           rel="apple-touch-icon"
           sizes="180x180"
-          href="/apple-touch-icon-helfi-approved-vector-v20260722f-180.png"
+          href="/apple-touch-icon-helfi-ios-nontransparent-v20260722g-180.png"
         />
         <link
           rel="stylesheet"
