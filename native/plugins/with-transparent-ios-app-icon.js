@@ -7,16 +7,21 @@ module.exports = function withTransparentIosAppIcon(config) {
   return withDangerousMod(config, [
     'ios',
     async (modConfig) => {
-      const source = path.join(modConfig.modRequest.projectRoot, 'assets', 'icon.png')
+      const source = path.join(
+        modConfig.modRequest.projectRoot,
+        'assets',
+        'ios-app-icon',
+        'AppIcon.appiconset'
+      )
       const destination = path.join(
         modConfig.modRequest.platformProjectRoot,
         'Helfi',
         'Images.xcassets',
-        'AppIcon.appiconset',
-        'App-Icon-1024x1024@1x.png'
+        'AppIcon.appiconset'
       )
 
-      fs.copyFileSync(source, destination)
+      fs.rmSync(destination, { recursive: true, force: true })
+      fs.cpSync(source, destination, { recursive: true })
       return modConfig
     },
   ])

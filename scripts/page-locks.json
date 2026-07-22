@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-07-22T04:49:12.157Z",
+  "generatedAt": "2026-07-22T05:14:49.085Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -86,7 +86,7 @@
     "app/insights/weekly-report/page.tsx": "633a3d4605a9125932b3537b4f96937c5a74da7a10e201b2441c70687b2a705a",
     "app/insights/weekly-report/print/page.tsx": "c4b4ca940002e31046fd818f639355489830eecdf072262a25e0e1b961d5a918",
     "app/lab-reports/page.tsx": "712c2bfa940852dcf2388196186ee35de14837dc6280b02d53151f87d4f3d5a2",
-    "app/layout.tsx": "580960b2c5f62ce0a16a79c0bb9ead0a2ef9618cb09a313e50fe6b8c541ee7b2",
+    "app/layout.tsx": "2bd98885ca2a69195e48c593c44eaac685efcec9c9ec7692833b6fea60dca88f",
     "app/list-your-practice/layout.tsx": "85399d7b9b4706938e19a81ce7225380828e3556152e73cee56b82336a0709d0",
     "app/list-your-practice/page.tsx": "9245b9a384c1cef5435b03851e77abded274ca4111df78b76d1f202f4a313341",
     "app/list-your-practice/start/page.tsx": "921e2446705e4ccf899ba27a4bdbd9ef6181986b8c50e4b128044c9a8a91c699",
