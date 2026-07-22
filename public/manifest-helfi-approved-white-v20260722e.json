@@ -1,0 +1,27 @@
+{
+  "id": "/pwa-entry?icon=helfi-approved-white-v20260722e",
+  "short_name": "Helfi",
+  "name": "Helfi",
+  "icons": [
+    {
+      "src": "/icons/helfi-approved-white-v20260722e-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "/icons/helfi-approved-white-v20260722e-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    },
+    {
+      "src": "/icons/helfi-approved-white-v20260722e-1024.png",
+      "type": "image/png",
+      "sizes": "1024x1024"
+    }
+  ],
+  "start_url": "/pwa-entry?icon=helfi-approved-white-v20260722e",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#ffffff",
+  "theme_color": "#ffffff"
+}
