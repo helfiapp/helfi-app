@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (safe migration release; final AWS cutover not yet done)
+- Date/time: 25 August 2026, 3:45 PM AEST
+- What changed: Added the shared AWS email and file-storage support while retaining Resend and Vercel Blob as automatic fallbacks. Every current website email path is covered. This release does not switch the live domain or remove either fallback.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; source commit `0facbe4b`, Vercel deployment `dpl_2Q64UVEDGS9vskfAJRiV7euyq44h`.
+- What to quickly test: Normal site loading, sign-in, uploads, and current email flows should behave exactly as before. AWS-specific live email and upload tests will be run only after the Amplify runtime role is attached.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE + local iPhone build
 - Date/time: 22 July 2026, 3:42 PM AEST
 - What changed: Replaced the fuzzy normal Helfi native icon and web shortcut with fully opaque high-resolution renders made directly from the exact approved FAVICON.svg leaf. Native build 34 now includes the complete generated iOS icon set, including the exact 180x180 3x Home Screen image that the fuzzy package was missing. The normal web shortcut uses a fresh icon identity. Helfi Admin was not changed, and nothing was uploaded to TestFlight or App Store review.
