@@ -7,6 +7,7 @@
 - AWS production sending access is approved and sending is enabled.
 - Every current website email sender now routes through `lib/email-client.ts`.
 - The automated coverage check passes for 30 send calls across 18 files.
+- A real send through `lib/email-client.ts` to the internal Helfi mailbox and the external SonicWeb test mailbox was accepted by AWS SES on 25 August 2026. The external message appeared in Apple Mail and the Helfi inbox showed the new unread message.
 - The AWS-hosted app will use its private AWS runtime role; permanent AWS keys must not be stored in app settings.
 - Resend remains the zero-cost fallback until the AWS-hosted app passes the real internal and external tests below.
 
