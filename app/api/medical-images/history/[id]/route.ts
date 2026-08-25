@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
-import { del } from '@vercel/blob'
+import { del, isObjectStorageConfigured } from '@/lib/object-storage'
 
 async function getMedicalImageUser(request: NextRequest) {
   const nativeUserId = await getUserIdFromNativeAuth(request)
@@ -42,7 +42,7 @@ export async function DELETE(
     }
 
     const blobTarget = analysis.imageFile?.cloudinaryId || analysis.imageFile?.secureUrl || null
-    if (blobTarget && process.env.BLOB_READ_WRITE_TOKEN) {
+    if (blobTarget && isObjectStorageConfigured()) {
       try {
         await del(blobTarget)
       } catch (deleteError) {

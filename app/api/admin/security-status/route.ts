@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { prisma } from '@/lib/prisma'
+import { isEmailConfigured } from '@/lib/email-client'
+import { isObjectStorageConfigured } from '@/lib/object-storage'
 
 const hasValue = (value?: string | null) => Boolean(value && value.trim().length > 0)
 const STORAGE_ENCRYPTION_KEY = 'storage_encryption_at_rest'
@@ -58,8 +60,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const storageKeySet =
-      hasValue(process.env.BLOB_READ_WRITE_TOKEN) || hasValue(process.env.VERCEL_BLOB_READ_WRITE_TOKEN)
+    const storageKeySet = isObjectStorageConfigured()
 
     let confirmation = await getStorageEncryptionConfirmation()
     if (!confirmation?.confirmed && storageKeySet) {
@@ -101,12 +102,12 @@ export async function GET(request: NextRequest) {
       {
         id: 'email-key',
         label: 'Email sending key',
-        status: hasValue(process.env.RESEND_API_KEY) ? 'set' : 'missing',
+        status: isEmailConfigured() ? 'set' : 'missing',
       },
       {
         id: 'storage-key',
         label: 'File storage key',
-        status: hasValue(process.env.BLOB_READ_WRITE_TOKEN) || hasValue(process.env.VERCEL_BLOB_READ_WRITE_TOKEN) ? 'set' : 'missing',
+        status: storageKeySet ? 'set' : 'missing',
       },
       {
         id: 'storage-encryption-confirmed',

@@ -18,10 +18,10 @@ function generateVerificationToken(): string {
 // Function to send verification email
 async function sendVerificationEmail(email: string, token: string) {
   try {
-    const { Resend } = await import('resend')
+    const { Resend, isEmailConfigured } = await import('@/lib/email-client')
     
-    if (!process.env.RESEND_API_KEY) {
-      console.log('📧 Resend API not configured, skipping verification email')
+    if (!isEmailConfigured()) {
+      console.log('📧 Email service not configured, skipping verification email')
       return false
     }
 

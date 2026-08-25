@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { head } from '@vercel/blob'
+import { getObjectStorageProviderName, head, isObjectStorageConfigured } from '@/lib/object-storage'
 import { verifySignedBlobToken } from '@/lib/signed-blob'
 import { isPathAllowedForScope, normalizeBlobPath } from '@/lib/blob-access'
 
@@ -9,7 +9,7 @@ const getBlobToken = () =>
 export async function GET(request: NextRequest) {
   try {
     const blobToken = getBlobToken()
-    if (!blobToken) {
+    if (!isObjectStorageConfigured()) {
       return NextResponse.json({ error: 'Storage not configured' }, { status: 503 })
     }
 
@@ -35,13 +35,15 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 })
     }
 
-    const blobInfo = await head(normalizedPath, { token: blobToken })
+    const blobInfo = await head(normalizedPath)
     if (!blobInfo?.url) {
       return NextResponse.json({ error: 'File not found' }, { status: 404 })
     }
 
     const blobResponse = await fetch(blobInfo.url, {
-      headers: { Authorization: `Bearer ${blobToken}` },
+      headers: getObjectStorageProviderName() === 'vercel-blob'
+        ? { Authorization: `Bearer ${blobToken}` }
+        : undefined,
     })
 
     if (!blobResponse.ok || !blobResponse.body) {

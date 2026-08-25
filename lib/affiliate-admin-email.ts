@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 
 export async function notifyAdminAffiliateManualReview(options: {
   toEmail: string
@@ -8,7 +8,7 @@ export async function notifyAdminAffiliateManualReview(options: {
   riskLevel: 'MEDIUM' | 'HIGH'
   reasoning: string
 }): Promise<void> {
-  if (!process.env.RESEND_API_KEY) return
+  if (!isEmailConfigured()) return
   const resend = new Resend(process.env.RESEND_API_KEY)
   await resend.emails.send({
     from: 'Helfi Alerts <support@helfi.ai>',
@@ -26,4 +26,3 @@ export async function notifyAdminAffiliateManualReview(options: {
     `,
   })
 }
-

@@ -1,6 +1,6 @@
 import OpenAI from 'openai'
 import crypto from 'crypto'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { prisma } from '@/lib/prisma'
 import { TicketCategory, TicketPriority } from '@prisma/client'
 import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
@@ -54,7 +54,7 @@ function getOpenAIClient(): OpenAI | null {
 }
 
 function getResendClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) return null
+  if (!isEmailConfigured()) return null
   return new Resend(process.env.RESEND_API_KEY)
 }
 

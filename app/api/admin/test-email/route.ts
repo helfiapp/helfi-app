@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+import { Resend, getEmailProviderName, isEmailConfigured } from '@/lib/email-client'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { getEmailFooter } from '@/lib/email-footer'
 
@@ -19,19 +19,19 @@ export async function POST(request: NextRequest) {
     }
 
     // Check environment configuration
-    const resendApiKey = process.env.RESEND_API_KEY
-    if (!resendApiKey) {
+    if (!isEmailConfigured()) {
       return NextResponse.json({ 
-        error: 'RESEND_API_KEY not configured',
+        error: 'Email service not configured',
         details: 'Email service is not properly configured on the server'
       }, { status: 500 })
     }
 
     console.log(`🧪 [EMAIL TEST] Starting test to: ${testEmail}`)
-    console.log(`🔑 [EMAIL TEST] API Key configured: ${resendApiKey.substring(0, 10)}...`)
+    const providerName = getEmailProviderName()
+    console.log(`📧 [EMAIL TEST] Provider configured: ${providerName}`)
 
     try {
-      const resend = new Resend(resendApiKey)
+      const resend = new Resend(process.env.RESEND_API_KEY)
       
       const emailResponse = await resend.emails.send({
         from: 'Helfi Team <support@helfi.ai>',
@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
                 <li><strong>Sent At:</strong> ${new Date().toISOString()}</li>
                 <li><strong>From:</strong> Helfi Team &lt;support@helfi.ai&gt;</li>
                 <li><strong>To:</strong> ${testEmail}</li>
-                <li><strong>Service:</strong> Resend Email API</li>
+                <li><strong>Service:</strong> ${providerName}</li>
               </ul>
             </div>
             
@@ -62,7 +62,7 @@ export async function POST(request: NextRequest) {
       const messageId = emailResponse.data?.id
       const success = emailResponse.error === null || emailResponse.error === undefined
 
-      console.log(`📧 [EMAIL TEST] Resend Response:`, {
+      console.log(`📧 [EMAIL TEST] Provider response:`, {
         success,
         messageId,
         error: emailResponse.error
@@ -78,7 +78,7 @@ export async function POST(request: NextRequest) {
             messageId,
             recipient: testEmail,
             timestamp: new Date().toISOString(),
-            resendResponse: emailResponse.data
+            providerResponse: emailResponse.data
           }
         })
       } else {
@@ -88,22 +88,22 @@ export async function POST(request: NextRequest) {
           success: false,
           error: 'Failed to send test email',
           details: {
-            resendError: emailResponse.error,
+            providerError: emailResponse.error,
             recipient: testEmail,
             timestamp: new Date().toISOString()
           }
         }, { status: 500 })
       }
 
-    } catch (resendError: any) {
-      console.error(`❌ [EMAIL TEST] Resend API Error:`, resendError)
+    } catch (providerError: any) {
+      console.error(`❌ [EMAIL TEST] Provider error:`, providerError)
       
       return NextResponse.json({
         success: false,
-        error: 'Resend API Error',
+        error: 'Email provider error',
         details: {
-          errorMessage: resendError.message,
-          errorName: resendError.name,
+          errorMessage: providerError.message,
+          errorName: providerError.name,
           recipient: testEmail,
           timestamp: new Date().toISOString()
         }

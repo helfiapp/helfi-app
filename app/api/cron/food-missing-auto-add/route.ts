@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { getEmailFooter } from '@/lib/email-footer'
 import { buildCustomFoodKey } from '@/lib/food/custom-food-import'
 import { findMenuMatchForReport, syncFastFoodMenus } from '@/lib/food/fast-food-sync'
@@ -9,7 +9,7 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const getResend = () => {
-  if (!process.env.RESEND_API_KEY) return null
+  if (!isEmailConfigured()) return null
   return new Resend(process.env.RESEND_API_KEY)
 }
 

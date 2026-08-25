@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import crypto from 'crypto'
 import { getEmailFooter } from '@/lib/email-footer'
 
 const RESET_TOKEN_TTL_HOURS = 2
 
 function getResend() {
-  if (!process.env.RESEND_API_KEY) return null
+  if (!isEmailConfigured()) return null
   return new Resend(process.env.RESEND_API_KEY)
 }
 

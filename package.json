@@ -8,6 +8,8 @@
   "scripts": {
     "dev": "next dev",
     "check:local-openai-key": "node scripts/assert-no-local-openai-key.js",
+    "check:email-coverage": "node scripts/check-email-coverage.js",
+    "check:email-provider": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/check-email-provider.ts",
     "check:page-locks": "node scripts/check-page-locks.js",
     "check:page-locks:web": "node scripts/check-page-locks.js --scope=web-routes && node scripts/check-page-locks.js --scope=web-components",
     "write:page-locks": "node scripts/check-page-locks.js --write",
@@ -36,6 +38,7 @@
   "dependencies": {
     "@aws-sdk/client-kms": "^3.927.0",
     "@aws-sdk/client-s3": "^3.927.0",
+    "@aws-sdk/client-sesv2": "^3.927.0",
     "@aws-sdk/s3-presigned-post": "^3.927.0",
     "@aws-sdk/s3-request-presigner": "^3.927.0",
     "@headlessui/react": "^1.7.18",

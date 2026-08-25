@@ -5,7 +5,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { Prisma } from '@prisma/client'
-import { put } from '@vercel/blob'
+import { isObjectStorageConfigured, put } from '@/lib/object-storage'
 import { deleteFoodPhotosIfUnused } from '@/lib/food-photo-storage'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 import { createWriteGuard, hashPayload } from '@/lib/write-guard'
@@ -268,7 +268,7 @@ const withSignedFoodPhoto = <T extends { imageUrl?: any }>(log: T): T => {
 }
 
 const uploadFoodPhoto = async (userId: string, imageDataUrl: string) => {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isObjectStorageConfigured()) {
     console.warn('⚠️ Food photo upload skipped: BLOB_READ_WRITE_TOKEN missing')
     return imageDataUrl
   }

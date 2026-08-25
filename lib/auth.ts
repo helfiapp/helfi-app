@@ -3,7 +3,7 @@ import CredentialsProvider from 'next-auth/providers/credentials'
 import AppleProvider from 'next-auth/providers/apple'
 import GoogleProvider from 'next-auth/providers/google'
 import { prisma } from '@/lib/prisma'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { getEmailFooter } from '@/lib/email-footer'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { sendOwnerSignupEmail } from '@/lib/admin-alerts'
@@ -13,9 +13,9 @@ import { getAppleClientSecret } from '@/lib/apple-client-secret'
 import { sendWelcomeEmail } from '@/lib/welcome-email'
 import bcrypt from 'bcryptjs'
 
-// Initialize Resend for welcome emails
+// Initialize the selected provider for welcome emails
 function getResend() {
-  if (!process.env.RESEND_API_KEY) {
+  if (!isEmailConfigured()) {
     return null
   }
   return new Resend(process.env.RESEND_API_KEY)
@@ -56,7 +56,7 @@ async function isOnboardingComplete(userId: string): Promise<boolean> {
 async function sendVerificationEmail(email: string, token: string) {
   const resend = getResend()
   if (!resend) {
-    console.log('📧 Resend API not configured, skipping verification email')
+    console.log('📧 Email service not configured, skipping verification email')
     return false
   }
 

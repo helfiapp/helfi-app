@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { getToken } from 'next-auth/jwt'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getEmailFooter } from '@/lib/email-footer'
 
 const getResend = () => {
-  if (!process.env.RESEND_API_KEY) {
+  if (!isEmailConfigured()) {
     console.log('📧 Resend not configured, skipping missing food email')
     return null
   }

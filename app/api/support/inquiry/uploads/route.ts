@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
+import { isObjectStorageConfigured, put } from '@/lib/object-storage'
 import { prisma } from '@/lib/prisma'
 import { buildSignedBlobUrl } from '@/lib/blob-access'
 
@@ -23,7 +23,7 @@ function guestTokenPrefix(token: string) {
 }
 
 export async function POST(request: NextRequest) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isObjectStorageConfigured()) {
     return NextResponse.json({ error: 'Upload system not configured' }, { status: 503 })
   }
 

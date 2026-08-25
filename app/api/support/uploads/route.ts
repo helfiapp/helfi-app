@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
-import { put } from '@vercel/blob'
+import { isObjectStorageConfigured, put } from '@/lib/object-storage'
 import { prisma } from '@/lib/prisma'
 import { buildSignedBlobUrl } from '@/lib/blob-access'
 
@@ -28,7 +28,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isObjectStorageConfigured()) {
     return NextResponse.json({ error: 'Upload system not configured' }, { status: 503 })
   }
 

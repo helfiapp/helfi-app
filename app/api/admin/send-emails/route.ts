@@ -1,12 +1,12 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { getEmailFooter } from '@/lib/email-footer'
 import { prisma } from '@/lib/prisma'
 
-// Initialize Resend only when needed to avoid build-time errors
+// Initialize the selected email provider only when needed to avoid build-time errors
 function getResend() {
-  if (!process.env.RESEND_API_KEY) {
+  if (!isEmailConfigured()) {
     return null
   }
   return new Resend(process.env.RESEND_API_KEY)
@@ -33,8 +33,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Subject and message are required' }, { status: 400 })
     }
 
-    // Check if Resend API key is configured
-    if (!process.env.RESEND_API_KEY) {
+    // Check if an email provider is configured
+    if (!isEmailConfigured()) {
       return NextResponse.json({ error: 'Email service not configured' }, { status: 500 })
     }
     
@@ -74,10 +74,10 @@ export async function POST(request: NextRequest) {
         const ctaHref = isSupportStyleEmail ? 'https://helfi.ai/support' : 'https://helfi.ai'
         const ctaLabel = isSupportStyleEmail ? 'Open Help & Support' : 'Get Started with Helfi'
         
-        // Send real email using Resend
+        // Send the real email using the selected provider
         const resend = getResend()
         if (!resend) {
-          throw new Error('Resend API key not configured')
+          throw new Error('Email service not configured')
         }
         
         const emailResponse = await resend.emails.send({

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { del, list } from '@vercel/blob'
+import { del, isObjectStorageConfigured, list } from '@/lib/object-storage'
 import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { extractScopedBlobPath } from '@/lib/blob-access'
@@ -71,7 +71,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  if (!process.env.BLOB_READ_WRITE_TOKEN) {
+  if (!isObjectStorageConfigured()) {
     return NextResponse.json({ error: 'Blob storage not configured' }, { status: 500 })
   }
 

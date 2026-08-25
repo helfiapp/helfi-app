@@ -9,7 +9,6 @@ const REQUIRED = [
   'STRIPE_WEBHOOK_SECRET',
   'OPENAI_API_KEY',
   'HELFI_VOICE_REALTIME_ENABLED',
-  'RESEND_API_KEY',
   'BLOB_READ_WRITE_TOKEN',
   'ENCRYPTION_MASTER_KEY',
   'NEXT_PUBLIC_VAPID_PUBLIC_KEY',
@@ -63,6 +62,12 @@ const productionNames = new Set(
 
 const missingRequired = REQUIRED.filter((name) => !productionNames.has(name))
 const missingFeatureSpecific = FEATURE_SPECIFIC.filter((name) => !productionNames.has(name))
+const hasResendEmail = productionNames.has('RESEND_API_KEY')
+const hasAwsSesEmail = [
+  'AWS_SES_REGION',
+  'AWS_SES_ACCESS_KEY_ID',
+  'AWS_SES_SECRET_ACCESS_KEY',
+].every((name) => productionNames.has(name))
 
 if (missingFeatureSpecific.length) {
   console.warn('⚠️  Vercel Production is missing feature-specific environment variables:')
@@ -71,9 +76,12 @@ if (missingFeatureSpecific.length) {
   console.warn('')
 }
 
-if (missingRequired.length) {
+if (missingRequired.length || (!hasResendEmail && !hasAwsSesEmail)) {
   console.error('❌ Vercel Production is missing required environment variables:')
   missingRequired.forEach((name) => console.error(`   - ${name}`))
+  if (!hasResendEmail && !hasAwsSesEmail) {
+    console.error('   - Email provider (RESEND_API_KEY or the three AWS SES settings)')
+  }
   console.error('')
   console.error('Do not claim live app, billing, storage, email, push, or AI features are fully working until these are restored.')
   process.exit(1)

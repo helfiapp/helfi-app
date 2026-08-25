@@ -4,7 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 import { Prisma } from '@prisma/client'
-import { del, list } from '@vercel/blob'
+import { del, isObjectStorageConfigured, list } from '@/lib/object-storage'
 import { v2 as cloudinary } from 'cloudinary'
 
 const stripe = process.env.STRIPE_SECRET_KEY 
@@ -13,7 +13,6 @@ const stripe = process.env.STRIPE_SECRET_KEY
     })
   : null
 
-const BLOB_HOST = 'blob.vercel-storage.com'
 const CLOUDINARY_HOST = 'res.cloudinary.com'
 const BLOB_PATH_PREFIXES = [
   'reports/',
@@ -25,9 +24,7 @@ const BLOB_PATH_PREFIXES = [
   'test-vision/',
 ]
 
-const hasBlobToken = Boolean(
-  process.env.BLOB_READ_WRITE_TOKEN || process.env.VERCEL_BLOB_READ_WRITE_TOKEN
-)
+const hasObjectStorage = isObjectStorageConfigured()
 
 const hasCloudinaryConfig = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -46,7 +43,8 @@ if (hasCloudinaryConfig) {
 type CloudinaryResourceType = 'image' | 'video' | 'raw'
 type CloudinaryAsset = { publicId: string; resourceType: CloudinaryResourceType }
 
-const isBlobUrl = (value: string) => value.includes(BLOB_HOST)
+const isBlobUrl = (value: string) =>
+  value.includes('blob.vercel-storage.com') || /\.s3[.-][a-z0-9-]+\.amazonaws\.com/i.test(value)
 const isCloudinaryUrl = (value: string) => value.includes('cloudinary.com')
 
 const isLikelyBlobPath = (value: string) =>
@@ -333,7 +331,7 @@ export async function POST(request: NextRequest) {
     const needsBlobDeletion = blobTargets.size > 0 || foodPhotoCount > 0
     const needsCloudinaryDeletion = cloudinaryAssets.size > 0
 
-    if (needsBlobDeletion && !hasBlobToken) {
+    if (needsBlobDeletion && !hasObjectStorage) {
       return NextResponse.json(
         { error: 'File deletion is not configured. Please contact support.' },
         { status: 503 }

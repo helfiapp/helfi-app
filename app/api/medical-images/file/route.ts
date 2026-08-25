@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { del, head, put } from '@vercel/blob'
+import { del, getObjectStorageProviderName, head, put } from '@/lib/object-storage'
 import { decryptBuffer, encryptBuffer } from '@/lib/file-encryption'
 import { verifySignedFileToken } from '@/lib/signed-file'
 
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
     }
 
     const blobResponse = await fetch(blobInfo.url, {
-      headers: process.env.BLOB_READ_WRITE_TOKEN
+      headers: getObjectStorageProviderName() === 'vercel-blob'
         ? { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
         : undefined,
     })

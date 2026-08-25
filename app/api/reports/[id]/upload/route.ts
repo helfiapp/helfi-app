@@ -7,7 +7,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { put } from '@vercel/blob';
+import { put } from '@/lib/object-storage';
 import { createAuditEvent } from '@/lib/audit';
 import { AuditEventType } from '@prisma/client';
 import { encryptBuffer } from '@/lib/file-encryption';

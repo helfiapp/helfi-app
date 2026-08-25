@@ -20,7 +20,9 @@ const extractFromProxyUrl = (value: string): string | null => {
 const extractFromBlobUrl = (value: string): string | null => {
   try {
     const parsed = new URL(value)
-    if (!parsed.hostname.includes(BLOB_HOST)) return null
+    const isVercelBlob = parsed.hostname.includes(BLOB_HOST)
+    const isAwsS3 = /\.s3[.-][a-z0-9-]+\.amazonaws\.com$/i.test(parsed.hostname)
+    if (!isVercelBlob && !isAwsS3) return null
     return normalizeBlobPath(parsed.pathname)
   } catch {
     return null

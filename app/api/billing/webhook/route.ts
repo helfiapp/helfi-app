@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { getEmailFooter } from '@/lib/email-footer'
 import { reportCriticalError } from '@/lib/error-reporter'
@@ -12,7 +12,7 @@ import {
 } from '@/lib/practitioner-emails'
 
 const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', { apiVersion: '2024-06-20' })
-const resend = process.env.RESEND_API_KEY ? new Resend(process.env.RESEND_API_KEY) : null
+const resend = isEmailConfigured() ? new Resend(process.env.RESEND_API_KEY) : null
 const endpointSecret = process.env.STRIPE_WEBHOOK_SECRET || ''
 const SUBSCRIBER_MILESTONE_INTERVAL = 20
 
@@ -204,7 +204,7 @@ async function sendSubscriberMilestoneEmail(options: {
   latestSubscriberEmail: string
 }) {
   if (!resend) {
-    console.log('📧 Resend API not configured, skipping subscriber milestone email')
+    console.log('📧 Email service not configured, skipping subscriber milestone email')
     return
   }
 

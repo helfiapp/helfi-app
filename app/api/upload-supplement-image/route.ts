@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { v2 as cloudinary } from 'cloudinary'
-import { put } from '@vercel/blob'
+import { isObjectStorageConfigured, put } from '@/lib/object-storage'
 
 const hasCloudinaryConfig = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -35,8 +35,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
-    const hasBlobToken = Boolean(blobToken)
-    if (!hasCloudinaryConfig && !hasBlobToken) {
+    const hasObjectStorage = isObjectStorageConfigured()
+    if (!hasCloudinaryConfig && !hasObjectStorage) {
       return NextResponse.json({ error: 'Upload system not configured' }, { status: 503 })
     }
 
@@ -125,7 +125,7 @@ export async function POST(request: NextRequest) {
           fileId: fileRecord.id,
         })
       } catch (error) {
-        if (!hasBlobToken) {
+        if (!hasObjectStorage) {
           throw error
         }
       }

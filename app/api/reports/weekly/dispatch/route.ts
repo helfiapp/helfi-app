@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import webpush from 'web-push'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { isSchedulerAuthorized } from '@/lib/scheduler-auth'
 import { dedupeSubscriptions, normalizeSubscriptionList, removeSubscriptionsByEndpoint, sendToSubscriptions } from '@/lib/push-subscriptions'
 import { getEmailFooter } from '@/lib/email-footer'
@@ -27,7 +27,7 @@ function getBaseUrl() {
 }
 
 function getResendClient() {
-  if (!process.env.RESEND_API_KEY) return null
+  if (!isEmailConfigured()) return null
   return new Resend(process.env.RESEND_API_KEY)
 }
 

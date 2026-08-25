@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth';
 import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { put } from '@vercel/blob';
+import { isObjectStorageConfigured, put } from '@/lib/object-storage';
 import { CreditManager } from '@/lib/credit-system';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { logAiUsageEvent } from '@/lib/ai-usage-logger';
@@ -527,7 +527,7 @@ export async function POST(req: NextRequest) {
 
     if (saveToHistory) {
       try {
-        if (!process.env.BLOB_READ_WRITE_TOKEN) {
+        if (!isObjectStorageConfigured()) {
           throw new Error('Image storage is not configured');
         }
 

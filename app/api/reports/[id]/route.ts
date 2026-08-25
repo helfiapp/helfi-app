@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
-import { del } from '@vercel/blob'
+import { del } from '@/lib/object-storage'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 

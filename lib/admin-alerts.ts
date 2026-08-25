@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { getEmailFooter } from '@/lib/email-footer'
 
 const DEFAULT_OWNER_EMAIL = 'louie@helfi.ai'
@@ -9,8 +9,8 @@ function getOwnerEmail(): string {
 }
 
 function getResendClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) {
-    console.log('📧 Resend API not configured, skipping admin alert email')
+  if (!isEmailConfigured()) {
+    console.log('📧 Email service not configured, skipping admin alert email')
     return null
   }
   return new Resend(process.env.RESEND_API_KEY)

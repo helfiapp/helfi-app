@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
-import { del, put } from '@vercel/blob'
+import { del, isObjectStorageConfigured, put } from '@/lib/object-storage'
 import { encryptBuffer } from '@/lib/file-encryption'
 import { createSignedFileToken } from '@/lib/signed-file'
 
@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    if (!process.env.BLOB_READ_WRITE_TOKEN) {
+    if (!isObjectStorageConfigured()) {
       return NextResponse.json({ error: 'Image storage is not configured' }, { status: 500 })
     }
 
@@ -226,7 +226,7 @@ export async function DELETE(request: NextRequest) {
       .map((item) => item.imageFile?.cloudinaryId || item.imageFile?.secureUrl)
       .filter((value): value is string => typeof value === 'string' && value.length > 0)
 
-    if (process.env.BLOB_READ_WRITE_TOKEN && blobTargets.length > 0) {
+    if (isObjectStorageConfigured() && blobTargets.length > 0) {
       try {
         await del(blobTargets)
       } catch (deleteError) {

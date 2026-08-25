@@ -10,7 +10,7 @@ import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { logAIUsage } from '@/lib/ai-usage-logger';
 import { isSubscriptionActive } from '@/lib/subscription-utils';
 import { logServerCall } from '@/lib/server-call-tracker';
-import { del } from '@vercel/blob';
+import { del, isObjectStorageConfigured } from '@/lib/object-storage';
 import { v2 as cloudinary } from 'cloudinary';
 import { extractBlobPathWithPrefixes } from '@/lib/blob-paths';
 
@@ -31,7 +31,7 @@ if (blobToken && !process.env.BLOB_READ_WRITE_TOKEN) {
   process.env.BLOB_READ_WRITE_TOKEN = blobToken;
 }
 
-const hasBlobToken = Boolean(blobToken);
+const hasObjectStorage = isObjectStorageConfigured();
 
 const hasCloudinaryConfig = Boolean(
   process.env.CLOUDINARY_CLOUD_NAME &&
@@ -152,7 +152,7 @@ const deleteCloudinaryAssets = async (assets: CloudinaryAsset[]) => {
 };
 
 const deleteBlobTargets = async (targets: string[]) => {
-  if (!targets.length || !hasBlobToken) return 0;
+  if (!targets.length || !hasObjectStorage) return 0;
   await del(targets);
   return targets.length;
 };

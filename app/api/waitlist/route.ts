@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { getEmailFooter } from '@/lib/email-footer'
 
-// Initialize Resend for emails
+// Initialize the selected email provider for emails
 function getResend() {
-  if (!process.env.RESEND_API_KEY) {
-    console.log('📧 Resend API not configured, skipping waitlist emails')
+  if (!isEmailConfigured()) {
+    console.log('📧 Email service not configured, skipping waitlist emails')
     return null
   }
   return new Resend(process.env.RESEND_API_KEY)

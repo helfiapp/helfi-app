@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
-import { del } from '@vercel/blob'
+import { del, isObjectStorageConfigured } from '@/lib/object-storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -108,7 +108,7 @@ function mediaBlobPaths(value: unknown): string[] {
 }
 
 async function deleteMoodMedia(paths: string[]) {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return
+  if (!isObjectStorageConfigured()) return
   if (paths.length === 0) return
   const batches = chunk(Array.from(new Set(paths)), 100)
   for (const batch of batches) {

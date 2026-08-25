@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { getEmailFooter } from '@/lib/email-footer'
 import { prisma } from '@/lib/prisma'
 import { processSupportTicketAutoReply } from '@/lib/support-automation'
@@ -230,7 +230,7 @@ export async function POST(request: NextRequest) {
 
         // Send email notification to support team
         try {
-          if (process.env.RESEND_API_KEY) {
+          if (isEmailConfigured()) {
             const resend = new Resend(process.env.RESEND_API_KEY)
             
             await resend.emails.send({
@@ -350,7 +350,7 @@ export async function POST(request: NextRequest) {
             }
           })
 
-          if (process.env.RESEND_API_KEY && ticket) {
+          if (isEmailConfigured() && ticket) {
             const resend = new Resend(process.env.RESEND_API_KEY)
             
             await resend.emails.send({
@@ -398,7 +398,7 @@ export async function POST(request: NextRequest) {
             
             console.log(`✅ [SUPPORT RESPONSE] Email sent to ${ticket.userEmail} for ticket ${ticketId}`)
           } else {
-            console.log(`⚠️ [SUPPORT RESPONSE] Email not sent - RESEND_API_KEY: ${!!process.env.RESEND_API_KEY}, Ticket found: ${!!ticket}`)
+            console.log(`⚠️ [SUPPORT RESPONSE] Email not sent - provider configured: ${isEmailConfigured()}, Ticket found: ${!!ticket}`)
           }
         } catch (emailError) {
           console.error(`❌ [SUPPORT RESPONSE] Failed to send email for ticket ${ticketId}:`, emailError)

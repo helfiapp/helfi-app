@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { getEmailFooter } from '@/lib/email-footer'
 import {
   FEEDBACK_REQUEST_EMAIL_SUBJECT,
@@ -27,7 +27,7 @@ interface SendWelcomeEmailOptions {
 }
 
 function getResendClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) {
+  if (!isEmailConfigured()) {
     return null
   }
   return new Resend(process.env.RESEND_API_KEY)
@@ -57,7 +57,7 @@ function renderTextAsHtml(message: string): string {
 async function sendStyledEmail(options: SendStyledEmailOptions): Promise<boolean> {
   const resend = getResendClient()
   if (!resend) {
-    console.log('📧 Resend API not configured, skipping email send')
+    console.log('📧 Email service not configured, skipping email send')
     return false
   }
 

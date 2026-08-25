@@ -1,4 +1,4 @@
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { prisma } from '@/lib/prisma'
 import { getEmailFooter } from '@/lib/email-footer'
 import type { PractitionerEmailType } from '@prisma/client'
@@ -6,8 +6,8 @@ import type { PractitionerEmailType } from '@prisma/client'
 const DEFAULT_SUPPORT_EMAIL = 'support@helfi.ai'
 
 function getResendClient(): Resend | null {
-  if (!process.env.RESEND_API_KEY) {
-    console.log('📧 Resend API not configured, skipping practitioner email')
+  if (!isEmailConfigured()) {
+    console.log('📧 Email service not configured, skipping practitioner email')
     return null
   }
   return new Resend(process.env.RESEND_API_KEY)
@@ -188,7 +188,7 @@ export async function sendPractitionerRejectedEmail(options: {
 }): Promise<{ ok: boolean; error?: string }> {
   const resend = getResendClient()
   if (!resend) {
-    return { ok: false, error: 'Resend API key is not configured.' }
+    return { ok: false, error: 'Email service is not configured.' }
   }
 
   const subject = `Update on your Helfi listing`

@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { del, head } from '@vercel/blob';
+import { del, head, getObjectStorageProviderName } from '@/lib/object-storage';
 import { processPDF } from '@/lib/pdf-processor';
 import { encryptFieldsBatch, verifyPasswordHash } from '@/lib/encryption';
 import { decryptBuffer } from '@/lib/file-encryption';
@@ -139,9 +139,9 @@ export async function POST(
 
       // Fetch PDF from blob URL
       const blobResponse = await fetch(blobInfo.url, {
-        headers: {
-          'Authorization': `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}`,
-        },
+        headers: getObjectStorageProviderName() === 'vercel-blob'
+          ? { Authorization: `Bearer ${process.env.BLOB_READ_WRITE_TOKEN}` }
+          : undefined,
       });
 
       if (!blobResponse.ok) {

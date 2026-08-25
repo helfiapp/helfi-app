@@ -106,3 +106,9 @@ The acknowledgment email was broken when someone added:
 
 If you're unsure about modifying this code, check with the user first. This functionality is critical and was broken before.
 
+## AWS SES Migration (August 3, 2026)
+
+- Email delivery now goes through `lib/email-client.ts` so Helfi can use AWS SES or Resend without changing the protected waitlist call pattern.
+- Keep the acknowledgment and support notification calls non-blocking exactly as described above.
+- Keep Resend configured as the fallback until AWS domain verification, production access, and real internal/external delivery tests have all passed.
+- Do not remove the Resend fallback or cancel Resend before those tests pass.

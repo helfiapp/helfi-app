@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
-import { Resend } from 'resend'
+import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { getEmailFooter } from '@/lib/email-footer'
 
-// Initialize Resend
+// Initialize the selected email provider
 function getResend() {
-  if (!process.env.RESEND_API_KEY) {
+  if (!isEmailConfigured()) {
     return null
   }
   return new Resend(process.env.RESEND_API_KEY)
@@ -20,7 +20,7 @@ function generateVerificationToken(): string {
 async function sendVerificationEmail(email: string, token: string) {
   const resend = getResend()
   if (!resend) {
-    console.log('📧 Resend API not configured, skipping verification email')
+    console.log('📧 Email service not configured, skipping verification email')
     return false
   }
 
@@ -140,4 +140,4 @@ export async function POST(request: NextRequest) {
     console.error('❌ Resend verification error:', error)
     return NextResponse.json({ error: 'Server error' }, { status: 500 })
   }
-} 
+}

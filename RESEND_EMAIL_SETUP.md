@@ -1,4 +1,6 @@
-# 📧 Resend Email Service Setup Guide
+# 📧 Resend Email Service Setup Guide (Legacy Fallback)
+
+> AWS SES is replacing Resend as Helfi's main email service. See `AWS_SES_EMAIL_MIGRATION.md` for the current migration and test checklist. Keep this Resend setup only as a temporary fallback until AWS passes every live email test.
 
 ## ⚠️ CRITICAL: Email Verification Required
 
@@ -50,14 +52,6 @@ The following emails are automatically sent:
 - ✅ **Sign-in blocked** for unverified users
 - ✅ **Clear error messages** for unverified accounts
 
-## 🚨 Current Status
+## Current Status — 25 August 2026
 
-**Email verification is ENFORCED but emails can't be sent until you add the RESEND_API_KEY.**
-
-Users who try to sign up will:
-1. Create an account (unverified)
-2. Not receive verification email (due to missing API key)
-3. Cannot sign in (due to verification requirement)
-4. Be stuck until you configure Resend
-
-**Priority: Configure Resend API key immediately!** 
+Resend is already configured on its zero-cost plan and is only a temporary fallback. AWS SES is verified and approved for production use. Do not remove the fallback until the AWS-hosted app passes the real email tests in `AWS_SES_EMAIL_MIGRATION.md`.

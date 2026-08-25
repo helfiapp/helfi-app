@@ -1,4 +1,4 @@
-import { del } from '@vercel/blob'
+import { del, isObjectStorageConfigured } from '@/lib/object-storage'
 import { prisma } from '@/lib/prisma'
 import { extractBlobPathWithPrefixes } from '@/lib/blob-paths'
 
@@ -19,7 +19,7 @@ const chunk = <T,>(items: T[], size: number) => {
 export const deleteFoodPhotosIfUnused = async (
   urls: Array<string | null | undefined>,
 ) => {
-  if (!process.env.BLOB_READ_WRITE_TOKEN) return { deleted: 0, skipped: 0 }
+  if (!isObjectStorageConfigured()) return { deleted: 0, skipped: 0 }
 
   const parsed = urls
     .filter((url): url is string => typeof url === 'string' && url.trim().length > 0)

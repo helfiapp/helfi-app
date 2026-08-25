@@ -8,7 +8,6 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth/next';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
-import { put } from '@vercel/blob';
 import { createAuditEvent } from '@/lib/audit';
 import { AuditEventType } from '@prisma/client';
 import { hashPasswordForVerification } from '@/lib/encryption';
