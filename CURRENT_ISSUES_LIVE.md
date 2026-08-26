@@ -1,9 +1,9 @@
 DEPLOYED:
-- LIVE or STAGING: LIVE on AWS
-- Date/time: 26 August 2026, 2:02 PM AEST
-- What changed: Added an admin-only AWS storage health check, completed the `helfi.ai` and `www.helfi.ai` cutover to AWS Amplify, confirmed AWS email sending, confirmed AWS file save/read/list/delete, and resumed all nine scheduled Helfi jobs.
-- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; source commit `482eed0b`.
-- What to quickly test: Open the main site and sign-in page. AWS checks passed for the website, Neon database connection, internal and external email sending, file storage, and scheduled jobs. The AI service key is still missing on AWS, so Vercel must remain active until that is restored and retested.
+- LIVE or STAGING: AWS migration test completed; LIVE safely returned to Vercel
+- Date/time: 26 August 2026, 2:11 PM AEST
+- What changed: Added an admin-only AWS storage health check and completed a full temporary `helfi.ai`/`www.helfi.ai` AWS cutover test. AWS passed website, Neon database, internal/external email, file save/read/list/delete, domain certificate, and schedule configuration checks. The public domain was then returned to Vercel because the AI service key is still missing on AWS.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai are currently served by the working Vercel safety copy; the verified AWS copy remains available at https://master.d2n4u4zm85ooe.amplifyapp.com; source commit `482eed0b`.
+- What to quickly test: Open the main site and sign-in page. Vercel must remain active. The nine AWS replacement schedules are paused to prevent duplicate runs while Vercel remains live. Create and add a fresh OpenAI project key to AWS, retest AI, switch the domain back to AWS, resume the replacement schedules, and only then cancel Vercel.
 
 DEPLOYED:
 - LIVE or STAGING: LIVE (safe migration release; final AWS cutover not yet done)
