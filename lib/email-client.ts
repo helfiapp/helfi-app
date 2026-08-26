@@ -28,7 +28,14 @@ const normalizeAddresses = (value?: AddressValue): string[] | undefined => {
   return addresses.length ? addresses : undefined
 }
 
-const awsSesConfigured = () => Boolean(process.env.AWS_SES_REGION)
+const awsSesRegion = () => (
+  process.env.HELFI_AWS_SES_REGION
+  || process.env.AWS_SES_REGION
+  || process.env.AWS_REGION
+  || ''
+).trim()
+
+const awsSesConfigured = () => Boolean(awsSesRegion())
 
 export function getEmailProviderName(): EmailProviderName {
   const requested = (process.env.EMAIL_PROVIDER || '').trim().toLowerCase()
@@ -73,7 +80,7 @@ export class Resend {
 
     this.sesClient = provider === 'aws-ses'
       ? new SESv2Client({
-          region: process.env.AWS_SES_REGION,
+          region: awsSesRegion(),
           ...(explicitSesCredentials ? { credentials: explicitSesCredentials } : {}),
         })
       : null

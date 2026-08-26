@@ -25,7 +25,7 @@ Move all Helfi app emails from Resend to AWS SES without missing any email path.
 ## AWS settings required in Amplify
 
 - `EMAIL_PROVIDER`
-- `AWS_SES_REGION`
+- `HELFI_AWS_SES_REGION` (Amplify reserves names that start with `AWS`)
 - An Amplify runtime role restricted to sending Helfi email through SES
 
 Do not add permanent AWS access keys to the app.

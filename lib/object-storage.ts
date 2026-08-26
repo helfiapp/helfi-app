@@ -29,8 +29,17 @@ type ListOptions = {
   cursor?: string
 }
 
-const awsRegion = () => (process.env.AWS_S3_REGION || process.env.AWS_REGION || '').trim()
-const awsBucket = () => (process.env.AWS_S3_BUCKET || '').trim()
+const awsRegion = () => (
+  process.env.HELFI_AWS_S3_REGION
+  || process.env.AWS_S3_REGION
+  || process.env.AWS_REGION
+  || ''
+).trim()
+const awsBucket = () => (
+  process.env.HELFI_AWS_S3_BUCKET
+  || process.env.AWS_S3_BUCKET
+  || ''
+).trim()
 
 export function getObjectStorageProviderName(): StorageProviderName {
   const requested = (process.env.OBJECT_STORAGE_PROVIDER || '').trim().toLowerCase()

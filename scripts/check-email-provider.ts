@@ -2,7 +2,8 @@ import { getEmailProviderName, Resend } from '../lib/email-client'
 
 async function main() {
   process.env.EMAIL_PROVIDER = 'aws-ses'
-  process.env.AWS_SES_REGION = 'ap-southeast-2'
+  process.env.HELFI_AWS_SES_REGION = 'ap-southeast-2'
+  delete process.env.AWS_SES_REGION
   delete process.env.AWS_SES_ACCESS_KEY_ID
   delete process.env.AWS_SES_SECRET_ACCESS_KEY
   delete process.env.RESEND_API_KEY
@@ -65,6 +66,7 @@ async function main() {
   }
 
   process.env.EMAIL_PROVIDER = 'resend'
+  delete process.env.HELFI_AWS_SES_REGION
   process.env.RESEND_API_KEY = 'test-resend-key'
   if (getEmailProviderName() !== 'resend') {
     throw new Error('Resend was not retained as the requested fallback provider.')
