@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE on AWS
+- Date/time: 26 August 2026, 2:02 PM AEST
+- What changed: Added an admin-only AWS storage health check, completed the `helfi.ai` and `www.helfi.ai` cutover to AWS Amplify, confirmed AWS email sending, confirmed AWS file save/read/list/delete, and resumed all nine scheduled Helfi jobs.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; source commit `482eed0b`.
+- What to quickly test: Open the main site and sign-in page. AWS checks passed for the website, Neon database connection, internal and external email sending, file storage, and scheduled jobs. The AI service key is still missing on AWS, so Vercel must remain active until that is restored and retested.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (safe migration release; final AWS cutover not yet done)
 - Date/time: 25 August 2026, 3:45 PM AEST
 - What changed: Added the shared AWS email and file-storage support while retaining Resend and Vercel Blob as automatic fallbacks. Every current website email path is covered. This release does not switch the live domain or remove either fallback.
