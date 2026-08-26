@@ -1,8 +1,16 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { randomUUID } from 'crypto'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import { prisma } from '@/lib/prisma'
 import { isEmailConfigured } from '@/lib/email-client'
-import { isObjectStorageConfigured } from '@/lib/object-storage'
+import {
+  del,
+  getObjectStorageProviderName,
+  head,
+  isObjectStorageConfigured,
+  list,
+  put,
+} from '@/lib/object-storage'
 
 const hasValue = (value?: string | null) => Boolean(value && value.trim().length > 0)
 const STORAGE_ENCRYPTION_KEY = 'storage_encryption_at_rest'
@@ -147,6 +155,44 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json().catch(() => ({}))
+    if (body?.action === 'test-object-storage') {
+      const pathname = `migration-canary/${randomUUID()}.txt`
+      let deleted = false
+
+      try {
+        const stored = await put(pathname, Buffer.from('helfi-storage-canary'), {
+          access: 'public',
+          contentType: 'text/plain',
+        })
+        const metadata = await head(stored.pathname)
+        const listed = await list({ prefix: stored.pathname, limit: 1 })
+
+        await del(stored.pathname)
+        deleted = true
+
+        const remaining = await list({ prefix: stored.pathname, limit: 1 })
+        const listedBeforeDelete = listed.blobs.some((blob) => blob.pathname === stored.pathname)
+        const absentAfterDelete = !remaining.blobs.some((blob) => blob.pathname === stored.pathname)
+
+        return NextResponse.json({
+          ok: metadata.pathname === stored.pathname && listedBeforeDelete && absentAfterDelete,
+          provider: getObjectStorageProviderName(),
+          checks: {
+            write: true,
+            read: metadata.pathname === stored.pathname,
+            list: listedBeforeDelete,
+            delete: absentAfterDelete,
+          },
+        })
+      } finally {
+        if (!deleted) {
+          await del(pathname).catch((cleanupError) => {
+            console.warn('Storage canary cleanup failed:', cleanupError)
+          })
+        }
+      }
+    }
+
     if (body?.action !== 'confirm-storage-encryption') {
       return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
