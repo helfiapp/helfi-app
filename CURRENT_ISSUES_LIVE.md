@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE on AWS
+- Date/time: 26 August 2026, 5:39 PM AEST
+- What changed: Completed the final hosting cutover from Vercel to AWS Amplify. Added a fresh Helfi OpenAI project key to AWS, corrected the AWS runtime build setting, passed a real Talk to Helfi response test, moved `helfi.ai` and `www.helfi.ai` to AWS CloudFront, resumed all nine AWS background schedules, and downgraded Vercel Pro to the free Hobby plan. Neon remains the production database and Helfi Resend remains on its free $0 plan.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; AWS Amplify app `d2n4u4zm85ooe`, successful build job `17`.
+- What to quickly test: Open the main site and Talk to Helfi. The public website must load from AWS, Talk to Helfi must answer, normal emails must continue through AWS SES, and Vercel billing must show Hobby Plan.
+
+DEPLOYED:
 - LIVE or STAGING: AWS migration test completed; LIVE safely returned to Vercel
 - Date/time: 26 August 2026, 2:11 PM AEST
 - What changed: Added an admin-only AWS storage health check and completed a full temporary `helfi.ai`/`www.helfi.ai` AWS cutover test. AWS passed website, Neon database, internal/external email, file save/read/list/delete, domain certificate, and schedule configuration checks. The public domain was then returned to Vercel because the AI service key is still missing on AWS.
