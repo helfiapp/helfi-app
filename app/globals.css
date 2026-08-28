@@ -2,8 +2,6 @@
 @tailwind components;
 @tailwind utilities;
 
-@import 'leaflet/dist/leaflet.css';
-
 /* Keep app icons local so Google Fonts cannot delay the first page render. */
 @font-face {
   font-family: 'Material Symbols Outlined';
