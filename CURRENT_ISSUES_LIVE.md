@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE on AWS
+- Date/time: 28 August 2026, 11:35 AM AEST
+- What changed: Improved mobile homepage speed by removing slow external icon-font requests and stopping practitioner-map styles from loading on the homepage.
+- Where to see it (page/link): https://helfi.ai/; AWS Amplify build job `20`; source commits `f6e59cb7` and `9e502cb6`.
+- What to quickly test: Open the homepage on a phone and confirm the logo, buttons, icons, and practitioner map still display normally.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE on AWS
 - Date/time: 26 August 2026, 5:39 PM AEST
 - What changed: Completed the final hosting cutover from Vercel to AWS Amplify. Added a fresh Helfi OpenAI project key to AWS, corrected the AWS runtime build setting, passed a real Talk to Helfi response test, moved `helfi.ai` and `www.helfi.ai` to AWS CloudFront, resumed all nine AWS background schedules, and downgraded Vercel Pro to the free Hobby plan. Neon remains the production database and Helfi Resend remains on its free $0 plan.
 - Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; AWS Amplify app `d2n4u4zm85ooe`, successful build job `17`.
