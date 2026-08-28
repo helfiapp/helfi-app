@@ -122,14 +122,6 @@ export default function RootLayout({
           sizes="180x180"
           href="/apple-touch-icon-helfi-ios-nontransparent-v20260722g-180.png"
         />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/icon?family=Material+Icons+Round"
-        />
-        <link
-          rel="stylesheet"
-          href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL,GRAD@500,0,0"
-        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
