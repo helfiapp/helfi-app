@@ -3,7 +3,7 @@
 This file is for quick handover. A new agent should be able to read this and
 start helping without the owner needing to copy/paste lots of background.
 
-Last updated: Feb 7, 2026
+Last updated: Sep 8, 2026
 
 ## Critical OpenAI Key Warning
 - Do not export, copy, print, or use `OPENAI_API_KEY` from agent scripts or terminal commands.
@@ -17,8 +17,9 @@ Last updated: Feb 7, 2026
 ## Where Things Live
 - Live site: `https://helfi.ai`
 - Staging (test site): `https://stg.helfi.ai`
-- Vercel deployments page: `https://vercel.com/louie-veleskis-projects/helfi-app/deployments`
-- Deployment status script (must be used after pushes): `./scripts/check-deployment-status.sh` (also verifies `helfi.ai` and `www.helfi.ai` point to the newest READY deploy)
+- Production hosting: AWS Amplify app `d2n4u4zm85ooe` in Sydney (`ap-southeast-2`)
+- The old Vercel `helfi-app` project was permanently removed on Sep 8, 2026. Do not recreate or relink it.
+- After a push, verify the newest AWS Amplify job succeeds and confirm both `helfi.ai` and `www.helfi.ai` load through AWS CloudFront.
 
 ## Agent Coordination (Required)
 
@@ -31,7 +32,7 @@ Linear project link: https://linear.app/helfi/project/helfi-dev-565afd449e32
 Rules:
 1. Every agent must claim ONE ticket and move it to `Doing` before starting.
 2. Only ONE ticket can be `Ready to deploy` at a time. If someone else is already `Ready to deploy`, wait.
-3. After a deploy is confirmed READY in Vercel, the agent must move the ticket to `Deployed` and write the `DEPLOYED:` note at the top of `CURRENT_ISSUES_LIVE.md`.
+3. After a deploy is confirmed successful in AWS Amplify, the agent must move the ticket to `Deployed` and write the `DEPLOYED:` note at the top of `CURRENT_ISSUES_LIVE.md`.
 
 Note: Linear may show default columns like `Todo / In Progress / Done`. That is fine:
 - `In Progress` = `Doing`
@@ -48,7 +49,7 @@ Rules:
 1. Default: deploy straight to LIVE (https://helfi.ai).
 2. Staging (https://stg.helfi.ai) is optional. Use it only if the owner asks, or if the change is risky.
 3. One task per deploy (do not bundle unrelated changes).
-4. After every deploy, verify Vercel is READY, then write a short `DEPLOYED` note at the TOP of `CURRENT_ISSUES_LIVE.md`.
+4. After every deploy, verify AWS Amplify succeeded and both live domains load through AWS CloudFront, then write a short `DEPLOYED` note at the TOP of `CURRENT_ISSUES_LIVE.md`.
 
 If/when real users are on the site, switch to staging-first to avoid breaking things for users.
 

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE on AWS
+- Date/time: 8 September 2026, 6:45 PM AEST
+- What changed: Permanently removed the obsolete Helfi Vercel project and its old deployments, functions, and scheduled jobs. AWS was not changed. Updated the handover note so future agents do not recreate Vercel hosting.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; AWS Amplify app `d2n4u4zm85ooe`.
+- What to quickly test: Both live domains must return 200 through AWS CloudFront. `helfi-app.vercel.app` must return 404, and `helfi-app` must no longer appear in the Vercel project list.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE on AWS
 - Date/time: 28 August 2026, 11:35 AM AEST
 - What changed: Improved mobile homepage speed by removing slow external icon-font requests and stopping practitioner-map styles from loading on the homepage.
 - Where to see it (page/link): https://helfi.ai/; AWS Amplify build job `20`; source commits `f6e59cb7` and `9e502cb6`.
