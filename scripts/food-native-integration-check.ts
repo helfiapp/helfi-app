@@ -4,11 +4,12 @@ import vm from 'node:vm'
 import ts from 'typescript'
 import { materializeMealPortion } from '../native/src/lib/mealPortions'
 import { convertFoodAmount, parseFoodServing, liquidDensity } from '../native/src/lib/foodUnits'
+import * as nutrientValues from '../native/src/lib/nutrientValues'
 
 // Execute the actual screen's pure read/editor/save functions, without React or network calls.
 const source = ts.createSourceFile('screen.tsx', fs.readFileSync('native/src/screens/TrackCaloriesScreen.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const code = source.statements.filter((node) => ts.isFunctionDeclaration(node) && node.name && !/^[A-Z]/.test(node.name.text)).map(node => node.getText(source)).join('\n')
-const context: any = { materializeMealPortion, convertFoodAmount, parseFoodServing, liquidDensity }
+const context: any = { ...nutrientValues, materializeMealPortion, convertFoodAmount, parseFoodServing, liquidDensity }
 vm.createContext(context)
 vm.runInContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText, context)
 for (const scale of [0.5, 1, 2]) {
@@ -35,6 +36,12 @@ assert.equal(smaller.servings, 0.92)
 assert.ok(Math.abs(context.calculateFavoriteAdjustTotals([smaller]).calories - 813.28) < 0.001)
 const unknown = context.buildFavoriteAdjustItemFromSearchFood({ name: 'Unknown sauce', id: 'sauce', serving_size: '100 ml', calories: 120 })
 assert.deepEqual(Array.from(context.favoriteAmountUnitOptions(unknown)), ['ml', 'fl oz'])
+for (const name of ['Mayonnaise, reduced fat, with olive oil', 'Apple juice, frozen concentrate, diluted with 3 volume water', 'Water chestnuts, chinese, raw', 'Egg, scrambled, with milk']) {
+  const food = context.buildFavoriteAdjustItemFromSearchFood({ name, id: 'original-mixture', serving_size: '100 g', calories: 120, protein_g: 2, carbs_g: 4, fat_g: 10 })
+  assert.equal(food.baseUnit, 'g', `${name}: recorded weight basis remains weight`)
+  assert.deepEqual(Array.from(context.favoriteAmountUnitOptions(food)), ['g', 'oz'], `${name}: no invented density in native editor`)
+  assert.equal(context.calculateFavoriteAdjustTotals([context.updateFavoriteAdjustItemAmount(food, '50')]).calories, 60)
+}
 assert.equal(context.parseServingBaseForFavorite('8 fl oz').unit, 'fl oz')
 assert.equal(context.nullableNumber(null), null)
 assert.equal(context.hasServingOptionMacroData({ calories: 120, protein_g: null, carbs_g: 30, fat_g: 0 }), false)

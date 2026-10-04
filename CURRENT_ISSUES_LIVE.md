@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai — AWS Amplify job48; BUILD, DEPLOY and VERIFY all SUCCEED. Both domains HTTP200 through CloudFront.
+- Date/time: 5 October2026,7:16am Melbourne.
+- What changed: Web Add Ingredient uses shared liquid density, explicit liquid household volumes, distinct weight/fluid ounces and metric-first serving labels. Unweighed portions keep the source serving/count basis; unknown densities restrict incompatible units. Precise serving ratios, null/true-zero optional values and invalid-amount/missing-basis blocking survive saves. Commit bd957f84f575449f02224d6aec4f5ea0fb85e244.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient — the normal adjustment/default/save flow. Protected search, rename, credits and native screens unchanged.
+- What to quickly test: Actual calculation/default/save fixtures first reproduced100g milk62.83 vs61; corrected cases pass for milk/oil/juice/eggs/zero/unknown/unweighed portions. Final build/typecheck, protected hashes and278/79 locks passed. Live whole milk100g61 saves on website and reopens on phone with all six cards (daily809/wallet619); oil15ml122/15g133 and unknown-density juice gram basis pass. Zero amount blocks saving, but its warning appears behind the window and remains open. Missing optional save fixtures pass; additional ordinary runtime save remains pending. Preferred synthetic milk provenance and saved diary amount captions remain separate open issues; food-photo model/store readiness remain incomplete.
+
+DEPLOYED:
 - LIVE: https://helfi.ai — AWS Amplify job47; BUILD, DEPLOY and VERIFY all SUCCEED. Both domains HTTP200 through CloudFront.
 - Date/time: 5 October2026,6:47am Melbourne.
 - What changed: Single-food API100g-to100ml conversion uses the existing shared density, leaves unknown-density drinks on their recorded gram basis, retains full precision/source IDs/provider options and preserves unknown optional nutrients and genuine zero. Commit b57d66c4c6dd7045e1859a64d23a0ff40b2b7c9b.

@@ -44,6 +44,11 @@ close(ctx.convertAdjustAmount(1, 'serving', 'g', base, null, milk.name), 103)
 assert.deepEqual(Array.from(ctx.buildAdjustUnitOptions('Apple juice', null, null, 'g')), ['g', 'oz'])
 assert.ok(!ctx.buildAdjustUnitOptions('Apple juice', null, null, 'ml').includes('g'))
 assert.ok(ctx.buildAdjustUnitOptions(milk.name, null, null, 'ml').includes('g'))
+for (const name of ['Mayonnaise, reduced fat, with olive oil', 'Apple juice, frozen concentrate, diluted with 3 volume water']) {
+  assert.ok(!ctx.buildAdjustUnitOptions(name, null, null, 'g').includes('ml'), `${name}: no guessed volume option`)
+  close(ctx.computeServingsFromAmount(50, 'g', { amount: 100, unit: 'g' }, null, name), 0.5)
+  assert.ok(Number.isNaN(ctx.computeServingsFromAmount(100, 'ml', { amount: 100, unit: 'g' }, null, name)), `${name}: unknown weight/volume cannot silently convert`)
+}
 assert.equal(ctx.formatAdjustUnitLabel('tbsp', milk.name), 'tbsp — 15 ml')
 assert.equal(ctx.formatAdjustUnitLabel('cup', milk.name), 'cup — 240 ml')
 close(ctx.computeServingsFromAmount(2, 'egg-large', { amount: 100, unit: 'g' }, null, 'Egg, whole, raw'), 1)

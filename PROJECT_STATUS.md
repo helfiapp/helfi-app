@@ -12,10 +12,10 @@ Last updated: Oct 5, 2026
 
 ## Current Release Repair Work
 - The full 1 October food/Apple audit repair goal is active under HEL-440.
-- Latest verified live source: `b57d66c4c6dd7045e1859a64d23a0ff40b2b7c9b`, AWS job47; all steps succeeded and both live domains loaded on Oct5.
+- Latest verified live source: `bd957f84f575449f02224d6aec4f5ea0fb85e244`, AWS job48; all steps succeeded and both live domains loaded on Oct5.
 - Six nutrient cards, serving/unit errors, missing-versus-zero values and native recipe zero-calorie imports have been repaired. Actual iPhone/iPad/web recipe save/reopen and portions agree.
 - Updated native Release simulator apps are signed in; these are not new signed store uploads. Store submissions are not complete.
-- Remaining work and evidence: `docs/RELEASE_REPAIR_PROGRESS_2026-10-04.json`. API liquid mapper repaired; next repair actual web Add Ingredient weight/volume and household units plus missing nutrient preservation. Review hard-coded preferred liquid results labelled USDA separately. FatSecret live supplier/region checks, restaurant custom serving-basis review, recipe-import wallet refresh, current AU labels/known-weight photos, model comparison and final signed device/store checks remain.
+- Remaining work and evidence: `docs/RELEASE_REPAIR_PROGRESS_2026-10-04.json`. API liquid mapper and ordinary web Add Ingredient portions repaired. Live website100g milk61 saved/reopened on phone with all six cards, daily809/wallet619; olive oil15ml122/15g133. Shared density incorrectly recognizes ingredient mentions in mixed foods; repair underway. Invalid amount save is blocked but its warning needs placement inside the window. Additional ordinary web missing-optional runtime save remains pending. Review hard-coded preferred liquid results labelled USDA separately. FatSecret live supplier/region checks, restaurant custom serving-basis review, recipe-import wallet refresh, current AU labels/known-weight photos, model comparison and final signed device/store checks remain.
 - Five owner information/approval questions remain unanswered: the three live credit API responses (required by GUARD_RAILS2082), plus Android SDK/ARM licenses, Apple HealthKit/Push profile access, Helfi admin login, and deleting/replacing incorrect iPad listing screenshots. Do not assume approval or repeat the same questions.
 
 ## What Helfi Is Right Now

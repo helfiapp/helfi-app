@@ -1,12 +1,20 @@
 export type FoodBaseUnit = 'g' | 'ml' | 'oz' | 'fl oz'
 export const liquidDensity = (name: string): number | null => {
   const label = name.toLowerCase()
-  if (/\b(powder|cake|bread|biscuit|cookie|chocolate|bar|soup|stew|chicken|beef|rice|pasta)\b/.test(label)) return null
-  if (/\boil\b/.test(label)) return 0.92
-  if (/\bsyrup\b/.test(label)) return 1.33
-  if (/\bhoney\b/.test(label)) return 1.42
-  if (/\bmilk\b/.test(label) && !/\b(chocolate|powder)\b/.test(label)) return 1.03
-  if (/\bwater\b/.test(label)) return 1
+  // A named ingredient is not the density of the whole food (e.g. mayonnaise
+  // with olive oil or juice diluted with water). Identify the food itself first.
+  const head = label.split(',')[0].replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, ' ')
+  if (/\b(powder|dry|dried|cake|bread|biscuit|cookie|chocolate|bar|soup|stew|chicken|beef|pasta|sauce|dressing|mayonnaise|spray|concentrate|concentrated|condensed|evaporated)\b/.test(label)) return null
+  const composition = label.replace(/\bwith(?: added)? vitamins?\b/g, '')
+  if (/\b(with|containing|contains|mixed|blend|blended)\b/.test(composition)) return null
+  const oilName = /^(?:(?:extra virgin|virgin|pure|refined|unrefined|cold pressed) )?(?:olive|canola|rapeseed|sunflower|safflower|soybean|soy|corn|peanut|groundnut|sesame|vegetable|avocado|grapeseed|grape seed|rice bran|cottonseed|palm|coconut|walnut|fish|cod liver|salad|cooking) oil$/
+  if (head === 'oil' || oilName.test(head)) return 0.92
+  if (head === 'syrup' || head === 'maple syrup') return 1.33
+  if (head === 'honey' || head === 'pure honey') return 1.42
+  const milkName = /^(?:milk|(?:whole|skim(?:med)?|nonfat|low ?fat|reduced fat|full cream|cow s|cow|goat s|goat|sheep s|sheep|dairy|fluid|[0-3](?: percent)?(?: fat)?) milk|milk (?:whole|skim(?:med)?|nonfat|low ?fat|reduced fat|full cream|fluid))$/
+  if (milkName.test(head) && !/\b(almond|soy|soya|oat|coconut|rice|cashew|hemp|breast|buttermilk|flavored|flavoured|malted|syrup|shake|smoothie)\b/.test(label)) return 1.03
+  const waterName = /^(?:(?:tap|drinking|bottled|spring|mineral|sparkling|carbonated|distilled|purified) )?water$/
+  if (waterName.test(head) && !/\b(juice|coconut|flavored|flavoured|sweetened|sugar|syrup|tonic|chestnuts?)\b/.test(label)) return 1
   return null
 }
 export function convertFoodAmount(value: number, from: FoodBaseUnit, to: FoodBaseUnit, density?: number | null): number {

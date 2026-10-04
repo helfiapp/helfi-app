@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T18:46:15.318Z",
+  "generatedAt": "2026-10-04T20:43:56.973Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -213,7 +213,7 @@
     "native/src/lib/dailyTargets.ts": "8ada3e9e7f09218f025bb4041ebfeeadb2c249c512ea3edcfff85bc800da7776",
     "native/src/lib/foodPhoto.ts": "cd3263caa424dd69c88c494977bfdc3a205f3ac3a647d6612423900e61213b2b",
     "native/src/lib/foodPreparation.ts": "b0db28b4b9a93184b335708f801c12993a79400f5f586f959b759008e9750e42",
-    "native/src/lib/foodUnits.ts": "9b7221e444dd5208dc51a0041bb038b8ef9d708617f7bb4964601973bccc36b4",
+    "native/src/lib/foodUnits.ts": "6fafcbe263f3360337b3ed4d98edf46dfa269c1e1803906635363d84679a06ab",
     "native/src/lib/inAppPurchase.ts": "90402ffd3070379cc354526a3e39f05f114e7cf16a828edf6fb2097ebaa51a9d",
     "native/src/lib/mealPortions.ts": "1da52b62b53f3bacbfbbe1e0f7afc0047c5dca3991851d972f08b7e7f1a6e858",
     "native/src/lib/nativeAuthHeaders.ts": "8b6a8a2b33b95d497a4d7bab4fe9003ea91db6a6a3c78bcd80ce63bb6f1dbdf9",

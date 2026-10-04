@@ -51,10 +51,23 @@ const water = normalize({ ...milk, name: 'Water', calories: 0, protein_g: 0, car
 assert.equal(water.serving_size, '100 ml')
 assert.equal(water.calories, 0)
 assert.equal(water.fiber_g, null)
-for (const name of ['Apple juice', 'Black tea', 'Vegetable broth', 'Milk powder', 'Milk chocolate bar', 'Egg, whole, cooked, hard-boiled']) {
+for (const name of ['Apple juice', 'Black tea', 'Vegetable broth', 'Milk powder', 'Milk chocolate bar', 'Egg, whole, cooked, hard-boiled',
+  'Mayonnaise, reduced fat, with olive oil',
+  'Apple juice, frozen concentrate, diluted with 3 volume water',
+  'Water chestnuts, chinese, raw', 'Egg, scrambled, with milk',
+  'Milk, canned, condensed, sweetened', 'Milk, evaporated',
+  'Almond milk', 'Milk, coconut', 'Soy milk', 'Milk, dry, whole',
+  'Honey roasted peanuts', 'Pancake with maple syrup', 'Oil, cooking spray',
+  'Honey, with nuts', 'Milk, mixed with water', 'Syrup, with fruit']) {
   const original = { ...milk, name }
+  assert.equal(liquidDensity(name), null, `${name}: ingredient mention is not a known liquid density`)
   assert.equal(normalize(original), original, `${name}: do not guess a density or convert a solid`)
 }
+for (const [name, density] of [
+  ['Oil, olive, salad or cooking', 0.92], ['Extra virgin olive oil', 0.92],
+  ['Milk, whole, 3.25% milkfat, without added vitamin A and vitamin D', 1.03],
+  ['Skim milk', 1.03], ['Water, tap, drinking', 1], ['Honey', 1.42], ['Maple syrup', 1.33],
+] as const) assert.equal(liquidDensity(name), density, `${name}: retain identified liquid conversion`)
 for (const serving_size of ['100 ml', '30 g', '1 cup (244 g)', '200 ml']) {
   const original = { ...milk, serving_size }
   assert.equal(normalize(original), original, 'other provider bases stay unchanged')
