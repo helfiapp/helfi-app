@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 /**
  * ⚠️ CRITICAL: DO NOT MODIFY THIS FILE WITHOUT EXTREME CAUTION ⚠️
  * 
@@ -108,6 +109,9 @@ export async function POST(
   _request: Request,
   context: { params: { slug: string } }
 ) {
+  const consentResponse = await aiConsentRequiredResponse(_request)
+  if (consentResponse) return consentResponse
+
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

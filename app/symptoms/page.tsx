@@ -205,7 +205,7 @@ export default function SymptomAnalysisPage() {
       return
     }
 
-    if (!hasSavedAiConsent()) {
+    if (!(await hasSavedAiConsent())) {
       setShowAiConsent(true)
       return
     }
@@ -213,8 +213,8 @@ export default function SymptomAnalysisPage() {
     await runSymptomNotes()
   }
 
-  const handleAiConsentAgree = () => {
-    saveAiConsent()
+  const handleAiConsentAgree = async () => {
+    try { await saveAiConsent() } catch { setError('Could not save AI permission. Please try again.'); return }
     setShowAiConsent(false)
     void runSymptomNotes()
   }

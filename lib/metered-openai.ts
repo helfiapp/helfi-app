@@ -20,6 +20,7 @@ export type CompletionWithCost<T = any> = {
 };
 
 function shouldReportCriticalOpenAIError(error: any): boolean {
+  if (error?.code === 'ai_consent_required') return false
   const status = Number(error?.status ?? error?.statusCode ?? error?.response?.status ?? 0)
   const code = String(error?.code || error?.error?.code || '').toLowerCase()
   const message = String(error?.message || '').toLowerCase()

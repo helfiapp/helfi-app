@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { getServerSession } from 'next-auth';
@@ -194,6 +195,9 @@ async function resolveMedicalAnalysisUser(request: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(req)
+  if (consentResponse) return consentResponse
+
   try {
     // Health image notes access check.
     const user = await resolveMedicalAnalysisUser(req);

@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
@@ -228,6 +229,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(req)
+  if (consentResponse) return consentResponse
+
   try {
     const isNativeClient = Boolean(req.headers.get('x-native-token') || req.headers.get('X-Native-Token'))
     const chatUser = await resolveMedicalChatUser(req)

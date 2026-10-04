@@ -10,12 +10,16 @@ const routePath = path.join(root, 'app/api/native/voice-assistant/route.ts')
 const realtimeRoutePath = path.join(root, 'app/api/native/voice-assistant/realtime/route.ts')
 const voiceAssistantPath = path.join(root, 'native/src/voice/VoiceAssistant.tsx')
 const realtimeClientPath = path.join(root, 'native/src/voice/realtimeVoice.ts')
+const audioRoutePath = path.join(root, 'native/ios/Helfi/HelfiAudioRoute.m')
+const creditSystemPath = path.join(root, 'lib/credit-system.ts')
 const voiceDurationPath = path.join(root, 'lib/exercise/voice-duration.ts')
 
 let source = fs.readFileSync(routePath, 'utf8')
 const realtimeSource = fs.existsSync(realtimeRoutePath) ? fs.readFileSync(realtimeRoutePath, 'utf8') : ''
 const voiceAssistantSource = fs.existsSync(voiceAssistantPath) ? fs.readFileSync(voiceAssistantPath, 'utf8') : ''
 const realtimeClientSource = fs.existsSync(realtimeClientPath) ? fs.readFileSync(realtimeClientPath, 'utf8') : ''
+const audioRouteSource = fs.existsSync(audioRoutePath) ? fs.readFileSync(audioRoutePath, 'utf8') : ''
+const creditSystemSource = fs.existsSync(creditSystemPath) ? fs.readFileSync(creditSystemPath, 'utf8') : ''
 let voiceDurationSource = fs.readFileSync(voiceDurationPath, 'utf8')
 voiceDurationSource = voiceDurationSource.replace(/^export\s+/gm, '')
 source = source
@@ -92,6 +96,16 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__realtimeClientSource.includes("type: 'response.cancel'") && __realtimeClientSource.includes("type: 'output_audio_buffer.clear'") && __realtimeClientSource.includes("type: 'input_audio_buffer.clear'"), 'Native realtime shutdown must cancel the current reply and clear queued input/output audio before closing WebRTC.')
     assert(__realtimeClientSource.includes('function likelyAssistantEcho') && __realtimeClientSource.includes('recentAssistantTextAt') && __realtimeClientSource.includes("payload.type === 'conversation.item.input_audio_transcription.completed'"), 'Native realtime voice must suppress immediate assistant-audio echoes before they create repeating turns.')
     assert(__realtimeClientSource.includes('echoCancellation: true') && __realtimeClientSource.includes('noiseSuppression: true') && __realtimeClientSource.includes('autoGainControl: true'), 'Native realtime microphone capture must request acoustic echo cancellation and noise control.')
+    assert(__realtimeClientSource.includes('pc.getStats?.()') && __realtimeClientSource.includes("stat.type === 'outbound-rtp'") && __realtimeClientSource.includes('stat.packetsSent') && __realtimeClientSource.includes('stat.bytesSent') && __realtimeClientSource.includes("stat.type === 'media-source'") && __realtimeClientSource.includes('stat.totalAudioEnergy'), 'Native realtime must record outgoing microphone traffic and real audio energy instead of treating a connected track as proof of speech.')
+    assert(__realtimeClientSource.includes('!dataChannelOpen || !peerConnected || !sessionReady || !microphoneSending || !remoteAudioReady') && __realtimeClientSource.includes('await readinessPromise'), 'Native realtime must wait for the conversation link, media link, session, microphone, and speaker path before reporting a live session.')
+    assert(__realtimeClientSource.includes("payload.type === 'input_audio_buffer.speech_started'") && __realtimeClientSource.includes("payload.type === 'input_audio_buffer.speech_stopped'"), 'Native realtime must show when speech is genuinely heard and when Helfi is preparing the reply.')
+    assert(__realtimeClientSource.includes('armSilenceReminder') && __realtimeClientSource.includes("I didn't hear anything. Please try speaking again."), 'Native realtime must visibly and audibly recover when the user stays silent.')
+    assert(__realtimeClientSource.includes("payload.type === 'error'") && __realtimeClientSource.includes('realtimeErrorMessage(payload)'), 'Native realtime must surface voice-service errors instead of silently waiting forever.')
+    assert(__realtimeClientSource.includes('payload.response.output.filter') && __realtimeClientSource.includes('toolCalls.some(handleToolCall)'), 'Native realtime must recover completed action tool calls from the final response event.')
+    assert(__realtimeClientSource.includes("'x-helfi-voice-session-id': cleanText(params.billingSessionId)") && __voiceAssistantSource.includes('realtimeBillingSessionIdRef'), 'Native realtime retries must keep one billing session ID for the same voice conversation.')
+    assert(__realtimeRouteSource.includes('.chargeCentsOnce(chargeCents') && __realtimeRouteSource.includes('voice-assistant:realtime-charge-marker') && __creditSystemSource.includes('async chargeCentsOnce') && __creditSystemSource.includes('pg_advisory_xact_lock(hashtext(\${this.userId}))') && __creditSystemSource.includes('chargeCentsInTransaction(costCents, tx)') && __creditSystemSource.includes('tx.aIUsageEvent.create'), 'Realtime billing retries must atomically save a persistent marker so the same conversation is charged at most once.')
+    assert(__realtimeClientSource.includes('requireHelfiAudioRoute') && __realtimeClientSource.includes('HelfiAudioRouteChanged') && __realtimeClientSource.includes('onAudioRoute'), 'Native realtime must use the iPhone audio-route bridge and show route changes.')
+    assert(__audioRouteSource.includes('RTCAudioSession.sharedInstance') && __audioRouteSource.includes('lockForConfiguration') && __audioRouteSource.includes('setWebRTCConfiguration') && __audioRouteSource.includes('AVAudioSessionCategoryOptionDefaultToSpeaker') && __audioRouteSource.includes('AVAudioSessionCategoryOptionAllowBluetoothHFP') && __audioRouteSource.includes('AVAudioSessionInterruptionNotification'), 'The iPhone audio bridge must use the WebRTC audio controller, default to the speaker, preserve Bluetooth microphone routing, and detect interruptions.')
     assert(__voiceAssistantSource.includes('realtimeVoiceAbortRef') && __voiceAssistantSource.includes('abortController?.abort()'), 'Native live voice Done/Close must abort connecting realtime sessions before they finish.')
     assert(__voiceAssistantSource.includes('realtimeVoiceRunRef') && __voiceAssistantSource.includes('Live voice has stopped.'), 'Native live voice callbacks must be ignored after Done/Close/New chat.')
     assert(__voiceAssistantSource.includes('realtimeActionGuardRef') && __voiceAssistantSource.includes('guardKey') && __voiceAssistantSource.includes('Date.now() - guard.startedAt < 5000'), 'Native live voice must dedupe repeated realtime app-action requests.')
@@ -100,6 +114,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__voiceAssistantSource.includes('realtimeVoiceConnectTimeoutRef') && __voiceAssistantSource.includes('Live voice took too long to connect') && __voiceAssistantSource.includes('armRealtimeConnectTimeout(REALTIME_VOICE_MEDIA_TIMEOUT_MS)'), 'Native live voice must use stage-aware limits instead of staying half-connected or cutting off an answering server.')
     assert(__voiceAssistantSource.includes('const LIVE_VOICE_ENABLED = true') && !__voiceAssistantSource.includes("process.env.EXPO_PUBLIC_HELFI_LIVE_VOICE_ENABLED === 'true'"), 'Native live voice must be the permanent default so the retired recorder cannot return when a build flag is missed.')
     assert(__voiceAssistantSource.includes("'speaking'") && __voiceAssistantSource.includes('Helfi is speaking'), 'Native live voice UI must show when Helfi is speaking.')
+    assert(__voiceAssistantSource.includes("'hearing'") && __voiceAssistantSource.includes('Hearing you') && __voiceAssistantSource.includes("'thinking'") && __voiceAssistantSource.includes('Understanding your request'), 'Native live voice UI must visibly distinguish hearing, thinking, and speaking.')
+    assert(!__voiceAssistantSource.includes("      clearRealtimeConnectTimeout()\\n      realtimeVoiceConnectedRef.current = true\\n      setRealtimeVoiceStatus"), 'Native live voice must not claim Listening merely because the setup function returned.')
     assert(__realtimeClientSource.includes("LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'") && __realtimeClientSource.includes('realtimeApiBaseUrl') && __realtimeClientSource.includes('EXPO_PUBLIC_USE_LOCAL_REALTIME'), 'Native realtime voice must fall back to live when local dev has no AI service, unless local realtime testing is explicitly enabled.')
     assert(__realtimeClientSource.includes('function localRealtimeApiBaseUrl') && __realtimeClientSource.includes('process.env.EXPO_PUBLIC_API_BASE_URL') && __realtimeClientSource.includes('return isLocalDevHost && useLocalRealtime ? raw'), 'Native realtime voice must let EXPO_PUBLIC_USE_LOCAL_REALTIME target the local realtime backend without silently falling back to live.')
     assert(__voiceAssistantSource.includes('onTranscript: (text) => {') && __voiceAssistantSource.includes("appendConversationTurns([makeConversationTurn('user', text)])"), 'Native live voice transcripts must appear in the chat review after voice mode.')
@@ -1730,8 +1746,10 @@ const sandbox = {
   createNativeVoicePromptHandoff: async () => ({ token: 'test-private-token' }),
   __routeSource: source,
   __realtimeRouteSource: realtimeSource,
+  __creditSystemSource: creditSystemSource,
   __nativeSourcesAvailable: Boolean(voiceAssistantSource && realtimeClientSource),
   __realtimeClientSource: realtimeClientSource,
+  __audioRouteSource: audioRouteSource,
   __voiceAssistantSource: voiceAssistantSource,
   prisma: {
     exerciseType: {

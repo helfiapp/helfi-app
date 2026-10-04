@@ -1,6 +1,7 @@
 'use client'
 
 import { SessionProvider } from 'next-auth/react'
+import { AiConsentProvider } from './AiConsentProvider'
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
   return (
@@ -11,7 +12,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       refetchWhenOffline={false}
       refetchInterval={15 * 60}
     >
-      {children}
+      <AiConsentProvider>{children}</AiConsentProvider>
     </SessionProvider>
   )
 }

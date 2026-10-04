@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -96,6 +97,9 @@ export async function POST(
   _request: NextRequest,
   context: { params: { slug: string; section: string } }
 ) {
+  const consentResponse = await aiConsentRequiredResponse(_request)
+  if (consentResponse) return consentResponse
+
   try {
     const session = await getServerSession(authOptions)
     const userId = session?.user?.id || (await getUserIdFromNativeAuth(_request))

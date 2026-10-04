@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { API_BASE_URL } from '../config'
 import { WeeklyReportDataExplorer } from '../components/WeeklyReportDataExplorer'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -803,6 +804,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
 
   const enableWeeklyReports = async () => {
     if (!authHeaders) return
+    if (!(await requestAiDataSharingPermission())) return
     setBusyMessage('Turning on weekly reports...')
     try {
       const res = await fetch(`${API_BASE_URL}/api/reports/weekly/preferences`, {
@@ -825,6 +827,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
 
   const createReportNow = async () => {
     if (!authHeaders) return
+    if (!(await requestAiDataSharingPermission())) return
     setBusyMessage('Creating your report now. This can take a minute.')
     startProgress()
     try {

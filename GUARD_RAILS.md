@@ -3086,6 +3086,11 @@ Last stable deployment: `d1b55505` (2026-02-16)
 ## 8.1 Talk to Helfi Live Voice Safety and Brevity (July 2026 - LOCKED)
 
 **Must keep:**
+- Never show `Listening` from connection or packet counters. A ready connection may say `Ready — speak now`; only the server's real speech-start event may say `Hearing you`.
+- iPhone realtime voice must have one audio-session owner. Configure it through WebRTC's shared audio controller; do not run Expo Audio, InCallManager, or direct AVAudioSession configuration against the same live call.
+- Show truthful separate states for hearing, thinking, and speaking; surface connection, microphone, service, interruption, and silence failures instead of silently waiting.
+- Normal iPhone voice audio must use the speaker, preserve a selected Bluetooth headset, report route changes, and stop safely on an audio interruption.
+- Reconnecting the same voice conversation must atomically reuse its billing claim. Connection retries, confirmations, corrections, and repeated realtime events must not create an extra charge.
 - Pressing Done or closing Talk to Helfi must immediately stop the microphone, assistant audio, connection, pending app actions, and pending voice requests.
 - Late connection or audio work must not restart after the user has stopped live voice.
 - Meal and recipe suggestions must be brief when spoken: say the meal name and one short reason, then ask whether the user wants ingredients and nutrients or cooking steps.
@@ -3134,3 +3139,14 @@ for guidance first.
 - Declared zero energy must remain zero, including foods with small nonzero macros; calculate macro energy only when energy is missing.
 - Unknown fibre/sugar values must remain missing in manual ingredient saves and display as unavailable.
 - Regression evidence: scripts/food-native-save-flow-check.ts, scripts/food-native-integration-check.ts, scripts/food-web-totals-check.ts.
+
+
+## 8.2 AI permission and Apple iPad fallback (4 October 2026)
+
+- Before sending user data to OpenAI, require the authenticated account's current-version `AiDataSharingConsent` record. A local flag or a client-supplied consent header alone is not proof.
+- Show the same disclosure on web/native, including OpenAI, the shared data categories, ordinary tracking without AI, and withdrawal in Settings. Do not send an AI request when the choice is declined, the permission save fails, or the account changes during approval.
+- Withdrawal blocks future AI calls and weekly AI reports before provider/billing work. Keep reading saved records and ordinary food, water, mood and device tracking available.
+- Native consent checks must use the signed-in account and fail closed with a bounded timeout. Never migrate an old global local flag into a server grant.
+- iPhone keeps the live voice layout. iPad must show its usable typed-message controls and explain that microphone input is iPhone only. Never leave iPad waiting on an unsupported voice connection.
+- Voice startup failures must close the connection and stop tracks/timers. Only complete audio/data readiness may produce the live state.
+- Apple upload readiness checks must verify the current candidate commit against the latest successful AWS Amplify master deployment and the actual helfi.ai voice readiness endpoint. Vercel is retired.

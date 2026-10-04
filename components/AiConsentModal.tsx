@@ -1,21 +1,42 @@
 'use client'
 
+import { AI_SHARING_CONSENT_VERSION, AI_SHARING_DISCLOSURE } from '@/lib/ai-consent-text'
+
 export const AI_CONSENT_STORAGE_KEY = 'helfi_ai_help_consent_v1'
 
-export function hasSavedAiConsent() {
+async function consentRequest(granted?: boolean) {
+  const controller = new AbortController()
+  const timeout = setTimeout(() => controller.abort(), 10000)
+  try {
+    return await fetch('/api/ai-consent', {
+      cache: 'no-store', signal: controller.signal,
+      ...(granted === undefined ? {} : { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ granted, version: AI_SHARING_CONSENT_VERSION }) }),
+    })
+  } finally { clearTimeout(timeout) }
+}
+
+export async function hasSavedAiConsent() {
   if (typeof window === 'undefined') return false
   try {
-    return window.localStorage.getItem(AI_CONSENT_STORAGE_KEY) === '1'
+    const response = await consentRequest()
+    const data = await response.json()
+    return response.ok && data.granted === true && data.version === AI_SHARING_CONSENT_VERSION
   } catch {
     return false
   }
 }
 
-export function saveAiConsent() {
-  if (typeof window === 'undefined') return
-  try {
-    window.localStorage.setItem(AI_CONSENT_STORAGE_KEY, '1')
-  } catch {}
+export async function setAiConsent(granted: boolean) {
+  const response = await consentRequest(granted)
+  if (!response.ok) throw new Error('Could not save AI permission. Please try again.')
+  const data = await response.json()
+  if (data.granted !== granted || data.version !== AI_SHARING_CONSENT_VERSION) throw new Error('Could not confirm AI permission. Please try again.')
+  try { window.localStorage.removeItem(AI_CONSENT_STORAGE_KEY) } catch {}
+  window.dispatchEvent(new Event('helfi:ai-consent-changed'))
+}
+
+export async function saveAiConsent() {
+  await setAiConsent(true)
 }
 
 export default function AiConsentModal({
@@ -34,12 +55,7 @@ export default function AiConsentModal({
       <div className="w-full max-w-md rounded-2xl bg-white p-5 shadow-2xl border border-gray-200 text-center">
         <h2 className="text-2xl font-extrabold text-gray-900 mb-4">Allow AI help?</h2>
         <p className="text-sm text-gray-700 leading-6">
-          To use this AI feature, Helfi may send what you choose to share, such as typed text,
-          photos, food logs, health profile details, or lab report text, to OpenAI, LLC.
-        </p>
-        <p className="mt-4 text-sm text-gray-700 leading-6">
-          OpenAI processes it so Helfi can create your AI response. You can say no and still use
-          non-AI tracking like food, water, mood, and device logs.
+          {AI_SHARING_DISCLOSURE}
         </p>
         <div className="mt-6 space-y-3">
           <button

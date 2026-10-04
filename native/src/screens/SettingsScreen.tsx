@@ -5,6 +5,8 @@ import { Feather } from '@expo/vector-icons'
 
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { hasAiDataSharingPermission, requestAiDataSharingPermission, revokeAiDataSharingPermission } from '../lib/aiConsent'
+import { useFocusEffect } from '@react-navigation/native'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
@@ -80,6 +82,13 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
   const [profileVisibility, setProfileVisibility] = useState<ProfileVisibility>('private')
   const [dataAnalytics, setDataAnalytics] = useState(true)
   const [localLoaded, setLocalLoaded] = useState(false)
+  const [aiPermission, setAiPermission] = useState(false)
+  const [aiPermissionSaving, setAiPermissionSaving] = useState(false)
+  useFocusEffect(React.useCallback(() => {
+    let active = true
+    void hasAiDataSharingPermission().then(value => { if (active) setAiPermission(value) })
+    return () => { active = false }
+  }, [session?.token]))
 
   const [weeklyReportsEnabled, setWeeklyReportsEnabled] = useState<boolean | null>(null)
   const [weeklyReportsLoading, setWeeklyReportsLoading] = useState(true)
@@ -200,6 +209,8 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
       return
     }
 
+    if (nextValue && !(await requestAiDataSharingPermission())) return
+    if (nextValue) setAiPermission(true)
     setWeeklyReportsSaving(true)
     setWeeklyReportsError('')
     try {
@@ -342,6 +353,22 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 
         <SectionCard title="Privacy Settings">
           <View style={{ gap: 14 }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+              <View style={{ flex: 1 }}>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>AI help permission</Text>
+                <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
+                  {aiPermission ? 'Allowed. Turn off to stop future sharing with OpenAI, including weekly AI reports.' : 'Off. Ordinary food, water, mood and device tracking still work.'}
+                </Text>
+              </View>
+              <Switch accessibilityLabel="AI help permission" value={aiPermission} disabled={aiPermissionSaving || mode !== 'signedIn'}
+                onValueChange={async allowed => {
+                  setAiPermissionSaving(true)
+                  const saved = allowed ? await requestAiDataSharingPermission() : await revokeAiDataSharingPermission()
+                  if (saved) setAiPermission(allowed)
+                  else if (!allowed) Alert.alert('Could not withdraw permission', 'Please try again. Your AI permission has not changed.')
+                  setAiPermissionSaving(false)
+                }} trackColor={{ false: '#D1D5DB', true: '#86D2A2' }} thumbColor="#FFFFFF" />
+            </View>
             <View>
               <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Profile Visibility</Text>
               <Text style={{ color: theme.colors.muted, marginTop: 4 }}>Make your profile visible to others</Text>

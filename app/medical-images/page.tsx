@@ -301,7 +301,7 @@ export default function MedicalImagesPage() {
       return
     }
 
-    if (!hasSavedAiConsent()) {
+    if (!(await hasSavedAiConsent())) {
       setShowAiConsent(true)
       return
     }
@@ -309,8 +309,8 @@ export default function MedicalImagesPage() {
     await runImageNotes()
   }
 
-  const handleAiConsentAgree = () => {
-    saveAiConsent()
+  const handleAiConsentAgree = async () => {
+    try { await saveAiConsent() } catch { setError('Could not save AI permission. Please try again.'); return }
     setShowAiConsent(false)
     void runImageNotes()
   }

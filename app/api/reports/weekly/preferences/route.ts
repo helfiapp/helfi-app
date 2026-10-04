@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { CreditManager } from '@/lib/credit-system'
 import { getWeeklyReportState, setWeeklyReportsEnabled } from '@/lib/weekly-health-report'
 import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@/lib/weekly-report-request-auth'
+import { hasAiSharingConsent } from '@/lib/ai-consent'
 
 export async function GET(request: NextRequest) {
   const requestUser = await getWeeklyReportRequestUser(request)
@@ -31,6 +32,9 @@ export async function POST(request: NextRequest) {
   }
 
   if (enabled) {
+    if (!(await hasAiSharingConsent(requestUser.id))) {
+      return NextResponse.json({ error: 'Please allow AI help before turning on weekly AI reports.', code: 'ai_consent_required' }, { status: 403 })
+    }
     const healthSetupComplete = await isWeeklyReportHealthSetupComplete(requestUser.id)
     if (!healthSetupComplete) {
       return NextResponse.json({ error: 'health_setup_required' }, { status: 403 })

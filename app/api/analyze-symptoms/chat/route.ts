@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -59,6 +60,9 @@ export async function GET(req: NextRequest) {
 }
 
 export async function POST(req: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(req)
+  if (consentResponse) return consentResponse
+
   try {
     const session = await getServerSession(authOptions)
     const userId = session?.user?.id || (await getUserIdFromNativeAuth(req))

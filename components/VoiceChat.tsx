@@ -2021,7 +2021,7 @@ export default function VoiceChat({
       return
     }
 
-    if (!hasSavedAiConsent()) {
+    if (!(await hasSavedAiConsent())) {
       pendingAiSendRef.current = { messageText, options }
       setShowAiConsent(true)
       return
@@ -2397,8 +2397,8 @@ export default function VoiceChat({
     sendChatMessageRef.current = sendChatMessage
   }, [sendChatMessage])
 
-  const handleAiConsentAgree = () => {
-    saveAiConsent()
+  const handleAiConsentAgree = async () => {
+    try { await saveAiConsent() } catch { setError('Could not save AI permission. Please try again.'); return }
     setShowAiConsent(false)
     const pending = pendingAiSendRef.current
     pendingAiSendRef.current = null

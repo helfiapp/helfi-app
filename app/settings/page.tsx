@@ -8,6 +8,7 @@ import { usePathname } from 'next/navigation'
 import Image from 'next/image'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import MobileMoreMenu from '@/components/MobileMoreMenu'
+import AiPermissionSettings from '@/components/AiPermissionSettings'
 
 // Global dark mode function type
 declare global {
@@ -626,6 +627,7 @@ export default function Settings() {
             <h2 className="text-xl font-bold text-gray-900 dark:text-white mb-6">Privacy Settings</h2>
             
             <div className="space-y-4">
+              <AiPermissionSettings />
               <div className="space-y-2">
                 <div>
                   <h3 className="font-medium text-gray-900 dark:text-white">Download my data (PDF)</h3>

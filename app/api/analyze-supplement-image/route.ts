@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -234,6 +235,9 @@ async function buildVoiceReviewDraft(userId: string, itemType: 'supplement' | 'm
 }
 
 export async function POST(req: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(req)
+  if (consentResponse) return consentResponse
+
   try {
     const user = await resolveRequestUser(req);
     if (!user) {

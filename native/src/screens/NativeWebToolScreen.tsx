@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from 'react-native'
+import { ActivityIndicator, Alert, Linking, Pressable, ScrollView, Text, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
@@ -7,7 +7,7 @@ import { WebView } from 'react-native-webview'
 
 import { API_BASE_URL } from '../config'
 import { NATIVE_WEB_PAGES } from '../config/nativePageRoutes'
-import { grantAiDataSharingPermission, hasAiDataSharingPermission } from '../lib/aiConsent'
+import { AI_SHARING_DISCLOSURE, grantAiDataSharingPermission, hasAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeWebSource } from '../lib/openNativeWebPath'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -460,15 +460,13 @@ export function NativeWebToolScreen({ route }: { route: any }) {
               Allow AI help?
             </Text>
             <Text style={{ color: theme.colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' }}>
-              To use this AI feature, Helfi may send what you choose to share, such as typed text, voice audio, photos, notes, food logs, health profile details, or lab report text, to OpenAI, LLC.
-            </Text>
-            <Text style={{ color: theme.colors.muted, fontSize: 15, lineHeight: 22, textAlign: 'center' }}>
-              OpenAI processes it so Helfi can create your AI response. You can say no and still use non-AI tracking like food, water, mood, and device logs.
+              {AI_SHARING_DISCLOSURE}
             </Text>
             <Pressable
               onPress={async () => {
-                await grantAiDataSharingPermission()
-                setAiPermissionGranted(true)
+                const allowed = await grantAiDataSharingPermission(session?.token)
+                if (allowed) setAiPermissionGranted(true)
+                else Alert.alert('Permission was not saved', 'Your data was not sent to AI. Please try again.')
               }}
               style={{ marginTop: 8, minHeight: 48, borderRadius: 8, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}
             >

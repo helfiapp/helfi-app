@@ -103,6 +103,18 @@ model User {
   // Lab report relationships
   reports        Report[]
   consentRecords ConsentRecord[]
+  aiDataSharingConsent AiDataSharingConsent?
+}
+
+model AiDataSharingConsent {
+  userId      String   @id
+  version     String
+  disclosure  String
+  granted     Boolean  @default(false)
+  grantedAt   DateTime?
+  withdrawnAt DateTime?
+  updatedAt   DateTime @updatedAt
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Account {

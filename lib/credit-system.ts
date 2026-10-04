@@ -274,91 +274,148 @@ export class CreditManager {
    * Consumes monthly allowance first, then earliest-expiring top-ups (FIFO).
    * Returns true if the charge succeeded, false if insufficient funds.
    */
+  private async chargeCentsInTransaction(costCents: number, tx: any): Promise<boolean> {
+    await this.ensureMonthlyReset(new Date(), tx);
+
+    const user = await tx.user.findUnique({
+      where: { id: this.userId },
+      include: { subscription: true },
+    });
+    if (!user) throw new Error('User not found');
+
+    const hasActiveSubscription = isSubscriptionActive(user.subscription);
+    const plan = hasActiveSubscription ? user.subscription?.plan || null : null;
+    const additionalAvailable = Math.max(0, (user as any).additionalCredits || 0);
+
+    // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
+    let monthlyCapCents = 0;
+    if (plan && user.subscription && hasActiveSubscription) {
+      if (user.subscription.monthlyPriceCents) {
+        // Use direct credit mapping (e.g., $30 → 1,700 credits)
+        monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
+      } else {
+        monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
+      }
+    }
+
+    const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
+    let remainingMonthly = Math.max(0, monthlyCapCents - monthlyUsedCents);
+
+    // Early insufficient check (monthly + all top-ups)
+    const now = new Date();
+    const topUps = await tx.creditTopUp.findMany({
+      where: { userId: user.id, expiresAt: { gt: now } },
+      orderBy: { expiresAt: 'asc' },
+    });
+    const topUpsAvailable = topUps.reduce((sum: number, t: any) => sum + Math.max(0, t.amountCents - t.usedCents), 0);
+    if (remainingMonthly + additionalAvailable + topUpsAvailable < costCents) {
+      return false;
+    }
+
+    let toCharge = costCents;
+
+    // 1) Consume monthly allowance
+    const fromMonthly = Math.min(toCharge, remainingMonthly);
+    if (fromMonthly > 0) {
+      await tx.user.update({
+        where: { id: this.userId },
+        data: { walletMonthlyUsedCents: (monthlyUsedCents + fromMonthly) as any },
+      });
+      toCharge -= fromMonthly;
+    }
+
+    if (toCharge <= 0) return true;
+
+    // 1b) Consume manual additional credits (non-expiring)
+    const fromAdditional = Math.min(toCharge, additionalAvailable);
+    if (fromAdditional > 0) {
+      await tx.user.update({
+        where: { id: this.userId },
+        data: {
+          additionalCredits: {
+            decrement: fromAdditional,
+          },
+        },
+      });
+      toCharge -= fromAdditional;
+    }
+
+    if (toCharge <= 0) return true;
+
+    // 2) Consume FIFO from top-ups
+    for (const tu of topUps) {
+      const available = Math.max(0, tu.amountCents - tu.usedCents);
+      if (available <= 0) continue;
+      const consume = Math.min(available, toCharge);
+      await tx.creditTopUp.update({
+        where: { id: tu.id },
+        data: { usedCents: tu.usedCents + consume },
+      });
+      toCharge -= consume;
+      if (toCharge <= 0) break;
+    }
+
+    return toCharge <= 0;
+  }
+
   async chargeCents(costCents: number): Promise<boolean> {
     if (costCents <= 0) return true;
     return prisma.$transaction(async (tx) => {
       await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${this.userId}))`;
-      await this.ensureMonthlyReset(new Date(), tx);
+      return this.chargeCentsInTransaction(costCents, tx);
+    }, CREDIT_CHARGE_TRANSACTION_OPTIONS);
+  }
 
-      const user = await tx.user.findUnique({
-        where: { id: this.userId },
-        include: { subscription: true },
+  async chargeCentsOnce(costCents: number, options: {
+    feature: string;
+    runId: string;
+    model: string;
+    endpoint?: string;
+    reuseWindowMs?: number;
+  }): Promise<{ success: boolean; charged: boolean; reused: boolean }> {
+    if (costCents <= 0) return { success: true, charged: false, reused: false };
+    const runId = String(options.runId || '').trim();
+    if (!runId) throw new Error('A billing run ID is required.');
+    const recentCutoff = new Date(Date.now() - Math.max(60_000, options.reuseWindowMs || 2 * 60 * 60 * 1000));
+
+    return prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${this.userId}))`;
+      const existing = await tx.aIUsageEvent.findFirst({
+        where: {
+          feature: options.feature,
+          userId: this.userId,
+          runId,
+          createdAt: { gte: recentCutoff },
+        },
+        orderBy: { createdAt: 'desc' },
+        select: { success: true, errorMessage: true },
       });
-      if (!user) throw new Error('User not found');
-
-      const hasActiveSubscription = isSubscriptionActive(user.subscription);
-      const plan = hasActiveSubscription ? user.subscription?.plan || null : null;
-      const additionalAvailable = Math.max(0, (user as any).additionalCredits || 0);
-      
-      // Use monthlyPriceCents if available, otherwise fall back to plan-based calculation
-      let monthlyCapCents = 0;
-      if (plan && user.subscription && hasActiveSubscription) {
-        if (user.subscription.monthlyPriceCents) {
-          // Use direct credit mapping (e.g., $30 → 1,700 credits)
-          monthlyCapCents = CreditManager.creditsForSubscriptionPrice(user.subscription.monthlyPriceCents);
-        } else {
-          monthlyCapCents = CreditManager.monthlyCapCentsForPlan(plan);
-        }
+      if (existing) {
+        return {
+          success: existing.success && existing.errorMessage !== 'insufficient_credits',
+          charged: false,
+          reused: true,
+        };
       }
-      
-      const monthlyUsedCents = (user as any).walletMonthlyUsedCents || 0;
-      let remainingMonthly = Math.max(0, monthlyCapCents - monthlyUsedCents);
 
-      // Early insufficient check (monthly + all top-ups)
-      const now = new Date();
-      const topUps = await tx.creditTopUp.findMany({
-        where: { userId: user.id, expiresAt: { gt: now } },
-        orderBy: { expiresAt: 'asc' },
+      const charged = await this.chargeCentsInTransaction(costCents, tx);
+      await tx.aIUsageEvent.create({
+        data: {
+          feature: options.feature,
+          userId: this.userId,
+          model: options.model,
+          promptTokens: 0,
+          completionTokens: 0,
+          totalTokens: 0,
+          costCents: 0,
+          endpoint: options.endpoint,
+          success: charged,
+          errorMessage: charged ? null : 'insufficient_credits',
+          detail: charged ? 'idempotent charge claimed once' : 'idempotent charge rejected',
+          runId,
+        },
       });
-      const topUpsAvailable = topUps.reduce((sum, t) => sum + Math.max(0, t.amountCents - t.usedCents), 0);
-      if (remainingMonthly + additionalAvailable + topUpsAvailable < costCents) {
-        return false;
-      }
-
-      let toCharge = costCents;
-
-      // 1) Consume monthly allowance
-      const fromMonthly = Math.min(toCharge, remainingMonthly);
-      if (fromMonthly > 0) {
-        await tx.user.update({
-          where: { id: this.userId },
-          data: { walletMonthlyUsedCents: (monthlyUsedCents + fromMonthly) as any },
-        });
-        toCharge -= fromMonthly;
-      }
-
-      if (toCharge <= 0) return true;
-
-      // 1b) Consume manual additional credits (non-expiring)
-      const fromAdditional = Math.min(toCharge, additionalAvailable);
-      if (fromAdditional > 0) {
-        await tx.user.update({
-          where: { id: this.userId },
-          data: {
-            additionalCredits: {
-              decrement: fromAdditional,
-            },
-          },
-        });
-        toCharge -= fromAdditional;
-      }
-
-      if (toCharge <= 0) return true;
-
-      // 2) Consume FIFO from top-ups
-      for (const tu of topUps) {
-        const available = Math.max(0, tu.amountCents - tu.usedCents);
-        if (available <= 0) continue;
-        const consume = Math.min(available, toCharge);
-        await tx.creditTopUp.update({
-          where: { id: tu.id },
-          data: { usedCents: tu.usedCents + consume },
-        });
-        toCharge -= consume;
-        if (toCharge <= 0) break;
-      }
-
-      return toCharge <= 0;
+      return { success: charged, charged, reused: false };
     }, CREDIT_CHARGE_TRANSACTION_OPTIONS);
   }
 

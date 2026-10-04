@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { reportCriticalError } from '@/lib/error-reporter'
 import { getCircuitState, openCircuit } from '@/lib/safety-circuit'
+import { assertAiSharingConsent } from '@/lib/ai-consent'
 
 type AiGuardContext = {
   feature?: string | null
@@ -71,6 +72,7 @@ async function openAiCircuitAndThrow(options: {
 }
 
 export async function assertAiUsageAllowed(context: AiGuardContext = {}) {
+  await assertAiSharingConsent(context)
   const recentFrom = new Date(Date.now() - AI_GUARD_WINDOW_MINUTES * 60 * 1000)
   const userId = typeof context.userId === 'string' && context.userId.trim() ? context.userId.trim() : null
   const runId = typeof context.runId === 'string' && context.runId.trim() ? context.runId.trim() : null

@@ -1,5 +1,6 @@
 'use server'
 
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -27,6 +28,9 @@ interface PrefetchBody {
 }
 
 export async function POST(request: Request, context: { params: { slug: string } }) {
+  const consentResponse = await aiConsentRequiredResponse(request)
+  if (consentResponse) return consentResponse
+
   const session = await getServerSession(authOptions)
   if (!session?.user?.id) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

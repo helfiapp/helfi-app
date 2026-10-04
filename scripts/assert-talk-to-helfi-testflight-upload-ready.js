@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 
-const { execFileSync, spawnSync } = require('child_process')
+const { execFileSync } = require('child_process')
 const fs = require('fs')
 const path = require('path')
 
@@ -18,26 +18,9 @@ function fail(message) {
   process.exit(1)
 }
 
-function vercelOutput(args) {
-  const result = spawnSync('vercel', args, {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-    stdio: ['ignore', 'pipe', 'pipe'],
-    timeout: 30000,
-  })
-  const output = `${result.stdout || ''}${result.stderr || ''}`
-  if (result.error) throw result.error
-  if (result.status !== 0) {
-    const error = new Error(output || `vercel ${args.join(' ')} failed`)
-    error.output = output
-    throw error
-  }
-  return output
-}
-
-function firstDeploymentUrl(output) {
-  const match = output.match(/https:\/\/helfi-[a-z0-9-]+-louie-veleskis-projects\.vercel\.app/i)
-  return match ? match[0] : ''
+function readAmplifyJob() {
+  const args = ['--profile', 'helfi-agent', '--region', 'ap-southeast-2', 'amplify', 'list-jobs', '--app-id', 'd2n4u4zm85ooe', '--branch-name', 'master', '--max-results', '1', '--query', 'jobSummaries[0]', '--output', 'json']
+  return JSON.parse(run('aws', args))
 }
 
 async function readJson(url) {
@@ -59,7 +42,6 @@ async function main() {
   try {
     run('node', ['scripts/assert-talk-to-helfi-testflight-preflight.js'])
     run('node', ['scripts/check-ios-distribution-signing.js'])
-    run('node', ['scripts/check-vercel-ai-env.js'])
   } catch (error) {
     process.stderr.write(error?.stderr || error?.stdout || '')
     fail('Talk to Helfi TestFlight upload is not ready.')
@@ -93,46 +75,17 @@ async function main() {
   if (manifest.bundleIdentifier !== bundleIdentifier) fail(`Live TestFlight IPA bundle ID does not match native/app.json ${bundleIdentifier}.`)
   if (manifest.commitSha !== commitSha) fail(`Live TestFlight IPA was built from ${String(manifest.commitSha || '').slice(0, 8)}, not current commit ${commitSha.slice(0, 8)}. Rebuild it before upload.`)
 
-  let deploymentList = ''
-  try {
-    deploymentList = vercelOutput([
-      'list',
-      '--environment',
-      'production',
-      '--yes',
-      '--no-color',
-      '-m',
-      `githubCommitSha=${commitSha}`,
-    ])
-  } catch (error) {
-    process.stderr.write(error?.output || error?.stderr || error?.stdout || '')
-    fail('Could not check Vercel production deployments. Do not upload this TestFlight build yet.')
+  let deployment
+  try { deployment = readAmplifyJob() } catch {
+    fail('Could not check AWS Amplify production. Do not upload this TestFlight build yet.')
   }
-
-  if (/No deployments found/i.test(deploymentList)) {
-    fail(`Current commit ${commitSha.slice(0, 8)} is not deployed to Vercel Production. Deploy and verify the backend before uploading TestFlight.`)
+  if (deployment?.commitId !== commitSha || deployment?.status !== 'SUCCEED') {
+    fail(`Current commit ${commitSha.slice(0, 8)} is not the latest successful AWS Amplify production deployment.`)
   }
-
-  if (!/Ready/i.test(deploymentList)) {
-    fail(`Current commit ${commitSha.slice(0, 8)} does not have a READY Vercel Production deployment.`)
-  }
-
-  const deploymentUrl = firstDeploymentUrl(deploymentList)
-  if (!deploymentUrl) {
-    fail('Could not read the Vercel Production deployment URL for the current commit.')
-  }
-
-  let liveDomainInspect = ''
-  try {
-    liveDomainInspect = vercelOutput(['inspect', 'helfi.ai', '--no-color'])
-  } catch (error) {
-    process.stderr.write(error?.output || error?.stderr || error?.stdout || '')
-    fail('Could not verify helfi.ai points to the current deployment.')
-  }
-
-  if (!liveDomainInspect.includes(deploymentUrl.replace(/^https:\/\//, ''))) {
-    fail(`helfi.ai is not pointing to the current commit deployment. Expected ${deploymentUrl}.`)
-  }
+  const job = JSON.parse(run('aws', ['--profile', 'helfi-agent', '--region', 'ap-southeast-2', 'amplify', 'get-job', '--app-id', 'd2n4u4zm85ooe', '--branch-name', 'master', '--job-id', deployment.jobId, '--query', 'job.steps[].{step:stepName,status:status}', '--output', 'json']))
+  if (!job.length || job.some(step => step.status !== 'SUCCEED')) fail('AWS build, deploy and verification must all succeed before upload.')
+  const domain = JSON.parse(run('aws', ['--profile', 'helfi-agent', '--region', 'ap-southeast-2', 'amplify', 'get-domain-association', '--app-id', 'd2n4u4zm85ooe', '--domain-name', 'helfi.ai', '--query', 'domainAssociation.{status:domainStatus,subDomains:subDomains[].subDomainSetting}', '--output', 'json']))
+  if (domain.status !== 'AVAILABLE' || !domain.subDomains.some(item => item.prefix === '' && item.branchName === 'master')) fail('helfi.ai must be assigned to the verified master deployment.')
 
   let readiness = null
   try {

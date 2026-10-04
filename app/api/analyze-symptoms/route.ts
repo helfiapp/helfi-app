@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
@@ -20,6 +21,9 @@ const getOpenAIClient = () => {
 }
 
 export async function POST(req: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(req)
+  if (consentResponse) return consentResponse
+
   try {
     // Auth check (with JWT fallback to avoid sporadic session resolution issues)
     const nativeUserId = await getUserIdFromNativeAuth(req)

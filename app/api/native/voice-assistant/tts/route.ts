@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import OpenAI from 'openai'
@@ -55,6 +56,9 @@ function voicePaidAccessResponse() {
 }
 
 export async function POST(request: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(request)
+  if (consentResponse) return consentResponse
+
   try {
     const user = await resolveUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })

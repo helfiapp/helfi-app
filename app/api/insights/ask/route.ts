@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -21,6 +22,9 @@ function getOpenAI() {
 }
 
 export async function POST(request: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(request)
+  if (consentResponse) return consentResponse
+
   try {
     const session = await getServerSession(authOptions)
     if (!session?.user?.id) {

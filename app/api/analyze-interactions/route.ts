@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/lib/auth';
@@ -253,6 +254,9 @@ const cleanupInteractionImages = async (params: {
 };
 
 export async function POST(request: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(request)
+  if (consentResponse) return consentResponse
+
   try {
     // Check authentication
     const session = await getServerSession(authOptions);

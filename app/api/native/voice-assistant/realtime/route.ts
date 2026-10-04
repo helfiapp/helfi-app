@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import crypto from 'crypto'
@@ -120,6 +121,13 @@ function safetyIdentifier(userId: string) {
   return crypto.createHash('sha256').update(`helfi-native-realtime:${userId}`).digest('hex')
 }
 
+function realtimeBillingRunId(userId: string, rawSessionId: unknown) {
+  const supplied = String(rawSessionId || '').trim()
+  const sessionId = /^[A-Za-z0-9._:-]{12,100}$/.test(supplied) ? supplied : crypto.randomUUID()
+  const digest = crypto.createHash('sha256').update(`${userId}:${sessionId}`).digest('hex')
+  return `native-realtime:${digest}`
+}
+
 function realtimeSessionConfig() {
   return {
     type: 'realtime',
@@ -226,6 +234,9 @@ function realtimeSessionConfig() {
 }
 
 export async function POST(request: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(request)
+  if (consentResponse) return consentResponse
+
   const requestStartedAt = Date.now()
   const abortController = new AbortController()
   const abortRealtimeRequest = () => abortController.abort()
@@ -283,9 +294,15 @@ export async function POST(request: NextRequest) {
     }
 
     const chargeStartedAt = Date.now()
-    const charged = await new CreditManager(user.id).chargeCents(chargeCents)
+    const billingRunId = realtimeBillingRunId(user.id, request.headers.get('x-helfi-voice-session-id'))
+    const chargeClaim = await new CreditManager(user.id).chargeCentsOnce(chargeCents, {
+      feature: 'voice-assistant:realtime-charge-marker',
+      runId: billingRunId,
+      model: REALTIME_MODEL,
+      endpoint: '/api/native/voice-assistant/realtime',
+    })
     const chargeMs = Date.now() - chargeStartedAt
-    if (!charged) {
+    if (!chargeClaim.success) {
       const wallet = await new CreditManager(user.id).getWalletStatus().catch(() => null)
       return NextResponse.json({
         error: 'Insufficient credits',
@@ -301,9 +318,12 @@ export async function POST(request: NextRequest) {
       model: REALTIME_MODEL,
       promptTokens: 0,
       completionTokens: 0,
-      costCents: chargeCents,
+      costCents: chargeClaim.charged ? chargeCents : 0,
       success: true,
-      detail: `charged ${chargeCents} credits; created realtime voice session`,
+      detail: chargeClaim.charged
+        ? `charged ${chargeCents} credits; created realtime voice session`
+        : 'reused the existing charge for a realtime voice connection retry',
+      runId: billingRunId,
     })
     const waitUntil = (globalThis as any).waitUntil
     if (typeof waitUntil === 'function') {
@@ -318,7 +338,8 @@ export async function POST(request: NextRequest) {
       status: 200,
       headers: {
         'content-type': 'application/sdp',
-        'x-helfi-charged-credits': String(chargeCents),
+        'x-helfi-charged-credits': String(chargeClaim.charged ? chargeCents : 0),
+        'x-helfi-charge-reused': String(chargeClaim.reused),
         'x-helfi-realtime-model': REALTIME_MODEL,
         'server-timing': `guard;dur=${guardMs}, openai;dur=${openAiMs}, charge;dur=${chargeMs}, total;dur=${totalMs}`,
       },

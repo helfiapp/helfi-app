@@ -1,3 +1,4 @@
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server';
 /**
  * IMPORTANT – DO NOT CHANGE OUTPUT FORMAT WITHOUT UPDATING UI PARSER
@@ -2347,6 +2348,9 @@ const getOpenAIClient = () => {
 };
 
 export async function POST(req: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(req)
+  if (consentResponse) return consentResponse
+
   try {
     console.log('=== FOOD ANALYZER DEBUG START ===');
     let imageHash: string | null = null;

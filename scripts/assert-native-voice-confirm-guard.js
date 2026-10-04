@@ -11,6 +11,8 @@ const confirmRoutePath = path.join(root, 'app/api/native/voice-assistant/confirm
 const ttsRoutePath = path.join(root, 'app/api/native/voice-assistant/tts/route.ts')
 const nativePath = path.join(root, 'native/src/voice/VoiceAssistant.tsx')
 const realtimePath = path.join(root, 'native/src/voice/realtimeVoice.ts')
+const audioRoutePath = path.join(root, 'native/ios/Helfi/HelfiAudioRoute.m')
+const creditSystemPath = path.join(root, 'lib/credit-system.ts')
 const healthImagePath = path.join(root, 'native/src/screens/HealthImageNotesScreen.tsx')
 const healthJournalPath = path.join(root, 'native/src/screens/HealthJournalScreen.tsx')
 const moodTrackerPath = path.join(root, 'native/src/screens/MoodTrackerScreen.tsx')
@@ -47,6 +49,8 @@ const confirmRoute = fs.readFileSync(confirmRoutePath, 'utf8')
 const ttsRoute = fs.readFileSync(ttsRoutePath, 'utf8')
 const native = fs.readFileSync(nativePath, 'utf8')
 const realtime = fs.readFileSync(realtimePath, 'utf8')
+const audioRoute = fs.readFileSync(audioRoutePath, 'utf8')
+const creditSystem = fs.readFileSync(creditSystemPath, 'utf8')
 const healthImage = fs.readFileSync(healthImagePath, 'utf8')
 const healthJournal = fs.readFileSync(healthJournalPath, 'utf8')
 const moodTracker = fs.readFileSync(moodTrackerPath, 'utf8')
@@ -75,8 +79,8 @@ if (!/const LIVE_VOICE_ENABLED = true/.test(native) || /process\.env\.EXPO_PUBLI
   failures.push('Talk to Helfi must default permanently to the approved single-screen live voice experience; a missing build flag must never restore the retired recorder UI.')
 }
 
-if (!/!LIVE_VOICE_ENABLED && !voiceSessionActive && !showingConversationReview \? \(\s*<View style=\{styles\.noticeBox\}>\s*<Text style=\{styles\.noticeTitle\}>Type-only on iPad<\/Text>/.test(native)) {
-  failures.push('The retired iPad/type-only notice must remain completely hidden from the approved live voice screen, including while it is connecting.')
+if (!native.includes('const liveVoiceEnabled = LIVE_VOICE_ENABLED && voiceRecordingSupported') || !/!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview \? \(\s*<View style=\{styles\.noticeBox\}>\s*<Text style=\{styles\.noticeTitle\}>Type-only on iPad<\/Text>/.test(native)) {
+  failures.push('The iPad must show its usable typed fallback while the iPhone keeps the approved live voice screen.')
 }
 
 if (/\bautoSave:\s*true\b/.test(route)) {
@@ -178,7 +182,8 @@ if (!/spokenReplyStatus/.test(native) || !/Preparing spoken reply/.test(native) 
 
 if (
   /Stop recording|Starting recording|Recording failed|Recording unavailable|Voice recording|recordingButton/.test(native) ||
-  !/'Listening'/.test(native) ||
+  !/'Ready — speak now'/.test(native) ||
+  !/'Hearing you'/.test(native) ||
   !/accessibilityLabel="Camera"/.test(native) ||
   !/>Camera<\/Text>/.test(native) ||
   !/presentationStyle="fullScreen"/.test(native) ||
@@ -287,10 +292,57 @@ if (
 
 if (
   !/realtimeVoiceConnectedRef/.test(native) ||
-  !/realtimeVoiceConnectedRef\.current = true[\s\S]*?setRealtimeVoiceStatus\(\(current\) => \(current === 'speaking' \? 'speaking' : 'live'\)\)/.test(native) ||
-  !/if \(realtimeVoiceConnectedRef\.current\)[\s\S]*?setRealtimeVoiceStatus\(\(current\) => \(current === 'speaking' \? 'speaking' : 'live'\)\)/.test(native)
+  !/if \(status === 'live'\)[\s\S]*?realtimeVoiceConnectedRef\.current = true[\s\S]*?setRealtimeVoiceStatus\('live'\)/.test(native) ||
+  !/if \(!dataChannelOpen \|\| !peerConnected \|\| !sessionReady \|\| !microphoneSending \|\| !remoteAudioReady\) return/.test(realtime) ||
+  !/await readinessPromise/.test(realtime) ||
+  native.includes("      clearRealtimeConnectTimeout()\n      realtimeVoiceConnectedRef.current = true\n      setRealtimeVoiceStatus")
 ) {
-  failures.push('Realtime voice must show Listening once WebRTC is ready and must not fall back to Connecting after it has connected.')
+  failures.push('Realtime voice must show Listening only after the session, speaker path, and real outgoing microphone audio are all verified.')
+}
+
+if (
+  !/pc\.getStats\?\.\(\)/.test(realtime) ||
+  !/stat\.type === 'outbound-rtp'/.test(realtime) ||
+  !/stat\.packetsSent/.test(realtime) ||
+  !/stat\.bytesSent/.test(realtime) ||
+  !/stat\.type === 'media-source'/.test(realtime) ||
+  !/stat\.totalAudioEnergy/.test(realtime) ||
+  !/input_audio_buffer\.speech_started/.test(realtime) ||
+  !/input_audio_buffer\.speech_stopped/.test(realtime) ||
+  !/armSilenceReminder/.test(realtime) ||
+  !/I didn't hear anything\. Please try speaking again\./.test(realtime) ||
+  !/payload\.type === 'error'/.test(realtime) ||
+  !/payload\.response\.output\.filter/.test(realtime)
+) {
+  failures.push('Realtime voice must verify outgoing microphone packets and handle hearing, spoken silence recovery, service errors, and completed tool calls.')
+}
+
+if (
+  !/billingSessionId:\s*string/.test(realtime) ||
+  !/'x-helfi-voice-session-id': cleanText\(params\.billingSessionId\)/.test(realtime) ||
+  !/realtimeBillingSessionIdRef/.test(native) ||
+  !/\.chargeCentsOnce\(chargeCents/.test(realtimeRoute) ||
+  !/voice-assistant:realtime-charge-marker/.test(realtimeRoute) ||
+  !/async chargeCentsOnce/.test(creditSystem) ||
+  !/pg_advisory_xact_lock\(hashtext\(\$\{this\.userId\}\)\)/.test(creditSystem) ||
+  !/chargeCentsInTransaction\(costCents, tx\)/.test(creditSystem) ||
+  !/tx\.aIUsageEvent\.create/.test(creditSystem)
+) {
+  failures.push('Realtime connection retries must atomically reuse one persistent billing claim instead of charging the user again.')
+}
+
+if (
+  !/requireHelfiAudioRoute/.test(realtime) ||
+  !/HelfiAudioRouteChanged/.test(realtime) ||
+  !/onAudioRoute/.test(realtime) ||
+  !/AVAudioSessionCategoryOptionDefaultToSpeaker/.test(audioRoute) ||
+  !/AVAudioSessionCategoryOptionAllowBluetoothHFP/.test(audioRoute) ||
+  !/RTCAudioSession\.sharedInstance/.test(audioRoute) ||
+  !/lockForConfiguration/.test(audioRoute) ||
+  !/setWebRTCConfiguration/.test(audioRoute) ||
+  !/AVAudioSessionInterruptionNotification/.test(audioRoute)
+) {
+  failures.push('iPhone live voice must configure audio through WebRTC, default to the speaker, preserve Bluetooth, report route changes, and stop safely on audio interruptions.')
 }
 
 if (!/const rejectDraft = useCallback[\s\S]*?spokenReplyAbortRef\.current\?\.abort\(\)[\s\S]*?draftRequestAbortRef\.current\?\.abort\(\)[\s\S]*?stopRealtimeVoiceSession\(\)[\s\S]*?stopPlayback\(\)\.catch[\s\S]*?setOpen\(false\)/.test(native)) {

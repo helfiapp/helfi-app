@@ -1,3 +1,4 @@
+import { hasAiSharingConsent } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server'
 import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@/lib/weekly-report-request-auth'
 import OpenAI from 'openai'
@@ -3248,6 +3249,9 @@ export async function POST(request: NextRequest) {
   }
 
   const now = new Date()
+  if (!(await hasAiSharingConsent(userId))) {
+    return NextResponse.json({ status: 'skipped', reason: 'ai_consent_required', error: 'Please allow AI help before creating a weekly AI report.' }, { status: isManualTrigger ? 403 : 200 })
+  }
   const healthSetupComplete = await isWeeklyReportHealthSetupComplete(userId)
   if (!healthSetupComplete) {
     return NextResponse.json({ status: 'skipped', reason: 'health_setup_required' }, { status: 403 })
@@ -4192,7 +4196,7 @@ ${llmPayloadJson}
         request.temperature = 0.2
       }
 
-      const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, request)
+      const { completion, costCents, promptTokens, completionTokens } = await chatCompletionWithCost(openai, request, { userId, feature: 'reports:weekly' })
 
       llmUsage = {
         promptTokens,
@@ -4209,6 +4213,10 @@ ${llmPayloadJson}
         summaryText = typeof parsed.summary === 'string' ? parsed.summary : ''
       }
     } catch (error) {
+      if ((error as any)?.code === 'ai_consent_required') {
+        await upsertWeeklyReportState(userId, { lastStatus: 'FAILED' })
+        return NextResponse.json({ status: 'skipped', reason: 'ai_consent_required', error: 'AI permission was withdrawn. No report was charged.' }, { status: isManualTrigger ? 403 : 200 })
+      }
       console.warn('[weekly-report] LLM generation failed', error)
       llmStatus = 'error'
     }

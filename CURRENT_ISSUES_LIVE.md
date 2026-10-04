@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai (AWS Amplify job 25: build/deploy/verify SUCCEED)
+- Date/time: 4 October 2026, 9:58 pm Melbourne
+- What changed: Shared native food photo preparation and explicit metric basis for dual-unit serving labels. Commit e8cee8bf.
+- Where to see it: Native source for the replacement store build; server serving-basis parsing is live.
+- What to quickly test: Food photo reaches editable review before save; 412 kcal per200g salmon changes to206 kcal at100g. Native photo build/runtime test and actual handlers passed. Store uploads are still pending.
+
+DEPLOYED:
 - LIVE: https://helfi.ai (AWS Amplify job 24: build/deploy/verify SUCCEED)
 - Date/time: 4 October 2026, 9:48 pm Melbourne (approximate verification time)
 - What changed: Food diary refresh on native return/focus, review-before-save in the second native photo route, genuine zero-calorie handling, and missing fibre/sugar preservation. Commit e7c21bfe.

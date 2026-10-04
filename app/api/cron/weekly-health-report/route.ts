@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { backfillWeeklyReportState, listDueWeeklyReportUsers } from '@/lib/weekly-health-report'
 import { publishWithQStash } from '@/lib/qstash'
+import { hasAiSharingConsent } from '@/lib/ai-consent'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
@@ -38,6 +39,10 @@ export async function POST(request: NextRequest) {
   const results = [] as Array<{ userId: string; ok: boolean; reason?: string }>
 
   for (const user of dueUsers) {
+    if (!(await hasAiSharingConsent(user.userId))) {
+      results.push({ userId: user.userId, ok: false, reason: 'ai_consent_required' })
+      continue
+    }
     if (process.env.QSTASH_TOKEN) {
       const published = await publishWithQStash('/api/reports/weekly/run', { userId: user.userId })
       results.push({ userId: user.userId, ok: published.ok, reason: published.reason })
