@@ -26,6 +26,7 @@ for (const scale of [0.5, 1, 2]) {
   assert.equal(context.normalizeFavoriteMeal({ ...raw, items: JSON.stringify(items) }).nutrients.calories, 280 * scale, 'legacy string ingredients')
   assert.equal(context.normalizeFavoriteMeal({ ...raw, items: undefined, ingredients: items }).nutrients.calories, 280 * scale, 'legacy ingredient key')
 }
+assert.equal(context.normalizeFoodApiEntry({ items: [{ calories: 0, protein_g: 1, carbs_g: 0, fat_g: 0, servings: 1 }] }).nutrients.calories, 0, 'a declared zero is not a missing calorie estimate')
 const oil = context.buildFavoriteAdjustItemFromSearchFood({ name: 'Olive oil', id: 'oil', serving_size: '100 g', calories: 884, fat_g: 100, protein_g: 0, carbs_g: 0 })
 const oilMl = context.updateFavoriteAdjustItemUnit(oil, 'ml')
 assert.ok(Math.abs(Number(oilMl.amountInput) - 108.7) < 0.02)

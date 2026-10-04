@@ -4,6 +4,7 @@ import {
   ActivityIndicator,
   Alert,
   Dimensions,
+  DeviceEventEmitter,
   Image,
   Modal,
   Pressable,
@@ -1255,21 +1256,25 @@ export function AddIngredientScreen() {
     }
 
     const servingsRaw = computeServings(amount, safeAdjustUnit, adjustBase, mergedAdjustUnitGrams)
-    const servings = Number.isFinite(servingsRaw) && servingsRaw > 0 ? servingsRaw : 1
+    if (!Number.isFinite(servingsRaw) || servingsRaw <= 0) {
+      Alert.alert('Check the amount', 'Choose a measured amount in one of the available units.')
+      return
+    }
+    const servings = servingsRaw
 
     const caloriesBase = numberOrZero(adjustItem.calories ?? adjustItem.calories_kcal)
     const proteinBase = numberOrZero(adjustItem.protein_g)
     const carbsBase = numberOrZero(adjustItem.carbs_g)
     const fatBase = numberOrZero(adjustItem.fat_g)
-    const fiberBase = numberOrZero(adjustItem.fiber_g)
-    const sugarBase = numberOrZero(adjustItem.sugar_g)
+    const fiberBase = safeNumber(adjustItem.fiber_g)
+    const sugarBase = safeNumber(adjustItem.sugar_g)
 
     const calories = Math.max(0, Math.round(caloriesBase * servings))
     const protein = Math.max(0, roundTo(proteinBase * servings, 2))
     const carbs = Math.max(0, roundTo(carbsBase * servings, 2))
     const fat = Math.max(0, roundTo(fatBase * servings, 2))
-    const fiber = Math.max(0, roundTo(fiberBase * servings, 2))
-    const sugar = Math.max(0, roundTo(sugarBase * servings, 2))
+    const fiber = fiberBase == null ? null : Math.max(0, roundTo(fiberBase * servings, 2))
+    const sugar = sugarBase == null ? null : Math.max(0, roundTo(sugarBase * servings, 2))
 
     const title = String(adjustItem.name || '').trim()
     const servingText = String(
@@ -1317,8 +1322,8 @@ export function AddIngredientScreen() {
               protein_g: Math.max(0, roundTo(proteinBase, 2)),
               carbs_g: Math.max(0, roundTo(carbsBase, 2)),
               fat_g: Math.max(0, roundTo(fatBase, 2)),
-              fiber_g: Math.max(0, roundTo(fiberBase, 2)),
-              sugar_g: Math.max(0, roundTo(sugarBase, 2)),
+              fiber_g: fiberBase == null ? null : Math.max(0, roundTo(fiberBase, 2)),
+              sugar_g: sugarBase == null ? null : Math.max(0, roundTo(sugarBase, 2)),
             },
           ],
         }),
@@ -1328,6 +1333,7 @@ export function AddIngredientScreen() {
         return
       }
 
+      DeviceEventEmitter.emit('helfi:food-log-changed', { localDate: selectedDate })
       setAdjustServingOptions([])
       setAdjustServingId(null)
       setAdjustItem(null)
@@ -1338,53 +1344,6 @@ export function AddIngredientScreen() {
     } finally {
       setAdjustSaving(false)
     }
-  }
-
-  const createFoodEntry = async (payload: {
-    name: string
-    calories: number
-    protein: number
-    carbs: number
-    fat: number
-    fiber?: number
-    sugar?: number
-    description?: string
-    items?: any[] | null
-    nutrition?: Record<string, any> | null
-    total?: Record<string, any> | null
-  }) => {
-    if (!session?.token) return false
-    const name = String(payload.name || '').trim()
-    if (!name) return false
-
-    const totals = {
-      calories: Math.max(0, Math.round(payload.calories)),
-      protein: Math.max(0, roundTo(payload.protein)),
-      carbs: Math.max(0, roundTo(payload.carbs)),
-      fat: Math.max(0, roundTo(payload.fat)),
-      fiber: Math.max(0, roundTo(payload.fiber || 0)),
-      sugar: Math.max(0, roundTo(payload.sugar || 0)),
-    }
-    const descriptionRaw = String(payload.description || '').trim()
-    const description = descriptionRaw ? `${name}, ${descriptionRaw}` : name
-    const nutritionPayload = payload.nutrition ? { ...payload.nutrition } : totals
-    const totalPayload = payload.total ? { ...payload.total } : payload.nutrition ? { ...nutritionPayload } : totals
-
-    const res = await fetch(`${API_BASE_URL}/api/food-log`, {
-      method: 'POST',
-      headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
-      body: JSON.stringify({
-        name,
-        localDate: selectedDate,
-        meal: targetMeal,
-        category: targetMeal,
-        description,
-        nutrition: nutritionPayload,
-        total: totalPayload,
-        items: Array.isArray(payload.items) ? payload.items : undefined,
-      }),
-    })
-    return res.ok
   }
 
   const resetSearchSection = () => {
@@ -1489,68 +1448,29 @@ export function AddIngredientScreen() {
       }
 
       const items = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
-      if (items.length > 0) {
-        let added = 0
-        for (const item of items) {
-          const ok = await createFoodEntry({
-            name: String(item?.name || 'Analyzed item'),
-            calories: numberOrZero(item?.calories || item?.calories_kcal),
-            protein: numberOrZero(item?.protein_g || item?.protein),
-            carbs: numberOrZero(item?.carbs_g || item?.carbs),
-            fat: numberOrZero(item?.fat_g || item?.fat),
-            fiber: numberOrZero(item?.fiber_g || item?.fiber),
-            sugar: numberOrZero(item?.sugar_g || item?.sugar),
-            description: String(item?.serving_size || 'Photo analyzed'),
-            items: [{ ...item }],
-            nutrition: {
-              ...item,
-              calories: numberOrZero(item?.calories || item?.calories_kcal),
-              calories_kcal: numberOrZero(item?.calories || item?.calories_kcal),
-              protein: numberOrZero(item?.protein_g || item?.protein),
-              protein_g: numberOrZero(item?.protein_g || item?.protein),
-              carbs: numberOrZero(item?.carbs_g || item?.carbs),
-              carbs_g: numberOrZero(item?.carbs_g || item?.carbs),
-              fat: numberOrZero(item?.fat_g || item?.fat),
-              fat_g: numberOrZero(item?.fat_g || item?.fat),
-              fiber: numberOrZero(item?.fiber_g || item?.fiber),
-              fiber_g: numberOrZero(item?.fiber_g || item?.fiber),
-              sugar: numberOrZero(item?.sugar_g || item?.sugar),
-              sugar_g: numberOrZero(item?.sugar_g || item?.sugar),
-            },
-          })
-          if (ok) added += 1
-        }
-        if (added > 0) {
-          Alert.alert('Done', `${added} item${added === 1 ? '' : 's'} added from photo.`)
-          navigation.goBack()
-        } else {
-          Alert.alert('Add failed', 'The photo was analyzed, but no food entry could be saved.')
-        }
-        return
-      }
-
       const summary = data?.food || data || {}
-      if (!isUsableAnalyzedFood(summary)) {
+      const reviewItems = items.length ? items : isUsableAnalyzedFood(summary) ? [{
+        ...summary,
+        name: String(summary?.name || 'Photo analyzed meal'),
+        serving_size: String(summary?.serving_size || summary?.description || '1 serving'),
+        calories: summary?.calories ?? summary?.calories_kcal,
+        protein_g: summary?.protein_g ?? summary?.protein,
+        carbs_g: summary?.carbs_g ?? summary?.carbs,
+        fat_g: summary?.fat_g ?? summary?.fat,
+        fiber_g: summary?.fiber_g ?? summary?.fiber,
+        sugar_g: summary?.sugar_g ?? summary?.sugar,
+        __custom: true,
+      }] : []
+      if (!reviewItems.length) {
         Alert.alert('No food detected', 'Please try again with a clear photo of food.')
         return
       }
-      const ok = await createFoodEntry({
-        name: String(summary?.name || 'Photo analyzed meal'),
-        calories: numberOrZero(summary?.calories || summary?.calories_kcal),
-        protein: numberOrZero(summary?.protein || summary?.protein_g),
-        carbs: numberOrZero(summary?.carbs || summary?.carbs_g),
-        fat: numberOrZero(summary?.fat || summary?.fat_g),
-        fiber: numberOrZero(summary?.fiber || summary?.fiber_g),
-        sugar: numberOrZero(summary?.sugar || summary?.sugar_g),
-        description: String(summary?.description || 'Photo analyzed'),
-        items: summary?.items && Array.isArray(summary.items) ? summary.items : undefined,
+      DeviceEventEmitter.emit('helfi:food-photo-review', {
+        meal: targetMeal, localDate: selectedDate, items: reviewItems,
+        nutritionNotice: data?.nutritionNotice,
       })
-      if (ok) {
-        Alert.alert('Done', 'Item added from photo.')
-        navigation.goBack()
-      } else {
-        Alert.alert('Add failed', 'The photo was analyzed, but the food entry could not be saved.')
-      }
+      navigation.goBack()
+
     } catch {
       setPhotoLoading(false)
       Alert.alert('Analysis failed', 'Could not analyze this image.')
@@ -1584,8 +1504,8 @@ export function AddIngredientScreen() {
   const previewProtein = roundTo(numberOrZero(adjustItem?.protein_g) * servingsForPreview, 1)
   const previewCarbs = roundTo(numberOrZero(adjustItem?.carbs_g) * servingsForPreview, 1)
   const previewFat = roundTo(numberOrZero(adjustItem?.fat_g) * servingsForPreview, 1)
-  const previewFiber = roundTo(numberOrZero(adjustItem?.fiber_g) * servingsForPreview, 1)
-  const previewSugar = roundTo(numberOrZero(adjustItem?.sugar_g) * servingsForPreview, 1)
+  const previewFiber = safeNumber(adjustItem?.fiber_g) == null ? null : roundTo(Number(adjustItem?.fiber_g) * servingsForPreview, 1)
+  const previewSugar = safeNumber(adjustItem?.sugar_g) == null ? null : roundTo(Number(adjustItem?.sugar_g) * servingsForPreview, 1)
 
   const formatAdjustUnitChoiceLabel = (
     unit: AdjustUnit,
@@ -2285,8 +2205,8 @@ export function AddIngredientScreen() {
                 { label: 'Protein', value: `${previewProtein} g` },
                 { label: 'Carbs', value: `${previewCarbs} g` },
                 { label: 'Fat', value: `${previewFat} g` },
-                { label: 'Fibre', value: `${previewFiber} g` },
-                { label: 'Sugar', value: `${previewSugar} g` },
+                { label: 'Fibre', value: `${previewFiber == null ? '—' : `${previewFiber} g`}` },
+                { label: 'Sugar', value: `${previewSugar == null ? '—' : `${previewSugar} g`}` },
               ].map((tile) => (
                 <View
                   key={tile.label}

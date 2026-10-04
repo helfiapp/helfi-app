@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-04T21:25:34+11:00
+- What changed: Food audit repairs for serving basis, missing values, exact-once kJ conversion, preparation matching, strict portion-aware AI enrichment, private barcode corrections, and the web photo review notice. Commit 605788ef8e34bcb68a31b0b308a9eb3b9978065b; AWS job 23 BUILD/DEPLOY/VERIFY all SUCCEED. The additive barcode migration preserves all 38 original records and adds 38 private copies. Native source repairs are committed but are not yet an uploaded store binary.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Packaged 30g portions, raw/cooked searches, kJ-only labels, user-private corrections, and photo review. Further rendered native testing found a diary refresh issue and a second photo autosave path; those are being repaired before the store release. Store readiness is not claimed.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE on AWS
 - Date/time: 8 September 2026, 6:45 PM AEST
 - What changed: Permanently removed the obsolete Helfi Vercel project and its old deployments, functions, and scheduled jobs. AWS was not changed. Updated the handover note so future agents do not recreate Vercel hosting.

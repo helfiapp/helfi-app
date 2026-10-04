@@ -40,6 +40,7 @@ import CreditPurchaseModal from '@/components/CreditPurchaseModal'
 import { STARTER_FOODS } from '@/data/foods-starter'
 import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
+import { foodNumberOrNull } from '@/lib/food/openfoodfacts'
 import { AI_MEAL_RECOMMENDATION_CREDITS, AI_MEAL_RECOMMENDATION_GOAL_NAME } from '@/lib/ai-meal-recommendation'
 import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
@@ -6544,7 +6545,8 @@ export default function FoodDiary() {
         const fat = Math.max(0, Number((scaled as any)?.fat) || 0)
         const macroEnergy = protein * 4 + carbs * 4 + fat * 9
         const calories = Number((scaled as any)?.calories)
-        if ((!Number.isFinite(calories) || calories <= 0) && macroEnergy > 0) {
+        const declaredCalories = foodNumberOrNull((entry as any)?.total?.calories ?? entry?.nutrition?.calories)
+        if (declaredCalories == null && (!Number.isFinite(calories) || calories <= 0) && macroEnergy > 0) {
           return { ...(scaled as any), calories: Math.round(macroEnergy) }
         }
         return scaled
@@ -11470,8 +11472,8 @@ const applyStructuredItems = (
       const safeCarbs = Math.max(0, carbs)
       const safeFat = Math.max(0, fat)
       const macroEnergy = safeProtein * 4 + safeCarbs * 4 + safeFat * 9
-      let calories = Number(item?.calories)
-      if (!Number.isFinite(calories) || calories <= 0) {
+      let calories = foodNumberOrNull(item?.calories)
+      if (calories == null) {
         calories = macroEnergy > 0 ? macroEnergy : 0
       }
       totals.calories += calories * servings * multiplier
@@ -11750,11 +11752,7 @@ const applyPendingDrinkSweetenerGuard = ({
 }
 function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
   if (!raw || typeof raw !== 'object') return null
-  const toNumber = (value: any) => {
-    if (value === null || value === undefined) return null
-    const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
-    return Number.isFinite(parsed) ? parsed : null
-  }
+  const toNumber = foodNumberOrNull
   const round = (value: number | null, decimals = 1, zeroAsNull = false) => {
     if (value === null) return null
     if (zeroAsNull && value <= 0) return null
@@ -11774,8 +11772,8 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
     protein: round(protein, 1),
     carbs: round(carbs, 1),
     fat: round(fat, 1),
-    fiber: round(fiber, 1, true),
-    sugar: round(sugar, 1, true),
+    fiber: round(fiber, 1),
+    sugar: round(sugar, 1),
   }
 
   const hasValues = Object.values(normalized).some((value) => value !== null)
@@ -23740,10 +23738,7 @@ Please add nutritional information manually if needed.`);
                       {analyzedItems.map((item: any, index: number) => {
                         const servingsCount = effectiveServings(item)
                         const macroMultiplier = macroMultiplierForItem(item)
-                        const numOrNull = (value: any) => {
-                          const n = Number(value)
-                          return Number.isFinite(n) ? n : null
-                        }
+                        const numOrNull = foodNumberOrNull
                         const baseProtein = numOrNull(item?.protein_g)
                         const baseCarbs = numOrNull(item?.carbs_g)
                         const baseFat = numOrNull(item?.fat_g)
@@ -23756,7 +23751,7 @@ Please add nutritional information manually if needed.`);
                             : null
                         const caloriesBase = numOrNull(item?.calories)
                         const effectiveCaloriesPerServing =
-                          caloriesBase !== null && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
+                          caloriesBase !== null ? caloriesBase : macroEnergyPerServing
 
                         const totalCalories =
                           effectiveCaloriesPerServing !== null
@@ -25211,9 +25206,9 @@ Please add nutritional information manually if needed.`);
                         const baseFat = Number(item?.fat_g) || 0
                         const macroEnergyPerServing =
                           Math.max(0, baseProtein) * 4 + Math.max(0, baseCarbs) * 4 + Math.max(0, baseFat) * 9
-                        const caloriesBase = Number(item?.calories)
+                        const caloriesBase = foodNumberOrNull(item?.calories)
                         const effectiveCaloriesPerServing =
-                          Number.isFinite(caloriesBase) && caloriesBase > 0 ? caloriesBase : macroEnergyPerServing
+                          caloriesBase !== null ? caloriesBase : macroEnergyPerServing
                         const totalMultiplier = Math.max(0, servingsCount * macroMultiplier)
                         const divider = totalMultiplier > 0 ? totalMultiplier : 1
                         const formatTotal = (value: any, decimals: number, isCalories = false) => {

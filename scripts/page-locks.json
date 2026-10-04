@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T10:11:29.482Z",
+  "generatedAt": "2026-10-04T10:39:13.299Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -35,7 +35,7 @@
     "app/food/analysis/page.tsx": "7282663fa2d6b3236c5c966de59e735b9edf9e479b28de4f843747d8f67cdbf4",
     "app/food/build-meal/page.tsx": "b0e3486c8c49c185702d77a3b5de653833289c5b7584494ff8ef82d8ced7893e",
     "app/food/import-recipe/page.tsx": "9c5784c66c83d64c4ed843b2b5fed565c62694d730a3bbae9466746b1575d491",
-    "app/food/page.tsx": "51ba5bc42e5795dfd319ae046eb819d612985119fa4b75f0608f1d0214f2337d",
+    "app/food/page.tsx": "bf8a3203bb6b3f9f099e79c1e4f8e76f58fdc4c1b8ba4920e905bda2aeb55fa5",
     "app/food/recommended/explain/page.tsx": "b00096869d0bb7bdab50447f9b5a9e298aa0c5b906289b7d2319ebe5a2d4d7ac",
     "app/food/recommended/page.tsx": "18a09615c9b36a5d7b66537e6082941d776e3c294331b1eb134304486aef588a",
     "app/food/water/page.tsx": "23f7d4f73f8cf04cf4d6477cf6e10a434081ddb93a4aa201ccaece4bc946b276",
@@ -222,7 +222,7 @@
     "native/src/navigation/NativeBottomNav.tsx": "6939c54d1d7f206c98fe57be46df98e7fe9c0edd1f12f03266a142f88ece17a8",
     "native/src/navigation/RootNavigator.tsx": "3e133cdb0f9721dc140baa6aafd370fc74c046cb72bfc049fcb890ecd1fd11d0",
     "native/src/screens/AccountSettingsScreen.tsx": "78f1b46ff4e18c1498e3c171e688ddfbd4ed6803cdc5dfe355d79e1d3bfa1478",
-    "native/src/screens/AddIngredientScreen.tsx": "17a36f0938f2ab5bf75dd3da2476b9cb93e73092fec582d75d55a06b223069af",
+    "native/src/screens/AddIngredientScreen.tsx": "f3b6803f9634bf194e90ac63256349cc49f45fc7da2ebc421e9224808b1079be",
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
     "native/src/screens/BillingScreen.tsx": "55dc417bd398eeef5bb4cc5dcbc44e109bf4de77ac7c187dfd9fb0583c6fc6a8",
     "native/src/screens/DailyCheckInScreen.tsx": "7e3f91adf203aa1af835757542f635201a927837a51fd8cbf7244e3c91fb3039",
@@ -262,7 +262,7 @@
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "b0456e82e3cae345d3722cb0a0ea1d791d5c26ff773840ee37a7b997d1334800",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "c13e0103c37608a2d78841eb24728aa3251d078208bb6070d9a58c1dba724655",
+    "native/src/screens/TrackCaloriesScreen.tsx": "d27538b8ec0248c3accc57f29c5607eec1bb9a0018e5f3cf4b36472794ce1ac5",
     "native/src/screens/WaterIntakeScreen.tsx": "5b7ffec299bbffa651a8433a7881bd0b3bb013dff102bd5a0b6f0f66f0dccebe",
     "native/src/state/AppModeContext.tsx": "ce70c2670e359ca8fba27a78a2bd817b551490a422b30dabe3b87b3837739321",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",

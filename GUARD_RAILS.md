@@ -3127,3 +3127,10 @@ for guidance first.
 - AI/database enrichment needs a compatible identity and measured portion conversion, with provider record and field attribution. Photo portions remain estimates. Do not apply a second loose web match; native photo results must be reviewed before saving.
 - Ordinary barcode label/diary corrections belong only to their submitting account in `BarcodeUserCorrection`; they cannot overwrite trusted shared products. The additive migration preserves original records and the last submitter's private copy. Account deletion cascades to private corrections.
 - Regression checks: `scripts/food-*-check.ts`, including actual native diary/favorite/editor/save functions and actual barcode label/read/write route functions. These checks do not substitute for rendered web/iOS/Android release testing.
+
+### Food follow-up safeguards — 4 October 2026
+- Every successful native Add Ingredient save must refresh the diary before returning; revisit/tab focus must reload the selected day.
+- Every food-photo entry path must open ingredient/amount review and show an estimate notice before saving.
+- Declared zero energy must remain zero, including foods with small nonzero macros; calculate macro energy only when energy is missing.
+- Unknown fibre/sugar values must remain missing in manual ingredient saves and display as unavailable.
+- Regression evidence: scripts/food-native-save-flow-check.ts, scripts/food-native-integration-check.ts, scripts/food-web-totals-check.ts.

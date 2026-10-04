@@ -17,7 +17,7 @@ import {
 } from 'react-native'
 import DateTimePicker, { DateTimePickerEvent } from '@react-native-community/datetimepicker'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { useNavigation, useRoute } from '@react-navigation/native'
+import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/native'
 import { MaterialCommunityIcons } from '@expo/vector-icons'
 import { CameraView, useCameraPermissions, type BarcodeScanningResult, type BarcodeType } from 'expo-camera'
 import * as ImagePicker from 'expo-image-picker'
@@ -1145,8 +1145,8 @@ function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotal
     const satFat = Math.max(0, Number(item?.saturated_fat_g ?? item?.saturatedFat) || 0)
 
     const macroCalories = protein * 4 + carbs * 4 + fat * 9
-    const rawCalories = Number(item?.calories ?? item?.calories_kcal)
-    const calories = Number.isFinite(rawCalories) && rawCalories > 0 ? rawCalories : macroCalories
+    const rawCalories = nullableNumber(item?.calories ?? item?.calories_kcal)
+    const calories = rawCalories != null && rawCalories >= 0 ? rawCalories : macroCalories
 
     totals.calories += calories * factor
     totals.protein += protein * factor
@@ -1190,7 +1190,10 @@ function normalizeFoodApiEntry(raw: any): FoodEntry {
   }
 
   const macroCalories = normalized.protein * 4 + normalized.carbs * 4 + normalized.fat * 9
-  if (normalized.calories <= 0 && macroCalories > 0) {
+  const recordedCalories = Array.isArray(raw?.items) && raw.items.length
+    ? raw.items.every((item: any) => nullableNumber(item?.calories ?? item?.calories_kcal) != null)
+    : nullableNumber((raw?.nutrients || raw?.nutrition || raw?.total)?.calories ?? (raw?.nutrients || raw?.nutrition || raw?.total)?.calories_kcal) != null
+  if (!recordedCalories && normalized.calories <= 0 && macroCalories > 0) {
     normalized.calories = Math.round(macroCalories)
   }
 
@@ -2851,10 +2854,10 @@ export function TrackCaloriesScreen() {
     setAccountImage(typeof session?.user?.image === 'string' && session.user.image ? session.user.image : null)
   }, [session?.user?.email, session?.user?.image, session?.user?.name])
 
-  useEffect(() => {
+  useFocusEffect(useCallback(() => {
     if (mode !== 'signedIn' || !session?.token) return
     void loadAll()
-  }, [loadAll, mode, selectedDate, session?.token])
+  }, [loadAll, mode, session?.token]))
 
   useEffect(() => {
     if (mode !== 'signedIn' || !session?.token) return
@@ -3770,6 +3773,23 @@ export function TrackCaloriesScreen() {
     setMealBuilderOpen(true)
     setSectionMenuMeal(null)
   }
+
+  useEffect(() => {
+    if (mode !== 'signedIn' || !session?.token) return
+    const subscription = DeviceEventEmitter.addListener('helfi:food-photo-review', (payload?: any) => {
+      const items = Array.isArray(payload?.items) ? payload.items.filter(isUsableAnalyzedFood) : []
+      if (!items.length) return
+      const meal = MEALS.some((entry) => entry.key === payload?.meal) ? payload.meal : 'other'
+      if (typeof payload?.localDate === 'string') setSelectedDate(payload.localDate)
+      closeAllAddMenus()
+      openNativeMealBuilder(meal, {
+        name: items.length === 1 ? String(items[0]?.name || 'Photo analyzed meal') : 'Photo analyzed meal',
+        items: items.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)),
+      })
+      Alert.alert('Review before saving', String(payload?.nutritionNotice || 'Photo nutrition is an estimate. Check the food and portion amounts before saving.'))
+    })
+    return () => subscription.remove()
+  }, [mode, session?.token])
 
   const resetImportRecipe = () => {
     setImportRecipeMode('url')
