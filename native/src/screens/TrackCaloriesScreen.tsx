@@ -30,6 +30,7 @@ import { calculateDailyTargets } from '../lib/dailyTargets'
 import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { sortPlainFoodResults } from '../lib/plainFoodSearch'
+import { parseRecipeAmount, chooseRecipeFood, measuredRecipeFood, recipePortionRatio } from '../lib/recipeNutrition'
 import { materializeMealPortion } from '../lib/mealPortions'
 import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '../lib/nutrientValues'
 import { convertFoodAmount, parseFoodServing, liquidDensity, type FoodBaseUnit } from '../lib/foodUnits'
@@ -1872,6 +1873,9 @@ export function TrackCaloriesScreen() {
   const [favoriteRenameItem, setFavoriteRenameItem] = useState<FavoritesListItem | null>(null)
   const [favoriteRenameValue, setFavoriteRenameValue] = useState('')
   const [mealBuilderOpen, setMealBuilderOpen] = useState(false)
+  const [mealRecipe, setMealRecipe] = useState<ImportedRecipe | null>(null)
+  const [recipeServingsEaten, setRecipeServingsEaten] = useState('')
+  const recipeServingsAppliedRef = useRef(1)
   const [importRecipeOpen, setImportRecipeOpen] = useState(false)
   const [importRecipeTargetMeal, setImportRecipeTargetMeal] = useState('lunch')
   const [importRecipeMode, setImportRecipeMode] = useState<'url' | 'photo'>('url')
@@ -3610,6 +3614,12 @@ export function TrackCaloriesScreen() {
     setFavoriteRenameItem(null)
     setFavoriteRenameValue('')
     setFavoriteEditItem(item)
+    const recipeNutrition = item.entry?.raw?.nutrients || item.entry?.raw?.nutrition || item.favorite?.raw?.nutrients || item.favorite?.raw?.nutrition || {}
+    const recipe = recipeNutrition.__importRecipe || null
+    setMealRecipe(recipe)
+    const eaten = Number(recipeNutrition.__nativeRecipeServingsEaten || recipe?.servings || 1)
+    setRecipeServingsEaten(recipe ? String(eaten) : '')
+    recipeServingsAppliedRef.current = eaten > 0 ? eaten : 1
     setFavoriteEditItems(buildFavoriteAdjustItems(item))
     setFavoriteEditName(item.label)
     setFavoriteEditTime(formatEditorTime(item.entry?.createdAt || item.entry?.raw?.createdAt || null))
@@ -3625,83 +3635,33 @@ export function TrackCaloriesScreen() {
     setFavoriteEditPortionControlEnabled(false)
   }
 
-  const recipeIngredientNutritionFallback = (line: string) => {
-    const text = normalizeFavoriteLabel(line).toLowerCase()
-    const gramMatch = text.match(/(\d+(?:\.\d+)?)\s*g\b/)
-    const tbspMatch = text.match(/(\d+(?:\.\d+)?)\s*tbsp\b/)
-    const cupMatch = text.match(/(\d+(?:\.\d+)?)\s*cup\b/)
-    const grams = Number(gramMatch?.[1]) || 0
-    const tablespoons = Number(tbspMatch?.[1]) || 0
-    const cups = Number(cupMatch?.[1]) || 0
-    const per100g = (calories: number, protein: number, carbs: number, fat: number, fiber = 0, sugar = 0) => {
-      const multiplier = grams > 0 ? grams / 100 : 1
-      return {
-        calories: Math.round(calories * multiplier),
-        protein_g: round1(protein * multiplier),
-        carbs_g: round1(carbs * multiplier),
-        fat_g: round1(fat * multiplier),
-        fiber_g: round1(fiber * multiplier),
-        sugar_g: round1(sugar * multiplier),
+  const buildImportedRecipeItems = async (ingredients: string[]) => {
+    const items: FavoriteAdjustItem[] = []
+    const missing: string[] = []
+    for (const line of ingredients.slice(0, 80)) {
+      const request = parseRecipeAmount(line)
+      if (!request) { missing.push(line); continue }
+      const controller = new AbortController()
+      const timer = setTimeout(() => controller.abort(), 12000)
+      try {
+        const res = await fetch(
+          `${API_BASE_URL}/api/food-data?source=usda&kind=single&localOnly=1&q=${encodeURIComponent(request.lookup)}&limit=20`,
+          { headers: buildNativeAuthHeaders(session?.token || '', { includeCookie: true }), signal: controller.signal },
+        )
+        const data = await res.json().catch(() => ({}))
+        const food = res.ok ? chooseRecipeFood(Array.isArray(data?.items) ? data.items : [], request) : null
+        const measured = food ? measuredRecipeFood(food, request) : null
+        if (!measured) { missing.push(line); continue }
+        const item = buildFavoriteAdjustItemFromSearchFood(measured as SearchFoodItem)
+        items.push({ ...item, id: `recipe-${items.length}-${String(item.id)}` })
+      } catch {
+        missing.push(line)
+      } finally {
+        clearTimeout(timer)
       }
     }
-    const perTablespoon = (calories: number, protein: number, carbs: number, fat: number, fiber = 0, sugar = 0) => {
-      const multiplier = tablespoons > 0 ? tablespoons : 1
-      return {
-        calories: Math.round(calories * multiplier),
-        protein_g: round1(protein * multiplier),
-        carbs_g: round1(carbs * multiplier),
-        fat_g: round1(fat * multiplier),
-        fiber_g: round1(fiber * multiplier),
-        sugar_g: round1(sugar * multiplier),
-      }
-    }
-    const perCup = (calories: number, protein: number, carbs: number, fat: number, fiber = 0, sugar = 0) => {
-      const multiplier = cups > 0 ? cups : 1
-      return {
-        calories: Math.round(calories * multiplier),
-        protein_g: round1(protein * multiplier),
-        carbs_g: round1(carbs * multiplier),
-        fat_g: round1(fat * multiplier),
-        fiber_g: round1(fiber * multiplier),
-        sugar_g: round1(sugar * multiplier),
-      }
-    }
-
-    if (/chickpeas|chick peas/.test(text)) return per100g(164, 8.9, 27.4, 2.6, 7.6, 4.8)
-    if (/brown rice/.test(text)) return per100g(111, 2.6, 23, 0.9, 1.8, 0.4)
-    if (/mixed vegetables?/.test(text)) return per100g(65, 3, 13, 0.3, 4, 4)
-    if (/olive oil/.test(text)) return perTablespoon(119, 0, 0, 13.5)
-    if (/chicken breast/.test(text)) return per100g(165, 31, 0, 3.6)
-    if (/salmon/.test(text)) return per100g(208, 20, 0, 13)
-    if (/sweet potato/.test(text)) return per100g(86, 1.6, 20.1, 0.1, 3, 4.2)
-    if (/\bpotato\b/.test(text)) return per100g(87, 1.9, 20.1, 0.1, 1.8, 0.9)
-    if (/broccoli/.test(text)) return per100g(35, 2.4, 7.2, 0.4, 3.3, 1.4)
-    if (/rolled oats|oats/.test(text)) return perCup(307, 10.7, 54.8, 5.3, 8.1, 0.8)
-    if (/greek yogurt|greek yoghurt/.test(text)) return per100g(59, 10.3, 3.6, 0.4, 0, 3.2)
-    if (/blueberries/.test(text)) return per100g(57, 0.7, 14.5, 0.3, 2.4, 10)
-    if (/chia/.test(text)) return perTablespoon(58, 2, 5, 3.7, 4.1, 0)
-
-    return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
+    return { items, missing }
   }
-
-  const buildImportedRecipeItems = (ingredients: string[]) =>
-    ingredients.slice(0, 80).map((line, index) => {
-      const nutrition = recipeIngredientNutritionFallback(line)
-      return buildFavoriteAdjustItemFromSearchFood({
-        id: `recipe-import-${Date.now()}-${index}`,
-        source: 'custom',
-        name: line,
-        serving_size: line,
-        servings: 1,
-        calories: nutrition.calories,
-        protein_g: nutrition.protein_g,
-        carbs_g: nutrition.carbs_g,
-        fat_g: nutrition.fat_g,
-        fiber_g: nutrition.fiber_g,
-        sugar_g: nutrition.sugar_g,
-        __custom: true,
-      })
-    })
 
   const buildRecommendedMealBuilderItems = (meal: RecommendedMeal) =>
     (meal.items || []).slice(0, 80).map((item, index) =>
@@ -3725,7 +3685,15 @@ export function TrackCaloriesScreen() {
     meal: string,
     prefill?: { name?: string; ingredients?: string[]; items?: FavoriteAdjustItem[]; steps?: string[]; servings?: number | null },
   ) => {
-    const prefillItems = prefill?.items?.length ? prefill.items : prefill?.ingredients?.length ? buildImportedRecipeItems(prefill.ingredients) : []
+    if (prefill?.ingredients?.length && !prefill?.items?.length) {
+      openNativeImportRecipe(meal)
+      applyImportedRecipe({ title: prefill.name || 'Recipe', servings: prefill.servings || null, ingredients: prefill.ingredients, steps: prefill.steps || [], sourceUrl: null, prepMinutes: null, cookMinutes: null })
+      return
+    }
+    const prefillItems = prefill?.items || []
+    setMealRecipe(null)
+    setRecipeServingsEaten('')
+    recipeServingsAppliedRef.current = 1
     setFavoritesTargetMeal(meal)
     setFavoriteActionItem(null)
     setFavoritePreviewItem(null)
@@ -3907,19 +3875,43 @@ export function TrackCaloriesScreen() {
     }
   }
 
-  const continueImportedRecipeToBuilder = () => {
-    if (!importRecipe) return
+  const continueImportedRecipeToBuilder = async () => {
+    if (!importRecipe || importRecipeLoading || !session?.token) return
     const ingredients = cleanRecipeLines(importRecipeIngredientsText)
     const steps = cleanRecipeLines(importRecipeStepsText)
     const servingsRaw = importRecipeServings.trim()
     const servings = servingsRaw && Number.isFinite(Number(servingsRaw)) && Number(servingsRaw) > 0 ? Number(servingsRaw) : null
-    setImportRecipeOpen(false)
-    openNativeMealBuilder(importRecipeTargetMeal, {
-      name: normalizeFavoriteLabel(importRecipeTitle) || importRecipe.title || 'Recipe',
-      ingredients,
-      steps,
-      servings,
-    })
+    if (!ingredients.length) { setImportRecipeError('Add the ingredients and measured amounts first.'); return }
+    setImportRecipeLoading(true)
+    setImportRecipeError('')
+    try {
+      const resolved = await buildImportedRecipeItems(ingredients)
+      if (resolved.missing.length) {
+        Alert.alert('Check recipe ingredients', `Add measured grams or ml and choose one food for: ${resolved.missing.join('; ')}. Remove optional extras you are not using. No meal has been saved.`)
+        setImportRecipeError(`Check these ingredients before continuing: ${resolved.missing.join('; ')}. Use grams or ml, choose one food for alternatives, and remove optional extras you are not using. No meal has been saved.`)
+        return
+      }
+      const recipe = { ...importRecipe, title: normalizeFavoriteLabel(importRecipeTitle) || importRecipe.title || 'Recipe', ingredients, steps, servings }
+      setImportRecipeOpen(false)
+      openNativeMealBuilder(importRecipeTargetMeal, { name: recipe.title, items: resolved.items })
+      setMealRecipe(recipe)
+      setRecipeServingsEaten(String(servings || 1))
+      recipeServingsAppliedRef.current = servings || 1
+      Alert.alert('Review recipe nutrition', 'Nutrition uses the matched food-library ingredients. Check the food varieties, measured amounts and number of servings before saving. Extra frying oil and toppings must be measured and included if used.')
+    } finally {
+      setImportRecipeLoading(false)
+    }
+  }
+
+  const updateRecipeServingsEaten = (value: string) => {
+    setRecipeServingsEaten(value)
+    const ratio = recipePortionRatio(value, recipeServingsAppliedRef.current)
+    if (ratio == null) return
+    setFavoriteEditItems((items) => items.map((item) => {
+      const servings = item.servings * ratio
+      return { ...item, servings, amountInput: formatFavoriteAmount(favoriteAmountFromServings(servings, item.amountUnit, favoriteBaseForItem(item))) }
+    }))
+    recipeServingsAppliedRef.current = Number(value)
   }
 
   const openMealEntryEditor = (entry: FoodEntry) => {
@@ -3933,6 +3925,11 @@ export function TrackCaloriesScreen() {
 
   const updateFavoriteFromEditor = async () => {
     const isMealBuilder = mealBuilderOpen && !favoriteEditItem
+    if (mealRecipe && recipePortionRatio(recipeServingsEaten, 1) == null) {
+      Alert.alert('Check servings', 'Enter the number of recipe servings you ate before saving.')
+      return
+    }
+    const recipeMetadata = mealRecipe ? { __importRecipe: mealRecipe, __nativeRecipeServingsEaten: Number(recipeServingsEaten) } : {}
     if (!favoriteEditItem && !isMealBuilder) return
     if (isMealBuilder && favoriteEditItems.length === 0) {
       Alert.alert('Add ingredients', 'Add at least one ingredient first.')
@@ -3976,6 +3973,7 @@ export function TrackCaloriesScreen() {
         sugar_g: roundOptionalNutrient(totals.sugar),
         customMeal: true,
         method: 'meal-builder',
+        ...recipeMetadata,
         ...(nextItems.length > 1 ? { __voiceBuiltMeal: true } : {}),
       }
       const ok = await createFoodEntry({
@@ -4037,6 +4035,7 @@ export function TrackCaloriesScreen() {
         sugar_g: roundOptionalNutrient(totals.sugar),
         customMeal: true,
         method: 'meal-builder',
+        ...recipeMetadata,
         ...(nextItems.length > 1 ? { __voiceBuiltMeal: true } : {}),
       }
       const res = await fetch(`${API_BASE_URL}/api/food-log`, {
@@ -4131,6 +4130,7 @@ export function TrackCaloriesScreen() {
         items: nextItems,
         nutrition: {
           ...((sourceFavorite.raw?.nutrition || sourceFavorite.raw?.total || {}) as any),
+          ...recipeMetadata,
           calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
           protein: Math.max(0, round1(Number(totals.protein) || 0)),
           carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
@@ -4140,6 +4140,7 @@ export function TrackCaloriesScreen() {
         },
         total: {
           ...((sourceFavorite.raw?.total || sourceFavorite.raw?.nutrition || {}) as any),
+          ...recipeMetadata,
           calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
           protein: Math.max(0, round1(Number(totals.protein) || 0)),
           carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
@@ -7512,6 +7513,8 @@ export function TrackCaloriesScreen() {
               <>
                 <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
                   <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Review (you can edit)</Text>
+                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 8 }}>Use measured grams or ml. Remove optional extras you are not using and choose one food where the recipe offers alternatives.</Text>
+                  {importRecipeError ? <Text style={{ color: '#DC2626', fontSize: 13, marginTop: 10 }}>{importRecipeError}</Text> : null}
                   <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700', marginTop: 12 }}>Title</Text>
                   <TextInput
                     value={importRecipeTitle}
@@ -7552,12 +7555,13 @@ export function TrackCaloriesScreen() {
                 </View>
 
                 <Pressable
-                  onPress={continueImportedRecipeToBuilder}
+                  onPress={() => void continueImportedRecipeToBuilder()}
+                  disabled={importRecipeLoading}
                   style={[primaryButton, { flex: 0, minHeight: 46 }]}
                   accessibilityRole="button"
                   accessibilityLabel="Continue to Build a meal"
                 >
-                  <Text style={primaryButtonText}>Continue to Build a meal</Text>
+                  <Text style={primaryButtonText}>{importRecipeLoading ? 'Checking ingredients…' : 'Continue to Build a meal'}</Text>
                 </Pressable>
                 <Text style={{ color: '#6B7280', fontSize: 12 }}>
                   You can choose Save to favorites on the next screen after reviewing the meal.
@@ -7836,6 +7840,17 @@ export function TrackCaloriesScreen() {
                 </View>
               </View>
 
+              {mealRecipe ? (
+                <View style={{ marginTop: 14, padding: 14, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 16 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Recipe servings</Text>
+                  <Text style={{ color: theme.colors.muted, marginTop: 6 }}>{mealRecipe.servings ? `Full recipe makes ${mealRecipe.servings} servings.` : 'Full recipe is one batch. Enter a fraction of the batch you ate.'}</Text>
+                  <Text style={{ color: theme.colors.muted, marginTop: 8 }}>{mealRecipe.servings ? 'Servings eaten' : 'Batches eaten'}</Text>
+                  <TextInput accessibilityLabel="Recipe servings eaten" value={recipeServingsEaten} onChangeText={updateRecipeServingsEaten} keyboardType="decimal-pad" style={[inputStyle, { marginTop: 6 }]} />
+                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 8 }}>Totals show this amount. Check the matched food varieties and include any measured oil or toppings.</Text>
+                </View>
+              ) : null}
+
+              {!mealRecipe ? (
               <View style={{ marginTop: 14, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 16, backgroundColor: '#ECFDF5', padding: 14 }}>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                   <View style={{ flex: 1 }}>
@@ -7883,6 +7898,8 @@ export function TrackCaloriesScreen() {
                   <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 6 }}>Add weights to ingredients to use portions.</Text>
                 ) : null}
               </View>
+
+              ) : null}
 
               {favoriteEditSearchError ? <Text style={{ color: '#DC2626', marginTop: 10 }}>{favoriteEditSearchError}</Text> : null}
 
@@ -8157,7 +8174,7 @@ export function TrackCaloriesScreen() {
             <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
-                  {favoriteEditPortionControlEnabled ? 'Your portion totals' : 'Meal totals'}
+                  {mealRecipe ? 'Recipe portion totals' : favoriteEditPortionControlEnabled ? 'Your portion totals' : 'Meal totals'}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, backgroundColor: theme.colors.bg, padding: 2 }}>
                   <Pressable onPress={() => setEnergyUnit('kcal')} style={{ borderRadius: 999, backgroundColor: energyUnit === 'kcal' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
@@ -8169,7 +8186,7 @@ export function TrackCaloriesScreen() {
                 </View>
               </View>
               <Text style={{ color: '#6B7280', fontSize: 12, marginBottom: 12 }}>
-                {favoriteEditPortionControlEnabled
+                {mealRecipe ? `${recipeServingsEaten || '—'} of ${mealRecipe.servings || 1} recipe servings.` : favoriteEditPortionControlEnabled
                   ? 'Your portion is based on the ingredient amounts shown above.'
                   : 'This meal is 100% of the full amount.'}
               </Text>

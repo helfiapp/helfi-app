@@ -104,6 +104,8 @@ assert.equal(savedBody.nutrition.sugar, 0)
 // Re-save the reopened diary through the actual ingredient editor handler.
 ctx.favoriteEditItem = { entry: ctx.normalizeFoodApiEntry({ id: 'saved', name: sauce.name, items: [sauce], nutrition: barcodePayload.nutrition }), label: sauce.name }
 ctx.mealBuilderOpen = false
+ctx.mealRecipe = null
+ctx.recipeServingsEaten = ''
 ctx.favoriteEditItems = ctx.buildFavoriteAdjustItems({ id: 'entry:saved', ...ctx.favoriteEditItem })
 ctx.favoriteEditName = sauce.name
 ctx.favoritesTargetMeal = 'snacks'

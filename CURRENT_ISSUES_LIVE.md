@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai — AWS Amplify job 44; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
+- Date/time: 5 October 2026, 5:17 am Melbourne.
+- What changed: Unknown fibre/sugar stays missing through barcode saves, saved meal/favourite reads, portion changes, recipe prefills and meal-editor saves; genuine zero stays zero. Incomplete meal/day totals show a dash. Commit 5eb4ad9d8379c9c5a7217b207c707cd81d79b9ec.
+- Where to see it (page/link): https://helfi.ai/food; rebuilt iPhone and iPad Release simulator apps. Signed store binaries remain pending.
+- What to quickly test: TERIYAKI SAUCE (USDA 1106110) 100 g = 88 kcal, fat 0, fibre unknown; 50 g = 44 kcal. Native save/restart and iPhone reopen preserve all six cards. Website receives the saved half portion (daily 575), then saves 100 g; iPhone revisit shows the restored 88 kcal with fibre still unknown and daily 619. Wallet 639 agrees. No food records deleted.
+
+DEPLOYED:
 - LIVE: https://helfi.ai — AWS Amplify job 43; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
 - Date/time: 5 October 2026, 4:36 am Melbourne.
 - What changed: Food liquid hints now match complete words. Boiled eggs, broiled foods, steak, watermelon and teaspoon measures no longer inherit liquid treatment. Individual egg size choices restored. Commit d052df8936dd90327b7d9e3b71d4d54d02630950.

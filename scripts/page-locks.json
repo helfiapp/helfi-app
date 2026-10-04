@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T18:05:01.644Z",
+  "generatedAt": "2026-10-04T18:46:15.318Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -222,6 +222,7 @@
     "native/src/lib/nutrientValues.ts": "0dbe2e607d584ab532e77e0ebc04b0f40d69a074085e3b0ae5219a37bb319e6c",
     "native/src/lib/openNativeWebPath.ts": "d12a6b09d0d06cef7076296f04ef8517180f5504d478f454187b071bea92c216",
     "native/src/lib/plainFoodSearch.ts": "52d589948784e0dd44a14d5a746036125acc9ff8954dc03b1ddbfd175d3e6807",
+    "native/src/lib/recipeNutrition.ts": "e34d59f84d82237c2997f0b2296ecfcc25fe274ca0103b8ffff80273ebea2c71",
     "native/src/navigation/AuthNavigator.tsx": "688915d7a9571e8233d5b69338c190a3611a5d508e6d77b4e186ea851e7b27f4",
     "native/src/navigation/MainNavigator.tsx": "13e970d64b1c22dc88293cb45ef0fc728472e316a766ea5e8a4193bdca3c064e",
     "native/src/navigation/MainTabs.tsx": "8f31f311f776bdcdaeb620288aee4b7b1319e8b721936aec559eff2a16e32839",
@@ -268,7 +269,7 @@
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "b0456e82e3cae345d3722cb0a0ea1d791d5c26ff773840ee37a7b997d1334800",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "0ad447a71ecbf97029dee25beeea7a02b4add768f8685e981fc9d8654690e81e",
+    "native/src/screens/TrackCaloriesScreen.tsx": "d8b39e905cebaec53f6431f73f6ad3b04dc3334eb5eb64dbc8e6f3407f1dd6e8",
     "native/src/screens/WaterIntakeScreen.tsx": "1b3aae043fcb347c0198b6aa25e6b4caad76d6105911d632b55fdd61fbd0c2f9",
     "native/src/state/AppModeContext.tsx": "ce70c2670e359ca8fba27a78a2bd817b551490a422b30dabe3b87b3837739321",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",

@@ -564,8 +564,8 @@ if (
   failures.push('Talk to Helfi recipe recommendations must open the native Build a meal tool with the recipe prefilled.')
 }
 
-if (!/recipeIngredientNutritionFallback/.test(trackCalories) || !/chickpeas\|chick peas/.test(trackCalories) || !/brown rice/.test(trackCalories) || !/olive oil/.test(trackCalories) || !/const nutrition = recipeIngredientNutritionFallback\(line\)/.test(trackCalories)) {
-  failures.push('Talk to Helfi Build a meal handoffs must not import common recipe ingredients as zero-calorie items.')
+if (/recipeIngredientNutritionFallback/.test(trackCalories) || !/await buildImportedRecipeItems\(ingredients\)/.test(trackCalories) || !/resolved\.missing\.length/.test(trackCalories) || !/measuredRecipeFood\(food, request\)/.test(trackCalories) || !/openNativeImportRecipe\(meal\)[\s\S]*?applyImportedRecipe\(/.test(trackCalories)) {
+  failures.push('Talk to Helfi recipe handoffs must review measured ingredients and resolve real food-library nutrition; unresolved ingredients must not become zero-calorie items.')
 }
 
 if (!/I used today's diary context where available/.test(route)) {
