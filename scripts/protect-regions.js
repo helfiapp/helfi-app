@@ -379,7 +379,7 @@ function main() {
     filePath: path.join(__dirname, '..', 'app', 'food', 'build-meal', 'MealBuilderClient.tsx'),
     startMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY START',
     endMarker: 'PROTECTED: MEAL_BUILDER_RECIPE_IMPORT_DRAFT_APPLY END',
-    expectedHash: '692857c89afabc27c143e8e26f7c483a3218087745fbcbd08cbd3701c6efdbe6',
+    expectedHash: '1e535fb826bb4d8f455a57f156c5d98b4de2807b8ae0c9c9e76d7eadc7e27cfc',
     allowEnvVar: 'ALLOW_MEAL_BUILDER_RECIPE_IMPORT_APPLY_EDIT',
     description: 'Meal builder recipe-import draft apply + serving inference flow',
   });

@@ -6,6 +6,7 @@
     "node": "22.x"
   },
   "scripts": {
+    "check:food-missing-nutrients": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-missing-nutrients-check.ts",
     "check:food-liquid-identity": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-liquid-identity-check.ts",
     "dev": "next dev",
     "check:local-openai-key": "node scripts/assert-no-local-openai-key.js",

@@ -1,4 +1,5 @@
 'use client'
+import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '@/lib/food/nutrient-values'
 import { Cog6ToothIcon, HandThumbDownIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/24/outline'
 /**
  * ABSOLUTE GUARD RAIL – READ BEFORE EDITING
@@ -1336,7 +1337,8 @@ const formatMacroValue = (value: number | null | undefined, unit: string) => {
 const KCAL_TO_KJ = 4.184
 const OZ_TO_ML = 29.57
 
-const formatMacroAmount = (value: number) => {
+const formatMacroAmount = (value: number | null | undefined) => {
+  if (value == null) return '—'
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || Math.abs(numeric) < 0.0001) return '0'
   const abs = Math.abs(numeric)
@@ -5261,10 +5263,10 @@ export default function FoodDiary() {
       if (option?.fat_g == null && Number.isFinite(Number(item?.fat_g))) {
         next.fat_g = scale(item.fat_g, 1)
       }
-      if (option?.fiber_g == null && Number.isFinite(Number(item?.fiber_g))) {
+      if (option?.fiber_g == null && optionalNutrient(item?.fiber_g) != null) {
         next.fiber_g = scale(item.fiber_g, 1)
       }
-      if (option?.sugar_g == null && Number.isFinite(Number(item?.sugar_g))) {
+      if (option?.sugar_g == null && optionalNutrient(item?.sugar_g) != null) {
         next.sugar_g = scale(item.sugar_g, 1)
       }
     }
@@ -5280,8 +5282,8 @@ export default function FoodDiary() {
       if (Number.isFinite(Number(next.protein_g))) next.protein_g = scaleMacro(next.protein_g, 1)
       if (Number.isFinite(Number(next.carbs_g))) next.carbs_g = scaleMacro(next.carbs_g, 1)
       if (Number.isFinite(Number(next.fat_g))) next.fat_g = scaleMacro(next.fat_g, 1)
-      if (Number.isFinite(Number(next.fiber_g))) next.fiber_g = scaleMacro(next.fiber_g, 1)
-      if (Number.isFinite(Number(next.sugar_g))) next.sugar_g = scaleMacro(next.sugar_g, 1)
+      next.fiber_g = roundOptionalNutrient(scaleOptionalNutrient(next.fiber_g, pieceScale))
+      next.sugar_g = roundOptionalNutrient(scaleOptionalNutrient(next.sugar_g, pieceScale))
     }
     if (optionGrams) {
       next.customGramsPerServing = pieceScale > 1 ? optionGrams * pieceScale : optionGrams
@@ -6216,8 +6218,8 @@ export default function FoodDiary() {
       protein: round((totals as any).protein, 1),
       carbs: round((totals as any).carbs, 1),
       fat: round((totals as any).fat, 1),
-      fiber: round((totals as any).fiber, 1),
-      sugar: round((totals as any).sugar, 1),
+      fiber: roundOptionalNutrient(scaleOptionalNutrient(totals.fiber, scale)),
+      sugar: roundOptionalNutrient(scaleOptionalNutrient(totals.sugar, scale)),
     }
   }
 
@@ -6557,8 +6559,8 @@ export default function FoodDiary() {
         protein: 0,
         carbs: 0,
         fat: 0,
-        fiber: 0,
-        sugar: 0,
+        fiber: null,
+        sugar: null,
       }
     } catch {
       return {
@@ -6566,8 +6568,8 @@ export default function FoodDiary() {
         protein: 0,
         carbs: 0,
         fat: 0,
-        fiber: 0,
-        sugar: 0,
+        fiber: null,
+        sugar: null,
       }
     }
   }
@@ -11461,8 +11463,8 @@ const applyStructuredItems = (
       protein: 0,
       carbs: 0,
       fat: 0,
-      fiber: 0,
-      sugar: 0,
+      fiber: 0 as number | null,
+      sugar: 0 as number | null,
     }
 
     items.forEach((item: any) => {
@@ -11471,8 +11473,8 @@ const applyStructuredItems = (
       const protein = Number(item?.protein_g) || 0
       const carbs = Number(item?.carbs_g) || 0
       const fat = Number(item?.fat_g) || 0
-      const fiber = Number(item?.fiber_g) || 0
-      const sugar = Number(item?.sugar_g) || 0
+      const fiber = readOptionalNutrient(item, ['fiber_g', 'fiber'])
+      const sugar = readOptionalNutrient(item, ['sugar_g', 'sugar'])
       const safeProtein = Math.max(0, protein)
       const safeCarbs = Math.max(0, carbs)
       const safeFat = Math.max(0, fat)
@@ -11485,8 +11487,8 @@ const applyStructuredItems = (
       totals.protein += protein * servings * multiplier
       totals.carbs += carbs * servings * multiplier
       totals.fat += fat * servings * multiplier
-      totals.fiber += fiber * servings * multiplier
-      totals.sugar += sugar * servings * multiplier
+      totals.fiber = sumOptionalNutrients(totals.fiber, scaleOptionalNutrient(fiber, servings * multiplier))
+      totals.sugar = sumOptionalNutrients(totals.sugar, scaleOptionalNutrient(sugar, servings * multiplier))
     })
 
     const round = (value: number, decimals = 1) => {
@@ -11499,8 +11501,8 @@ const applyStructuredItems = (
       protein: round(totals.protein),
       carbs: round(totals.carbs),
       fat: round(totals.fat),
-      fiber: totals.fiber > 0 ? round(totals.fiber) : null,
-      sugar: totals.sugar > 0 ? round(totals.sugar) : null,
+      fiber: roundOptionalNutrient(totals.fiber),
+      sugar: roundOptionalNutrient(totals.sugar),
     }
   }
 
@@ -11769,8 +11771,8 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
   const protein = toNumber(raw.protein ?? raw.protein_g)
   const carbs = toNumber(raw.carbs ?? raw.carbs_g)
   const fat = toNumber(raw.fat ?? raw.fat_g)
-  const fiber = toNumber(raw.fiber ?? raw.fiber_g)
-  const sugar = toNumber(raw.sugar ?? raw.sugar_g)
+  const fiber = readOptionalNutrient(raw, ['fiber', 'fiber_g'])
+  const sugar = readOptionalNutrient(raw, ['sugar', 'sugar_g'])
 
   const normalized: NutritionTotals = {
     calories: calories === null ? null : Math.round(calories),
@@ -11785,7 +11787,8 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
   return hasValues ? normalized : null
 }
 
-  const formatNutrientValue = (key: typeof NUTRIENT_DISPLAY_ORDER[number], value: number) => {
+  const formatNutrientValue = (key: typeof NUTRIENT_DISPLAY_ORDER[number], value: number | null | undefined) => {
+    if (value == null) return '—'
     const safeValue = Number.isFinite(value) ? value : 0
     if (key === 'calories') {
       return energyUnit === 'kJ'
@@ -18276,8 +18279,8 @@ Please add nutritional information manually if needed.`);
       protein: (Number(base?.protein) || 0) * safe,
       carbs: (Number(base?.carbs) || 0) * safe,
       fat: (Number(base?.fat) || 0) * safe,
-      fiber: (Number(base?.fiber) || 0) * safe,
-      sugar: (Number(base?.sugar) || 0) * safe,
+      fiber: scaleOptionalNutrient(readOptionalNutrient(base, ['fiber', 'fiber_g']), safe),
+      sugar: scaleOptionalNutrient(readOptionalNutrient(base, ['sugar', 'sugar_g']), safe),
     }
   }
 
@@ -26982,7 +26985,7 @@ Please add nutritional information manually if needed.`);
 
                 const fatSplit = { good: 0, bad: 0, unclear: 0 }
 
-                const totals = source.reduce((acc: Record<typeof NUTRIENT_DISPLAY_ORDER[number], number>, item: any) => {
+                const totals = source.reduce((acc: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }, item: any) => {
                   const derivedItems = deriveItemsForEntry(item)
                   const recalculated = derivedItems ? recalculateNutritionFromItems(derivedItems) : null
                   const portionScale = getEntryPortionScale(item)
@@ -26994,8 +26997,8 @@ Please add nutritional information manually if needed.`);
                     acc.protein += scaledRecalculated.protein || 0
                     acc.carbs += scaledRecalculated.carbs || 0
                     acc.fat += scaledRecalculated.fat || 0
-                    acc.fiber += scaledRecalculated.fiber || 0
-                    acc.sugar += scaledRecalculated.sugar || 0
+                    acc.fiber = sumOptionalNutrients(acc.fiber, scaledRecalculated.fiber)
+                    acc.sugar = sumOptionalNutrients(acc.sugar, scaledRecalculated.sugar)
                     if (splitFromItems) {
                       fatSplit.good += splitFromItems.good
                       fatSplit.bad += splitFromItems.bad
@@ -27010,8 +27013,8 @@ Please add nutritional information manually if needed.`);
                   acc.protein += Number(storedTotals?.protein) || 0
                   acc.carbs += Number(storedTotals?.carbs) || 0
                   acc.fat += Number(storedTotals?.fat) || 0
-                  acc.fiber += Number(storedTotals?.fiber) || 0
-                  acc.sugar += Number(storedTotals?.sugar) || 0
+                  acc.fiber = sumOptionalNutrients(acc.fiber, storedTotals?.fiber)
+                  acc.sugar = sumOptionalNutrients(acc.sugar, storedTotals?.sugar)
                   if (splitFromItems) {
                     fatSplit.good += splitFromItems.good
                     fatSplit.bad += splitFromItems.bad
@@ -27143,7 +27146,7 @@ Please add nutritional information manually if needed.`);
                 type MacroRow = {
                   key: 'protein' | 'carbs' | 'fat' | 'fibre' | 'sugar'
                   label: string
-                  consumed: number
+                  consumed: number | null
                   target: number
                   unit: string
                   color: string
@@ -27154,8 +27157,8 @@ Please add nutritional information manually if needed.`);
                   { key: 'protein', label: 'Protein', consumed: totals.protein || 0, target: macroTargetsWithExercise.protein || 0, unit: 'g', color: '#ef4444' },
                   { key: 'carbs', label: 'Carbs', consumed: carbGrams, target: macroTargetsWithExercise.carbs || 0, unit: 'g', color: '#22c55e' },
                   { key: 'fat', label: 'Fat', consumed: totals.fat || 0, target: macroTargetsWithExercise.fat || 0, unit: 'g', color: '#6366f1', fatSplit: normalizedFatSplit },
-                  { key: 'fibre', label: 'Fibre', consumed: fibreGrams, target: macroTargetsWithExercise.fiber || 0, unit: 'g', color: '#12adc9' },
-                  { key: 'sugar', label: 'Sugar (max)', consumed: sugarGrams, target: macroTargetsWithExercise.sugar || 0, unit: 'g', color: '#f97316' },
+                  { key: 'fibre', label: 'Fibre', consumed: totals.fiber, target: macroTargetsWithExercise.fiber || 0, unit: 'g', color: '#12adc9' },
+                  { key: 'sugar', label: 'Sugar (max)', consumed: totals.sugar, target: macroTargetsWithExercise.sugar || 0, unit: 'g', color: '#f97316' },
                 ] satisfies MacroRow[]
                 const macroRowsFiltered = macroRows.filter((row) => row.target > 0)
 
@@ -27393,18 +27396,18 @@ Please add nutritional information manually if needed.`);
                             macroPanel = (
                               <div className="order-2 md:order-1 space-y-2 mt-4 md:mt-0">
                                 {macroRowsFiltered.map((row) => {
-                  const pctRaw = row.target > 0 ? row.consumed / row.target : 0
+                  const pctRaw = row.target > 0 ? (row.consumed ?? 0) / row.target : 0
                   const pct = Math.max(0, pctRaw)
                   const percentValue = row.target > 0 ? Math.round(pctRaw * 100) : 0
                   const percentLabel =
-                    row.target > 0
+                    row.consumed == null ? '—' : row.target > 0
                       ? pctRaw > 0 && pctRaw < 0.01
                         ? '<1%'
                         : `${percentValue}%`
                       : '0%'
                   const over = percentValue > 100
                   const percentColor = over ? 'text-red-600' : 'text-gray-900'
-                  const remaining = Math.max(0, row.target - row.consumed)
+                  const remaining = row.consumed == null ? null : Math.max(0, row.target - row.consumed)
                                   // ⚠️ GUARD RAIL: Fat bar must stay split by good/bad/unclear colors.
                                   const fatSplitValues = row.key === 'fat' ? row.fatSplit : null
                                   const fatSplitTotal = fatSplitValues
@@ -27432,7 +27435,7 @@ Please add nutritional information manually if needed.`);
                                             {formatMacroAmount(row.consumed)} / {formatMacroAmount(row.target)} {row.unit}{row.key === 'sugar' ? ' cap' : ''}
                                           </span>
                                           <span className="font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
-                                            {formatMacroAmount(remaining)} {row.unit} left
+                                            {remaining == null ? 'Incomplete data' : `${formatMacroAmount(remaining)} ${row.unit} left`}
                                           </span>
                                         </div>
                                         <div className={`text-xs font-semibold ${percentColor}`}>
@@ -30677,8 +30680,8 @@ Please add nutritional information manually if needed.`);
                     protein: 0,
                     carbs: 0,
                     fat: 0,
-                    fiber: 0,
-                    sugar: 0,
+                    fiber: null,
+                    sugar: null,
                   }
                   return (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -30688,7 +30691,7 @@ Please add nutritional information manually if needed.`);
                         const value = raw === null || raw === undefined ? null : Number(raw)
                         const display =
                           value === null || !Number.isFinite(value)
-                            ? formatNutrientValue(key, 0)
+                            ? formatNutrientValue(key, null)
                             : formatNutrientValue(key, value)
                         const label =
                           key === 'calories'
@@ -30817,8 +30820,8 @@ Please add nutritional information manually if needed.`);
                           protein: Number(totals?.protein) || 0,
                           carbs: Number(totals?.carbs) || 0,
                           fat: Number(totals?.fat) || 0,
-                          fiber: Number(totals?.fiber) || 0,
-                          sugar: Number(totals?.sugar) || 0,
+                          fiber: optionalNutrient(totals?.fiber),
+                          sugar: optionalNutrient(totals?.sugar),
                         }
                       } catch {
                         const multiplier = Number.isFinite(servingsCount) && servingsCount > 0 ? servingsCount : 1
@@ -30827,8 +30830,8 @@ Please add nutritional information manually if needed.`);
                           protein: (Number(adjustItem?.protein_g ?? adjustItem?.protein) || 0) * multiplier,
                           carbs: (Number(adjustItem?.carbs_g ?? adjustItem?.carbs) || 0) * multiplier,
                           fat: (Number(adjustItem?.fat_g ?? adjustItem?.fat) || 0) * multiplier,
-                          fiber: (Number(adjustItem?.fiber_g ?? adjustItem?.fiber) || 0) * multiplier,
-                          sugar: (Number(adjustItem?.sugar_g ?? adjustItem?.sugar) || 0) * multiplier,
+                          fiber: scaleOptionalNutrient(readOptionalNutrient(adjustItem, ['fiber_g', 'fiber']), multiplier),
+                          sugar: scaleOptionalNutrient(readOptionalNutrient(adjustItem, ['sugar_g', 'sugar']), multiplier),
                         }
                       }
                     })()
@@ -31028,7 +31031,7 @@ Please add nutritional information manually if needed.`);
 
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
                               {ITEM_NUTRIENT_META.map((meta) => {
-                                const valueByKey: Record<string, number> = {
+                                const valueByKey: Record<string, number | null> = {
                                   calories: ingredientTotals.calories,
                                   protein: ingredientTotals.protein,
                                   carbs: ingredientTotals.carbs,
@@ -31036,7 +31039,7 @@ Please add nutritional information manually if needed.`);
                                   fiber: ingredientTotals.fiber,
                                   sugar: ingredientTotals.sugar,
                                 }
-                                const display = formatNutrientValue(meta.key as any, valueByKey[meta.key] || 0)
+                                const display = formatNutrientValue(meta.key as any, valueByKey[meta.key])
                                 const label =
                                   meta.key === 'calories'
                                     ? energyUnit === 'kJ'
@@ -31068,8 +31071,8 @@ Please add nutritional information manually if needed.`);
                     protein: 0,
                     carbs: 0,
                     fat: 0,
-                    fiber: 0,
-                    sugar: 0,
+                    fiber: null,
+                    sugar: null,
                   }
                   return (
                     <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
@@ -31079,7 +31082,7 @@ Please add nutritional information manually if needed.`);
                         const value = raw === null || raw === undefined ? null : Number(raw)
                         const display =
                           value === null || !Number.isFinite(value)
-                            ? formatNutrientValue(key, 0)
+                            ? formatNutrientValue(key, null)
                             : formatNutrientValue(key, value)
                         const label =
                           key === 'calories'

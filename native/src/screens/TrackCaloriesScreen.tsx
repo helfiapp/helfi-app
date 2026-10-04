@@ -31,6 +31,7 @@ import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { materializeMealPortion } from '../lib/mealPortions'
+import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '../lib/nutrientValues'
 import { convertFoodAmount, parseFoodServing, liquidDensity, type FoodBaseUnit } from '../lib/foodUnits'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -107,8 +108,8 @@ type FavoriteMeal = {
     protein: number
     carbs: number
     fat: number
-    fiber: number
-    sugar: number
+    fiber: number | null
+    sugar: number | null
   }
   description?: string
   ingredients?: Array<{ name: string; amount: number; unit: string }>
@@ -154,7 +155,8 @@ const FAVORITE_NUTRIENT_CARDS: Array<{
 
 const BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code128', 'code39', 'code93', 'itf14', 'codabar']
 
-function formatFavoriteNutrientValue(key: FavoriteNutrientKey, value: number, energyUnit: 'kcal' | 'kj') {
+function formatFavoriteNutrientValue(key: FavoriteNutrientKey, value: number | null, energyUnit: 'kcal' | 'kj') {
+  if (value == null) return '—'
   const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0
   if (key === 'calories') {
     return energyUnit === 'kj' ? `${Math.round(safeValue * 4.184)} kJ` : String(Math.round(safeValue))
@@ -175,8 +177,8 @@ type FavoriteAdjustItem = {
   protein: number
   carbs: number
   fat: number
-  fiber: number
-  sugar: number
+  fiber: number | null
+  sugar: number | null
   servingOptions?: SearchFoodServingOption[] | null
   selectedServingId?: string | null
   raw?: any
@@ -582,8 +584,8 @@ type EntryTotals = {
   protein: number
   carbs: number
   fat: number
-  fiber: number
-  sugar: number
+  fiber: number | null
+  sugar: number | null
   satFat: number
 }
 
@@ -681,8 +683,8 @@ function buildFallbackFavoriteServingOptions(item: FavoriteAdjustItem): SearchFo
     protein_g: Math.max(0, numberOrZero(item.protein)),
     carbs_g: Math.max(0, numberOrZero(item.carbs)),
     fat_g: Math.max(0, numberOrZero(item.fat)),
-    fiber_g: Math.max(0, numberOrZero(item.fiber)),
-    sugar_g: Math.max(0, numberOrZero(item.sugar)),
+    fiber_g: optionalNutrient(item.fiber),
+    sugar_g: optionalNutrient(item.sugar),
   }
   const options: SearchFoodServingOption[] = [
     {
@@ -708,8 +710,8 @@ function buildFallbackFavoriteServingOptions(item: FavoriteAdjustItem): SearchFo
         protein_g: roundTo(macros.protein_g * scale, 2),
         carbs_g: roundTo(macros.carbs_g * scale, 2),
         fat_g: roundTo(macros.fat_g * scale, 2),
-        fiber_g: roundTo(macros.fiber_g * scale, 2),
-        sugar_g: roundTo(macros.sugar_g * scale, 2),
+        fiber_g: roundOptionalNutrient(scaleOptionalNutrient(macros.fiber_g, scale), 2),
+        sugar_g: roundOptionalNutrient(scaleOptionalNutrient(macros.sugar_g, scale), 2),
         grams,
         ml: null,
         unit: 'g',
@@ -727,8 +729,8 @@ function buildFallbackFavoriteServingOptions(item: FavoriteAdjustItem): SearchFo
         protein_g: roundTo(macros.protein_g * scale, 2),
         carbs_g: roundTo(macros.carbs_g * scale, 2),
         fat_g: roundTo(macros.fat_g * scale, 2),
-        fiber_g: roundTo(macros.fiber_g * scale, 2),
-        sugar_g: roundTo(macros.sugar_g * scale, 2),
+        fiber_g: roundOptionalNutrient(scaleOptionalNutrient(macros.fiber_g, scale), 2),
+        sugar_g: roundOptionalNutrient(scaleOptionalNutrient(macros.sugar_g, scale), 2),
         grams: null,
         ml,
         unit: 'ml',
@@ -943,8 +945,8 @@ function applyServingOptionToFavoriteAdjustItem(
     protein: Math.max(0, numberOrZero(option?.protein_g)),
     carbs: Math.max(0, numberOrZero(option?.carbs_g)),
     fat: Math.max(0, numberOrZero(option?.fat_g)),
-    fiber: Math.max(0, numberOrZero(option?.fiber_g)),
-    sugar: Math.max(0, numberOrZero(option?.sugar_g)),
+    fiber: optionalNutrient(option?.fiber_g),
+    sugar: optionalNutrient(option?.sugar_g),
     servingOptions: options,
     selectedServingId: String(option.id),
     raw: {
@@ -969,10 +971,10 @@ function applyServingOptionToFavoriteAdjustItem(
       carbs_g: Math.max(0, numberOrZero(option?.carbs_g)),
       fat: Math.max(0, numberOrZero(option?.fat_g)),
       fat_g: Math.max(0, numberOrZero(option?.fat_g)),
-      fiber: Math.max(0, numberOrZero(option?.fiber_g)),
-      fiber_g: Math.max(0, numberOrZero(option?.fiber_g)),
-      sugar: Math.max(0, numberOrZero(option?.sugar_g)),
-      sugar_g: Math.max(0, numberOrZero(option?.sugar_g)),
+      fiber: optionalNutrient(option?.fiber_g),
+      fiber_g: optionalNutrient(option?.fiber_g),
+      sugar: optionalNutrient(option?.sugar_g),
+      sugar_g: optionalNutrient(option?.sugar_g),
     },
   }
 }
@@ -1031,8 +1033,8 @@ function sanitizeEntryTotals(raw: any): EntryTotals | null {
   const protein = pick(raw?.protein, raw?.protein_g)
   const carbs = pick(raw?.carbs, raw?.carbs_g)
   const fat = pick(raw?.fat, raw?.fat_g)
-  const fiber = pick(raw?.fiber, raw?.fiber_g)
-  const sugar = pick(raw?.sugar, raw?.sugar_g)
+  const fiber = readOptionalNutrient(raw, ['fiber', 'fiber_g'])
+  const sugar = readOptionalNutrient(raw, ['sugar', 'sugar_g'])
   const satFat = pick(raw?.saturatedFat, raw?.saturated_fat_g, raw?.satFat)
 
   const hasValue = [calories, protein, carbs, fat, fiber, sugar, satFat].some((v) => v != null)
@@ -1048,8 +1050,8 @@ function sanitizeEntryTotals(raw: any): EntryTotals | null {
     protein: safe(protein),
     carbs: safe(carbs),
     fat: safe(fat),
-    fiber: safe(fiber),
-    sugar: safe(sugar),
+    fiber: roundOptionalNutrient(fiber),
+    sugar: roundOptionalNutrient(sugar),
     satFat: safe(satFat),
   }
 }
@@ -1086,8 +1088,8 @@ function extractTotalsFromDescriptionText(value: any): EntryTotals | null {
     protein: Math.max(0, roundTo(protein || 0)),
     carbs: Math.max(0, roundTo(carbs || 0)),
     fat: Math.max(0, roundTo(fat || 0)),
-    fiber: Math.max(0, roundTo(fiber || 0)),
-    sugar: Math.max(0, roundTo(sugar || 0)),
+    fiber: roundOptionalNutrient(fiber),
+    sugar: roundOptionalNutrient(sugar),
     satFat: 0,
   }
 }
@@ -1100,8 +1102,8 @@ function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotal
     protein: 0,
     carbs: 0,
     fat: 0,
-    fiber: 0,
-    sugar: 0,
+    fiber: 0 as number | null,
+    sugar: 0 as number | null,
     satFat: 0,
   }
 
@@ -1115,8 +1117,8 @@ function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotal
     const protein = Math.max(0, Number(item?.protein_g ?? item?.protein) || 0)
     const carbs = Math.max(0, Number(item?.carbs_g ?? item?.carbs) || 0)
     const fat = Math.max(0, Number(item?.fat_g ?? item?.fat) || 0)
-    const fiber = Math.max(0, Number(item?.fiber_g ?? item?.fiber) || 0)
-    const sugar = Math.max(0, Number(item?.sugar_g ?? item?.sugar) || 0)
+    const fiber = readOptionalNutrient(item, ['fiber_g', 'fiber'])
+    const sugar = readOptionalNutrient(item, ['sugar_g', 'sugar'])
     const satFat = Math.max(0, Number(item?.saturated_fat_g ?? item?.saturatedFat) || 0)
 
     const macroCalories = protein * 4 + carbs * 4 + fat * 9
@@ -1127,8 +1129,8 @@ function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotal
     totals.protein += protein * factor
     totals.carbs += carbs * factor
     totals.fat += fat * factor
-    totals.fiber += fiber * factor
-    totals.sugar += sugar * factor
+    totals.fiber = sumOptionalNutrients(totals.fiber, scaleOptionalNutrient(fiber, factor))
+    totals.sugar = sumOptionalNutrients(totals.sugar, scaleOptionalNutrient(sugar, factor))
     totals.satFat += satFat * factor
   }
 
@@ -1137,8 +1139,8 @@ function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotal
     protein: Math.max(0, roundTo(totals.protein)),
     carbs: Math.max(0, roundTo(totals.carbs)),
     fat: Math.max(0, roundTo(totals.fat)),
-    fiber: Math.max(0, roundTo(totals.fiber)),
-    sugar: Math.max(0, roundTo(totals.sugar)),
+    fiber: roundOptionalNutrient(totals.fiber),
+    sugar: roundOptionalNutrient(totals.sugar),
     satFat: Math.max(0, roundTo(totals.satFat)),
   }
 }
@@ -1159,8 +1161,8 @@ function normalizeFoodApiEntry(raw: any): FoodEntry {
     protein: 0,
     carbs: 0,
     fat: 0,
-    fiber: 0,
-    sugar: 0,
+    fiber: null,
+    sugar: null,
     satFat: 0,
   }
 
@@ -1301,7 +1303,8 @@ function buildDailyTargetsFromUserData(raw: any): DailyTargets {
   }
 }
 
-function formatMacroAmount(value: number) {
+function formatMacroAmount(value: number | null | undefined) {
+  if (value == null) return '—'
   const numeric = Number(value)
   if (!Number.isFinite(numeric) || Math.abs(numeric) < 0.0001) return '0'
   const abs = Math.abs(numeric)
@@ -1384,8 +1387,8 @@ function makeFavoriteFromEntry(entry: FoodEntry): FavoriteMeal {
       protein: readNutrient(nutrients, ['protein', 'protein_g']),
       carbs: readNutrient(nutrients, ['carbs', 'carbs_g']),
       fat: readNutrient(nutrients, ['fat', 'fat_g']),
-      fiber: readNutrient(nutrients, ['fiber', 'fiber_g']),
-      sugar: readNutrient(nutrients, ['sugar', 'sugar_g']),
+      fiber: readOptionalNutrient(nutrients, ['fiber', 'fiber_g']),
+      sugar: readOptionalNutrient(nutrients, ['sugar', 'sugar_g']),
     },
     custom: false,
     items: Array.isArray(entry.items) ? JSON.parse(JSON.stringify(entry.items)) : null,
@@ -1478,8 +1481,8 @@ function favoriteTotalsFromRaw(raw: any) {
     protein: 0,
     carbs: 0,
     fat: 0,
-    fiber: 0,
-    sugar: 0,
+    fiber: null,
+    sugar: null,
     satFat: 0,
   }
 }
@@ -1529,8 +1532,8 @@ function normalizeFavoriteMeal(raw: any): FavoriteMeal | null {
       protein: Math.max(0, round1(Number(totals?.protein) || 0)),
       carbs: Math.max(0, round1(Number(totals?.carbs) || 0)),
       fat: Math.max(0, round1(Number(totals?.fat) || 0)),
-      fiber: Math.max(0, round1(Number(totals?.fiber) || 0)),
-      sugar: Math.max(0, round1(Number(totals?.sugar) || 0)),
+      fiber: roundOptionalNutrient(totals?.fiber),
+      sugar: roundOptionalNutrient(totals?.sugar),
     },
     ingredients: Array.isArray(raw?.ingredients)
       ? raw.ingredients
@@ -1565,8 +1568,8 @@ function favoriteStorageRecord(favorite: FavoriteMeal) {
     protein: Math.max(0, round1(Number(favorite?.nutrients?.protein) || 0)),
     carbs: Math.max(0, round1(Number(favorite?.nutrients?.carbs) || 0)),
     fat: Math.max(0, round1(Number(favorite?.nutrients?.fat) || 0)),
-    fiber: Math.max(0, round1(Number(favorite?.nutrients?.fiber) || 0)),
-    sugar: Math.max(0, round1(Number(favorite?.nutrients?.sugar) || 0)),
+    fiber: roundOptionalNutrient(favorite?.nutrients?.fiber),
+    sugar: roundOptionalNutrient(favorite?.nutrients?.sugar),
   }
   return {
     ...baseRaw,
@@ -1614,8 +1617,8 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
         protein: Math.max(0, Number(raw?.protein_g ?? raw?.protein) || 0),
         carbs: Math.max(0, Number(raw?.carbs_g ?? raw?.carbs) || 0),
         fat: Math.max(0, Number(raw?.fat_g ?? raw?.fat) || 0),
-        fiber: Math.max(0, Number(raw?.fiber_g ?? raw?.fiber) || 0),
-        sugar: Math.max(0, Number(raw?.sugar_g ?? raw?.sugar) || 0),
+        fiber: readOptionalNutrient(raw, ['fiber_g', 'fiber']),
+        sugar: readOptionalNutrient(raw, ['sugar_g', 'sugar']),
         servingOptions,
         selectedServingId: findSelectedServingId(servingOptions, servingLabel, raw?.selectedServingId),
         raw: { ...raw, servingOptions },
@@ -1627,8 +1630,8 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
     protein: 0,
     carbs: 0,
     fat: 0,
-    fiber: 0,
-    sugar: 0,
+    fiber: null,
+    sugar: null,
   }
   return [
     {
@@ -1641,8 +1644,8 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
       protein: Math.max(0, Number(sourceTotals?.protein) || 0),
       carbs: Math.max(0, Number(sourceTotals?.carbs) || 0),
       fat: Math.max(0, Number(sourceTotals?.fat) || 0),
-      fiber: Math.max(0, Number(sourceTotals?.fiber) || 0),
-      sugar: Math.max(0, Number(sourceTotals?.sugar) || 0),
+      fiber: optionalNutrient(sourceTotals?.fiber),
+      sugar: optionalNutrient(sourceTotals?.sugar),
       raw: null,
     },
   ]
@@ -1663,8 +1666,8 @@ function buildFavoriteAdjustItemFromSearchFood(item: SearchFoodItem): FavoriteAd
     protein: Math.max(0, Number(item?.protein_g) || 0),
     carbs: Math.max(0, Number(item?.carbs_g) || 0),
     fat: Math.max(0, Number(item?.fat_g) || 0),
-    fiber: Math.max(0, Number(item?.fiber_g) || 0),
-    sugar: Math.max(0, Number(item?.sugar_g) || 0),
+    fiber: optionalNutrient(item?.fiber_g),
+    sugar: optionalNutrient(item?.sugar_g),
     servingOptions,
     selectedServingId: findSelectedServingId(servingOptions, servingLabel, item?.selectedServingId),
     raw: { ...item, servingOptions },
@@ -1679,11 +1682,11 @@ function calculateFavoriteAdjustTotals(items: FavoriteAdjustItem[]) {
       acc.protein += Math.max(0, Number(item?.protein) || 0) * servings
       acc.carbs += Math.max(0, Number(item?.carbs) || 0) * servings
       acc.fat += Math.max(0, Number(item?.fat) || 0) * servings
-      acc.fiber += Math.max(0, Number(item?.fiber) || 0) * servings
-      acc.sugar += Math.max(0, Number(item?.sugar) || 0) * servings
+      acc.fiber = sumOptionalNutrients(acc.fiber, scaleOptionalNutrient(item?.fiber, servings))
+      acc.sugar = sumOptionalNutrients(acc.sugar, scaleOptionalNutrient(item?.sugar, servings))
       return acc
     },
-    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null },
   )
 }
 
@@ -2005,12 +2008,12 @@ export function TrackCaloriesScreen() {
         acc.protein += readNutrient(n, ['protein', 'protein_g'])
         acc.carbs += readNutrient(n, ['carbs', 'carbs_g'])
         acc.fat += readNutrient(n, ['fat', 'fat_g'])
-        acc.fiber += readNutrient(n, ['fiber', 'fiber_g'])
-        acc.sugar += readNutrient(n, ['sugar', 'sugar_g'])
+        acc.fiber = sumOptionalNutrients(acc.fiber, readOptionalNutrient(n, ['fiber', 'fiber_g']))
+        acc.sugar = sumOptionalNutrients(acc.sugar, readOptionalNutrient(n, ['sugar', 'sugar_g']))
         acc.satFat += readNutrient(n, ['saturatedFat', 'saturated_fat_g'])
         return acc
       },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0, satFat: 0 },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null, satFat: 0 },
     )
 
     const healthyFat = Math.max(0, all.fat - all.satFat)
@@ -2020,8 +2023,8 @@ export function TrackCaloriesScreen() {
       protein: round1(all.protein),
       carbs: round1(all.carbs),
       fat: round1(all.fat),
-      fiber: round1(all.fiber),
-      sugar: round1(all.sugar),
+      fiber: roundOptionalNutrient(all.fiber),
+      sugar: roundOptionalNutrient(all.sugar),
       satFat: round1(all.satFat),
       healthyFat: round1(healthyFat),
     }
@@ -2879,8 +2882,8 @@ export function TrackCaloriesScreen() {
       protein: number
       carbs: number
       fat: number
-      fiber?: number
-      sugar?: number
+      fiber?: number | null
+      sugar?: number | null
       description?: string
       localDate?: string
       items?: any[] | null
@@ -2899,8 +2902,8 @@ export function TrackCaloriesScreen() {
         protein: Math.max(0, roundTo(payload.protein)),
         carbs: Math.max(0, roundTo(payload.carbs)),
         fat: Math.max(0, roundTo(payload.fat)),
-        fiber: Math.max(0, roundTo(payload.fiber || 0)),
-        sugar: Math.max(0, roundTo(payload.sugar || 0)),
+        fiber: roundOptionalNutrient(payload.fiber),
+        sugar: roundOptionalNutrient(payload.sugar),
       }
       const descriptionRaw = String(payload.description || '').trim()
       const description = descriptionRaw || name
@@ -3075,8 +3078,8 @@ export function TrackCaloriesScreen() {
     setEditProtein(String(round1(readNutrient(n, ['protein', 'protein_g']))))
     setEditCarbs(String(round1(readNutrient(n, ['carbs', 'carbs_g']))))
     setEditFat(String(round1(readNutrient(n, ['fat', 'fat_g']))))
-    setEditFiber(String(round1(readNutrient(n, ['fiber', 'fiber_g']))))
-    setEditSugar(String(round1(readNutrient(n, ['sugar', 'sugar_g']))))
+    setEditFiber(roundOptionalNutrient(readOptionalNutrient(n, ['fiber', 'fiber_g']))?.toString() ?? '')
+    setEditSugar(roundOptionalNutrient(readOptionalNutrient(n, ['sugar', 'sugar_g']))?.toString() ?? '')
     setEditModalOpen(true)
     setEntryMenu(null)
     closeEntrySwipeMenus()
@@ -3094,8 +3097,8 @@ export function TrackCaloriesScreen() {
     const proteinPerServing = perServing(Number(nextTotals.protein) || Number(nextTotals.protein_g) || 0, 3)
     const carbsPerServing = perServing(Number(nextTotals.carbs) || Number(nextTotals.carbs_g) || 0, 3)
     const fatPerServing = perServing(Number(nextTotals.fat) || Number(nextTotals.fat_g) || 0, 3)
-    const fiberPerServing = perServing(Number(nextTotals.fiber) || Number(nextTotals.fiber_g) || 0, 3)
-    const sugarPerServing = perServing(Number(nextTotals.sugar) || Number(nextTotals.sugar_g) || 0, 3)
+    const fiberPerServing = roundOptionalNutrient(scaleOptionalNutrient(readOptionalNutrient(nextTotals, ['fiber', 'fiber_g']), 1 / servings), 3)
+    const sugarPerServing = roundOptionalNutrient(scaleOptionalNutrient(readOptionalNutrient(nextTotals, ['sugar', 'sugar_g']), 1 / servings), 3)
 
     return [
       {
@@ -3119,8 +3122,8 @@ export function TrackCaloriesScreen() {
       protein: number
       carbs: number
       fat: number
-      fiber?: number
-      sugar?: number
+      fiber?: number | null
+      sugar?: number | null
     },
   ) => {
     const existing =
@@ -3138,8 +3141,8 @@ export function TrackCaloriesScreen() {
       protein: readNutrient(entry.nutrients, ['protein', 'protein_g']),
       carbs: readNutrient(entry.nutrients, ['carbs', 'carbs_g']),
       fat: readNutrient(entry.nutrients, ['fat', 'fat_g']),
-      fiber: readNutrient(entry.nutrients, ['fiber', 'fiber_g']),
-      sugar: readNutrient(entry.nutrients, ['sugar', 'sugar_g']),
+      fiber: readOptionalNutrient(entry.nutrients, ['fiber', 'fiber_g']),
+      sugar: readOptionalNutrient(entry.nutrients, ['sugar', 'sugar_g']),
     }
     const next = {
       ...existing,
@@ -3147,8 +3150,8 @@ export function TrackCaloriesScreen() {
       protein: Math.max(0, round1(Number(source.protein) || 0)),
       carbs: Math.max(0, round1(Number(source.carbs) || 0)),
       fat: Math.max(0, round1(Number(source.fat) || 0)),
-      fiber: Math.max(0, round1(Number(source.fiber) || 0)),
-      sugar: Math.max(0, round1(Number(source.sugar) || 0)),
+      fiber: roundOptionalNutrient(source.fiber),
+      sugar: roundOptionalNutrient(source.sugar),
     }
     return {
       ...next,
@@ -3171,8 +3174,8 @@ export function TrackCaloriesScreen() {
       protein: number
       carbs: number
       fat: number
-      fiber?: number
-      sugar?: number
+      fiber?: number | null
+      sugar?: number | null
     },
   ) => {
     const name = String(nameOverride || entry.name || entry.description || 'Food item').trim()
@@ -3184,8 +3187,8 @@ export function TrackCaloriesScreen() {
       protein: numberOrZero(nutrition.protein),
       carbs: numberOrZero(nutrition.carbs),
       fat: numberOrZero(nutrition.fat),
-      fiber: numberOrZero(nutrition.fiber),
-      sugar: numberOrZero(nutrition.sugar),
+      fiber: optionalNutrient(nutrition.fiber),
+      sugar: optionalNutrient(nutrition.sugar),
       description: name,
       localDate,
       items: cloneEntryItemsForSave(entry, name, nutrition),
@@ -3203,8 +3206,8 @@ export function TrackCaloriesScreen() {
       protein: numberOrZero(editProtein),
       carbs: numberOrZero(editCarbs),
       fat: numberOrZero(editFat),
-      fiber: numberOrZero(editFiber),
-      sugar: numberOrZero(editSugar),
+      fiber: optionalNutrient(editFiber),
+      sugar: optionalNutrient(editSugar),
     }
     const nutrition = buildEntryNutritionForSave(editTarget, nextTotals)
     const res = await fetch(`${API_BASE_URL}/api/food-log`, {
@@ -3535,8 +3538,8 @@ export function TrackCaloriesScreen() {
       protein: Math.max(0, round1(Number(totals?.protein) || 0)),
       carbs: Math.max(0, round1(Number(totals?.carbs) || 0)),
       fat: Math.max(0, round1(Number(totals?.fat) || 0)),
-      fiber: Math.max(0, round1(Number(totals?.fiber) || 0)),
-      sugar: Math.max(0, round1(Number(totals?.sugar) || 0)),
+      fiber: roundOptionalNutrient(totals?.fiber),
+      sugar: roundOptionalNutrient(totals?.sugar),
       ...(favoriteId ? { __favoriteId: favoriteId, __favoriteManualEdit: false } : {}),
     }
     const createdAt = new Date().toISOString()
@@ -3564,8 +3567,8 @@ export function TrackCaloriesScreen() {
       protein: Number(totals?.protein) || 0,
       carbs: Number(totals?.carbs) || 0,
       fat: Number(totals?.fat) || 0,
-      fiber: Number(totals?.fiber) || 0,
-      sugar: Number(totals?.sugar) || 0,
+      fiber: optionalNutrient(totals?.fiber),
+      sugar: optionalNutrient(totals?.sugar),
       description: item.label,
       items: normalizedItems,
       nutrition: nutritionPayload,
@@ -3712,8 +3715,8 @@ export function TrackCaloriesScreen() {
         protein_g: item.protein_g ?? 0,
         carbs_g: item.carbs_g ?? 0,
         fat_g: item.fat_g ?? 0,
-        fiber_g: item.fiber_g ?? 0,
-        sugar_g: item.sugar_g ?? 0,
+        fiber_g: optionalNutrient(item.fiber_g),
+        sugar_g: optionalNutrient(item.sugar_g),
         __custom: true,
       }),
     )
@@ -3952,8 +3955,8 @@ export function TrackCaloriesScreen() {
       protein_g: Math.max(0, Number(entry.protein) || 0),
       carbs_g: Math.max(0, Number(entry.carbs) || 0),
       fat_g: Math.max(0, Number(entry.fat) || 0),
-      fiber_g: Math.max(0, Number(entry.fiber) || 0),
-      sugar_g: Math.max(0, Number(entry.sugar) || 0),
+      fiber_g: optionalNutrient(entry.fiber),
+      sugar_g: optionalNutrient(entry.sugar),
     }))
 
     if (isMealBuilder) {
@@ -3967,10 +3970,10 @@ export function TrackCaloriesScreen() {
         carbs_g: Math.max(0, round1(Number(totals.carbs) || 0)),
         fat: Math.max(0, round1(Number(totals.fat) || 0)),
         fat_g: Math.max(0, round1(Number(totals.fat) || 0)),
-        fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
-        fiber_g: Math.max(0, round1(Number(totals.fiber) || 0)),
-        sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
-        sugar_g: Math.max(0, round1(Number(totals.sugar) || 0)),
+        fiber: roundOptionalNutrient(totals.fiber),
+        fiber_g: roundOptionalNutrient(totals.fiber),
+        sugar: roundOptionalNutrient(totals.sugar),
+        sugar_g: roundOptionalNutrient(totals.sugar),
         customMeal: true,
         method: 'meal-builder',
         ...(nextItems.length > 1 ? { __voiceBuiltMeal: true } : {}),
@@ -4028,10 +4031,10 @@ export function TrackCaloriesScreen() {
         carbs_g: Math.max(0, round1(Number(totals.carbs) || 0)),
         fat: Math.max(0, round1(Number(totals.fat) || 0)),
         fat_g: Math.max(0, round1(Number(totals.fat) || 0)),
-        fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
-        fiber_g: Math.max(0, round1(Number(totals.fiber) || 0)),
-        sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
-        sugar_g: Math.max(0, round1(Number(totals.sugar) || 0)),
+        fiber: roundOptionalNutrient(totals.fiber),
+        fiber_g: roundOptionalNutrient(totals.fiber),
+        sugar: roundOptionalNutrient(totals.sugar),
+        sugar_g: roundOptionalNutrient(totals.sugar),
         customMeal: true,
         method: 'meal-builder',
         ...(nextItems.length > 1 ? { __voiceBuiltMeal: true } : {}),
@@ -4116,8 +4119,8 @@ export function TrackCaloriesScreen() {
         protein: Math.max(0, round1(Number(totals.protein) || 0)),
         carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
         fat: Math.max(0, round1(Number(totals.fat) || 0)),
-        fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
-        sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+        fiber: roundOptionalNutrient(totals.fiber),
+        sugar: roundOptionalNutrient(totals.sugar),
       },
       raw: {
         ...(sourceFavorite.raw || {}),
@@ -4132,8 +4135,8 @@ export function TrackCaloriesScreen() {
           protein: Math.max(0, round1(Number(totals.protein) || 0)),
           carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
           fat: Math.max(0, round1(Number(totals.fat) || 0)),
-          fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
-          sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+          fiber: roundOptionalNutrient(totals.fiber),
+          sugar: roundOptionalNutrient(totals.sugar),
         },
         total: {
           ...((sourceFavorite.raw?.total || sourceFavorite.raw?.nutrition || {}) as any),
@@ -4141,8 +4144,8 @@ export function TrackCaloriesScreen() {
           protein: Math.max(0, round1(Number(totals.protein) || 0)),
           carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
           fat: Math.max(0, round1(Number(totals.fat) || 0)),
-          fiber: Math.max(0, round1(Number(totals.fiber) || 0)),
-          sugar: Math.max(0, round1(Number(totals.sugar) || 0)),
+          fiber: roundOptionalNutrient(totals.fiber),
+          sugar: roundOptionalNutrient(totals.sugar),
         },
         method: method || (custom ? 'meal-builder' : 'text'),
         ...(custom ? { customMeal: true } : {}),
@@ -4263,8 +4266,8 @@ export function TrackCaloriesScreen() {
       prev.map((item) => {
         if (item.id !== id) return item
         const servings = Number.isFinite(Number(item.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1
-        const total = Math.max(0, Number(totalValue) || 0)
-        return { ...item, [key]: total / servings }
+        const total = key === 'fiber' || key === 'sugar' ? optionalNutrient(totalValue) : Math.max(0, Number(totalValue) || 0)
+        return { ...item, [key]: scaleOptionalNutrient(total, 1 / servings) }
       }),
     )
   }
@@ -4529,8 +4532,8 @@ export function TrackCaloriesScreen() {
           protein_g: numberOrZero(summary?.protein || summary?.protein_g),
           carbs_g: numberOrZero(summary?.carbs || summary?.carbs_g),
           fat_g: numberOrZero(summary?.fat || summary?.fat_g),
-          fiber_g: numberOrZero(summary?.fiber || summary?.fiber_g),
-          sugar_g: numberOrZero(summary?.sugar || summary?.sugar_g),
+          fiber_g: readOptionalNutrient(summary, ['fiber', 'fiber_g']),
+          sugar_g: readOptionalNutrient(summary, ['sugar', 'sugar_g']),
         }),
       ])
     } catch {
@@ -4636,8 +4639,8 @@ export function TrackCaloriesScreen() {
     const proteinBase = numberOrZero(proteinRaw)
     const carbsBase = numberOrZero(carbsRaw)
     const fatBase = numberOrZero(fatRaw)
-    const fiberBase = numberOrZero(item.fiber_g)
-    const sugarBase = numberOrZero(item.sugar_g)
+    const fiberBase = optionalNutrient(item.fiber_g)
+    const sugarBase = optionalNutrient(item.sugar_g)
     const title = String(item.name || '').trim()
     const servingText = String(item.serving_size || '1 serving').trim()
     const detail = `${servingText}${item.brand ? ` • ${item.brand}` : ''}`
@@ -4782,8 +4785,8 @@ export function TrackCaloriesScreen() {
       protein: numberOrZero(barcodeFood.protein_g),
       carbs: numberOrZero(barcodeFood.carbs_g),
       fat: numberOrZero(barcodeFood.fat_g),
-      fiber: numberOrZero(barcodeFood.fiber_g),
-      sugar: numberOrZero(barcodeFood.sugar_g),
+      fiber: optionalNutrient(barcodeFood.fiber_g),
+      sugar: optionalNutrient(barcodeFood.sugar_g),
       description: `${barcodeFood.serving_size || '1 serving'}${barcodeFood.brand ? ` • ${barcodeFood.brand}` : ''}`,
       items: [{ ...barcodeFood }],
       nutrition: {
@@ -4795,10 +4798,10 @@ export function TrackCaloriesScreen() {
         carbs_g: numberOrZero(barcodeFood.carbs_g),
         fat: numberOrZero(barcodeFood.fat_g),
         fat_g: numberOrZero(barcodeFood.fat_g),
-        fiber: numberOrZero(barcodeFood.fiber_g),
-        fiber_g: numberOrZero(barcodeFood.fiber_g),
-        sugar: numberOrZero(barcodeFood.sugar_g),
-        sugar_g: numberOrZero(barcodeFood.sugar_g),
+        fiber: optionalNutrient(barcodeFood.fiber_g),
+        fiber_g: optionalNutrient(barcodeFood.fiber_g),
+        sugar: optionalNutrient(barcodeFood.sugar_g),
+        sugar_g: optionalNutrient(barcodeFood.sugar_g),
         __barcode: String(barcodeFood.barcode || barcodeCode || '').trim() || undefined,
       },
     })
@@ -4847,8 +4850,8 @@ export function TrackCaloriesScreen() {
         protein_g: numberOrZero(barcodeLabelProtein) || undefined,
         carbs_g: numberOrZero(barcodeLabelCarbs) || undefined,
         fat_g: numberOrZero(barcodeLabelFat) || undefined,
-        fiber_g: numberOrZero(barcodeLabelFiber) || undefined,
-        sugar_g: numberOrZero(barcodeLabelSugar) || undefined,
+        fiber_g: optionalNutrient(barcodeLabelFiber),
+        sugar_g: optionalNutrient(barcodeLabelSugar),
       },
       report: true,
     }
@@ -5197,11 +5200,11 @@ export function TrackCaloriesScreen() {
         acc.protein += numberOrZero(item.protein_g) * servings
         acc.carbs += numberOrZero(item.carbs_g) * servings
         acc.fat += numberOrZero(item.fat_g) * servings
-        acc.fiber += numberOrZero(item.fiber_g) * servings
-        acc.sugar += numberOrZero(item.sugar_g) * servings
+        acc.fiber = sumOptionalNutrients(acc.fiber, scaleOptionalNutrient(item.fiber_g, servings))
+        acc.sugar = sumOptionalNutrients(acc.sugar, scaleOptionalNutrient(item.sugar_g, servings))
         return acc
       },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null },
     )
     const totals = meal.totals || null
     return {
@@ -5209,8 +5212,8 @@ export function TrackCaloriesScreen() {
       protein: numberOrZero(totals?.protein ?? totals?.protein_g) || itemTotals.protein,
       carbs: numberOrZero(totals?.carbs ?? totals?.carbs_g) || itemTotals.carbs,
       fat: numberOrZero(totals?.fat ?? totals?.fat_g) || itemTotals.fat,
-      fiber: numberOrZero(totals?.fiber ?? totals?.fiber_g) || itemTotals.fiber,
-      sugar: numberOrZero(totals?.sugar ?? totals?.sugar_g) || itemTotals.sugar,
+      fiber: meal.items?.length ? itemTotals.fiber : readOptionalNutrient(totals, ['fiber', 'fiber_g']),
+      sugar: meal.items?.length ? itemTotals.sugar : readOptionalNutrient(totals, ['sugar', 'sugar_g']),
     }
   }
 
@@ -5240,7 +5243,7 @@ export function TrackCaloriesScreen() {
       { label: 'Sugar', value: n.sugar, unit: 'g', target: macroTargetsWithExercise.sugar, color: '#F97316' },
     ].map((row) => ({
       ...row,
-      display: row.unit === 'kcal' ? String(Math.round(row.value)) : `${formatMacroAmount(row.value)}g`,
+      display: row.unit === 'kcal' ? row.value == null ? '—' : String(Math.round(row.value)) : `${formatMacroAmount(row.value)}g`,
       percent: row.target > 0 ? clamp((Number(row.value) / Number(row.target)) * 100, 0, 100) : 0,
     }))
   }
@@ -5302,11 +5305,11 @@ export function TrackCaloriesScreen() {
         acc.protein += readNutrient(n, ['protein', 'protein_g'])
         acc.carbs += readNutrient(n, ['carbs', 'carbs_g'])
         acc.fat += readNutrient(n, ['fat', 'fat_g'])
-        acc.fiber += readNutrient(n, ['fiber', 'fiber_g'])
-        acc.sugar += readNutrient(n, ['sugar', 'sugar_g'])
+        acc.fiber = sumOptionalNutrients(acc.fiber, readOptionalNutrient(n, ['fiber', 'fiber_g']))
+        acc.sugar = sumOptionalNutrients(acc.sugar, readOptionalNutrient(n, ['sugar', 'sugar_g']))
         return acc
       },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null },
     )
 
     const ok = await createFoodEntry({
@@ -5806,36 +5809,11 @@ export function TrackCaloriesScreen() {
     ])
   }
 
-  const renderFavoriteNutrientCards = (entryTotals: Record<FavoriteNutrientKey, number>) => (
-    <View style={{ marginTop: 18, flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-      {FAVORITE_NUTRIENT_CARDS.map((card) => {
-        const rawValue = Number(entryTotals[card.key] || 0)
-        const label = card.key === 'calories' && energyUnit === 'kj' ? 'Kilojoules' : card.label
-        return (
-          <View
-            key={card.key}
-            style={{
-              width: '47%',
-              borderWidth: 1,
-              borderColor: card.border,
-              borderRadius: 16,
-              padding: 14,
-              backgroundColor: card.bg,
-            }}
-          >
-            <Text style={{ color: card.color, fontSize: 18, fontWeight: '700' }}>
-              {formatFavoriteNutrientValue(card.key, rawValue, energyUnit)}
-            </Text>
-            <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginTop: 6, textTransform: 'uppercase' }}>
-              {label}
-            </Text>
-          </View>
-        )
-      })}
-    </View>
+  const renderFavoriteNutrientCards = (entryTotals: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }) => (
+    <NutrientCards energyUnit={energyUnit} values={entryTotals} />
   )
 
-  const renderFavoriteDailyTotals = (entryTotals: Record<FavoriteNutrientKey, number>) => {
+  const renderFavoriteDailyTotals = (entryTotals: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }) => {
     const rows = [
       {
         key: 'calories',
@@ -5883,22 +5861,22 @@ export function TrackCaloriesScreen() {
       {
         key: 'fiber',
         label: 'Fibre',
-        consumed: totals.fiber + entryTotals.fiber,
+        consumed: sumOptionalNutrients(totals.fiber, entryTotals.fiber),
         target: macroTargetsWithExercise.fiber,
         color: '#EAB308',
         bg: '#FEFCE8',
         border: '#FDE68A',
-        value: `${formatMacroAmount(totals.fiber + entryTotals.fiber)} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g`,
+        value: `${formatMacroAmount(sumOptionalNutrients(totals.fiber, entryTotals.fiber))} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g`,
       },
       {
         key: 'sugar',
         label: 'Sugar',
-        consumed: totals.sugar + entryTotals.sugar,
+        consumed: sumOptionalNutrients(totals.sugar, entryTotals.sugar),
         target: macroTargetsWithExercise.sugar,
         color: '#EC4899',
         bg: '#FDF2F8',
         border: '#FBCFE8',
-        value: `${formatMacroAmount(totals.sugar + entryTotals.sugar)} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g`,
+        value: `${formatMacroAmount(sumOptionalNutrients(totals.sugar, entryTotals.sugar))} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g`,
       },
     ]
 
@@ -6194,7 +6172,8 @@ export function TrackCaloriesScreen() {
                   const safeConsumed = Math.max(0, Number(row.consumed) || 0)
                   const rawPct = safeTarget > 0 ? safeConsumed / safeTarget : 0
                   const over = rawPct > 1
-                  const percentLabel = safeTarget > 0 ? (rawPct > 0 && rawPct < 0.01 ? '<1%' : `${Math.round(rawPct * 100)}%`) : '0%'
+                  const unknown = row.consumed == null
+                  const percentLabel = unknown ? '—' : safeTarget > 0 ? (rawPct > 0 && rawPct < 0.01 ? '<1%' : `${Math.round(rawPct * 100)}%`) : '0%'
                   const remaining = Math.max(0, safeTarget - safeConsumed)
                   const usedWidth = clamp(rawPct * 100, 0, 100)
                   const fatTotal = Math.max(0, fatSplit.good + fatSplit.bad + fatSplit.unclear)
@@ -6208,11 +6187,11 @@ export function TrackCaloriesScreen() {
                         <Text style={{ color: theme.colors.text, fontSize: 25/2, fontWeight: '600', flex: 1 }}>
                           {row.label}{' '}
                           <Text style={{ color: '#4B5563', fontWeight: '500' }}>
-                            {formatMacroAmount(safeConsumed)} / {formatMacroAmount(safeTarget)} {row.unit}
+                            {formatMacroAmount(row.consumed)} / {formatMacroAmount(safeTarget)} {row.unit}
                             {row.key === 'sugar' ? ' cap' : ''}
                           </Text>{' '}
                           <Text style={{ color: over ? '#EF4444' : row.color, fontWeight: '600' }}>
-                            {formatMacroAmount(remaining)} {row.unit} left
+                            {unknown ? 'Incomplete data' : `${formatMacroAmount(remaining)} ${row.unit} left`}
                           </Text>
                         </Text>
                         <Text style={{ color: over ? '#EF4444' : '#111827', fontSize: 12, fontWeight: '700' }}>
@@ -8133,12 +8112,13 @@ export function TrackCaloriesScreen() {
                                   ['sugar', 'Sugar', 'g'],
                                 ] as const).map(([key, label, unit]) => {
                                   const servings = Number.isFinite(Number(editItem.servings)) && Number(editItem.servings) > 0 ? Number(editItem.servings) : 1
-                                  const total = Math.max(0, Number(editItem[key]) || 0) * servings
+                                  const total = scaleOptionalNutrient(editItem[key], servings)
                                   return (
                                     <View key={key} style={{ width: '48%' }}>
                                       <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginBottom: 5 }}>{label} ({unit})</Text>
                                       <TextInput
-                                        value={key === 'calories' ? String(Math.round(total)) : String(round1(total))}
+                                        value={total == null ? '' : key === 'calories' ? String(Math.round(total)) : String(round1(total))}
+                                        placeholder="Not provided"
                                         onChangeText={(value) => updateFavoriteEditIngredientNutrient(editItem.id, key, value)}
                                         keyboardType="decimal-pad"
                                         selectTextOnFocus
@@ -8155,8 +8135,8 @@ export function TrackCaloriesScreen() {
                               protein: editItem.protein * editItem.servings,
                               carbs: editItem.carbs * editItem.servings,
                               fat: editItem.fat * editItem.servings,
-                              fiber: editItem.fiber * editItem.servings,
-                              sugar: editItem.sugar * editItem.servings,
+                              fiber: scaleOptionalNutrient(editItem.fiber, editItem.servings),
+                              sugar: scaleOptionalNutrient(editItem.sugar, editItem.servings),
                             }} />
 
                             <Pressable
@@ -8405,8 +8385,8 @@ export function TrackCaloriesScreen() {
                       protein: adjustItem.protein * adjustItem.servings,
                       carbs: adjustItem.carbs * adjustItem.servings,
                       fat: adjustItem.fat * adjustItem.servings,
-                      fiber: adjustItem.fiber * adjustItem.servings,
-                      sugar: adjustItem.sugar * adjustItem.servings,
+                      fiber: scaleOptionalNutrient(adjustItem.fiber, adjustItem.servings),
+                      sugar: scaleOptionalNutrient(adjustItem.sugar, adjustItem.servings),
                     }} />
                   </View>
                 </View>
@@ -8429,7 +8409,7 @@ export function TrackCaloriesScreen() {
                     }}
                   >
                     <Text style={{ color: card.color, fontSize: 18, fontWeight: '700' }}>
-                      {formatFavoriteNutrientValue(card.key, Number(favoriteAdjustTotals[card.key] || 0), energyUnit)}
+                      {formatFavoriteNutrientValue(card.key, favoriteAdjustTotals[card.key], energyUnit)}
                     </Text>
                     <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginTop: 6, textTransform: 'uppercase' }}>
                       {label}

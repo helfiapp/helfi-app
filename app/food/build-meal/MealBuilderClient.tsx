@@ -1,5 +1,7 @@
 'use client'
 
+import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '@/lib/food/nutrient-values'
+
 import NutrientCards from '@/components/food/NutrientCards'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
@@ -185,6 +187,7 @@ const buildCreatedAtFromEntryTime = (localDate: string, entryTime: string, fallb
 }
 
 const toNumber = (v: any): number | null => {
+  if (v == null || typeof v === 'boolean' || (typeof v === 'string' && !v.trim())) return null
   const n = typeof v === 'number' ? v : Number(v)
   return Number.isFinite(n) ? n : null
 }
@@ -244,7 +247,11 @@ const inferImportedRecipeServings = (draft: any) => {
   return clampRecipeServings(estimate)
 }
 
-const round3 = (n: number) => Math.round(n * 1000) / 1000
+function round3(n: number): number
+function round3(n: number | null | undefined): number | '—'
+function round3(n: number | null | undefined): number | '—' {
+  return n == null ? '—' : Math.round(n * 1000) / 1000
+}
 const KCAL_TO_KJ = 4.184
 
 const toRecipeTextLine = (raw: any) =>
@@ -1666,7 +1673,7 @@ const computeItemTotals = (item: BuilderItem) => {
   const protein = macroOrZero(item.protein_g)
   const carbs = macroOrZero(item.carbs_g)
   const fat = macroOrZero(item.fat_g)
-  const fiber = macroOrZero(item.fiber_g)
+  const fiber = optionalNutrient(item.fiber_g)
   let calories = macroOrZero(item.calories)
   if (!Number.isFinite(calories) || calories <= 0) {
     const macroEnergy = protein * 4 + carbs * 4 + fat * 9
@@ -1677,8 +1684,8 @@ const computeItemTotals = (item: BuilderItem) => {
     protein: protein * servings,
     carbs: carbs * servings,
     fat: fat * servings,
-    fiber: fiber * servings,
-    sugar: macroOrZero(item.sugar_g) * servings,
+    fiber: scaleOptionalNutrient(fiber, servings),
+    sugar: scaleOptionalNutrient(item.sugar_g, servings),
   }
 }
 
@@ -1771,7 +1778,7 @@ const computePortionScale = (
 }
 
 const applyPortionScaleToTotals = (
-  totals: { calories: number; protein: number; carbs: number; fat: number; fiber: number; sugar: number },
+  totals: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null },
   scale: number,
 ) => {
   if (!Number.isFinite(scale) || scale <= 0 || scale === 1) return totals
@@ -1780,8 +1787,8 @@ const applyPortionScaleToTotals = (
     protein: Math.max(0, Math.round(totals.protein * scale * 10) / 10),
     carbs: Math.max(0, Math.round(totals.carbs * scale * 10) / 10),
     fat: Math.max(0, Math.round(totals.fat * scale * 10) / 10),
-    fiber: Math.max(0, Math.round(totals.fiber * scale * 10) / 10),
-    sugar: Math.max(0, Math.round(totals.sugar * scale * 10) / 10),
+    fiber: roundOptionalNutrient(scaleOptionalNutrient(totals.fiber, scale)),
+    sugar: roundOptionalNutrient(scaleOptionalNutrient(totals.sugar, scale)),
   }
 }
 
@@ -1833,6 +1840,7 @@ const parseFavoriteItems = (fav: any): any[] | null => {
 const extractTotalsSignature = (totals: any) => {
   if (!totals || typeof totals !== 'object') return null
   const toNumber = (value: any) => {
+    if (value == null || typeof value === 'boolean' || (typeof value === 'string' && !value.trim())) return null
     const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
     return Number.isFinite(parsed) ? parsed : null
   }
@@ -2693,15 +2701,15 @@ export default function MealBuilderClient() {
   }, [selectedDate])
 
   const baseMealTotals = useMemo(() => {
-    const total = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 }
+    const total = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null }
     for (const it of items) {
       const t = computeItemTotals(it)
       total.calories += t.calories
       total.protein += t.protein
       total.carbs += t.carbs
       total.fat += t.fat
-      total.fiber += t.fiber
-      total.sugar += t.sugar
+      total.fiber = sumOptionalNutrients(total.fiber, t.fiber)
+      total.sugar = sumOptionalNutrients(total.sugar, t.sugar)
     }
     return total
   }, [items])
@@ -4005,8 +4013,8 @@ export default function MealBuilderClient() {
               protein_g: Number.isFinite(Number(prefill?.protein_g)) ? Number(prefill.protein_g) : null,
               carbs_g: Number.isFinite(Number(prefill?.carbs_g)) ? Number(prefill.carbs_g) : null,
               fat_g: Number.isFinite(Number(prefill?.fat_g)) ? Number(prefill.fat_g) : null,
-              fiber_g: Number.isFinite(Number(prefill?.fiber_g)) ? Number(prefill.fiber_g) : null,
-              sugar_g: Number.isFinite(Number(prefill?.sugar_g)) ? Number(prefill.sugar_g) : null,
+              fiber_g: optionalNutrient(prefill?.fiber_g),
+              sugar_g: optionalNutrient(prefill?.sugar_g),
             } as NormalizedFoodItem
             if (hasMacroData(prefillCandidate)) {
               addItemDirectWithOverrides(
@@ -4346,8 +4354,8 @@ export default function MealBuilderClient() {
     if (option?.protein_g != null) next.protein_g = toNumber(option.protein_g)
     if (option?.carbs_g != null) next.carbs_g = toNumber(option.carbs_g)
     if (option?.fat_g != null) next.fat_g = toNumber(option.fat_g)
-    if (option?.fiber_g != null) next.fiber_g = toNumber(option.fiber_g)
-    if (option?.sugar_g != null) next.sugar_g = toNumber(option.sugar_g)
+    next.fiber_g = optionalNutrient(option?.fiber_g)
+    next.sugar_g = optionalNutrient(option?.sugar_g)
 
     const grams = Number(option?.grams)
     const ml = Number(option?.ml)
@@ -5486,11 +5494,11 @@ export default function MealBuilderClient() {
         total.protein += t.protein
         total.carbs += t.carbs
         total.fat += t.fat
-        total.fiber += t.fiber
-        total.sugar += t.sugar
+        total.fiber = sumOptionalNutrients(total.fiber, t.fiber)
+        total.sugar = sumOptionalNutrients(total.sugar, t.sugar)
         return total
       },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null },
     )
 
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
@@ -5543,8 +5551,8 @@ export default function MealBuilderClient() {
           protein: totalsForSave.protein * portionScaleForSave,
           carbs: totalsForSave.carbs * portionScaleForSave,
           fat: totalsForSave.fat * portionScaleForSave,
-          fiber: totalsForSave.fiber * portionScaleForSave,
-          sugar: totalsForSave.sugar * portionScaleForSave,
+          fiber: scaleOptionalNutrient(totalsForSave.fiber, portionScaleForSave),
+          sugar: scaleOptionalNutrient(totalsForSave.sugar, portionScaleForSave),
         }
       : totalsForSave
 
@@ -5555,8 +5563,8 @@ export default function MealBuilderClient() {
       protein: round3(scaledTotals.protein),
       carbs: round3(scaledTotals.carbs),
       fat: round3(scaledTotals.fat),
-      fiber: round3(scaledTotals.fiber),
-      sugar: round3(scaledTotals.sugar),
+      fiber: roundOptionalNutrient(scaledTotals.fiber, 3),
+      sugar: roundOptionalNutrient(scaledTotals.sugar, 3),
       __origin: 'meal-builder',
       __portionControlEnabled: portionControlEnabled,
       ...(favoriteId ? { __favoriteId: favoriteId } : {}),
@@ -5682,11 +5690,11 @@ export default function MealBuilderClient() {
         total.protein += t.protein
         total.carbs += t.carbs
         total.fat += t.fat
-        total.fiber += t.fiber
-        total.sugar += t.sugar
+        total.fiber = sumOptionalNutrients(total.fiber, t.fiber)
+        total.sugar = sumOptionalNutrients(total.sugar, t.sugar)
         return total
       },
-      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+      { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null },
     )
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
@@ -5734,8 +5742,8 @@ export default function MealBuilderClient() {
           protein: totalsForSave.protein * portionScaleForSave,
           carbs: totalsForSave.carbs * portionScaleForSave,
           fat: totalsForSave.fat * portionScaleForSave,
-          fiber: totalsForSave.fiber * portionScaleForSave,
-          sugar: totalsForSave.sugar * portionScaleForSave,
+          fiber: scaleOptionalNutrient(totalsForSave.fiber, portionScaleForSave),
+          sugar: scaleOptionalNutrient(totalsForSave.sugar, portionScaleForSave),
         }
       : totalsForSave
     const portionWeightForSave = portionControlEnabled
@@ -5795,8 +5803,8 @@ export default function MealBuilderClient() {
         protein: round3(scaledTotals.protein),
         carbs: round3(scaledTotals.carbs),
         fat: round3(scaledTotals.fat),
-        fiber: round3(scaledTotals.fiber),
-        sugar: round3(scaledTotals.sugar),
+        fiber: roundOptionalNutrient(scaledTotals.fiber, 3),
+        sugar: roundOptionalNutrient(scaledTotals.sugar, 3),
         __origin: 'meal-builder',
         __portionControlEnabled: portionControlEnabled,
         ...(safeFavoriteLinkId ? { __favoriteId: safeFavoriteLinkId } : {}),
@@ -7230,10 +7238,10 @@ export default function MealBuilderClient() {
                 <span className="font-semibold text-gray-900">{round3(mealTotals.fat)}</span> g fat
               </div>
               <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
-                <span className="font-semibold text-gray-900">{round3(mealTotals.fiber)}</span> g fibre
+                <span className="font-semibold text-gray-900">{(roundOptionalNutrient(mealTotals.fiber, 3) ?? '—')}</span> g fibre
               </div>
               <div className="px-2 py-1 rounded-full bg-white border border-emerald-200 text-[11px] font-medium text-gray-700">
-                <span className="font-semibold text-gray-900">{round3(mealTotals.sugar)}</span> g sugar
+                <span className="font-semibold text-gray-900">{(roundOptionalNutrient(mealTotals.sugar, 3) ?? '—')}</span> g sugar
               </div>
             </div>
             <div className="mt-1 text-[11px] text-gray-600">
@@ -7601,7 +7609,7 @@ export default function MealBuilderClient() {
               Your portion is about {Math.round(effectivePortionScale * 100)}% of the recipe.
               <span className="mx-1">•</span>
               Whole recipe: {formatEnergyValue(baseMealTotals.calories, energyUnit)} {energyUnit} • {round3(baseMealTotals.carbs)} g
-              carbs • {round3(baseMealTotals.sugar)} g sugar
+              carbs • {(roundOptionalNutrient(baseMealTotals.sugar, 3) ?? '—')} g sugar
             </div>
           )}
           {!portionControlEnabled && (
@@ -7619,8 +7627,8 @@ export default function MealBuilderClient() {
                   : card.key === 'fat'
                   ? round3(mealTotals.fat)
                   : card.key === 'fiber'
-                  ? round3(mealTotals.fiber)
-                  : round3(mealTotals.sugar)
+                  ? (roundOptionalNutrient(mealTotals.fiber, 3) ?? '—')
+                  : (roundOptionalNutrient(mealTotals.sugar, 3) ?? '—')
               const label = card.key === 'calories' ? (energyUnit === 'kJ' ? 'Kilojoules' : 'Calories') : card.label
               const unit = card.key === 'calories' ? energyUnit : card.unit || ''
               return (

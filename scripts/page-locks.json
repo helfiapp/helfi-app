@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T17:22:19.986Z",
+  "generatedAt": "2026-10-04T18:05:01.644Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -35,7 +35,7 @@
     "app/food/analysis/page.tsx": "7282663fa2d6b3236c5c966de59e735b9edf9e479b28de4f843747d8f67cdbf4",
     "app/food/build-meal/page.tsx": "b0e3486c8c49c185702d77a3b5de653833289c5b7584494ff8ef82d8ced7893e",
     "app/food/import-recipe/page.tsx": "9c5784c66c83d64c4ed843b2b5fed565c62694d730a3bbae9466746b1575d491",
-    "app/food/page.tsx": "f217efb3e461ac5c7b79c4eee51da61dfbc76c9a8e1e68e241e8f6a8eaefb835",
+    "app/food/page.tsx": "3ef47bbd1cbdd570d6e98d558a3ddb673f79b9c52bc1936fd05a9acaf60fc672",
     "app/food/recommended/explain/page.tsx": "b00096869d0bb7bdab50447f9b5a9e298aa0c5b906289b7d2319ebe5a2d4d7ac",
     "app/food/recommended/page.tsx": "18a09615c9b36a5d7b66537e6082941d776e3c294331b1eb134304486aef588a",
     "app/food/water/page.tsx": "23f7d4f73f8cf04cf4d6477cf6e10a434081ddb93a4aa201ccaece4bc946b276",
@@ -219,6 +219,7 @@
     "native/src/lib/nativeAuthHeaders.ts": "8b6a8a2b33b95d497a4d7bab4fe9003ea91db6a6a3c78bcd80ce63bb6f1dbdf9",
     "native/src/lib/nativeNotifications.ts": "34eb9b7cdcd861a190c63a1da803b967b0f14f8b1422fdb04c7d50c0ca0678f5",
     "native/src/lib/nativeSocialAuth.ts": "e4cc62ba9d9258dacc0d9f63d655850b935bae831097303fc20c9be0a2723add",
+    "native/src/lib/nutrientValues.ts": "0dbe2e607d584ab532e77e0ebc04b0f40d69a074085e3b0ae5219a37bb319e6c",
     "native/src/lib/openNativeWebPath.ts": "d12a6b09d0d06cef7076296f04ef8517180f5504d478f454187b071bea92c216",
     "native/src/lib/plainFoodSearch.ts": "52d589948784e0dd44a14d5a746036125acc9ff8954dc03b1ddbfd175d3e6807",
     "native/src/navigation/AuthNavigator.tsx": "688915d7a9571e8233d5b69338c190a3611a5d508e6d77b4e186ea851e7b27f4",
@@ -267,7 +268,7 @@
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "b0456e82e3cae345d3722cb0a0ea1d791d5c26ff773840ee37a7b997d1334800",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "2e6cda0a40994dcbd510814976ae0dfc154e806ef4fd045063f79e79bc348669",
+    "native/src/screens/TrackCaloriesScreen.tsx": "0ad447a71ecbf97029dee25beeea7a02b4add768f8685e981fc9d8654690e81e",
     "native/src/screens/WaterIntakeScreen.tsx": "1b3aae043fcb347c0198b6aa25e6b4caad76d6105911d632b55fdd61fbd0c2f9",
     "native/src/state/AppModeContext.tsx": "ce70c2670e359ca8fba27a78a2bd817b551490a422b30dabe3b87b3837739321",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",

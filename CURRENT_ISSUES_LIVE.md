@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai — AWS Amplify job 43; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
+- Date/time: 5 October 2026, 4:36 am Melbourne.
+- What changed: Food liquid hints now match complete words. Boiled eggs, broiled foods, steak, watermelon and teaspoon measures no longer inherit liquid treatment. Individual egg size choices restored. Commit d052df8936dd90327b7d9e3b71d4d54d02630950.
+- Where to see it (page/link): https://helfi.ai/food; rebuilt iPhone and iPad Release simulator apps.
+- What to quickly test: Hard-boiled egg 100 g and two large eggs both show 155 kcal. Saved egg meal reopens as 100 g / 155 kcal; website, iPhone and iPad daily totals match at 531 kcal and wallet 642. All six nutrient cards remain visible. Signed store builds and broader release gates remain pending.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job 42 (BUILD, DEPLOY and VERIFY all SUCCEED).
 - Date/time: 5 October 2026, 3:47 am Melbourne.
 - What changed: Removed the historical plaintext database fallback from lib/prisma.ts; require the protected DATABASE_URL setting and redact PostgreSQL URLs in generated support excerpts. Added an actual-module safety check to prebuild. Commit 4614a1ae648984bdacfe8babd05bf0d52b3acb7d. Other original index edits were preserved.
