@@ -10373,6 +10373,7 @@ const applyStructuredItems = (
     try {
       await flushPendingFoodLogSaves()
       await refreshEntriesFromServer({ mode: 'manual' })
+      window.dispatchEvent(new CustomEvent('credits:refresh', { detail: { force: true } }))
     } finally {
       syncInFlightRef.current = false
       diaryRefreshingRef.current = false

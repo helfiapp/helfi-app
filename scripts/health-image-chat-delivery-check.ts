@@ -77,6 +77,30 @@ async function main() {
     await ctx.loadThreads(test.preferred)
     assert.equal(selected, test.expected)
   }
+  const submit = client.statements.flatMap(node => {
+    if (!ts.isFunctionDeclaration(node) || !node.body) return []
+    return node.body.statements.filter(n => ts.isFunctionDeclaration(n) && n.name?.text === 'handleSubmit').map(n => n.getText(client))
+  }).join('\n')
+  assert.ok(submit, 'exercise the actual follow-up submit handler')
+  for (const outcome of ['success', 'denied', 'network'] as const) {
+    const calls: any[] = []
+    const context: any = {
+      input: 'Public fixture question', currentThreadId: 'fixture-thread', analysisResult: {}, Date,
+      setLoading() {}, setError() {}, setInput() {}, setMessages() {}, setThreads() {},
+      loadThreads: async () => {}, getApiErrorMessage: () => 'Permission required',
+      CustomEvent: class { constructor(public type: string, public detail: any) {} },
+      window: { dispatchEvent: (event: any) => calls.push({ event: event.type }) },
+      fetch: async () => {
+        calls.push({ request: true })
+        if (outcome === 'network') throw new Error('Synthetic network failure')
+        return { ok: outcome === 'success', headers: new Headers({ 'content-type': 'application/json' }), json: async () => ({ assistant: fullReply, costCents: 3 }) }
+      },
+    }
+    vm.runInNewContext(ts.transpileModule(submit, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
+    await context.handleSubmit({ preventDefault() {} })
+    assert.equal(calls.filter(call => call.request).length, 1, 'wallet display refresh must not repeat a charged request')
+    assert.equal(calls.filter(call => call.event === 'credits:refresh').length, outcome === 'success' ? 1 : 0)
+  }
   console.log('PASS: actual health-image chat route preserves full safety paragraphs and cost receipts, free fallbacks/permission gates, native formatting and explicit historical-chat selection.')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

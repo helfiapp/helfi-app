@@ -582,6 +582,7 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
         }
       }
       await loadThreads(activeThreadId)
+      window.dispatchEvent(new CustomEvent('credits:refresh', { detail: { force: true } }))
     } catch (err) {
       setError((err as Error).message)
     } finally {

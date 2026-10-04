@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job36, all BUILD/DEPLOY/VERIFY SUCCEED
+- Date/time: 5 October 2026, 12:45 am Melbourne
+- What changed: Native Apple sign-in uses verified signed Apple email for initial account linking, blocks client-email fallback, preserves linked returning Apple-subject sign-in. No identity token/error payload logging. Commiteb4a4df63216be3458523d24ce91c1ac76e4c0df.
+- Where to see it (page/link): Native iPhone/iPad Apple sign-in, https://helfi.ai/api/native-auth/apple
+- What to quickly test: Actual Apple login on the exact signed release device; legitimate first/return login and cancellation. Actual route fixtures/full build passed; physical flow remains unverified and no store upload claimed.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job35, all BUILD/DEPLOY/VERIFY SUCCEED
 - Date/time: 5 October 2026, 12:36 am Melbourne
 - What changed: Follow-up display keeps complete bold headings instead of treating their closing stars as bullets. Commit17d98b5ec45f09ecc960ef47a08de181532ea580.
