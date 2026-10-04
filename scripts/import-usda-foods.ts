@@ -1,10 +1,19 @@
 import fs from 'fs'
 import path from 'path'
-import { spawn } from 'child_process'
+import { spawn, execFileSync } from 'child_process'
 import { parse } from 'csv-parse'
-import { PrismaClient } from '@prisma/client'
+import { PrismaClient, type Prisma } from '@prisma/client'
+import { foodNumberOrNull } from '../lib/food/openfoodfacts'
 
+execFileSync(process.execPath, [path.join(process.cwd(), 'scripts/assert-no-local-openai-key.js')], { stdio: 'inherit' })
 const prisma = new PrismaClient()
+
+async function saveFoodRecord(data: Prisma.FoodLibraryItemUncheckedCreateInput & { source: string; fdcId: number }) {
+  await prisma.foodLibraryItem.upsert({
+    where: { source_fdcId: { source: data.source, fdcId: data.fdcId } },
+    create: data, update: data,
+  })
+}
 
 type MacroTotals = {
   calories?: number
@@ -64,6 +73,9 @@ async function streamCsvFromZip(
       relax_quotes: true,
       trim: true,
     })
+    let csvFinished = false
+    let unzipFinished = false
+    const finish = () => { if (csvFinished && unzipFinished) resolve() }
 
     parser.on('error', reject)
     child.on('error', reject)
@@ -73,6 +85,8 @@ async function streamCsvFromZip(
         for await (const record of parser) {
           await onRow(record as Record<string, string>)
         }
+        csvFinished = true
+        finish()
       } catch (err) {
         reject(err)
       }
@@ -83,34 +97,32 @@ async function streamCsvFromZip(
         reject(new Error(`unzip failed (${code}): ${stderr || 'unknown error'}`))
         return
       }
-      resolve()
+      unzipFinished = true
+      finish()
     })
 
     child.stdout.pipe(parser)
   })
 }
 
-const toNumber = (value: any): number | null => {
-  const num = typeof value === 'number' ? value : Number(value)
-  return Number.isFinite(num) ? num : null
-}
+const toNumber = foodNumberOrNull
 
 const normalizeUnit = (value: string | null): string | null => {
   if (!value) return null
   const raw = String(value).trim().toLowerCase()
   if (!raw) return null
-  if (raw === 'g' || raw === 'gram' || raw === 'grams') return 'g'
-  if (raw === 'ml' || raw === 'milliliter' || raw === 'millilitre') return 'ml'
+  if (['g', 'gm', 'grm', 'gram', 'grams'].includes(raw)) return 'g'
+  if (['ml', 'mlt', 'milliliter', 'millilitre'].includes(raw)) return 'ml'
   if (raw === 'oz' || raw === 'ounce' || raw === 'ounces') return 'oz'
-  if (raw === 'fl oz' || raw === 'floz' || raw === 'fluid ounce') return 'oz'
+  if (raw === 'fl oz' || raw === 'floz' || raw === 'fluid ounce') return 'ml'
   return raw
 }
 
 const round1 = (value: number): number => Math.round(value * 10) / 10
 
-async function loadNutrientIds(zipPath: string): Promise<Record<string, number>> {
+async function loadNutrientIds(zipPath: string): Promise<Record<string, number[]>> {
   const root = getZipRoot(zipPath)
-  const nutrientIds: Record<string, number> = {}
+  const nutrientIds: Record<string, number[]> = {}
   const nutrientFile = `${root}/nutrient.csv`
 
   await streamCsvFromZip(zipPath, nutrientFile, (row) => {
@@ -119,43 +131,26 @@ async function loadNutrientIds(zipPath: string): Promise<Record<string, number>>
     const name = String(row.name || '').trim().toLowerCase()
     const unit = String(row.unit_name || '').trim().toLowerCase()
 
-    if (name === 'energy' && unit === 'kcal' && nutrientIds.calories == null) {
-      nutrientIds.calories = id
-      return
-    }
-    if (name === 'protein' && nutrientIds.protein_g == null) {
-      nutrientIds.protein_g = id
-      return
-    }
-    if (name === 'carbohydrate, by difference' && nutrientIds.carbs_g == null) {
-      nutrientIds.carbs_g = id
-      return
-    }
-    if (name === 'total lipid (fat)' && nutrientIds.fat_g == null) {
-      nutrientIds.fat_g = id
-      return
-    }
-    if (name === 'fiber, total dietary' && nutrientIds.fiber_g == null) {
-      nutrientIds.fiber_g = id
-      return
-    }
-    if ((name === 'total sugars' || name === 'sugars, total') && nutrientIds.sugar_g == null) {
-      nutrientIds.sugar_g = id
-    }
+    const key = name === 'energy' && unit === 'kcal' ? 'calories'
+      : unit !== 'g' ? null
+      : name === 'protein' ? 'protein_g'
+      : name === 'carbohydrate, by difference' ? 'carbs_g'
+      : name === 'total lipid (fat)' ? 'fat_g'
+      : name === 'fiber, total dietary' ? 'fiber_g'
+      : ['total sugars', 'sugars, total', 'sugars, total including nlea'].includes(name) ? 'sugar_g' : null
+    if (key) (nutrientIds[key] ||= []).push(id)
   })
 
   return nutrientIds
 }
 
-async function loadMacroMap(zipPath: string, nutrientIds: Record<string, number>): Promise<Map<number, MacroTotals>> {
+async function loadMacroMap(zipPath: string, nutrientIds: Record<string, number[]>): Promise<Map<number, MacroTotals>> {
   const root = getZipRoot(zipPath)
   const nutrientFile = `${root}/food_nutrient.csv`
   const idToKey = new Map<number, keyof MacroTotals>()
 
-  for (const [key, id] of Object.entries(nutrientIds)) {
-    if (Number.isFinite(id)) {
-      idToKey.set(Number(id), key as keyof MacroTotals)
-    }
+  for (const [key, ids] of Object.entries(nutrientIds)) {
+    for (const id of ids) if (Number.isFinite(id)) idToKey.set(id, key as keyof MacroTotals)
   }
 
   const macrosByFdc = new Map<number, MacroTotals>()
@@ -217,33 +212,6 @@ async function loadBrandedInfo(zipPath: string, macrosByFdc: Map<number, MacroTo
   return infoByFdc
 }
 
-function buildServingLabel(info: BrandedInfo | null): string {
-  if (!info) return '100 g'
-  if (info.householdServing) return info.householdServing
-  if (info.servingSizeValue != null && info.servingSizeUnit) {
-    return `Serving — ${info.servingSizeValue} ${info.servingSizeUnit}`
-  }
-  return '100 g'
-}
-
-function scaleMacros(macros: MacroTotals, info: BrandedInfo | null): MacroTotals {
-  if (!info || info.servingSizeValue == null || !info.servingSizeUnit) return macros
-  let grams = info.servingSizeValue
-  if (info.servingSizeUnit === 'oz') {
-    grams = grams * 28.3495
-  }
-  const factor = grams / 100
-  if (!Number.isFinite(factor) || factor <= 0) return macros
-
-  const scaled: MacroTotals = {}
-  if (macros.calories != null) scaled.calories = Math.round(macros.calories * factor)
-  if (macros.protein_g != null) scaled.protein_g = round1(macros.protein_g * factor)
-  if (macros.carbs_g != null) scaled.carbs_g = round1(macros.carbs_g * factor)
-  if (macros.fat_g != null) scaled.fat_g = round1(macros.fat_g * factor)
-  if (macros.fiber_g != null) scaled.fiber_g = round1(macros.fiber_g * factor)
-  if (macros.sugar_g != null) scaled.sugar_g = round1(macros.sugar_g * factor)
-  return scaled
-}
 
 async function importFoundation(zipPath: string) {
   console.log(`\nImporting USDA foundation foods from: ${zipPath}`)
@@ -252,8 +220,8 @@ async function importFoundation(zipPath: string) {
   const macrosByFdc = await loadMacroMap(zipPath, nutrientIds)
   const foodFile = `${root}/food.csv`
 
-  await prisma.foodLibraryItem.deleteMany({ where: { source: 'usda_foundation' } })
-  console.log('Cleared existing foundation records.')
+
+  console.log('Preserving existing records; upserting USDA foundation foods.')
 
   let rowCount = 0
   let inserted = 0
@@ -266,8 +234,7 @@ async function importFoundation(zipPath: string) {
     const macros = macrosByFdc.get(fdcId)
     if (!macros) return
 
-    await prisma.foodLibraryItem.create({
-      data: {
+    await saveFoodRecord({
         source: 'usda_foundation',
         fdcId,
         name,
@@ -279,7 +246,6 @@ async function importFoundation(zipPath: string) {
         fatG: macros.fat_g ?? null,
         fiberG: macros.fiber_g ?? null,
         sugarG: macros.sugar_g ?? null,
-      },
     })
 
     macrosByFdc.delete(fdcId)
@@ -298,8 +264,8 @@ async function importSrLegacy(zipPath: string) {
   const macrosByFdc = await loadMacroMap(zipPath, nutrientIds)
   const foodFile = `${root}/food.csv`
 
-  await prisma.foodLibraryItem.deleteMany({ where: { source: 'usda_sr_legacy' } })
-  console.log('Cleared existing SR Legacy records.')
+
+  console.log('Preserving existing records; upserting USDA SR Legacy foods.')
 
   let rowCount = 0
   let inserted = 0
@@ -312,8 +278,7 @@ async function importSrLegacy(zipPath: string) {
     const macros = macrosByFdc.get(fdcId)
     if (!macros) return
 
-    await prisma.foodLibraryItem.create({
-      data: {
+    await saveFoodRecord({
         source: 'usda_sr_legacy',
         fdcId,
         name,
@@ -325,7 +290,6 @@ async function importSrLegacy(zipPath: string) {
         fatG: macros.fat_g ?? null,
         fiberG: macros.fiber_g ?? null,
         sugarG: macros.sugar_g ?? null,
-      },
     })
     inserted += 1
     macrosByFdc.delete(fdcId)
@@ -342,8 +306,8 @@ async function importBranded(zipPath: string) {
   const brandedInfo = await loadBrandedInfo(zipPath, macrosByFdc)
   const foodFile = `${root}/food.csv`
 
-  await prisma.foodLibraryItem.deleteMany({ where: { source: 'usda_branded' } })
-  console.log('Cleared existing branded records.')
+
+  console.log('Preserving existing records; upserting USDA branded foods with a 100 g nutrient basis.')
 
   let rowCount = 0
   let inserted = 0
@@ -357,24 +321,21 @@ async function importBranded(zipPath: string) {
     if (!macros) return
 
     const info = brandedInfo.get(fdcId) || null
-    const scaledMacros = scaleMacros(macros, info)
-    const servingLabel = buildServingLabel(info)
+    if (!info || !['g', 'ml', 'oz'].includes(info.servingSizeUnit || '')) return
 
-    await prisma.foodLibraryItem.create({
-      data: {
+    await saveFoodRecord({
         source: 'usda_branded',
         fdcId,
         gtinUpc: info?.gtinUpc || null,
         name,
         brand: info?.brand || null,
-        servingSize: servingLabel,
-        calories: scaledMacros.calories ?? null,
-        proteinG: scaledMacros.protein_g ?? null,
-        carbsG: scaledMacros.carbs_g ?? null,
-        fatG: scaledMacros.fat_g ?? null,
-        fiberG: scaledMacros.fiber_g ?? null,
-        sugarG: scaledMacros.sugar_g ?? null,
-      },
+        servingSize: info.servingSizeUnit === 'ml' ? '100 ml' : '100 g',
+        calories: macros.calories ?? null,
+        proteinG: macros.protein_g ?? null,
+        carbsG: macros.carbs_g ?? null,
+        fatG: macros.fat_g ?? null,
+        fiberG: macros.fiber_g ?? null,
+        sugarG: macros.sugar_g ?? null,
     })
 
     macrosByFdc.delete(fdcId)
@@ -421,7 +382,7 @@ async function run() {
 }
 
 run().catch((err) => {
-  console.error('USDA import failed:', err)
+  console.error('USDA import failed; connection and secret details withheld.')
   prisma.$disconnect().catch(() => {})
   process.exit(1)
 })

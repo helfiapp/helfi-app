@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { normalizeOffNutrition } from '@/lib/food/openfoodfacts'
 import { normalizeExactUsdaBarcode } from '@/lib/food/usda-barcode'
+import { usdaLibraryServingSize } from '@/lib/food/usda-library'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
@@ -262,12 +263,14 @@ async function fetchFoodFromLocalBarcode(barcode: string): Promise<NormalizedFoo
       where: { gtinUpc: barcode, source: { notIn: ['label-photo', 'user-label', 'user-diary'] } },
     })
     if (!record) return null
+    const servingSize = usdaLibraryServingSize(record)
+    if (servingSize == null) return null
     return {
       source: 'usda',
       id: String(record.fdcId ?? record.id),
       name: record.name || 'Scanned food',
       brand: record.brand || null,
-      serving_size: record.servingSize || '100 g',
+      serving_size: servingSize,
       calories: record.calories ?? null,
       protein_g: record.proteinG ?? null,
       carbs_g: record.carbsG ?? null,

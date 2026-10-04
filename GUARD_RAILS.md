@@ -3171,3 +3171,13 @@ for guidance first.
 - Missing nutrients keep their card with `—`; genuine zero remains `0`. Never hide a card because its value is missing or zero.
 - Keep cards usable on iPhone and iPad; the shared native result grid measures its own available width and uses two or three columns.
 - Source work is authorized by the owner's 5 October screenshot correction. Replacement screenshots and final signed store binaries must be captured/tested after this repair.
+
+- Nutrient-card baseline verified: commit `bc8c5f178247b9d9add5855b890c396f0fb658e7`, 5 October 2026; AWS job 38 all steps succeeded, web/iPhone/iPad ingredient cards rendered and portion totals checked. Signed store builds still pending.
+
+### USDA packaged nutrition basis — 5 October 2026
+
+- Branded USDA nutrients use 100 g or 100 ml according to the provider unit. A label serving is an optional scaled portion, never the denominator for already standardized values. Preserve decimal portion weights and genuine zero values; missing values and unsupported units remain unknown.
+- Never replace `None`, a household-only label, or an unsupported provider unit with a guessed 100 g food result. Search and local barcode lookup share the serving-basis gate. Preserve unresolved public rows; the dated unresolved-ID list prevents misleading adds.
+- Food library corrections may update only exact public `usda_branded` provider identities matched to the original archive by FDC ID, name and barcode. Preserve every row/ID and all customer diary/favourite/custom/private-label records. Keep the public-data backup and check every original value before each atomic repair batch.
+- USDA imports must upsert provider rows, never delete or clear food tables. Store the standardized 100 g/ml basis, recognize GRM/MLT codes and both total-sugar IDs, and finish reading the CSV before declaring completion.
+- Official basis/missing-value reference: https://fdc.nal.usda.gov/GBFPD_Documentation/ . Checks: `scripts/food-usda-serving-options-check.ts`, `scripts/food-usda-barcode-check.ts`, read-only archive fixture and reviewed repair-plan dry run.

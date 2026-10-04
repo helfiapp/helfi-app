@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job 38 (BUILD, DEPLOY and VERIFY all SUCCEED).
+- Date/time: 5 October 2026, 1:50 am Melbourne.
+- What changed: Restored six coloured nutrient cards in missing ingredient, expanded meal/favourite, barcode, recommended meal and structured food chat/voice results; the existing sweetener nutrient preview also retains all six cards. Commit bc8c5f178247b9d9add5855b890c396f0fb658e7. Food calculations and save behavior were preserved.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and the newly built iPhone/iPad simulator apps. Both public domains return 200 through CloudFront. Store binaries have not been uploaded.
+- What to quickly test: Banana 100 g = 89 kcal; 200 g = 178; 50 g = 45. All six cards remain visible, including zero and missing values. iPhone saved oil editor scrolls through coloured ingredient and meal totals to Save; unchanged saved daily total is 122 kcal and wallet 642. USDA packaged serving repair and final store checks remain pending.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job37, all BUILD/DEPLOY/VERIFY SUCCEED
 - Date/time: 5 October 2026, 12:58 am Melbourne
 - What changed: Image-note follow-ups and manual food diary refresh update the displayed credit balance. Charging calculations and prices unchanged. Commit5f97013948fc1a5c8d5884a63826d165581739c3.

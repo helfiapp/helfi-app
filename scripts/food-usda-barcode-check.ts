@@ -12,4 +12,6 @@ assert.equal(food.calories, 400); assert.equal(food.serving_size, '100 g'); asse
 assert.equal(food.carbs_g, null)
 assert.equal(normalizeExactUsdaBarcode({ ...record, gtinUpc: '999999999999' }, barcode), null)
 assert.equal(normalizeExactUsdaBarcode({ ...record, gtinUpc: undefined }, barcode), null)
+const drink = normalizeExactUsdaBarcode({ ...record, dataType: 'Branded', servingSizeUnit: 'ml' }, barcode)!
+assert.equal(drink.serving_size, '100 ml'); assert.equal(drink.quantity_g, null); assert.equal(drink.calories, 400)
 console.log('PASS: exact product barcode, leading-zero equivalence, nutrient units, missing fields and explicit USDA 100g basis.')

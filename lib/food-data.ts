@@ -1,4 +1,6 @@
 import 'server-only'
+import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } from './food/usda-nutrition'
+import { usdaLibraryServingSize } from './food/usda-library'
 import { foodNumberOrNull, normalizeOffNutrition } from './food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
 import {
@@ -99,7 +101,10 @@ const liquidDensityGramsPerMl = (nameRaw: string | null | undefined) => {
   const label = normalizeFoodText(String(nameRaw || ''))
   if (/\boil\b/.test(label)) return 0.92
   if (/\bsyrup\b/.test(label)) return 1.33
-  return 1
+  if (/\bhoney\b/.test(label)) return 1.42
+  if (/\bmilk\b/.test(label)) return 1.03
+  if (/\bwater\b/.test(label)) return 1
+  return null
 }
 
 const OPENFOODFACTS_BASE_URL =
@@ -180,6 +185,7 @@ const appendLiquidServingOptions = (
 ) => {
   if (!isLikelyLiquidFoodName(foodName)) return
   const density = liquidDensityGramsPerMl(foodName)
+  if (density == null) return
   const addMl = (idSuffix: string, label: string, ml: number) => {
     appendOptionIfMissing(
       options,
@@ -439,19 +445,23 @@ export async function searchLocalFoods(
         : []
 
     const rows = [...prefixRows, ...containsRows]
-    return rows.map((row) => ({
+    return rows.flatMap<NormalizedFoodItem>((row) => {
+      const servingSize = usdaLibraryServingSize(row)
+      if (servingSize == null) return []
+      return [{
       source: 'usda',
       id: String(row.fdcId ?? row.id),
       name: row.name,
       brand: row.brand ?? undefined,
-      serving_size: row.servingSize || '100 g',
+      serving_size: servingSize,
       calories: row.calories ?? null,
       protein_g: row.proteinG ?? null,
       carbs_g: row.carbsG ?? null,
       fat_g: row.fatG ?? null,
       fiber_g: row.fiberG ?? null,
       sugar_g: row.sugarG ?? null,
-    }))
+      }]
+    })
   } catch (err) {
     console.warn('Local food search failed', err)
     return []
@@ -569,97 +579,19 @@ interface UsdaFood {
   }>
 }
 
-const extractUsdaNutrients = (food: UsdaFood) => {
-  const nutrients = food.foodNutrients || []
-
-  const getName = (n: UsdaFoodNutrient) => (n.nutrientName || n.nutrient?.name || '').toLowerCase()
-  const getUnit = (n: UsdaFoodNutrient) => (n.unitName || n.nutrient?.unitName || '').toUpperCase()
-  const getId = (n: UsdaFoodNutrient) =>
-    Number.isFinite(Number(n.nutrientId)) ? Number(n.nutrientId) : Number(n.nutrient?.id)
-  const getNumber = (n: UsdaFoodNutrient) => (n.nutrientNumber || n.nutrient?.number || '').trim()
-  const getValue = (n: UsdaFoodNutrient) => {
-    const raw = Number.isFinite(Number(n.value)) ? n.value : n.amount
-    return Number.isFinite(Number(raw)) ? Number(raw) : null
-  }
-
-  const findVal = (opts: {
-    names?: string[]
-    ids?: number[]
-    numbers?: string[]
-    units?: string[]
-  }): number | null => {
-    const names = (opts.names || []).map((n) => n.toLowerCase())
-    const ids = opts.ids || []
-    const numbers = opts.numbers || []
-    const units = (opts.units || []).map((u) => u.toUpperCase())
-    for (const n of nutrients) {
-      const name = getName(n)
-      const id = getId(n)
-      const number = getNumber(n)
-      const unit = getUnit(n)
-      const matchesName = name && names.includes(name)
-      const matchesId = Number.isFinite(Number(id)) && ids.includes(Number(id))
-      const matchesNumber = number && numbers.includes(number)
-      if (!matchesName && !matchesId && !matchesNumber) continue
-      if (units.length > 0 && unit && !units.includes(unit)) continue
-      const val = getValue(n)
-      if (val != null) return val
-    }
-    return null
-  }
-
-  const energyKcal =
-    findVal({ names: ['Energy'], units: ['KCAL'] }) ??
-    findVal({ ids: [1008], numbers: ['208'], units: ['KCAL'] })
-  const energyKj =
-    findVal({ names: ['Energy'], units: ['KJ'] }) ??
-    findVal({ ids: [1008], numbers: ['208'], units: ['KJ'] })
-  const energy = energyKcal ?? (energyKj ? energyKj / 4.184 : null)
-
-  const protein = findVal({
-    names: ['Protein'],
-    ids: [1003],
-    numbers: ['203'],
-    units: ['G'],
-  })
-  const carbs = findVal({
-    names: ['Carbohydrate, by difference', 'Carbohydrate'],
-    ids: [1005],
-    numbers: ['205'],
-    units: ['G'],
-  })
-  const fat = findVal({
-    names: ['Total lipid (fat)'],
-    ids: [1004],
-    numbers: ['204'],
-    units: ['G'],
-  })
-  const fiber = findVal({
-    names: ['Fiber, total dietary', 'Dietary Fiber'],
-    ids: [1079],
-    numbers: ['291'],
-    units: ['G'],
-  })
-  const sugar =
-    findVal({
-      names: ['Sugars, total including NLEA', 'Sugars, total'],
-      ids: [2000],
-      numbers: ['269'],
-      units: ['G'],
-    }) ?? null
-  return { energyKcal: energy, protein, carbs, fat, fiber, sugar }
-}
 
 function normalizeUsdaFood(food: UsdaFood): NormalizedFoodItem | null {
   if (!food || !food.description) return null
   const { energyKcal, protein, carbs, fat, fiber, sugar } = extractUsdaNutrients(food)
+  const basis = usdaNutrientBasis(food)
+  if (basis == null) return null
 
   return {
     source: 'usda',
     id: String(food.fdcId),
     name: food.description,
     brand: food.brandName,
-    serving_size: '100 g',
+    serving_size: `100 ${basis}`,
     calories: energyKcal,
     protein_g: protein,
     carbs_g: carbs,
@@ -695,6 +627,7 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
 
     const food: UsdaFood = await res.json()
     const { energyKcal, protein, carbs, fat, fiber, sugar } = extractUsdaNutrients(food)
+    if (energyKcal == null) return []
     const base = {
       calories: energyKcal,
       protein_g: protein,
@@ -704,90 +637,14 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
       sugar_g: sugar,
     }
 
-    const dataType = String((food as any)?.dataType || '').toLowerCase()
-    const isBranded = dataType.includes('branded')
-    const servingSizeRaw = (food as any)?.servingSize
-    const servingSizeUnitRaw = (food as any)?.servingSizeUnit
-    const servingSizeUnit =
-      typeof servingSizeUnitRaw === 'string'
-        ? servingSizeUnitRaw
-        : typeof servingSizeUnitRaw?.name === 'string'
-        ? servingSizeUnitRaw.name
-        : ''
-    const servingSizeNum = Number(servingSizeRaw)
-    const servingSizeGrams =
-      Number.isFinite(servingSizeNum) && servingSizeNum > 0 && String(servingSizeUnit).toLowerCase() === 'g'
-        ? servingSizeNum
-        : null
-    const baseWeightGrams = isBranded && servingSizeGrams ? servingSizeGrams : 100
-
-    const scaleFromBase = (grams: number) => grams / baseWeightGrams
-
-    const options: ServingOption[] = []
-    if (Number.isFinite(Number(base.calories))) {
-      options.push({
-        id: `usda:${fdcId}:100g`,
-        label: '100 g',
-        serving_size: '100 g',
-        grams: 100,
-        unit: 'g',
-        calories: base.calories != null ? Math.round(base.calories * scaleFromBase(100)) : null,
-        protein_g: base.protein_g != null ? Math.round(base.protein_g * scaleFromBase(100) * 10) / 10 : null,
-        carbs_g: base.carbs_g != null ? Math.round(base.carbs_g * scaleFromBase(100) * 10) / 10 : null,
-        fat_g: base.fat_g != null ? Math.round(base.fat_g * scaleFromBase(100) * 10) / 10 : null,
-        fiber_g: base.fiber_g != null ? Math.round(base.fiber_g * scaleFromBase(100) * 10) / 10 : null,
-        sugar_g: base.sugar_g != null ? Math.round(base.sugar_g * scaleFromBase(100) * 10) / 10 : null,
-        source: 'usda',
-      })
-    }
-
-    if (isBranded && servingSizeGrams && Number.isFinite(Number(base.calories))) {
-      options.push({
-        id: `usda:${fdcId}:serving`,
-        label: `Serving — ${Math.round(servingSizeGrams)}g`,
-        serving_size: `Serving — ${Math.round(servingSizeGrams)}g`,
-        grams: servingSizeGrams,
-        unit: 'g',
-        calories: base.calories ?? null,
-        protein_g: base.protein_g ?? null,
-        carbs_g: base.carbs_g ?? null,
-        fat_g: base.fat_g ?? null,
-        fiber_g: base.fiber_g ?? null,
-        sugar_g: base.sugar_g ?? null,
-        source: 'usda',
-      })
-    }
-
-    const portions = Array.isArray(food.foodPortions) ? food.foodPortions : []
-    portions.forEach((portion, idx) => {
-      const grams = Number(portion?.gramWeight ?? 0)
-      if (!Number.isFinite(grams) || grams <= 0) return
-      const labelBase =
-        portion?.portionDescription ||
-        portion?.modifier ||
-        portion?.measureUnit?.name ||
-        'Serving'
-      const label = `${labelBase} — ${Math.round(grams)}g`
-      const factor = scaleFromBase(grams)
-      options.push({
-        id: `usda:${fdcId}:${idx}`,
-        label,
-        serving_size: label,
-        grams,
-        unit: 'g',
-        calories: base.calories != null ? Math.round(base.calories * factor) : null,
-        protein_g: base.protein_g != null ? Math.round(base.protein_g * factor * 10) / 10 : null,
-        carbs_g: base.carbs_g != null ? Math.round(base.carbs_g * factor * 10) / 10 : null,
-        fat_g: base.fat_g != null ? Math.round(base.fat_g * factor * 10) / 10 : null,
-        fiber_g: base.fiber_g != null ? Math.round(base.fiber_g * factor * 10) / 10 : null,
-        sugar_g: base.sugar_g != null ? Math.round(base.sugar_g * factor * 10) / 10 : null,
-        source: 'usda',
-      })
-    })
+    const baseWeightGrams = 100
+    const options: ServingOption[] = usdaStandardServingOptions(food, fdcId)
 
     const foodName = String((food as any)?.description || (food as any)?.lowercaseDescription || '').trim()
-    appendLiquidServingOptions(options, fdcId, foodName, baseWeightGrams, base)
-    appendCommonFoodServingOptions(options, fdcId, foodName, baseWeightGrams, base)
+    if (usdaNutrientBasis(food) === 'g') {
+      appendLiquidServingOptions(options, fdcId, foodName, baseWeightGrams, base)
+      appendCommonFoodServingOptions(options, fdcId, foodName, baseWeightGrams, base)
+    }
 
     const deduped = new Map<string, ServingOption>()
     options.forEach((opt) => {

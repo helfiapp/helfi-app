@@ -1,4 +1,5 @@
 import { foodNumberOrNull } from './openfoodfacts'
+import { usdaNutrientBasis } from './usda-nutrition'
 
 export const sameProductBarcode = (a: unknown, b: unknown) => {
   const left = String(a || '').trim()
@@ -8,6 +9,8 @@ export const sameProductBarcode = (a: unknown, b: unknown) => {
 
 export function normalizeExactUsdaBarcode(food: any, barcode: string) {
   if (!sameProductBarcode(food?.gtinUpc, barcode)) return null
+  const unit = usdaNutrientBasis(food)
+  if (unit == null) return null
   const nutrients = Array.isArray(food.foodNutrients) ? food.foodNutrients : []
   const nutrient = (ids: number[], names: string[], unit: string) => {
     const matches = nutrients.filter((n: any) => {
@@ -27,9 +30,9 @@ export function normalizeExactUsdaBarcode(food: any, barcode: string) {
   return {
     source: 'usda' as const, id: String(food.fdcId), name: String(food.description || 'Packaged food'),
     brand: food.brandName || food.brandOwner || null,
-    // USDA search nutrient values are per 100g, irrespective of the branded label serving.
-    serving_size: '100 g', basis: 'per_serving' as const, energyUnit: 'kcal' as const,
-    barcode, quantity_g: 100,
+    // Branded drinks use the provider's 100ml basis; solids use 100g.
+    serving_size: `100 ${unit}`, basis: 'per_serving' as const, energyUnit: 'kcal' as const,
+    barcode, quantity_g: unit === 'g' ? 100 : null,
     calories: kcal ?? (kj == null ? null : kj / 4.184),
     protein_g: nutrient([1003], ['protein'], 'G'),
     carbs_g: nutrient([1005], ['carbohydrate, by difference'], 'G'),
