@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE, AWS53 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront, matching new etagaxmtvhwwdp1z15.
+- Date/time: 2026-10-04T22:42:15.956600+00:00
+- What changed: Removed fabricated preferred USDA common-drink rows; actual matching library/provider IDs, bases and options retained. Explicit chocolate plant milk remains eligible. Whole audit/model/store work incomplete.
+- Where to see it (page/link): https://helfi.ai/food, Single food search.
+- What to quickly test: Plain/variant milk, plant milk, orange juice, coffee and olive oil lookup; measured portion, six cards and save/reopen; core source checks/build pass. Live milk100ml63/100g61 saves and reopens web+iPhone with sixcards and realUSDA171265; bothdaily956/wallet619. Coffee/orangejuice/oil/chocolatealmond lookups show actualmatching records; full common-food/signed matrix remains incomplete. Oat milk search still returns babyfood cereal; next54 identity fix claimed, no fabricated oats calibration substituted.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE, AWS52 BUILD/DEPLOY/VERIFY SUCCEED, both domains200/CloudFront matching etag77q7p3ll7f1z15.
 - Date/time: 2026-10-04T22:18:02.940206+00:00
 - What changed: Provider serving options use shared food identity/density; native fresh/cached overrides retain recorded choices and selected IDs. Cup fraction label corrected. Whole audit/model/store work incomplete.

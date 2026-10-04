@@ -4,6 +4,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { isFoodPreparationCompatible } from '@/native/src/lib/foodPreparation'
 import { liquidDensity } from '@/native/src/lib/foodUnits'
 import { optionalNutrient } from '@/native/src/lib/nutrientValues'
+import { isSingleMilkQuery, isSingleMilkIdentityCompatible, milkSearchText, singleMilkLookupQueries } from '@/lib/food/single-milk-identity'
 import {
   searchOpenFoodFactsByQuery,
   searchUsdaFoods,
@@ -789,15 +790,27 @@ export async function GET(request: NextRequest) {
       return items.filter((it) => hasMacroData(it))
     }
 
+    const filterSingleFoodItems = (list: any[], value: string, allowTypo = true) => {
+      const milkQuery = isSingleMilkQuery(value)
+      return filterItemsByQuery(
+        list.filter(item => isSingleMilkIdentityCompatible(item?.name, value)),
+        milkQuery ? milkSearchText(value) : value,
+        item => milkQuery ? milkSearchText(item?.name) : item?.name || '',
+        allowTypo,
+      )
+    }
+
     const buildSingleFoodResults = async (value: string) => {
-      const customPrefix = await toCustomFoodItems(value, { allowTypo: false })
+      const customPrefix = (await toCustomFoodItems(value, { allowTypo: false }))
+        .filter(item => isSingleMilkIdentityCompatible(item?.name, value))
       const localSearchWindow = Math.max(limit, 60)
+      const lookupQueries = singleMilkLookupQueries(value)
 
       // For single foods: only use foundation and legacy (simple foods), NOT branded (product foods)
       // Branded/product foods should only appear for packaged searches
       const [foundation, legacy] = await Promise.all([
-        searchLocalFoods(value, { pageSize: localSearchWindow, sources: ['usda_foundation'] }),
-        searchLocalFoods(value, { pageSize: localSearchWindow, sources: ['usda_sr_legacy'] }),
+        Promise.all(lookupQueries.map(q => searchLocalFoods(q, { pageSize: localSearchWindow, sources: ['usda_foundation'] }))).then(groups => groups.flat()),
+        Promise.all(lookupQueries.map(q => searchLocalFoods(q, { pageSize: localSearchWindow, sources: ['usda_sr_legacy'] }))).then(groups => groups.flat()),
       ])
 
       const combinedMain = [...foundation, ...legacy]
@@ -812,18 +825,19 @@ export async function GET(request: NextRequest) {
         })
       }
 
-      const mainDeduped = dedupe(combinedMain)
+      // An incomplete Foundation row must not mask a complete Legacy peer.
+      const mainDeduped = dedupe(combinedMain.filter(item => hasMacroData(item)))
 
       const mainWithMacros = mainDeduped.filter((it) => hasMacroData(it))
 
-      const mainPrefix = filterItemsByQuery(mainWithMacros, value, (item) => item?.name || '', false)
+      const mainPrefix = filterSingleFoodItems(mainWithMacros, value, false)
 
       const hasPrefixMatches = customPrefix.length > 0 || mainPrefix.length > 0
 
       const customFinal = hasPrefixMatches ? customPrefix : await toCustomFoodItems(value, { allowTypo: true })
       let mainFinal = hasPrefixMatches
         ? mainPrefix
-        : filterItemsByQuery(mainWithMacros, value, (item) => item?.name || '', true)
+        : filterSingleFoodItems(mainWithMacros, value, true)
       const requestedTokensForSingle = getSearchTokens(value).map((token) => singularizeToken(token))
       const requestedMilkDrink = requestedTokensForSingle.includes('milk')
       if (requestedMilkDrink) {
@@ -958,6 +972,7 @@ export async function GET(request: NextRequest) {
         for (const item of group) {
           if (combined.length >= limit) return
           if (!hasMacroData(item)) continue
+          if (!isSingleMilkIdentityCompatible(item?.name, value)) continue
           combined.push(item)
         }
       }
@@ -972,7 +987,7 @@ export async function GET(request: NextRequest) {
       // (We still return the Helfi database results first.)
       if (!localOnly && combined.length < limit) {
         const fat = await searchFatSecretFoods(value, { pageSize: localSearchWindow })
-        const filteredFat = filterItemsByQuery(fat, value, (item) => item?.name || '').filter((it) => hasMacroData(it))
+        const filteredFat = filterSingleFoodItems(fat, value).filter((it) => hasMacroData(it))
         const sortedFat = sortByAlphabeticalHierarchyAsc(filteredFat, value)
         const seen = new Set(combined.map((it) => `${normalizeForMatch(it?.name)}|${normalizeForMatch(it?.brand)}`))
         for (const item of sortedFat) {
@@ -1105,7 +1120,8 @@ export async function GET(request: NextRequest) {
       const sources = ['usda_foundation', 'usda_sr_legacy']
       const attempt = async (q: string) => {
         if (!q) return []
-        return await searchLocalFoods(q, { pageSize: limit, sources })
+        const found = await searchLocalFoods(q, { pageSize: limit, sources })
+        return filterSingleFoodItems(found, value).filter(item => hasMacroData(item) && isFoodPreparationCompatible(item?.name, value))
       }
 
       const primary = await attempt(value)
@@ -1123,10 +1139,12 @@ export async function GET(request: NextRequest) {
       }
       if (localOnly) return []
       // As a last resort, hit USDA API so users still get results if the local library is empty.
-      const remote = await searchUsdaFoods(value, { pageSize: limit, dataType: 'generic' })
+      const remote = filterSingleFoodItems(await searchUsdaFoods(value, { pageSize: limit, dataType: 'generic' }), value)
+        .filter(item => hasMacroData(item) && isFoodPreparationCompatible(item?.name, value))
       if (remote.length > 0) return remote
       for (const fallback of fallbacks) {
-        const remoteNext = await searchUsdaFoods(fallback, { pageSize: limit, dataType: 'generic' })
+        const remoteNext = filterSingleFoodItems(await searchUsdaFoods(fallback, { pageSize: limit, dataType: 'generic' }), value)
+          .filter(item => hasMacroData(item) && isFoodPreparationCompatible(item?.name, value))
         if (remoteNext.length > 0) return remoteNext
       }
       return []
@@ -1451,7 +1469,7 @@ export async function GET(request: NextRequest) {
     }
 
     if (kindMode === 'single' && Array.isArray(items) && items.length > 0) {
-      const filtered = filterItemsByQuery(items, query, (item) => item?.name || '')
+      const filtered = filterSingleFoodItems(items, query)
       items = filtered.length > 0 ? filtered : []
     }
 

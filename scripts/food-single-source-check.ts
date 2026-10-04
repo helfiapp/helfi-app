@@ -5,16 +5,19 @@ import ts from 'typescript'
 import { isFoodPreparationCompatible } from '../native/src/lib/foodPreparation'
 import { liquidDensity } from '../native/src/lib/foodUnits'
 import { optionalNutrient } from '../native/src/lib/nutrientValues'
+import { isSingleMilkQuery, isSingleMilkIdentityCompatible, milkSearchText, singleMilkLookupQueries } from '../lib/food/single-milk-identity'
 
 // Execute the complete real endpoint with synthetic provider records. No server
 // imports, environment values, database, credentials or network requests.
 const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/food-data/route.ts', 'utf8'), ts.ScriptTarget.Latest, true)
 const get = source.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'GET')
 assert.ok(get)
-let library: any[] = [], custom: any[] = [], fallback: any[] = []
+let library: any[] = [], custom: any[] = [], fallback: any[] = [], remote: any[] = []
 let calls: string[] = []
+let literalLookupOnly = false
 const context: any = vm.createContext({
   URL, isFoodPreparationCompatible, liquidDensity, optionalNutrient,
+  isSingleMilkQuery, isSingleMilkIdentityCompatible, milkSearchText, singleMilkLookupQueries,
   console: { warn() {}, error: (...args: any[]) => { throw new Error(String(args)) } },
   NextResponse: { json: (body: any, options?: any) => ({ body, status: options?.status ?? 200 }) },
   usdaHealthCache: { count: 200000, checkedAt: Date.now() },
@@ -23,10 +26,12 @@ const context: any = vm.createContext({
   getCustomPackagedItems: async () => [],
   searchLocalFoods: async (_query: string, options: any) => {
     const category = options.sources[0]; calls.push(category)
-    return library.filter(item => item.fixtureCategory === category)
+    calls.push(`query:${_query}`)
+    if (literalLookupOnly && !/^soymilk\b/i.test(_query)) return []
+    return library.filter(item => options.sources.includes(item.fixtureCategory))
   },
   searchFatSecretFoods: async () => { calls.push('fatsecret'); return fallback },
-  searchUsdaFoods: async () => [],
+  searchUsdaFoods: async () => { calls.push('remote-usda'); return remote },
 })
 context.GET = vm.runInContext(ts.transpile(`(${get.getText(source).replace(/^export\s+/, '')})`, { target: ts.ScriptTarget.ES2020 }), context)
 const record = (id: string, name: string, calories: number, extra: any = {}) => ({
@@ -91,6 +96,40 @@ async function run() {
     assert.ok(!calls.includes('fatsecret'), 'local-only keeps database-first source order')
   }
   const originalJson = JSON.stringify(rows)
+  const wrongOats = record('900014', 'Babyfood, cereal, oatmeal, prepared with whole milk', 116)
+  library = [wrongOats]
+  assert.equal((await query('oat milk')).length, 0, 'empty primary search cannot return porridge through USDA fallback')
+  library = []
+  custom = [{ ...wrongOats, id: 'fixture-custom-oats' }]
+  fallback = [{ ...wrongOats, source: 'fatsecret' }]
+  remote = [wrongOats]
+  assert.equal((await query('oat milk', false)).length, 0, 'custom/supplier/remote fallback cannot substitute milk-containing cereal')
+  custom = []; fallback = []; remote = []
+  for (const [value, id] of [['skim milk', '900002'], ['skimmed milk', '900002'], ['fat-free milk', '900002'], ['full cream milk', '900001'], ['milk 1%', '900003'], ['milk 2%', '900004']] as const) {
+    library = rows
+    const found = await query(value)
+    assert.ok(found.length, `${value}: actual source alias remains searchable`)
+    assert.equal(found[0].id, id, `${value}: variant must be the requested actual record`)
+    checkRecord(found[0], rows.find(row => row.id === id))
+  }
+  const soy = record('900015', 'Soymilk, original and vanilla, light, unsweetened', 34)
+  library = [soy]; literalLookupOnly = true
+  const soyFound = await query('soy milk unsweetened')
+  assert.equal(soyFound.length, 1); checkRecord(soyFound[0], soy)
+  assert.ok(calls.includes('query:soymilk unsweetened'), 'alias must actually reach compound-name database search')
+  literalLookupOnly = false
+  library = [record('900016', 'Milk, lowfat, 0.1% milkfat', 40), rows[2], rows[3]]
+  const onePercent = await query('milk 1%')
+  assert.equal(onePercent.length, 1); assert.equal(onePercent[0].id, '900003', '1% must not match 0.1% or 2%')
+  library = [{ ...rows[0], id: '900017', fixtureCategory: 'usda_foundation', calories: null }, rows[0]]
+  assert.equal((await query('milk', true, 1))[0].id, rows[0].id, 'incomplete foundation cannot mask complete same-name legacy row')
+  library = []; remote = [wrongOats, rows[5]]
+  const remoteOat = await query('oat milk', false)
+  assert.equal(remoteOat.length, 1); checkRecord(remoteOat[0], rows[5])
+  remote = []; library = []; fallback = [{ ...wrongOats, source: 'fatsecret' }, { ...rows[5], source: 'fatsecret' }]
+  const supplierOat = await query('oat milk', false, 1)
+  assert.equal(supplierOat.length, 1); assert.equal(supplierOat[0].id, rows[5].id, 'incompatible peer cannot consume the supplier result limit')
+  fallback = []
   library = []
   for (const [value] of examples) assert.equal((await query(value)).length, 0, `${value}: absent source must not fabricate nutrition`)
   library = [record('900013', 'Milk, whole', 61, { protein_g: null })]
@@ -104,6 +143,6 @@ async function run() {
   const withCustom = await query('milk')
   checkRecord(withCustom[0], rows[0]); assert.equal(withCustom[1].source, 'custom')
   assert.equal(JSON.stringify(rows), originalJson, 'provider input records are never rewritten')
-  console.log('PASS: complete real endpoint uses original provider records for common drinks, preserves source IDs/options/precision/null/zero, requested chocolate variant and database-first fallbacks; unavailable sources cannot invent nutrients. No network or credentials.')
+  console.log('PASS: complete real endpoint retains real common-drink records/IDs/bases/options/precision/null/zero; milk identity applies across all fallback paths, actual spelling/fat variants resolve, invalid peers cannot mask valid records or consume result limits. No network or credentials.')
 }
 void run().catch(error => { console.error(error); process.exitCode = 1 })
