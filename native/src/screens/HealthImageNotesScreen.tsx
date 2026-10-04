@@ -469,7 +469,7 @@ export function HealthImageNotesScreen() {
       >
         {isAnalyzing ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.primaryButtonText}>Create Image Notes</Text>}
       </Pressable>
-      <Text style={styles.costText}>Cost: 2 credits per image notes request</Text>
+      <Text style={styles.costText}>From 2 credits per image notes request. Longer notes may cost more.</Text>
 
       {result ? (
         <View style={{ gap: 12 }}>

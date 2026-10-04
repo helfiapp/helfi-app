@@ -282,7 +282,6 @@ export async function POST(req: NextRequest) {
     const imageMeta = getImageMetadata(normalizedImage.buffer);
     
     console.log('Image info:', {
-      name: imageFile.name,
       type: resolvedImageType,
       aiType: normalizedImage.mimeType,
       aiConverted: normalizedImage.converted,
@@ -458,7 +457,6 @@ export async function POST(req: NextRequest) {
         prompt: wrapped.promptTokens,
         completion: wrapped.completionTokens,
       },
-      analysis: cleanAnalysis.substring(0, 100) + '...'
     });
 
     const resp: any = {

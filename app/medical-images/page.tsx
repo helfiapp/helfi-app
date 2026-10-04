@@ -511,7 +511,7 @@ export default function MedicalImagesPage() {
               )}
             </div>
             <div className="mt-2">
-              <p className="text-xs text-gray-500 mb-2">Cost: 2 credits per image notes request</p>
+              <p className="text-xs text-gray-500 mb-2">From 2 credits per image notes request. Longer notes may cost more.</p>
               {!hasPaidAccess && (
                 <div className="text-[11px] text-blue-800 bg-blue-50 border border-blue-200 rounded px-2 py-1 mb-2">
                   Free accounts can try this AI feature once. After your free notes request, upgrade or buy credits to continue.

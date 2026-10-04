@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify job 32; BUILD/DEPLOY/VERIFY all SUCCEED)
+- Date/time: 5 October 2026, 12:03 am Australia/Melbourne
+- What changed: Apple Health preserves native connection functions and handles denied/empty reads without a false connection or exercise import.
+- Where to see it (page/link): Current main native source, iPhone Dashboard > Apple Health; screenshot evidence in docs/release-evidence/2026-10-04.
+- What to quickly test: Continue opens Apple Health permissions; declined/no-data access shows an honest message and does not import. Signed physical-device/store verification remains pending.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify job 31; BUILD/DEPLOY/VERIFY all SUCCEED)
 - Date/time: 4 October 2026, 11:40 pm Australia/Melbourne
 - What changed: Android release preparation now requires a private upload key and records the bundle/source signature details; no Android store upload has occurred.

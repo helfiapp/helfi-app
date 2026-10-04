@@ -219,21 +219,19 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
           const data = await res.json()
           const nextThreads = Array.isArray(data?.threads) ? data.threads : []
           setThreads(nextThreads)
-          const selectedId = preferredThreadId || currentThreadId
-          if (selectedId && nextThreads.some((thread: ChatThread) => thread.id === selectedId)) {
-            setCurrentThreadId(selectedId)
-            return
-          }
-          const fallback =
-            nextThreads.find((thread: ChatThread) => !thread.archivedAt) || nextThreads[0] || null
-          setCurrentThreadId(fallback ? fallback.id : null)
+          // A new image starts a fresh conversation. Older chats are opened
+          // only when selected, so their advice cannot appear for this image.
+          setCurrentThreadId(current => {
+            const selectedId = preferredThreadId || current
+            return selectedId && nextThreads.some((thread: ChatThread) => thread.id === selectedId) ? selectedId : null
+          })
         }
       } catch {
         setThreads([])
         setCurrentThreadId(null)
       }
     },
-    [currentThreadId]
+    []
   )
 
   useEffect(() => {
@@ -241,12 +239,14 @@ export default function MedicalImageChat({ analysisResult }: MedicalImageChatPro
   }, [loadThreads])
 
   useEffect(() => {
+    // Do not replace a question/answer in progress with an earlier history read.
+    if (loading) return
     if (!currentThreadId) {
       setMessages([])
       return
     }
     loadThreadMessages(currentThreadId)
-  }, [currentThreadId, loadThreadMessages])
+  }, [currentThreadId, loadThreadMessages, loading])
 
   // Scroll to bottom inside chat container
   useEffect(() => {

@@ -459,21 +459,8 @@ export async function POST(req: NextRequest) {
         if (persistChatHistory) {
           await appendMessage(threadId, 'assistant', finalFallbackText).catch(() => {})
         }
-        const enc = new TextEncoder()
-        const chunks = finalFallbackText.match(/[\s\S]{1,200}/g) || ['']
-        const costPayload = JSON.stringify({ costCents: 0, covered: true })
-        const stream = new ReadableStream({
-          start(controller) {
-            for (const chunk of chunks) {
-              controller.enqueue(enc.encode(`data: ${chunk}\n\n`))
-            }
-            controller.enqueue(enc.encode(`data: __cost__${costPayload}\n\n`))
-            controller.enqueue(enc.encode('event: end\n\n'))
-            controller.close()
-          },
-        })
-        console.error('[medical-chat.POST] stream AI fallback used', aiError)
-        return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
+        console.error('[medical-chat.POST] AI fallback used')
+        return NextResponse.json({ assistant: finalFallbackText, costCents: 0, covered: true, threadId })
       }
 
       const text = extractAssistantText(wrapped)
@@ -481,20 +468,7 @@ export async function POST(req: NextRequest) {
         if (persistChatHistory) {
           await appendMessage(threadId, 'assistant', finalFallbackText).catch(() => {})
         }
-        const enc = new TextEncoder()
-        const chunks = finalFallbackText.match(/[\s\S]{1,200}/g) || ['']
-        const costPayload = JSON.stringify({ costCents: 0, covered: true })
-        const stream = new ReadableStream({
-          start(controller) {
-            for (const chunk of chunks) {
-              controller.enqueue(enc.encode(`data: ${chunk}\n\n`))
-            }
-            controller.enqueue(enc.encode(`data: __cost__${costPayload}\n\n`))
-            controller.enqueue(enc.encode('event: end\n\n'))
-            controller.close()
-          },
-        })
-        return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
+        return NextResponse.json({ assistant: finalFallbackText, costCents: 0, covered: true, threadId })
       }
       const finalText = isNativeClient ? formatForNativePlainText(text) : text
 
@@ -542,20 +516,10 @@ export async function POST(req: NextRequest) {
           console.error('[medical-chat.POST] update cost fallback', storageError)
         })
       }
-      const enc = new TextEncoder()
-      const chunks = finalText.match(/[\s\S]{1,200}/g) || ['']
-      const costPayload = JSON.stringify({ costCents: wrapped.costCents, covered: allowViaFreeUse })
-      const stream = new ReadableStream({
-        start(controller) {
-          for (const chunk of chunks) {
-            controller.enqueue(enc.encode(`data: ${chunk}\n\n`))
-          }
-          controller.enqueue(enc.encode(`data: __cost__${costPayload}\n\n`))
-          controller.enqueue(enc.encode('event: end\n\n'))
-          controller.close()
-        },
-      })
-      return new Response(stream, { headers: { 'Content-Type': 'text/event-stream' } })
+      // The provider already completed before the old artificial stream began.
+      // Return the complete reply through the client's existing JSON path so
+      // paragraph breaks cannot discard safety guidance during SSE framing.
+      return NextResponse.json({ assistant: finalText, costCents: wrapped.costCents, covered: allowViaFreeUse, threadId })
     }
 
     // Non-streaming fallback
