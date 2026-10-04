@@ -3134,6 +3134,7 @@ for guidance first.
 - Regression checks: `scripts/food-*-check.ts`, including actual native diary/favorite/editor/save functions and actual barcode label/read/write route functions. These checks do not substitute for rendered web/iOS/Android release testing.
 
 ### Food follow-up safeguards — 4 October 2026
+- Food liquid hints must match complete words, including ordinary plurals. Never classify `boiled`, `broiled`, `steak`, `watermelon` or a `teaspoon` measure as oil, tea or water. Whole hard-boiled eggs must retain their individual size choices and measured gram amounts; actual milk, oil, drinks and milkshakes retain liquid options. Check all six actual web/native/provider classifiers with `npm run check:food-liquid-identity`.
 - Every successful native Add Ingredient save must refresh the diary before returning; revisit/tab focus must reload the selected day.
 - Every food-photo entry path must open ingredient/amount review and show an estimate notice before saving.
 - Declared zero energy must remain zero, including foods with small nonzero macros; calculate macro energy only when energy is missing.
@@ -3191,3 +3192,5 @@ for guidance first.
 - Database URLs and passwords belong only in protected environment settings. `lib/prisma.ts` must require a non-empty `DATABASE_URL`; never add a built-in connection fallback. Preserve the existing Prisma write guard, client reuse and disconnect behavior.
 - Generated support source excerpts must redact every PostgreSQL URL before indexing, including credentials inside quotes and query strings. Never print original URLs while reviewing, staging or testing this repair.
 - `npm run check:database-env-safety` runs during prebuild and checks the actual Prisma module with synthetic settings only. Check deployed live database-backed UI after changing connection setup. Previously exposed credentials require safe replacement in the protected account; source cleanup does not remove historical exposure.
+
+- Database safety baseline: commit `4614a1ae648984bdacfe8babd05bf0d52b3acb7d`, AWS job42 all steps SUCCEED, 5 October2026. Fresh live diary/manual refresh retained376kcal/wallet642; current protected connection passed read-only SELECT1. Authoritative Neon role password differs from the removed historical fallback and matches the working protected setting; old connection failed, so that exposed historical credential was already invalid. No password or customer data changed.

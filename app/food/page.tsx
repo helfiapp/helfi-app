@@ -2277,7 +2277,7 @@ const isLikelyLiquidFood = (nameRaw: string, servingSizeRaw: string | null | und
     'chocolate bar',
     'granola bar',
   ]
-  if (solidHints.some((hint) => label.includes(hint))) return false
+  if (solidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es|ed)?\\b`).test(label))) return false
 
   const liquidKeywords = [
     'oil',
@@ -2306,7 +2306,7 @@ const isLikelyLiquidFood = (nameRaw: string, servingSizeRaw: string | null | und
     'hot chocolate',
     'cocoa',
   ]
-  return liquidKeywords.some((keyword) => label.includes(keyword))
+  return liquidKeywords.some((keyword) => new RegExp(`\\b${keyword}(?:s|es)?\\b`).test(label))
 }
 
 const normalizeServingSizeForLiquid = (

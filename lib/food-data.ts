@@ -73,7 +73,7 @@ const isLikelyLiquidFoodName = (nameRaw: string | null | undefined) => {
     'cake',
     'brownie',
   ]
-  if (solidHints.some((hint) => label.includes(hint))) return false
+  if (solidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es|ed)?\\b`).test(label))) return false
   const liquidHints = [
     'water',
     'milk',
@@ -86,6 +86,7 @@ const isLikelyLiquidFoodName = (nameRaw: string | null | undefined) => {
     'beverage',
     'smoothie',
     'shake',
+    'milkshake',
     'broth',
     'stock',
     'soup',
@@ -94,7 +95,7 @@ const isLikelyLiquidFoodName = (nameRaw: string | null | undefined) => {
     'sauce',
     'syrup',
   ]
-  return liquidHints.some((hint) => label.includes(hint))
+  return liquidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es)?\\b`).test(label))
 }
 
 const liquidDensityGramsPerMl = (nameRaw: string | null | undefined) => {

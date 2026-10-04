@@ -474,10 +474,10 @@ const extractPieceGramsFromLabel = (label: string) => {
 const isLikelyLiquidItem = (nameRaw: string, servingRaw?: string | null) => {
   const label = `${String(nameRaw || '').toLowerCase()} ${String(servingRaw || '').toLowerCase()}`.trim()
   if (!label) return false
-  const liquidHints = ['milk', 'juice', 'water', 'soda', 'drink', 'tea', 'coffee', 'broth', 'soup', 'oil', 'vinegar', 'smoothie']
+  const liquidHints = ['milk', 'juice', 'water', 'soda', 'drink', 'tea', 'coffee', 'broth', 'soup', 'oil', 'vinegar', 'smoothie', 'milkshake']
   const solidHints = ['powder', 'mix', 'bar', 'granola', 'bread', 'cookie', 'chips', 'cracker']
-  if (solidHints.some((hint) => label.includes(hint))) return false
-  return liquidHints.some((hint) => label.includes(hint))
+  if (solidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es|ed)?\\b`).test(label))) return false
+  return liquidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es)?\\b`).test(label))
 }
 
 const resolveUnitGrams = (

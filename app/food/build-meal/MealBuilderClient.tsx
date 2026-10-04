@@ -1395,7 +1395,7 @@ const isLikelyLiquidItem = (nameRaw: string, servingRaw?: string | null) => {
   if (!label) return false
 
   const solidHints = ['powder', 'mix', 'bar', 'granola', 'bread', 'cookie', 'chips', 'crisps', 'cracker']
-  if (solidHints.some((hint) => label.includes(hint))) return false
+  if (solidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es|ed)?\\b`).test(label))) return false
 
   const liquidHints = [
     'milk',
@@ -1412,11 +1412,12 @@ const isLikelyLiquidItem = (nameRaw: string, servingRaw?: string | null) => {
     'beer',
     'smoothie',
     'shake',
+    'milkshake',
     'oil',
     'vinegar',
     'syrup',
   ]
-  return liquidHints.some((hint) => label.includes(hint))
+  return liquidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es)?\\b`).test(label))
 }
 
 const isLikelyPieceItem = (nameRaw: string, servingRaw?: string | null) => {

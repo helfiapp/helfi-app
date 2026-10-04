@@ -193,7 +193,7 @@ export const isLiquidFood = (name: string | null | undefined) => {
     'cake',
     'brownie',
   ]
-  if (solidHints.some((hint) => normalized.includes(hint))) return false
+  if (solidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es|ed)?\\b`).test(normalized))) return false
   const liquidHints = [
     'water',
     'milk',
@@ -206,6 +206,7 @@ export const isLiquidFood = (name: string | null | undefined) => {
     'beverage',
     'smoothie',
     'shake',
+    'milkshake',
     'broth',
     'stock',
     'soup',
@@ -214,7 +215,7 @@ export const isLiquidFood = (name: string | null | undefined) => {
     'sauce',
     'syrup',
   ]
-  return liquidHints.some((hint) => normalized.includes(hint))
+  return liquidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es)?\\b`).test(normalized))
 }
 
 const splitFoodOptions = (value: string) =>

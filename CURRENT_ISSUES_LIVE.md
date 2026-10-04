@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job 42 (BUILD, DEPLOY and VERIFY all SUCCEED).
+- Date/time: 5 October 2026, 3:47 am Melbourne.
+- What changed: Removed the historical plaintext database fallback from lib/prisma.ts; require the protected DATABASE_URL setting and redact PostgreSQL URLs in generated support excerpts. Added an actual-module safety check to prebuild. Commit 4614a1ae648984bdacfe8babd05bf0d52b3acb7d. Other original index edits were preserved.
+- Where to see it (page/link): https://helfi.ai/food. Both public domains return 200 through CloudFront. Fresh live diary load/manual refresh retains daily376 and wallet642. Current protected production credentials passed a read-only SELECT1. No customer records or credentials were changed.
+- What to quickly test: npm run check:database-env-safety, normal diary refresh/search. The provider's current main-branch role password matches the protected production setting and differs from the historical fallback; the historical connection also failed. The exposed old password is already invalid, so no further reset was performed or needed for that fallback. This narrow repair does not certify the broader older security-audit ticket or signed store builds.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job 41 (BUILD, DEPLOY and VERIFY all SUCCEED).
 - Date/time: 5 October 2026, 3:28 am Melbourne.
 - What changed: Manual web diary refresh accepts changed saved nutrition/items even when entry IDs stay the same; native Add Ingredient preserves original stored per-serving nutrient precision. Commit cacfe8a42f1613e5d04a8b568c1238073a82920a. Rename, pending-save and deletion safeguards retained.
