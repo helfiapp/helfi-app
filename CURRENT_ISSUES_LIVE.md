@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify job 28, BUILD/DEPLOY/VERIFY SUCCEED
+- Date/time: 2026-10-04T12:06:11.339140+00:00
+- What changed: Apple Health release configuration restored, sample activity imports removed from native release source, existing voice bridge included. Commit 9a671ef3.
+- Where to see it (page/link): https://helfi.ai; native Health changes require build 39, still awaiting Apple signing and upload.
+- What to quickly test: Existing tracking remains available; replacement iPhone Health import uses real activity only; iPad shows iPhone-only guidance. Store submission is not complete.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify job 27, all build/deploy/verify steps SUCCEED
 - Date/time: 2026-10-04T11:59:22.112704+00:00
 - What changed: Account-specific AI permission before processing, withdrawal and account isolation, weekly report safeguards, reviewed voice retry/charging and iPad typed fallback. Commit 3af441ee.

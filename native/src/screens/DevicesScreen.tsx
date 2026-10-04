@@ -132,8 +132,9 @@ function InterestCard({
   busy: boolean
   onPress: () => void
 }) {
+  const { width } = useWindowDimensions()
   return (
-    <View style={{ flex: 1, minWidth: 190, backgroundColor: selected ? '#EEF9F0' : '#F6F8F7', borderRadius: theme.radius.md, borderWidth: 1, borderColor: selected ? '#A7DDB0' : theme.colors.border, padding: 14, gap: 9 }}>
+    <View style={{ flexGrow: 1, flexBasis: width >= 1000 ? '22%' : width >= 700 ? '45%' : '100%', minWidth: 0, backgroundColor: selected ? '#EEF9F0' : '#F6F8F7', borderRadius: theme.radius.md, borderWidth: 1, borderColor: selected ? '#A7DDB0' : theme.colors.border, padding: 14, gap: 9 }}>
       <View style={{ alignItems: 'center', gap: 5 }}>
         <View style={{ height: 34, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
         <Text style={{ color: theme.colors.text, fontWeight: '700', textAlign: 'center' }}>{title}</Text>
@@ -356,7 +357,7 @@ export function DevicesScreen() {
 
           <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
             <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700', marginBottom: 14 }}>Other devices under review</Text>
-            <View style={{ flexDirection: width >= 700 ? 'row' : 'column', gap: 12 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
               <InterestCard
                 title="Google Fit"
                 detail="Android fitness"

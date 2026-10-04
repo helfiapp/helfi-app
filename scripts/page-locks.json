@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T11:57:47.063Z",
+  "generatedAt": "2026-10-04T12:05:38.968Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -230,7 +230,7 @@
     "native/src/screens/BillingScreen.tsx": "55dc417bd398eeef5bb4cc5dcbc44e109bf4de77ac7c187dfd9fb0583c6fc6a8",
     "native/src/screens/DailyCheckInScreen.tsx": "7e3f91adf203aa1af835757542f635201a927837a51fd8cbf7244e3c91fb3039",
     "native/src/screens/DashboardScreen.tsx": "b42812c1173565fd070a0a02b36197b6c1b55ceb9020eff851c301a1e628622b",
-    "native/src/screens/DevicesScreen.tsx": "8f446594e0b1151d5fb7f57d300b28e1087c1f8089220300193bda27b864b0cc",
+    "native/src/screens/DevicesScreen.tsx": "f168e89088552879eb038a76566e8b183ce0c7b46f8a276c4e87d68ba3b0900d",
     "native/src/screens/FoodDiarySettingsScreen.tsx": "4be27f5bc3ee5651b3b8e66f5c2f4a9d4e27b60dda832cdd32f71286b16ef5f4",
     "native/src/screens/FoodScreen.tsx": "fcb1382fc17499842d50bfae07686f9a94a367d1151d8c857f87c131b431a92a",
     "native/src/screens/HealthImageNotesScreen.tsx": "990e885a03f708456f1c6bbedb8cf6adae1ccab6b0df60ee6e5d3a25118f0565",
