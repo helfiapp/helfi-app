@@ -3185,3 +3185,9 @@ for guidance first.
 - Public library basis repair verified: commit `7734ec210c255f434d513797409e5d3b1caac66c`, AWS job 39 all steps SUCCEED, 5 October 2026. Applied 1,867,037 exact archive-backed corrections; all 1,886,557 provider rows/identities and customer tables preserved. Original public-only backup remains in ignored `data/food-import/repair-backups/usda-branded-public-library-before-2026-10-05.ndjson` (SHA256 `57d6058f37a45e3a4de9b1f3dbd1118f37d3c9c897254418d252b65aac861f60`).
 
 - Saved portion precision and manual refresh (5 October 2026): Native Add Ingredient must store original per-serving nutrient precision and round only final totals/display. On manual diary refresh, matching IDs alone are insufficient: updated nutrition, totals or ingredient portions from another device must replace stale values. Keep local pending saves, identity linking, deletion safeguards and manual-refresh-only behavior unchanged. Check the actual refresh guard and native saved-item expression with `scripts/food-diary-nutrient-sync-check.ts`.
+
+### Database credential safety — 5 October 2026
+
+- Database URLs and passwords belong only in protected environment settings. `lib/prisma.ts` must require a non-empty `DATABASE_URL`; never add a built-in connection fallback. Preserve the existing Prisma write guard, client reuse and disconnect behavior.
+- Generated support source excerpts must redact every PostgreSQL URL before indexing, including credentials inside quotes and query strings. Never print original URLs while reviewing, staging or testing this repair.
+- `npm run check:database-env-safety` runs during prebuild and checks the actual Prisma module with synthetic settings only. Check deployed live database-backed UI after changing connection setup. Previously exposed credentials require safe replacement in the protected account; source cleanup does not remove historical exposure.

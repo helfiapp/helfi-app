@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job 41 (BUILD, DEPLOY and VERIFY all SUCCEED).
+- Date/time: 5 October 2026, 3:28 am Melbourne.
+- What changed: Manual web diary refresh accepts changed saved nutrition/items even when entry IDs stay the same; native Add Ingredient preserves original stored per-serving nutrient precision. Commit cacfe8a42f1613e5d04a8b568c1238073a82920a. Rename, pending-save and deletion safeguards retained.
+- Where to see it (page/link): https://helfi.ai/food and rebuilt iPhone/iPad Release simulators; both public domains return 200 through CloudFront. Final signed store binaries remain pending.
+- What to quickly test: Native 20 g / 127 kcal saves and reopens as 100 g / 636 kcal, sugar 4 g; iPhone reopens iPad save correctly. Changing the same native entry back to 20 g updates web after manual refresh (daily 1394 → 885). Web saves the other test entry back to 20 g; phone revisit and full web reload both show daily 376 (original oil 122 + two test peanut servings 127 each). Wallet stays 642. All six coloured cards visible; no records deleted.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job 40 (BUILD, DEPLOY and VERIFY all SUCCEED).
 - Date/time: 5 October 2026, 2:58 am Melbourne.
 - What changed: Preserve original USDA serving-option nutrient precision, rounding only final displayed results. Commit d2160b33fbd7346cdd4f82e79ab807b1ddb07174.

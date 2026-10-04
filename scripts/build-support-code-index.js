@@ -1,5 +1,6 @@
 const fs = require('fs')
 const path = require('path')
+const { redactDatabaseUrls } = require('./lib/redact-database-urls')
 
 const ROOT = process.cwd()
 const OUTPUT_PATH = path.join(ROOT, 'data', 'support-code-index.json')
@@ -47,7 +48,7 @@ function walkDir(dirPath, entries) {
 
 function readFileContent(filePath) {
   const stats = fs.statSync(filePath)
-  let content = fs.readFileSync(filePath, 'utf8')
+  let content = redactDatabaseUrls(fs.readFileSync(filePath, 'utf8'))
   let truncated = false
   if (stats.size > MAX_BYTES) {
     const lines = content.split(/\r?\n/)
