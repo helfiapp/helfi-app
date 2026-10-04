@@ -28,18 +28,25 @@ function healthKitBridge(): typeof AppleHealthKit {
   // methods may be callable without being enumerable, so that copy can lose
   // the methods. Keep the original native object in that case.
   const candidates = [AppleHealthKit, NativeModules.AppleHealthKit]
-  const methods = ['initHealthKit', 'getStepCount', 'getDistanceWalkingRunning', 'getActiveEnergyBurned']
+  const methods = ['isAvailable', 'initHealthKit', 'getStepCount', 'getDistanceWalkingRunning', 'getActiveEnergyBurned']
   const bridge = candidates.find(candidate => candidate && methods.every(method => typeof candidate[method] === 'function'))
   if (!bridge) throw new Error('Apple Health is unavailable in this installation. Please update Helfi and try again.')
   return bridge
 }
 
 export function isAppleHealthSupportedDevice() {
-  return Platform.OS === 'ios' && (Platform as any).isPad !== true
+  // Apple brought HealthKit to iPad with iPadOS 17. The native availability
+  // check below is still authoritative before requesting access.
+  return Platform.OS === 'ios' && ((Platform as any).isPad !== true || Number.parseInt(String(Platform.Version), 10) >= 17)
 }
 
-function initHealthKit(): Promise<void> {
-  if (!isAppleHealthSupportedDevice()) return Promise.reject(new Error('Apple Health is available only on iPhone.'))
+async function initHealthKit(): Promise<void> {
+  if (!isAppleHealthSupportedDevice()) throw new Error('Apple Health requires an iPhone or an iPad with iPadOS 17 or later.')
+  const bridge = healthKitBridge()
+  const available = await new Promise<boolean>((resolve, reject) => {
+    bridge.isAvailable((error, result) => error ? reject(new Error(String(error))) : resolve(result === true))
+  })
+  if (!available) throw new Error('Apple Health is unavailable on this device.')
 
   const permissions: HealthKitPermissions = {
     permissions: {
@@ -53,7 +60,7 @@ function initHealthKit(): Promise<void> {
   }
 
   return new Promise((resolve, reject) => {
-    healthKitBridge().initHealthKit(permissions, (err: string) => {
+    bridge.initHealthKit(permissions, (err: string) => {
       if (err) reject(new Error(String(err)))
       else resolve()
     })

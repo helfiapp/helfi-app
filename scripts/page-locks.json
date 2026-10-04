@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T13:11:27.204Z",
+  "generatedAt": "2026-10-04T13:17:58.886Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -205,7 +205,7 @@
     "native/src/config/nativePageRoutes.ts": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f",
     "native/src/content/legal.ts": "338d30c5ace5fb8f1a3df72c824acb4dc886997002c6a265220e53d675a52bd9",
     "native/src/data/produceMeasurements.ts": "1c0985f90c573a5e84084497aa08e59354a67f6392c5c7127acf3bbac0470a13",
-    "native/src/health/appleHealth.ts": "735a0e46bf366f0fcd3cebd79ba92984fd9ad35d331deeb8e76d1bc92776c13d",
+    "native/src/health/appleHealth.ts": "20c75fadcb69c81772f5ce8ab43a05f0a9e442676889bd050854c741d50f9ded",
     "native/src/lib/affiliateAttribution.ts": "a8f111e48edc67bbde16505278f9b76547b22ba6aa414204f45f55916381a1c3",
     "native/src/lib/aiConsent.ts": "cad69ccb3ee5eca072761d138b51344cfcd588e46f99f7d42b35e8ecc36835f6",
     "native/src/lib/dailyTargets.ts": "8ada3e9e7f09218f025bb4041ebfeeadb2c249c512ea3edcfff85bc800da7776",
@@ -229,7 +229,7 @@
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
     "native/src/screens/BillingScreen.tsx": "55dc417bd398eeef5bb4cc5dcbc44e109bf4de77ac7c187dfd9fb0583c6fc6a8",
     "native/src/screens/DailyCheckInScreen.tsx": "7e3f91adf203aa1af835757542f635201a927837a51fd8cbf7244e3c91fb3039",
-    "native/src/screens/DashboardScreen.tsx": "86e73982aaf4ee27095bb2408ab572502936d83fd0155a93fe551e5ecd5d2298",
+    "native/src/screens/DashboardScreen.tsx": "2cabd33a7bd6e1905fe06053eacad720839cc20a24dcfdccfe0093d4aa78e236",
     "native/src/screens/DevicesScreen.tsx": "f168e89088552879eb038a76566e8b183ce0c7b46f8a276c4e87d68ba3b0900d",
     "native/src/screens/FoodDiarySettingsScreen.tsx": "4be27f5bc3ee5651b3b8e66f5c2f4a9d4e27b60dda832cdd32f71286b16ef5f4",
     "native/src/screens/FoodScreen.tsx": "fcb1382fc17499842d50bfae07686f9a94a367d1151d8c857f87c131b431a92a",

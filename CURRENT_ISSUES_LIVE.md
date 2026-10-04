@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job 33, all BUILD/DEPLOY/VERIFY SUCCEED
+- Date/time: 5 October 2026, 12:19 am Melbourne
+- What changed: Complete health-image follow-up JSON preserves every word/paragraph; fresh images start fresh conversations; private filenames/note excerpts removed from logs; price wording says from 2 credits. Commit 3191e47be094b151ecc93a86f2354fcdd583ec37.
+- Where to see it (page/link): https://helfi.ai/medical-images ; native Health Image Notes in candidate 39 (not uploaded)
+- What to quickly test: Ordinary/worrying public image notes and follow-ups, complete answer, fresh chat, doctor referral; native cost wording. No clinical accuracy or store-release claim.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify job 32; BUILD/DEPLOY/VERIFY all SUCCEED)
 - Date/time: 5 October 2026, 12:03 am Australia/Melbourne
 - What changed: Apple Health preserves native connection functions and handles denied/empty reads without a false connection or exercise import.

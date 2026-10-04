@@ -37,7 +37,7 @@ async function main() {
     assert.ok(failed.some(call => call.alert))
     assert.ok(!failed.some(call => call.url || call.connected), 'failed Health access never imports or claims connection')
     const ipad = await run(handler, { appleHealthAvailable: false })
-    assert.ok(ipad.some(call => call.alert[0] === 'Apple Health is iPhone only'))
+    assert.ok(ipad.some(call => call.alert[0] === 'Apple Health unavailable'))
     assert.ok(!ipad.some(call => call.url || call.connected))
     for (const summary of [{ steps: 0, distanceKm: null, activeEnergyKcal: null }, { steps: 0, distanceKm: 0, activeEnergyKcal: 0 }]) {
       const empty = await run(handler, { appleHealthConnectAndReadToday: async () => summary })
@@ -50,6 +50,6 @@ async function main() {
   const rejected = await run('onAppleHealthImportToday', { fetch: async () => ({ ok: false, json: async () => ({ error: 'Import unavailable' }) }) })
   assert.ok(rejected.some(call => call.alert[0] === 'Import failed'))
   assert.ok(!rejected.some(call => call.alert[0] === 'Imported'))
-  console.log('PASS: real Health activity only; unavailable/denied/iPad access does not import sample calories or claim success.')
+  console.log('PASS: real Health activity only; unavailable/denied/empty access does not import sample calories or claim success.')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

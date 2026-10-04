@@ -519,7 +519,7 @@ export function DashboardScreen() {
 
   const onAppleHealthConnect = async () => {
     if (!appleHealthAvailable) {
-      Alert.alert('Apple Health is iPhone only', 'Apple Health import works on iPhone. You can still use food, water, mood, and other tracking on this iPad.')
+      Alert.alert('Apple Health unavailable', 'Apple Health needs an iPhone or an iPad with iPadOS 17 or later. You can still use food, water, mood, and other tracking.')
       return
     }
     try {
@@ -551,7 +551,7 @@ export function DashboardScreen() {
 
   const onAppleHealthImportToday = async () => {
     if (!appleHealthAvailable) {
-      Alert.alert('Apple Health is iPhone only', 'Apple Health import works on iPhone. You can still use food, water, mood, and other tracking on this iPad.')
+      Alert.alert('Apple Health unavailable', 'Apple Health needs an iPhone or an iPad with iPadOS 17 or later. You can still use food, water, mood, and other tracking.')
       return
     }
     if (!session?.token) {
@@ -978,15 +978,15 @@ export function DashboardScreen() {
                     </>
                   ) : (
                     <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-                      Apple Health import is available on iPhone only. This iPad can still use food, water, mood, check-ins, and reports.
+                      Apple Health needs an iPhone or an iPad with iPadOS 17 or later. You can still use food, water, mood, check-ins, and reports.
                     </Text>
                   )}
                 </View>
                 <DeviceRow
                   name="Apple Health (HealthKit)"
                   icon={<AppleHealthLogo />}
-                  detail={appleHealthAvailable ? "Continue to Apple's HealthKit permission screen for steps, distance, and active energy." : 'Available on iPhone only.'}
-                  rightLabel={!appleHealthAvailable ? 'iPhone only' : appleHealthConnected ? 'Import today' : 'Continue'}
+                  detail={appleHealthAvailable ? "Continue to Apple's HealthKit permission screen for steps, distance, and active energy." : 'Requires iPadOS 17 or later.'}
+                  rightLabel={!appleHealthAvailable ? 'Unavailable' : appleHealthConnected ? 'Import today' : 'Continue'}
                   rightKind="connect"
                   disabled={appleHealthBusy || !appleHealthAvailable}
                   onPress={appleHealthConnected ? onAppleHealthImportToday : onAppleHealthConnect}
