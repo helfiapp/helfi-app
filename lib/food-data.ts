@@ -1,4 +1,5 @@
 import 'server-only'
+import { liquidDensity } from '../native/src/lib/foodUnits'
 import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } from './food/usda-nutrition'
 import { usdaLibraryServingSize } from './food/usda-library'
 import { foodNumberOrNull, normalizeOffNutrition } from './food/openfoodfacts'
@@ -98,15 +99,8 @@ const isLikelyLiquidFoodName = (nameRaw: string | null | undefined) => {
   return liquidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es)?\\b`).test(label))
 }
 
-const liquidDensityGramsPerMl = (nameRaw: string | null | undefined) => {
-  const label = normalizeFoodText(String(nameRaw || ''))
-  if (/\boil\b/.test(label)) return 0.92
-  if (/\bsyrup\b/.test(label)) return 1.33
-  if (/\bhoney\b/.test(label)) return 1.42
-  if (/\bmilk\b/.test(label)) return 1.03
-  if (/\bwater\b/.test(label)) return 1
-  return null
-}
+const liquidDensityGramsPerMl = (nameRaw: string | null | undefined) =>
+  liquidDensity(String(nameRaw || ''))
 
 const OPENFOODFACTS_BASE_URL =
   process.env.OPENFOODFACTS_BASE_URL || 'https://world.openfoodfacts.org'

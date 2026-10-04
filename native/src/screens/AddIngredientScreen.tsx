@@ -750,7 +750,7 @@ function defaultUnitOptions(
 }
 
 function unitLabel(unit: AdjustUnit, foodName: string | null | undefined, foodUnitGrams: FoodUnitGrams) {
-  if (isLikelyLiquidFood(foodName) && LIQUID_UNIT_ML[unit]) return `${unit.replace('quarter-cup', '1/4 cup').replace('half-cup', '1/2 cup').replace('three-quarter-cup', '3/4 cup')} — ${LIQUID_UNIT_ML[unit]} ml`
+  if (isLikelyLiquidFood(foodName) && LIQUID_UNIT_ML[unit]) return `${unit.replace('three-quarter-cup', '3/4 cup').replace('quarter-cup', '1/4 cup').replace('half-cup', '1/2 cup')} — ${LIQUID_UNIT_ML[unit]} ml`
   const grams = roundTo(resolveUnitGrams(unit, foodUnitGrams), 1)
   if (unit === 'quarter-cup') return `1/4 cup — ${grams}g`
   if (unit === 'half-cup') return `1/2 cup — ${grams}g`
@@ -928,7 +928,7 @@ export function AddIngredientScreen() {
   } | null>(null)
   const [adjustServingOptions, setAdjustServingOptions] = useState<ServingOption[]>([])
   const [adjustServingId, setAdjustServingId] = useState<string | null>(null)
-  const servingOverrideCacheRef = useRef<Map<string, ServingOption>>(new Map())
+  const servingOverrideCacheRef = useRef<Map<string, { option: ServingOption; options: ServingOption[] }>>(new Map())
   const servingOverridePendingRef = useRef<Set<string>>(new Set())
   const sizeUnitCacheRef = useRef<Map<string, DynamicSizeLookup>>(new Map())
   const sizeUnitPendingRef = useRef<Set<string>>(new Set())
@@ -1074,7 +1074,7 @@ export function AddIngredientScreen() {
 
     const key = `${String(item.source)}:${String(item.id)}`
     const cached = servingOverrideCacheRef.current.get(key)
-    if (cached) return applyServingOptionToResult(item, cached)
+    if (cached) return { ...applyServingOptionToResult(item, cached.option), servingOptions: cached.options }
     if (servingOverridePendingRef.current.has(key)) return null
 
     servingOverridePendingRef.current.add(key)
@@ -1088,10 +1088,10 @@ export function AddIngredientScreen() {
       const options = normalizeServingOptionsForAdjust(data?.options)
       const best = pickBestServingOption(options)
       if (!best) return null
-      servingOverrideCacheRef.current.set(key, best)
-      const updated = applyServingOptionToResult(item, best)
-      if (!hasMeaningfulChange(item, updated)) return null
-      return updated
+      // Keep the provider's measured choices with the selected basis, including
+      // when the default numbers are unchanged or the lookup comes from cache.
+      servingOverrideCacheRef.current.set(key, { option: best, options })
+      return { ...applyServingOptionToResult(item, best), servingOptions: options }
     } catch {
       return null
     } finally {
@@ -1143,7 +1143,9 @@ export function AddIngredientScreen() {
       const upgraded = await loadServingOverride(item)
       const resolvedTarget = upgraded || item
       const resolvedServingOptions = normalizeServingOptionsForAdjust(resolvedTarget.servingOptions)
-      const defaultServingOption = pickDefaultServingOptionForAdjust(resolvedServingOptions)
+      const defaultServingOption =
+        resolvedServingOptions.find((option) => option.id === resolvedTarget.selectedServingId) ||
+        pickDefaultServingOptionForAdjust(resolvedServingOptions)
       const resolvedItem =
         defaultServingOption && hasServingOptionMacroData(defaultServingOption)
           ? applyServingOptionToResult(resolvedTarget, defaultServingOption)

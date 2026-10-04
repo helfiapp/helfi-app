@@ -17,7 +17,7 @@
     "check:page-locks": "node scripts/check-page-locks.js",
     "check:page-locks:web": "node scripts/check-page-locks.js --scope=web-routes && node scripts/check-page-locks.js --scope=web-components",
     "write:page-locks": "node scripts/check-page-locks.js --write",
-    "prebuild": "npm run check:local-openai-key && npm run check:database-env-safety && npm run check:food-native-recipe && npm run check:food-fatsecret-search && npm run check:food-liquid-serving && npm run check:food-native-integration && npm run check:food-web-adjustment && npm run check:food-saved-measurement && npm run check:page-locks:web && npm run check:native-voice-confirm-guard && npm run check:native-voice-command-behavior && npm run check:custom-food-servings && node scripts/protect-regions.js && node scripts/assert-food-log-date-guard.js && bash scripts/check-practitioner-web-lock.sh && node scripts/build-support-code-index.js",
+    "prebuild": "npm run check:local-openai-key && npm run check:database-env-safety && npm run check:food-native-recipe && npm run check:food-fatsecret-search && npm run check:food-liquid-serving && npm run check:food-native-serving-override && npm run check:food-native-integration && npm run check:food-web-adjustment && npm run check:food-saved-measurement && npm run check:page-locks:web && npm run check:native-voice-confirm-guard && npm run check:native-voice-command-behavior && npm run check:custom-food-servings && node scripts/protect-regions.js && node scripts/assert-food-log-date-guard.js && bash scripts/check-practitioner-web-lock.sh && node scripts/build-support-code-index.js",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",
@@ -42,7 +42,8 @@
     "check:food-native-recipe": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-native-recipe-check.ts",
     "check:food-fatsecret-search": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-fatsecret-search-check.ts",
     "check:food-native-integration": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-native-integration-check.ts",
-    "check:food-saved-measurement": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-saved-measurement-check.ts"
+    "check:food-saved-measurement": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-saved-measurement-check.ts",
+    "check:food-native-serving-override": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-native-serving-override-check.ts"
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.927.0",

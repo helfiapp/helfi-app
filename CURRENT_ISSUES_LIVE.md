@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE, AWS Amplify job51; BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront, etag4vl4zb9jrq1z15.
+- Date/time: 2026-10-04T21:56:45.045939+00:00
+- What changed: Saved weight edits choose the entered physical amount on older serving-mode entries. Enter validates empty/zero amounts; tapping elsewhere discards weight drafts. Whole audit/store work remains incomplete.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Zero/empty Enter then Update must stay in editor with warning; valid juice/milk/oil unit/amount edits must retain six cards, save and reopen. Live zero/empty rejection PASS; milk100ml63 and oil15g133 save/reopen on website+iPhone with six cards; bothdaily846/wallet619. Screenshot evidence in docs/release-evidence/2026-10-05/.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify job50 SUCCEED; BUILD/DEPLOY/VERIFY succeeded; both domains200/CloudFront, matching new etag s5xhs6zk5l1z15.
 - Date/time: 5 October2026, 8:36am Melbourne (4 October21:36UTC).
 - What changed: Saved web food measurements now use compatible recorded bases, density and full precision; recorded cup weights replace generic defaults; unknown nutrients remain unknown. Whole audit and release are incomplete: live testing found a serving-mode weight-validation gap requiring immediate follow-up.
