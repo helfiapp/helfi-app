@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai — AWS Amplify job 46; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
+- Date/time: 5 October 2026, 6:28 am Melbourne.
+- What changed: FatSecret v1 food-search summaries resolve real food.get.v2 details; singleton search/serving responses work. Exact source identity, measured serving basis, true zero and missing optional nutrition are preserved. Missing core nutrition is excluded and failed detail requests do not discard successful peers. Commit 1be32257f485879f9cdf9a62ef8a511a8f8efd7e.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient — applies to web and native server lookups. No native source or store binary changed.
+- What to quickly test: Actual provider-function fixtures: one30g bar120kcal, one200ml drink80kcal, genuine0, fibreunknown, wrong-detail ID/missing-core/provider-failure handling and at most4 parallel requests; full build/typecheck and278/79 locks passed. Live Popeyes search still showed only a custom sandwich; end-to-end FatSecret supplier and AU-region coverage are not certified. Existing database-first ordering and charges unchanged.
+
+DEPLOYED:
 - LIVE: https://helfi.ai — AWS Amplify job 45; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
 - Date/time: 5 October 2026, 6:01 am Melbourne.
 - What changed: Native recipe imports resolve measured ingredients using real food-library nutrition instead of hard-coded zero macros. Unresolved amounts stay in review. Yield, source, cooking steps and servings eaten survive saving; all six nutrient cards remain visible. Commit 462e4457c01958f22e5b3dc5377cfefb8e490c33.

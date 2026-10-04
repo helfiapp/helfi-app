@@ -2,6 +2,8 @@ export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
 import { isFoodPreparationCompatible } from '@/native/src/lib/foodPreparation'
+import { liquidDensity } from '@/native/src/lib/foodUnits'
+import { optionalNutrient } from '@/native/src/lib/nutrientValues'
 import {
   searchOpenFoodFactsByQuery,
   searchUsdaFoods,
@@ -78,17 +80,17 @@ export async function GET(request: NextRequest) {
       return /\b(water|milk|juice|coffee|tea|soda|cola|drink|beverage|smoothie|shake|broth|stock|oil|vinegar)\b/.test(name)
     }
 
-    const liquidDensityForName = (item: any) => (/\boil\b/.test(normalizeForMatch(item?.name)) ? 0.92 : 1)
+    const liquidDensityForName = (item: any) => liquidDensity(String(item?.name || ''))
 
     const normalizeSingleLiquidServing = (item: any) => {
       if (!item || !prefersMlServingLabel(item)) return item
       if (!/^\s*100\s*g\s*$/i.test(String(item?.serving_size || ''))) return item
       const density = liquidDensityForName(item)
-      const scale = density
+      // Keep the recorded gram basis when weight-to-volume conversion is unknown.
+      if (density == null || !Number.isFinite(density) || density <= 0) return item
       const scaleValue = (value: any) => {
-        const num = Number(value)
-        if (!Number.isFinite(num)) return value
-        return Math.round(num * scale * 10) / 10
+        const num = optionalNutrient(value)
+        return num == null ? null : num * density
       }
       return {
         ...item,

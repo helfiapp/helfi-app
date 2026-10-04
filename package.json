@@ -8,6 +8,7 @@
   "scripts": {
     "check:food-missing-nutrients": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-missing-nutrients-check.ts",
     "check:food-liquid-identity": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-liquid-identity-check.ts",
+    "check:food-liquid-serving": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/food-liquid-serving-check.ts",
     "dev": "next dev",
     "check:local-openai-key": "node scripts/assert-no-local-openai-key.js",
     "check:email-coverage": "node scripts/check-email-coverage.js",
@@ -15,7 +16,7 @@
     "check:page-locks": "node scripts/check-page-locks.js",
     "check:page-locks:web": "node scripts/check-page-locks.js --scope=web-routes && node scripts/check-page-locks.js --scope=web-components",
     "write:page-locks": "node scripts/check-page-locks.js --write",
-    "prebuild": "npm run check:local-openai-key && npm run check:database-env-safety && npm run check:food-native-recipe && npm run check:food-fatsecret-search && npm run check:page-locks:web && npm run check:native-voice-confirm-guard && npm run check:native-voice-command-behavior && npm run check:custom-food-servings && node scripts/protect-regions.js && node scripts/assert-food-log-date-guard.js && bash scripts/check-practitioner-web-lock.sh && node scripts/build-support-code-index.js",
+    "prebuild": "npm run check:local-openai-key && npm run check:database-env-safety && npm run check:food-native-recipe && npm run check:food-fatsecret-search && npm run check:food-liquid-serving && npm run check:page-locks:web && npm run check:native-voice-confirm-guard && npm run check:native-voice-command-behavior && npm run check:custom-food-servings && node scripts/protect-regions.js && node scripts/assert-food-log-date-guard.js && bash scripts/check-practitioner-web-lock.sh && node scripts/build-support-code-index.js",
     "build": "prisma generate && next build",
     "start": "next start",
     "lint": "next lint",

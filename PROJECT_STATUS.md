@@ -12,11 +12,11 @@ Last updated: Oct 5, 2026
 
 ## Current Release Repair Work
 - The full 1 October food/Apple audit repair goal is active under HEL-440.
-- Latest verified live source: `462e4457c01958f22e5b3dc5377cfefb8e490c33`, AWS job45; all steps succeeded and both live domains loaded on Oct5.
+- Latest verified live source: `1be32257f485879f9cdf9a62ef8a511a8f8efd7e`, AWS job46; all steps succeeded and both live domains loaded on Oct5.
 - Six nutrient cards, serving/unit errors, missing-versus-zero values and native recipe zero-calorie imports have been repaired. Actual iPhone/iPad/web recipe save/reopen and portions agree.
 - Updated native Release simulator apps are signed in; these are not new signed store uploads. Store submissions are not complete.
-- Remaining work and evidence: `docs/RELEASE_REPAIR_PROGRESS_2026-10-04.json`. Native recipe-import wallet refresh, current Australian label/known-weight photo checks, image model comparison and final signed device/store checks remain.
-- Four prior owner questions remain unanswered: Android SDK/ARM licenses, Apple HealthKit/Push profile access, Helfi admin login, and deleting/replacing incorrect iPad listing screenshots. Do not assume approval or repeat the same questions.
+- Remaining work and evidence: `docs/RELEASE_REPAIR_PROGRESS_2026-10-04.json`. Next: repair the reproduced API100g/100ml mapper mismatch and missing-to-zero conversion. FatSecret live supplier/region checks, restaurant custom serving-basis review, recipe-import wallet refresh, current AU labels/known-weight photos, model comparison and final signed device/store checks remain.
+- Five owner information/approval questions remain unanswered: the three live credit API responses (required by GUARD_RAILS2082), plus Android SDK/ARM licenses, Apple HealthKit/Push profile access, Helfi admin login, and deleting/replacing incorrect iPad listing screenshots. Do not assume approval or repeat the same questions.
 
 ## What Helfi Is Right Now
 - The main product is a website (web app).
