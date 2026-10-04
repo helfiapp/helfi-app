@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai (AWS Amplify job 24: build/deploy/verify SUCCEED)
+- Date/time: 4 October 2026, 9:48 pm Melbourne (approximate verification time)
+- What changed: Food diary refresh on native return/focus, review-before-save in the second native photo route, genuine zero-calorie handling, and missing fibre/sugar preservation. Commit e7c21bfe.
+- Where to see it: https://helfi.ai/food; native changes are source only until the new store binary is uploaded.
+- What to quickly test: Native 50 g banana save updates diary immediately; native/web both show 223 kcal including the existing 200 g banana. Photo estimates require review before save. Additional native photo preparation fix has passed a rendered test and is being prepared separately.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-04T21:25:34+11:00
 - What changed: Food audit repairs for serving basis, missing values, exact-once kJ conversion, preparation matching, strict portion-aware AI enrichment, private barcode corrections, and the web photo review notice. Commit 605788ef8e34bcb68a31b0b308a9eb3b9978065b; AWS job 23 BUILD/DEPLOY/VERIFY all SUCCEED. The additive barcode migration preserves all 38 original records and adds 38 private copies. Native source repairs are committed but are not yet an uploaded store binary.

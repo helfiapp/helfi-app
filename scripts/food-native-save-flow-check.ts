@@ -26,6 +26,7 @@ async function run(overrides: Record<string, any> = {}, handler = 'addAdjustedIt
     DeviceEventEmitter: { emit: (name: string, payload: any) => calls.push({ event: name, payload }) },
     navigation: { goBack: () => calls.push({ back: true }) }, Alert: { alert: (...args: any[]) => calls.push({ alert: args }) },
     requestAiDataSharingPermission: async () => true,
+    prepareFoodPhotoForUpload: async (asset: any) => ({ uri: asset.uri, type: 'image/jpeg', name: 'fixture.jpg' }),
     ImagePicker: { requestMediaLibraryPermissionsAsync: async () => ({ granted: true }), launchImageLibraryAsync: async () => ({ canceled: false, assets: [{ uri: 'file:///fixture.jpg' }] }) },
     FormData: class { values: any[] = []; append(...args: any[]) { this.values.push(args) } },
     setAdjustSaving: () => {}, setAdjustServingOptions: () => {}, setAdjustServingId: () => {}, setAdjustItem: () => {}, setAdjustPickerMode: () => {}, setPhotoPreviewUri: () => {}, setPhotoLoading: () => {}, ...overrides,

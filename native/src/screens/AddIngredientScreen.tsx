@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import * as ImagePicker from 'expo-image-picker'
+import { prepareFoodPhotoForUpload } from '../lib/foodPhoto'
 import {
   ActivityIndicator,
   Alert,
@@ -1428,11 +1429,8 @@ export function AddIngredientScreen() {
       form.append('mealType', targetMeal)
       form.append('analysisMode', 'meal')
       form.append('forceFresh', '1')
-      form.append('image', {
-        uri: asset.uri,
-        type: asset.mimeType || 'image/jpeg',
-        name: asset.fileName || 'food.jpg',
-      } as any)
+      const photo = await prepareFoodPhotoForUpload(asset)
+      form.append('image', photo as any)
 
       const res = await fetch(`${API_BASE_URL}/api/analyze-food`, {
         method: 'POST',
@@ -1443,7 +1441,7 @@ export function AddIngredientScreen() {
       setPhotoLoading(false)
 
       if (!res.ok) {
-        Alert.alert('Analysis failed', String(data?.error || 'Could not analyze this image.'))
+        Alert.alert('Analysis failed', String(data?.error || (res.status === 413 ? 'This photo is too large. Please try a smaller image.' : `Could not analyze this image (${res.status}). Please try again.`)))
         return
       }
 

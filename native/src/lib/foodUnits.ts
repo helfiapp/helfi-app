@@ -22,7 +22,10 @@ export function convertFoodAmount(value: number, from: FoodBaseUnit, to: FoodBas
   return amount / (to === 'oz' ? 28.349523125 : to === 'fl oz' ? 29.5735295625 : 1)
 }
 export function parseFoodServing(label: string, name = ''): { amount: number; unit: FoodBaseUnit; density?: number | null } | null {
-  const match = label.toLowerCase().match(/(\d+(?:\.\d+)?)\s*(kg|grams?|g|millilit(?:er|re)s?|ml|fl\s*oz|fluid ounces?|ounces?|oz|lit(?:er|re)s?|l)\b/)
+  // Metric amounts in dual-unit labels are the recorded basis; ounce values are often rounded.
+  const text = label.toLowerCase()
+  const match = text.match(/(\d+(?:\.\d+)?)\s*(kg|grams?|g|millilit(?:er|re)s?|ml|lit(?:er|re)s?|l)\b/)
+    || text.match(/(\d+(?:\.\d+)?)\s*(fl\s*oz|fluid ounces?|ounces?|oz)\b/)
   if (!match || Number(match[1]) <= 0) return null
   const token = match[2]
   const unit: FoodBaseUnit = /^fl|^fluid/.test(token) ? 'fl oz' : /^oz|^ounce/.test(token) ? 'oz' : /^ml|^millilit|^l/.test(token) ? 'ml' : 'g'

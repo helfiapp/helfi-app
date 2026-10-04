@@ -12,3 +12,7 @@ assert.equal(parseFoodServing('8 fl oz')?.unit, 'fl oz')
 assert.equal(parseFoodServing('8 oz')?.unit, 'oz')
 close(parseFoodServing('0.5 l')!.amount, 500)
 console.log('PASS: oil density, inverse conversions, separate weight/fluid ounces, unknown-density refusal and litre parsing.')
+
+assert.equal(parseFoodServing('1 fillet, about 7 oz (200g)')?.amount, 200)
+assert.equal(parseFoodServing('8 fl oz (240 ml)')?.amount, 240)
+assert.equal(parseFoodServing('8 fl oz (240 ml)')?.unit, 'ml')
