@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai — AWS Amplify job47; BUILD, DEPLOY and VERIFY all SUCCEED. Both domains HTTP200 through CloudFront.
+- Date/time: 5 October2026,6:47am Melbourne.
+- What changed: Single-food API100g-to100ml conversion uses the existing shared density, leaves unknown-density drinks on their recorded gram basis, retains full precision/source IDs/provider options and preserves unknown optional nutrients and genuine zero. Commit b57d66c4c6dd7045e1859a64d23a0ff40b2b7c9b.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and native live lookups. No new native binary or store submission.
+- What to quickly test: Actual USDA whole milk without added A/D shows100ml63 in web/native and100g61 in native. Dedicated actual-mapper fixtures/build/typecheck and278/79 locks pass. Web Add Ingredient still incorrectly treats weight/volume as equal and offers generic household grams; its optional-value calculation/save also needs correction. A separate preferred milk result uses hard-coded values labelled USDA. These are open follow-up tasks, not certified accurate results.
+
+DEPLOYED:
 - LIVE: https://helfi.ai — AWS Amplify job 46; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
 - Date/time: 5 October 2026, 6:28 am Melbourne.
 - What changed: FatSecret v1 food-search summaries resolve real food.get.v2 details; singleton search/serving responses work. Exact source identity, measured serving basis, true zero and missing optional nutrition are preserved. Missing core nutrition is excluded and failed detail requests do not discard successful peers. Commit 1be32257f485879f9cdf9a62ef8a511a8f8efd7e.

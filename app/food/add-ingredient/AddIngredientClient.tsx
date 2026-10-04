@@ -6,6 +6,8 @@ import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
 import MissingFoodReport from '@/components/food/MissingFoodReport'
 import NutrientCards from '@/components/food/NutrientCards'
+import { convertFoodAmount, liquidDensity, parseFoodServing } from '@/native/src/lib/foodUnits'
+import { scaleOptionalNutrient, roundOptionalNutrient } from '@/lib/food/nutrient-values'
 import {
   DEFAULT_UNIT_GRAMS,
   MeasurementUnit,
@@ -597,6 +599,12 @@ const parseServingUnitMeta = (label: string) => {
 const parseServingBase = (servingSize: any): { amount: number | null; unit: MeasurementUnit | null } => {
   const raw = String(servingSize || '').trim()
   if (!raw) return { amount: null, unit: null }
+  const measured = parseFoodServing(raw)
+  if (measured) {
+    return measured.unit === 'fl oz'
+      ? { amount: convertFoodAmount(measured.amount, 'fl oz', 'ml'), unit: 'ml' }
+      : { amount: measured.amount, unit: measured.unit }
+  }
 
   const paren = raw.match(/\(([^)]*)\)/)
   const target = paren?.[1] ? paren[1] : raw
@@ -686,10 +694,8 @@ const extractPieceGramsFromLabel = (label: string) => {
 }
 
 const normalizeLegacyBaseUnit = (amount: number | null, unit: MeasurementUnit | null) => {
-  if (!amount || !unit) return { amount, unit }
-  if (unit === 'serving') return { amount: amount * DEFAULT_UNIT_GRAMS.serving, unit: 'g' as MeasurementUnit }
-  if (unit === 'slice') return { amount: amount * DEFAULT_UNIT_GRAMS.slice, unit: 'g' as MeasurementUnit }
-  if (unit === 'handful') return { amount: amount * DEFAULT_UNIT_GRAMS.handful, unit: 'g' as MeasurementUnit }
+  // A provider's serving label describes one recorded portion, without implying a weight.
+  if (unit === 'serving' && amount) return { amount: 1, unit }
   return { amount, unit }
 }
 
@@ -752,6 +758,39 @@ const mergeFoodUnitGrams = (foodName: string, unitGrams?: DynamicUnitGrams | nul
   ...(getFoodUnitGrams(foodName) || {}),
 })
 
+const LIQUID_UNIT_ML: Partial<Record<MeasurementUnit, number>> = {
+  ml: 1, tsp: 5, tbsp: 15, 'quarter-cup': 60, 'half-cup': 120, 'three-quarter-cup': 180, cup: 240,
+}
+
+const convertAdjustAmount = (
+  amount: number,
+  from: MeasurementUnit,
+  to: MeasurementUnit,
+  base: { amount: number | null; unit: MeasurementUnit | null } | null,
+  pieceGrams: number | null,
+  foodName: string,
+  unitGrams?: DynamicUnitGrams | null,
+): number => {
+  if (!Number.isFinite(amount) || amount < 0) return NaN
+  if (from === to) return amount
+  if (from === 'serving' || to === 'serving') {
+    if (!base?.amount || !base.unit || base.unit === 'serving') return NaN
+    return from === 'serving'
+      ? convertAdjustAmount(amount * base.amount, base.unit, to, base, pieceGrams, foodName, unitGrams)
+      : convertAdjustAmount(amount, from, base.unit, base, pieceGrams, foodName, unitGrams) / base.amount
+  }
+  if (isLiquidFood(foodName)) {
+    const fromMl = LIQUID_UNIT_ML[from]
+    const toMl = LIQUID_UNIT_ML[to]
+    const fromUnit = fromMl ? 'ml' : from === 'g' || from === 'oz' ? from : null
+    const toUnit = toMl ? 'ml' : to === 'g' || to === 'oz' ? to : null
+    if (fromUnit && toUnit) {
+      return convertFoodAmount(amount * (fromMl || 1), fromUnit, toUnit, liquidDensity(foodName)) / (toMl || 1)
+    }
+  }
+  return convertAmount(amount, from, to, base?.amount, base?.unit, pieceGrams, mergeFoodUnitGrams(foodName, unitGrams))
+}
+
 const getAdjustPieceDisplayName = (name?: string | null) => {
   const normalized = normalizeSearchToken(String(name || '').trim())
   if (!normalized) return ''
@@ -798,6 +837,11 @@ const formatAdjustUnitLabel = (
   pieceGrams?: number | null,
   unitGrams?: DynamicUnitGrams | null,
 ) => {
+  const ml = LIQUID_UNIT_ML[unit]
+  if (ml && unit !== 'ml' && isLiquidFood(name)) {
+    const label = unit === 'quarter-cup' ? '1/4 cup' : unit === 'half-cup' ? '1/2 cup' : unit === 'three-quarter-cup' ? '3/4 cup' : unit
+    return `${label} — ${ml} ml`
+  }
   const mergedUnitGrams = mergeFoodUnitGrams(String(name || ''), unitGrams)
   const displayName = getAdjustPieceDisplayName(name)
   const grams = Number(mergedUnitGrams?.[unit])
@@ -813,7 +857,11 @@ const buildAdjustUnitOptions = (
   name: string,
   pieceGrams: number | null | undefined,
   unitGrams?: DynamicUnitGrams | null,
+  baseUnit?: MeasurementUnit | null,
 ) => {
+  if (baseUnit && !['g', 'ml', 'oz', 'tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup'].includes(baseUnit)) {
+    return Array.from(new Set<MeasurementUnit>(['serving', baseUnit]))
+  }
   const mergedUnitGrams = mergeFoodUnitGrams(name, unitGrams)
   const units = new Set<MeasurementUnit>(getAllowedUnitsForFood(name, pieceGrams))
   MERGEABLE_SIZE_UNITS.forEach((unit) => {
@@ -825,7 +873,11 @@ const buildAdjustUnitOptions = (
     hasPositiveUnitGrams(mergedUnitGrams?.['piece-large']) ||
     hasPositiveUnitGrams(mergedUnitGrams?.['piece-extra-large'])
   if (hasSizedPieceUnits) units.delete('piece')
-  return Array.from(units).sort((a, b) => ADJUST_UNIT_ORDER.indexOf(a) - ADJUST_UNIT_ORDER.indexOf(b))
+  return Array.from(units).filter((unit) => {
+    if (!isLiquidFood(name) || liquidDensity(name) != null || !baseUnit) return true
+    const baseIsVolume = LIQUID_UNIT_ML[baseUnit] != null
+    return baseIsVolume ? LIQUID_UNIT_ML[unit] != null : unit === 'g' || unit === 'oz'
+  }).sort((a, b) => ADJUST_UNIT_ORDER.indexOf(a) - ADJUST_UNIT_ORDER.indexOf(b))
 }
 
 const MEAT_TOKENS = [
@@ -1624,12 +1676,11 @@ export default function AddIngredientClient() {
     foodName: string,
     unitGrams?: DynamicUnitGrams | null,
   ) => {
-    if (!base?.amount || !base?.unit) return 1
-    if (!Number.isFinite(amount) || amount <= 0) return 1
-    const foodUnitGrams = mergeFoodUnitGrams(foodName, unitGrams)
-    const inBase = convertAmount(amount, unit, base.unit, base.amount, base.unit, pieceGrams, foodUnitGrams)
-    const servings = base.amount > 0 ? inBase / base.amount : 0
-    return round3(Math.max(0, servings || 0))
+    if (!Number.isFinite(amount) || amount <= 0) return NaN
+    if (unit === 'serving') return base?.unit === 'serving' && base.amount ? amount / base.amount : amount
+    if (!base?.amount || !base?.unit) return NaN
+    const inBase = convertAdjustAmount(amount, unit, base.unit, base, pieceGrams, foodName, unitGrams)
+    return Number.isFinite(inBase) && inBase > 0 ? inBase / base.amount : NaN
   }
 
   const openAdjustModalForItem = async (r: NormalizedFoodItem) => {
@@ -1704,28 +1755,27 @@ export default function AddIngredientClient() {
       const parsedBase = parseServingBase(baseItem.serving_size)
       const fallbackGrams = parseServingGrams(baseItem.serving_size)
       const base = normalizeLegacyBaseUnit(
-        parsedBase.amount && parsedBase.unit ? parsedBase.amount : fallbackGrams || 100,
-        parsedBase.amount && parsedBase.unit ? parsedBase.unit : 'g',
+        parsedBase.amount && parsedBase.unit ? parsedBase.amount : fallbackGrams || 1,
+        parsedBase.amount && parsedBase.unit ? parsedBase.unit : fallbackGrams ? 'g' : 'serving',
       )
       const pieceGrams = extractPieceGramsFromLabel(baseItem.serving_size || '')
 
-      const allowedUnits = buildAdjustUnitOptions(baseItem.name, pieceGrams, baseItem.unitGrams)
+      const allowedUnits = buildAdjustUnitOptions(baseItem.name, pieceGrams, baseItem.unitGrams, base.unit)
       const baseUnitAllowed =
         base.unit && allowedUnits.includes(base.unit) ? (base.unit as MeasurementUnit) : null
       let nextUnit = baseUnitAllowed || allowedUnits[0] || 'g'
       let nextAmount = base.amount && base.amount > 0 ? base.amount : 1
 
       if (drinkOverride) {
-        if (drinkOverride.unit === 'ml' || drinkOverride.unit === 'oz') {
-          nextUnit = drinkOverride.unit
-          nextAmount = drinkOverride.amount
-        } else if (drinkOverride.unit === 'l') {
-          nextUnit = 'ml'
-          nextAmount = drinkOverride.amount * 1000
+        if (!allowedUnits.includes('ml')) {
+          setError('This food has no verified weight-to-volume conversion. Choose its recorded weight instead.')
+          return
         }
+        nextUnit = 'ml'
+        nextAmount = drinkOverride.amountMl
       } else if (isLiquidFood(baseItem.name) && allowedUnits.includes('ml')) {
         nextUnit = 'ml'
-        nextAmount = base.amount && base.amount > 0 ? base.amount : 100
+        nextAmount = convertAdjustAmount(base.amount || 1, base.unit || 'g', 'ml', base, pieceGrams, baseItem.name, baseItem.unitGrams)
       } else if (servingOptions.length > 0) {
         // Fast-food menu items: default to "1 serving" so users can pick Small/Medium/Large.
         nextUnit = 'serving'
@@ -1751,10 +1801,18 @@ export default function AddIngredientClient() {
     try {
       const amount = Number(adjustAmountInput)
       const unit = adjustUnit
-      const base = adjustBase || { amount: 100, unit: 'g' }
+      const base = adjustBase
+      if (!base?.amount || !base.unit) {
+        setError('Choose a recorded serving size before adding this food.')
+        return
+      }
       const pieceGrams = adjustPieceGrams
       const servings = computeServingsFromAmount(amount, unit, base, pieceGrams, adjustItem.name || '', adjustItem.unitGrams)
-      const finalServings = Number.isFinite(servings) && servings > 0 ? servings : 1
+      if (!Number.isFinite(servings) || servings <= 0) {
+        setError('Enter a valid amount using a supported unit before adding this food.')
+        return
+      }
+      const finalServings = servings
 
       const item = {
         ...adjustItem,
@@ -1768,8 +1826,8 @@ export default function AddIngredientClient() {
         protein: round3(Number(item.protein_g || 0) * finalServings),
         carbs: round3(Number(item.carbs_g || 0) * finalServings),
         fat: round3(Number(item.fat_g || 0) * finalServings),
-        fiber: round3(Number(item.fiber_g || 0) * finalServings),
-        sugar: round3(Number(item.sugar_g || 0) * finalServings),
+        fiber: roundOptionalNutrient(scaleOptionalNutrient(item.fiber_g, finalServings), 3),
+        sugar: roundOptionalNutrient(scaleOptionalNutrient(item.sugar_g, finalServings), 3),
         ...(drinkMeta ? drinkMeta : {}),
       }
 
@@ -2187,7 +2245,7 @@ export default function AddIngredientClient() {
                 const selectedServingLabel =
                   selectedServing?.label || selectedServing?.serving_size || adjustItem.serving_size || 'serving'
 
-                let unitOptions = buildAdjustUnitOptions(adjustItem.name, pieceGrams, adjustItem.unitGrams)
+                let unitOptions = buildAdjustUnitOptions(adjustItem.name, pieceGrams, adjustItem.unitGrams, adjustBase?.unit)
                 if (servingOptions.length > 0) {
                   // Fast-food menu items often include produce words (eg "strawberry") in the name,
                   // which can make the dropdown show "small strawberry", "large strawberry", etc.
@@ -2206,12 +2264,12 @@ export default function AddIngredientClient() {
                   adjustItem.name || '',
                   adjustItem.unitGrams,
                 )
-                const calories = round3(Number(adjustItem.calories || 0) * servings)
-                const protein = round3(Number(adjustItem.protein_g || 0) * servings)
-                const carbs = round3(Number(adjustItem.carbs_g || 0) * servings)
-                const fat = round3(Number(adjustItem.fat_g || 0) * servings)
-                const fiber = round3(Number(adjustItem.fiber_g || 0) * servings)
-                const sugar = round3(Number(adjustItem.sugar_g || 0) * servings)
+                const calories = scaleOptionalNutrient(adjustItem.calories, servings)
+                const protein = scaleOptionalNutrient(adjustItem.protein_g, servings)
+                const carbs = scaleOptionalNutrient(adjustItem.carbs_g, servings)
+                const fat = scaleOptionalNutrient(adjustItem.fat_g, servings)
+                const fiber = scaleOptionalNutrient(adjustItem.fiber_g, servings)
+                const sugar = scaleOptionalNutrient(adjustItem.sugar_g, servings)
 
                 return (
                   <>
@@ -2241,8 +2299,8 @@ export default function AddIngredientClient() {
                             const nextParsed = parseServingBase(nextLabel)
                             const nextFallbackGrams = parseServingGrams(nextLabel)
                             const nextBase = normalizeLegacyBaseUnit(
-                              nextParsed.amount && nextParsed.unit ? nextParsed.amount : nextFallbackGrams || 100,
-                              nextParsed.amount && nextParsed.unit ? nextParsed.unit : 'g',
+                              nextParsed.amount && nextParsed.unit ? nextParsed.amount : nextFallbackGrams || 1,
+                              nextParsed.amount && nextParsed.unit ? nextParsed.unit : nextFallbackGrams ? 'g' : 'serving',
                             )
                             setAdjustBase(nextBase)
                             setAdjustPieceGrams(extractPieceGramsFromLabel(nextLabel || ''))
@@ -2311,15 +2369,14 @@ export default function AddIngredientClient() {
                                   : 1
                               setAdjustAmountInput(formatNumber(keepAmount))
                             } else if (Number.isFinite(currentAmount)) {
-                              const foodUnitGrams = mergeFoodUnitGrams(adjustItem.name, adjustItem.unitGrams)
-                              const converted = convertAmount(
+                              const converted = convertAdjustAmount(
                                 currentAmount,
                                 safeUnit,
                                 nextUnit,
-                                adjustBase?.amount ?? null,
-                                adjustBase?.unit ?? null,
+                                adjustBase,
                                 pieceGrams,
-                                foodUnitGrams,
+                                adjustItem.name,
+                                adjustItem.unitGrams,
                               )
                               if (Number.isFinite(converted)) setAdjustAmountInput(formatNumber(converted))
                             }
@@ -2336,10 +2393,10 @@ export default function AddIngredientClient() {
                           ))}
                         </select>
                       </div>
-                      <div className="mt-1 text-xs text-gray-500">Servings: {formatNumber(servings || 1)}</div>
+                      <div className="mt-1 text-xs text-gray-500">Servings: {Number.isFinite(servings) ? formatNumber(servings) : '—'}</div>
                     </div>
 
-                    <NutrientCards values={{ calories, protein, carbs, fat, fiber: adjustItem.fiber_g == null ? null : fiber, sugar: adjustItem.sugar_g == null ? null : sugar }} />
+                    <NutrientCards values={{ calories, protein, carbs, fat, fiber, sugar }} />
                   </>
                 )
               })()}
