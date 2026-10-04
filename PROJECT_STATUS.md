@@ -3,12 +3,20 @@
 This file is for quick handover. A new agent should be able to read this and
 start helping without the owner needing to copy/paste lots of background.
 
-Last updated: Sep 8, 2026
+Last updated: Oct 5, 2026
 
 ## Critical OpenAI Key Warning
 - Do not export, copy, print, or use `OPENAI_API_KEY` from agent scripts or terminal commands.
 - The local key is only for the actual Helfi app UI/server during owner-approved AI feature testing.
 - If the local OpenAI key blocker fires, stop and do not bypass it.
+
+## Current Release Repair Work
+- The full 1 October food/Apple audit repair goal is active under HEL-440.
+- Latest verified live source: `462e4457c01958f22e5b3dc5377cfefb8e490c33`, AWS job45; all steps succeeded and both live domains loaded on Oct5.
+- Six nutrient cards, serving/unit errors, missing-versus-zero values and native recipe zero-calorie imports have been repaired. Actual iPhone/iPad/web recipe save/reopen and portions agree.
+- Updated native Release simulator apps are signed in; these are not new signed store uploads. Store submissions are not complete.
+- Remaining work and evidence: `docs/RELEASE_REPAIR_PROGRESS_2026-10-04.json`. Native recipe-import wallet refresh, current Australian label/known-weight photo checks, image model comparison and final signed device/store checks remain.
+- Four prior owner questions remain unanswered: Android SDK/ARM licenses, Apple HealthKit/Push profile access, Helfi admin login, and deleting/replacing incorrect iPad listing screenshots. Do not assume approval or repeat the same questions.
 
 ## What Helfi Is Right Now
 - The main product is a website (web app).

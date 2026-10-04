@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai — AWS Amplify job 45; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
+- Date/time: 5 October 2026, 6:01 am Melbourne.
+- What changed: Native recipe imports resolve measured ingredients using real food-library nutrition instead of hard-coded zero macros. Unresolved amounts stay in review. Yield, source, cooking steps and servings eaten survive saving; all six nutrient cards remain visible. Commit 462e4457c01958f22e5b3dc5377cfefb8e490c33.
+- Where to see it (page/link): Updated iPhone/iPad Release simulator apps; saved recipes also appear at https://helfi.ai/food. Final signed store builds remain pending.
+- What to quickly test: Reviewed pancake recipe makes 12 servings: full812kcal, one68, two135. Save/restart and iPhone/iPad/web edits agree; iPad saves one, phone and web refresh to daily687, wallet619. Recipe steps/source/yield remain. Independent laboratory or current Australian label accuracy is not claimed. Native wallet immediately after recipe import needs a separate refresh repair.
+
+DEPLOYED:
 - LIVE: https://helfi.ai — AWS Amplify job 44; BUILD, DEPLOY and VERIFY all SUCCEED. Both live domains HTTP 200 through CloudFront.
 - Date/time: 5 October 2026, 5:17 am Melbourne.
 - What changed: Unknown fibre/sugar stays missing through barcode saves, saved meal/favourite reads, portion changes, recipe prefills and meal-editor saves; genuine zero stays zero. Incomplete meal/day totals show a dash. Commit 5eb4ad9d8379c9c5a7217b207c707cd81d79b9ec.

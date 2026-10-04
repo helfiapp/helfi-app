@@ -725,33 +725,35 @@ interface FatSecretFood {
   brand_name?: string
   food_description?: string
   servings?: {
-    serving: Array<{
-      serving_id: string
-      serving_description: string
-      serving_url: string
-      metric_serving_amount: string
-      metric_serving_unit: string
-      number_of_units: string
-      measurement_description: string
-      calories: string
-      carbohydrate: string
-      protein: string
-      fat: string
-      saturated_fat?: string
-      polyunsaturated_fat?: string
-      monounsaturated_fat?: string
-      cholesterol?: string
-      sodium?: string
-      potassium?: string
-      fiber?: string
-      sugar?: string
-    }>
+    serving: FatSecretServing | FatSecretServing[]
   }
+}
+
+interface FatSecretServing {
+  serving_id: string
+  serving_description: string
+  serving_url: string
+  metric_serving_amount: string
+  metric_serving_unit: string
+  number_of_units: string
+  measurement_description: string
+  calories: string
+  carbohydrate: string
+  protein: string
+  fat: string
+  saturated_fat?: string
+  polyunsaturated_fat?: string
+  monounsaturated_fat?: string
+  cholesterol?: string
+  sodium?: string
+  potassium?: string
+  fiber?: string
+  sugar?: string
 }
 
 interface FatSecretSearchResponse {
   foods?: {
-    food?: FatSecretFood[]
+    food?: FatSecretFood | FatSecretFood[]
     total_results?: string
     max_results?: string
     page_number?: string
@@ -766,14 +768,14 @@ function normalizeFatSecretFood(food: FatSecretFood): NormalizedFoodItem | null 
   if (!food || !food.food_name) return null
 
   // Use the first serving as default, or try to find a standard serving
-  const servings = food.servings?.serving || []
+  const rawServings = food.servings?.serving
+  const servings = (Array.isArray(rawServings) ? rawServings : rawServings ? [rawServings] : [])
+    .filter((serving) => ['calories', 'protein', 'carbohydrate', 'fat'].every((key) => foodNumberOrNull((serving as any)?.[key]) !== null))
   if (servings.length === 0) return null
 
   const lower = (v: any) => String(v || '').toLowerCase()
   const parseValue = (val: string | undefined): number | null => {
-    if (!val) return null
-    const num = parseFloat(val)
-    return Number.isFinite(num) ? num : null
+    return foodNumberOrNull(val)
   }
   const parseAmount = (val: string | undefined): number | null => parseValue(val)
 
@@ -911,11 +913,13 @@ async function getFatSecretAccessToken(scope = 'basic'): Promise<string | null> 
   }
 }
 
-export async function fetchFatSecretServingOptions(foodId: string): Promise<ServingOption[]> {
-  if (!foodId) return []
-  const accessToken = await getFatSecretAccessToken()
-  if (!accessToken) return []
-
+async function fetchFatSecretFoodDetail(
+  foodId: string,
+  options: { accessToken?: string; timeoutMs?: number } = {},
+): Promise<FatSecretFood | null> {
+  if (!/^\d+$/.test(String(foodId))) return null
+  const accessToken = options.accessToken || await getFatSecretAccessToken()
+  if (!accessToken) return null
   try {
     const params = new URLSearchParams({
       method: 'food.get.v2',
@@ -932,23 +936,30 @@ export async function fetchFatSecretServingOptions(foodId: string): Promise<Serv
       },
       cache: 'no-store',
       next: { revalidate: 0 },
-      timeoutMs: 3500,
+      timeoutMs: options.timeoutMs ?? 3500,
     })
 
     if (!res.ok) {
-      const text = await res.text()
-      console.warn('FatSecret food.get.v2 failed', res.status, text.substring(0, 200))
-      return []
+      console.warn('FatSecret food.get.v2 failed', res.status)
+      return null
     }
 
     const data: FatSecretFoodDetail = await res.json()
     const food = data.food
-    if (!food || !food.servings || !food.servings.serving) return []
+    if (!food || String(food.food_id) !== String(foodId) || !food.food_name) return null
+    return food
+  } catch {
+    console.warn('FatSecret detail lookup failed')
+    return null
+  }
+}
 
-    const servings = Array.isArray(food.servings.serving)
-      ? food.servings.serving
-      : [food.servings.serving]
-
+export async function fetchFatSecretServingOptions(foodId: string): Promise<ServingOption[]> {
+  const food = await fetchFatSecretFoodDetail(foodId)
+  if (!food?.servings?.serving) return []
+  const servings = (Array.isArray(food.servings.serving) ? food.servings.serving : [food.servings.serving])
+    .filter((serving) => ['calories', 'protein', 'carbohydrate', 'fat'].every((key) => foodNumberOrNull((serving as any)?.[key]) !== null))
+  try {
     const options: ServingOption[] = []
     servings.forEach((serving: any, idx: number) => {
       const metricAmount = Number(serving?.metric_serving_amount)
@@ -963,9 +974,7 @@ export async function fetchFatSecretServingOptions(foodId: string): Promise<Serv
 
       const label = hasMetric ? `${measurement} — ${metricAmount} ${metricUnit}` : measurement
       const parseValue = (val: string | undefined): number | null => {
-        if (!val) return null
-        const num = parseFloat(val)
-        return Number.isFinite(num) ? num : null
+        return foodNumberOrNull(val)
       }
 
       options.push({
@@ -1001,7 +1010,7 @@ export async function searchFatSecretFoods(
     return []
   }
 
-  const pageSize = opts.pageSize ?? 5
+  const pageSize = Math.min(50, Math.max(1, Math.floor(Number(opts.pageSize) || 5)))
   const timeoutMs = Number.isFinite(Number(opts.timeoutMs)) ? Math.max(1000, Number(opts.timeoutMs)) : 3500
   if (!query.trim()) return []
 
@@ -1012,6 +1021,7 @@ export async function searchFatSecretFoods(
   }
 
   try {
+    const deadline = Date.now() + timeoutMs
     const params = new URLSearchParams({
       method: 'foods.search',
       search_expression: query,
@@ -1033,20 +1043,29 @@ export async function searchFatSecretFoods(
     })
 
     if (!res.ok) {
-      const errorText = await res.text()
-      console.warn('FatSecret search failed', res.status, errorText.substring(0, 200))
+      console.warn('FatSecret search failed', res.status)
       return []
     }
 
     const data: FatSecretSearchResponse = await res.json()
-    const foods: FatSecretFood[] = data.foods?.food || []
-
-    const normalized: NormalizedFoodItem[] = []
-    for (const f of foods) {
-      const n = normalizeFatSecretFood(f)
-      if (n) normalized.push(n)
+    const rawFoods = data.foods?.food
+    const foods = (Array.isArray(rawFoods) ? rawFoods : rawFoods ? [rawFoods] : []).slice(0, pageSize)
+    const resolved: Array<NormalizedFoodItem | null> = foods.map(() => null)
+    let cursor = 0
+    // Search v1 returns summaries, not serving nutrition. Resolve real detail
+    // responses within the existing timeout, with at most four in flight.
+    const worker = async () => {
+      while (cursor < foods.length) {
+        const index = cursor++
+        const summary = foods[index]
+        const remainingMs = deadline - Date.now()
+        if (remainingMs <= 0) return
+        const food = await fetchFatSecretFoodDetail(String(summary?.food_id || ''), { accessToken, timeoutMs: remainingMs })
+        if (food) resolved[index] = normalizeFatSecretFood(food)
+      }
     }
-    return normalized
+    await Promise.all(Array.from({ length: Math.min(4, foods.length) }, worker))
+    return resolved.filter((item): item is NormalizedFoodItem => item !== null)
   } catch (err) {
     console.warn('FatSecret API error', err)
     return []
