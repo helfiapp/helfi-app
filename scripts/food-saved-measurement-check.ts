@@ -79,6 +79,57 @@ for (const amount of ['', '0', '-1', 'invalid']) {
   assert.ok(!Number.isFinite(ctx.effectiveServings(item)), 'invalid weight cannot fall back to one serving')
   assert.equal(ctx.recalculateNutritionFromItems([item]), null)
 }
+// Imported entries often use servings mode while displaying an editable weight.
+// The real handler must validate the user's newly entered weight, rather than
+// falling back to the previous saved serving count.
+for (const amount of ['', '0', '-1', 'invalid']) {
+  ctx.analyzedItems = [{ ...juice, portionMode: 'servings' }]
+  ctx.updateItemField(0, 'weightAmount', amount)
+  assert.ok(!Number.isFinite(ctx.effectiveServings(ctx.analyzedItems[0])), 'a weight edit must not silently retain old imported servings')
+}
+// Unit and amount edits also choose the physical basis on older imports.
+for (const portionMode of ['servings', undefined]) {
+  ctx.analyzedItems = [{ ...milk, portionMode }]
+  ctx.updateItemField(0, 'weightUnit', 'ml')
+  close(ctx.effectiveServings(ctx.analyzedItems[0]) * milk.calories, 61)
+  ctx.updateItemField(0, 'weightAmount', '100')
+  close(ctx.effectiveServings(ctx.analyzedItems[0]) * milk.calories, 62.83)
+  ctx.analyzedItems = [{ ...oil, portionMode }]
+  ctx.updateItemField(0, 'weightAmount', '15')
+  assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, 133)
+}
+// Execute the real card/modal input handlers: typing a draft and tapping
+// elsewhere discards it; Enter explicitly commits valid or invalid amounts.
+const weightInputs: ts.JsxAttributes[] = []
+const findWeightInputs = (node: ts.Node) => {
+  if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(source) === 'input') {
+    const attributes = node.attributes.getText(source)
+    if (attributes.includes('data-weight-input-id=') || (attributes.includes('value={amountValue}') && attributes.includes('[amountKey]'))) weightInputs.push(node.attributes)
+  }
+  ts.forEachChild(node, findWeightInputs)
+}
+findWeightInputs(source); assert.equal(weightInputs.length, 2)
+ctx.setNumericInputDrafts = (update: any) => { ctx.numericInputDrafts = update(ctx.numericInputDrafts) }
+ctx.index = 0; ctx.editingItemIndex = 0; ctx.amountKey = 'ai:modal:0:weightAmount'
+for (const attributes of weightInputs) {
+  const handlers: Record<string, any> = {}
+  for (const property of attributes.properties) {
+    if (ts.isJsxAttribute(property) && ['onFocus', 'onChange', 'onKeyDown', 'onBlur'].includes(property.name.getText(source)) && property.initializer && ts.isJsxExpression(property.initializer) && property.initializer.expression) {
+      handlers[property.name.getText(source)] = vm.runInContext(ts.transpile(`(${property.initializer.expression.getText(source)})`, { target: ts.ScriptTarget.ES2020 }), ctx)
+    }
+  }
+  const reset = () => { ctx.numericInputDrafts = {}; ctx.analyzedItems = [{ ...juice, portionMode: 'servings' }] }
+  reset(); handlers.onFocus(); handlers.onChange({ target: { value: '25' } }); handlers.onBlur()
+  close(ctx.analyzedItems[0].weightAmount, 100)
+  for (const value of ['', '0', '-1']) {
+    reset(); handlers.onFocus(); handlers.onChange({ target: { value } })
+    handlers.onKeyDown({ key: 'Enter', currentTarget: { blur: () => handlers.onBlur() } })
+    assert.ok(!Number.isFinite(ctx.effectiveServings(ctx.analyzedItems[0])), 'explicit invalid Enter must be rejected, rather than discarded')
+  }
+  reset(); handlers.onFocus(); handlers.onChange({ target: { value: '50' } })
+  handlers.onKeyDown({ key: 'Enter', currentTarget: { blur: () => handlers.onBlur() } })
+  assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, 24)
+}
 // Preserve the existing full-set denominator and per-piece macro multiplier.
 for (const [name, label, pieces, grams, calories] of [
   ['Beef patty', '1 patty (115 g)', 2, 230, 500],
@@ -128,10 +179,13 @@ async function checkSaveGates() {
   let calls = 0
   ctx.fetch = () => { calls++; throw new Error('Invalid amount reached persistence') }
   ctx.editingDrinkMetaRef = { get current() { calls++; throw new Error('Invalid amount reached drink metadata') } }
-  for (const value of [null, '', 0, -1, NaN]) {
-    ctx.analyzedItems = [{ ...juice, weightAmount: value }]; notice = ''
-    await ctx.updateFoodEntry(); assert.ok(notice)
-    notice = ''; await ctx.addFoodEntry('Original juice', 'photo'); assert.ok(notice)
+  for (const portionMode of ['weight', 'servings', undefined]) {
+    for (const value of [null, '', 0, -1, NaN]) {
+      ctx.analyzedItems = [{ ...juice, portionMode }]
+      ctx.updateItemField(0, 'weightAmount', value); notice = ''
+      await ctx.updateFoodEntry(); assert.ok(notice)
+      notice = ''; await ctx.addFoodEntry('Original juice', 'photo'); assert.ok(notice)
+    }
   }
   assert.equal(calls, 0)
   console.log('PASS: actual diary add/update boundaries reject invalid quantities before metadata, charging or persistence.')

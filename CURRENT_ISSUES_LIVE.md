@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify job50 SUCCEED; BUILD/DEPLOY/VERIFY succeeded; both domains200/CloudFront, matching new etag s5xhs6zk5l1z15.
+- Date/time: 5 October2026, 8:36am Melbourne (4 October21:36UTC).
+- What changed: Saved web food measurements now use compatible recorded bases, density and full precision; recorded cup weights replace generic defaults; unknown nutrients remain unknown. Whole audit and release are incomplete: live testing found a serving-mode weight-validation gap requiring immediate follow-up.
+- Where to see it (page/link): https://helfi.ai/food — saved diluted juice editor.
+- What to quickly test: Original100g47, recorded239g cup conversion preserves47;50g24 saved/reopened on web and iPhone, sixcards including Sugarunknown; daily833/wallet619. Zero weight on a legacy serving-mode entry can still keep its old portion; do not claim invalid-amount runtime passed. Native Add Ingredient serving-option override also remains wrong and was cancelled without adding.
+
+DEPLOYED:
 - LIVE: https://helfi.ai — AWS Amplify job49; BUILD, DEPLOY and VERIFY all SUCCEED. Both domains HTTP200 through CloudFront.
 - Date/time: 5 October2026,7:52am Melbourne.
 - What changed: Food density uses the actual food identity. Oil/milk/water mentions in mayonnaise, juice, eggs and other mixtures no longer invent a weight/volume conversion; concentrated, dry, plant milk and unknown food densities retain their recorded source basis. Commit f068fb554e9cfaef7b61385a4af0b70a69186e68.

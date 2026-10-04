@@ -8395,6 +8395,9 @@ const applyStructuredItems = (
         itemsCopy[index].portionMode = 'servings'
       }
     } else if (field === 'weightAmount') {
+      // A committed Weight edit chooses physical-amount calculation even when
+      // the original imported entry was stored in serving-count mode.
+      itemsCopy[index].portionMode = 'weight'
       const amount = value == null || typeof value === 'boolean' || String(value).trim() === '' ? NaN : Number(value)
       itemsCopy[index].weightAmount = Number.isFinite(amount) && amount > 0 ? Math.min(amount, 5000) : null
       const baseWeight = getBaseWeightPerServing(itemsCopy[index])
@@ -8477,6 +8480,7 @@ const applyStructuredItems = (
         }
         itemsCopy[index].weightUnit = normalized
       }
+      itemsCopy[index].portionMode = 'weight'
       clearLabelReviewFlag()
     } else if (field === 'customGramsPerServing') {
       const clamped = clampNumber(value, 0, 5000)
@@ -24145,7 +24149,7 @@ Please add nutritional information manually if needed.`);
                                         if (e.key !== 'Enter') return
                                         const key = `ai:card:${index}:weightAmount`
                                         const v = numericInputDrafts[key]
-                                        if (String(v || '').trim() !== '') {
+                                        if (Object.prototype.hasOwnProperty.call(numericInputDrafts, key)) {
                                           updateItemField(index, 'weightAmount', v)
                                         }
                                         setNumericInputDrafts((prev) => {
@@ -24157,10 +24161,6 @@ Please add nutritional information manually if needed.`);
                                       }}
                                       onBlur={() => {
                                         const key = `ai:card:${index}:weightAmount`
-                                        const v = numericInputDrafts[key]
-                                        if (String(v || '').trim() !== '') {
-                                          updateItemField(index, 'weightAmount', v)
-                                        }
                                         setNumericInputDrafts((prev) => {
                                           const next = { ...prev }
                                           delete next[key]
@@ -24706,9 +24706,18 @@ Please add nutritional information manually if needed.`);
                                 onChange={(e) => {
                                   const v = e.target.value
                                   setNumericInputDrafts((prev) => ({ ...prev, [amountKey]: v }))
-                                  if (String(v).trim() !== '') {
-                                    updateItemField(editingItemIndex, 'weightAmount', v)
+                                }}
+                                onKeyDown={(e) => {
+                                  if (e.key !== 'Enter') return
+                                  if (Object.prototype.hasOwnProperty.call(numericInputDrafts, amountKey)) {
+                                    updateItemField(editingItemIndex, 'weightAmount', numericInputDrafts[amountKey])
                                   }
+                                  setNumericInputDrafts((prev) => {
+                                    const next = { ...prev }
+                                    delete next[amountKey]
+                                    return next
+                                  })
+                                  ;(e.currentTarget as HTMLInputElement).blur()
                                 }}
                                 onBlur={() => {
                                   setNumericInputDrafts((prev) => {
