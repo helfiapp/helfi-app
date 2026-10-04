@@ -21,7 +21,7 @@ function localDateYYYYMMDD(d: Date) {
 }
 
 const APPLE_HEALTH_CONNECTED_KEY = 'helfi_apple_health_connected_v1'
-const APPLE_HEALTH_MODE_KEY = 'helfi_apple_health_mode_v1' // 'real' | 'sample'
+const APPLE_HEALTH_MODE_KEY = 'helfi_apple_health_mode_v1' // Ignore legacy sample connections.
 const MOOD_REMINDERS_KEY = 'helfi_reminders_mood_v1'
 type WearableProvider = 'fitbit' | 'garmin'
 type DeviceInterestKey = 'googleFit' | 'oura' | 'polar' | 'huawei'
@@ -71,7 +71,6 @@ export function DashboardScreen() {
   const [moodRemindersSet, setMoodRemindersSet] = useState(false)
 
   const [appleHealthConnected, setAppleHealthConnected] = useState(false)
-  const [appleHealthMode, setAppleHealthMode] = useState<'real' | 'sample'>('real')
   const [appleHealthBusy, setAppleHealthBusy] = useState(false)
   const [fitbitConnected, setFitbitConnected] = useState(false)
   const [fitbitBusy, setFitbitBusy] = useState(false)
@@ -92,9 +91,8 @@ export function DashboardScreen() {
     const load = async () => {
       try {
         const v = await AsyncStorage.getItem(APPLE_HEALTH_CONNECTED_KEY)
-        if (!cancelled) setAppleHealthConnected(v === '1')
-        const mode = await AsyncStorage.getItem(APPLE_HEALTH_MODE_KEY)
-        if (!cancelled && (mode === 'real' || mode === 'sample')) setAppleHealthMode(mode)
+        const storedMode = await AsyncStorage.getItem(APPLE_HEALTH_MODE_KEY)
+        if (!cancelled) setAppleHealthConnected(v === '1' && storedMode !== 'sample')
       } catch {}
 
       // Mood reminder settings are stored locally in the app.
@@ -529,77 +527,16 @@ export function DashboardScreen() {
       // This triggers the permission prompt. We don’t need the values yet.
       await appleHealthConnectAndReadToday()
       setAppleHealthConnected(true)
-      setAppleHealthMode('real')
       try {
         await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '1')
         await AsyncStorage.setItem(APPLE_HEALTH_MODE_KEY, 'real')
       } catch {}
       Alert.alert('Apple Health connected', 'Great. You can now import today’s steps and calories.')
     } catch (e: any) {
-      // Simulator usually can’t read real Apple Health data. Offer a sample-data test.
       Alert.alert(
-        'Apple Health not available here',
-        'This is normal on the simulator. Do you want to use sample data to test the import button?',
-        [
-          { text: 'Cancel', style: 'cancel' },
-          {
-            text: 'Use sample data',
-            onPress: async () => {
-              setAppleHealthMode('sample')
-              setAppleHealthConnected(true)
-              try {
-                await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '1')
-                await AsyncStorage.setItem(APPLE_HEALTH_MODE_KEY, 'sample')
-              } catch {}
-              await onAppleHealthImportSample()
-            },
-          },
-        ],
+        'Apple Health could not connect',
+        'Check Helfi’s access in the Health app under Sharing, Apps, then Helfi, and try again. You can keep using ordinary tracking while Health access is unavailable.',
       )
-    } finally {
-      setAppleHealthBusy(false)
-    }
-  }
-
-  const onAppleHealthImportSample = async () => {
-    if (!appleHealthAvailable) {
-      Alert.alert('Apple Health is iPhone only', 'Apple Health import works on iPhone. You can still use food, water, mood, and other tracking on this iPad.')
-      return
-    }
-    if (!session?.token) {
-      Alert.alert('Not signed in', 'Please log in again, then try importing.')
-      return
-    }
-
-    try {
-      setAppleHealthBusy(true)
-      const date = localDateYYYYMMDD(new Date())
-
-      const res = await fetch(`${API_BASE_URL}/api/native-exercise-import`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({
-          source: 'APPLE_HEALTH',
-          date,
-          // Sample data just for testing on simulator:
-          steps: 4321,
-          distanceKm: 3.2,
-          caloriesKcal: 210,
-        }),
-      })
-
-      const data = await res.json().catch(() => ({} as any))
-      if (!res.ok) {
-        Alert.alert('Import failed', data?.error ? String(data.error) : 'Please try again.')
-        return
-      }
-
-      Alert.alert('Imported (sample data)', 'Sample activity was added to your exercise log.')
-    } catch (e: any) {
-      Alert.alert('Import failed', e?.message || 'Please try again.')
     } finally {
       setAppleHealthBusy(false)
     }
@@ -612,11 +549,6 @@ export function DashboardScreen() {
     }
     if (!session?.token) {
       Alert.alert('Not signed in', 'Please log in again, then try importing.')
-      return
-    }
-
-    if (appleHealthMode === 'sample') {
-      await onAppleHealthImportSample()
       return
     }
 

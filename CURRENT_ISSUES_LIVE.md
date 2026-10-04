@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify job 27, all build/deploy/verify steps SUCCEED
+- Date/time: 2026-10-04T11:59:22.112704+00:00
+- What changed: Account-specific AI permission before processing, withdrawal and account isolation, weekly report safeguards, reviewed voice retry/charging and iPad typed fallback. Commit 3af441ee.
+- Where to see it (page/link): https://helfi.ai/settings and AI help features
+- What to quickly test: Decline permission sends no AI request; approve and withdraw through Privacy Settings; ordinary tracking stays available. Native changes require replacement build 39 and are not yet released in either store.
+
+DEPLOYED:
 - LIVE: https://helfi.ai (AWS Amplify job 25: build/deploy/verify SUCCEED)
 - Date/time: 4 October 2026, 9:58 pm Melbourne
 - What changed: Shared native food photo preparation and explicit metric basis for dual-unit serving labels. Commit e8cee8bf.

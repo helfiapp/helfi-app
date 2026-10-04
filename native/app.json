@@ -52,6 +52,7 @@
       "@react-native-community/datetimepicker",
       "expo-notifications",
       "expo-apple-authentication",
+      "react-native-health",
       "react-native-iap",
       "expo-web-browser",
       "./plugins/with-transparent-ios-app-icon"

@@ -3150,3 +3150,5 @@ for guidance first.
 - iPhone keeps the live voice layout. iPad must show its usable typed-message controls and explain that microphone input is iPhone only. Never leave iPad waiting on an unsupported voice connection.
 - Voice startup failures must close the connection and stop tracks/timers. Only complete audio/data readiness may produce the live state.
 - Apple upload readiness checks must verify the current candidate commit against the latest successful AWS Amplify master deployment and the actual helfi.ai voice readiness endpoint. Vercel is retired.
+
+- Apple Health release gate: preserve the `react-native-health` Expo plugin and `com.apple.developer.healthkit` entitlement. Activity reading is limited to user-selected steps, distance and active calories; do not add clinical records, background Health access or writes. Validate the signed provisioning profile and device permission flow before claiming release readiness.
