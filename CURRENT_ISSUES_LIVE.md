@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE; AWS54 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront with matching new etaguyx92802a61z15.
+- Date/time: 2026-10-04T23:14:43.862960+00:00
+- What changed: Strict whole-food milk identity in every search/fallback path; actual aliases retain original records, exact fat variants and complete source peers. Commit82bff8278b833a7c49fbb465fdd9965562219963. Whole audit/model/store work incomplete.
+- Where to see it (page/link): https://helfi.ai/food — Single food oat-milk search.
+- What to quickly test: Actual website/iPhone now return oat milk rather than babyfood cereal. USDA2257046 100g48 /50g24 preview,100g save/reopen website+restarted logged-in iPhone retains sixcards and original100g/48.3298kcal; bothdaily1004/wallet619. Alias/fat-variant live coverage and signed matrix remain pending. Foundation energy import2047 omission found in original archive; next55 source repair claimed. Native new-add fat2.8 versus saved/web2.7 remains to trace.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE, AWS53 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront, matching new etagaxmtvhwwdp1z15.
 - Date/time: 2026-10-04T22:42:15.956600+00:00
 - What changed: Removed fabricated preferred USDA common-drink rows; actual matching library/provider IDs, bases and options retained. Explicit chocolate plant milk remains eligible. Whole audit/model/store work incomplete.

@@ -1,0 +1,17 @@
+{
+  "verifiedAt": "2026-10-04T23:26:48.030453+00:00",
+  "status": "230 source-backed public records repaired; source deployment/runtime pending",
+  "publicRecordCountBefore": 6250,
+  "publicRecordCountAfter": 6250,
+  "nullCaloriesBefore": 6115,
+  "nullCaloriesAfter": 5885,
+  "applied": 230,
+  "existingCaloriesPreserved": 135,
+  "missingOriginalEnergyPreserved": 5874,
+  "originalMacroMismatchesPreserved": 11,
+  "backupSha256": "30db8f0701d21d47a3df89709892a42137ca5c5046471b7f2d0e94d8681c2901",
+  "archiveSha256": "3850de85effd6d9aa471f48aab2a76c20f9bc5feb3f2f52c8ce693f9cf75d52b",
+  "planSha256": "c02a4bae8e4f57bb68f312c0ec659954a44d158c61abeb8ccc90596840b96ba8",
+  "customerTablesTouched": false,
+  "otherNutrientsChanged": false
+}

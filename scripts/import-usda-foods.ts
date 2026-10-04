@@ -131,7 +131,9 @@ async function loadNutrientIds(zipPath: string): Promise<Record<string, number[]
     const name = String(row.name || '').trim().toLowerCase()
     const unit = String(row.unit_name || '').trim().toLowerCase()
 
-    const key = name === 'energy' && unit === 'kcal' ? 'calories'
+    // Foundation uses the provider's Atwater energy fields instead of1008.
+    // Match their stable IDs and declared kcal unit, not one display name.
+    const key = [1008, 2047, 2048].includes(id) && unit === 'kcal' ? 'calories'
       : unit !== 'g' ? null
       : name === 'protein' ? 'protein_g'
       : name === 'carbohydrate, by difference' ? 'carbs_g'
@@ -141,6 +143,9 @@ async function loadNutrientIds(zipPath: string): Promise<Record<string, number[]
     if (key) (nutrientIds[key] ||= []).push(id)
   })
 
+  // Keep original reported energy first, then the published general/specific
+  // alternatives. Never choose the largest of different energy methods.
+  nutrientIds.calories?.sort((a, b) => [1008, 2047, 2048].indexOf(a) - [1008, 2047, 2048].indexOf(b))
   return nutrientIds
 }
 
@@ -154,6 +159,8 @@ async function loadMacroMap(zipPath: string, nutrientIds: Record<string, number[
   }
 
   const macrosByFdc = new Map<number, MacroTotals>()
+  const energyIdByFdc = new Map<number, number>()
+  const energyIds = nutrientIds.calories ?? []
   let rowCount = 0
 
   await streamCsvFromZip(zipPath, nutrientFile, (row) => {
@@ -168,8 +175,12 @@ async function loadMacroMap(zipPath: string, nutrientIds: Record<string, number[
 
     const entry = macrosByFdc.get(fdcId) ?? {}
     const current = entry[key]
-    if (current == null || amount > current) {
+    const previousEnergyId = energyIdByFdc.get(fdcId)
+    const preferredEnergy = key === 'calories' && (previousEnergyId == null || energyIds.indexOf(nutrientId) < energyIds.indexOf(previousEnergyId))
+    const sameMeasurement = key !== 'calories' || previousEnergyId === nutrientId
+    if (current == null || preferredEnergy || (sameMeasurement && amount > current)) {
       entry[key] = amount
+      if (key === 'calories') energyIdByFdc.set(fdcId, nutrientId)
       macrosByFdc.set(fdcId, entry)
     }
   })
