@@ -84,9 +84,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'Apple sign in did not return an account id.' }, { status: 400 })
     }
 
-    const tokenEmail = normalizeEmail(payload.email)
-    const bodyEmail = normalizeEmail(body?.email)
-    const email = tokenEmail || bodyEmail
+    // Only Apple's signed, verified email can select or link an account.
+    // The client-supplied email is not identity evidence. Returning users
+    // can still sign in by their existing Apple subject without an email.
+    const emailVerified = payload.email_verified === true || payload.email_verified === 'true'
+    const email = emailVerified ? normalizeEmail(payload.email) : ''
     const name = formatName(body?.fullName, email)
 
     let user = await prisma.user.findFirst({
@@ -104,7 +106,7 @@ export async function POST(req: NextRequest) {
     if (!user) {
       if (!email) {
         return NextResponse.json(
-          { error: 'Apple did not share an email address for this sign in. Please use email login, then try Apple again.' },
+          { error: 'Apple did not provide a verified email address for this sign in. Please use email login.' },
           { status: 400 },
         )
       }
@@ -189,8 +191,8 @@ export async function POST(req: NextRequest) {
     const res = NextResponse.json(await createSession(latestUser), { status: 200 })
     res.headers.set('cache-control', 'no-store')
     return res
-  } catch (error) {
-    console.error('Native Apple sign in failed:', error)
+  } catch {
+    console.error('Native Apple sign in failed')
     return NextResponse.json({ error: 'Apple sign in failed. Please try again.' }, { status: 500 })
   }
 }

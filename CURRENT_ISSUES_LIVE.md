@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job35, all BUILD/DEPLOY/VERIFY SUCCEED
+- Date/time: 5 October 2026, 12:36 am Melbourne
+- What changed: Follow-up display keeps complete bold headings instead of treating their closing stars as bullets. Commit17d98b5ec45f09ecc960ef47a08de181532ea580.
+- Where to see it (page/link): https://helfi.ai/medical-images
+- What to quickly test: Refresh the page; ordinary/worrying image follow-ups retain complete text, headings and doctor referrals. Actual formatting/route fixtures passed; no clinical accuracy or store-ready claim.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job 34, all BUILD/DEPLOY/VERIFY SUCCEED
 - Date/time: 5 October 2026, 12:29 am Melbourne
 - What changed: Native Apple Health supports iPadOS17+ and checks real HealthKit availability before access. Older/unsupported devices remain disabled; no fake activity. Commit 16591171732cbd5c0a221365c6e6aaf00fcbe2e6.
