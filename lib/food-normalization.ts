@@ -1,3 +1,5 @@
+import { foodNumberOrNull } from './food/openfoodfacts'
+
 type Basis = 'per_serving' | 'per_100g'
 type EnergyUnit = 'kcal' | 'kJ' | null
 
@@ -240,37 +242,36 @@ export const normalizeDiscreteItems = (
 
 export const normalizeBarcodeFood = (food: NormalizedFoodInput): { food: NormalizedFoodInput; debug: any } => {
   const next: NormalizedFoodInput = { ...food }
-  let calories = Number.isFinite(Number(next.calories)) ? Number(next.calories) : null
-  let protein = Number.isFinite(Number(next.protein_g)) ? Number(next.protein_g) : null
-  let carbs = Number.isFinite(Number(next.carbs_g)) ? Number(next.carbs_g) : null
-  let fat = Number.isFinite(Number(next.fat_g)) ? Number(next.fat_g) : null
-  let fiber = Number.isFinite(Number(next.fiber_g)) ? Number(next.fiber_g) : null
-  let sugar = Number.isFinite(Number(next.sugar_g)) ? Number(next.sugar_g) : null
+  let calories = foodNumberOrNull(next.calories)
+  let protein = foodNumberOrNull(next.protein_g)
+  let carbs = foodNumberOrNull(next.carbs_g)
+  let fat = foodNumberOrNull(next.fat_g)
+  let fiber = foodNumberOrNull(next.fiber_g)
+  let sugar = foodNumberOrNull(next.sugar_g)
 
   const quantityG = Number.isFinite(Number(next.quantity_g)) && Number(next.quantity_g) > 0 ? Number(next.quantity_g) : parseGramWeight(next.serving_size)
   const energyUnit: EnergyUnit = next.energyUnit || null
 
-  // Normalize energy to kcal (heuristic: values > 4000 likely kJ)
+  // Convert only an explicitly declared unit. A large meal can legitimately exceed 4000 kcal.
   let convertedFromKJ = false
   if (energyUnit === 'kJ' && calories !== null) {
-    calories = Math.round((calories as number) / 4.184)
-    convertedFromKJ = true
-  } else if (calories !== null && calories > 4000) {
-    calories = Math.round(calories / 4.184)
+    calories = Math.round((calories as number) / 4.184 * 1000) / 1000
     convertedFromKJ = true
   }
 
   // Scale from per-100g to per-serving if possible
   if (next.basis === 'per_100g' && quantityG && quantityG > 0) {
     const factor = quantityG / 100
-    const scale = (v: number | null) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * factor * 1000) / 1000 : null)
+    const scale = (v: number | null) => (v != null ? Math.round(v * factor * 1000) / 1000 : null)
     calories = scale(calories)
     protein = scale(protein)
     carbs = scale(carbs)
     fat = scale(fat)
     fiber = scale(fiber)
     sugar = scale(sugar)
+    next.basis = 'per_serving'
   }
+  if (energyUnit === 'kJ' || energyUnit === 'kcal') next.energyUnit = 'kcal'
 
   next.calories = calories
   next.protein_g = protein

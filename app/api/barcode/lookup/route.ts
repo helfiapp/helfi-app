@@ -1,4 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { normalizeOffNutrition } from '@/lib/food/openfoodfacts'
+import { normalizeExactUsdaBarcode } from '@/lib/food/usda-barcode'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
@@ -11,8 +13,8 @@ import { normalizeBarcodeFood, summarizeDiscreteItemsForLog } from '@/lib/food-n
 // 2. OpenFoodFacts (fallback - great AU/UK/CA coverage)
 // 3. USDA (last fallback - search by product name if barcode not found)
 
-const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID || '5b035e5de0b041ffb0b8522abd75dd0b'
-const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET || 'd544f96d19494c9ca8a3dec1bcaf1da3'
+const FATSECRET_CLIENT_ID = process.env.FATSECRET_CLIENT_ID || ''
+const FATSECRET_CLIENT_SECRET = process.env.FATSECRET_CLIENT_SECRET || ''
 const USDA_API_KEY = process.env.USDA_API_KEY
 const OPENFOODFACTS_USER_AGENT = 'helfi-app/1.0 (support@helfi.ai)'
 const BARCODE_SCAN_COST_CENTS = 3
@@ -54,6 +56,7 @@ interface NormalizedFood {
   energyUnit?: 'kcal' | 'kJ' | null
   piecesPerServing?: number | null
   pieces?: number | null
+  nutritionProvenance?: Record<string, unknown>
 }
 
 type OpenFoodFactsResult = {
@@ -205,10 +208,12 @@ const isServingNutritionPlausible = (data: {
 
 // ============ Helfi Barcode Cache ============
 
-async function fetchFoodFromHelfiBarcode(barcode: string): Promise<NormalizedFood | null> {
+async function fetchFoodFromHelfiBarcode(barcode: string, userId: string): Promise<NormalizedFood | null> {
   try {
-    const record = await prisma.barcodeProduct.findUnique({
-      where: { barcode },
+    const privateRecord = await prisma.barcodeUserCorrection.findUnique({ where: { userId_barcode: { userId, barcode } } })
+    // Old submitted records are retained, but cannot become trusted for other accounts.
+    const record = privateRecord || await prisma.barcodeProduct.findFirst({
+      where: { barcode, OR: [{ createdById: null, updatedById: null }, { createdById: userId, updatedById: userId }] },
     })
     if (!record) return null
     const plausible = isServingNutritionPlausible({
@@ -236,11 +241,12 @@ async function fetchFoodFromHelfiBarcode(barcode: string): Promise<NormalizedFoo
       fiber_g: record.fiberG ?? null,
       sugar_g: record.sugarG ?? null,
       barcode,
-      basis: null,
+      basis: 'per_serving',
       quantity_g: record.quantityG ?? null,
       piecesPerServing: record.piecesPerServing ?? null,
       pieces: record.piecesPerServing ?? null,
-      energyUnit: null,
+      energyUnit: 'kcal',
+      nutritionProvenance: { provider: privateRecord ? 'private-user-correction' : 'helfi-cache', recordId: record.id, version: privateRecord?.version ?? null, status: privateRecord ? 'user-corrected' : 'cached', portionEstimated: false },
     }
   } catch (err) {
     console.warn('Helfi barcode lookup failed', err)
@@ -253,7 +259,7 @@ async function fetchFoodFromHelfiBarcode(barcode: string): Promise<NormalizedFoo
 async function fetchFoodFromLocalBarcode(barcode: string): Promise<NormalizedFood | null> {
   try {
     const record = await prisma.foodLibraryItem.findFirst({
-      where: { gtinUpc: barcode },
+      where: { gtinUpc: barcode, source: { notIn: ['label-photo', 'user-label', 'user-diary'] } },
     })
     if (!record) return null
     return {
@@ -462,44 +468,9 @@ async function fetchFoodFromOpenFoodFacts(barcode: string): Promise<OpenFoodFact
 
     if (!name) return { food: null, productName: null }
 
-    const servingSizeRaw = String(product.serving_size || '').trim()
-    const servingSize = servingSizeRaw || '1 serving'
-    const quantity_g = parseGramsFromLabel(servingSize)
-
-    const kcalServing = parseNumber(nutr['energy-kcal_serving'])
-    const kjServing = parseNumber(nutr['energy_serving'])
-    const kcal100g = parseNumber(nutr['energy-kcal_100g'])
-    const kj100g = parseNumber(nutr['energy_100g'])
-
-    const proteinServing = parseNumber(nutr['proteins_serving'])
-    const carbsServing = parseNumber(nutr['carbohydrates_serving'])
-    const fatServing = parseNumber(nutr['fat_serving'])
-    const fiberServing = parseNumber(nutr['fiber_serving'])
-    const sugarServing = parseNumber(nutr['sugars_serving'])
-
-    const protein100g = parseNumber(nutr['proteins_100g'])
-    const carbs100g = parseNumber(nutr['carbohydrates_100g'])
-    const fat100g = parseNumber(nutr['fat_100g'])
-    const fiber100g = parseNumber(nutr['fiber_100g'])
-    const sugar100g = parseNumber(nutr['sugars_100g'])
-
-    // Prefer per-serving values when present, otherwise use per-100g.
-    const hasServingMacros =
-      kcalServing != null ||
-      kjServing != null ||
-      proteinServing != null ||
-      carbsServing != null ||
-      fatServing != null
-
-    const calories = hasServingMacros ? (kcalServing ?? kjToKcal(kjServing)) : (kcal100g ?? kjToKcal(kj100g))
-    const protein_g = hasServingMacros ? proteinServing : protein100g
-    const carbs_g = hasServingMacros ? carbsServing : carbs100g
-    const fat_g = hasServingMacros ? fatServing : fat100g
-    const fiber_g = hasServingMacros ? fiberServing : fiber100g
-    const sugar_g = hasServingMacros ? sugarServing : sugar100g
-
-    const basis: NormalizedFood['basis'] = hasServingMacros ? 'per_serving' : 'per_100g'
-    const finalServingSize = hasServingMacros ? servingSize : '100 g'
+    const nutrition = normalizeOffNutrition(product)
+    const { calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g } = nutrition
+    const finalServingSize = nutrition.serving_size
 
     const plausible = isServingNutritionPlausible({
       servingSize: finalServingSize,
@@ -528,9 +499,9 @@ async function fetchFoodFromOpenFoodFacts(barcode: string): Promise<OpenFoodFact
         fiber_g,
         sugar_g,
         barcode,
-        basis,
-        quantity_g,
-        energyUnit: kcalServing != null || kcal100g != null ? 'kcal' : kjServing != null || kj100g != null ? 'kJ' : null,
+        basis: nutrition.basis,
+        quantity_g: parseGramsFromLabel(finalServingSize),
+        energyUnit: nutrition.energyUnit,
       },
       productName: name,
     }
@@ -552,7 +523,7 @@ async function searchFoodFromUSDA(productName: string, barcode: string): Promise
     const params = new URLSearchParams({
       api_key: USDA_API_KEY,
       query: productName,
-      pageSize: '1',
+      pageSize: '25',
       dataType: 'Branded',
     })
 
@@ -580,40 +551,12 @@ async function searchFoodFromUSDA(productName: string, barcode: string): Promise
       return null
     }
 
-    const food = foods[0]
-    const nutrients = food.foodNutrients || []
-
-    const findNutrient = (name: string): number | null => {
-      const n = nutrients.find(
-        (n: any) => n.nutrientName?.toLowerCase().includes(name.toLowerCase())
-      )
-      return n ? parseNumber(n.value) : null
+    for (const candidate of foods) {
+      const exact = normalizeExactUsdaBarcode(candidate, barcode)
+      if (exact) return exact
     }
-
-    console.log('✅ USDA found:', food.description, 'for barcode', barcode)
-
-    const servingSize =
-      food.servingSize ? `${food.servingSize} ${food.servingSizeUnit || 'g'}` : '100 g'
-    const quantity_g = parseGramsFromLabel(servingSize)
-    const basis: NormalizedFood['basis'] = food.servingSize ? 'per_serving' : 'per_100g'
-
-    return {
-      source: 'usda',
-      id: String(food.fdcId),
-      name: food.description || productName,
-      brand: food.brandName || food.brandOwner || null,
-      serving_size: servingSize,
-      calories: findNutrient('energy'),
-      protein_g: findNutrient('protein'),
-      carbs_g: findNutrient('carbohydrate'),
-      fat_g: findNutrient('fat') ?? findNutrient('lipid'),
-      fiber_g: findNutrient('fiber'),
-      sugar_g: findNutrient('sugar'),
-      barcode,
-      basis,
-      quantity_g,
-      energyUnit: null,
-    }
+    // A fuzzy name result cannot become an authoritative barcode product.
+    return null
   } catch (err) {
     console.warn('USDA search error', err)
     return null
@@ -693,7 +636,7 @@ export async function GET(req: NextRequest) {
 
   // Try Helfi cache first (user-labeled nutrition from barcode scans)
   for (const candidate of barcodeCandidates) {
-    food = await fetchFoodFromHelfiBarcode(candidate)
+    food = await fetchFoodFromHelfiBarcode(candidate, user.id)
     if (food) {
       if (candidate !== code) {
         console.log('✅ Helfi barcode matched via normalized code', candidate)

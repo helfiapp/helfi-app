@@ -1,4 +1,5 @@
 import 'server-only'
+import { foodNumberOrNull, normalizeOffNutrition } from './food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
 import {
   formatUnitLabel,
@@ -110,9 +111,9 @@ const OPENFOODFACTS_USER_AGENT =
 const USDA_API_KEY = process.env.USDA_API_KEY
 // Default to provided credentials if env vars are not set (per user request for FatSecret packaged lookups)
 const FATSECRET_CLIENT_ID =
-  process.env.FATSECRET_CLIENT_ID || '5b035e5de0b041ffb0b8522abd75dd0b'
+  process.env.FATSECRET_CLIENT_ID || ''
 const FATSECRET_CLIENT_SECRET =
-  process.env.FATSECRET_CLIENT_SECRET || 'd544f96d19494c9ca8a3dec1bcaf1da3'
+  process.env.FATSECRET_CLIENT_SECRET || ''
 
 type TimeoutFetchInit = RequestInit & { timeoutMs?: number }
 
@@ -288,11 +289,7 @@ async function fetchWithTimeout(url: string, init: TimeoutFetchInit = {}): Promi
   }
 }
 
-function parseNumber(value: any): number | null {
-  const n = typeof value === 'number' ? value : Number(value)
-  if (!Number.isFinite(n)) return null
-  return n
-}
+const parseNumber = foodNumberOrNull
 
 export async function searchLocalFoods(
   query: string,
@@ -475,64 +472,12 @@ function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null 
 
   const brand = (product.brands as string) || undefined
 
-  // Prefer explicit serving_size; fallback to 100g/100ml if not available
-  const servingSizeLabel: string =
-    (product.serving_size && String(product.serving_size).trim()) ||
-    (nutr['serving_size'] && String(nutr['serving_size']).trim()) ||
-    (nutr['serving_size_unit']
-      ? `1 ${nutr['serving_size_unit']}`
-      : nutr['serving_size'] || '')
-
-  let calories: number | null = null
-  let protein_g: number | null = null
-  let carbs_g: number | null = null
-  let fat_g: number | null = null
-  let fiber_g: number | null = null
-  let sugar_g: number | null = null
-
-  // If per-serving values exist, use them; otherwise fall back to per 100g/ml.
-  // OpenFoodFacts reports energy in kJ unless the "-kcal" field is present.
-  const kcalServing = parseNumber(nutr['energy-kcal_serving'])
-  const kjServing = parseNumber(nutr['energy-kj_serving'] ?? nutr['energy_serving'])
-  const proteinServing = parseNumber(nutr['proteins_serving'])
-  const carbsServing = parseNumber(nutr['carbohydrates_serving'])
-  const fatServing = parseNumber(nutr['fat_serving'])
-  const fiberServing = parseNumber(nutr['fiber_serving'])
-  const sugarServing = parseNumber(nutr['sugars_serving'])
-  const kcal100g = parseNumber(nutr['energy-kcal_100g'])
-  const kj100g = parseNumber(nutr['energy-kj_100g'] ?? nutr['energy_100g'])
-  const convertKjToKcal = (value: number | null) =>
-    value != null && Number.isFinite(value) ? value / 4.184 : null
-
-  if (kcalServing != null || kjServing != null || proteinServing != null || carbsServing != null || fatServing != null) {
-    calories = kcalServing ?? convertKjToKcal(kjServing) ?? kcal100g ?? convertKjToKcal(kj100g)
-    protein_g = proteinServing ?? parseNumber(nutr['proteins_100g'])
-    carbs_g = carbsServing ?? parseNumber(nutr['carbohydrates_100g'])
-    fat_g = fatServing ?? parseNumber(nutr['fat_100g'])
-    fiber_g = fiberServing ?? parseNumber(nutr['fiber_100g'])
-    sugar_g = sugarServing ?? parseNumber(nutr['sugars_100g'])
-  } else {
-    // Fallback: use per 100g/ml as "per serving"
-    calories = kcal100g ?? convertKjToKcal(kj100g)
-    protein_g = parseNumber(nutr['proteins_100g'])
-    carbs_g = parseNumber(nutr['carbohydrates_100g'])
-    fat_g = parseNumber(nutr['fat_100g'])
-    fiber_g = parseNumber(nutr['fiber_100g'])
-    sugar_g = parseNumber(nutr['sugars_100g'])
-  }
-
   return {
     source: 'openfoodfacts',
     id: String(product.code || product.id || name),
     name,
     brand,
-    serving_size: servingSizeLabel || undefined,
-    calories,
-    protein_g,
-    carbs_g,
-    fat_g,
-    fiber_g,
-    sugar_g,
+    ...normalizeOffNutrition(product),
   }
 }
 

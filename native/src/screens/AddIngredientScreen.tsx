@@ -16,6 +16,7 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { convertFoodAmount, parseFoodServing } from '../lib/foodUnits'
 import { PRODUCE_MEASUREMENTS, type ProduceMeasurement } from '../data/produceMeasurements'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { requestAiDataSharingPermission } from '../lib/aiConsent'
@@ -55,6 +56,7 @@ type AdjustUnit =
   | 'g'
   | 'ml'
   | 'oz'
+  | 'fl oz'
   | 'piece'
   | 'piece-small'
   | 'piece-medium'
@@ -71,7 +73,7 @@ type AdjustUnit =
   | 'three-quarter-cup'
   | 'cup'
   | 'pinch'
-type BaseServing = { amount: number; unit: 'g' | 'ml' | 'oz' } | null
+type BaseServing = { amount: number; unit: 'g' | 'ml' | 'oz' | 'fl oz'; density?: number | null } | null
 type ServingOption = {
   id: string
   label?: string
@@ -144,6 +146,7 @@ function isUsableAnalyzedFood(value: any) {
 }
 
 function safeNumber(value: any) {
+  if (value == null || (typeof value === 'string' && !value.trim()) || typeof value === 'boolean') return null
   const n = Number(value)
   if (!Number.isFinite(n)) return null
   return n
@@ -178,29 +181,8 @@ function formatAmount(value: number) {
   return String(roundTo(value, 2))
 }
 
-function parseServingBase(servingSize?: string | null): BaseServing {
-  const raw = String(servingSize || '').toLowerCase()
-  if (!raw.trim()) return null
-
-  const gMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
-  if (gMatch) {
-    const amount = Number(gMatch[1])
-    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'g' }
-  }
-
-  const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/)
-  if (mlMatch) {
-    const amount = Number(mlMatch[1])
-    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'ml' }
-  }
-
-  const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(?:fl\s*)?oz\b/)
-  if (ozMatch) {
-    const amount = Number(ozMatch[1])
-    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'oz' }
-  }
-
-  return null
+function parseServingBase(servingSize?: string | null, foodName = ''): BaseServing {
+  return parseFoodServing(String(servingSize || ''), foodName)
 }
 
 type FoodUnitGrams = Partial<Record<AdjustUnit, number>>
@@ -239,6 +221,7 @@ const STATIC_UNIT_GRAMS: Record<AdjustUnit, number> = {
   g: 1,
   ml: 1,
   oz: 28.3495,
+  'fl oz': 29.5735,
   piece: 100,
   'piece-small': 100,
   'piece-medium': 100,
@@ -646,33 +629,29 @@ function hasMeaningfulChange(before: SearchFoodItem, after: SearchFoodItem) {
   return false
 }
 
-function convertBaseUnit(value: number, from: 'g' | 'ml' | 'oz', to: 'g' | 'ml' | 'oz') {
-  if (!Number.isFinite(value) || value <= 0) return 0
-  if (from === to) return value
-
-  if (from === 'g' && to === 'ml') return value
-  if (from === 'ml' && to === 'g') return value
-  if (from === 'oz' && to === 'g') return value * 28.3495
-  if (from === 'g' && to === 'oz') return value / 28.3495
-  if (from === 'oz' && to === 'ml') return value * 29.5735
-  if (from === 'ml' && to === 'oz') return value / 29.5735
-
-  return value
+function convertBaseUnit(value: number, from: 'g' | 'ml' | 'oz' | 'fl oz', to: 'g' | 'ml' | 'oz' | 'fl oz', density?: number | null) {
+  return convertFoodAmount(value, from, to, density)
 }
+
+const LIQUID_UNIT_ML: Partial<Record<AdjustUnit, number>> = { tsp: 5, tbsp: 15, 'quarter-cup': 60, 'half-cup': 120, 'three-quarter-cup': 180, cup: 240 }
 
 function amountInBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams) {
   if (!Number.isFinite(amount) || amount <= 0 || !base) return 0
   if (unit === 'serving') return amount * base.amount
   if (unit === base.unit) return amount
 
-  if (STATIC_UNIT_GRAMS[unit]) {
-    const grams = amount * resolveUnitGrams(unit, foodUnitGrams)
-    return convertBaseUnit(grams, 'g', base.unit)
+  if ((base.unit === 'ml' || base.unit === 'fl oz' || base.density) && LIQUID_UNIT_ML[unit]) {
+    return convertBaseUnit(amount * LIQUID_UNIT_ML[unit]!, 'ml', base.unit, base.density)
+  }
+  if (unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz') {
+    return convertBaseUnit(amount, unit, base.unit, base.density)
   }
 
-  if (unit === 'g' || unit === 'ml' || unit === 'oz') {
-    return convertBaseUnit(amount, unit, base.unit)
+  if (STATIC_UNIT_GRAMS[unit]) {
+    const grams = amount * resolveUnitGrams(unit, foodUnitGrams)
+    return convertBaseUnit(grams, 'g', base.unit, base.density)
   }
+
 
   return amount
 }
@@ -682,16 +661,19 @@ function amountFromBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing,
   if (unit === 'serving') return amount / base.amount
   if (unit === base.unit) return amount
 
+  if ((base.unit === 'ml' || base.unit === 'fl oz' || base.density) && LIQUID_UNIT_ML[unit]) {
+    return convertBaseUnit(amount, base.unit, 'ml', base.density) / LIQUID_UNIT_ML[unit]!
+  }
+  if (unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz') {
+    return convertBaseUnit(amount, base.unit, unit, base.density)
+  }
   if (STATIC_UNIT_GRAMS[unit]) {
-    const grams = convertBaseUnit(amount, base.unit, 'g')
+    const grams = convertBaseUnit(amount, base.unit, 'g', base.density)
     const perUnit = resolveUnitGrams(unit, foodUnitGrams)
     if (!Number.isFinite(grams) || !Number.isFinite(perUnit) || perUnit <= 0) return 0
     return grams / perUnit
   }
 
-  if (unit === 'g' || unit === 'ml' || unit === 'oz') {
-    return convertBaseUnit(amount, base.unit, unit)
-  }
 
   return amount
 }
@@ -711,7 +693,7 @@ function computeServings(amount: number, unit: AdjustUnit, base: BaseServing, fo
   if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return amount
 
   const converted = amountInBaseUnit(amount, unit, base, foodUnitGrams)
-  if (!Number.isFinite(converted) || converted <= 0) return amount
+  if (!Number.isFinite(converted) || converted <= 0) return 0
   return converted / base.amount
 }
 
@@ -728,10 +710,11 @@ function defaultUnitOptions(
   foodName: string | null | undefined,
   foodUnitGramsOverride?: FoodUnitGrams | null,
 ): AdjustUnit[] {
-  if (!base) return ['g', 'ml', 'oz']
+  if (!base) return ['serving']
 
   if (isLikelyLiquidFood(foodName)) {
-    return ['ml', 'g', 'oz', 'tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup']
+    if (!base.density && (base.unit === 'g' || base.unit === 'oz')) return ['serving', 'g', 'oz']
+    return [...(base.density ? ['ml', 'g', 'oz', 'fl oz'] as AdjustUnit[] : ['ml', 'fl oz'] as AdjustUnit[]), 'tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup']
   }
 
   if (isEggFood(foodName)) {
@@ -763,6 +746,7 @@ function defaultUnitOptions(
 }
 
 function unitLabel(unit: AdjustUnit, foodName: string | null | undefined, foodUnitGrams: FoodUnitGrams) {
+  if (isLikelyLiquidFood(foodName) && LIQUID_UNIT_ML[unit]) return `${unit.replace('quarter-cup', '1/4 cup').replace('half-cup', '1/2 cup').replace('three-quarter-cup', '3/4 cup')} — ${LIQUID_UNIT_ML[unit]} ml`
   const grams = roundTo(resolveUnitGrams(unit, foodUnitGrams), 1)
   if (unit === 'quarter-cup') return `1/4 cup — ${grams}g`
   if (unit === 'half-cup') return `1/2 cup — ${grams}g`
@@ -1183,15 +1167,15 @@ export function AddIngredientScreen() {
           }
         : resolvedItem
 
-      const caloriesRaw = Number(authoritativeItem.calories ?? authoritativeItem.calories_kcal)
-      const proteinRaw = Number(authoritativeItem.protein_g)
-      const carbsRaw = Number(authoritativeItem.carbs_g)
-      const fatRaw = Number(authoritativeItem.fat_g)
+      const caloriesRaw = safeNumber(authoritativeItem.calories ?? authoritativeItem.calories_kcal)
+      const proteinRaw = safeNumber(authoritativeItem.protein_g)
+      const carbsRaw = safeNumber(authoritativeItem.carbs_g)
+      const fatRaw = safeNumber(authoritativeItem.fat_g)
       const hasCoreNutrition =
-        Number.isFinite(caloriesRaw) &&
-        Number.isFinite(proteinRaw) &&
-        Number.isFinite(carbsRaw) &&
-        Number.isFinite(fatRaw)
+        caloriesRaw != null && Number.isFinite(caloriesRaw) &&
+        proteinRaw != null && Number.isFinite(proteinRaw) &&
+        carbsRaw != null && Number.isFinite(carbsRaw) &&
+        fatRaw != null && Number.isFinite(fatRaw)
 
       if (!hasCoreNutrition) {
         Alert.alert('Cannot add this item', 'This result has missing nutrition data. Please pick another one.')
@@ -1199,7 +1183,7 @@ export function AddIngredientScreen() {
       }
 
       const resolvedServingSize = String(authoritativeItem.serving_size || '100 g')
-      const base = parseServingBase(resolvedServingSize) || (() => {
+      const base: BaseServing = parseServingBase(resolvedServingSize, authoritativeItem.name) || (() => {
         const grams = parseServingGrams(resolvedServingSize)
         return grams && grams > 0 ? { amount: grams, unit: 'g' as const } : { amount: 100, unit: 'g' as const }
       })()
@@ -1230,14 +1214,14 @@ export function AddIngredientScreen() {
       }
       let units = defaultUnitOptions(base, authoritativeItem?.name || '', mergedUnitGrams)
       if (resolvedServingOptions.length > 0) {
-        units = units.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz')
+        units = units.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz')
         units = ['serving', ...units]
       }
       const liquidDefault = isLikelyLiquidFood(authoritativeItem?.name || '') && units.includes('ml')
       const nextUnit = liquidDefault ? 'ml' : resolvedServingOptions.length > 0 ? 'serving' : units[0] || 'g'
       setAdjustUnit(nextUnit)
       if (liquidDefault) {
-        setAdjustAmountInput(formatAmount(base?.amount && base.amount > 0 ? base.amount : 100))
+        setAdjustAmountInput(formatAmount(base ? convertBaseUnit(base.amount, base.unit, 'ml', base.density) : 100))
       } else if (nextUnit === 'serving') {
         setAdjustAmountInput('1')
       } else if (base && nextUnit === base.unit) {
@@ -1576,7 +1560,7 @@ export function AddIngredientScreen() {
   const adjustAmount = numberOrZero(adjustAmountInput)
   let unitOptions = defaultUnitOptions(adjustBase, adjustItem?.name || '', mergedAdjustUnitGrams)
   if (adjustServingOptions.length > 0) {
-    unitOptions = unitOptions.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz')
+    unitOptions = unitOptions.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz')
     unitOptions = ['serving', ...unitOptions]
   }
   const safeAdjustUnit = unitOptions.includes(adjustUnit) ? adjustUnit : unitOptions[0] || 'g'
@@ -1622,7 +1606,7 @@ export function AddIngredientScreen() {
       }
     })
     const nextLabel = option.serving_size || option.label || '1 serving'
-    const nextBase = parseServingBase(nextLabel) || (() => {
+    const nextBase = parseServingBase(nextLabel, adjustItem?.name || '') || (() => {
       const grams = parseServingGrams(nextLabel)
       return grams && grams > 0 ? { amount: grams, unit: 'g' as const } : { amount: 100, unit: 'g' as const }
     })()
@@ -1635,7 +1619,7 @@ export function AddIngredientScreen() {
 
   const applyAdjustUnitChoice = (unit: AdjustUnit) => {
     const current = numberOrZero(adjustAmountInput)
-    const isWeightUnit = unit === 'g' || unit === 'ml' || unit === 'oz'
+    const isWeightUnit = unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz'
 
     if (isWeightUnit) {
       const converted = convertAmountBetweenUnits(

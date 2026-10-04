@@ -12015,7 +12015,9 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
           barcodeTag,
           allowTextFallback: false,
           analysisSeq,
-          autoMatchEnabled: true,
+          // The server already performs portion-aware, attributed enrichment.
+          // A second loose client match can erase preparation, amounts and provenance.
+          autoMatchEnabled: false,
           preserveExplicitCountsFrom: previousSnapshot?.items,
         });
         if (!Array.isArray(applied?.items) || applied.items.length === 0) {
@@ -23016,6 +23018,11 @@ Please add nutritional information manually if needed.`);
               <div
                 className="w-full bg-transparent border-0 shadow-none rounded-none"
               >
+                {photoPreview && !editingEntry && (
+                  <p role="note" className="mx-4 my-3 rounded-lg bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                    Photo nutrition is an estimate. Check the food and portion amounts before saving.
+                  </p>
+                )}
                 {editingEntry && (
                   <div className="flex items-center justify-end gap-3 px-4 pt-4">
                     <button

@@ -3,25 +3,14 @@ import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { reportCriticalError } from '@/lib/error-reporter'
+import { savePrivateBarcodeCorrection } from '@/lib/food/barcode-corrections'
+import { foodNumberOrNull } from '@/lib/food/openfoodfacts'
 
-const SUPPORT_ALERT_EMAIL = (process.env.SUPPORT_ALERT_EMAIL || 'support@helfi.ai').trim() || 'support@helfi.ai'
-
-const toNumber = (value: any): number | null => {
-  if (value === null || value === undefined || value === '') return null
-  const parsed = typeof value === 'string' ? parseFloat(value) : Number(value)
-  return Number.isFinite(parsed) ? parsed : null
-}
+const toNumber = foodNumberOrNull
 
 const convertKjToKcal = (kj: number | null): number | null => {
-  if (!Number.isFinite(Number(kj)) || Number(kj) <= 0) return null
-  return Number(kj) / 4.184
-}
-
-const deriveCaloriesFromMacros = (protein: number | null, carbs: number | null, fat: number | null): number | null => {
-  const safe = (value: number | null) => (Number.isFinite(Number(value)) ? Number(value) : 0)
-  const computed = safe(protein) * 4 + safe(carbs) * 4 + safe(fat) * 9
-  return computed > 0 ? computed : null
+  const value = foodNumberOrNull(kj)
+  return value == null ? null : value / 4.184
 }
 
 const normalizeText = (value: any): string | null => {
@@ -74,16 +63,6 @@ const validateServingSanity = (data: {
   return { ok: true }
 }
 
-const buildFriendlyError = (error: unknown) => {
-  if (!error) return 'Unknown error'
-  if (typeof error === 'string') return error
-  if (error instanceof Error && error.message) return error.message
-  try {
-    return JSON.stringify(error)
-  } catch {
-    return 'Unknown error'
-  }
-}
 
 export async function POST(req: NextRequest) {
   try {
@@ -143,16 +122,11 @@ export async function POST(req: NextRequest) {
     const sugarG = toNumber(item?.sugar_g ?? item?.sugarG)
     const energyKj = toNumber(item?.energy_kj ?? item?.energyKj ?? item?.kilojoules ?? item?.kj)
     const caloriesFromKj = convertKjToKcal(energyKj)
-    const caloriesFromMacros = deriveCaloriesFromMacros(proteinG, carbsG, fatG)
-    const calories =
-      (Number.isFinite(Number(caloriesRaw)) && Number(caloriesRaw) > 0 ? caloriesRaw : null) ||
-      caloriesFromKj ||
-      caloriesFromMacros
+    const calories = caloriesRaw ?? caloriesFromKj
     const quantityG = toNumber(item?.quantity_g ?? item?.quantityG)
     const piecesPerServing = toNumber(item?.piecesPerServing ?? item?.pieces_per_serving)
 
-    const nutritionValues = [calories, proteinG, carbsG, fatG, fiberG, sugarG]
-    const hasNutrition = nutritionValues.some((v) => Number.isFinite(Number(v)) && Number(v) > 0)
+    const hasNutrition = [calories, proteinG, carbsG, fatG].every((value) => value != null && Number.isFinite(value))
     if (!hasNutrition) {
       return NextResponse.json(
         {
@@ -181,134 +155,18 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    const isReport = Boolean(body?.report)
-    const now = new Date()
-
-    const updateData = {
-      name,
-      brand,
-      servingSize,
-      calories,
-      proteinG,
-      carbsG,
-      fatG,
-      fiberG,
-      sugarG,
-      quantityG,
-      piecesPerServing,
-      source: 'label-photo',
-      updatedById: user.id,
-      updatedAt: now,
-      ...(isReport ? { reportCount: { increment: 1 }, lastReportedAt: now } : {}),
-    }
-
-    const createData = {
-      barcode,
-      name,
-      brand,
-      servingSize,
-      calories,
-      proteinG,
-      carbsG,
-      fatG,
-      fiberG,
-      sugarG,
-      quantityG,
-      piecesPerServing,
-      source: 'label-photo',
-      reportCount: isReport ? 1 : 0,
-      lastReportedAt: isReport ? now : null,
-      createdById: user.id,
-      updatedById: user.id,
-      createdAt: now,
-      updatedAt: now,
-    }
-
-    try {
-      const record = await prisma.barcodeProduct.upsert({
-        where: { barcode },
-        update: updateData,
-        create: createData,
-      })
-
-      return NextResponse.json({
-        success: true,
-        product: {
-          barcode: record.barcode,
-          name: record.name,
-          brand: record.brand,
-          servingSize: record.servingSize,
-        },
-      })
-    } catch (saveError) {
-      console.warn('Barcode label save failed, trying fallback storage', saveError)
-      await reportCriticalError({
-        source: 'barcode-label-save',
-        error: saveError,
-        userId: user.id,
-        userEmail,
-        details: { barcode, step: 'barcodeProduct' },
-        recipientEmail: SUPPORT_ALERT_EMAIL,
-      })
-      try {
-        const existing = await prisma.foodLibraryItem.findFirst({
-          where: { gtinUpc: barcode },
-        })
-        const fallbackData = {
-          source: 'label-photo',
-          name,
-          brand,
-          gtinUpc: barcode,
-          servingSize,
-          calories,
-          proteinG,
-          carbsG,
-          fatG,
-          fiberG,
-          sugarG,
-        }
-        const fallbackRecord = existing
-          ? await prisma.foodLibraryItem.update({
-              where: { id: existing.id },
-              data: fallbackData,
-            })
-          : await prisma.foodLibraryItem.create({
-              data: fallbackData,
-            })
-
-        return NextResponse.json({
-          success: true,
-          product: {
-            barcode,
-            name: fallbackRecord.name,
-            brand: fallbackRecord.brand,
-            servingSize: fallbackRecord.servingSize,
-          },
-          fallback: 'foodLibraryItem',
-        })
-      } catch (fallbackError) {
-        console.error('Barcode label fallback save failed', fallbackError)
-        await reportCriticalError({
-          source: 'barcode-label-save-fallback',
-          error: fallbackError,
-          userId: user.id,
-          userEmail,
-          details: { barcode, step: 'foodLibraryItem' },
-          recipientEmail: SUPPORT_ALERT_EMAIL,
-        })
-        return NextResponse.json(
-          {
-            error: 'Failed to save barcode label',
-            message: buildFriendlyError(fallbackError),
-          },
-          { status: 500 },
-        )
-      }
-    }
+    const record = await savePrivateBarcodeCorrection(user.id, barcode, {
+      name, brand, servingSize, calories, proteinG, carbsG, fatG, fiberG, sugarG, quantityG, piecesPerServing,
+    }, 'user-label', Boolean(body?.report))
+    return NextResponse.json({
+      success: true,
+      product: { barcode: record.barcode, name: record.name, brand: record.brand, servingSize: record.servingSize },
+      scope: 'private', version: record.version,
+    })
   } catch (error) {
     console.error('Barcode label save failed', error)
     return NextResponse.json(
-      { error: 'Failed to save barcode label', message: buildFriendlyError(error) },
+      { error: 'Failed to save barcode label', message: 'Could not save your label numbers. Please try again.' },
       { status: 500 },
     )
   }

@@ -750,7 +750,8 @@ if (!/form\.append\('saveToHistory',\s*'false'\)/.test(healthImage) || !/saveRes
   failures.push('Health-image notes must create notes first and only save to history after review.')
 }
 
-if (!/openFoodPhotoPicker\(meal,\s*'voiceReview'\)/.test(trackCalories) || !/usageMode === 'voiceReview'/.test(trackCalories) || !/Review before saving/.test(trackCalories) || !/openNativeMealBuilder\(meal/.test(trackCalories)) {
+const foodPhotoReviewFlow = trackCalories.slice(trackCalories.indexOf('  const createFromImage = async'), trackCalories.indexOf('  const openFoodPhotoPicker ='))
+if (!/openFoodPhotoPicker\(meal,\s*'voiceReview'\)/.test(trackCalories) || !/Review before saving/.test(foodPhotoReviewFlow) || !/openNativeMealBuilder\(meal/.test(foodPhotoReviewFlow) || /createFoodEntry\(/.test(foodPhotoReviewFlow)) {
   failures.push('Talk to Helfi food photo handoffs must open Build a meal for review instead of saving photo analysis automatically.')
 }
 

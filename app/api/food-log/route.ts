@@ -3,6 +3,8 @@ import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { savePrivateBarcodeCorrection } from '@/lib/food/barcode-corrections'
+import { foodNumberOrNull } from '@/lib/food/openfoodfacts'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { Prisma } from '@prisma/client'
 import { isObjectStorageConfigured, put } from '@/lib/object-storage'
@@ -355,75 +357,23 @@ const maybeUpsertBarcodeFromItems = async (
   const barcode = barcodeRaw.replace(/[^0-9A-Za-z]/g, '')
   if (!barcode) return
 
-  const calories = Number(candidate?.calories)
-  const proteinG = Number(candidate?.protein_g)
-  const carbsG = Number(candidate?.carbs_g)
-  const fatG = Number(candidate?.fat_g)
-  const fiberG = Number(candidate?.fiber_g)
-  const sugarG = Number(candidate?.sugar_g)
-  const hasNutrition = [calories, proteinG, carbsG, fatG, fiberG, sugarG].some(
-    (v) => Number.isFinite(v) && v > 0,
-  )
-  if (!hasNutrition) return
-
+  const calories = foodNumberOrNull(candidate?.calories)
+  const proteinG = foodNumberOrNull(candidate?.protein_g)
+  const carbsG = foodNumberOrNull(candidate?.carbs_g)
+  const fatG = foodNumberOrNull(candidate?.fat_g)
+  const fiberG = foodNumberOrNull(candidate?.fiber_g)
+  const sugarG = foodNumberOrNull(candidate?.sugar_g)
+  if ([calories, proteinG, carbsG, fatG].some((value) => value == null)) return
   const servingSize = stripNutritionFromServingSize(candidate?.serving_size || '')
-  const plausible = isServingNutritionPlausible({
-    servingSize,
-    calories,
-    protein: proteinG,
-    carbs: carbsG,
-    fat: fatG,
-    fiber: fiberG,
-  })
-  if (!plausible) return
-
-  const quantityG = Number.isFinite(Number(candidate?.customGramsPerServing))
-    ? Number(candidate.customGramsPerServing)
-    : parseServingWeight(servingSize || null)
-  const piecesPerServing = Number.isFinite(Number(candidate?.piecesPerServing))
-    ? Number(candidate.piecesPerServing)
-    : null
-
+  if (!isServingNutritionPlausible({ servingSize, calories, protein: proteinG, carbs: carbsG, fat: fatG, fiber: fiberG })) return
+  const quantityG = foodNumberOrNull(candidate?.customGramsPerServing) ?? parseServingWeight(servingSize || null)
+  const piecesPerServing = foodNumberOrNull(candidate?.piecesPerServing)
   const name = String(candidate?.name || '').trim() || 'Packaged item'
   const brand = candidate?.brand ? String(candidate.brand).trim() : null
-  const source = candidate?.barcodeSource || candidate?.source || 'label-photo'
-
   try {
-    await prisma.barcodeProduct.upsert({
-      where: { barcode },
-      update: {
-        name,
-        brand,
-        servingSize: servingSize || null,
-        calories: Number.isFinite(calories) ? calories : null,
-        proteinG: Number.isFinite(proteinG) ? proteinG : null,
-        carbsG: Number.isFinite(carbsG) ? carbsG : null,
-        fatG: Number.isFinite(fatG) ? fatG : null,
-        fiberG: Number.isFinite(fiberG) ? fiberG : null,
-        sugarG: Number.isFinite(sugarG) ? sugarG : null,
-        quantityG: Number.isFinite(quantityG) ? quantityG : null,
-        piecesPerServing,
-        source,
-        updatedById: userId,
-      },
-      create: {
-        barcode,
-        name,
-        brand,
-        servingSize: servingSize || null,
-        calories: Number.isFinite(calories) ? calories : null,
-        proteinG: Number.isFinite(proteinG) ? proteinG : null,
-        carbsG: Number.isFinite(carbsG) ? carbsG : null,
-        fatG: Number.isFinite(fatG) ? fatG : null,
-        fiberG: Number.isFinite(fiberG) ? fiberG : null,
-        sugarG: Number.isFinite(sugarG) ? sugarG : null,
-        quantityG: Number.isFinite(quantityG) ? quantityG : null,
-        piecesPerServing,
-        source,
-        createdById: userId,
-        updatedById: userId,
-      },
-    })
+    await savePrivateBarcodeCorrection(userId, barcode, {
+      name, brand, servingSize: servingSize || null, calories, proteinG, carbsG, fatG, fiberG, sugarG, quantityG, piecesPerServing,
+    }, 'user-diary')
   } catch (err) {
     console.warn('Barcode cache save failed (non-blocking)', err)
   }

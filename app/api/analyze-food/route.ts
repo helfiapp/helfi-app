@@ -16,6 +16,9 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { lookupFoodNutrition, searchFatSecretFoods } from '@/lib/food-data';
+import { fillMissingNutrition, nutritionCandidateScale, NUTRITION_FIELDS } from '@/lib/food/nutrition-provenance';
+import { foodNumberOrNull } from '@/lib/food/openfoodfacts';
+import { convertFoodAmount, parseFoodServing } from '@/native/src/lib/foodUnits';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
 import { hasFreeCredits, consumeFreeCredit, type FreeCreditType, ensureFreeCreditColumns, NEW_USER_FREE_CREDITS } from '@/lib/free-credits';
 import crypto from 'crypto';
@@ -40,7 +43,7 @@ import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-lo
 import { getImageMetadata } from '@/lib/image-metadata';
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets';
 import { normalizeImageForAi, resolveImageContentType } from '@/lib/ai-image-normalize';
-// NOTE: USDA/FatSecret lookup removed from AI analysis - kept only for manual ingredient lookup via /api/food-data
+// Database enrichment requires compatible identity and an explicit portion conversion; photo amounts remain estimates.
 
 export const maxDuration = 120;
 
@@ -1313,136 +1316,36 @@ const stripPiecesWithoutExplicitCount = (items: any[]): { items: any[]; changed:
   return { items: next, changed }
 }
 
-// When in packaged mode, try to fill missing/zero macros from FatSecret without overwriting existing values.
-const enrichPackagedItemsWithFatSecret = async (items: any[]): Promise<{ items: any[]; total: any | null }> => {
-  const enriched: any[] = [];
-  let changed = false;
-
-  for (const item of items) {
-    const next = { ...item };
-    const query = [item.brand, item.name].filter(Boolean).join(' ').trim();
-    const hasMissingMacros =
-      next.calories == null ||
-      next.protein_g == null ||
-      next.carbs_g == null ||
-      next.fat_g == null ||
-      next.fiber_g == null ||
-      next.sugar_g == null ||
-      next.calories === 0;
-
-    if (query && hasMissingMacros) {
-      try {
-        const fsResults = await searchFatSecretFoods(query, { pageSize: 1 });
-        const candidate = fsResults?.[0];
-        if (candidate) {
-          const maybe = (key: keyof typeof candidate, fallback: any) =>
-            candidate[key] !== null && candidate[key] !== undefined ? candidate[key] : fallback;
-
-          if (candidate.serving_size && !next.serving_size) {
-            next.serving_size = candidate.serving_size;
-          }
-          if (next.calories == null || next.calories === 0) next.calories = maybe('calories', next.calories);
-          if (next.protein_g == null) next.protein_g = maybe('protein_g', next.protein_g);
-          if (next.carbs_g == null) next.carbs_g = maybe('carbs_g', next.carbs_g);
-          if (next.fat_g == null) next.fat_g = maybe('fat_g', next.fat_g);
-          if (next.fiber_g == null) next.fiber_g = maybe('fiber_g', next.fiber_g);
-          if (next.sugar_g == null) next.sugar_g = maybe('sugar_g', next.sugar_g);
-          changed = true;
-        }
-      } catch (err) {
-        console.warn('FatSecret enrichment failed (non-fatal)', err);
-      }
-    }
-
-    enriched.push(next);
-  }
-
-  return {
-    items: enriched,
-    total: changed ? computeTotalsFromItems(enriched) : null,
-  };
-};
-
-// Lightweight enrichment for struggling items using FatSecret without overriding decent AI values.
-// Only runs when calories are missing/zero OR all macros are missing/zero.
+// Fill absent values only, using a preparation/brand compatible record and one measured basis.
 const enrichItemsWithFatSecretIfMissing = async (items: any[]): Promise<{ items: any[]; total: any | null; changed: boolean }> => {
-  if (!Array.isArray(items) || items.length === 0) {
-    return { items, total: null, changed: false };
-  }
-
-  const enriched: any[] = [];
+  if (!Array.isArray(items)) return { items, total: null, changed: false };
   let changed = false;
-
+  const enriched: any[] = [];
   for (const item of items) {
-    const next = { ...item };
-    const query = [item.brand, item.name].filter(Boolean).join(' ').trim();
-    const calories = Number(item?.calories ?? 0);
-    const protein = Number(item?.protein_g ?? 0);
-    const carbs = Number(item?.carbs_g ?? 0);
-    const fat = Number(item?.fat_g ?? 0);
-    const macrosMissing =
-      (!Number.isFinite(calories) || calories === 0) &&
-      (!Number.isFinite(protein) || protein === 0) &&
-      (!Number.isFinite(carbs) || carbs === 0) &&
-      (!Number.isFinite(fat) || fat === 0);
-    const caloriesMissingOrZero = !Number.isFinite(calories) || calories === 0;
-
-    // Only attempt enrichment when we truly lack data
-    if (!query || (!macrosMissing && !caloriesMissingOrZero)) {
-      enriched.push(next);
-      continue;
-    }
-
-    if (isSodaDrinkQuery(query)) {
-      const estimate = estimatedGuessMacrosForName(query);
-      if (caloriesMissingOrZero) next.calories = estimate.calories;
-      if (!Number.isFinite(protein) || protein === 0) next.protein_g = estimate.protein_g;
-      if (!Number.isFinite(carbs) || carbs === 0) next.carbs_g = estimate.carbs_g;
-      if (!Number.isFinite(fat) || fat === 0) next.fat_g = estimate.fat_g;
-      if (!next.serving_size) next.serving_size = '1 cup';
-      changed = true;
-      enriched.push(next);
-      continue;
-    }
-
-    try {
-      const fsResults = await searchFatSecretFoods(query, { pageSize: 1 });
-      const candidate = fsResults?.[0];
-      if (candidate) {
-        const maybe = (key: keyof typeof candidate, fallback: any) =>
-          candidate[key] !== null && candidate[key] !== undefined ? candidate[key] : fallback;
-
-        if (caloriesMissingOrZero) next.calories = maybe('calories', next.calories);
-        if (!Number.isFinite(protein) || protein === 0) next.protein_g = maybe('protein_g', next.protein_g);
-        if (!Number.isFinite(carbs) || carbs === 0) next.carbs_g = maybe('carbs_g', next.carbs_g);
-        if (!Number.isFinite(fat) || fat === 0) next.fat_g = maybe('fat_g', next.fat_g);
-        if (!next.serving_size && candidate.serving_size) next.serving_size = candidate.serving_size;
-
-        // Do not override non-zero values; only fill missing/zero
-        changed = true;
+    let next = item;
+    if (NUTRITION_FIELDS.some((field) => foodNumberOrNull(item?.[field]) == null)) {
+      const query = [item.brand, item.name].filter(Boolean).join(' ').trim();
+      if (query) {
+        try {
+          const results = await searchFatSecretFoods(query, { pageSize: 5 });
+          for (const candidate of results) {
+            const filled = fillMissingNutrition(next, candidate);
+            if (filled !== next) { next = filled; changed = true; break; }
+          }
+        } catch (err) { console.warn('Nutrition lookup unavailable; keeping original estimate.'); }
       }
-    } catch (err) {
-      console.warn('FatSecret enrichment (missing macros) failed (non-fatal)', err);
     }
-
     enriched.push(next);
   }
-
-  return {
-    items: enriched,
-    total: changed ? computeTotalsFromItems(enriched) : null,
-    changed,
-  };
+  return { items: enriched, total: changed ? computeTotalsFromItems(enriched) : null, changed };
 };
+const enrichPackagedItemsWithFatSecret = enrichItemsWithFatSecretIfMissing;
 
-const normalizeLookupQuery = (raw: string): string => {
-  const cleaned = replaceWordNumbers(String(raw || ''))
-    .replace(/^\s*\d+(?:\.\d+)?\s+/, '')
-    .replace(/[^a-z0-9\s]+/gi, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-  return cleaned.toLowerCase();
-};
+const normalizeLookupQuery = (raw: string): string => replaceWordNumbers(String(raw || ''))
+  .replace(/^\s*\d+(?:\.\d+)?\s+/, '')
+  .replace(/[^a-z0-9\s]+/gi, ' ')
+  .replace(/\s+/g, ' ')
+  .trim().toLowerCase();
 
 const scoreLookupNameMatch = (queryNorm: string, candidateName: string): number => {
   if (!queryNorm) return 0;
@@ -1458,14 +1361,12 @@ const scoreLookupNameMatch = (queryNorm: string, candidateName: string): number 
 };
 
 const getItemWeightInGrams = (item: any): number | null => {
-  const customGrams = Number(item?.customGramsPerServing);
-  if (Number.isFinite(customGrams) && customGrams > 0) return customGrams;
-  const customMl = Number(item?.customMlPerServing);
-  if (Number.isFinite(customMl) && customMl > 0) return customMl;
-  const serving = item?.serving_size || item?.servingSize;
-  const parsed = parseServingWeight(serving);
-  if (Number.isFinite(parsed) && parsed && parsed > 0) return parsed;
-  return null;
+  const explicit = foodNumberOrNull(item?.customGramsPerServing);
+  if (explicit != null && explicit > 0) return explicit;
+  const portion = parseFoodServing(String(item?.serving_size || item?.servingSize || ''), String(item?.name || ''));
+  if (!portion) return null;
+  const grams = convertFoodAmount(portion.amount, portion.unit, 'g', portion.density);
+  return Number.isFinite(grams) && grams > 0 ? grams : null;
 };
 
 const FRIED_SEAFOOD_KCAL_PER_100G_FLOOR = 180;
@@ -1568,7 +1469,7 @@ const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: nu
   const queryNorm = normalizeLookupQuery(query);
   const candidatesWithMetrics: Array<{ candidate: any; weight: number; per100: number; score: number }> = [];
   for (const candidate of candidates) {
-    const weight = parseServingWeight(candidate?.serving_size || null);
+    const weight = getItemWeightInGrams(candidate);
     if (!weight || weight <= 0 || weight > 5000) continue;
     const calories = Number(candidate?.calories ?? 0);
     if (!Number.isFinite(calories) || calories <= 0) continue;
@@ -1626,7 +1527,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
   }
 
   const maxItemsRaw = Number(options?.maxItems);
-  const maxItems = Number.isFinite(maxItemsRaw) && maxItemsRaw > 0 ? Math.floor(maxItemsRaw) : 1;
+  const maxItems = Number.isFinite(maxItemsRaw) && maxItemsRaw > 0 ? Math.min(Math.floor(maxItemsRaw), 20) : Math.min(items.length, 20);
   const outlierRatioRaw = Number(options?.outlierRatio);
   const OUTLIER_RATIO = Number.isFinite(outlierRatioRaw) && outlierRatioRaw > 0 ? outlierRatioRaw : 0.2;
   const allowIncrease = options?.allowIncrease === true;
@@ -1670,7 +1571,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
     }
 
     const aiPer100 = (calories / weight) * 100;
-    const selected = selectDatabaseCandidate(query, dbResults, aiPer100);
+    const selected = selectDatabaseCandidate(query, dbResults.filter((candidate) => nutritionCandidateScale(item, candidate) != null), aiPer100);
     if (!selected) continue;
 
     const { candidate, weight: candidateWeight } = selected;
@@ -1693,12 +1594,18 @@ const enrichItemsWithDatabaseIfOutlier = async (
 
     const scale = weight / candidateWeight;
     const scaleMacro = (value: any, decimals = 1) => {
-      const num = Number(value);
-      if (!Number.isFinite(num)) return null;
+      const num = foodNumberOrNull(value);
+      if (num == null) return null;
       const factor = Math.pow(10, decimals);
       return Math.round(num * scale * factor) / factor;
     };
 
+    item.nutritionProvenance = {
+      provider: candidate.source, recordId: String(candidate.id), foodName: candidate.name,
+      referenceServing: candidate.serving_size, selectedServing: item.serving_size,
+      scale, fields: NUTRITION_FIELDS.filter((field) => foodNumberOrNull(candidate[field]) != null),
+      portionEstimated: true, status: 'database-assisted-estimate',
+    };
     item.calories = dbScaledCalories;
     if (candidate?.protein_g !== null && candidate?.protein_g !== undefined) {
       item.protein_g = scaleMacro(candidate.protein_g);
@@ -4445,13 +4352,7 @@ CRITICAL REQUIREMENTS:
 
     // General (non-packaged) enrichment when macros are missing/zero
     if (!labelScan && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
-      const needsEnrichment = resp.items.some(
-        (it: any) =>
-          (!Number.isFinite(Number(it?.calories)) || Number(it?.calories) === 0) ||
-          ((!Number.isFinite(Number(it?.protein_g)) || Number(it?.protein_g) === 0) &&
-            (!Number.isFinite(Number(it?.carbs_g)) || Number(it?.carbs_g) === 0) &&
-            (!Number.isFinite(Number(it?.fat_g)) || Number(it?.fat_g) === 0)),
-      );
+      const needsEnrichment = resp.items.some((item: any) => NUTRITION_FIELDS.some((field) => foodNumberOrNull(item?.[field]) == null));
       if (needsEnrichment) {
         const enriched = await enrichItemsWithFatSecretIfMissing(resp.items);
         if (enriched.changed) {
@@ -4466,7 +4367,7 @@ CRITICAL REQUIREMENTS:
 
     if (!labelScan && !packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
       const calibrated = await enrichItemsWithDatabaseIfOutlier(resp.items, {
-        maxItems: feedbackDown ? Math.min(resp.items.length, 6) : 1,
+        maxItems: Math.min(resp.items.length, 20),
         outlierRatio: feedbackDown ? 0.15 : 0.2,
         allowIncrease: feedbackDown,
       });
@@ -4727,10 +4628,17 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    // NOTE: USDA/FatSecret database enhancement removed from AI photo estimate flow
-    // These databases are still available via /api/food-data for manual ingredient lookup
-    // The AI analysis works better without database interference - it provides accurate
-    // estimates based on visual analysis and portion sizes, which databases can't match.
+    if (Array.isArray(resp.items)) {
+      resp.items = resp.items.map((item: any) => ({
+        ...item,
+        nutritionProvenance: labelScan
+          ? { ...item.nutritionProvenance, status: 'label-reading', portionEstimated: false }
+          : { ...item.nutritionProvenance, status: item.nutritionProvenance?.status || 'ai-estimate', portionEstimated: true },
+      }));
+    }
+    (resp as any).nutritionNotice = labelScan
+      ? 'Check these numbers against the product label before saving.'
+      : 'Photo nutrition is an estimate. Check the food and portion amounts before saving.';
 
     // HEALTH COMPATIBILITY CHECK: advisory-only, uses saved allergies/diabetes settings
     try {

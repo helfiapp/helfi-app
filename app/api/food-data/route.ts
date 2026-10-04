@@ -1,6 +1,7 @@
 export const dynamic = 'force-dynamic';
 
 import { NextRequest, NextResponse } from 'next/server'
+import { isFoodPreparationCompatible } from '@/native/src/lib/foodPreparation'
 import {
   searchOpenFoodFactsByQuery,
   searchUsdaFoods,
@@ -1070,7 +1071,7 @@ export async function GET(request: NextRequest) {
       }
 
       const sortSingleFoodResults = (list: any[]) =>
-        sortByAlphabeticalHierarchyAsc(list, value)
+        sortByAlphabeticalHierarchyAsc(list.filter((item) => isFoodPreparationCompatible(item?.name, value)), value)
           .map((item, index) => ({ item, index, score: scorePlainSingleFoodFit(item) }))
           .sort((a, b) => b.score - a.score || a.index - b.index)
           .map((entry) => entry.item)
@@ -1089,9 +1090,9 @@ export async function GET(request: NextRequest) {
 
       // Simple USDA foods first, then the custom fallback list.
       // Branded/product foods are excluded from single food searches.
-      pushGroup(preferredItems)
+      pushGroup(preferredItems.filter((item) => isFoodPreparationCompatible(item?.name, value)))
       pushGroup(sortedMain)
-      pushGroup(sortedCustom)
+      pushGroup(sortedCustom.filter((item) => isFoodPreparationCompatible(item?.name, value)))
 
       // If we still don't have enough results, use FatSecret as a fallback.
       // (We still return the Helfi database results first.)

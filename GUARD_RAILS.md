@@ -3115,3 +3115,15 @@ Before changing anything in the protected areas above, an agent **must**:
 
 If there is *any* doubt, the agent should **not** touch these flows and must ask the user
 for guidance first.
+
+
+## Food audit repairs — 4 October 2026
+
+- Packaged search and barcode lookup must share one displayed serving basis. Convert explicit kJ to canonical kcal once and preserve unknown nutrients as null; genuine zeros remain valid.
+- Native diary and favorite reads materialize web `__portionScale` into eaten ingredient servings once, clear the scale on the materialized payload, and retain the original saved record. Half/full/double portions must agree after edit/save/reload.
+- Preparation compatibility must precede automatic ranking. Do not substitute raw, breaded, skin-on, or a different specified cooking method for the requested food.
+- Weight ounces and fluid ounces are distinct. Cross mass/volume conversion requires a known food density; unknown density must not silently become water.
+- A USDA barcode result needs an exact product barcode, explicit nutrient units, and the correct 100g basis.
+- AI/database enrichment needs a compatible identity and measured portion conversion, with provider record and field attribution. Photo portions remain estimates. Do not apply a second loose web match; native photo results must be reviewed before saving.
+- Ordinary barcode label/diary corrections belong only to their submitting account in `BarcodeUserCorrection`; they cannot overwrite trusted shared products. The additive migration preserves original records and the last submitter's private copy. Account deletion cascades to private corrections.
+- Regression checks: `scripts/food-*-check.ts`, including actual native diary/favorite/editor/save functions and actual barcode label/read/write route functions. These checks do not substitute for rendered web/iOS/Android release testing.

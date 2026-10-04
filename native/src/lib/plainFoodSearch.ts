@@ -1,3 +1,5 @@
+import { isFoodPreparationCompatible } from './foodPreparation'
+
 export type PlainFoodSearchItem = {
   id?: string | number | null
   name?: string | null
@@ -49,6 +51,7 @@ const includesAny = (tokens: string[], words: string[]) => words.some((word) => 
 export const scorePlainFoodSearchResult = (item: PlainFoodSearchItem, query: string) => {
   const name = normalizeFoodSearchText(item?.name)
   if (!name) return 0
+  if (!isFoodPreparationCompatible(name, query)) return -100000
 
   const rawNameTokens = name.split(' ').filter(Boolean)
   const nameTokens = rawNameTokens.map(singularize)
@@ -134,6 +137,7 @@ export const sortPlainFoodResults = <T extends PlainFoodSearchItem>(
   sourcePriority?: (item: T) => number,
 ) =>
   [...(Array.isArray(list) ? list : [])]
+    .filter((item) => isFoodPreparationCompatible(item?.name, query))
     .map((item, index) => ({
       item,
       index,

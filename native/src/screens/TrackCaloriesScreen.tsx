@@ -29,6 +29,8 @@ import { calculateDailyTargets } from '../lib/dailyTargets'
 import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { sortPlainFoodResults } from '../lib/plainFoodSearch'
+import { materializeMealPortion } from '../lib/mealPortions'
+import { convertFoodAmount, parseFoodServing, liquidDensity, type FoodBaseUnit } from '../lib/foodUnits'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
@@ -179,7 +181,8 @@ type FavoriteAdjustItem = {
   raw?: any
 }
 
-type FavoriteBaseUnit = 'g' | 'ml' | 'oz'
+type FavoriteBaseUnit = FoodBaseUnit
+type FavoriteBase = { amount: number; unit: FavoriteBaseUnit; density?: number | null }
 type FavoriteAmountUnit = 'serving' | FavoriteBaseUnit
 
 type SearchFoodSource = 'openfoodfacts' | 'usda' | 'fatsecret' | 'custom' | string
@@ -615,6 +618,7 @@ function roundTo(value: number, decimals = 1) {
 }
 
 function nullableNumber(value: any) {
+  if (value == null || typeof value === 'boolean' || (typeof value === 'string' && !value.trim())) return null
   const n = Number(value)
   return Number.isFinite(n) ? n : null
 }
@@ -681,37 +685,16 @@ function parseServingGramsFromLabel(label?: string | null) {
   return Number.isFinite(grams) && grams > 0 ? grams : null
 }
 
-function parseServingBaseForFavorite(label?: string | null): { amount: number; unit: FavoriteBaseUnit } | null {
-  const raw = String(label || '').toLowerCase()
-  if (!raw.trim()) return null
-
-  const gramsMatch = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
-  if (gramsMatch) {
-    const amount = Number(gramsMatch[1])
-    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'g' }
-  }
-
-  const mlMatch = raw.match(/(\d+(?:\.\d+)?)\s*ml\b/)
-  if (mlMatch) {
-    const amount = Number(mlMatch[1])
-    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'ml' }
-  }
-
-  const ozMatch = raw.match(/(\d+(?:\.\d+)?)\s*(?:fl\s*)?oz\b/)
-  if (ozMatch) {
-    const amount = Number(ozMatch[1])
-    if (Number.isFinite(amount) && amount > 0) return { amount, unit: 'oz' }
-  }
-
-  return null
+function parseServingBaseForFavorite(label?: string | null, name = ''): FavoriteBase | null {
+  return parseFoodServing(String(label || ''), name)
 }
 
-function servingOptionBase(option: SearchFoodServingOption): { amount: number; unit: FavoriteBaseUnit } | null {
+function servingOptionBase(option: SearchFoodServingOption, name = ''): FavoriteBase | null {
   const grams = nullableNumber(option?.grams)
-  if (grams && grams > 0) return { amount: grams, unit: 'g' }
+  if (grams && grams > 0) return { amount: grams, unit: 'g', density: liquidDensity(name) }
   const ml = nullableNumber(option?.ml)
-  if (ml && ml > 0) return { amount: ml, unit: 'ml' }
-  return parseServingBaseForFavorite(option?.serving_size || option?.label || '')
+  if (ml && ml > 0) return { amount: ml, unit: 'ml', density: liquidDensity(name) }
+  return parseServingBaseForFavorite(option?.serving_size || option?.label || '', name)
 }
 
 function buildFallbackFavoriteServingOptions(item: FavoriteAdjustItem): SearchFoodServingOption[] {
@@ -785,7 +768,8 @@ function normalizeFavoriteAmountUnit(value: any, fallback: FavoriteAmountUnit = 
   const raw = String(value || '').toLowerCase().trim()
   if (raw === 'g' || raw === 'gram' || raw === 'grams') return 'g'
   if (raw === 'ml' || raw === 'milliliter' || raw === 'millilitre') return 'ml'
-  if (raw === 'oz' || raw === 'ounce' || raw === 'ounces' || raw === 'fl oz') return 'oz'
+  if (raw === 'fl oz' || raw === 'fluid ounce' || raw === 'fluid ounces') return 'fl oz'
+  if (raw === 'oz' || raw === 'ounce' || raw === 'ounces') return 'oz'
   if (raw === 'serving' || raw === 'servings') return 'serving'
   return fallback
 }
@@ -801,53 +785,47 @@ function isOpenMeasurementServing(label?: string | null) {
   return /^\d+(?:\.\d+)?\s*(?:g|grams?|ml|millilit(?:er|re)s?|(?:fl\s*)?oz|ounces?)$/.test(raw)
 }
 
-function convertFavoriteBaseAmount(value: number, from: FavoriteBaseUnit, to: FavoriteBaseUnit) {
-  if (!Number.isFinite(value) || value <= 0) return 0
-  if (from === to) return value
-  if (from === 'oz' && to === 'g') return value * 28.3495
-  if (from === 'g' && to === 'oz') return value / 28.3495
-  if (from === 'oz' && to === 'ml') return value * 29.5735
-  if (from === 'ml' && to === 'oz') return value / 29.5735
-  return value
+function convertFavoriteBaseAmount(value: number, from: FavoriteBaseUnit, to: FavoriteBaseUnit, density?: number | null) {
+  return convertFoodAmount(value, from, to, density)
 }
 
 function favoriteAmountInBase(
   amount: number,
   unit: FavoriteAmountUnit,
-  base: { amount: number; unit: FavoriteBaseUnit } | null,
+  base: FavoriteBase | null,
 ) {
   if (!Number.isFinite(amount) || amount <= 0) return 0
   if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return amount
   if (unit === 'serving') return amount * base.amount
-  return convertFavoriteBaseAmount(amount, unit, base.unit)
+  return convertFavoriteBaseAmount(amount, unit, base.unit, base.density)
 }
 
 function favoriteAmountFromServings(
   servings: number,
   unit: FavoriteAmountUnit,
-  base: { amount: number; unit: FavoriteBaseUnit } | null,
+  base: FavoriteBase | null,
 ) {
   const safeServings = Number.isFinite(servings) && servings > 0 ? servings : 1
   if (unit === 'serving') return safeServings
   if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return safeServings
-  return convertFavoriteBaseAmount(base.amount * safeServings, base.unit, unit)
+  return convertFavoriteBaseAmount(base.amount * safeServings, base.unit, unit, base.density)
 }
 
 function favoriteServingsFromAmount(
   amount: number,
   unit: FavoriteAmountUnit,
-  base: { amount: number; unit: FavoriteBaseUnit } | null,
+  base: FavoriteBase | null,
 ) {
   if (!Number.isFinite(amount) || amount <= 0) return 0
   if (unit === 'serving') return amount
   if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return amount
   const inBase = favoriteAmountInBase(amount, unit, base)
-  return inBase > 0 ? inBase / base.amount : amount
+  return Number.isFinite(inBase) && inBase > 0 ? inBase / base.amount : 0
 }
 
 function favoriteBaseForItem(item: FavoriteAdjustItem) {
-  if (item.baseAmount && item.baseUnit) return { amount: item.baseAmount, unit: item.baseUnit }
-  return parseServingBaseForFavorite(item.servingLabel)
+  if (item.baseAmount && item.baseUnit) return { amount: item.baseAmount, unit: item.baseUnit, density: liquidDensity(item.name) }
+  return parseServingBaseForFavorite(item.servingLabel, item.name)
 }
 
 function isLikelyLiquidFavoriteItem(item: FavoriteAdjustItem) {
@@ -863,13 +841,12 @@ function isLikelyLiquidFavoriteItem(item: FavoriteAdjustItem) {
 }
 
 function favoriteAmountUnitOptions(item: FavoriteAdjustItem): FavoriteAmountUnit[] {
-  const isOpenServing = isOpenMeasurementServing(item.servingLabel)
-  const units: FavoriteAmountUnit[] = isOpenServing ? ['g', 'oz'] : ['serving', 'g', 'oz']
-  if (item.amountUnit === 'ml' || isLikelyLiquidFavoriteItem(item)) {
-    const insertIndex = units.includes('serving') ? 2 : 1
-    units.splice(insertIndex, 0, 'ml')
-  }
-  return units
+  const base = favoriteBaseForItem(item)
+  if (!base) return ['serving']
+  const prefix: FavoriteAmountUnit[] = isOpenMeasurementServing(item.servingLabel) ? [] : ['serving']
+  const isVolume = base.unit === 'ml' || base.unit === 'fl oz'
+  if (base.density != null) return [...prefix, 'g', 'ml', 'oz', 'fl oz']
+  return isVolume ? [...prefix, 'ml', 'fl oz'] : [...prefix, 'g', 'oz']
 }
 
 function favoriteAmountUnitLabel(unit: FavoriteAmountUnit, item: FavoriteAdjustItem) {
@@ -878,7 +855,7 @@ function favoriteAmountUnitLabel(unit: FavoriteAmountUnit, item: FavoriteAdjustI
 }
 
 function favoriteAmountStateFromRaw(raw: any, servingLabel: string, servings: number) {
-  const base = parseServingBaseForFavorite(servingLabel)
+  const base = parseServingBaseForFavorite(servingLabel, String(raw?.name || ''))
   const rawUnitValue = raw?.amountUnit ?? raw?.__unit ?? raw?.weightUnit
   const hasRawUnit = rawUnitValue !== null && rawUnitValue !== undefined && String(rawUnitValue).trim().length > 0
   const rawUnit = hasRawUnit ? normalizeFavoriteAmountUnit(rawUnitValue, 'serving') : null
@@ -913,8 +890,8 @@ function favoriteAdjustPersistenceFields(entry: FavoriteAdjustItem) {
     weightUnit: entry.amountUnit,
   }
 
-  if (base?.unit === 'ml') {
-    fields.customMlPerServing = roundTo(base.amount, 3)
+  if (base?.unit === 'ml' || base?.unit === 'fl oz') {
+    fields.customMlPerServing = roundTo(convertFoodAmount(base.amount, base.unit, 'ml'), 3)
     fields.customGramsPerServing = null
   } else if (base?.unit === 'oz') {
     fields.customGramsPerServing = roundTo(base.amount * 28.3495, 3)
@@ -975,7 +952,7 @@ function applyServingOptionToFavoriteAdjustItem(
 ) {
   const servingLabel = servingOptionDisplayLabel(option)
   const raw = item.raw && typeof item.raw === 'object' ? item.raw : {}
-  const base = servingOptionBase(option) || parseServingBaseForFavorite(servingLabel)
+  const base = servingOptionBase(option, item.name) || parseServingBaseForFavorite(servingLabel, item.name)
   const amountUnit: FavoriteAmountUnit = base && isOpenMeasurementServing(servingLabel) ? base.unit : 'serving'
   const servings = item.amountUnit === 'serving' ? nextServingsForServingOption(item, option) : 1
   const amount = favoriteAmountFromServings(servings, amountUnit, base)
@@ -1069,8 +1046,8 @@ function sanitizeEntryTotals(raw: any): EntryTotals | null {
   if (!raw || typeof raw !== 'object') return null
   const pick = (...values: any[]) => {
     for (const value of values) {
-      const n = Number(value)
-      if (Number.isFinite(n)) return n
+      const n = nullableNumber(value)
+      if (n != null && Number.isFinite(n)) return n
     }
     return null
   }
@@ -1192,6 +1169,7 @@ function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotal
 }
 
 function normalizeFoodApiEntry(raw: any): FoodEntry {
+  raw = materializeMealPortion(raw)
   const itemsTotals = recalculateTotalsFromItems(raw?.items)
   const storedTotals = sanitizeEntryTotals(raw?.nutrients || raw?.nutrition || raw?.total)
   const parsedTotals = extractTotalsFromDescriptionText(raw?.description || raw?.name || '')
@@ -1512,7 +1490,7 @@ function cloneFavoriteItems(raw: any) {
 }
 
 function favoriteTotalsFromRaw(raw: any) {
-  const itemsTotals = recalculateTotalsFromItems(cloneFavoriteItems(raw?.items))
+  const itemsTotals = recalculateTotalsFromItems(cloneFavoriteItems(raw?.items) || cloneFavoriteItems(raw?.ingredients))
   const storedTotals = sanitizeEntryTotals(raw?.nutrition || raw?.total || raw?.nourishment || raw?.nutrients)
   const parsedTotals = extractTotalsFromDescriptionText(raw?.description || raw?.label || raw?.name || '')
   if (hasNonZeroEntryTotals(itemsTotals)) return itemsTotals
@@ -1559,6 +1537,7 @@ function favoriteServingLabel(favorite: FavoriteMeal | null | undefined) {
 
 function normalizeFavoriteMeal(raw: any): FavoriteMeal | null {
   if (!raw || typeof raw !== 'object') return null
+  raw = materializeMealPortion(raw)
   const items = cloneFavoriteItems(raw?.items) || cloneFavoriteItems(raw?.ingredients)
   const totals = favoriteTotalsFromRaw(raw)
   const name = normalizeFavoriteLabel(raw?.label || raw?.description || raw?.name || 'Favorite meal') || 'Favorite meal'
@@ -1679,7 +1658,7 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
       name: item.label,
       servingLabel: item.serving || '1 serving',
       servings: 1,
-      ...favoriteAmountStateFromRaw(null, item.serving || '1 serving', 1),
+      ...favoriteAmountStateFromRaw({ name: item.label }, item.serving || '1 serving', 1),
       calories: Math.max(0, Number(sourceTotals?.calories) || 0),
       protein: Math.max(0, Number(sourceTotals?.protein) || 0),
       carbs: Math.max(0, Number(sourceTotals?.carbs) || 0),
@@ -4537,6 +4516,7 @@ export function TrackCaloriesScreen() {
       const foundItems = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
       if (foundItems.length > 0) {
         appendItemsToFavoriteEditor(foundItems.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)))
+        Alert.alert('Review photo estimate', String(data?.nutritionNotice || 'Check the food and portion amounts before saving.'))
         return
       }
 
@@ -4951,97 +4931,29 @@ export function TrackCaloriesScreen() {
       }
 
       const items = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
-      if (items.length > 0) {
-        if (usageMode === 'voiceReview') {
-          openNativeMealBuilder(meal, {
-            name: items.length === 1 ? String(items[0]?.name || 'Photo analyzed meal') : 'Photo analyzed meal',
-            items: items.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)),
-          })
-          Alert.alert('Review before saving', 'I added the photo results to Build a meal. Please review them before saving.')
-          return
-        }
-        let added = 0
-        for (const item of items) {
-          const ok = await createFoodEntry({
-            name: String(item?.name || 'Analyzed item'),
-            meal,
-            calories: numberOrZero(item?.calories || item?.calories_kcal),
-            protein: numberOrZero(item?.protein_g || item?.protein),
-            carbs: numberOrZero(item?.carbs_g || item?.carbs),
-            fat: numberOrZero(item?.fat_g || item?.fat),
-            fiber: numberOrZero(item?.fiber_g || item?.fiber),
-            sugar: numberOrZero(item?.sugar_g || item?.sugar),
-            description: String(item?.serving_size || 'Photo analyzed'),
-            items: [{ ...item }],
-            nutrition: {
-              ...item,
-              calories: numberOrZero(item?.calories || item?.calories_kcal),
-              calories_kcal: numberOrZero(item?.calories || item?.calories_kcal),
-              protein: numberOrZero(item?.protein_g || item?.protein),
-              protein_g: numberOrZero(item?.protein_g || item?.protein),
-              carbs: numberOrZero(item?.carbs_g || item?.carbs),
-              carbs_g: numberOrZero(item?.carbs_g || item?.carbs),
-              fat: numberOrZero(item?.fat_g || item?.fat),
-              fat_g: numberOrZero(item?.fat_g || item?.fat),
-              fiber: numberOrZero(item?.fiber_g || item?.fiber),
-              fiber_g: numberOrZero(item?.fiber_g || item?.fiber),
-              sugar: numberOrZero(item?.sugar_g || item?.sugar),
-              sugar_g: numberOrZero(item?.sugar_g || item?.sugar),
-            },
-          })
-          if (ok) added += 1
-        }
-        if (added > 0) {
-          Alert.alert('Done', `${added} item${added === 1 ? '' : 's'} added from photo.`)
-        } else {
-          Alert.alert('Add failed', 'The photo was analyzed, but no food entry could be saved.')
-        }
-        return
-      }
-
       const summary = data?.food || data || {}
-      if (!isUsableAnalyzedFood(summary)) {
+      const reviewItems = items.length ? items : isUsableAnalyzedFood(summary) ? [{
+        ...summary,
+        name: String(summary?.name || 'Photo analyzed meal'),
+        serving_size: String(summary?.serving_size || summary?.description || '1 serving'),
+        calories: summary?.calories ?? summary?.calories_kcal,
+        protein_g: summary?.protein_g ?? summary?.protein,
+        carbs_g: summary?.carbs_g ?? summary?.carbs,
+        fat_g: summary?.fat_g ?? summary?.fat,
+        fiber_g: summary?.fiber_g ?? summary?.fiber,
+        sugar_g: summary?.sugar_g ?? summary?.sugar,
+        __custom: true,
+      }] : []
+      if (!reviewItems.length) {
         Alert.alert('No food detected', 'Please try again with a clear photo of food.')
         return
       }
-      if (usageMode === 'voiceReview') {
-        openNativeMealBuilder(meal, {
-          name: String(summary?.name || 'Photo analyzed meal'),
-          items: [
-            buildFavoriteAdjustItemFromSearchFood({
-              id: `photo-${Date.now()}`,
-              name: String(summary?.name || 'Photo analyzed meal'),
-              serving_size: String(summary?.description || '1 serving'),
-              calories: numberOrZero(summary?.calories || summary?.calories_kcal),
-              protein_g: numberOrZero(summary?.protein || summary?.protein_g),
-              carbs_g: numberOrZero(summary?.carbs || summary?.carbs_g),
-              fat_g: numberOrZero(summary?.fat || summary?.fat_g),
-              fiber_g: numberOrZero(summary?.fiber || summary?.fiber_g),
-              sugar_g: numberOrZero(summary?.sugar || summary?.sugar_g),
-              __custom: true,
-            }),
-          ],
-        })
-        Alert.alert('Review before saving', 'I added the photo result to Build a meal. Please review it before saving.')
-        return
-      }
-      const ok = await createFoodEntry({
-        name: String(summary?.name || 'Photo analyzed meal'),
-        meal,
-        calories: numberOrZero(summary?.calories || summary?.calories_kcal),
-        protein: numberOrZero(summary?.protein || summary?.protein_g),
-        carbs: numberOrZero(summary?.carbs || summary?.carbs_g),
-        fat: numberOrZero(summary?.fat || summary?.fat_g),
-        fiber: numberOrZero(summary?.fiber || summary?.fiber_g),
-        sugar: numberOrZero(summary?.sugar || summary?.sugar_g),
-        description: String(summary?.description || 'Photo analyzed'),
-        items: summary?.items && Array.isArray(summary.items) ? summary.items : undefined,
+      openNativeMealBuilder(meal, {
+        name: reviewItems.length === 1 ? String(reviewItems[0]?.name || 'Photo analyzed meal') : 'Photo analyzed meal',
+        items: reviewItems.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)),
       })
-      if (ok) {
-        Alert.alert('Done', 'Item added from photo.')
-      } else {
-        Alert.alert('Add failed', 'The photo was analyzed, but the food entry could not be saved.')
-      }
+      Alert.alert('Review before saving', String(data?.nutritionNotice || 'Photo nutrition is an estimate. Check the food and portion amounts before saving.'))
+
     } catch {
       setSaving(false)
       Alert.alert('Analysis failed', 'Could not analyze this image.')

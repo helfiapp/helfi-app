@@ -94,6 +94,7 @@ model User {
   foodAnalysisFeedback FoodAnalysisFeedback[]
   medicalImageAnalyses MedicalImageAnalysis[]
   foodMissingReports  FoodMissingReport[]
+  barcodeCorrections  BarcodeUserCorrection[]
 
   // File relationships (PHASE 2 addition)
   uploadedFiles File[] @relation("UploadedFiles")
@@ -288,6 +289,35 @@ model BarcodeProduct {
   createdAt        DateTime @default(now())
   updatedAt        DateTime @updatedAt
 
+  @@index([barcode])
+}
+
+// Unreviewed label/diary corrections belong to the submitting user only.
+// Trusted BarcodeProduct records are never overwritten by this data.
+model BarcodeUserCorrection {
+  id               String   @id @default(cuid())
+  userId           String
+  barcode          String
+  name             String
+  brand            String?
+  servingSize      String?
+  calories         Float?
+  proteinG         Float?
+  carbsG           Float?
+  fatG             Float?
+  fiberG           Float?
+  sugarG           Float?
+  quantityG        Float?
+  piecesPerServing Float?
+  source           String
+  version          Int      @default(1)
+  reportCount      Int      @default(0)
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, barcode])
   @@index([barcode])
 }
 
