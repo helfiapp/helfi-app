@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job 34, all BUILD/DEPLOY/VERIFY SUCCEED
+- Date/time: 5 October 2026, 12:29 am Melbourne
+- What changed: Native Apple Health supports iPadOS17+ and checks real HealthKit availability before access. Older/unsupported devices remain disabled; no fake activity. Commit 16591171732cbd5c0a221365c6e6aaf00fcbe2e6.
+- Where to see it (page/link): Candidate39 native Dashboard, Connect Your Devices; not uploaded to stores
+- What to quickly test: iPad Continue opens real Apple Health Access; decline/empty data gives honest no-activity message without import. Physical signed-device read/import remains a release gate.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job 33, all BUILD/DEPLOY/VERIFY SUCCEED
 - Date/time: 5 October 2026, 12:19 am Melbourne
 - What changed: Complete health-image follow-up JSON preserves every word/paragraph; fresh images start fresh conversations; private filenames/note excerpts removed from logs; price wording says from 2 credits. Commit 3191e47be094b151ecc93a86f2354fcdd583ec37.

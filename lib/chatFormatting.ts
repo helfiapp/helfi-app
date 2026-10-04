@@ -25,7 +25,8 @@ export function formatChatContent(
 
   // Add missing line breaks before numbered / bulleted lists (model sometimes streams them without breaks).
   text = text.replace(/([^\n])(\d+\.\s)/g, '$1\n$2')
-  text = text.replace(/([^\n])([-*•]\s)/g, '$1\n$2')
+  // A closing ** followed by whitespace belongs to bold text, not a list.
+  text = text.replace(/([^\n*])([-*•]\s)/g, '$1\n$2')
 
   // If a list starts immediately after a colon/semicolon, give it breathing room.
   text = text.replace(/([:;])\s*(\d+\.\s)/g, '$1\n\n$2')

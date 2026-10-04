@@ -2,6 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
+import { formatChatContent } from '../lib/chatFormatting'
 
 const route = ts.createSourceFile('medical-chat.ts', fs.readFileSync('app/api/medical-images/chat/route.ts', 'utf8'), ts.ScriptTarget.Latest, true)
 const names = new Set(['buildTitle', 'extractAssistantText', 'formatForNativePlainText', 'buildFallbackAssistantText', 'POST'])
@@ -37,6 +38,10 @@ async function run(outcome: 'success' | 'failure' | 'empty' | 'denied', native =
 }
 
 async function main() {
+  const formatted = formatChatContent(fullReply, { headings: ['**Short answer**', '**Why this matters**'] })
+  for (const heading of ['Short answer', 'Why this matters', 'When to seek care', 'Tracking notes']) assert.ok(formatted.includes('**' + heading + '**'), 'bold heading must keep both closing stars')
+  assert.match(formatted, /No\. These notes do not replace/)
+  assert.equal(formatChatContent('One sentence. - Next item\n* Another item'), 'One sentence. \n- Next item\n* Another item')
   const success = await run('success')
   assert.match(success.response.headers.get('content-type') || '', /application\/json/)
   assert.equal(success.body.assistant, fullReply)
