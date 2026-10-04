@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job 39 (BUILD, DEPLOY and VERIFY all SUCCEED).
+- Date/time: 5 October 2026, 2:35 am Melbourne; public-library apply completed 2:43 am.
+- What changed: Canonical USDA 100 g/100 ml nutrition, exact provider identity gates, missing/zero nutrients, sugar recovery and non-destructive future imports. Commit 7734ec210c255f434d513797409e5d3b1caac66c. Applied all 1,867,037 reviewed public-library corrections; all 1,886,557 provider rows and customer tables preserved. Original public-only backup is retained in ignored data/food-import/repair-backups.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and native packaged search. Both public domains return 200 through CloudFront. Store binaries have not been uploaded.
+- What to quickly test: Sanitarium Crunchy Peanut Butter 500g correctly opens 20 g / 127 kcal with sugar 0.8 g; library base is 100 g / 636 kcal / sugar 4 g. Blueberry cereal is 100 g / 382 kcal. Rendered check found premature serving-option rounding produces 635 on returning to 100 g; that follow-up is still being repaired. All six coloured cards remain visible.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job 38 (BUILD, DEPLOY and VERIFY all SUCCEED).
 - Date/time: 5 October 2026, 1:50 am Melbourne.
 - What changed: Restored six coloured nutrient cards in missing ingredient, expanded meal/favourite, barcode, recommended meal and structured food chat/voice results; the existing sweetener nutrient preview also retains all six cards. Commit bc8c5f178247b9d9add5855b890c396f0fb658e7. Food calculations and save behavior were preserved.

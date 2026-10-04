@@ -41,13 +41,15 @@ export function usdaStandardServingOptions(food: any, fdcId: string) {
   const basis = usdaNutrientBasis(food)
   // Missing calories must not become a valid zero-calorie serving option.
   if (n.energyKcal == null || basis == null) return []
+  const energyKcal = n.energyKcal
   const option = (id: string, label: string, amount: number) => {
     const scale = amount / 100
-    const macro = (value: number | null) => value == null ? null : Math.round(value * scale * 10) / 10
+    // Retain provider precision for later portion changes; round only the displayed result.
+    const macro = (value: number | null) => value == null ? null : value * scale
     return {
       id: `usda:${fdcId}:${id}`, label, serving_size: label,
       grams: basis === 'g' ? amount : null, ml: basis === 'ml' ? amount : null, unit: basis,
-      calories: Math.round(n.energyKcal! * scale),
+      calories: energyKcal * scale,
       protein_g: macro(n.protein), carbs_g: macro(n.carbs), fat_g: macro(n.fat),
       fiber_g: macro(n.fiber), sugar_g: macro(n.sugar), source: 'usda' as const,
     }

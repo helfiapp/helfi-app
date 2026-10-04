@@ -122,8 +122,6 @@ const FATSECRET_CLIENT_SECRET =
 
 type TimeoutFetchInit = RequestInit & { timeoutMs?: number }
 
-const roundMacro = (value: number) => Math.round(value * 10) / 10
-
 const buildScaledServingOption = (
   params: {
     fdcId: string
@@ -146,7 +144,7 @@ const buildScaledServingOption = (
   const amount = params.grams ?? params.ml
   if (!Number.isFinite(Number(amount)) || Number(amount) <= 0) return null
   if (!Number.isFinite(Number(params.baseWeightGrams)) || params.baseWeightGrams <= 0) return null
-  if (!Number.isFinite(Number(params.base.calories))) return null
+  if (params.base.calories == null || !Number.isFinite(params.base.calories)) return null
 
   const factor = Number(amount) / params.baseWeightGrams
   return {
@@ -156,12 +154,13 @@ const buildScaledServingOption = (
     grams: params.grams,
     ml: params.ml,
     unit: params.unit,
-    calories: params.base.calories != null ? Math.round(params.base.calories * factor) : null,
-    protein_g: params.base.protein_g != null ? roundMacro(params.base.protein_g * factor) : null,
-    carbs_g: params.base.carbs_g != null ? roundMacro(params.base.carbs_g * factor) : null,
-    fat_g: params.base.fat_g != null ? roundMacro(params.base.fat_g * factor) : null,
-    fiber_g: params.base.fiber_g != null ? roundMacro(params.base.fiber_g * factor) : null,
-    sugar_g: params.base.sugar_g != null ? roundMacro(params.base.sugar_g * factor) : null,
+    // These values may become the basis for another amount; display code rounds them.
+    calories: params.base.calories * factor,
+    protein_g: params.base.protein_g != null ? params.base.protein_g * factor : null,
+    carbs_g: params.base.carbs_g != null ? params.base.carbs_g * factor : null,
+    fat_g: params.base.fat_g != null ? params.base.fat_g * factor : null,
+    fiber_g: params.base.fiber_g != null ? params.base.fiber_g * factor : null,
+    sugar_g: params.base.sugar_g != null ? params.base.sugar_g * factor : null,
     source: 'usda',
   }
 }

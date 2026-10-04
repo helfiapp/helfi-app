@@ -18,6 +18,18 @@ assert.equal(options[1].carbs_g, 0)
 assert.equal(options[1].fat_g, null)
 assert.equal(options[2].serving_size, 'Half bar — 12.5g')
 assert.equal(options[2].calories, 50)
+const peanut = usdaStandardServingOptions({ ...food, servingSize: 20, foodNutrients: [
+  { nutrientId: 1008, unitName: 'KCAL', value: 636 },
+  { nutrientId: 1003, unitName: 'G', value: 27 },
+  { nutrientId: 2000, unitName: 'G', value: 4 },
+] }, 'peanut-precision')[1]
+assert.ok(Math.abs(peanut.calories * 100 / peanut.grams! - 636) < 1e-9)
+assert.ok(Math.abs(peanut.sugar_g! * 100 / peanut.grams! - 4) < 1e-9)
+const smallPortion = usdaStandardServingOptions({ ...food, servingSize: 7.5, foodNutrients: [
+  { nutrientId: 1008, unitName: 'KCAL', value: 382 },
+  { nutrientId: 1003, unitName: 'G', value: 10.22 },
+] }, 'small-portion-precision')[1]
+assert.ok(Math.abs(smallPortion.protein_g! * 100 / smallPortion.grams! - 10.22) < 1e-9)
 const liquid = usdaStandardServingOptions({ ...food, servingSizeUnit: 'ml' }, 'fixture')
 assert.equal(liquid[0].serving_size, '100 ml')
 assert.equal(liquid[0].grams, null)
