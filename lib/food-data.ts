@@ -2,7 +2,7 @@ import 'server-only'
 import { liquidDensity } from '../native/src/lib/foodUnits'
 import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } from './food/usda-nutrition'
 import { usdaLibraryServingSize } from './food/usda-library'
-import { foodNumberOrNull, normalizeOffNutrition } from './food/openfoodfacts'
+import { foodNumberOrNull, hasCoreFoodNutrition, normalizeOffNutrition } from './food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
 import {
   formatUnitLabel,
@@ -448,12 +448,12 @@ export async function searchLocalFoods(
       name: row.name,
       brand: row.brand ?? undefined,
       serving_size: servingSize,
-      calories: row.calories ?? null,
-      protein_g: row.proteinG ?? null,
-      carbs_g: row.carbsG ?? null,
-      fat_g: row.fatG ?? null,
-      fiber_g: row.fiberG ?? null,
-      sugar_g: row.sugarG ?? null,
+      calories: foodNumberOrNull(row.calories),
+      protein_g: foodNumberOrNull(row.proteinG),
+      carbs_g: foodNumberOrNull(row.carbsG),
+      fat_g: foodNumberOrNull(row.fatG),
+      fiber_g: foodNumberOrNull(row.fiberG),
+      sugar_g: foodNumberOrNull(row.sugarG),
       }]
     })
   } catch (err) {
@@ -630,6 +630,7 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
       fiber_g: fiber,
       sugar_g: sugar,
     }
+    if (!hasCoreFoodNutrition(base) || usdaNutrientBasis(food) == null) return []
 
     const baseWeightGrams = 100
     const options: ServingOption[] = usdaStandardServingOptions(food, fdcId)

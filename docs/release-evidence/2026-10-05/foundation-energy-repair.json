@@ -1,6 +1,6 @@
 {
-  "verifiedAt": "2026-10-04T23:26:48.030453+00:00",
-  "status": "230 source-backed public records repaired; source deployment/runtime pending",
+  "verifiedAt": "2026-10-04T23:39:33.302810+00:00",
+  "status": "Source/deploy/230-row data repair and actual soy/oat runtime verified; broader source/model/release work incomplete",
   "publicRecordCountBefore": 6250,
   "publicRecordCountAfter": 6250,
   "nullCaloriesBefore": 6115,
@@ -13,5 +13,19 @@
   "archiveSha256": "3850de85effd6d9aa471f48aab2a76c20f9bc5feb3f2f52c8ce693f9cf75d52b",
   "planSha256": "c02a4bae8e4f57bb68f312c0ec659954a44d158c61abeb8ccc90596840b96ba8",
   "customerTablesTouched": false,
-  "otherNutrientsChanged": false
+  "otherNutrientsChanged": false,
+  "commit": "74f3ea0e22327fab5eab1d15a456fb6618b559ad",
+  "awsJob": "55",
+  "runtime": {
+    "soySourceId": "1999630",
+    "sourceCalories": 38.485,
+    "sourceBasis": "100 g",
+    "full100g": 38,
+    "half50g": 19,
+    "webNativeSixCards": true,
+    "savedReopenedWebNative": true,
+    "daily": 1042,
+    "wallet": 619,
+    "remaining": "5874 original energies unavailable;11 original-macro mismatches preserved; core invalid source gate, oat native provider-detail precision and final signed release matrix"
+  }
 }

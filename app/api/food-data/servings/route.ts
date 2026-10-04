@@ -3,6 +3,7 @@ export const dynamic = 'force-dynamic'
 import { NextRequest, NextResponse } from 'next/server'
 import { fetchFatSecretServingOptions, fetchUsdaServingOptions } from '@/lib/food-data'
 import { buildCustomFoodServingOptions } from '@/lib/food/custom-serving-options'
+import { hasCoreFoodNutrition } from '@/lib/food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
 
 export async function GET(request: NextRequest) {
@@ -36,17 +37,17 @@ export async function GET(request: NextRequest) {
               fiberPer100g: item.fiberPer100g,
               sugarPer100g: item.sugarPer100g,
             })
-      return NextResponse.json({ success: true, source: 'custom', options })
+      return NextResponse.json({ success: true, source: 'custom', options: options.filter(hasCoreFoodNutrition) })
     }
 
     if (source === 'usda') {
       const options = await fetchUsdaServingOptions(id)
-      return NextResponse.json({ success: true, source: 'usda', options })
+      return NextResponse.json({ success: true, source: 'usda', options: options.filter(hasCoreFoodNutrition) })
     }
 
     if (source === 'fatsecret') {
       const options = await fetchFatSecretServingOptions(id)
-      return NextResponse.json({ success: true, source: 'fatsecret', options })
+      return NextResponse.json({ success: true, source: 'fatsecret', options: options.filter(hasCoreFoodNutrition) })
     }
 
     return NextResponse.json(

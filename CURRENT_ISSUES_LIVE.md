@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE; AWS55 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront, matching new etagvjch1e8fnp1z15.
+- Date/time: 2026-10-04T23:39:33.302810+00:00
+- What changed: Original Foundation calorie fields recognized;230 exact archive-backed null calorie values restored. All6250 Foundation rows/IDs/other nutrient values and all customer records preserved. Commit74f3ea0e22327fab5eab1d15a456fb6618b559ad. Whole audit/model/store work incomplete.
+- Where to see it (page/link): https://helfi.ai/food — Single food oat/soy/almond milk searches.
+- What to quickly test: Actual oat milk now uses complete local100g48 record. Soy unsweetened100g38/50g19 previews agree web+iPhone;100g38 saved/reopened fresh website and restarted logged-in iPhone with sixcards, bothdaily1042/wallet619; saved USDA1999630 retains38.485kcal/100g and precise macros.5874 no-original-energy rows and11 macro mismatches remain preserved. Native oat-detail precision, other alias/fat queries, invalid-source values and signed-release matrix remain open.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE; AWS54 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront with matching new etaguyx92802a61z15.
 - Date/time: 2026-10-04T23:14:43.862960+00:00
 - What changed: Strict whole-food milk identity in every search/fallback path; actual aliases retain original records, exact fat variants and complete source peers. Commit82bff8278b833a7c49fbb465fdd9965562219963. Whole audit/model/store work incomplete.

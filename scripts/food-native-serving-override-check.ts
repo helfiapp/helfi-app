@@ -6,6 +6,7 @@ import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } f
 import { liquidDensity, convertFoodAmount, parseFoodServing } from '../native/src/lib/foodUnits'
 import { getFoodUnitGrams, formatUnitLabel } from '../lib/food/measurement-units'
 import { PRODUCE_MEASUREMENTS } from '../native/src/data/produceMeasurements'
+import { hasCoreFoodNutrition } from '../lib/food/openfoodfacts'
 
 // Exercise real USDA detail -> serving options -> native override/cache ->
 // open adjustment -> saved payload, without environment values or network.
@@ -22,7 +23,7 @@ function bind(source: ts.SourceFile, ctx: any, name: string) {
   ctx[name] = vm.runInContext(ts.transpile(expression, { target: ts.ScriptTarget.ES2020 }), ctx)
 }
 let detail: any
-const server: any = vm.createContext({ extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions, liquidDensity, getFoodUnitGrams, formatUnitLabel, USDA_API_KEY: 'fixture-only', console: { warn() {} }, fetchWithTimeout: async () => ({ ok: true, json: async () => detail }) })
+const server: any = vm.createContext({ hasCoreFoodNutrition, extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions, liquidDensity, getFoodUnitGrams, formatUnitLabel, USDA_API_KEY: 'fixture-only', console: { warn() {} }, fetchWithTimeout: async () => ({ ok: true, json: async () => detail }) })
 for (const name of ['normalizeFoodText', 'isLikelyLiquidFoodName', 'liquidDensityGramsPerMl', 'buildScaledServingOption', 'appendOptionIfMissing', 'appendLiquidServingOptions', 'appendCommonFoodServingOptions', 'fetchUsdaServingOptions']) bind(provider, server, name)
 const ctx: any = vm.createContext({ PRODUCE_MEASUREMENTS, convertFoodAmount, parseFoodServing, console, URLSearchParams, authHeaders: { Fixture: 'no-real-token' }, API_BASE_URL: 'https://fixture.invalid', servingOverrideCacheRef: { current: new Map() }, servingOverridePendingRef: { current: new Set() }, Alert: { alert: (...args: any[]) => { throw new Error(`Unexpected food error: ${args[0]}`) } } })
 const pure = screen.statements.filter(node => ts.isVariableStatement(node) || (ts.isFunctionDeclaration(node) && node.name?.text !== 'AddIngredientScreen')).map(node => node.getText(screen)).join('\n')

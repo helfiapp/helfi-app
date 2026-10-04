@@ -5,6 +5,7 @@ import { isFoodPreparationCompatible } from '@/native/src/lib/foodPreparation'
 import { liquidDensity } from '@/native/src/lib/foodUnits'
 import { optionalNutrient } from '@/native/src/lib/nutrientValues'
 import { isSingleMilkQuery, isSingleMilkIdentityCompatible, milkSearchText, singleMilkLookupQueries } from '@/lib/food/single-milk-identity'
+import { hasCoreFoodNutrition } from '@/lib/food/openfoodfacts'
 import {
   searchOpenFoodFactsByQuery,
   searchUsdaFoods,
@@ -755,18 +756,7 @@ export async function GET(request: NextRequest) {
 
     // Owner rule: never return items with missing calories/macros.
     // Enforce this early so "fill up to limit" can still work.
-    const hasMacroData = (item: any) => {
-      if (!item) return false
-      const calories = item?.calories
-      const protein = item?.protein_g
-      const carbs = item?.carbs_g
-      const fat = item?.fat_g
-      const hasCalories = calories !== null && calories !== undefined && Number.isFinite(Number(calories))
-      const hasProtein = protein !== null && protein !== undefined && Number.isFinite(Number(protein))
-      const hasCarbs = carbs !== null && carbs !== undefined && Number.isFinite(Number(carbs))
-      const hasFat = fat !== null && fat !== undefined && Number.isFinite(Number(fat))
-      return hasCalories && hasProtein && hasCarbs && hasFat
-    }
+    const hasMacroData = hasCoreFoodNutrition
 
     const toCustomFoodItems = async (value: string, options?: { allowTypo?: boolean }) => {
       if (kindMode !== 'single') return []

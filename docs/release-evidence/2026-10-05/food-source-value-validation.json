@@ -1,0 +1,46 @@
+{
+  "checkedAt": "2026-10-04T23:50:17.810841+00:00",
+  "task": 56,
+  "issue": "HEL-440",
+  "status": "source-build-passed-deploy-runtime-pending",
+  "reproducedBeforeFix": [
+    "negative calorie Foundation masks valid Legacy peer",
+    "library mapper returns negative nutrient unchanged",
+    "USDA detail generates incomplete protein choices",
+    "servings endpoint returns invalid stored option",
+    "custom builder rounds invalid/null core nutrition into zero choices"
+  ],
+  "actualFunctions": [
+    "food-data GET",
+    "searchLocalFoods",
+    "fetchUsdaServingOptions",
+    "food-data/servings GET",
+    "buildCustomFoodServingOptions"
+  ],
+  "preserved": [
+    "source identities",
+    "measurement bases",
+    "provider precision",
+    "genuine zero",
+    "unknown optional fibre/sugar",
+    "customer history",
+    "existing page locks"
+  ],
+  "databaseWrites": false,
+  "checks": {
+    "sourceValues": "PASS",
+    "completeEndpoint": "PASS",
+    "nativeServingOverride": "PASS",
+    "customRows": 502,
+    "rootPageLocks": 278,
+    "nativePageLocks": 79,
+    "rootTypecheck": "PASS",
+    "fullProductionBuild": "PASS"
+  },
+  "remaining": [
+    "Full production build and live runtime verification",
+    "Original negative Foundation carbs and source-unavailable energy remain preserved",
+    "Native oat provider detail precision",
+    "Signed device/store release matrix"
+  ]
+}

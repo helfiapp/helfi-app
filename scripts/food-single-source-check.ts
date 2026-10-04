@@ -6,6 +6,7 @@ import { isFoodPreparationCompatible } from '../native/src/lib/foodPreparation'
 import { liquidDensity } from '../native/src/lib/foodUnits'
 import { optionalNutrient } from '../native/src/lib/nutrientValues'
 import { isSingleMilkQuery, isSingleMilkIdentityCompatible, milkSearchText, singleMilkLookupQueries } from '../lib/food/single-milk-identity'
+import { hasCoreFoodNutrition } from '../lib/food/openfoodfacts'
 
 // Execute the complete real endpoint with synthetic provider records. No server
 // imports, environment values, database, credentials or network requests.
@@ -16,7 +17,7 @@ let library: any[] = [], custom: any[] = [], fallback: any[] = [], remote: any[]
 let calls: string[] = []
 let literalLookupOnly = false
 const context: any = vm.createContext({
-  URL, isFoodPreparationCompatible, liquidDensity, optionalNutrient,
+  URL, isFoodPreparationCompatible, liquidDensity, optionalNutrient, hasCoreFoodNutrition,
   isSingleMilkQuery, isSingleMilkIdentityCompatible, milkSearchText, singleMilkLookupQueries,
   console: { warn() {}, error: (...args: any[]) => { throw new Error(String(args)) } },
   NextResponse: { json: (body: any, options?: any) => ({ body, status: options?.status ?? 200 }) },
@@ -142,6 +143,30 @@ async function run() {
   custom = [{ ...rows[0], id: 'fixture-custom', name: 'Milk, whole, custom' }]
   const withCustom = await query('milk')
   checkRecord(withCustom[0], rows[0]); assert.equal(withCustom[1].source, 'custom')
+  custom = []; fallback = []; remote = []
+  for (const field of ['calories', 'protein_g', 'carbs_g', 'fat_g']) {
+    for (const invalid of [-1, '', '  ', false, true, [], {}, NaN, Infinity, 'unknown', null, undefined]) {
+      const bad = { ...rows[0], id: '900099', fixtureCategory: 'usda_foundation', [field]: invalid }
+      library = [bad, rows[0]]
+      const local = await query('milk', true, 1)
+      assert.equal(local.length, 1)
+      assert.equal(local[0].id, rows[0].id, `${field}=${String(invalid)}: invalid Foundation peer cannot mask valid Legacy nutrition`)
+      library = []
+      for (const provider of ['custom', 'fatsecret', 'remote-usda']) {
+        custom = []; fallback = []; remote = []
+        if (provider === 'custom') custom = [bad, rows[0]]
+        if (provider === 'fatsecret') fallback = [bad, rows[0]]
+        if (provider === 'remote-usda') remote = [bad, rows[0]]
+        const found = await query('milk', false, 1)
+        assert.equal(found.length, 1, `${provider}: valid peer remains available`)
+        assert.ok(!found[0].id.includes(bad.id), `${provider}: invalid ${field} cannot consume result limit`)
+      }
+      custom = []; fallback = []; remote = []
+    }
+  }
+  const zero = record('900098', 'Milk, whole', 0, { protein_g: 0, carbs_g: '0', fat_g: 0, fiber_g: 0, sugar_g: null })
+  library = [zero]
+  checkRecord((await query('milk'))[0], zero)
   assert.equal(JSON.stringify(rows), originalJson, 'provider input records are never rewritten')
   console.log('PASS: complete real endpoint retains real common-drink records/IDs/bases/options/precision/null/zero; milk identity applies across all fallback paths, actual spelling/fat variants resolve, invalid peers cannot mask valid records or consume result limits. No network or credentials.')
 }

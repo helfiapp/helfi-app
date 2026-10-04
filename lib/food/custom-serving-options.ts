@@ -4,6 +4,7 @@ import {
   getFoodUnitGrams,
   type MeasurementUnit,
 } from './measurement-units'
+import { foodNumberOrNull } from './openfoodfacts'
 
 export type CustomServingOption = {
   id: string
@@ -41,10 +42,7 @@ export type CustomServingBasis = {
 const round1 = (value: number) => Math.round(value * 10) / 10
 const roundCalories = (value: number) => Math.round(value)
 
-const toNumberOrNull = (value: unknown) => {
-  const num = Number(value)
-  return Number.isFinite(num) ? num : null
-}
+const toNumberOrNull = foodNumberOrNull
 
 const normalizeText = (value: string) =>
   String(value || '')

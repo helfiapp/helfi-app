@@ -7,6 +7,11 @@ export const foodNumberOrNull = (value: unknown): number | null => {
   return Number.isFinite(number) && number >= 0 ? number : null
 }
 
+// Core nutrition must be usable before a food or serving can be selected.
+// Missing optional fibre/sugar values do not make a result incomplete.
+export const hasCoreFoodNutrition = (item: any): boolean =>
+  ['calories', 'protein_g', 'carbs_g', 'fat_g'].every(key => foodNumberOrNull(item?.[key]) !== null)
+
 export function normalizeOffNutrition(product: any) {
   const nutr = product?.nutriments || {}
   const label = String(product?.serving_size || '').trim()
