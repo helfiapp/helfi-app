@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify job 30; BUILD/DEPLOY/VERIFY all SUCCEED)
+- Date/time: 4 October 2026, 11:32 pm Australia/Melbourne
+- What changed: Admin food-photo comparison supports the current model and GPT-6.1 Sol, preserves complete ingredient cards and checks totals; regular food analysis remains on the current model.
+- Where to see it (page/link): https://helfi.ai/admin-panel?tab=management
+- What to quickly test: Sign in as admin, compare a public Helfi test photo, check complete ingredients/totals and estimates. Real comparison/model choice still pending.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify job 29, BUILD/DEPLOY/VERIFY SUCCEED
 - Date/time: 2026-10-04T12:17:36.011698+00:00
 - What changed: Native iPad device-interest cards wrap within the screen; rendered permission-decline and tablet-layout proof saved. Commit f1446a25.

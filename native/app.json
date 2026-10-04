@@ -55,7 +55,8 @@
       "react-native-health",
       "react-native-iap",
       "expo-web-browser",
-      "./plugins/with-transparent-ios-app-icon"
+      "./plugins/with-transparent-ios-app-icon",
+      "./plugins/with-android-release-signing"
     ]
   }
 }
