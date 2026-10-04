@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE, AWS52 BUILD/DEPLOY/VERIFY SUCCEED, both domains200/CloudFront matching etag77q7p3ll7f1z15.
+- Date/time: 2026-10-04T22:18:02.940206+00:00
+- What changed: Provider serving options use shared food identity/density; native fresh/cached overrides retain recorded choices and selected IDs. Cup fraction label corrected. Whole audit/model/store work incomplete.
+- Where to see it (page/link): Native Add Ingredient against https://helfi.ai and USDA food-serving lookup.
+- What to quickly test: Original diluted juice gram/cup choices and calories, sixcards, saved/reopened source ID and unknown Sugar. Rebuilt iPhone Release39 ready; live exact-juice check passed: recordedcup239g112,100g47, no fake100ml, zero Add blocked; saved/reopened web/iPhone with sixcards/Sugar unknown, bothdaily893/wallet619. Existing caption/rounding display follow-ups remain.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE, AWS Amplify job51; BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront, etag4vl4zb9jrq1z15.
 - Date/time: 2026-10-04T21:56:45.045939+00:00
 - What changed: Saved weight edits choose the entered physical amount on older serving-mode entries. Enter validates empty/zero amounts; tapping elsewhere discards weight drafts. Whole audit/store work remains incomplete.

@@ -789,140 +789,8 @@ export async function GET(request: NextRequest) {
       return items.filter((it) => hasMacroData(it))
     }
 
-    const buildPreferredSingleFoodItems = (value: string) => {
-      if (kindMode !== 'single') return []
-      const tokens = getSearchTokens(value).map((token) => singularizeToken(token))
-      const hasPreferredSingleFood =
-        tokens.includes('milk') ||
-        (tokens.includes('juice') && tokens.includes('orange')) ||
-        (tokens.includes('coffee') && !tokens.some((token) => ['bean', 'beans', 'creamer', 'whitener', 'milk'].includes(token))) ||
-        (tokens.includes('oil') && tokens.includes('olive'))
-      if (!hasPreferredSingleFood) return []
-      const makeMilk = (item: {
-        id: string
-        name: string
-        calories: number
-        protein_g: number
-        carbs_g: number
-        fat_g: number
-        sugar_g: number
-      }) => [
-        {
-          source: 'usda' as const,
-          id: item.id,
-          name: item.name,
-          brand: null,
-          serving_size: '100 ml',
-          calories: item.calories,
-          protein_g: item.protein_g,
-          carbs_g: item.carbs_g,
-          fat_g: item.fat_g,
-          fiber_g: 0,
-          sugar_g: item.sugar_g,
-        },
-      ]
-      const makePreferredLiquid = (item: {
-        id: string
-        name: string
-        serving_size: string
-        calories: number
-        protein_g: number
-        carbs_g: number
-        fat_g: number
-        fiber_g?: number
-        sugar_g?: number
-      }) => [
-        {
-          source: 'usda' as const,
-          id: item.id,
-          name: item.name,
-          brand: null,
-          serving_size: item.serving_size,
-          calories: item.calories,
-          protein_g: item.protein_g,
-          carbs_g: item.carbs_g,
-          fat_g: item.fat_g,
-          fiber_g: item.fiber_g ?? 0,
-          sugar_g: item.sugar_g ?? 0,
-        },
-      ]
-
-      if (tokens.includes('almond')) {
-        return makeMilk({ id: 'preferred:milk-almond', name: 'Almond milk, unsweetened', calories: 15, protein_g: 0.5, carbs_g: 0.6, fat_g: 1.2, sugar_g: 0.2 })
-      }
-      if (tokens.includes('oat')) {
-        return makeMilk({ id: 'preferred:milk-oat', name: 'Oat milk', calories: 45, protein_g: 1.0, carbs_g: 6.7, fat_g: 1.5, sugar_g: 4.0 })
-      }
-      if (tokens.includes('soy')) {
-        return makeMilk({ id: 'preferred:milk-soy', name: 'Soy milk, unsweetened', calories: 33, protein_g: 3.3, carbs_g: 0.6, fat_g: 1.8, sugar_g: 0.4 })
-      }
-      if (tokens.includes('coconut')) {
-        return makeMilk({ id: 'preferred:milk-coconut', name: 'Coconut milk beverage, unsweetened', calories: 20, protein_g: 0.2, carbs_g: 0.7, fat_g: 2.0, sugar_g: 0.4 })
-      }
-      if (tokens.some((token) => ['chocolate', 'dry', 'dried', 'powder', 'buttermilk'].includes(token))) {
-        return []
-      }
-      if (tokens.includes('skim') || tokens.includes('skimmed') || tokens.includes('nonfat') || (tokens.includes('fat') && tokens.includes('free'))) {
-        return makeMilk({ id: 'preferred:milk-skim', name: 'Milk, skim/nonfat', calories: 34, protein_g: 3.4, carbs_g: 4.9, fat_g: 0.1, sugar_g: 5.0 })
-      }
-      if (tokens.includes('lowfat') || (tokens.includes('low') && tokens.includes('fat')) || tokens.includes('1')) {
-        return makeMilk({ id: 'preferred:milk-lowfat', name: 'Milk, low fat 1%', calories: 43, protein_g: 3.4, carbs_g: 5.0, fat_g: 1.0, sugar_g: 5.0 })
-      }
-      if (tokens.includes('reduced') || tokens.includes('2')) {
-        return makeMilk({ id: 'preferred:milk-reduced-fat', name: 'Milk, reduced fat 2%', calories: 50, protein_g: 3.3, carbs_g: 4.9, fat_g: 1.9, sugar_g: 4.9 })
-      }
-      const isPlainMilkQuery =
-        tokens.length === 1 ||
-        tokens.includes('whole') ||
-        (tokens.includes('full') && tokens.includes('cream'))
-      if (isPlainMilkQuery) {
-        return makeMilk({ id: 'preferred:milk-whole', name: 'Milk, whole', calories: 61, protein_g: 3.2, carbs_g: 4.8, fat_g: 3.3, sugar_g: 5.1 })
-      }
-      if (tokens.includes('juice') && tokens.includes('orange')) {
-        return makePreferredLiquid({
-          id: 'preferred:orange-juice',
-          name: 'Orange juice',
-          serving_size: '100 ml',
-          calories: 45,
-          protein_g: 0.7,
-          carbs_g: 10.4,
-          fat_g: 0.2,
-          fiber_g: 0.2,
-          sugar_g: 8.4,
-        })
-      }
-      if (tokens.includes('coffee') && !tokens.some((token) => ['bean', 'beans', 'creamer', 'whitener', 'milk'].includes(token))) {
-        return makePreferredLiquid({
-          id: 'preferred:coffee-brewed',
-          name: 'Coffee, brewed',
-          serving_size: '100 ml',
-          calories: 2,
-          protein_g: 0.1,
-          carbs_g: 0,
-          fat_g: 0,
-          fiber_g: 0,
-          sugar_g: 0,
-        })
-      }
-      if (tokens.includes('oil') && tokens.includes('olive')) {
-        return makePreferredLiquid({
-          id: 'preferred:olive-oil',
-          name: 'Olive oil',
-          serving_size: '1 tbsp (15 ml)',
-          calories: 122,
-          protein_g: 0,
-          carbs_g: 0,
-          fat_g: 13.5,
-          fiber_g: 0,
-          sugar_g: 0,
-        })
-      }
-      return []
-    }
-
     const buildSingleFoodResults = async (value: string) => {
       const customPrefix = await toCustomFoodItems(value, { allowTypo: false })
-      const preferredItems = buildPreferredSingleFoodItems(value)
       const localSearchWindow = Math.max(limit, 60)
 
       // For single foods: only use foundation and legacy (simple foods), NOT branded (product foods)
@@ -980,7 +848,11 @@ export async function GET(request: NextRequest) {
         requestedTokensForSingle.includes('milk') &&
         requestedTokensForSingle.some((token) => ['almond', 'oat', 'soy', 'coconut'].includes(token))
       if (requestedPlantMilk) {
-        mainFinal = mainFinal.filter((item) => !/\bcandy|candies|chocolate|nougat\b/.test(normalizeForMatch(item?.name)))
+        mainFinal = mainFinal.filter((item) => {
+          const name = normalizeForMatch(item?.name)
+          if (/\bcandy|candies|nougat\b/.test(name)) return false
+          return requestedTokensForSingle.includes('chocolate') || !/\bchocolate\b/.test(name)
+        })
       }
 
       const scorePlainSingleFoodFit = (item: any) => {
@@ -1090,9 +962,9 @@ export async function GET(request: NextRequest) {
         }
       }
 
-      // Simple USDA foods first, then the custom fallback list.
+      // Return actual USDA library records first, then the custom fallback list.
+      // Never invent a preferred USDA ID or substitute fixed nutrition figures.
       // Branded/product foods are excluded from single food searches.
-      pushGroup(preferredItems.filter((item) => isFoodPreparationCompatible(item?.name, value)))
       pushGroup(sortedMain)
       pushGroup(sortedCustom.filter((item) => isFoodPreparationCompatible(item?.name, value)))
 
