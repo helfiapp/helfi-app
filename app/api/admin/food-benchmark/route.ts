@@ -2,7 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
 import OpenAI from 'openai'
 import { chatCompletionWithCost } from '@/lib/metered-openai'
-import { openaiCostCentsForTokens, costCentsForTokens } from '@/lib/cost-meter'
+import { costCentsForTokens } from '@/lib/cost-meter'
+import { FOOD_BENCHMARK_MODELS, isFoodBenchmarkImageUrl, inspectFoodBenchmarkOutput, estimateFoodBenchmarkVendorCents } from '@/lib/food-benchmark'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -11,8 +12,6 @@ const getOpenAIClient = (): OpenAI | null => {
   if (!process.env.OPENAI_API_KEY) return null
   return new OpenAI({ apiKey: process.env.OPENAI_API_KEY })
 }
-
-const isSafeImageUrl = (url: string) => /^https?:\/\//i.test(url) && url.length < 2000
 
 const buildBenchmarkMessages = (imageUrl: string) => {
   return [
@@ -25,7 +24,9 @@ const buildBenchmarkMessages = (imageUrl: string) => {
             'Analyze this food image.\n' +
             '- Return short, plain ingredient names (no "several components:" prefixes).\n' +
             '- For sliced produce (e.g., avocado slices), treat as a portion (grams or fraction of whole), NOT "pieces".\n' +
-            '- Be conservative when uncertain and mark guesses.\n' +
+            '- Mark every estimated portion with isGuess:true. Do not pretend a photo measures weight or hidden oil.\n' +
+            '- Keep raw/cooked/breaded identities. Give one ingredient card for each visible component, with nutrition for that whole stated portion and servings:1. Do not default every component to 100g.\n' +
+            '- Unknown fibre/sugar are null, not zero. Total must equal the sum of the item values.\n' +
             'Return ONLY a JSON block with shape:\n' +
             '{"items":[{"name":"string","brand":null,"serving_size":"string","servings":1,"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0,"isGuess":false}],"total":{"calories":0,"protein_g":0,"carbs_g":0,"fat_g":0,"fiber_g":0,"sugar_g":0}}',
         },
@@ -46,13 +47,12 @@ export async function POST(req: NextRequest) {
     const body = await req.json().catch(() => ({} as any))
     const imageUrl = typeof body?.imageUrl === 'string' ? body.imageUrl.trim() : ''
     const models = Array.isArray(body?.models) ? body.models : []
-    const modelList =
-      models.length > 0
-        ? models.filter((m: any) => typeof m === 'string' && m.trim().length > 0).slice(0, 3)
-        : ['gpt-5.6-sol']
-
-    if (!imageUrl || !isSafeImageUrl(imageUrl)) {
-      return NextResponse.json({ error: 'Provide a public https:// imageUrl' }, { status: 400 })
+    const modelList: string[] = models.length ? [...new Set<string>(models)] : ['gpt-5.6-sol', 'gpt-6.1-sol']
+    if (modelList.length > 3 || modelList.some(model => !(FOOD_BENCHMARK_MODELS as readonly string[]).includes(model))) {
+      return NextResponse.json({ error: 'Choose a supported food comparison model.' }, { status: 400 })
+    }
+    if (!imageUrl || !isFoodBenchmarkImageUrl(imageUrl)) {
+      return NextResponse.json({ error: 'Use a public Helfi food test image. Private or customer images are not accepted.' }, { status: 400 })
     }
 
     const openai = getOpenAIClient()
@@ -62,34 +62,32 @@ export async function POST(req: NextRequest) {
 
     const results: any[] = []
     for (const model of modelList) {
-      const isGpt5Family = model.toLowerCase().includes('gpt-5')
-      const out = await chatCompletionWithCost(
-        openai,
-        {
-          model,
-          messages,
-          ...(isGpt5Family ? { max_completion_tokens: 700 } : { max_tokens: 700 }),
-          temperature: 0,
-        } as any,
-        { feature: 'admin:food-benchmark' }
-      )
-      const text = out.completion.choices?.[0]?.message?.content?.trim?.() || ''
-      const vendorCostCents = openaiCostCentsForTokens(model, {
-        promptTokens: out.promptTokens,
-        completionTokens: out.completionTokens,
-      })
-      const billedCostCents = costCentsForTokens(model, {
-        promptTokens: out.promptTokens,
-        completionTokens: out.completionTokens,
-      })
-      results.push({
-        model,
-        promptTokens: out.promptTokens,
-        completionTokens: out.completionTokens,
-        vendorCostCents,
-        billedCostCents,
-        outputPreview: text.slice(0, 1200),
-      })
+      const started = Date.now()
+      try {
+        const out = await chatCompletionWithCost(openai, {
+          model, messages,
+          ...(model.startsWith('gpt-5') || model.startsWith('gpt-6')
+            ? { max_completion_tokens: model === 'gpt-6.1-sol' ? 6144 : 3072 }
+            : { max_tokens: 3072 }),
+          response_format: { type: 'json_object' },
+          ...(model === 'gpt-6.1-sol' ? { reasoning_effort: 'low' } : { temperature: 0 }),
+        } as any, { feature: 'admin:food-benchmark' })
+        const text = out.completion.choices?.[0]?.message?.content?.trim?.() || ''
+        const finishReason = out.completion.choices?.[0]?.finish_reason || null
+        const inspected = inspectFoodBenchmarkOutput(text, finishReason)
+        results.push({
+          model, promptTokens: out.promptTokens, completionTokens: out.completionTokens,
+          vendorCostCents: estimateFoodBenchmarkVendorCents(model, out.promptTokens, out.completionTokens),
+          billedCostCents: costCentsForTokens(model, { promptTokens: out.promptTokens, completionTokens: out.completionTokens }),
+          outputPreview: text, finishReason, elapsedMs: Date.now() - started,
+          ingredientCardsReady: inspected.ingredientCardsReady, itemCount: inspected.itemCount,
+          totalsMatch: inspected.totalsMatch,
+        })
+      } catch (error: any) {
+        results.push({ model, ingredientCardsReady: false, elapsedMs: Date.now() - started,
+          outputPreview: 'This model could not complete the comparison.',
+          errorCode: typeof error?.code === 'string' ? error.code : 'comparison_failed' })
+      }
     }
 
     return NextResponse.json({
@@ -97,10 +95,10 @@ export async function POST(req: NextRequest) {
       imageUrl,
       results,
       note:
-        'Benchmark prompt is simplified vs the live analyzer. Use this to compare relative cost/token usage and qualitative output.',
+        'Public test photos only. Portions are estimates; calories cannot be verified without measured ingredient weights. This simplified comparison checks ingredient cards and totals. Vendor cost is an uncached standard-price estimate; Configured charge shows the current charge estimate in cents and no test-account wallet is charged.',
     })
   } catch (err: any) {
-    console.error('[admin food-benchmark] error', err)
-    return NextResponse.json({ error: err?.message || 'Benchmark failed' }, { status: 500 })
+    console.error('[admin food-benchmark] failed')
+    return NextResponse.json({ error: 'Food comparison could not complete. Please try again.' }, { status: 500 })
   }
 }

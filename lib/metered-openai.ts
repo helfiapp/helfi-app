@@ -64,13 +64,27 @@ export async function chatCompletionWithCost(
   const effectiveParams: any = { ...params, model: effectiveModel }
   const modelName = effectiveModel.toLowerCase()
   const isGpt5Family = modelName.includes('gpt-5')
+  const isGpt61Sol = modelName.includes('gpt-6.1-sol')
   const normalizedParams = (() => {
-    if (!isGpt5Family) return effectiveParams
+    if (!isGpt5Family && !isGpt61Sol) return effectiveParams
     const maxTokens = Number(effectiveParams.max_tokens)
     const maxCompletionTokens = Number(effectiveParams.max_completion_tokens)
     const next: any = { ...effectiveParams }
     delete next.max_tokens
     delete next.temperature
+    if (isGpt61Sol) {
+      // GPT-6.1 Sol requires reasoning and does not accept sampling controls
+      // or tool calling through Chat Completions (official docs, 4 Oct 2026).
+      delete next.top_p
+      delete next.top_logprobs
+      delete next.logprobs
+      if (next.tools?.length || next.functions?.length) {
+        throw new Error('GPT-6.1 Sol tool calls require the Responses API.')
+      }
+      if (!['low', 'medium', 'high', 'xhigh', 'max'].includes(next.reasoning_effort)) {
+        next.reasoning_effort = 'low'
+      }
+    }
     if (modelName.includes('gpt-5.6') && !next.reasoning_effort) {
       // Most Helfi calls have small, user-facing response budgets. GPT-5.6
       // counts reasoning tokens inside max_completion_tokens, so using "low"

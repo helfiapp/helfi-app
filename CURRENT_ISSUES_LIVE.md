@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify job 29, BUILD/DEPLOY/VERIFY SUCCEED
+- Date/time: 2026-10-04T12:17:36.011698+00:00
+- What changed: Native iPad device-interest cards wrap within the screen; rendered permission-decline and tablet-layout proof saved. Commit f1446a25.
+- Where to see it (page/link): Native Devices page in replacement build 39; browser production remains https://helfi.ai.
+- What to quickly test: iPad shows two columns without spill; declined AI request stays unsent. Build 39 is not yet uploaded or released in either store.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify job 28, BUILD/DEPLOY/VERIFY SUCCEED
 - Date/time: 2026-10-04T12:06:11.339140+00:00
 - What changed: Apple Health release configuration restored, sample activity imports removed from native release source, existing voice bridge included. Commit 9a671ef3.

@@ -25,6 +25,12 @@ const envNumber = (key: string, fallback: number): number => {
 };
 
 const DEFAULT_PRICES: Record<string, ModelPrices> = {
+  // GPT-6.1 Sol standard short-context pricing, verified 4 October 2026.
+  // https://developers.openai.com/api/docs/models/gpt-6.1-sol
+  'gpt-6.1-sol': {
+    inputCentsPer1k: envNumber('HELFI_PRICE_GPT61_SOL_INPUT_CENTS_PER_1K', 0.2),
+    outputCentsPer1k: envNumber('HELFI_PRICE_GPT61_SOL_OUTPUT_CENTS_PER_1K', 1.0),
+  },
   // GPT-5.6 Sol standard pricing, checked against OpenAI pricing on 2026-07-15.
   // Input: $5.00 / 1M tokens; Output: $30.00 / 1M tokens
   'gpt-5.6-sol': {
@@ -91,6 +97,7 @@ export type TokenUsage = {
 
 function normalizeModelKey(model: string): string {
   const m = (model || '').toLowerCase();
+  if (m.includes('gpt-6.1-sol')) return 'gpt-6.1-sol';
   if (m.includes('gpt-5.6-sol') || m === 'gpt-5.6') return 'gpt-5.6-sol';
   if (m.includes('gpt-5.5') && m.includes('pro')) return 'gpt-5.5-pro';
   if (m.includes('gpt-5.5')) return 'gpt-5.5';

@@ -177,10 +177,9 @@ export default function AdminPanel() {
   const [foodEstimatorAutoCalls, setFoodEstimatorAutoCalls] = useState(true)
   const [foodBenchmarkImageUrl, setFoodBenchmarkImageUrl] = useState('')
   const [foodBenchmarkModels, setFoodBenchmarkModels] = useState<Record<string, boolean>>({
-    'gpt-4o': true,
-    'gpt-5.2': true,
-    'gpt-5-mini': false,
-    'gpt-5.2-pro': false,
+    'gpt-5.6-sol': true,
+    'gpt-6.1-sol': true,
+    'gpt-4o': false,
   })
   const [foodBenchmarkResult, setFoodBenchmarkResult] = useState<any>(null)
   const [foodBenchmarkLoading, setFoodBenchmarkLoading] = useState(false)
@@ -4643,7 +4642,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                         <tr>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Model</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vendor $ (est)</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Billed Credits</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Configured charge ¢</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Analyses / $20 Plan</th>
                         </tr>
                       </thead>
@@ -4693,7 +4692,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                     placeholder="https://…"
                     className="w-full border-gray-300 rounded-lg text-sm px-3 py-2"
                   />
-                  <div className="text-xs text-gray-500 mt-1">Must be publicly accessible (https://).</div>
+                  <div className="text-xs text-gray-500 mt-1">Use a public image from Helfi’s FOOD TEST IMAGES folder.</div>
                 </div>
 
                 <div>
@@ -4748,8 +4747,8 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Model</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Prompt</th>
                           <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Completion</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Vendor $</th>
-                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Billed Credits</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Estimated vendor $</th>
+                          <th className="px-4 py-3 text-left text-xs font-semibold text-gray-700 uppercase">Configured charge ¢</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-200 text-sm">
@@ -4770,7 +4769,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
 
                   {(foodBenchmarkResult.results || []).map((r: any) => (
                     <div key={`${r.model}-preview`} className="bg-gray-50 border border-gray-200 rounded-lg p-3">
-                      <div className="text-xs font-semibold text-gray-700 mb-2">{r.model} output preview</div>
+                      <div className="text-xs font-semibold text-gray-700 mb-2">{r.model}: {r.ingredientCardsReady ? 'Complete ingredient cards' : 'Incomplete result'} ({Math.round(Number(r.elapsedMs || 0) / 1000)}s)</div>
                       <pre className="whitespace-pre-wrap text-xs text-gray-800">{r.outputPreview}</pre>
                     </div>
                   ))}
