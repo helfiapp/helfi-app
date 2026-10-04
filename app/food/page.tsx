@@ -41,6 +41,7 @@ import { STARTER_FOODS } from '@/data/foods-starter'
 import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
 import { foodNumberOrNull } from '@/lib/food/openfoodfacts'
+import { hasSameDiaryNutrientContent } from '@/lib/food/diary-entry-comparison'
 import { AI_MEAL_RECOMMENDATION_CREDITS, AI_MEAL_RECOMMENDATION_GOAL_NAME } from '@/lib/ai-meal-recommendation'
 import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
@@ -10062,9 +10063,11 @@ const applyStructuredItems = (
     const aSet = new Set(aKeys)
     if (aSet.size !== a.length) return false
     const localDbByKey = new Map<string, string>()
+    const localEntryByKey = new Map<string, any>()
     a.forEach((entry) => {
       const key = entryIdentityKey(entry)
       if (!key) return
+      localEntryByKey.set(key, entry)
       const dbId = (entry as any)?.dbId
       if (dbId) localDbByKey.set(key, String(dbId))
     })
@@ -10074,6 +10077,7 @@ const applyStructuredItems = (
       const mergedDbId = (entry as any)?.dbId
       const localDbId = localDbByKey.get(key) || ''
       if (mergedDbId && !localDbId) return false
+      if (!hasSameDiaryNutrientContent(localEntryByKey.get(key), entry)) return false
     }
     return true
   }

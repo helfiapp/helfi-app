@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job 40 (BUILD, DEPLOY and VERIFY all SUCCEED).
+- Date/time: 5 October 2026, 2:58 am Melbourne.
+- What changed: Preserve original USDA serving-option nutrient precision, rounding only final displayed results. Commit d2160b33fbd7346cdd4f82e79ab807b1ddb07174.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and native packaged search. Both public domains return 200 through CloudFront; store binaries remain pending.
+- What to quickly test: Fresh web peanut-butter adjustment 20 g = 127 kcal, 100 g = 636 kcal, sugar 0.8 g/4 g. Native saved edit also shows 636. Actual cross-device save test uncovered web manual refresh retaining the previous 127 result; that remaining refresh issue and native stored base rounding are the next repair.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job 39 (BUILD, DEPLOY and VERIFY all SUCCEED).
 - Date/time: 5 October 2026, 2:35 am Melbourne; public-library apply completed 2:43 am.
 - What changed: Canonical USDA 100 g/100 ml nutrition, exact provider identity gates, missing/zero nutrients, sugar recovery and non-destructive future imports. Commit 7734ec210c255f434d513797409e5d3b1caac66c. Applied all 1,867,037 reviewed public-library corrections; all 1,886,557 provider rows and customer tables preserved. Original public-only backup is retained in ignored data/food-import/repair-backups.
