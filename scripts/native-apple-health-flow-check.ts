@@ -39,6 +39,11 @@ async function main() {
     const ipad = await run(handler, { appleHealthAvailable: false })
     assert.ok(ipad.some(call => call.alert[0] === 'Apple Health is iPhone only'))
     assert.ok(!ipad.some(call => call.url || call.connected))
+    for (const summary of [{ steps: 0, distanceKm: null, activeEnergyKcal: null }, { steps: 0, distanceKm: 0, activeEnergyKcal: 0 }]) {
+      const empty = await run(handler, { appleHealthConnectAndReadToday: async () => summary })
+      assert.ok(empty.some(call => call.alert?.[0] === 'No activity available today'))
+      assert.ok(!empty.some(call => call.url || call.connected === true), 'empty/denied Health reads never import or claim a connected permission')
+    }
   }
   const success = await run('onAppleHealthImportToday')
   assert.deepEqual(success.find(call => call.url).payload, { source: 'APPLE_HEALTH', date: '2026-10-04', steps: 1200, distanceKm: 0.82, caloriesKcal: 64 })

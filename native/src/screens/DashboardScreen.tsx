@@ -524,8 +524,15 @@ export function DashboardScreen() {
     }
     try {
       setAppleHealthBusy(true)
-      // This triggers the permission prompt. We don’t need the values yet.
-      await appleHealthConnectAndReadToday()
+      const summary = await appleHealthConnectAndReadToday()
+      // Apple intentionally makes denied read access look like an empty store.
+      // Completing the permission dialog is not proof that access was granted.
+      if (!(summary.steps > 0 || (summary.distanceKm ?? 0) > 0 || (summary.activeEnergyKcal ?? 0) > 0)) {
+        setAppleHealthConnected(false)
+        try { await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '0') } catch {}
+        Alert.alert('No activity available today', 'There may be no saved activity for today, or Helfi may not have permission to read it. Check Health, Sharing, Apps, Helfi, then try again.')
+        return
+      }
       setAppleHealthConnected(true)
       try {
         await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '1')
@@ -555,6 +562,12 @@ export function DashboardScreen() {
     try {
       setAppleHealthBusy(true)
       const summary = await appleHealthConnectAndReadToday()
+      if (!(summary.steps > 0 || (summary.distanceKm ?? 0) > 0 || (summary.activeEnergyKcal ?? 0) > 0)) {
+        setAppleHealthConnected(false)
+        try { await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '0') } catch {}
+        Alert.alert('No activity available today', 'There may be no saved activity for today, or Helfi may not have permission to read it. Check Health, Sharing, Apps, Helfi, then try again.')
+        return
+      }
       const date = localDateYYYYMMDD(new Date())
 
       const res = await fetch(`${API_BASE_URL}/api/native-exercise-import`, {

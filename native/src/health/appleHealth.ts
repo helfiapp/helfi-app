@@ -1,4 +1,4 @@
-import { Platform } from 'react-native'
+import { NativeModules, Platform } from 'react-native'
 import AppleHealthKit, { HealthKitPermissions, HealthValue } from 'react-native-health'
 
 type AppleHealthTodaySummary = {
@@ -23,6 +23,17 @@ function nowISO() {
   return new Date().toISOString()
 }
 
+function healthKitBridge(): typeof AppleHealthKit {
+  // The library copies NativeModules with Object.assign. Bridgeless host
+  // methods may be callable without being enumerable, so that copy can lose
+  // the methods. Keep the original native object in that case.
+  const candidates = [AppleHealthKit, NativeModules.AppleHealthKit]
+  const methods = ['initHealthKit', 'getStepCount', 'getDistanceWalkingRunning', 'getActiveEnergyBurned']
+  const bridge = candidates.find(candidate => candidate && methods.every(method => typeof candidate[method] === 'function'))
+  if (!bridge) throw new Error('Apple Health is unavailable in this installation. Please update Helfi and try again.')
+  return bridge
+}
+
 export function isAppleHealthSupportedDevice() {
   return Platform.OS === 'ios' && (Platform as any).isPad !== true
 }
@@ -42,7 +53,7 @@ function initHealthKit(): Promise<void> {
   }
 
   return new Promise((resolve, reject) => {
-    AppleHealthKit.initHealthKit(permissions, (err: string) => {
+    healthKitBridge().initHealthKit(permissions, (err: string) => {
       if (err) reject(new Error(String(err)))
       else resolve()
     })
@@ -51,7 +62,7 @@ function initHealthKit(): Promise<void> {
 
 function getStepCount(): Promise<number> {
   return new Promise((resolve, reject) => {
-    AppleHealthKit.getStepCount(
+    healthKitBridge().getStepCount(
       { startDate: startOfTodayLocalISO(), endDate: nowISO() } as any,
       (err: string, results: HealthValue) => {
         if (err) return reject(new Error(String(err)))
@@ -63,7 +74,7 @@ function getStepCount(): Promise<number> {
 
 function getDistanceWalkingRunningKm(): Promise<number | null> {
   return new Promise((resolve, reject) => {
-    AppleHealthKit.getDistanceWalkingRunning(
+    healthKitBridge().getDistanceWalkingRunning(
       { startDate: startOfTodayLocalISO(), endDate: nowISO() } as any,
       (err: string, results: HealthValue) => {
         if (err) return reject(new Error(String(err)))
@@ -77,7 +88,7 @@ function getDistanceWalkingRunningKm(): Promise<number | null> {
 
 function getActiveEnergyKcal(): Promise<number | null> {
   return new Promise((resolve, reject) => {
-    AppleHealthKit.getActiveEnergyBurned(
+    healthKitBridge().getActiveEnergyBurned(
       { startDate: startOfTodayLocalISO(), endDate: nowISO() } as any,
       (err: string, results: Array<HealthValue>) => {
         if (err) return reject(new Error(String(err)))

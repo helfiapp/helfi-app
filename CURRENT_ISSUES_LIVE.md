@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify job 31; BUILD/DEPLOY/VERIFY all SUCCEED)
+- Date/time: 4 October 2026, 11:40 pm Australia/Melbourne
+- What changed: Android release preparation now requires a private upload key and records the bundle/source signature details; no Android store upload has occurred.
+- Where to see it (page/link): native/plugins/with-android-release-signing.js and scripts/build-android-release-bundle.sh
+- What to quickly test: Missing upload key must stop a store build. After SDK licence approval, build and verify the actual signed Android bundle and device flows.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify job 30; BUILD/DEPLOY/VERIFY all SUCCEED)
 - Date/time: 4 October 2026, 11:32 pm Australia/Melbourne
 - What changed: Admin food-photo comparison supports the current model and GPT-6.1 Sol, preserves complete ingredient cards and checks totals; regular food analysis remains on the current model.
