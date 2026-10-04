@@ -1,0 +1,139 @@
+import assert from 'node:assert/strict'
+import fs from 'node:fs'
+import vm from 'node:vm'
+import ts from 'typescript'
+import * as measurements from '../lib/food/measurement-units'
+import * as recorded from '../lib/food/serving-measurements'
+import * as nutrients from '../lib/food/nutrient-values'
+import { convertFoodAmount, liquidDensity } from '../native/src/lib/foodUnits'
+
+// Execute the real page's measurement/update functions without React, server
+// dependencies, credentials, a database or network calls.
+const source = ts.createSourceFile('page.tsx', fs.readFileSync('app/food/page.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const ctx = vm.createContext({ ...measurements, ...recorded, ...nutrients,
+  convertFoodAmount, liquidDensity, analysisMode: 'meal',
+  formatMeasurementUnitLabel: measurements.formatUnitLabel,
+  estimateGramsPerServing: () => null, foodNumberOrNull: nutrients.optionalNutrient,
+  editingEntry: null, clampNumber: (value: any, min: number, max: number) => Math.min(max, Math.max(min, Number(value))),
+})
+function bind(name: string) {
+  let code = ''
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) code = `(${node.getText(source)})`
+    if (ts.isVariableDeclaration(node) && node.name.getText(source) === name && node.initializer) code = `(${node.initializer.getText(source)})`
+    ts.forEachChild(node, visit)
+  }
+  visit(source); assert.ok(code, `actual ${name} exists`)
+  ctx[name] = vm.runInContext(ts.transpile(code, { target: ts.ScriptTarget.ES2020 }), ctx)
+}
+for (const name of ['DEFAULT_SERVING_GRAMS', 'WEIGHT_UNIT_LABELS', 'WEIGHT_UNIT_TO_GRAMS', 'DISCRETE_UNIT_KEYWORDS', 'escapeRegex', 'parseServingQuantity', 'singularizeUnitLabel', 'isGenericSizeLabel', 'isDiscreteUnitLabel', 'isFractionalServingQuantity', 'stripWeightPhrasesFromLabel', 'replaceWordNumbersForLabel', 'hasExplicitPieceCountInLabel', 'getExplicitPieces', 'getPiecesPerServing', 'parseServingUnitMetadata', 'piecesMultiplierForServing', 'macroMultiplierForItem', 'defaultGramsForItem', 'getDiscreteWeightFloor', 'normalizeWeightUnit', 'roundWeightValue', 'parseServingSizeInfo', 'getPieceGramsForItem', 'getMeasurementItem', 'getWeightUnitOptions', 'getUnitGramsForItem', 'weightAmountToGrams', 'gramsToWeightAmount', 'getBaseGramsPerServing', 'getBaseWeightPerServing', 'effectiveServings', 'recalculateNutritionFromItems', 'stripNutritionFromServingSize', 'updateItemField']) bind(name)
+const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} must equal ${expected}`)
+const juice = { id: 'original-juice', source: 'usda', name: 'Apple juice, frozen concentrate, diluted with 3 volume water', serving_size: 'cup —239g', calories: 112.33, protein_g: 0.239, carbs_g: 27.605, fat_g: 0.239, fiber_g: 0.239, sugar_g: null, servings: 100 / 239, weightAmount: 100, weightUnit: 'g', portionMode: 'weight' }
+assert.ok(!ctx.getWeightUnitOptions(juice, 'g').some((option: any) => option.value === 'ml'), 'unknown-density juice cannot offer volume relabelling')
+const milk = { ...juice, name: 'Milk, whole', serving_size: '100 ml', calories: 62.83, protein_g: 3.193, carbs_g: 4.944, fat_g: 3.3475, fiber_g: null, sugar_g: 5.2427, servings: 100 / 103 }
+close(ctx.getBaseGramsPerServing(milk), 103)
+close(ctx.getBaseWeightPerServing(milk), 103)
+close(ctx.effectiveServings(milk) * milk.calories, 61)
+const oil = { ...milk, name: 'Oil, olive, salad or cooking', calories: 813.28, protein_g: 0, carbs_g: 0, fat_g: 92, weightAmount: 15, servings: 15 / 92 }
+close(ctx.effectiveServings(oil) * oil.calories, 132.6)
+assert.equal(ctx.recalculateNutritionFromItems([oil]).calories, 133)
+const volumeJuice = { ...juice, serving_size: '100 ml', weightUnit: 'ml', weightAmount: 240, servings: 2.4 }
+close(ctx.effectiveServings(volumeJuice), 2.4)
+assert.ok(!ctx.getWeightUnitOptions(volumeJuice, 'ml').some((option: any) => option.value === 'g'))
+assert.equal(ctx.getBaseGramsPerServing(volumeJuice), null)
+const unweighed = { ...juice, name: 'Unweighed bar', serving_size: '1 bar', weightUnit: 'serving', weightAmount: 2, servings: 2 }
+assert.equal(ctx.getBaseGramsPerServing(unweighed), null, 'do not invent a gram basis from calories')
+close(ctx.effectiveServings(unweighed), 2)
+assert.equal(ctx.getBaseGramsPerServing({ ...unweighed, name: 'Apple', serving_size: '1 apple' }), null, 'provider count-only foods cannot inherit a guessed produce mass')
+assert.equal(ctx.getWeightUnitOptions(juice, 'g').find((option: any) => option.value === 'cup').label, 'cup — 239 g')
+close(recorded.convertItemMeasurement(1, 'quarter-cup', 'g', juice)!, 59.75)
+assert.equal(recorded.formatItemMeasurementUnit(juice, 'three-quarter-cup'), '3/4 cup — 179.25 g')
+close(recorded.convertItemMeasurement(1, 'cup', 'ml', { ...volumeJuice, serving_size: '100 ml (1 cup)' })!, 100)
+close(recorded.convertItemMeasurement(1, 'cup', 'ml', { ...volumeJuice, serving_size: '100 ml (1/2 cup)' })!, 200)
+close(recorded.convertItemMeasurement(1, 'tbsp', 'g', { ...oil, servingOptions: [{ label: '1 tbsp (13.5 g)', grams: 13.5 }] })!, 13.5)
+close(ctx.getBaseWeightPerServing({ ...volumeJuice, serving_size: '8 fl oz', weightUnit: 'fl oz' }), 8)
+close(ctx.getBaseWeightPerServing({ ...juice, serving_size: '8 oz', weightUnit: 'oz' }), 8)
+close(ctx.getBaseGramsPerServing({ ...juice, serving_size: '6 oz (177 g)' }), 177)
+
+let notice = ''
+ctx.showQuickToast = (text: string) => { notice = text }
+ctx.setAnalyzedItems = (items: any[]) => { ctx.analyzedItems = items }
+ctx.applyRecalculatedNutrition = () => {}
+ctx.analyzedItems = [{ ...milk }]
+ctx.updateItemField(0, 'weightUnit', 'ml')
+close(ctx.analyzedItems[0].weightAmount, 100 / 1.03)
+close(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, 61)
+ctx.updateItemField(0, 'weightUnit', 'g')
+close(ctx.analyzedItems[0].weightAmount, 100)
+ctx.analyzedItems = [{ ...oil }]
+ctx.updateItemField(0, 'weightAmount', '15')
+close(ctx.analyzedItems[0].servings, 15 / 92)
+assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, 133)
+ctx.analyzedItems = [{ ...juice }]; notice = ''
+ctx.updateItemField(0, 'weightUnit', 'ml')
+assert.equal(ctx.analyzedItems[0].weightUnit, 'g')
+assert.ok(notice, 'unsupported programmatic unit change must be rejected')
+assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).sugar, null)
+for (const amount of ['', '0', '-1', 'invalid']) {
+  const item = { ...juice, weightAmount: amount === '' ? null : Number(amount) }
+  assert.ok(!Number.isFinite(ctx.effectiveServings(item)), 'invalid weight cannot fall back to one serving')
+  assert.equal(ctx.recalculateNutritionFromItems([item]), null)
+}
+// Preserve the existing full-set denominator and per-piece macro multiplier.
+for (const [name, label, pieces, grams, calories] of [
+  ['Beef patty', '1 patty (115 g)', 2, 230, 500],
+  ['Carrot', '1 medium (200 g)', 6, 1200, 492],
+] as const) {
+  const item = { name, serving_size: label, piecesPerServing: pieces, servings: 1, weightAmount: grams, weightUnit: 'g', portionMode: 'weight', calories: calories / pieces, protein_g: 1, carbs_g: 0, fat_g: 0, fiber_g: null, sugar_g: 0 }
+  close(ctx.getBaseWeightPerServing(item), grams)
+  close(ctx.effectiveServings(item), 1)
+  assert.equal(ctx.recalculateNutritionFromItems([item]).calories, calories)
+  ctx.analyzedItems = [{ ...item }]
+  ctx.updateItemField(0, 'weightAmount', String(grams / 2))
+  close(ctx.analyzedItems[0].servings, 0.5)
+  assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, calories / 2)
+  ctx.updateItemField(0, 'servings', 1)
+  close(ctx.analyzedItems[0].weightAmount, grams)
+}
+ctx.analyzedItems = [{ name: 'Egg, whole, raw', serving_size: '1 egg (50 g)', customGramsPerServing: 50, weightAmount: 1, weightUnit: 'egg-large', portionMode: 'weight', servings: 1, calories: 77.5, protein_g: 6.28, carbs_g: 0.36, fat_g: 4.755, fiber_g: null, sugar_g: 0 }]
+ctx.updateItemField(0, 'weightUnit', 'egg-small')
+assert.equal(ctx.analyzedItems[0].fiber_g, null)
+assert.equal(ctx.analyzedItems[0].sugar_g, 0)
+close(ctx.analyzedItems[0].calories, 58.9)
+ctx.updateItemField(0, 'weightUnit', 'egg-large')
+close(ctx.analyzedItems[0].calories, 77.5)
+ctx.analyzedItems = [{ ...milk }]
+ctx.updateItemField(0, 'serving_size', '100 g')
+close(ctx.analyzedItems[0].calories, 61)
+assert.equal(ctx.analyzedItems[0].fiber_g, null)
+close(ctx.analyzedItems[0].servings, 100 / 103)
+ctx.updateItemField(0, 'serving_size', '100 ml')
+close(ctx.analyzedItems[0].calories, 62.83)
+ctx.analyzedItems = [{ ...juice }]; notice = ''
+ctx.updateItemField(0, 'serving_size', '100 ml')
+assert.equal(ctx.analyzedItems[0].serving_size, juice.serving_size)
+assert.ok(notice)
+ctx.analyzedItems = [{ ...milk, weightUnit: 'ml', weightAmount: 100, servings: 1 }]
+ctx.updateItemField(0, 'weightUnit', 'fl oz')
+close(ctx.analyzedItems[0].weightAmount, 100 / 29.5735295625)
+ctx.updateItemField(0, 'weightUnit', 'ml')
+close(ctx.analyzedItems[0].weightAmount, 100)
+assert.equal(ctx.analyzedItems[0].id, milk.id)
+assert.equal(ctx.analyzedItems[0].source, milk.source)
+console.log('PASS: actual saved-food page options, recorded basis, density, source quantity, unknown nutrients, precise updates and invalid/unsupported measurements; no credentials or network.')
+
+async function checkSaveGates() {
+  bind('updateFoodEntry'); bind('addFoodEntry')
+  ctx.editingEntry = { id: 'original-juice' }; ctx.labelBlocked = false
+  let calls = 0
+  ctx.fetch = () => { calls++; throw new Error('Invalid amount reached persistence') }
+  ctx.editingDrinkMetaRef = { get current() { calls++; throw new Error('Invalid amount reached drink metadata') } }
+  for (const value of [null, '', 0, -1, NaN]) {
+    ctx.analyzedItems = [{ ...juice, weightAmount: value }]; notice = ''
+    await ctx.updateFoodEntry(); assert.ok(notice)
+    notice = ''; await ctx.addFoodEntry('Original juice', 'photo'); assert.ok(notice)
+  }
+  assert.equal(calls, 0)
+  console.log('PASS: actual diary add/update boundaries reject invalid quantities before metadata, charging or persistence.')
+}
+checkSaveGates().catch(error => { console.error(error); process.exitCode = 1 })

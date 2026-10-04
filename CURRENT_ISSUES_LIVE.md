@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai — AWS Amplify job49; BUILD, DEPLOY and VERIFY all SUCCEED. Both domains HTTP200 through CloudFront.
+- Date/time: 5 October2026,7:52am Melbourne.
+- What changed: Food density uses the actual food identity. Oil/milk/water mentions in mayonnaise, juice, eggs and other mixtures no longer invent a weight/volume conversion; concentrated, dry, plant milk and unknown food densities retain their recorded source basis. Commit f068fb554e9cfaef7b61385a4af0b70a69186e68.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and rebuilt Release iPhone source. No signed store upload.
+- What to quickly test: Actual endpoint/web/native editor checks reproduced pure-oil0.92 for mayonnaise, then passed mixed-food mass choices and half portions while retaining ordinary milk/oil/water. Full web build/typecheck, native Release build/run and278/79 locks pass; screenshot confirms rebuilt phone signed in at809/wallet619. Live mayonnaise now retains cup232g838;100g361 and50g180, onlyg/oz, allsixcards visible; cancelled without extra diary records. Diluted juice keeps239g112;100g47/sugarunknown saved via website, reopened web and rebuilt phone (sixcards/sugar—), bothdaily856/wallet619. Native new-lookup initial-unit interaction still needs validation. The saved web editor separately offers unsupportedml and generic household weights; reproduced and queued. Approximate conversion factors and broader food/store gates remain unverified.
+
+DEPLOYED:
 - LIVE: https://helfi.ai — AWS Amplify job48; BUILD, DEPLOY and VERIFY all SUCCEED. Both domains HTTP200 through CloudFront.
 - Date/time: 5 October2026,7:16am Melbourne.
 - What changed: Web Add Ingredient uses shared liquid density, explicit liquid household volumes, distinct weight/fluid ounces and metric-first serving labels. Unweighed portions keep the source serving/count basis; unknown densities restrict incompatible units. Precise serving ratios, null/true-zero optional values and invalid-amount/missing-basis blocking survive saves. Commit bd957f84f575449f02224d6aec4f5ea0fb85e244.
