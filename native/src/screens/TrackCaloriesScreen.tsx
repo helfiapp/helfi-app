@@ -1,3 +1,4 @@
+import { NutrientCards } from '../components/NutrientCards'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -7009,8 +7010,9 @@ export function TrackCaloriesScreen() {
 
       <Modal transparent visible={editModalOpen} animationType="fade" onRequestClose={() => setEditModalOpen(false)}>
         <View style={modalBackdrop}>
-          <View style={modalCard}>
+          <View style={[modalCard, { maxHeight: '90%' }]}>
             <Text style={modalTitle}>Edit food entry</Text>
+            <ScrollView keyboardShouldPersistTaps="handled" style={{ flexShrink: 1 }}>
             <TextInput value={editName} onChangeText={setEditName} placeholder="Name" placeholderTextColor="#8AA39D" style={inputStyle} />
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, marginTop: 8 }}>
               {MEALS.map((meal) => (
@@ -7034,6 +7036,10 @@ export function TrackCaloriesScreen() {
               <LabeledNumberInput label="Fiber (g)" value={editFiber} onChange={setEditFiber} />
               <LabeledNumberInput label="Sugar (g)" value={editSugar} onChange={setEditSugar} />
             </View>
+            <View style={{ marginTop: 12 }}>
+              <NutrientCards energyUnit={energyUnit} values={{ calories: nullableNumber(editCalories), protein: nullableNumber(editProtein), carbs: nullableNumber(editCarbs), fat: nullableNumber(editFat), fiber: nullableNumber(editFiber), sugar: nullableNumber(editSugar) }} />
+            </View>
+            </ScrollView>
             <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
               <Pressable accessibilityRole="button" accessibilityLabel="Save food entry" onPress={() => void saveEditedEntry()} style={primaryButton}>
                 <Text style={primaryButtonText}>Save</Text>
@@ -8144,20 +8150,14 @@ export function TrackCaloriesScreen() {
                               </View>
                             </View>
 
-                            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                              {[
-                                `${Math.round(editItem.calories * editItem.servings)} kcal`,
-                                `${formatMacroAmount(editItem.protein * editItem.servings)} g protein`,
-                                `${formatMacroAmount(editItem.carbs * editItem.servings)} g carbs`,
-                                `${formatMacroAmount(editItem.fat * editItem.servings)} g fat`,
-                                `${formatMacroAmount(editItem.fiber * editItem.servings)} g fibre`,
-                                `${formatMacroAmount(editItem.sugar * editItem.servings)} g sugar`,
-                              ].map((value) => (
-                                <View key={value} style={{ borderRadius: 999, backgroundColor: theme.colors.bg, paddingHorizontal: 10, paddingVertical: 6 }}>
-                                  <Text style={{ color: theme.colors.muted, fontSize: 11, fontWeight: '700' }}>{value}</Text>
-                                </View>
-                              ))}
-                            </View>
+                            <NutrientCards energyUnit={energyUnit} values={{
+                              calories: editItem.calories * editItem.servings,
+                              protein: editItem.protein * editItem.servings,
+                              carbs: editItem.carbs * editItem.servings,
+                              fat: editItem.fat * editItem.servings,
+                              fiber: editItem.fiber * editItem.servings,
+                              sugar: editItem.sugar * editItem.servings,
+                            }} />
 
                             <Pressable
                               onPress={() => removeFavoriteEditIngredient(editItem.id)}
@@ -8399,9 +8399,16 @@ export function TrackCaloriesScreen() {
                     </Pressable>
                   </View>
 
-                  <Text style={{ color: '#6B7280', marginTop: 10 }}>
-                    {Math.round(adjustItem.calories * adjustItem.servings)} kcal • P {formatMacroAmount(adjustItem.protein * adjustItem.servings)}g • C {formatMacroAmount(adjustItem.carbs * adjustItem.servings)}g • F {formatMacroAmount(adjustItem.fat * adjustItem.servings)}g
-                  </Text>
+                  <View style={{ marginTop: 12 }}>
+                    <NutrientCards energyUnit={energyUnit} values={{
+                      calories: adjustItem.calories * adjustItem.servings,
+                      protein: adjustItem.protein * adjustItem.servings,
+                      carbs: adjustItem.carbs * adjustItem.servings,
+                      fat: adjustItem.fat * adjustItem.servings,
+                      fiber: adjustItem.fiber * adjustItem.servings,
+                      sugar: adjustItem.sugar * adjustItem.servings,
+                    }} />
+                  </View>
                 </View>
               ))}
             </View>
@@ -8762,9 +8769,16 @@ export function TrackCaloriesScreen() {
               {barcodeFood ? (
                 <View style={barcodeProductPanel}>
                   <Text style={barcodeProductTitle}>{barcodeFood.name}</Text>
-                  <Text style={barcodeProductMeta}>
-                    {formatCalories(numberOrZero(barcodeFood.calories ?? barcodeFood.calories_kcal), energyUnit)} • P {round1(numberOrZero(barcodeFood.protein_g))}g • C {round1(numberOrZero(barcodeFood.carbs_g))}g • F {round1(numberOrZero(barcodeFood.fat_g))}g
-                  </Text>
+                  <ScrollView style={{ maxHeight: 320, marginTop: 10 }}>
+                    <NutrientCards energyUnit={energyUnit} values={{
+                      calories: nullableNumber(barcodeFood.calories ?? barcodeFood.calories_kcal),
+                      protein: nullableNumber(barcodeFood.protein_g),
+                      carbs: nullableNumber(barcodeFood.carbs_g),
+                      fat: nullableNumber(barcodeFood.fat_g),
+                      fiber: nullableNumber(barcodeFood.fiber_g),
+                      sugar: nullableNumber(barcodeFood.sugar_g),
+                    }} />
+                  </ScrollView>
                   <Pressable
                     onPress={() => void addBarcodeFood()}
                     style={barcodeProductButton}
@@ -8952,6 +8966,7 @@ export function TrackCaloriesScreen() {
 
                       <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14 }}>
                         <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>Meal macro summary</Text>
+                        <View style={{ marginTop: 12 }}><NutrientCards energyUnit={energyUnit} values={recommendedMealTotals(recommendedMeal)} /></View>
                         <View style={{ marginTop: 12, gap: 12 }}>
                           {macroRows.map((row) => (
                             <View key={row.label}>

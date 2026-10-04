@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-04T13:51:20.877Z",
+  "generatedAt": "2026-10-04T14:41:53.784Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -153,7 +153,8 @@
     "components/FeatureUsageDisplay.tsx": "5e128c251f08bf7efae896956166aba6e87f0455944db7d4f5496343adf4bf08",
     "components/food/DailyMacroSummary.tsx": "c13d73ba93ac3c0dbf639b35f60df116152b00dcd4b3b73e3a1d3325553fa160",
     "components/food/MissingFoodReport.tsx": "507d0d0178a7eacc7d6d0b397a28caf14d9864e2e923f90c88fe1094e2d0933b",
-    "components/food/RecommendedIngredientCard.tsx": "bb8abad28ca852c611f44f5ba9844bef64dfe466a566680b96e0dcde3b3f6d0b",
+    "components/food/NutrientCards.tsx": "c6c1d88289cc01804c42a153a5966a9669da40da48e7fce67404b8abd4378bb6",
+    "components/food/RecommendedIngredientCard.tsx": "ca08058cba3906574a9cb4b9c66a83d5b69cf8db55107c1611371938c54f3c8c",
     "components/food/RollerTimePicker.tsx": "a3322deac0e0cc00277d4e9b23ec31e6b30b6ace63de5c9aee258b986ae5332f",
     "components/HeroCarousel.tsx": "662d268be69e4e2dc4daa16eb82728cf43720cee000a88ba5bbc8ad9a67a29de",
     "components/InsightMoreInfo.tsx": "689843884c9060c2463b30227e2b8a690da8bd523452507746aabf6c2737d02a",
@@ -198,8 +199,9 @@
     "components/SolidMacroRing.tsx": "c3c6e3f07fafd237fa4dcd498b024ac48e48c2ebd23a64c924aab253590fedaa",
     "components/support/SupportChatWidget.tsx": "2f6316a0cfdd832bb7e71d4de51a18cf2a2e84aba575262e291d646ec84165f5",
     "components/UsageMeter.tsx": "c031540fcb357f17144674e6a8fddb2f15af88887d56b0c743cec2ad6f1eb9a0",
-    "components/VoiceChat.tsx": "2e35d038663a8894dbcbe5ca3996de2a064f9c801addcaef043bb92b75a53e40",
+    "components/VoiceChat.tsx": "8a8b2206b3f021002b456eec2852c4bcd4752a185066d3e74843fe64412fba39",
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
+    "native/src/components/NutrientCards.tsx": "fb5ccace14e52ec3e38d6b60b8d98801e749d16b9b65e5b7c753fa8aa2eb4fd9",
     "native/src/components/WeeklyReportDataExplorer.tsx": "e9552ed655d48736cbe00946ae20c9d580389f2469463dd22f20b6e69e496e51",
     "native/src/config.ts": "b9081565de3694e029e92b1149e1412c8d5e322d5a2e2e68ba0963b6d0489428",
     "native/src/config/nativePageRoutes.ts": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f",
@@ -225,7 +227,7 @@
     "native/src/navigation/NativeBottomNav.tsx": "6939c54d1d7f206c98fe57be46df98e7fe9c0edd1f12f03266a142f88ece17a8",
     "native/src/navigation/RootNavigator.tsx": "3e133cdb0f9721dc140baa6aafd370fc74c046cb72bfc049fcb890ecd1fd11d0",
     "native/src/screens/AccountSettingsScreen.tsx": "78f1b46ff4e18c1498e3c171e688ddfbd4ed6803cdc5dfe355d79e1d3bfa1478",
-    "native/src/screens/AddIngredientScreen.tsx": "f5aac750bbb0925e3d00417ace3d8ebd5c4bcb175acddec15565a4b12c50b784",
+    "native/src/screens/AddIngredientScreen.tsx": "2de63b4562976e9b3c61ce895562ef2887f47398a7de7987f81f23621eed731e",
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
     "native/src/screens/BillingScreen.tsx": "55dc417bd398eeef5bb4cc5dcbc44e109bf4de77ac7c187dfd9fb0583c6fc6a8",
     "native/src/screens/DailyCheckInScreen.tsx": "7e3f91adf203aa1af835757542f635201a927837a51fd8cbf7244e3c91fb3039",
@@ -265,8 +267,8 @@
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "b0456e82e3cae345d3722cb0a0ea1d791d5c26ff773840ee37a7b997d1334800",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "a07ef10ed34206fe04ca68c386d57e8434fda81015017a9241949477ca1eab6b",
-    "native/src/screens/WaterIntakeScreen.tsx": "5b7ffec299bbffa651a8433a7881bd0b3bb013dff102bd5a0b6f0f66f0dccebe",
+    "native/src/screens/TrackCaloriesScreen.tsx": "2e6cda0a40994dcbd510814976ae0dfc154e806ef4fd045063f79e79bc348669",
+    "native/src/screens/WaterIntakeScreen.tsx": "1b3aae043fcb347c0198b6aa25e6b4caad76d6105911d632b55fdd61fbd0c2f9",
     "native/src/state/AppModeContext.tsx": "ce70c2670e359ca8fba27a78a2bd817b551490a422b30dabe3b87b3837739321",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",
     "native/src/ui/HelfiButton.tsx": "351c6e506085f49f81a9e6bfc1d3d004f5c1d642538c258071585d8fc22e6f64",
@@ -274,7 +276,7 @@
     "native/src/ui/Screen.tsx": "085e4c4a81c7bf61a60d4a29e4185fddc17ca49b8b9587fa489480fafed0d375",
     "native/src/ui/theme.ts": "c4843a306c46b6b8116b0b89a768265a26bbbef3f636e34e096f30154bb8f2ab",
     "native/src/voice/realtimeVoice.ts": "b447d8b41c160c39bb446aabbb5fd7cdcedb96622517c893918ce0af25dfb00f",
-    "native/src/voice/VoiceAssistant.tsx": "d95990f3bab5c9e7916469b8f0b47bea4753dd2991b606857d641b9071ef0879",
+    "native/src/voice/VoiceAssistant.tsx": "22bae458b4395a6075fb82843e42ec7c640d0667f815884107cda13f66e1dedf",
     "native/src/voice/VoiceAssistantIconButton.tsx": "9be7cd11cc7abffa4c8778de0740aeb1a4bad2b84f21073bc3db1ed7feaa2301"
   }
 }

@@ -26,6 +26,7 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { NutrientCards } from '../components/NutrientCards'
 
 type SearchKind = 'packaged' | 'single'
 type SearchSource = 'auto'
@@ -2197,32 +2198,7 @@ export function AddIngredientScreen() {
               <Text style={{ marginTop: 6, fontSize: 12, color: '#6B7280' }}>Servings: {formatAmount(servingsForPreview || 1)}</Text>
             </View>
 
-            <View style={{ flexDirection: 'row', flexWrap: 'wrap', marginTop: 2, gap: 8 }}>
-              {[
-                { label: 'Calories', value: `${previewCalories}` },
-                { label: 'Protein', value: `${previewProtein} g` },
-                { label: 'Carbs', value: `${previewCarbs} g` },
-                { label: 'Fat', value: `${previewFat} g` },
-                { label: 'Fibre', value: `${previewFiber == null ? '—' : `${previewFiber} g`}` },
-                { label: 'Sugar', value: `${previewSugar == null ? '—' : `${previewSugar} g`}` },
-              ].map((tile) => (
-                <View
-                  key={tile.label}
-                  style={{
-                    width: '48.6%',
-                    borderWidth: 1,
-                    borderColor: '#E5E7EB',
-                    borderRadius: 8,
-                    paddingHorizontal: 10,
-                    paddingVertical: 8,
-                  }}
-                >
-                  <Text style={{ fontSize: 12, color: '#4B5563' }}>
-                    {tile.label}: <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{tile.value}</Text>
-                  </Text>
-                </View>
-              ))}
-            </View>
+            <NutrientCards values={{ calories: previewCalories, protein: previewProtein, carbs: previewCarbs, fat: previewFat, fiber: previewFiber, sugar: previewSugar }} />
           </ScrollView>
 
           <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingHorizontal: 16, paddingVertical: 10 }}>

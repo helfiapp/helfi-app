@@ -8,6 +8,7 @@ import { Feather } from '@expo/vector-icons'
 import { useSafeAreaInsets } from 'react-native-safe-area-context'
 
 import { API_BASE_URL } from '../config'
+import { NutrientCards } from '../components/NutrientCards'
 import { hasAiDataSharingPermission, requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
@@ -3251,10 +3252,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                         ))}
                       </View>
                     ) : null}
-                    {draft.food?.nutrition?.calories ? (
-                      <Text style={styles.creditText}>
-                        Estimate: {Math.round(Number(draft.food.nutrition.calories) || 0)} kcal
-                      </Text>
+                    {draft.food?.nutrition ? (
+                      <View style={{ marginTop: 12 }}>
+                        <Text style={styles.creditText}>Estimated nutrition</Text>
+                        <NutrientCards values={draft.food.nutrition} />
+                      </View>
                     ) : null}
                     {draft.food?.draftText ? <Text style={styles.message}>{draft.food.draftText}</Text> : null}
                     {draft.healthIntake?.items?.length ? (

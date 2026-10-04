@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useState } from 'react'
+import NutrientCards from './NutrientCards'
 
 import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measurements'
 import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
@@ -811,26 +812,14 @@ export default function RecommendedIngredientCard({
             </div>
           </div>
 
-          <div className="flex flex-wrap gap-2">
-            <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-              <span className="font-semibold text-gray-900">{formatNumber(totals.calories)}</span> kcal
-            </div>
-            <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-              <span className="font-semibold text-gray-900">{formatNumber(totals.protein_g, 1)}</span> g protein
-            </div>
-            <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-              <span className="font-semibold text-gray-900">{formatNumber(totals.carbs_g, 1)}</span> g carbs
-            </div>
-            <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-              <span className="font-semibold text-gray-900">{formatNumber(totals.fat_g, 1)}</span> g fat
-            </div>
-            <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-              <span className="font-semibold text-gray-900">{formatNumber(totals.fiber_g, 1)}</span> g fibre
-            </div>
-            <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-              <span className="font-semibold text-gray-900">{formatNumber(totals.sugar_g, 1)}</span> g sugar
-            </div>
-          </div>
+          <NutrientCards values={{
+            calories: item.calories == null ? null : totals.calories,
+            protein: item.protein_g == null ? null : totals.protein_g,
+            carbs: item.carbs_g == null ? null : totals.carbs_g,
+            fat: item.fat_g == null ? null : totals.fat_g,
+            fiber: item.fiber_g == null ? null : totals.fiber_g,
+            sugar: item.sugar_g == null ? null : totals.sugar_g,
+          }} />
         </div>
       )}
     </div>

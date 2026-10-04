@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master, job37, all BUILD/DEPLOY/VERIFY SUCCEED
+- Date/time: 5 October 2026, 12:58 am Melbourne
+- What changed: Image-note follow-ups and manual food diary refresh update the displayed credit balance. Charging calculations and prices unchanged. Commit5f97013948fc1a5c8d5884a63826d165581739c3.
+- Where to see it (page/link): https://helfi.ai/medical-images and https://helfi.ai/food
+- What to quickly test: Follow-up visibly charges3 and wallet645→642 immediately; Food Diary shows642 and retained589kcal daily total. Actual live UI verified; candidate39 iPad dashboard/diary/AddIngredient all show642. Final signed store builds remain pending.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master, job36, all BUILD/DEPLOY/VERIFY SUCCEED
 - Date/time: 5 October 2026, 12:45 am Melbourne
 - What changed: Native Apple sign-in uses verified signed Apple email for initial account linking, blocks client-email fallback, preserves linked returning Apple-subject sign-in. No identity token/error payload logging. Commiteb4a4df63216be3458523d24ce91c1ac76e4c0df.

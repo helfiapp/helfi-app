@@ -1,5 +1,7 @@
 'use client'
 
+import NutrientCards from '@/components/food/NutrientCards'
+
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
@@ -7538,26 +7540,14 @@ export default function MealBuilderClient() {
                           </div>
                         </div>
 
-                        <div className="flex flex-wrap gap-2">
-                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{formatEnergyValue(macroTotals.calories, energyUnit)}</span> {energyUnit}
-                          </div>
-                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(macroTotals.protein)}</span> g protein
-                          </div>
-                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(macroTotals.carbs)}</span> g carbs
-                          </div>
-                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(macroTotals.fat)}</span> g fat
-                          </div>
-                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(macroTotals.fiber)}</span> g fibre
-                          </div>
-                          <div className="px-3 py-1 rounded-full bg-gray-100 border border-gray-200 text-[11px] font-medium text-gray-700">
-                            <span className="font-semibold text-gray-900">{round3(macroTotals.sugar)}</span> g sugar
-                          </div>
-                        </div>
+                        <NutrientCards energyUnit={energyUnit} values={{
+                          calories: it.calories == null ? null : macroTotals.calories,
+                          protein: it.protein_g == null ? null : macroTotals.protein,
+                          carbs: it.carbs_g == null ? null : macroTotals.carbs,
+                          fat: it.fat_g == null ? null : macroTotals.fat,
+                          fiber: it.fiber_g == null ? null : macroTotals.fiber,
+                          sugar: it.sugar_g == null ? null : macroTotals.sugar,
+                        }} />
 
                         <button
                           type="button"

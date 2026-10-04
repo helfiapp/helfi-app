@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
 import MissingFoodReport from '@/components/food/MissingFoodReport'
+import NutrientCards from '@/components/food/NutrientCards'
 import {
   DEFAULT_UNIT_GRAMS,
   MeasurementUnit,
@@ -2338,26 +2339,7 @@ export default function AddIngredientClient() {
                       <div className="mt-1 text-xs text-gray-500">Servings: {formatNumber(servings || 1)}</div>
                     </div>
 
-                    <div className="grid grid-cols-2 gap-2 text-xs text-gray-600">
-                      <div className="rounded-lg border border-gray-200 px-2 py-2">
-                        Calories: <span className="font-semibold text-gray-900">{Math.round(calories)}</span>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 px-2 py-2">
-                        Protein: <span className="font-semibold text-gray-900">{formatNumber(protein)} g</span>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 px-2 py-2">
-                        Carbs: <span className="font-semibold text-gray-900">{formatNumber(carbs)} g</span>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 px-2 py-2">
-                        Fat: <span className="font-semibold text-gray-900">{formatNumber(fat)} g</span>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 px-2 py-2">
-                        Fibre: <span className="font-semibold text-gray-900">{formatNumber(fiber)} g</span>
-                      </div>
-                      <div className="rounded-lg border border-gray-200 px-2 py-2">
-                        Sugar: <span className="font-semibold text-gray-900">{formatNumber(sugar)} g</span>
-                      </div>
-                    </div>
+                    <NutrientCards values={{ calories, protein, carbs, fat, fiber: adjustItem.fiber_g == null ? null : fiber, sugar: adjustItem.sugar_g == null ? null : sugar }} />
                   </>
                 )
               })()}

@@ -1,5 +1,7 @@
 'use client'
 
+import NutrientCards from '@/components/food/NutrientCards'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
 import { useRouter, useSearchParams } from 'next/navigation'
@@ -977,6 +979,7 @@ export default function RecommendedMealClient() {
 
                   <div className="rounded-2xl border border-gray-200 bg-white p-4">
                     <div className="text-sm font-semibold text-gray-900">Meal macro summary</div>
+                    <div className="mt-3"><NutrientCards values={{ calories: draftTotals.calories, protein: draftTotals.protein_g, carbs: draftTotals.carbs_g, fat: draftTotals.fat_g, fiber: draftTotals.fiber_g, sugar: draftTotals.sugar_g }} /></div>
                     <div className="mt-3 space-y-3">
                       {mealMacroRows.map((row) => (
                         <div key={row.key} className="space-y-1">

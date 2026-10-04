@@ -9,6 +9,7 @@ import Link from 'next/link'
 import { formatChatContent } from '@/lib/chatFormatting'
 import AiConsentModal, { hasSavedAiConsent, saveAiConsent } from '@/components/AiConsentModal'
 import UsageMeter from '@/components/UsageMeter'
+import NutrientCards from '@/components/food/NutrientCards'
 import PractitionerRecommendations from '@/components/PractitionerRecommendations'
 import { useUserData } from '@/components/providers/UserDataProvider'
 import { UserIcon } from '@heroicons/react/24/outline'
@@ -2678,6 +2679,7 @@ export default function VoiceChat({
     return (
       <div className="rounded-2xl border border-gray-200 bg-white px-4 py-4 shadow-sm">
         <div className="text-[15px] md:text-[13px] font-semibold text-gray-900">{label}: {caloriesLabel}</div>
+        <div className="mt-3"><NutrientCards values={totals} /></div>
         <div className="mt-3 space-y-3">
           {rows.map((row) => {
             const consumed = totals[row.key]

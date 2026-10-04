@@ -14,6 +14,7 @@ import { useFocusEffect, useNavigation, useRoute } from '@react-navigation/nativ
 import type { RouteProp } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { NutrientCards } from '../components/NutrientCards'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
@@ -1058,9 +1059,7 @@ export function WaterIntakeScreen() {
                         : sugarToGrams(amount, drinkSugarUnit)
                     const macros = sweetenerToMacros(grams, drinkSugarChoice)
                     return (
-                      <Text style={{ color: theme.colors.muted }}>
-                        Auto nutrition: {Math.round(macros.calories)} kcal • Carbs {formatNumber(macros.carbs)}g • Sugar {formatNumber(macros.sugar)}g
-                      </Text>
+                      <NutrientCards values={macros} />
                     )
                   })()}
                 </View>
