@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify73, helfi.ai/www.helfi.ai200CloudFront/new matchingetagzcs3p7lh4k1z15.
+- Date/time: 5 October2026, verified07:00:12UTC (18:00 Melbourne); fresh live saved-card check18:01.
+- What changed: 8a020a0b533ca51f7db6059c18883b838deee85d; saved website ingredient nutrients retain original multiplication precision until display and decimal ties round consistently. Native unchanged; matching native display fix is next74.
+- Where to see it (page/link): https://helfi.ai/food — Lunch17:38 Sanitarium > Edit Entry > Nutritional breakdown.
+- What to quickly test: Original20g/1.5servings/30g191 retains all6cards/P8.1/C3/F16.1/Fibre1.8/S1.2, matching new-add preview; kJ798 switch passes. Fresh live reload daily2673/619; noSave/Update and all22rows/hash unchanged, storedfat16.05/source unchanged. Actual oldJSX FAIL/newJSX PASS; original precision/decimal boundaries/missing/zeros/cards/kcal-kJ plus96clockchecks/fullbuild45827exit0/protected/root278native79 PASS. AWS BUILD/DEPLOY/VERIFY SUCCEED. Native currently still16g for this tie; broader labels/source-choice metadata/photos/model/signed stores remain unfinished. Apple saved autofill still requires unlocked Mac.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify72, helfi.ai/www.helfi.ai200CloudFront/new matchingetag87xz4031981z15.
 - Date/time: 5 October2026, verified06:35:07UTC (17:35 Melbourne); saved/reopened verification17:45.
 - What changed: 1d1565a719bb921b033a3eca1b7d494ec474baf5; packaged local search matches every product word before limiting20 rows, so exact branded products survive broad brand matches. Source nutrients, UI, native and customer history unchanged.

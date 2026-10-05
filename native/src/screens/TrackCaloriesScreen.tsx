@@ -1307,7 +1307,8 @@ function buildDailyTargetsFromUserData(raw: any): DailyTargets {
 
 function formatNutrientGrams(value: number | null | undefined) {
   if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
-  return String(Math.round(value * 10) / 10)
+  const scaled = value * 10
+  return String(Math.round(scaled + Number.EPSILON * Math.max(1, Math.abs(scaled))) / 10)
 }
 
 function formatMacroAmount(value: number | null | undefined) {
@@ -8155,7 +8156,7 @@ export function TrackCaloriesScreen() {
                                     <View key={key} style={{ width: '48%' }}>
                                       <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginBottom: 5 }}>{label} ({unit})</Text>
                                       <TextInput
-                                        value={total == null ? '' : key === 'calories' ? String(Math.round(total)) : String(round1(total))}
+                                        value={total == null ? '' : key === 'calories' ? String(Math.round(total)) : formatNutrientGrams(total)}
                                         placeholder="Not provided"
                                         onChangeText={(value) => updateFavoriteEditIngredientNutrient(editItem.id, key, value)}
                                         keyboardType="decimal-pad"

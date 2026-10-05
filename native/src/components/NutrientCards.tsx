@@ -22,9 +22,12 @@ export function NutrientCards({ values, energyUnit = 'kcal' }: { values: Nutrien
         const value = values[card.key]
         const known = typeof value === 'number' && Number.isFinite(value)
         const label = card.key === 'calories' && energyUnit === 'kj' ? 'Kilojoules' : card.label
+        const scaledGrams = known ? value * 10 : 0
+        // Preserve decimal ties after portion multiplication, as on the website.
+        const roundedGrams = Math.round(scaledGrams + Number.EPSILON * Math.max(1, Math.abs(scaledGrams))) / 10
         const display = !known ? '—' : card.key === 'calories'
           ? `${Math.round(value * (energyUnit === 'kj' ? 4.184 : 1))} ${energyUnit === 'kj' ? 'kJ' : 'kcal'}`
-          : `${Math.round(value * 10) / 10} g`
+          : `${roundedGrams} g`
         return (
           <View key={card.key} accessible accessibilityLabel={`${label}: ${display}`}
             style={{ width: width > 0 ? (width - (columns - 1) * 10) / columns : '47%', minHeight: 86, borderWidth: 1, borderColor: card.border, borderRadius: 16, padding: 14, backgroundColor: card.bg }}>

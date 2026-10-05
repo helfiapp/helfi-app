@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T06:50:51.478Z",
+  "generatedAt": "2026-10-05T07:10:53.518Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -201,7 +201,7 @@
     "components/UsageMeter.tsx": "c031540fcb357f17144674e6a8fddb2f15af88887d56b0c743cec2ad6f1eb9a0",
     "components/VoiceChat.tsx": "8a8b2206b3f021002b456eec2852c4bcd4752a185066d3e74843fe64412fba39",
     "components/WeeklyReportReadyModal.tsx": "0ea80097b64c7c177bc7326594b52958982768e391b1b885e7140cf345ae90b6",
-    "native/src/components/NutrientCards.tsx": "fb5ccace14e52ec3e38d6b60b8d98801e749d16b9b65e5b7c753fa8aa2eb4fd9",
+    "native/src/components/NutrientCards.tsx": "49df34044f4bed687167214a82cd3a714744cb841964b10ef5658a44e30454eb",
     "native/src/components/WeeklyReportDataExplorer.tsx": "e9552ed655d48736cbe00946ae20c9d580389f2469463dd22f20b6e69e496e51",
     "native/src/config.ts": "b9081565de3694e029e92b1149e1412c8d5e322d5a2e2e68ba0963b6d0489428",
     "native/src/config/nativePageRoutes.ts": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f",
@@ -269,7 +269,7 @@
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "b0456e82e3cae345d3722cb0a0ea1d791d5c26ff773840ee37a7b997d1334800",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "a991d6646ac48a88c665b9f6532dbcbef642c926efd86fe55f4ee45d7d74a9f2",
+    "native/src/screens/TrackCaloriesScreen.tsx": "491baa44df38f6fa830631dff7b819b80a8e2bbf856907954bc61c05eeee0c2c",
     "native/src/screens/WaterIntakeScreen.tsx": "1b3aae043fcb347c0198b6aa25e6b4caad76d6105911d632b55fdd61fbd0c2f9",
     "native/src/state/AppModeContext.tsx": "ce70c2670e359ca8fba27a78a2bd817b551490a422b30dabe3b87b3837739321",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",

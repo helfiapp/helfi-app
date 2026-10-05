@@ -1,0 +1,118 @@
+{
+  "task": 74,
+  "baselineSource": "8a020a0b533ca51f7db6059c18883b838deee85d",
+  "status": "SOURCE_BUILD_AND_NATIVE_RUNTIME_PASS_DEPLOYMENT_PENDING",
+  "sourceScope": [
+    "native/src/components/NutrientCards.tsx",
+    "native/src/screens/TrackCaloriesScreen.tsx"
+  ],
+  "reproduction": {
+    "sourceFat": 10.7,
+    "servings": 1.5,
+    "preciseMultipliedFat": 16.049999999999997,
+    "beforeDisplay": "16",
+    "afterDisplay": "16.1",
+    "editableFieldBefore": "16",
+    "editableFieldAfter": "16.1",
+    "originalSourceCalculationUnchanged": true
+  },
+  "checks": {
+    "actualSourceBaseline": "FAIL reproduces 16 versus expected 16.1",
+    "actualSourceFinal": "PASS meal sum, summary, actual ingredient field JSX, six colors, responsive widths 0/369/1024, decimal boundaries, missing/zero, kcal/kJ798, immutable inputs; no network/writes",
+    "nativeTypecheck": {
+      "session": 86640,
+      "exitCode": 0
+    },
+    "productionBuild": {
+      "session": 93861,
+      "exitCode": 0,
+      "log": "tmp/task74-final-production-build.log"
+    },
+    "rootPageLocks": 278,
+    "nativePageLocks": 79,
+    "onlyChangedLockHashes": [
+      "native/src/components/NutrientCards.tsx",
+      "native/src/screens/TrackCaloriesScreen.tsx"
+    ],
+    "protectedRegions": "PASS"
+  },
+  "builds": {
+    "task74PhoneBuildFinal": {
+      "summary": {
+        "status": "SUCCEEDED",
+        "durationMs": 26861,
+        "target": "simulator"
+      },
+      "artifacts": {
+        "appPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/DerivedData/Helfi-ccc9cb918b94/Build/Products/Release-iphonesimulator/Helfi.app",
+        "bundleId": "ai.helfi.app",
+        "processId": 38592,
+        "simulatorId": "BDD79FD0-6ED1-474D-88A1-4FD8EFAD4A75",
+        "buildLogPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/logs/build_run_sim_2026-10-05T07-11-15-430Z_pid52869_0a603e72.log",
+        "runtimeLogPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/logs/ai.helfi.app_2026-10-05T07-11-41-580Z_helperpid38589_ownerpid52869_98f1cae5.log",
+        "osLogPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/logs/ai.helfi.app_oslog_2026-10-05T07-11-42-248Z_helperpid38688_ownerpid52869_9c57fa36.log"
+      }
+    },
+    "task74PadBuild": {
+      "summary": {
+        "status": "SUCCEEDED",
+        "durationMs": 90006,
+        "target": "simulator"
+      },
+      "artifacts": {
+        "appPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/DerivedData/Helfi-ccc9cb918b94/Build/Products/Release-iphonesimulator/Helfi.app",
+        "bundleId": "ai.helfi.app",
+        "processId": 40662,
+        "simulatorId": "30601C93-5376-4799-8C98-7A4F3FCF762D",
+        "buildLogPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/logs/build_run_sim_2026-10-05T07-13-38-951Z_pid52869_add60536.log",
+        "runtimeLogPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/logs/ai.helfi.app_2026-10-05T07-15-07-855Z_helperpid40659_ownerpid52869_eb815e07.log",
+        "osLogPath": "/Users/louieveleski/Library/Developer/XcodeBuildMCP/workspaces/helfi-app-ecb2a5fb64ce/logs/ai.helfi.app_oslog_2026-10-05T07-15-08-912Z_helperpid40759_ownerpid52869_d3243628.log"
+      }
+    }
+  },
+  "runtime": {
+    "account": "info@sonicweb.com.au",
+    "nativeReleaseBuild": 39,
+    "savedMealId": "cmuuvpib70001tvel0mwqie66",
+    "name": "Sanitarium Crunchy Peanut Butter 500g",
+    "clock": "17:38",
+    "originalServing": "Serving — 20g",
+    "amount": "30 g",
+    "dailyCalories": 2673,
+    "remainingCalories": 0,
+    "credits": 619,
+    "values": {
+      "calories": 191,
+      "protein": 8.1,
+      "carbs": 3,
+      "fat": 16.1,
+      "fiber": 1.8,
+      "sugar": 1.2
+    },
+    "iPhone": "Rebuilt/restarted signed in; reopened meal summary, all six colorful meal cards, original serving/amount and all six ingredient cards/fields agree",
+    "iPad": "Rebuilt/restarted signed in; reopened meal summary, three-column six-card grids and original serving/amount/fields agree",
+    "openingOnly": true,
+    "saveOrUpdatePressed": false,
+    "screenshots": [
+      "iphone-saved-peanut-butter-30g-corrected-rounding-cards.jpg",
+      "iphone-saved-peanut-butter-30g-corrected-rounding-fields.jpg",
+      "ipad-saved-peanut-butter-30g-corrected-rounding-cards.jpg",
+      "ipad-saved-peanut-butter-30g-corrected-rounding-fields.jpg"
+    ]
+  },
+  "records": {
+    "diaryCount": 22,
+    "allDiaryRecordsHash": "34b88b671201191d4adb12a54605b0c08a6fff61a2fc72311189a1615efc3f95",
+    "original21Unchanged": true,
+    "all22OpeningHashUnchanged": true,
+    "checkpoint": "packaged-food-label-review.json recordsFinalNativeDisplayReopening",
+    "storedFat": 16.05,
+    "originalSourceUnchanged": true
+  },
+  "limitations": [
+    "Native energy toggle/missing/genuine-zero cases covered by actual-component fixtures, not new task74 live UI interactions",
+    "No native Save in task74; normal website Save and cross-device reopen recorded in task72",
+    "No new signed store binaries uploaded",
+    "Current food label/barcode certification, image-model comparison and complete release matrix remain open"
+  ]
+}
