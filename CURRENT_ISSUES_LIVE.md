@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify
+- Date/time: 5 October 2026, verified 08:52:16 UTC (19:52 Melbourne)
+- What changed: Saved serving amounts retain their recorded serving option instead of displaying a misleading gram label. Source 57faa2e9249368f6db0ffd02ead7c8fafd482dda; AWS job 77 BUILD/DEPLOY/VERIFY SUCCEED; both live domains 200 via CloudFront with matching new ETag 16ls0dgx9jc1z15.
+- Where to see it (page/link): https://helfi.ai/food — saved rice entry, 5 October, 19:09.
+- What to quickly test: Edit entry: 0.5 serving — 158 g, all six colored cards and 103 kcal. Switching to g gives 79 g with 103 kcal; cancel preserves original entry. Original23 records/hash unchanged, daily2776/credits619/time retained. Model comparison/admin access, current-label validation, Android runtime and final signed stores remain open.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify job76, all steps SUCCEED)
 - Date/time: 5October2026 verified08:27:19UTC
 - What changed: Task77 USDA recorded household servings take priority over conflicting generic cups/spoons; source746ef5aa3bcb61549af4538d833e5ee457e07aff.

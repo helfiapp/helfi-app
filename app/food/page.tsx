@@ -70,9 +70,9 @@ const NUTRIENT_CARD_META: Record<typeof NUTRIENT_DISPLAY_ORDER[number], { label:
 const ITEM_NUTRIENT_META = [
   { key: 'calories', field: 'calories', label: 'Calories', unit: '', valueClass: 'text-orange-600', labelClass: 'text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/10', border: 'border-orange-100 dark:border-orange-900/20' },
   { key: 'protein', field: 'protein_g', label: 'Protein', unit: 'g', valueClass: 'text-blue-600', labelClass: 'text-blue-400', bg: 'bg-blue-50 dark:bg-blue-900/10', border: 'border-blue-100 dark:border-blue-900/20' },
-  { key: 'carbs', field: 'carbs_g', label: 'Carbs', unit: 'g', valueClass: 'text-purple-600', labelClass: 'text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-100 dark:border-purple-900/20' },
-  { key: 'fat', field: 'fat_g', label: 'Fat', unit: 'g', valueClass: 'text-yellow-600', labelClass: 'text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/10', border: 'border-yellow-100 dark:border-yellow-900/20' },
-  { key: 'fiber', field: 'fiber_g', label: 'Fiber', unit: 'g', valueClass: 'text-green-600', labelClass: 'text-green-400', bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-100 dark:border-green-900/20' },
+  { key: 'carbs', field: 'carbs_g', label: 'Carbs', unit: 'g', valueClass: 'text-green-600', labelClass: 'text-green-400', bg: 'bg-green-50 dark:bg-green-900/10', border: 'border-green-100 dark:border-green-900/20' },
+  { key: 'fat', field: 'fat_g', label: 'Fat', unit: 'g', valueClass: 'text-purple-600', labelClass: 'text-purple-400', bg: 'bg-purple-50 dark:bg-purple-900/10', border: 'border-purple-100 dark:border-purple-900/20' },
+  { key: 'fiber', field: 'fiber_g', label: 'Fiber', unit: 'g', valueClass: 'text-yellow-600', labelClass: 'text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/10', border: 'border-yellow-100 dark:border-yellow-900/20' },
   { key: 'sugar', field: 'sugar_g', label: 'Sugar', unit: 'g', valueClass: 'text-rose-600', labelClass: 'text-rose-400', bg: 'bg-rose-50 dark:bg-rose-900/10', border: 'border-rose-100 dark:border-rose-900/20' },
 ] as const
 
