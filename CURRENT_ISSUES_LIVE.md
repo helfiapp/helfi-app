@@ -1,5 +1,13 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05 12:08:25 UTC
+- What changed: Restored six colourful nutrient cards in the common overall food-result summary, including photo/saved and unknown-total results. Source numbers, existing chart/controls, model and native app unchanged.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Analyse a food photo or reopen a saved entry; Calories/Protein/Carbs/Fat/Fibre/Sugar cards must all appear in their existing colours. Missing stays— and known zero stays0; both energy units supported. Actual freshphoto/saved desktop and390x844 phone cards passed; knownzero/missing retained. Original23/hash unchanged/noSave/daily2776/wallet564.
+- Verified source:843f104506122675e47862a9642fbffcdd913d51/AWS87 BUILD-DEPLOY-VERIFY SUCCEED; both domains200CloudFront/new matching ETag uudgurwxc11z15. Full signed-store/model accuracy comparison goal remainsopen.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-05 11:50:39 UTC
 - What changed: Counted-food calorie correction now preserves nutrition already covering the whole stated portion, requires smaller-portion evidence before scaling conflicting egg labels, retains unknown nutrients and refreshes changed-count totals.
 - Where to see it (page/link): https://helfi.ai/food

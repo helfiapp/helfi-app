@@ -1,0 +1,34 @@
+{
+  "scope": 89,
+  "recordedAt": "2026-10-05T12:31:51.315890+00:00",
+  "status": "SOURCE_FULL_BUILD_PROTECTED_AND_LOCKS_PASS_EXACT_DEPLOY_PENDING",
+  "baselineSource": "843f104506122675e47862a9642fbffcdd913d51",
+  "baselineEvidence": "Actual normal production photo response: prose Calories885/P33/C122/F33; final seven structured items/total/UI962/P32.7/C142/F33.3. Local raw receipt tmp/task88-live-production-response.json.",
+  "implementation": "Synchronize only standalone single-line meal nutrition summaries after all final structured-item sanitization, using final response total. Retain original photo observations, ingredient count/portion descriptions and unknown-versus-zero. No extra AI calls.",
+  "checks": [
+    "actual prior production description and885-versus962 fixture",
+    "idempotence",
+    "bold/semicolon/fallbackunknown/optional fields",
+    "preserve ingredient or quoted label quantities",
+    "unknown total fields remain unknown",
+    "true zero remains zero",
+    "card-compatible presentation decimal ties without changing total values",
+    "actual final route call occurs after final item processing"
+  ],
+  "fixtureCommand": "npm run check:food-analysis-summary",
+  "modelChanged": false,
+  "billingChanged": false,
+  "nativeChanged": false,
+  "pageLocksChanged": false,
+  "databaseChanged": false,
+  "liveVerified": false,
+  "wholeGoalComplete": false,
+  "build": "17290 exit0",
+  "pageLocks": {
+    "web": 278,
+    "native": 79,
+    "status": "PASS",
+    "snapshotsChanged": false
+  },
+  "protectedRegions": "PASS"
+}

@@ -1,7 +1,7 @@
 {
   "scope": 88,
   "recordedAt": "2026-10-05T12:01:30.821656+00:00",
-  "status": "ACTUAL_SUMMARY_JSX_32_CARD_RENDERS_FULL_PRODUCTION_BUILD_PASS_DEPLOY_PENDING",
+  "status": "PASS_SOURCE_BUILD_EXACT_AWS_LIVE_PHOTO_SAVED_PHONE_CARDS",
   "baselineSource": "2c5a023ee6fd519c00d06c4e633808eb6e8ef257",
   "baselineFailure": "Common overall-result nutrient-card block absent; actual JSX presence fixture fails. Real photo summary shows only chart and labels.",
   "implementation": "Reuse existing shared NutrientCards in the common food-result area whenever totals or ingredient results exist, independent of editing/photo/viewport; all-unknown results retain six cards.",
@@ -35,7 +35,94 @@
   "billingChanged": false,
   "historyChanged": false,
   "apiChanged": false,
-  "deployment": null,
-  "actualLiveResult": null,
+  "deployment": {
+    "verifiedAt": "2026-10-05T12:08:25.822Z",
+    "summary": {
+      "jobId": "87",
+      "status": "SUCCEED",
+      "commitId": "843f104506122675e47862a9642fbffcdd913d51"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"uudgurwxc11z15\"",
+        "via": "1.1 fdeb308ffcd71e7834712bbbf4e0bcb0.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"uudgurwxc11z15\"",
+        "via": "1.1 fdeb308ffcd71e7834712bbbf4e0bcb0.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "actualLiveResult": {
+    "photo": {
+      "httpStatus": 200,
+      "seconds": 12.331856,
+      "uiSeconds": 13,
+      "model": "unchanged 5.6 Sol",
+      "calories": 962,
+      "kj": 4025,
+      "cards": 6,
+      "allSixColours": true
+    },
+    "savedUnknownOptional": {
+      "name": "Teriyaki sauce",
+      "calories": 88,
+      "fibre": null,
+      "fat": 0,
+      "cards": 6,
+      "desktopPassed": true,
+      "phoneViewport": {
+        "width": 390,
+        "height": 844
+      },
+      "phonePassed": true
+    },
+    "savedZero": {
+      "name": "Water, bottled, generic",
+      "cards": 6,
+      "allSixKnownZero": true
+    },
+    "history": {
+      "original23Unchanged": true,
+      "hash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+      "saveOrUpdate": false,
+      "dailyCalories": 2776,
+      "wallet": 564
+    },
+    "screenshots": [
+      "web-photo-overall-six-cards.png",
+      "web-saved-overall-six-cards.png",
+      "web-phone-saved-overall-six-cards.png",
+      "web-saved-zero-overall-six-cards.png"
+    ],
+    "limitations": [
+      "Fresh photo phone layout covered by common source32render cases, not separately rerun paid photo request.",
+      "New separate issue: final prose885 versus structured/UI962.",
+      "Existing phone chart displays missing fibre as0; cards correctly retain dash.",
+      "No newer model or signed-store release certification."
+    ]
+  },
   "wholeGoalComplete": false
 }

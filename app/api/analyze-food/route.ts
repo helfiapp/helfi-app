@@ -48,6 +48,30 @@ import { normalizeImageForAi, resolveImageContentType } from '@/lib/ai-image-nor
 
 export const maxDuration = 120;
 
+// The model's initial prose can become stale after the existing portion corrections.
+// Keep only standalone meal-summary lines aligned with the final structured nutrition.
+const synchronizeAnalysisNutritionSummary = (analysis: string, total: any): string => {
+  if (!total || typeof total !== 'object') return analysis;
+  const display = (value: unknown, energy = false) => {
+    const number = foodNumberOrNull(value);
+    if (number === null) return 'unknown';
+    const rounded = energy ? Math.round(number) : Math.round((number + Number.EPSILON * Math.abs(number)) * 10) / 10;
+    return `${rounded}${energy ? '' : 'g'}`;
+  };
+  const summary = `Calories: ${display(total.calories, true)}, Protein: ${display(total.protein_g)}, Carbs: ${display(total.carbs_g)}, Fat: ${display(total.fat_g)}, Fibre: ${display(total.fiber_g)}, Sugar: ${display(total.sugar_g)}`;
+  const value = '(?:\\d+(?:\\.\\d+)?|unknown|—|n/a)';
+  const separator = '\\s*[,;|]\\s*';
+  const field = (name: string, unit: string) => `(?:${name})\\s*:\\s*${value}\\s*${unit}`;
+  const mealLine = new RegExp(`^(?:total\\s+)?${field('calories', '(?:kcal)?')}${separator}${field('protein', 'g?')}${separator}${field('carbs', 'g?')}${separator}${field('fat', 'g?')}(?:${separator}${field('fibre|fiber', 'g?')})?(?:${separator}${field('sugar', 'g?')})?\\s*$`, 'i');
+  let replaced = false;
+  const text = String(analysis || '').split('\n').map(line => {
+    if (!mealLine.test(line.replace(/\*\*|__/g, '').trim())) return line;
+    replaced = true;
+    return summary;
+  }).join('\n').trim();
+  return replaced ? text : `${text}${text ? '\n\n' : ''}${summary}`;
+};
+
 // Best-effort relaxed JSON parsing to handle minor LLM formatting issues
 function parseItemsJsonRelaxed(raw: string): any | null {
   try {
@@ -4896,6 +4920,8 @@ CRITICAL REQUIREMENTS:
       resp.items = sanitizeStructuredItems(resp.items);
       resp.total = computeTotalsFromItems(resp.items) || resp.total;
     }
+
+    resp.analysis = synchronizeAnalysisNutritionSummary(resp.analysis, resp.total);
 
     const finalSummary = {
       itemsSource,
