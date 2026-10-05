@@ -1854,8 +1854,8 @@ const harmonizeDiscretePortionItems = (
           if (Number.isFinite(calories)) item.calories = Math.round(calories * mult);
           const macroFields: Array<keyof typeof item> = ['protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'];
           for (const field of macroFields) {
-            const v = Number((item as any)?.[field]);
-            if (Number.isFinite(v)) (item as any)[field] = Math.round(v * mult * 10) / 10;
+            const v = foodNumberOrNull((item as any)?.[field]);
+            if (v !== null) (item as any)[field] = Math.round(v * mult * 10) / 10;
           }
         } else {
           item.calories = Math.round(defaults.caloriesPerPiece * totalPiecesForMacros);

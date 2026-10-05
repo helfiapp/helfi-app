@@ -1,7 +1,7 @@
 {
   "scope": 87,
   "updatedAt": "2026-10-05T11:26:05.474942+00:00",
-  "status": "ACTUAL_ROUTE_FIXTURES_FULL_PRODUCTION_BUILD_PASS_DEPLOY_PENDING",
+  "status": "ACTUAL_ROUTE_FIXTURES_NULL_REFINEMENT_FULL_PRODUCTION_BUILD_PASS_FINAL_DEPLOY_PENDING",
   "baselineSource": "e295b3b38f62372b065e2b6c7eac1d1cb11330d4",
   "observedProductionResult": {
     "wholeEggPortion": "3 eggs",
@@ -26,12 +26,13 @@
     "baconPerServingPreserved": true,
     "unknownAndZeroPreserved": true,
     "inputImmutable": true,
-    "changedCountsRefreshResponseTotal": true
+    "changedCountsRefreshResponseTotal": true,
+    "singlePieceCorrectionPreservesUnknownFibreAndSugar": true
   },
   "guardCommand": "npm run check:food-egg-count",
   "automaticPrebuildGuard": true,
   "firstBuild": "85829 exit0",
-  "finalBuild": "80559 exit0",
+  "finalBuild": "94192 exit0",
   "pageLocks": {
     "web": 278,
     "native": 79,
@@ -51,5 +52,7 @@
     "Photo overall summary six cards require separate display repair.",
     "Signed Apple/Google release matrix remains open."
   ],
-  "finalPrebuild": "60480 exit0"
+  "finalPrebuild": "60480 exit0",
+  "initialCommit": "e0383e000324655fa19565dca50bc94fa1bd5adf",
+  "initialJob": 84
 }
