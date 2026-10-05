@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify
+- Date/time: 5October2026, verified10:20:16UTC (21:20 Melbourne)
+- What changed: Barcode ingredient mapping preserves unknownnutrients versus truezero and keeps declared gram/ml serving labels without silently relabelling. Source906e68ac649051cd0ba90d7bcdc924f3aed94030/AWS81 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag b0xppesrh61z15.
+- Where to see it (page/link): https://helfi.ai/food — normal barcode072036761163 chooserPreview.
+- What to quickly test:100g/all6coloredcards88/P5.9/C11.8/F0/Fibre—/S11.8. Cancel/noSave preserves23originalrecords/source/hash/daily2776. Successfulcheck3credits/freshreload607; immediatewalletrefresh remains separate guardedfollowup. Dailypreview falsecompletefibre/sugar remains next83. Gram/ml variantsactualsourcefixturesonly; notcurrentmanufacturercertification/nativebinary/store/model releasecompletion.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify
 - Date/time: 5October2026, verified09:55:14UTC (20:55 Melbourne)
 - What changed: Missing/invalid required barcode nutrients reject with existing label prompt before accepting/charging. Genuine zero and optional unknown nutrients stay usable. Source da5568bd5e47f3d849f2e5d65a16c51d52dd5863/AWS80 BUILD/DEPLOY/VERIFY SUCCEED, bothdomains200CloudFront/newmatchingETag hk49ddsb4w1z15.
 - Where to see it (page/link): https://helfi.ai/food — normal barcode072036761163; existing private source, not current-label certification.

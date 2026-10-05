@@ -1,6 +1,7 @@
 'use client'
 
 import { useMemo, useState } from 'react'
+import { optionalNutrient } from '@/lib/food/nutrient-values'
 
 type MacroTotals = {
   calories: number | null
@@ -18,7 +19,8 @@ const safeNumber = (value: any) => {
 
 const kcalToKj = (kcal: number) => kcal * 4.184
 const normalizeNearZero = (value: number) => (Math.abs(value) < 0.0001 ? 0 : value)
-const formatMacroAmount = (value: number, unit?: string) => {
+const formatMacroAmount = (value: number | null, unit?: string) => {
+  if (value == null) return '—'
   const numeric = normalizeNearZero(value)
   const abs = Math.abs(numeric)
   let display = '0'
@@ -42,8 +44,8 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
       { key: 'protein', label: 'Protein', consumed: safeNumber(used.protein_g), target: safeNumber(targets.protein_g), unit: 'g', color: '#ef4444', cap: false },
       { key: 'carbs', label: 'Carbs', consumed: safeNumber(used.carbs_g), target: safeNumber(targets.carbs_g), unit: 'g', color: '#22c55e', cap: false },
       { key: 'fat', label: 'Fat', consumed: safeNumber(used.fat_g), target: safeNumber(targets.fat_g), unit: 'g', color: '#6366f1', cap: false },
-      { key: 'fibre', label: 'Fibre', consumed: safeNumber(used.fiber_g), target: safeNumber(targets.fiber_g), unit: 'g', color: '#12adc9', cap: false },
-      { key: 'sugar', label: 'Sugar (max)', consumed: safeNumber(used.sugar_g), target: safeNumber(targets.sugar_g), unit: 'g', color: '#f97316', cap: true },
+      { key: 'fibre', label: 'Fibre', consumed: optionalNutrient(used.fiber_g), target: safeNumber(targets.fiber_g), unit: 'g', color: '#12adc9', cap: false },
+      { key: 'sugar', label: 'Sugar (max)', consumed: optionalNutrient(used.sugar_g), target: safeNumber(targets.sugar_g), unit: 'g', color: '#f97316', cap: true },
     ].filter((row) => row.target > 0)
 
     return macroRows
@@ -121,11 +123,11 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
         )}
 
         {rows.map((row) => {
-          const pctRaw = row.target > 0 ? row.consumed / row.target : 0
+          const pctRaw = row.target > 0 ? (row.consumed ?? 0) / row.target : 0
           const pct = Math.max(0, pctRaw)
           const percentDisplay = row.target > 0 ? Math.round(pctRaw * 100) : 0
           const over = pctRaw * 100 > 100
-          const remaining = Math.max(0, row.target - row.consumed)
+          const remaining = row.consumed == null ? null : Math.max(0, row.target - row.consumed)
           return (
             <div key={row.key} className="space-y-1">
               <div className="flex items-center justify-between text-sm">
@@ -136,11 +138,11 @@ export default function DailyMacroSummary({ targets, used }: { targets: MacroTot
                     {row.cap ? ' cap' : ''}
                   </span>
                   <span className="font-semibold" style={{ color: over ? '#ef4444' : row.color }}>
-                    {formatMacroAmount(remaining)} {row.unit} left
+                    {remaining == null ? 'Incomplete data' : `${formatMacroAmount(remaining)} ${row.unit} left`}
                   </span>
                 </div>
                 <div className={`text-xs font-semibold ${over ? 'text-red-600' : 'text-gray-900'}`}>
-                  {pctRaw > 0 && pctRaw < 0.01 ? '<1%' : percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
+                  {row.consumed == null ? '—' : pctRaw > 0 && pctRaw < 0.01 ? '<1%' : percentDisplay > 0 ? `${percentDisplay}%` : '0%'}
                 </div>
               </div>
               <div className="h-2 w-full bg-gray-200 rounded-full overflow-hidden">

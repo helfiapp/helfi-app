@@ -18318,8 +18318,8 @@ Please add nutritional information manually if needed.`);
         acc.protein += Number(t?.protein) || 0
         acc.carbs += Number(t?.carbs) || 0
         acc.fat += Number(t?.fat) || 0
-        acc.fiber += Number(t?.fiber) || 0
-        acc.sugar += Number(t?.sugar) || 0
+        acc.fiber = sumOptionalNutrients(acc.fiber, readOptionalNutrient(t, ['fiber', 'fiber_g']))
+        acc.sugar = sumOptionalNutrients(acc.sugar, readOptionalNutrient(t, ['sugar', 'sugar_g']))
         return acc
       },
       { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
@@ -18330,8 +18330,8 @@ Please add nutritional information manually if needed.`);
       protein_g: (Number(dayTotals.protein) || 0) + (Number((mealTotals as any).protein) || 0),
       carbs_g: (Number(dayTotals.carbs) || 0) + (Number((mealTotals as any).carbs) || 0),
       fat_g: (Number(dayTotals.fat) || 0) + (Number((mealTotals as any).fat) || 0),
-      fiber_g: (Number(dayTotals.fiber) || 0) + (Number((mealTotals as any).fiber) || 0),
-      sugar_g: (Number(dayTotals.sugar) || 0) + (Number((mealTotals as any).sugar) || 0),
+      fiber_g: sumOptionalNutrients(dayTotals.fiber, readOptionalNutrient(mealTotals, ['fiber', 'fiber_g'])),
+      sugar_g: sumOptionalNutrients(dayTotals.sugar, readOptionalNutrient(mealTotals, ['sugar', 'sugar_g'])),
     }
 
     const baseTargets = {

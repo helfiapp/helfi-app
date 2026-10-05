@@ -3357,3 +3357,13 @@ for guidance first.
 - check:food-barcode-mapping executes actual source mapping/totals with105offline cases and runs in fullproductionprebuild. Actual baseline46cases fail; new105PASS plus existingmissingnutrients/protected/root278/native79 PASS, onlyfoodpagehash refreshed. Fullbuild/exactlive/normalruntime pending; last stableda5568bd5e47f3d849f2e5d65a16c51d52dd5863/AWS80.
 
 - Task82 finalproductionbuild87375exit0/allrequiredchecks/strictregressiontypecheck/protected/root278/native79 PASS. Onlyapprovedfoodpagehash refreshed; actual105casesPASS. Exact source deployment and normal browser verification pending.
+
+- Task82 stable source906e68ac649051cd0ba90d7bcdc924f3aed94030/AWS81 allstepsSUCCEED, bothdomains200CloudFront/newmatchingETag b0xppesrh61z15 verified2026-10-05T10:20:16UTC. Freshnormalwebprivate100gbarcode all6cards/unknownfibre—/truezero correct, original23/source/hash unchanged, cancelled/noSave/daily2776. Positive3credit lookup/freshwallet607; immediatewalletrefresh remains guardedfollowup. Dailypreview optionalcompleteness next83; native unchanged/unitsfixturesonly/no currentmanufacturer orsignedstore/model accuracyclaim.
+
+### Preview daily nutrition completeness (2026-10-05, task83)
+
+- computeOverallMacrosAfterAddingFavorite must retain optional fibre/sugar unknown through every existing day entry and proposedmeal sum. A partial knownsum is not a complete day total. Genuine0 remains0; an empty day contributes known0. Preserve original precision, source/history, core totals, actual daily targets and exercise adjustments.
+- DailyMacroSummary must retain missing optional rows and show—/Incomplete data; no numericprogresspercentage or remainingamount when unknown. Keep all six ingredientcards and existing colors/controls/targets. Onlyfoodpage and DailyMacroSummary UIlock refresh authorized; no HealthSetup/goal/caching/credit/native changes.
+- check:food-daily-preview executes the real parent and ReactsummaryJSX offline; HEAD30of33fail/new33PASS including zero, knownprecision/source and exercise. Fullbuild/exactdeployment/runtime pending; laststable906e68ac649051cd0ba90d7bcdc924f3aed94030/AWS81.
+
+- Task83 fullproductionbuild91930exit0/allrequiredchecks/strict/protected/root278native79 PASS;33actualparent/componentcasesPASS and105barcodemappingcasesPASS. Onlyfoodpage+DailyMacroSummary lockhashes refreshed. Exactdeployment/normalruntime pending.
