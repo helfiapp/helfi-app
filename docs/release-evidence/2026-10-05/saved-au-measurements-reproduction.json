@@ -178,7 +178,7 @@
     "scope": "Only both actual saved-editor total-amount captions",
     "fixtureFailureBefore": "actual JSX 1 1/4 cup != 0.25 cup",
     "fixtureAfter": "PASS: both actual JSX expressions and fraction counts display 0.25/0.5/0.75/1 cup, metric unchanged",
-    "saveReopen": "Pending deployment and actual runtime",
+    "saveReopen": "PASS: normal website Save/reopen and restarted signed-in iPhone same20ml163/all6cards; no opening-only writes",
     "checks": {
       "fullProductionBuild": {
         "session": 70339,
@@ -189,6 +189,247 @@
       "rootLocks": 278,
       "nativeLocks": 79,
       "lockChange": "Only root food-page hash refreshed"
+    },
+    "deployment": {
+      "verifiedAt": "2026-10-05T04:53:27.247Z",
+      "summary": {
+        "jobId": "68",
+        "status": "SUCCEED",
+        "commitId": "b353089270651a4c42dda4aa9b0f583a2f925957"
+      },
+      "steps": [
+        {
+          "name": "BUILD",
+          "status": "SUCCEED"
+        },
+        {
+          "name": "DEPLOY",
+          "status": "SUCCEED"
+        },
+        {
+          "name": "VERIFY",
+          "status": "SUCCEED"
+        }
+      ],
+      "domains": [
+        {
+          "url": "https://helfi.ai",
+          "status": 200,
+          "etag": "\"47srm8bu9x1z15\"",
+          "via": "1.1 69b737af1efcebe93fe9d0963bec99ac.cloudfront.net (CloudFront)",
+          "cache": "Miss from cloudfront",
+          "finalUrl": "https://helfi.ai/"
+        },
+        {
+          "url": "https://www.helfi.ai",
+          "status": 200,
+          "etag": "\"47srm8bu9x1z15\"",
+          "via": "1.1 d4e2e0b56ca0486dc26305fb34afffe8.cloudfront.net (CloudFront)",
+          "cache": "Miss from cloudfront",
+          "finalUrl": "https://www.helfi.ai/"
+        }
+      ]
     }
+  },
+  "recordsBeforeFinalSave": {
+    "verifiedAt": "2026-10-05T04:47:26.237Z",
+    "recordCount": 20,
+    "allRecordsHash": "80d8bc2e3a4260a9bbb9192c7f589b303f1570685d00cb287f5ece3c3c1cf2c0",
+    "meal": {
+      "id": "cmuumzmvc0001c6dmhk4wguy8",
+      "description": "Oil, olive, salad or cooking, 20 ml",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:34:39.624Z",
+      "nutrients": {
+        "fat": 18.4,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 163
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "label": "Oil, olive, salad or cooking",
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.2,
+          "protein_g": 0,
+          "unitGrams": {},
+          "serving_size": "100 ml",
+          "calories_kcal": 813.2800000000001,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "f521d931db9428d3154a5c057576de4d43d996ad110d8c5828ccd98d8c06ddbf"
+  },
+  "recordsAfterSave": {
+    "verifiedAt": "2026-10-05T04:54:33.197Z",
+    "recordCount": 20,
+    "allRecordsHash": "dc84fc15a0b1cdbf83c010b950c918efbd200c610d670fe6aad70282cf98aaf6",
+    "meal": {
+      "id": "cmuumzmvc0001c6dmhk4wguy8",
+      "description": "Oil, olive, salad or cooking, 20 ml",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:34:00.000Z",
+      "nutrients": {
+        "fat": 18.4,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 163
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking, 20 ml",
+          "brand": null,
+          "fat_g": 92,
+          "label": "Oil, olive, salad or cooking",
+          "__unit": "ml",
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "__amount": 20,
+          "calories": 813.2800000000001,
+          "servings": 0.2,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 20,
+          "calories_kcal": 813.2800000000001,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "f521d931db9428d3154a5c057576de4d43d996ad110d8c5828ccd98d8c06ddbf"
+  },
+  "recordsAfterReopening": {
+    "verifiedAt": "2026-10-05T04:57:01.575Z",
+    "recordCount": 20,
+    "allRecordsHash": "dc84fc15a0b1cdbf83c010b950c918efbd200c610d670fe6aad70282cf98aaf6",
+    "meal": {
+      "id": "cmuumzmvc0001c6dmhk4wguy8",
+      "description": "Oil, olive, salad or cooking, 20 ml",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:34:00.000Z",
+      "nutrients": {
+        "fat": 18.4,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 163
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking, 20 ml",
+          "brand": null,
+          "fat_g": 92,
+          "label": "Oil, olive, salad or cooking",
+          "__unit": "ml",
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "__amount": 20,
+          "calories": 813.2800000000001,
+          "servings": 0.2,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 20,
+          "calories_kcal": 813.2800000000001,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "f521d931db9428d3154a5c057576de4d43d996ad110d8c5828ccd98d8c06ddbf"
+  },
+  "finalLiveRuntime": {
+    "verifiedAt": "2026-10-05T04:58:19.211310+00:00",
+    "normalQuarterCup": {
+      "amount": 1,
+      "totalCupLabel": "0.25 cup",
+      "physicalMl": 62.5,
+      "calories": 508,
+      "fat": 57.5,
+      "fiveGenuineZeros": true,
+      "sixColorfulCards": true,
+      "savePressed": false
+    },
+    "normalTablespoonSave": {
+      "saveCount": 1,
+      "physicalMl": 20,
+      "servings": 0.2,
+      "calories": 163,
+      "fat": 18.4,
+      "fiveGenuineZeros": true,
+      "sixColorfulCards": true,
+      "originalDescriptionPreserved": true,
+      "originalSourceBasisPrecisionOptionsPreserved": true,
+      "temporaryCountryRemoved": true,
+      "sameRowId": true,
+      "recordCount": 20,
+      "other19RowsUnchanged": true
+    },
+    "websiteReopen": {
+      "physicalMl": 20,
+      "servings": 0.2,
+      "calories": 163,
+      "fat": 18.4,
+      "fiveGenuineZeros": true,
+      "sixColorfulCards": true,
+      "clock": "13:34",
+      "dailyCalories": 2152,
+      "remainingCalories": 132,
+      "credits": 619
+    },
+    "restartedSignedInIPhoneRelease39": {
+      "sourceBuiltFromTask": 64,
+      "nativeSourceUnchangedInTask68": true,
+      "physicalMl": 20,
+      "originalServingSize": "100 ml",
+      "calories": 163,
+      "fat": 18.4,
+      "fiveGenuineZeros": true,
+      "sixColorfulIngredientCards": true,
+      "clock": "13:34",
+      "dailyCalories": 2152,
+      "remainingCalories": 132,
+      "credits": 619,
+      "savePressed": false
+    },
+    "openingOnlyWrites": false,
+    "separateRootSaveTimestampIssue": {
+      "before": "2026-10-05T02:34:39.624Z",
+      "after": "2026-10-05T02:34:00.000Z",
+      "displayedClockUnchanged": "13:34",
+      "issue": "Existing root explicit Save truncates seconds even with untouched clock; separate next task, not repaired here"
+    },
+    "screenshots": [
+      "web-saved-quarter-cup-caption-after.jpg",
+      "web-saved-au-tablespoon-reopened.jpg",
+      "iphone-saved-au-tablespoon-quantity.jpg",
+      "iphone-saved-au-tablespoon-cards.jpg"
+    ]
   }
 }

@@ -1,0 +1,62 @@
+{
+  "task": 69,
+  "scope": "Root saved-editor exact timestamp preservation on unchanged clock",
+  "sourceBefore": "b353089270651a4c42dda4aa9b0f583a2f925957",
+  "failureBefore": "Actual root timestamp fixture truncates02:54:21.987Z to02:54:00.000Z with unchanged13:54",
+  "sourceAfterChecks": "PASS:96 actual timestamp checks, unchanged exact original string/date/seconds, legitimate changed-clock/date fallback, Melbourne/LA/UTC/daylight-saving and missing-invalid original cases",
+  "scopeSafety": "Only root updateFoodEntry timestamp calculation; no automatic migration, rename, nutrients, serving, credit or loading changes",
+  "recordsBefore": {
+    "verifiedAt": "2026-10-05T05:01:55.800Z",
+    "recordCount": 20,
+    "allRecordsHash": "dc84fc15a0b1cdbf83c010b950c918efbd200c610d670fe6aad70282cf98aaf6",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 57.5,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 508
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.625,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "serving_size": "100 ml",
+          "weightAmount": 62.5,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "checks": {
+    "fullProductionBuild": {
+      "session": 11813,
+      "exitCode": 0,
+      "log": "tmp/task69-production-build.log"
+    },
+    "actualTimestampCases": 96,
+    "protectedRegions": "PASS",
+    "rootLocks": 278,
+    "nativeLocks": 79,
+    "lockChange": "Only root food-page hash refreshed",
+    "liveSaveReopen": "Pending deployment"
+  }
+}

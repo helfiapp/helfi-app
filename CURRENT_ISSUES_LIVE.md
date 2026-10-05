@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 3:53pm Melbourne; normal Save/web/iPhone reopen verified 3:56pm.
+- What changed: Task68 final saved-editor Australian household measures and clear cup-fraction captions. Sourceb353089270651a4c42dda4aa9b0f583a2f925957; AWS68 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag47srm8bu9x1z15.
+- Where to see it: Food Diary > saved oil20ml > Edit Entry > Weight/unit and all six nutrient cards.
+- What to quickly test: AU quarter-cup displays0.25cup/62.5ml508/F57.5/fivezeros/all6cards. One normal Update original20ml as1tbsp163 saved exact20ml/.2/original source171413/100ml813.28/precision/options; original row/title and other19rows unchanged. Normal website/restarted signed-in iPhone39 reopen20ml163/F18.4/fivezeros/all6cards/13:34; daily2152/132remaining/619 unchanged. All20hash unchanged on reopening; native no Save/sourcechange. Full production build70339exit0/protected/root278native79 pass. Existing root explicit Save removes timestamp seconds39.624->00 with untouchedclock; next separate fix69. Broader food/photo/model and signed stores remain unfinished.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 3:37pm Melbourne; saved-editor preview checked 3:39pm.
 - What changed: Task68 saved-editor Australian generic measurements and known saved serving-count conversion. Source531ced5d4e23b11adc5fd30db968042b1fba78d3; AWS67 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag h24qpxtd11z15.
 - Where to see it: Food Diary > saved oil20ml > Edit Entry > Weight/unit.

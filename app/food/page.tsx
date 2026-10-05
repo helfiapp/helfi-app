@@ -12645,9 +12645,15 @@ Please add nutritional information manually if needed.`);
         ? normalizeFoodName(previousLabel || '') !== normalizeFoodName(nextLabel || '')
         : false
 
-    // Calculate new createdAt from entryTime + selectedDate
+    // Preserve the exact saved timestamp unless the displayed clock changes.
     let newCreatedAt = editingEntry.createdAt;
-    if (entryTime) {
+    const originalDate = editingEntry.createdAt == null || editingEntry.createdAt === ''
+      ? null
+      : new Date(editingEntry.createdAt);
+    const originalTime = originalDate && !isNaN(originalDate.getTime())
+      ? `${originalDate.getHours().toString().padStart(2, '0')}:${originalDate.getMinutes().toString().padStart(2, '0')}`
+      : '';
+    if (entryTime && entryTime !== originalTime) {
       const [h, m] = entryTime.split(':').map(Number);
       const [y, mon, d] = (editingEntry.localDate || selectedDate).split('-').map(Number);
       // Create date in local timezone (browser's)
