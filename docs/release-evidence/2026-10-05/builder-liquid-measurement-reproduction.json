@@ -25,6 +25,261 @@
     "Root278/native79 page locks PASS"
   ],
   "productionBuild": "PASS final full production build session58727 exit0; prebuild protected guards and builder check passed",
-  "deployment": "not pushed; live65 runtime pending",
-  "remaining": "Whole audit/photo/model/signed store release unfinished"
+  "deployment": {
+    "sourceCommit": "34c0db913ff4999c51e7e8f927401a3071bc197b",
+    "job": {
+      "summary": {
+        "jobId": "63",
+        "status": "SUCCEED",
+        "commitId": "34c0db913ff4999c51e7e8f927401a3071bc197b"
+      },
+      "steps": [
+        {
+          "stepName": "BUILD",
+          "status": "SUCCEED"
+        },
+        {
+          "stepName": "DEPLOY",
+          "status": "SUCCEED"
+        },
+        {
+          "stepName": "VERIFY",
+          "status": "SUCCEED"
+        }
+      ]
+    },
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "server": null,
+        "etag": "\"nylfbg6rj21z15\"",
+        "via": "1.1 d3a8cad6c816d1162fe5971155442eb0.cloudfront.net (CloudFront)"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "server": null,
+        "etag": "\"nylfbg6rj21z15\"",
+        "via": "1.1 6f01da654ce062002b93fece7e4b0d9e.cloudfront.net (CloudFront)"
+      }
+    ],
+    "verifiedAt": "2026-10-05T03:17:27.599812+00:00"
+  },
+  "remaining": "Whole audit/photo/model/signed store release unfinished",
+  "runtimeSoFar": "Completed live AWS63 normal web oil100ml813 ->92g813;100g884;AU20ml tablespoon163/F18.4; all six cards. Provider13.5g tablespoon/216g cup/240ml cup retained separately.",
+  "savedSourceReadOnly": {
+    "country": "AU",
+    "rows": [
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "description": "Audit oil and milk",
+        "localDate": "2026-10-05",
+        "createdAt": "2026-10-05T03:26:00.000Z",
+        "nutrients": {
+          "fat": 10.848,
+          "carbs": 2.405,
+          "fiber": null,
+          "sugar": 2.477,
+          "protein": 1.689,
+          "__origin": "meal-builder",
+          "calories": 112,
+          "__favoriteId": "fav-1791170524876",
+          "__portionUnit": "g",
+          "__portionScale": 0.5,
+          "__portionAmount": 60.7,
+          "__portionWeightG": 61,
+          "__favoriteManualEdit": true,
+          "__portionTotalWeightG": 121,
+          "__portionControlEnabled": true,
+          "__portionRecipeServings": null
+        },
+        "items": [
+          {
+            "id": "171413",
+            "name": "Oil, olive, salad or cooking",
+            "brand": null,
+            "fat_g": 92,
+            "__unit": "ml",
+            "source": "usda",
+            "carbs_g": 0,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "__amount": 20,
+            "calories": 813.2800000000001,
+            "servings": 0.2,
+            "protein_g": 0,
+            "weightUnit": "ml",
+            "__importKey": null,
+            "serving_size": "100 ml",
+            "weightAmount": 20,
+            "__matchedName": null,
+            "servingOptions": [
+              {
+                "id": "usda:171413:100g",
+                "ml": null,
+                "unit": "g",
+                "fat_g": 100,
+                "grams": 100,
+                "label": "100 g",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 884,
+                "protein_g": 0,
+                "serving_size": "100 g"
+              },
+              {
+                "id": "usda:171413:0",
+                "ml": null,
+                "unit": "g",
+                "fat_g": 13.5,
+                "grams": 13.5,
+                "label": "tablespoon \u2014 13.5g",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 119.34,
+                "protein_g": 0,
+                "serving_size": "tablespoon \u2014 13.5g"
+              },
+              {
+                "id": "usda:171413:1",
+                "ml": null,
+                "unit": "g",
+                "fat_g": 4.5,
+                "grams": 4.5,
+                "label": "tsp \u2014 4.5g",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 39.78,
+                "protein_g": 0,
+                "serving_size": "tsp \u2014 4.5g"
+              },
+              {
+                "id": "usda:171413:2",
+                "ml": null,
+                "unit": "g",
+                "fat_g": 216,
+                "grams": 216,
+                "label": "cup \u2014 216g",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 1909.44,
+                "protein_g": 0,
+                "serving_size": "cup \u2014 216g"
+              },
+              {
+                "id": "usda:171413:100ml",
+                "ml": 100,
+                "unit": "ml",
+                "fat_g": 92,
+                "grams": 92,
+                "label": "100 ml",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 813.2800000000001,
+                "protein_g": 0,
+                "serving_size": "100 ml"
+              },
+              {
+                "id": "usda:171413:250ml",
+                "ml": 250,
+                "unit": "ml",
+                "fat_g": 230,
+                "grams": 230,
+                "label": "250 ml",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 2033.2,
+                "protein_g": 0,
+                "serving_size": "250 ml"
+              },
+              {
+                "id": "usda:171413:cup-240ml",
+                "ml": 240,
+                "unit": "ml",
+                "fat_g": 220.8,
+                "grams": 220.8,
+                "label": "1 cup (240 ml)",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 1951.872,
+                "protein_g": 0,
+                "serving_size": "1 cup (240 ml)"
+              },
+              {
+                "id": "usda:171413:tbsp-15ml",
+                "ml": 15,
+                "unit": "ml",
+                "fat_g": 13.8,
+                "grams": 13.8,
+                "label": "1 tbsp (15 ml)",
+                "source": "usda",
+                "carbs_g": 0,
+                "fiber_g": 0,
+                "sugar_g": 0,
+                "calories": 121.992,
+                "protein_g": 0,
+                "serving_size": "1 tbsp (15 ml)"
+              }
+            ],
+            "selectedServingId": "usda:171413:100ml",
+            "__measurementCountry": "AU"
+          },
+          {
+            "id": "322892",
+            "name": "Milk, whole, 3.25% milkfat, with added vitamin D",
+            "brand": null,
+            "fat_g": 3.296,
+            "__unit": "ml",
+            "source": "usda",
+            "carbs_g": 4.8101,
+            "fiber_g": null,
+            "sugar_g": 4.9543,
+            "__amount": 100,
+            "calories": 61.8,
+            "servings": 1,
+            "protein_g": 3.3784,
+            "weightUnit": "ml",
+            "__importKey": null,
+            "serving_size": "100 ml",
+            "weightAmount": 100,
+            "__matchedName": null,
+            "servingOptions": null,
+            "selectedServingId": null,
+            "__measurementCountry": "AU"
+          }
+        ]
+      }
+    ]
+  },
+  "runtime": {
+    "webReopen": "PASS same saved half121.4g recipe/60.7g portion,112kcal/P1.7/C2.4/F10.8/FibreMissing/S2.5 and allsix colorful cards; physical source oil20ml and milk100ml retain original source bases/servings. No second Save button pressed.",
+    "nativeReopen": "PASS restarted signed-in iPhone16e Release39; daily2152/132remaining/wallet619 matches website; same112/P1.7/C2.4/F10.8/FibreMissing/S2.5 with allsix cards. Consumed materialized ingredient quantities oil10ml81 and milk50ml31 inspected without edits or Save.",
+    "source": "Actual selected whole-milk USDAFoundation322892 is60kcal/100g and61.8kcal/100ml; original fibre unknown remains unknown. Earlier planned113 used a different legitimate source171265 and is not this selected record. Original source values preserved.",
+    "screenshots": [
+      "web-builder-oil-92g-after.jpg",
+      "web-builder-measured-half-preview.jpg",
+      "web-builder-measured-half-reopened.jpg",
+      "iphone-builder-measured-half-reopened.jpg"
+    ]
+  },
+  "followups": [
+    "Actual saved __portionTotalWeightG121 and __portionWeightG61 round precise121.4/60.7; initial reopened scale0.5 retained. Verify edited gram portion calculations before changing precision in next task.",
+    "Normal web Edit Entry opened at14:26 although original saved list showed14:22; read-only createdAt became03:26UTC without pressing Save/Update. Trace existing autosave/time initialization in a separate task; do not rewrite history.",
+    "Saved root editor/recommended regional household measures, photo/model and final signed release matrix remain open."
+  ]
 }

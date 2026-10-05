@@ -82,7 +82,7 @@ assert.equal(evaluate('parseServingBase("1 fl oz").unit'), 'ml')
 assert.ok(Array.from(evaluate('allowedUnitsForItem({...oil,name:"Apple",__baseUnit:"g"})')).includes('piece-medium'), 'solid counted portions stay available')
 
 // Both actual save mappings must store country-independent physical amounts.
-Object.assign(ctx, { isDiaryEdit: true, sourceLogId: 'fixture-saved', mealName: 'Measured oil', linkedFavoriteId: '', selectedDate: '2026-10-05', entryTime: '14:00', portionUnit: 'serving', portionAmountInput: '1', portionInputRef: { current: { value: '1' } }, recipeServingsForPortion: 1, sanitizeMealTitle: (name: string) => name, buildDefaultMealName: () => 'Measured oil', portionControlEnabled: false })
+Object.assign(ctx, { isDiaryEdit: true, savedPortionScale: null, portionScaleOverriddenByUser: false, sourceCreatedAtRef: { current: null }, sourceLogId: 'fixture-saved', mealName: 'Measured oil', linkedFavoriteId: '', selectedDate: '2026-10-05', entryTime: '14:00', portionUnit: 'serving', portionAmountInput: '1', portionInputRef: { current: { value: '1' } }, recipeServingsForPortion: 1, sanitizeMealTitle: (name: string) => name, buildDefaultMealName: () => 'Measured oil', portionControlEnabled: false })
 for (const [unit, amount, expectedMl] of [['tbsp',1,20],['quarter-cup',1,62.5],['cup',.4,100]] as const) {
   const item = { ...oil, __unit: unit, __amount: amount, __amountInput: String(amount), fiber_g: null }
   Object.assign(ctx, { itemsForSave: [item], itemsRef: { current: [item] }, items: [item], shouldStripBuilderIds: false, sourceItemsForMerge: null })

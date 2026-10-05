@@ -1,0 +1,17 @@
+{
+  "task": 66,
+  "scope": "Build a Meal saved state integrity: exact portion weights and original entry time; opening is read-only",
+  "before": [
+    "Actual default-time effect prefilled current time before saved row loaded",
+    "Actual autosave callback PUT on hydration without user edit",
+    "Actual saved timestamp lost seconds/milliseconds",
+    "Both save metadata mappings rounded121.4/60.7 to121/61 and scale1/3 to0.333",
+    "Actual edited gram-scale basis used old rounded121 instead of measured121.4"
+  ],
+  "sourceChecks": "Actual source AST/effects/handlers reproduce five pre-fix failures; six repaired checks pass, including no opening writes, one actual clock edit autosave, exact source timestamp, manual+autosave weights, historical unchanged scale, half/full/double precise ratios, nutrient edits remain autosavable.",
+  "existingChecks": "Builder liquid, missing nutrient, protected regions, root278/native79 page locks PASS",
+  "build": "PASS full production build1256exit0; protected prebuild guards and saved-state check pass",
+  "deployment": null,
+  "runtime": null,
+  "remaining": "Full audit/photo/model/signed store release unfinished"
+}

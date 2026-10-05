@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 2:17pm Melbourne; save/reopen verified 2:29pm.
+- What changed: Task65 Build a Meal uses actual liquid density and Australian generic kitchen volumes. Oil100ml converts to92g at the same813kcal;100g is884kcal. New saves retain physical ml/g, exact original food sources and missing nutrient values. Source34c0db913ff4999c51e7e8f927401a3071bc197b; AWS63 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag nylfbg6rj21z15.
+- Where to see it: Food Diary > Build a Meal.
+- What to quickly test: AU oil20ml plus actual Foundation322892 milk100ml full121.4g/224kcal;60.7g half112/P1.7/C2.4/F10.8/FibreMissing/S2.5. One normal Save and website/restarted signed-in iPhone reopen agree with all six colorful cards; bothdaily2152/132remaining/wallet619. Original source/bases/precision/options retained. Full production build and root278/native79 locks pass. Saved portion metadata rounds precise weights and opening existing meal changed its time through existing autosave; separate next task investigation required. Photos/model and signed store submissions remain incomplete.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 1:49pm Melbourne (02:49UTC); final save/reopen verified 1:58pm.
 - What changed: Task64 normal Add Ingredient uses Australian liquid measures (20ml tablespoon, 250ml cup and measured cup fractions) consistently on web/native. Source47b5ca0604155c36540ae8e17f43d1b3acb4aa42; AWS62 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag ymsrzox1yo1z15. Native repair tested in rebuilt Release39 iPhone/iPad; signed store uploads incomplete.
 - Where to see it: Food Diary > Add Ingredient > Adjust ingredient.

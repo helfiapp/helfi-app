@@ -188,6 +188,11 @@ const buildCreatedAtFromEntryTime = (localDate: string, entryTime: string, fallb
   }
 }
 
+const preserveSavedEntryTime = (localDate: string, entryTime: string, originalIso: string | null) => {
+  if (originalIso && extractTimeFromTimestamp(originalIso) === entryTime) return originalIso
+  return buildCreatedAtFromEntryTime(localDate, entryTime, originalIso || new Date().toISOString())
+}
+
 const toNumber = (v: any): number | null => {
   if (v == null || typeof v === 'boolean' || (typeof v === 'string' && !v.trim())) return null
   const n = typeof v === 'number' ? v : Number(v)
@@ -2163,6 +2168,10 @@ export default function MealBuilderClient() {
     category: string
   } | null>(null)
   const [entryTime, setEntryTime] = useState<string>('')
+  const sourceCreatedAtRef = useRef<string | null>(null)
+  const diaryAutosaveBaselineRef = useRef<string | null>(null)
+  const [savedPortionScale, setSavedPortionScale] = useState<number | null>(null)
+  const [portionScaleOverriddenByUser, setPortionScaleOverriddenByUser] = useState(false)
   const [favoriteUpdatePromptSaving, setFavoriteUpdatePromptSaving] = useState(false)
   const [favoriteAdjustRecencySeed, setFavoriteAdjustRecencySeed] = useState<{
     favoriteId: string
@@ -2218,7 +2227,7 @@ export default function MealBuilderClient() {
         setPortionAmountInput(Number.isFinite(oz) ? String(round3(oz)) : '')
       } else {
         setPortionUnit('g')
-        setPortionAmountInput(String(Math.round(grams)))
+        setPortionAmountInput(String(grams))
       }
     }
   }
@@ -2665,6 +2674,8 @@ export default function MealBuilderClient() {
   useEffect(() => {
     // Editing mode (diary): load a FoodLog row directly when a Build-a-meal diary entry is edited.
     if (!sourceLogId) {
+      sourceCreatedAtRef.current = null
+      diaryAutosaveBaselineRef.current = null
       if (!isFavoriteAdjustBuild) setEntryTime('')
       if (!editFavoriteId) {
         initialItemsSignatureRef.current = ''
@@ -2696,8 +2707,14 @@ export default function MealBuilderClient() {
         if (!cancelled) setLinkedFavoriteId(linked)
 
         const loadedTime = extractTimeFromTimestamp(log?.createdAt)
+        if (!cancelled) sourceCreatedAtRef.current = loadedTime ? String(log.createdAt) : null
+        if (!cancelled) {
+          const storedScale = Number(log?.nutrients?.__portionScale)
+          setSavedPortionScale(Number.isFinite(storedScale) && storedScale > 0 ? storedScale : null)
+          setPortionScaleOverriddenByUser(draftAppliedRef.current)
+        }
         if (!cancelled && loadedTime) {
-          setEntryTime((prev) => (prev ? prev : loadedTime))
+          setEntryTime((prev) => (draftAppliedRef.current && prev ? prev : loadedTime))
         }
 
         // If we restored a draft, do not overwrite the user's in-progress changes.
@@ -2755,9 +2772,10 @@ export default function MealBuilderClient() {
 
   useEffect(() => {
     if (!showEntryTimeOverride) return
+    if (sourceLogId) return // Existing meals get their original clock from the loaded row.
     if (entryTime) return
     setEntryTime(formatTimeInputValue(new Date()))
-  }, [showEntryTimeOverride, entryTime])
+  }, [showEntryTimeOverride, sourceLogId, entryTime])
 
   useEffect(() => {
     // UX rule: when reopening an already-saved meal, start with all ingredient cards collapsed.
@@ -2816,6 +2834,7 @@ export default function MealBuilderClient() {
 
   const totalRecipeWeightG = useMemo(() => computeTotalRecipeWeightG(items), [items])
   const totalRecipeWeightGForScale = useMemo(() => {
+    if (portionScaleOverriddenByUser) return totalRecipeWeightG
     const saved = initialPortionTotalWeightRef.current
     if (!saved || !Number.isFinite(saved) || saved <= 0) return totalRecipeWeightG
     const initialSig = initialItemsSignatureRef.current
@@ -2823,7 +2842,7 @@ export default function MealBuilderClient() {
     const currentSig = buildItemsSignature(items)
     if (!currentSig || currentSig !== initialSig) return totalRecipeWeightG
     return saved
-  }, [items, totalRecipeWeightG])
+  }, [items, totalRecipeWeightG, portionScaleOverriddenByUser])
 
   useEffect(() => {
     const draft = recipeImportDraft
@@ -2858,33 +2877,12 @@ export default function MealBuilderClient() {
   // When editing an existing entry, we MUST use the saved __portionScale from the entry
   // Do NOT recalculate from portion input - the front page uses saved scale, so we must match it
   // See GUARD_RAILS.md section 3.14 for details
-  const [savedPortionScale, setSavedPortionScale] = useState<number | null>(null)
-  const [portionScaleOverriddenByUser, setPortionScaleOverriddenByUser] = useState(false)
   
   useEffect(() => {
     if (sourceLogId && !editFavoriteId) {
-      setPortionScaleOverriddenByUser(false)
-      // When editing a diary entry, fetch and store the saved portion scale
-      const fetchSavedScale = async () => {
-        try {
-          const res = await fetch(`/api/food-log?id=${encodeURIComponent(sourceLogId)}`, { method: 'GET' })
-          const data = await res.json().catch(() => ({} as any))
-          if (res.ok && data?.log) {
-            const logTotals = (data.log as any)?.nutrients || null
-            if (logTotals && typeof logTotals === 'object') {
-              const scale = Number((logTotals as any).__portionScale)
-              setSavedPortionScale(Number.isFinite(scale) && scale > 0 ? scale : null)
-            } else {
-              setSavedPortionScale(null)
-            }
-          } else {
-            setSavedPortionScale(null)
-          }
-        } catch {
-          setSavedPortionScale(null)
-        }
-      }
-      fetchSavedScale()
+      // The diary hydration effect loads the row, scale and original clock
+      // together. A second request can race with the first user edit.
+      return
     } else if (editFavoriteId) {
       setPortionScaleOverriddenByUser(false)
       // When editing a favorite, get saved portion scale from favorite data
@@ -5612,7 +5610,9 @@ export default function MealBuilderClient() {
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
     const portionScaleRaw = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave, recipeServingsForPortion)
-    const portionScaleForSave = portionControlEnabled ? portionScaleRaw : 1
+    const portionScaleForSave = portionControlEnabled
+      ? savedPortionScale !== null && !portionScaleOverriddenByUser ? savedPortionScale : portionScaleRaw
+      : 1
     const portionAmountNumeric = parseNumericInput(portionAmountForSave)
 
     const portionWeightForSave = portionControlEnabled
@@ -5621,19 +5621,19 @@ export default function MealBuilderClient() {
     const portionMeta =
       portionControlEnabled && portionAmountNumeric && portionAmountNumeric > 0
         ? {
-            __portionScale: round3(portionScaleForSave),
+            __portionScale: portionScaleForSave,
             __portionUnit: portionUnit,
             __portionAmount: portionAmountNumeric,
             __portionTotalWeightG:
               Number.isFinite(Number(totalRecipeWeightForSave)) && Number(totalRecipeWeightForSave) > 0
-                ? Math.round(Number(totalRecipeWeightForSave))
+                ? Number(totalRecipeWeightForSave)
                 : null,
             __portionRecipeServings:
               Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0
                 ? Number(recipeServingsForPortion)
                 : null,
             __portionControlEnabled: true,
-            ...(portionWeightForSave ? { __portionWeightG: Math.round(portionWeightForSave) } : {}),
+            ...(portionWeightForSave ? { __portionWeightG: portionWeightForSave } : {}),
           }
         : null
 
@@ -5665,7 +5665,7 @@ export default function MealBuilderClient() {
       : totalsForSave
 
     const favoriteId = (linkedFavoriteId || '').trim()
-    const createdAtIso = buildCreatedAtFromEntryTime(selectedDate, entryTime, new Date().toISOString())
+    const createdAtIso = preserveSavedEntryTime(selectedDate, entryTime, sourceCreatedAtRef.current)
     const nutritionBase: any = {
       calories: Math.round(scaledTotals.calories),
       protein: round3(scaledTotals.protein),
@@ -5688,18 +5688,29 @@ export default function MealBuilderClient() {
       entryTime,
       String(Number(recipeServingsForPortion) || ''),
       buildItemsSignature(itemsForSave),
+      JSON.stringify([diaryNutrition, cleanedItems]),
       favoriteId,
     ].join('|')
 
     return { title, description, cleanedItems, diaryNutrition, createdAtIso, signature }
-  }, [isDiaryEdit, sourceLogId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, entryTime, recipeServingsForPortion, linkedFavoriteId, selectedDate])
+  }, [isDiaryEdit, sourceLogId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, entryTime, recipeServingsForPortion, linkedFavoriteId, selectedDate, savedPortionScale, portionScaleOverriddenByUser])
 
   useEffect(() => {
     if (!isDiaryEdit) return
     if (!sourceLogId) return
+    if (loadedFavoriteId !== `log:${sourceLogId}`) return
     if (savingMeal) return
     const itemsForSave = itemsRef.current?.length ? itemsRef.current : items
     if (!itemsForSave || itemsForSave.length === 0) return
+
+    // Loading/collapsing an existing meal is read-only. Only edits after this
+    // baseline (or a deliberately restored draft) may trigger an autosave.
+    if (diaryAutosaveBaselineRef.current !== sourceLogId) {
+      const initial = buildDiaryAutosaveBundle()
+      if (!initial) return
+      diaryAutosaveBaselineRef.current = sourceLogId
+      if (!draftAppliedRef.current) lastDiaryAutosaveSignatureRef.current = initial.signature
+    }
 
     try {
       if (diaryAutosaveTimeoutRef.current) window.clearTimeout(diaryAutosaveTimeoutRef.current)
@@ -5753,7 +5764,7 @@ export default function MealBuilderClient() {
         if (diaryAutosaveTimeoutRef.current) window.clearTimeout(diaryAutosaveTimeoutRef.current)
       } catch {}
     }
-  }, [isDiaryEdit, sourceLogId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, linkedFavoriteId, savingMeal, buildDiaryAutosaveBundle, category, selectedDate])
+  }, [isDiaryEdit, sourceLogId, loadedFavoriteId, items, mealName, portionControlEnabled, portionAmountInput, portionUnit, linkedFavoriteId, savingMeal, buildDiaryAutosaveBundle, category, selectedDate])
 
   const createMeal = async () => {
     if (items.length === 0) {
@@ -5810,7 +5821,9 @@ export default function MealBuilderClient() {
     const totalRecipeWeightForSave = computeTotalRecipeWeightG(itemsForSave)
     const portionAmountForSave = portionInputRef.current?.value ?? portionAmountInput
     const portionScaleRaw = computePortionScale(portionAmountForSave, portionUnit, totalRecipeWeightForSave, recipeServingsForPortion)
-    const portionScaleForSave = portionControlEnabled ? portionScaleRaw : 1
+    const portionScaleForSave = portionControlEnabled
+      ? savedPortionScale !== null && (sourceLogId || editFavoriteId) && !portionScaleOverriddenByUser ? savedPortionScale : portionScaleRaw
+      : 1
     const portionAmountNumeric = parseNumericInput(portionAmountForSave)
 
     const shouldStripBuilderIds = Boolean(editFavoriteId) && !editFavoriteIsCustomRef.current
@@ -5863,19 +5876,19 @@ export default function MealBuilderClient() {
     const portionMeta =
       portionControlEnabled && portionAmountNumeric && portionAmountNumeric > 0
         ? {
-            __portionScale: round3(portionScaleForSave),
+            __portionScale: portionScaleForSave,
             __portionUnit: portionUnit,
             __portionAmount: portionAmountNumeric,
             __portionTotalWeightG:
               Number.isFinite(Number(totalRecipeWeightForSave)) && Number(totalRecipeWeightForSave) > 0
-                ? Math.round(Number(totalRecipeWeightForSave))
+                ? Number(totalRecipeWeightForSave)
                 : null,
             __portionRecipeServings:
               Number.isFinite(Number(recipeServingsForPortion)) && Number(recipeServingsForPortion) > 0
                 ? Number(recipeServingsForPortion)
                 : null,
             __portionControlEnabled: true,
-            ...(portionWeightForSave ? { __portionWeightG: Math.round(portionWeightForSave) } : {}),
+            ...(portionWeightForSave ? { __portionWeightG: portionWeightForSave } : {}),
           }
         : null
 
@@ -5905,7 +5918,7 @@ export default function MealBuilderClient() {
         }
       : null
 
-    const createdAtIso = buildCreatedAtFromEntryTime(selectedDate, entryTime, new Date().toISOString())
+    const createdAtIso = preserveSavedEntryTime(selectedDate, entryTime, sourceCreatedAtRef.current)
 
     const payload = {
       description,

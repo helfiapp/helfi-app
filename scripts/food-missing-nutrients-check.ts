@@ -147,7 +147,8 @@ assert.equal(web.toNumber(''), null)
 assert.equal(web.toNumber(0), 0)
 // Check the actual web editor's saved bundle, including portion scaling.
 Object.assign(web, { isDiaryEdit: true, sourceLogId: 'saved', itemsRef: { current: [sauce] }, items: [sauce], mealName: sauce.name, linkedFavoriteId: '', selectedDate: '2026-10-05', entryTime: '04:41', portionUnit: 'fraction', portionAmountInput: '0.5', portionInputRef: { current: { value: '0.5' } }, recipeServingsForPortion: 1, sanitizeMealTitle: (name: string) => name, buildDefaultMealName: () => sauce.name, computeTotalRecipeWeightG: () => 100, computePortionScale: () => 0.5, computePortionWeightG: () => 50, parseNumericInput: (value: any) => Number(value), buildCreatedAtFromEntryTime: () => '2026-10-04T17:41:00Z' })
-bind(web, builder, ['buildItemsSignature'])
+bind(web, builder, ['buildItemsSignature', 'formatTimeInputValue', 'extractTimeFromTimestamp', 'preserveSavedEntryTime'])
+Object.assign(web, { sourceCreatedAtRef: { current: null }, savedPortionScale: null, portionScaleOverriddenByUser: false })
 for (const enabled of [false, true]) {
   web.portionControlEnabled = enabled
   const bundle = vm.runInContext(expression(builder, 'buildDiaryAutosaveBundle', true), web)()
