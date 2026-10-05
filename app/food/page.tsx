@@ -44,7 +44,7 @@ import { calculateDailyTargets } from '@/lib/daily-targets'
 import { foodNumberOrNull } from '@/lib/food/openfoodfacts'
 import { hasSameDiaryNutrientContent, hasSameDiaryEntryTime } from '@/lib/food/diary-entry-comparison'
 import { convertFoodAmount, liquidDensity } from '@/native/src/lib/foodUnits'
-import { convertItemMeasurement, recordedServingBasis, itemMeasurementUnitOptions, formatItemMeasurementUnit, type ItemMeasurementUnit } from '@/lib/food/serving-measurements'
+import { convertItemMeasurement, recordedServingBasis, itemMeasurementUnitOptions, formatItemMeasurementUnit, itemMeasurementPhysicalAmount, type ItemMeasurementUnit } from '@/lib/food/serving-measurements'
 import { AI_MEAL_RECOMMENDATION_CREDITS, AI_MEAL_RECOMMENDATION_GOAL_NAME } from '@/lib/ai-meal-recommendation'
 import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
 import { SolidMacroRing } from '@/components/SolidMacroRing'
@@ -124,10 +124,12 @@ const WEIGHT_UNIT_OPTIONS: Array<{ value: WeightUnit; label: string }> = [
   { value: 'piece-extra-large', label: WEIGHT_UNIT_LABELS['piece-extra-large'] },
 ]
 
-const getWeightUnitOptions = (item?: any, current?: WeightUnit, pieceGrams?: number | null) => {
-  return itemMeasurementUnitOptions(item, pieceGrams).map((unit) => ({
+const getItemMeasurementCountry = (item: any): string => typeof item?.__measurementCountry === 'string' ? item.__measurementCountry : ''
+
+const getWeightUnitOptions = (item?: any, current?: WeightUnit, pieceGrams?: number | null, country = '') => {
+  return itemMeasurementUnitOptions(item, pieceGrams, country).map((unit) => ({
     value: unit,
-    label: formatItemMeasurementUnit(item, unit, pieceGrams),
+    label: formatItemMeasurementUnit(item, unit, pieceGrams, unit === current ? getItemMeasurementCountry(item) : country),
   }))
 }
 
@@ -8413,7 +8415,7 @@ const applyStructuredItems = (
       const baseGrams = getBaseGramsPerServing(itemsCopy[index])
       const measured = getMeasurementItem(itemsCopy[index], baseGrams)
       const pieceGrams = getPieceGramsForItem(itemsCopy[index], baseGrams)
-      if (!itemMeasurementUnitOptions(measured, pieceGrams).includes(normalized)) {
+      if (!itemMeasurementUnitOptions(measured, pieceGrams, userCountry).includes(normalized)) {
         showQuickToast('This measurement is unavailable for this food. Keep its recorded unit.')
         return
       }
@@ -8469,14 +8471,22 @@ const applyStructuredItems = (
             : 1
         itemsCopy[index].weightAmount = servings
       } else {
-        const currentWeight = Number(itemsCopy[index].weightAmount)
+        let currentWeight = Number(itemsCopy[index].weightAmount)
+        if ((!Number.isFinite(currentWeight) || currentWeight <= 0) && itemsCopy[index].portionMode !== 'weight') {
+          const savedServings = Number(itemsCopy[index].servings)
+          const previousBase = getBaseWeightPerServing(itemsCopy[index])
+          if (previousBase && previousBase > 0 && Number.isFinite(savedServings) && savedServings > 0) {
+            currentWeight = previousBase * savedServings
+          }
+        }
         if (normalized !== previousUnit) {
-          const converted = convertItemMeasurement(currentWeight, previousUnit, normalized, measured, pieceGrams, piecesMultiplierForServing(itemsCopy[index]))
+          const converted = convertItemMeasurement(currentWeight, previousUnit, normalized, measured, pieceGrams, piecesMultiplierForServing(itemsCopy[index]), { fromCountry: getItemMeasurementCountry(itemsCopy[index]), toCountry: userCountry })
           if (converted == null) {
             showQuickToast('Enter a valid amount in the recorded unit before changing units.')
             return
           }
           itemsCopy[index].weightAmount = converted
+          itemsCopy[index].__measurementCountry = userCountry
         }
         itemsCopy[index].weightUnit = normalized
       }
@@ -11187,15 +11197,15 @@ const applyStructuredItems = (
 
   const getUnitGramsForItem = (unit: WeightUnit, item: any, baseGrams: number | null) => {
     const measured = getMeasurementItem(item, baseGrams)
-    return convertItemMeasurement(1, unit, 'g', measured, getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item))
+    return convertItemMeasurement(1, unit, 'g', measured, getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item), { fromCountry: getItemMeasurementCountry(item), toCountry: getItemMeasurementCountry(item) })
   }
 
   const weightAmountToGrams = (amount: number, unit: WeightUnit, item: any, baseGrams: number | null) => {
-    return convertItemMeasurement(amount, unit, 'g', getMeasurementItem(item, baseGrams), getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item))
+    return convertItemMeasurement(amount, unit, 'g', getMeasurementItem(item, baseGrams), getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item), { fromCountry: getItemMeasurementCountry(item), toCountry: getItemMeasurementCountry(item) })
   }
 
   const gramsToWeightAmount = (grams: number, unit: WeightUnit, item: any, baseGrams: number | null) => {
-    return convertItemMeasurement(grams, 'g', unit, getMeasurementItem(item, baseGrams), getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item))
+    return convertItemMeasurement(grams, 'g', unit, getMeasurementItem(item, baseGrams), getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item), { fromCountry: getItemMeasurementCountry(item), toCountry: getItemMeasurementCountry(item) })
   }
 
   const getBaseGramsPerServing = (item: any): number | null => {
@@ -11229,7 +11239,18 @@ const applyStructuredItems = (
   // stays unknown; neither calories nor current input invent the denominator.
   const getBaseWeightPerServing = (item: any): number | null => {
     const baseGrams = getBaseGramsPerServing(item)
-    return convertItemMeasurement(1, 'serving', normalizeWeightUnit(item?.weightUnit), getMeasurementItem(item, baseGrams), getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item))
+    return convertItemMeasurement(1, 'serving', normalizeWeightUnit(item?.weightUnit), getMeasurementItem(item, baseGrams), getPieceGramsForItem(item, baseGrams), piecesMultiplierForServing(item), { fromCountry: getItemMeasurementCountry(item), toCountry: getItemMeasurementCountry(item) })
+  }
+
+  const measurementItemForStorage = (item: any) => {
+    if (typeof item?.__measurementCountry !== 'string') return item
+    const stored = { ...item }
+    delete stored.__measurementCountry
+    const unit = normalizeWeightUnit(item?.weightUnit)
+    if (!['tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup'].includes(unit)) return stored
+    const physical = itemMeasurementPhysicalAmount(item, Number(item.weightAmount), unit, getItemMeasurementCountry(item))
+    if (!physical) return item
+    return { ...stored, weightUnit: physical.unit, weightAmount: physical.amount, __unit: physical.unit, __amount: physical.amount }
   }
 
   // Estimate grams per serving when no explicit weight/volume is available.
@@ -12143,6 +12164,7 @@ Please add nutritional information manually if needed.`);
 	      drinkSweetener?.choice ? null : drinkOverride,
 	    )
 	    let finalItems = adjusted.items || (analyzedItems && analyzedItems.length > 0 ? analyzedItems : null)
+	    if (Array.isArray(finalItems)) finalItems = finalItems.map(measurementItemForStorage)
 	    const overrideTotals = adjusted.used ? adjusted.totals || null : null
 	    // If this is a single-item entry and the user gave it a title, use that as the item name too.
 	    try {
@@ -12811,7 +12833,7 @@ Please add nutritional information manually if needed.`);
 
     let updatedItems = (() => {
       const baseItems =
-        analyzedItems && analyzedItems.length > 0 ? analyzedItems : (editingEntry.items || null)
+        analyzedItems && analyzedItems.length > 0 ? analyzedItems.map(measurementItemForStorage) : (editingEntry.items || null)
       if (!Array.isArray(baseItems) || baseItems.length !== 1) return baseItems
       if (!resolvedDrinkMeta?.type) return baseItems
       if (!resolvedSweetenerMeta && !baseSweetenerMeta) return baseItems
@@ -24185,7 +24207,7 @@ Please add nutritional information manually if needed.`);
                                       className="bg-transparent border-none text-sm font-semibold text-slate-700 cursor-pointer pr-0 appearance-none min-w-0 max-w-[10.5rem] sm:max-w-none truncate"
                                       style={{ backgroundImage: 'none', WebkitAppearance: 'none', MozAppearance: 'none', appearance: 'none' }}
                                     >
-                                      {getWeightUnitOptions(getMeasurementItem(item, getBaseGramsPerServing(item)), weightUnit, pieceGrams).map((option) => (
+                                      {getWeightUnitOptions(getMeasurementItem(item, getBaseGramsPerServing(item)), weightUnit, pieceGrams, userCountry).map((option) => (
                                         <option key={option.value} value={option.value}>
                                           {option.label}
                                         </option>
@@ -24741,7 +24763,7 @@ Please add nutritional information manually if needed.`);
                                 onChange={(e) => updateItemField(editingItemIndex, 'weightUnit', e.target.value)}
                                 className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               >
-                                {getWeightUnitOptions(getMeasurementItem(item, getBaseGramsPerServing(item)), unit, pieceGrams).map((option) => (
+                                {getWeightUnitOptions(getMeasurementItem(item, getBaseGramsPerServing(item)), unit, pieceGrams, userCountry).map((option) => (
                                   <option key={option.value} value={option.value}>
                                     {option.label}
                                   </option>
@@ -30891,7 +30913,7 @@ Please add nutritional information manually if needed.`);
                                   onChange={(e) => updateItemField(idx, 'weightUnit', e.target.value)}
                                   className="px-3 py-2 rounded-lg border border-gray-300 bg-white text-sm font-semibold text-gray-700"
                                 >
-                                  {getWeightUnitOptions(getMeasurementItem(adjustItem, getBaseGramsPerServing(adjustItem)), weightUnit, pieceGrams).map((option) => (
+                                  {getWeightUnitOptions(getMeasurementItem(adjustItem, getBaseGramsPerServing(adjustItem)), weightUnit, pieceGrams, userCountry).map((option) => (
                                     <option key={option.value} value={option.value}>
                                       {option.label}
                                     </option>

@@ -1,4 +1,4 @@
-import { convertFoodAmount, liquidDensity, parseFoodServing, type FoodBaseUnit } from '../../native/src/lib/foodUnits'
+import { convertFoodAmount, liquidDensity, liquidHouseholdMl, parseFoodServing, type FoodBaseUnit } from '../../native/src/lib/foodUnits'
 import { formatUnitLabel, getAllowedUnitsForFood, getFoodUnitGrams, isLiquidFood, type MeasurementUnit } from './measurement-units'
 
 export type ItemMeasurementUnit = MeasurementUnit | 'fl oz'
@@ -10,8 +10,7 @@ const positive = (value: unknown): number | null => {
 }
 const nameOf = (item: any) => String(item?.name || item?.food || '')
 const volumeUnits: Partial<Record<ItemMeasurementUnit, number>> = {
-  ml: 1, 'fl oz': 29.5735295625, tsp: 5, tbsp: 15,
-  'quarter-cup': 60, 'half-cup': 120, 'three-quarter-cup': 180, cup: 240,
+  ml: 1, 'fl oz': 29.5735295625,
 }
 const cupFractions: Partial<Record<ItemMeasurementUnit, number>> = {
   'quarter-cup': 0.25, 'half-cup': 0.5, 'three-quarter-cup': 0.75, cup: 1,
@@ -66,25 +65,26 @@ function recordedHouseholdMeasure(item: any, unit: ItemMeasurementUnit): Basis |
   return null
 }
 
-function unitMeasure(item: any, unit: ItemMeasurementUnit, pieceGrams?: number | null, multiplier = 1): Basis | null {
+function unitMeasure(item: any, unit: ItemMeasurementUnit, pieceGrams?: number | null, multiplier = 1, country = ''): Basis | null {
   if (unit === 'serving') return recordedServingBasis(item, multiplier)
   if (unit === 'g') return { amount: 1, unit: 'g' }
   if (unit === 'oz') return { amount: 28.349523125, unit: 'g' }
   if (unit === 'ml' || unit === 'fl oz') return { amount: volumeUnits[unit]!, unit: 'ml' }
   const recorded = recordedHouseholdMeasure(item, unit)
   if (recorded) return recorded
-  if (isLiquidFood(nameOf(item)) && volumeUnits[unit]) return { amount: volumeUnits[unit]!, unit: 'ml' }
+  const householdMl = liquidHouseholdMl(country)[unit]
+  if (isLiquidFood(nameOf(item)) && householdMl) return { amount: householdMl, unit: 'ml' }
   const grams = positive(getFoodUnitGrams(nameOf(item))?.[unit as MeasurementUnit])
     ?? (unit === 'piece' || unit === 'slice' ? positive(pieceGrams) : null)
   return grams == null ? null : { amount: grams, unit: 'g' }
 }
 
-export function convertItemMeasurement(amount: number, from: ItemMeasurementUnit, to: ItemMeasurementUnit, item: any, pieceGrams?: number | null, multiplier = 1): number | null {
+export function convertItemMeasurement(amount: number, from: ItemMeasurementUnit, to: ItemMeasurementUnit, item: any, pieceGrams?: number | null, multiplier = 1, regions?: { fromCountry?: string; toCountry?: string }): number | null {
   if (!Number.isFinite(amount) || amount <= 0) return null
   // Count-only foods can still be adjusted by their recorded serving.
   if (from === 'serving' && to === 'serving') return amount
-  const source = unitMeasure(item, from, pieceGrams, multiplier)
-  const target = unitMeasure(item, to, pieceGrams, multiplier)
+  const source = unitMeasure(item, from, pieceGrams, multiplier, regions?.fromCountry)
+  const target = unitMeasure(item, to, pieceGrams, multiplier, regions?.toCountry)
   if (!source || !target) return null
   const converted = convertFoodAmount(amount * source.amount, source.unit, target.unit, liquidDensity(nameOf(item)))
   return Number.isFinite(converted) && converted > 0 ? converted / target.amount : null
@@ -94,18 +94,24 @@ export function servingRatioFromMeasurement(item: any, amount: number, unit: Ite
   return convertItemMeasurement(amount, unit, 'serving', item, null, multiplier)
 }
 
-export function itemMeasurementUnitOptions(item: any, pieceGrams?: number | null): ItemMeasurementUnit[] {
+export function itemMeasurementUnitOptions(item: any, pieceGrams?: number | null, country = ''): ItemMeasurementUnit[] {
   const basis = recordedServingBasis(item)
   if (!basis) return ['serving']
   const candidates: ItemMeasurementUnit[] = [...getAllowedUnitsForFood(nameOf(item), pieceGrams)]
   if (basis.unit === 'ml' || liquidDensity(nameOf(item)) != null) candidates.push('ml', 'fl oz')
-  return [...new Set(candidates)].filter(unit => convertItemMeasurement(1, unit, 'serving', item, pieceGrams) != null)
+  return [...new Set(candidates)].filter(unit => convertItemMeasurement(1, unit, 'serving', item, pieceGrams, 1, { fromCountry: country }) != null)
 }
 
-export function formatItemMeasurementUnit(item: any, unit: ItemMeasurementUnit, pieceGrams?: number | null): string {
+export function formatItemMeasurementUnit(item: any, unit: ItemMeasurementUnit, pieceGrams?: number | null, country = ''): string {
   if (unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz') return unit
   if (unit.startsWith('piece') || unit.startsWith('egg') || unit === 'slice') return formatUnitLabel(unit as MeasurementUnit, nameOf(item), pieceGrams)
-  const measure = unitMeasure(item, unit, pieceGrams)
+  const measure = unitMeasure(item, unit, pieceGrams, 1, country)
   const label = ({ 'quarter-cup': '1/4 cup', 'half-cup': '1/2 cup', 'three-quarter-cup': '3/4 cup' } as Partial<Record<ItemMeasurementUnit, string>>)[unit] || unit
   return measure ? `${label} — ${Number(measure.amount.toFixed(3))} ${measure.unit}` : label
+}
+
+export function itemMeasurementPhysicalAmount(item: any, amount: number, unit: ItemMeasurementUnit, country = ''): Basis | null {
+  if (!Number.isFinite(amount) || amount <= 0) return null
+  const measure = unitMeasure(item, unit, null, 1, country)
+  return measure ? { amount: amount * measure.amount, unit: measure.unit } : null
 }

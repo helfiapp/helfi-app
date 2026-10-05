@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 3:14pm Melbourne; normal refresh/reopen verified 3:17pm.
+- What changed: Task67 website Food Diary manual-refresh no-change check now accepts saved clock/date changes even when meals and nutrients match. Source0b496bf2387e0cb713f6abe292912e251a3ddf91; AWS66 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag175tao6e1hw1z15.
+- Where to see it: Food Diary > Refresh, then saved Build a Meal > Edit Entry.
+- What to quickly test: Fresh reload preserved cached14:22; normal manual Refresh correctly replaced it with original saved14:26. Reopened60.7g halfmeal112/P1.7/C2.4/F10.8/FibreMissing/S2.5/all6colorfulcards/time14:26. Daily2152/132remaining/wallet619 unchanged. Readonly all20FoodLog rows/hash unchanged after Refresh and reopening; no Save/Update pressed. Full production build6290exit0/protected regions/root278-native79 locks pass. Manual-only/pending-save/delete/history/rename/targets/credit code untouched; no history migration. Remaining regional saved-editor measurements, photo/model and signed stores are open. Apple saved sign-in remains blocked by locked Mac; no store uploads.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 2:53pm Melbourne; final live save/reopen verified 2:58pm.
 - What changed: Task66 Build a Meal waits for the original saved clock and preserves its exact timestamp unless edited. Opening, including restored local drafts, no longer autosaves. Both save paths retain exact portion weights/ratios. Final source1b8cb1864eaaff10615b473a2901645cd3b11cab; AWS65 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag9y9x6o22yi1z15.
 - Where to see it: Food Diary > saved Build a Meal > Edit Entry.

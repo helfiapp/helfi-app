@@ -1,0 +1,78 @@
+{
+  "task": 68,
+  "scope": "Saved-food editor regional generic household measurements and known saved serving-to-unit conversion",
+  "sourceBefore": "0b496bf2387e0cb713f6abe292912e251a3ddf91",
+  "liveBefore": {
+    "meal": "Oil, olive, salad or cooking, 20 ml",
+    "clock": "13:34",
+    "originalServing": "100 ml",
+    "savedServings": 0.2,
+    "calories": 163,
+    "fat": 18.4,
+    "fiveRealZeros": true,
+    "genericChoices": {
+      "tbspMl": 15,
+      "cupMl": 240
+    },
+    "normalUnitChangeToMl": "Blocked with Enter a valid amount in the recorded unit before changing units."
+  },
+  "fixtureFailuresBefore": [
+    "AU actual dropdown says tbsp15ml instead of20ml",
+    "Actual known saved serving-count entry unit handler rejects change g->tbsp when physical weight input is unset"
+  ],
+  "scopeSafety": "Preserve original provider measures/source/nutrient bases and historical selected units. New selections use region-aware conversion and save physical grams/ml, so other devices need no region interpretation. No rename, credits or history migration.",
+  "recordsBefore": {
+    "verifiedAt": "2026-10-05T04:26:26.640Z",
+    "recordCount": 20,
+    "allRecordsHash": "80d8bc2e3a4260a9bbb9192c7f589b303f1570685d00cb287f5ece3c3c1cf2c0",
+    "meal": {
+      "id": "cmuumzmvc0001c6dmhk4wguy8",
+      "description": "Oil, olive, salad or cooking, 20 ml",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:34:39.624Z",
+      "nutrients": {
+        "fat": 18.4,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 163
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "label": "Oil, olive, salad or cooking",
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.2,
+          "protein_g": 0,
+          "unitGrams": {},
+          "serving_size": "100 ml",
+          "calories_kcal": 813.2800000000001,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    }
+  },
+  "checks": {
+    "verifiedAt": "2026-10-05T04:29:51.659430+00:00",
+    "actualSavedEditorHandlerDropdownAndSaveFixtures": "PASS",
+    "scope": "AU20/250/fractions, US15/240, historical untagged choices preserved, original recorded13.5gspoon/239gcup, known saved-servingcount unit conversion, unknown density/count-only/invalid/missing/zero, both real add/update canonical metric mappings",
+    "fullProductionBuild": {
+      "session": 40292,
+      "exitCode": 0,
+      "log": "tmp/task68-production-build.log"
+    },
+    "protectedRegions": "PASS",
+    "rootLocks": 278,
+    "nativeLocks": 79,
+    "lockChange": "Only root food-page hash refreshed"
+  }
+}

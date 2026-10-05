@@ -11,7 +11,7 @@ import { convertFoodAmount, liquidDensity } from '../native/src/lib/foodUnits'
 // dependencies, credentials, a database or network calls.
 const source = ts.createSourceFile('page.tsx', fs.readFileSync('app/food/page.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const ctx = vm.createContext({ ...measurements, ...recorded, ...nutrients,
-  convertFoodAmount, liquidDensity, analysisMode: 'meal',
+  convertFoodAmount, liquidDensity, analysisMode: 'meal', userCountry: '',
   formatMeasurementUnitLabel: measurements.formatUnitLabel,
   estimateGramsPerServing: () => null, foodNumberOrNull: nutrients.optionalNutrient,
   editingEntry: null, clampNumber: (value: any, min: number, max: number) => Math.min(max, Math.max(min, Number(value))),
@@ -26,7 +26,7 @@ function bind(name: string) {
   visit(source); assert.ok(code, `actual ${name} exists`)
   ctx[name] = vm.runInContext(ts.transpile(code, { target: ts.ScriptTarget.ES2020 }), ctx)
 }
-for (const name of ['DEFAULT_SERVING_GRAMS', 'WEIGHT_UNIT_LABELS', 'WEIGHT_UNIT_TO_GRAMS', 'DISCRETE_UNIT_KEYWORDS', 'escapeRegex', 'parseServingQuantity', 'singularizeUnitLabel', 'isGenericSizeLabel', 'isDiscreteUnitLabel', 'isFractionalServingQuantity', 'stripWeightPhrasesFromLabel', 'replaceWordNumbersForLabel', 'hasExplicitPieceCountInLabel', 'getExplicitPieces', 'getPiecesPerServing', 'parseServingUnitMetadata', 'piecesMultiplierForServing', 'macroMultiplierForItem', 'defaultGramsForItem', 'getDiscreteWeightFloor', 'normalizeWeightUnit', 'roundWeightValue', 'parseServingSizeInfo', 'getPieceGramsForItem', 'getMeasurementItem', 'getWeightUnitOptions', 'getUnitGramsForItem', 'weightAmountToGrams', 'gramsToWeightAmount', 'getBaseGramsPerServing', 'getBaseWeightPerServing', 'effectiveServings', 'recalculateNutritionFromItems', 'stripNutritionFromServingSize', 'updateItemField']) bind(name)
+for (const name of ['DEFAULT_SERVING_GRAMS', 'WEIGHT_UNIT_LABELS', 'WEIGHT_UNIT_TO_GRAMS', 'DISCRETE_UNIT_KEYWORDS', 'escapeRegex', 'parseServingQuantity', 'singularizeUnitLabel', 'isGenericSizeLabel', 'isDiscreteUnitLabel', 'isFractionalServingQuantity', 'stripWeightPhrasesFromLabel', 'replaceWordNumbersForLabel', 'hasExplicitPieceCountInLabel', 'getExplicitPieces', 'getPiecesPerServing', 'parseServingUnitMetadata', 'piecesMultiplierForServing', 'macroMultiplierForItem', 'defaultGramsForItem', 'getDiscreteWeightFloor', 'normalizeWeightUnit', 'roundWeightValue', 'parseServingSizeInfo', 'getPieceGramsForItem', 'getMeasurementItem', 'getItemMeasurementCountry', 'getWeightUnitOptions', 'measurementItemForStorage', 'getUnitGramsForItem', 'weightAmountToGrams', 'gramsToWeightAmount', 'getBaseGramsPerServing', 'getBaseWeightPerServing', 'effectiveServings', 'recalculateNutritionFromItems', 'stripNutritionFromServingSize', 'updateItemField']) bind(name)
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} must equal ${expected}`)
 const juice = { id: 'original-juice', source: 'usda', name: 'Apple juice, frozen concentrate, diluted with 3 volume water', serving_size: 'cup —239g', calories: 112.33, protein_g: 0.239, carbs_g: 27.605, fat_g: 0.239, fiber_g: 0.239, sugar_g: null, servings: 100 / 239, weightAmount: 100, weightUnit: 'g', portionMode: 'weight' }
 assert.ok(!ctx.getWeightUnitOptions(juice, 'g').some((option: any) => option.value === 'ml'), 'unknown-density juice cannot offer volume relabelling')
@@ -35,6 +35,8 @@ close(ctx.getBaseGramsPerServing(milk), 103)
 close(ctx.getBaseWeightPerServing(milk), 103)
 close(ctx.effectiveServings(milk) * milk.calories, 61)
 const oil = { ...milk, name: 'Oil, olive, salad or cooking', calories: 813.28, protein_g: 0, carbs_g: 0, fat_g: 92, weightAmount: 15, servings: 15 / 92 }
+assert.equal(ctx.getWeightUnitOptions(oil, 'g', null, 'AU').find((option: any) => option.value === 'tbsp').label, 'tbsp — 20 ml', 'AU saved editor must offer the Australian tablespoon')
+assert.equal(ctx.getWeightUnitOptions(oil, 'g', null, 'AU').find((option: any) => option.value === 'cup').label, 'cup — 250 ml', 'AU saved editor must offer the Australian cup')
 close(ctx.effectiveServings(oil) * oil.calories, 132.6)
 assert.equal(ctx.recalculateNutritionFromItems([oil]).calories, 133)
 const volumeJuice = { ...juice, serving_size: '100 ml', weightUnit: 'ml', weightAmount: 240, servings: 2.4 }
@@ -171,6 +173,92 @@ ctx.updateItemField(0, 'weightUnit', 'ml')
 close(ctx.analyzedItems[0].weightAmount, 100)
 assert.equal(ctx.analyzedItems[0].id, milk.id)
 assert.equal(ctx.analyzedItems[0].source, milk.source)
+// Evaluate every actual dropdown expression, including the details modal.
+const dropdowns: string[] = []
+const findDropdowns = (node: ts.Node) => {
+  if (ts.isCallExpression(node) && node.expression.getText(source) === 'getWeightUnitOptions') dropdowns.push(node.getText(source))
+  ts.forEachChild(node, findDropdowns)
+}
+findDropdowns(source); assert.equal(dropdowns.length, 3)
+ctx.userCountry = 'AU'; ctx.item = oil; ctx.adjustItem = oil; ctx.weightUnit = 'g'; ctx.unit = 'g'; ctx.pieceGrams = null
+for (const expression of dropdowns) {
+  const options = vm.runInContext(ts.transpile(expression, { target: ts.ScriptTarget.ES2020 }), ctx)
+  assert.equal(options.find((option: any) => option.value === 'tbsp').label, 'tbsp — 20 ml')
+  assert.equal(options.find((option: any) => option.value === 'quarter-cup').label, '1/4 cup — 62.5 ml')
+}
+const originalOil = { ...oil, weightAmount: 20, weightUnit: 'ml', servings: 0.2 }
+const sourceSnapshot = JSON.stringify(originalOil)
+ctx.analyzedItems = [{ ...originalOil, weightAmount: undefined, weightUnit: 'g', portionMode: undefined }]
+ctx.updateItemField(0, 'weightUnit', 'tbsp')
+assert.equal(ctx.analyzedItems[0].weightUnit, 'tbsp', 'saved serving-count entries can change units using their known original quantity')
+close(ctx.analyzedItems[0].weightAmount, 1)
+ctx.analyzedItems = [structuredClone(originalOil)]
+ctx.updateItemField(0, 'weightUnit', 'tbsp')
+close(ctx.analyzedItems[0].weightAmount, 1)
+close(ctx.effectiveServings(ctx.analyzedItems[0]), 0.2)
+assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, 163)
+ctx.updateItemField(0, 'weightUnit', 'quarter-cup')
+close(ctx.analyzedItems[0].weightAmount, 20 / 62.5)
+ctx.updateItemField(0, 'weightAmount', '1')
+assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, 508)
+const savedQuarter = ctx.measurementItemForStorage(ctx.analyzedItems[0])
+close(savedQuarter.weightAmount, 62.5)
+assert.equal(savedQuarter.weightUnit, 'ml')
+assert.equal(savedQuarter.__unit, 'ml')
+close(savedQuarter.__amount, 62.5)
+close(ctx.effectiveServings(savedQuarter), 0.625)
+assert.equal(savedQuarter.calories, oil.calories)
+assert.equal(savedQuarter.id, oil.id)
+assert.equal(savedQuarter.source, oil.source)
+assert.equal(savedQuarter.serving_size, oil.serving_size)
+assert.equal(savedQuarter.fiber_g, oil.fiber_g)
+assert.equal(JSON.stringify(originalOil), sourceSnapshot)
+// Old choices retain their original recorded interpretation until changed.
+const historicalSpoon = { ...originalOil, weightUnit: 'tbsp', weightAmount: 1, servings: 0.15 }
+close(ctx.effectiveServings(historicalSpoon), 0.15)
+assert.equal(ctx.measurementItemForStorage(historicalSpoon), historicalSpoon)
+assert.equal(ctx.getWeightUnitOptions(historicalSpoon, 'tbsp', null, 'AU').find((option: any) => option.value === 'tbsp').label, 'tbsp — 15 ml')
+ctx.analyzedItems = [structuredClone(historicalSpoon)]
+ctx.updateItemField(0, 'weightUnit', 'ml')
+close(ctx.analyzedItems[0].weightAmount, 15)
+ctx.updateItemField(0, 'weightUnit', 'tbsp')
+close(ctx.analyzedItems[0].weightAmount, 0.75)
+ctx.updateItemField(0, 'weightAmount', '1')
+close(ctx.effectiveServings(ctx.analyzedItems[0]), 0.2)
+const providerSpoon = { ...originalOil, servingOptions: [{ label: '1 tbsp (13.5 g)', grams: 13.5 }] }
+ctx.analyzedItems = [providerSpoon]
+ctx.updateItemField(0, 'weightUnit', 'tbsp')
+assert.equal(ctx.getWeightUnitOptions(ctx.analyzedItems[0], 'tbsp', null, 'AU').find((option: any) => option.value === 'tbsp').label, 'tbsp — 13.5 g')
+ctx.updateItemField(0, 'weightAmount', '1')
+const savedProvider = ctx.measurementItemForStorage(ctx.analyzedItems[0])
+assert.equal(savedProvider.weightUnit, 'g'); close(savedProvider.weightAmount, 13.5)
+assert.deepEqual(savedProvider.servingOptions, providerSpoon.servingOptions)
+assert.equal(ctx.getWeightUnitOptions(juice, 'g', null, 'AU').find((option: any) => option.value === 'cup').label, 'cup — 239 g')
+// Execute both real save-boundary mappings, not just the storage helper.
+let updateMapping = ''; let addMapping = ''
+const findSaveMappings = (node: ts.Node) => {
+  if (ts.isVariableDeclaration(node) && node.name.getText(source) === 'baseItems' && node.initializer?.getText(source).includes('analyzedItems.map(measurementItemForStorage)')) updateMapping = node.initializer.getText(source)
+  if (ts.isIfStatement(node) && node.getText(source).includes('finalItems = finalItems.map(measurementItemForStorage)') && node.getText(source).length < 180) addMapping = node.getText(source)
+  ts.forEachChild(node, findSaveMappings)
+}
+findSaveMappings(source); assert.ok(updateMapping); assert.ok(addMapping)
+ctx.analyzedItems = [{ ...originalOil, weightAmount: 1, weightUnit: 'tbsp', __measurementCountry: 'AU' }]
+ctx.editingEntry = { items: [] }
+const updateStored = vm.runInContext(ts.transpile(`(${updateMapping})`, { target: ts.ScriptTarget.ES2020 }), ctx)
+ctx.finalItems = structuredClone(ctx.analyzedItems)
+vm.runInContext(ts.transpile(addMapping, { target: ts.ScriptTarget.ES2020 }), ctx)
+for (const storedItems of [updateStored, ctx.finalItems]) {
+  assert.equal(storedItems[0].weightUnit, 'ml'); close(storedItems[0].weightAmount, 20)
+  assert.equal(storedItems[0].__measurementCountry, undefined)
+  close(ctx.effectiveServings(JSON.parse(JSON.stringify(storedItems[0]))), 0.2)
+}
+ctx.editingEntry = null
+ctx.userCountry = 'US'; ctx.analyzedItems = [structuredClone(originalOil)]
+ctx.updateItemField(0, 'weightUnit', 'tbsp')
+close(ctx.analyzedItems[0].weightAmount, 20 / 15)
+ctx.updateItemField(0, 'weightAmount', '1')
+close(ctx.measurementItemForStorage(ctx.analyzedItems[0]).weightAmount, 15)
+ctx.userCountry = ''
 console.log('PASS: actual saved-food page options, recorded basis, density, source quantity, unknown nutrients, precise updates and invalid/unsupported measurements; no credentials or network.')
 
 async function checkSaveGates() {
