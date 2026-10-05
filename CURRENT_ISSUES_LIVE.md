@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 3:37pm Melbourne; saved-editor preview checked 3:39pm.
+- What changed: Task68 saved-editor Australian generic measurements and known saved serving-count conversion. Source531ced5d4e23b11adc5fd30db968042b1fba78d3; AWS67 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag h24qpxtd11z15.
+- Where to see it: Food Diary > saved oil20ml > Edit Entry > Weight/unit.
+- What to quickly test: Actual original saved20ml now switches to AU tablespoon20ml163/F18.4 and quarter-cup62.5ml508/F57.5 with all6cards/fivegenuinezeros. Canceled normally without Save; all20saved rows unchanged. Remaining ambiguous caption '1 1/4 cup' found for one quarter-cup; same-task follow-up correction/build and actual normal Save/web-iPhone reopen remain pending. This task and full photo/model/signed stores are unfinished.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 3:14pm Melbourne; normal refresh/reopen verified 3:17pm.
 - What changed: Task67 website Food Diary manual-refresh no-change check now accepts saved clock/date changes even when meals and nutrients match. Source0b496bf2387e0cb713f6abe292912e251a3ddf91; AWS66 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag175tao6e1hw1z15.
 - Where to see it: Food Diary > Refresh, then saved Build a Meal > Edit Entry.

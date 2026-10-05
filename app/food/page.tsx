@@ -1387,6 +1387,12 @@ const formatNumberInputValue = (value: any) => {
   return value
 }
 
+const formatWeightAmountLabel = (amount: number, unit: WeightUnit) => {
+  const cupFraction = unit === 'quarter-cup' ? 0.25 : unit === 'half-cup' ? 0.5 : unit === 'three-quarter-cup' ? 0.75 : null
+  if (cupFraction !== null) return `${formatNumberInputValue(amount * cupFraction)} cup`
+  return `${formatNumberInputValue(amount)} ${WEIGHT_UNIT_LABELS[unit]}`
+}
+
 const formatPieceDisplay = (value: number | null | undefined) => {
   if (value === null || value === undefined) return ''
   const numeric = Number(value)
@@ -24318,7 +24324,7 @@ Please add nutritional information manually if needed.`);
                                     {(() => {
                                       const raw = baseWeightPerServing * servingsCount
                                       const amount = roundWeightValue(raw, weightUnit)
-                                      return `${formatNumberInputValue(amount)} ${WEIGHT_UNIT_LABELS[weightUnit]}`
+                                      return formatWeightAmountLabel(amount, weightUnit)
                                     })()}
                                   </div>
                                 )}
@@ -24776,7 +24782,7 @@ Please add nutritional information manually if needed.`);
                                 {(() => {
                                   const raw = baseWeightPerServing * servingsCount
                                   const amount = roundWeightValue(raw, unit)
-                                  return `${formatNumberInputValue(amount)} ${WEIGHT_UNIT_LABELS[unit]}`
+                                  return formatWeightAmountLabel(amount, unit)
                                 })()}
                               </p>
                             )}

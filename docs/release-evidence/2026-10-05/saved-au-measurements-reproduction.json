@@ -74,5 +74,121 @@
     "rootLocks": 278,
     "nativeLocks": 79,
     "lockChange": "Only root food-page hash refreshed"
+  },
+  "recordsBeforeSave": {
+    "verifiedAt": "2026-10-05T04:37:47.566Z",
+    "recordCount": 20,
+    "allRecordsHash": "80d8bc2e3a4260a9bbb9192c7f589b303f1570685d00cb287f5ece3c3c1cf2c0",
+    "meal": {
+      "id": "cmuumzmvc0001c6dmhk4wguy8",
+      "description": "Oil, olive, salad or cooking, 20 ml",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:34:39.624Z",
+      "nutrients": {
+        "fat": 18.4,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 163
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "label": "Oil, olive, salad or cooking",
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.2,
+          "protein_g": 0,
+          "unitGrams": {},
+          "serving_size": "100 ml",
+          "calories_kcal": 813.2800000000001,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "f521d931db9428d3154a5c057576de4d43d996ad110d8c5828ccd98d8c06ddbf"
+  },
+  "deployment": {
+    "verifiedAt": "2026-10-05T04:37:50.437Z",
+    "summary": {
+      "jobId": "67",
+      "status": "SUCCEED",
+      "commitId": "531ced5d4e23b11adc5fd30db968042b1fba78d3"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"h24qpxtd11z15\"",
+        "via": "1.1 6f01da654ce062002b93fece7e4b0d9e.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"h24qpxtd11z15\"",
+        "via": "1.1 c4682a07be5015c8378e0b701a19324c.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "initialLivePreview": {
+    "source": "531ced5d4e23b11adc5fd30db968042b1fba78d3",
+    "normalSavedEditor": {
+      "auTablespoonMl": 20,
+      "auCupMl": 250,
+      "tablespoonCalories": 163,
+      "tablespoonFat": 18.4,
+      "quarterCupMl": 62.5,
+      "quarterCupCalories": 508,
+      "quarterCupFat": 57.5,
+      "fiveGenuineZeros": true,
+      "sixCards": true
+    },
+    "savePressed": false,
+    "cancelledNormally": true,
+    "remainingFailure": "One quarter-cup caption reads 1 1/4 cup; actual JSX fixture reproduced failure",
+    "screenshot": "web-saved-quarter-cup-caption-before.jpg"
+  },
+  "captionFollowup": {
+    "scope": "Only both actual saved-editor total-amount captions",
+    "fixtureFailureBefore": "actual JSX 1 1/4 cup != 0.25 cup",
+    "fixtureAfter": "PASS: both actual JSX expressions and fraction counts display 0.25/0.5/0.75/1 cup, metric unchanged",
+    "saveReopen": "Pending deployment and actual runtime",
+    "checks": {
+      "fullProductionBuild": {
+        "session": 70339,
+        "exitCode": 0,
+        "log": "tmp/task68-caption-production-build.log"
+      },
+      "protectedRegions": "PASS",
+      "rootLocks": 278,
+      "nativeLocks": 79,
+      "lockChange": "Only root food-page hash refreshed"
+    }
   }
 }

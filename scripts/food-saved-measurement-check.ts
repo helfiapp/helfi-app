@@ -28,6 +28,22 @@ function bind(name: string) {
 }
 for (const name of ['DEFAULT_SERVING_GRAMS', 'WEIGHT_UNIT_LABELS', 'WEIGHT_UNIT_TO_GRAMS', 'DISCRETE_UNIT_KEYWORDS', 'escapeRegex', 'parseServingQuantity', 'singularizeUnitLabel', 'isGenericSizeLabel', 'isDiscreteUnitLabel', 'isFractionalServingQuantity', 'stripWeightPhrasesFromLabel', 'replaceWordNumbersForLabel', 'hasExplicitPieceCountInLabel', 'getExplicitPieces', 'getPiecesPerServing', 'parseServingUnitMetadata', 'piecesMultiplierForServing', 'macroMultiplierForItem', 'defaultGramsForItem', 'getDiscreteWeightFloor', 'normalizeWeightUnit', 'roundWeightValue', 'parseServingSizeInfo', 'getPieceGramsForItem', 'getMeasurementItem', 'getItemMeasurementCountry', 'getWeightUnitOptions', 'measurementItemForStorage', 'getUnitGramsForItem', 'weightAmountToGrams', 'gramsToWeightAmount', 'getBaseGramsPerServing', 'getBaseWeightPerServing', 'effectiveServings', 'recalculateNutritionFromItems', 'stripNutritionFromServingSize', 'updateItemField']) bind(name)
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} must equal ${expected}`)
+bind('formatNumberInputValue')
+if (source.text.includes('const formatWeightAmountLabel')) bind('formatWeightAmountLabel')
+const amountCaptions: string[] = []
+const findAmountCaptions = (node: ts.Node) => {
+  if (ts.isJsxExpression(node) && node.expression && node.expression.getText(source).length < 500 && node.expression.getText(source).includes('const raw = baseWeightPerServing * servingsCount')) amountCaptions.push(node.expression.getText(source))
+  ts.forEachChild(node, findAmountCaptions)
+}
+findAmountCaptions(source); assert.equal(amountCaptions.length, 2)
+ctx.baseWeightPerServing = 1; ctx.servingsCount = 1; ctx.weightUnit = 'quarter-cup'; ctx.unit = 'quarter-cup'
+for (const expression of amountCaptions) assert.equal(vm.runInContext(ts.transpile(expression, { target: ts.ScriptTarget.ES2020 }), ctx), '0.25 cup', 'actual editor quarter-cup caption must not read as one and a quarter cups')
+assert.equal(ctx.formatWeightAmountLabel(1, 'quarter-cup'), '0.25 cup')
+assert.equal(ctx.formatWeightAmountLabel(2, 'quarter-cup'), '0.5 cup')
+assert.equal(ctx.formatWeightAmountLabel(1, 'half-cup'), '0.5 cup')
+assert.equal(ctx.formatWeightAmountLabel(1, 'three-quarter-cup'), '0.75 cup')
+assert.equal(ctx.formatWeightAmountLabel(4, 'quarter-cup'), '1 cup')
+assert.equal(ctx.formatWeightAmountLabel(20, 'ml'), '20 ml')
 const juice = { id: 'original-juice', source: 'usda', name: 'Apple juice, frozen concentrate, diluted with 3 volume water', serving_size: 'cup —239g', calories: 112.33, protein_g: 0.239, carbs_g: 27.605, fat_g: 0.239, fiber_g: 0.239, sugar_g: null, servings: 100 / 239, weightAmount: 100, weightUnit: 'g', portionMode: 'weight' }
 assert.ok(!ctx.getWeightUnitOptions(juice, 'g').some((option: any) => option.value === 'ml'), 'unknown-density juice cannot offer volume relabelling')
 const milk = { ...juice, name: 'Milk, whole', serving_size: '100 ml', calories: 62.83, protein_g: 3.193, carbs_g: 4.944, fat_g: 3.3475, fiber_g: null, sugar_g: 5.2427, servings: 100 / 103 }
