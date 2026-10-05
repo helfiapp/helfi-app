@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T05:54:47.814Z",
+  "generatedAt": "2026-10-05T06:50:51.478Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -35,7 +35,7 @@
     "app/food/analysis/page.tsx": "7282663fa2d6b3236c5c966de59e735b9edf9e479b28de4f843747d8f67cdbf4",
     "app/food/build-meal/page.tsx": "b0e3486c8c49c185702d77a3b5de653833289c5b7584494ff8ef82d8ced7893e",
     "app/food/import-recipe/page.tsx": "9c5784c66c83d64c4ed843b2b5fed565c62694d730a3bbae9466746b1575d491",
-    "app/food/page.tsx": "d4b42010a26cf062c66719dfcd87697b62cbe72ed2b981ea0622fd253a4ed21e",
+    "app/food/page.tsx": "e3cc617bf74dbdc026ed685da71e92aa07c10ba098d73eeffa4c00bbaec533c1",
     "app/food/recommended/explain/page.tsx": "b00096869d0bb7bdab50447f9b5a9e298aa0c5b906289b7d2319ebe5a2d4d7ac",
     "app/food/recommended/page.tsx": "18a09615c9b36a5d7b66537e6082941d776e3c294331b1eb134304486aef588a",
     "app/food/water/page.tsx": "23f7d4f73f8cf04cf4d6477cf6e10a434081ddb93a4aa201ccaece4bc946b276",

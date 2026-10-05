@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify72, helfi.ai/www.helfi.ai200CloudFront/new matchingetag87xz4031981z15.
+- Date/time: 5 October2026, verified06:35:07UTC (17:35 Melbourne); saved/reopened verification17:45.
+- What changed: 1d1565a719bb921b033a3eca1b7d494ec474baf5; packaged local search matches every product word before limiting20 rows, so exact branded products survive broad brand matches. Source nutrients, UI, native and customer history unchanged.
+- Where to see it (page/link): https://helfi.ai/food — Add Ingredient > Packaged/Fast-foods > Sanitarium Crunchy Peanut Butter.
+- What to quickly test: Fresh website/restarted signed-in iPhone39 use original USDA2317111. Original20g127;100g636 and30g191 previews retain allsixcards. One normal website30g Save17:38 reopens191/all6cards on website+iPhone; bothdaily2673/619. Original21rows and opening22row hashes unchanged. Actual local/fullendpoint fixtures, productionbuild16851exit0/protected/root278native79 pass; AWS BUILD/DEPLOY/VERIFY allSUCCEED. Saved fat16.05 recomputes to16.049999999999999 and displays16 versus preview16.1: separate task73 website display then native follow-up. Current label/barcode/serving-choice metadata/photo/model/signed stores remain open.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify71, helfi.ai/www.helfi.ai200CloudFront/newmatchingetag11odfi3i2lr1z15.
 - Date/time: 5 October2026, verified06:06:59UTC (17:06 Melbourne); saved/reopened cards verified17:17.
 - What changed: b4ad81b527ea58c55617a103f2f704289a09c3f7; recommended-meal precise sums preserve unknown nutrients and reject incomplete core/empty saves; summary/progress and cards round consistently. Native unchanged.

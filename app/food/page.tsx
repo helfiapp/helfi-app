@@ -1328,7 +1328,10 @@ const formatMacroValue = (value: number | null | undefined, unit: string) => {
     return '—'
   }
   if (unit) {
-    return `${Math.round(numeric * 10) / 10}${unit}`
+    const scaled = numeric * 10
+    // Portion multiplication can put an exact decimal tie just below .5.
+    const rounded = Math.round(scaled + Number.EPSILON * Math.max(1, Math.abs(scaled))) / 10
+    return `${rounded}${unit}`
   }
   return `${Math.round(numeric)}`
 }
@@ -23667,19 +23670,19 @@ Please add nutritional information manually if needed.`);
                             : null
                         const totalProtein =
                           baseProtein !== null
-                            ? Math.round(baseProtein * servingsCount * macroMultiplier * 10) / 10
+                            ? baseProtein * servingsCount * macroMultiplier
                             : null
                         const totalCarbs =
-                          baseCarbs !== null ? Math.round(baseCarbs * servingsCount * macroMultiplier * 10) / 10 : null
+                          baseCarbs !== null ? baseCarbs * servingsCount * macroMultiplier : null
                         const totalFat =
-                          baseFat !== null ? Math.round(baseFat * servingsCount * macroMultiplier * 10) / 10 : null
+                          baseFat !== null ? baseFat * servingsCount * macroMultiplier : null
                         const totalFiber =
                           baseFiber !== null
-                            ? Math.round(baseFiber * servingsCount * macroMultiplier * 10) / 10
+                            ? baseFiber * servingsCount * macroMultiplier
                             : null
                         const totalSugar =
                           baseSugar !== null
-                            ? Math.round(baseSugar * servingsCount * macroMultiplier * 10) / 10
+                            ? baseSugar * servingsCount * macroMultiplier
                             : null
                         const formattedServings = `${formatServingsDisplay(servingsCount)} serving${Math.abs(servingsCount - 1) < 0.001 ? '' : 's'}`
                         const baseWeightPerServing = getBaseWeightPerServing(item)
