@@ -1,0 +1,77 @@
+{
+  "scope": 94,
+  "status": "Read-only check complete; supplier availability and AU account entitlement unresolved",
+  "liveUiCheck": {
+    "verifiedAt": "2026-10-05T13:39:02.988Z",
+    "readOnly": true,
+    "query": "YoPRO Vanilla",
+    "country": "AU",
+    "kind": "packaged",
+    "response": {
+      "success": true,
+      "source": "auto",
+      "items": []
+    },
+    "networkSeconds": 4.388364000013098,
+    "duplicateRequests": [
+      {
+        "requestId": "22559.262",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=YoPRO+Vanilla&kind=packaged&limit=20&country=AU",
+        "timestamp": 389116.050386
+      },
+      {
+        "requestId": "22559.263",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=yopro+vanilla&kind=packaged&limit=20&country=AU&localOnly=1",
+        "timestamp": 389116.05106
+      },
+      {
+        "requestId": "22559.264",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=yopro+vanilla&kind=packaged&limit=20&localOnly=1&country=AU",
+        "timestamp": 389116.05664
+      },
+      {
+        "requestId": "22559.265",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=YoPRO+Vanilla&kind=packaged&limit=20&country=AU",
+        "timestamp": 389116.148306
+      }
+    ],
+    "wallet": 544,
+    "noSave": true,
+    "visibleMessage": "No results yet. Try a different search."
+  },
+  "recordCheck": {
+    "original23Unchanged": true,
+    "diaryCount": 23,
+    "diaryHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e"
+  },
+  "supplierCodeFindings": {
+    "foodSearchMethod": "foods.search v1",
+    "foodDetailsMethod": "food.get.v2",
+    "searchAndDetailScope": "basic",
+    "regionAndLanguageOmitted": true,
+    "outerBudgetMsWithNoLocalMatch": 8000,
+    "underlyingBudgetMs": 9000,
+    "oauthBudgetMs": 2500,
+    "availabilityConclusion": "The combined UI response was successful but empty; it does not reveal which supplier returned zero matches or failed.",
+    "australianCoverageConclusion": "FatSecret defaults to US/en without explicit localization. AU localization requires account entitlement, which has not been verified."
+  },
+  "primaryReferences": [
+    "https://platform.fatsecret.com/docs/v1/foods.search",
+    "https://platform.fatsecret.com/docs/v2/food.get",
+    "https://platform.fatsecret.com/docs/guides/localization"
+  ],
+  "safeAwsLogCheck": {
+    "windowStart": "2026-10-05T13:33:42.496Z",
+    "pages": 1,
+    "hasMore": false,
+    "matchingWarnings": 0,
+    "limitation": "No warning in this bounded log window does not establish supplier health."
+  },
+  "nextRepair": {
+    "scope": 95,
+    "area": "Standalone Add Ingredient category buttons",
+    "observedProblem": "One category switch started two full identical requests 98 ms apart; first was cancelled in browser.",
+    "sourceCause": "Click calls runSearch immediately; kind change schedules another full search after 90 ms."
+  },
+  "noSavedFoodOrCreditMutation": true
+}

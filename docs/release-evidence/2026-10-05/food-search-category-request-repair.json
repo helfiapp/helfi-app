@@ -1,0 +1,63 @@
+{
+  "scope": 95,
+  "status": "Full production build and required checks passed; exact live verification pending",
+  "before": {
+    "verifiedAt": "2026-10-05T13:39:02.988Z",
+    "readOnly": true,
+    "query": "YoPRO Vanilla",
+    "country": "AU",
+    "kind": "packaged",
+    "response": {
+      "success": true,
+      "source": "auto",
+      "items": []
+    },
+    "networkSeconds": 4.388364000013098,
+    "duplicateRequests": [
+      {
+        "requestId": "22559.262",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=YoPRO+Vanilla&kind=packaged&limit=20&country=AU",
+        "timestamp": 389116.050386
+      },
+      {
+        "requestId": "22559.263",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=yopro+vanilla&kind=packaged&limit=20&country=AU&localOnly=1",
+        "timestamp": 389116.05106
+      },
+      {
+        "requestId": "22559.264",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=yopro+vanilla&kind=packaged&limit=20&localOnly=1&country=AU",
+        "timestamp": 389116.05664
+      },
+      {
+        "requestId": "22559.265",
+        "url": "https://helfi.ai/api/food-data?source=auto&q=YoPRO+Vanilla&kind=packaged&limit=20&country=AU",
+        "timestamp": 389116.148306
+      }
+    ],
+    "wallet": 544,
+    "noSave": true,
+    "visibleMessage": "No results yet. Try a different search."
+  },
+  "repair": {
+    "file": "app/food/add-ingredient/AddIngredientClient.tsx",
+    "behavior": "A changed category relies on the existing query effect; tapping the current category still calls an explicit refresh.",
+    "sourceOrderingUnchanged": true,
+    "searchCoreUnchanged": true,
+    "supplierBudgetsUnchanged": true,
+    "noModelOrCreditOrDataChanges": true
+  },
+  "checks": {
+    "protectedRegions": true,
+    "rootPageLocks": 278,
+    "nativePageLocks": 79,
+    "onlyProtectedUiRegionHashRefreshed": "ADD_INGREDIENT_SEARCH",
+    "fullProductionBuild": {
+      "sessionId": 7791,
+      "exitCode": 0,
+      "requiredPrebuildChecksPassed": true
+    }
+  },
+  "after": null,
+  "deployment": null
+}

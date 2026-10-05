@@ -38,7 +38,7 @@
   "noSaveClicked": true,
   "wallet": 544,
   "task": 93,
-  "status": "EXACT_PUBLIC_CATALOGUE_UPDATED_SOURCE_BUILD_PASSED_AWS_DEPLOYMENT_PENDING",
+  "status": "PASS_EXACT_SOURCE_CATALOGUE_AWS91_AND_ACTUAL_LIVE_FULL_HALF_DOUBLE",
   "csvBefore": {
     "country": "AU",
     "chain": "McDonald's",
@@ -84,5 +84,91 @@
     "nativeLockedFiles": 79,
     "sourceCsvRowsChanged": 1,
     "uiNativeSourceFilesChanged": 0
-  }
+  },
+  "deployment": {
+    "verifiedAt": "2026-10-05T13:26:29.092Z",
+    "summary": {
+      "jobId": "91",
+      "status": "SUCCEED",
+      "commitId": "837244c49e0fc60cffe51de12e519be47ef5062b"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"kk9szr30t41z15\"",
+        "via": "1.1 dbb6b920c5cfab7c5dbd93c18314d8ce.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"kk9szr30t41z15\"",
+        "via": "1.1 69b737af1efcebe93fe9d0963bec99ac.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "liveAfter": {
+    "verifiedAt": "2026-10-05T13:29:21.472Z",
+    "item": {
+      "id": "custom:cmlc49usf000512sx03uqnzy4",
+      "name": "Big Mac",
+      "brand": "McDonald's",
+      "kind": "FAST_FOOD",
+      "serving_size": "1 serving",
+      "servingOptions": [
+        {
+          "id": "serving-mcdonald s big mac 1 serving",
+          "ml": null,
+          "fat_g": 34.4,
+          "grams": null,
+          "label": "1 serving",
+          "carbs_g": 46.5,
+          "fiber_g": null,
+          "sugar_g": 8,
+          "calories": 621,
+          "protein_g": 28.7,
+          "serving_size": "1 serving"
+        }
+      ],
+      "calories": 621,
+      "protein_g": 28.7,
+      "carbs_g": 46.5,
+      "fat_g": 34.4,
+      "fiber_g": null,
+      "sugar_g": 8,
+      "source": "custom",
+      "__custom": true
+    },
+    "whole": "- generic: Adjust ingredient\n- button \"Close\": \u2715\n- generic: Big Mac\n- generic: McDonald's\n- generic: Serving size\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: Amount\n- spinbutton: \"1\"\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: \"Servings: 1\"\n- 'generic \"Calories: 621 kcal\"':\n  - generic: 621 kcal\n  - generic: Calories\n- 'generic \"Protein: 28.7 g\"':\n  - generic: 28.7 g\n  - generic: Protein\n- 'generic \"Carbs: 46.5 g\"':\n  - generic: 46.5 g\n  - generic: Carbs\n- 'generic \"Fat: 34.4 g\"':\n  - generic: 34.4 g\n  - generic: Fat\n- 'generic \"Fibre: \u2014\"':\n  - generic: \u2014\n  - generic: Fibre\n- 'generic \"Sugar: 8 g\"':\n  - generic: 8 g\n  - generic: Sugar\n- button \"Add to diary\"\n- button \"Cancel\"\n",
+    "half": "- generic: Adjust ingredient\n- button \"Close\": \u2715\n- generic: Big Mac\n- generic: McDonald's\n- generic: Serving size\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: Amount\n- spinbutton [active]: \"0.5\"\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: \"Servings: 0.5\"\n- 'generic \"Calories: 311 kcal\"':\n  - generic: 311 kcal\n  - generic: Calories\n- 'generic \"Protein: 14.4 g\"':\n  - generic: 14.4 g\n  - generic: Protein\n- 'generic \"Carbs: 23.3 g\"':\n  - generic: 23.3 g\n  - generic: Carbs\n- 'generic \"Fat: 17.2 g\"':\n  - generic: 17.2 g\n  - generic: Fat\n- 'generic \"Fibre: \u2014\"':\n  - generic: \u2014\n  - generic: Fibre\n- 'generic \"Sugar: 4 g\"':\n  - generic: 4 g\n  - generic: Sugar\n- button \"Add to diary\"\n- button \"Cancel\"\n",
+    "double": "- generic: Adjust ingredient\n- button \"Close\": \u2715\n- generic: Big Mac\n- generic: McDonald's\n- generic: Serving size\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: Amount\n- spinbutton [active]: \"2\"\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: \"Servings: 2\"\n- 'generic \"Calories: 1242 kcal\"':\n  - generic: 1242 kcal\n  - generic: Calories\n- 'generic \"Protein: 57.4 g\"':\n  - generic: 57.4 g\n  - generic: Protein\n- 'generic \"Carbs: 93 g\"':\n  - generic: 93 g\n  - generic: Carbs\n- 'generic \"Fat: 68.8 g\"':\n  - generic: 68.8 g\n  - generic: Fat\n- 'generic \"Fibre: \u2014\"':\n  - generic: \u2014\n  - generic: Fibre\n- 'generic \"Sugar: 16 g\"':\n  - generic: 16 g\n  - generic: Sugar\n- button \"Add to diary\"\n- button \"Cancel\"\n",
+    "noSaveClicked": true,
+    "wallet": 544
+  },
+  "recordsAfter": {
+    "verifiedAt": "2026-10-05T13:29:29.239Z",
+    "readOnly": true,
+    "original23Unchanged": true,
+    "diaryCount": 23,
+    "diaryHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e"
+  },
+  "screenshot": "docs/release-evidence/2026-10-05/web-current-au-big-mac-six-cards.png"
 }

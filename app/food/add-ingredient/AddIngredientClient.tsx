@@ -2070,7 +2070,8 @@ export default function AddIngredientClient() {
                 disabled={loading}
                 onClick={() => {
                   setKind('packaged')
-                  if (query.trim().length >= 1) runSearch(query, 'packaged', 'auto')
+                  // Changing category already starts a search through the query effect.
+                  if (kind === 'packaged' && query.trim().length >= 1) runSearch(query, 'packaged', 'auto')
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
@@ -2083,7 +2084,8 @@ export default function AddIngredientClient() {
                 disabled={loading}
                 onClick={() => {
                   setKind('single')
-                  if (query.trim().length >= 1) runSearch(query, 'single', 'auto')
+                  // Tapping the current category still refreshes its results.
+                  if (kind === 'single' && query.trim().length >= 1) runSearch(query, 'single', 'auto')
                 }}
                 className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
                   kind === 'single' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-700 border-gray-200'

@@ -1,5 +1,13 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05T13:26:29.092Z
+- What changed: Refreshed the ONE Australian McDonald's Big Mac public catalogue serving and CSV source to the current manufacturer per-serving621kcal/P28.7/C46.5/F34.4/S8.0. Fibre and serve mass remain unknown; original serving identity unchanged.
+- Where to see it (page/link): https://helfi.ai/food -> Add ingredient -> Packaged/Fast-foods -> Big Mac (AU).
+- What to quickly test: Full/half/double must show621/311/1242kcal with allsixcards and Fibre—. Actual fresh AU lookup621 and full/half/double621/311/1242 with P/C/F/S proportionate and allsixcards/Fibre— passed. Cancelled/noSave/noAIcharge; original23hash/day5daily2776/wallet544 unchanged. No saved meal rewrite.
+- Verified source: 837244c49e0fc60cffe51de12e519be47ef5062b / AWS91 allstepsSUCCEED; bothdomains200CloudFront/new matching ETagkk9szr30t41z15. Fullbuild93161 exit0/root278native79PASS. ExactpublicDBupdate other8259rows unchanged/original23FoodLogs hash unchanged/wallet544. Pairedmodel/signedstore/fullgoal unfinished.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-05T13:05:30.467Z
 - What changed: Result chart labels and centre energy preserve missing values as— rather than displaying drawing-only0; both chart layouts retain true zero, existing drawing/colors/controls and allsixcards.
 - Where to see it (page/link): https://helfi.ai/food
