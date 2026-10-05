@@ -1,6 +1,6 @@
 {
   "task": 81,
-  "status": "SOURCE_FULL_BUILD_PASS_DEPLOYMENT_PENDING",
+  "status": "SOURCE_FULL_BUILD_EXACT_DEPLOYMENT_CORE_RUNTIME_PASS_OPTIONAL_WEB_BUG_FOUND",
   "checkedAt": "2026-10-05T09:44:17.413676+00:00",
   "priorLiveSource": "8d054eb05e4861739234b17b752b34da033085fb",
   "diagnosis": "Actual normalized barcode acceptance gate Number(null) is finite; endpoint fixture with helfi calories=null returns200 rather than422.",
@@ -171,5 +171,462 @@
     "nativePageLocks": 79,
     "lockHashesChanged": false
   },
-  "runtimePlan": "Existing real test/public barcode cache contains no missing-core records; do not seed false nutrition. Missing-core path coverage is actual-source/endpoint fixtures. Use normal signed-in known valid barcode to verify fresh deployed success/6cards remains, without Save; retain explicit scope limits."
+  "runtimePlan": "Existing real test/public barcode cache contains no missing-core records; do not seed false nutrition. Missing-core path coverage is actual-source/endpoint fixtures. Use normal signed-in known valid barcode to verify fresh deployed success/6cards remains, without Save; retain explicit scope limits.",
+  "exactSauceStoredSources": {
+    "readOnly": true,
+    "barcode": "072036761163",
+    "globalRecord": null,
+    "privateRecord": {
+      "id": "cmuu3xok2000410jdrn5owkoc",
+      "barcode": "072036761163",
+      "name": "TERIYAKI SAUCE",
+      "brand": "HT TRADERS",
+      "servingSize": "100 g",
+      "calories": 88,
+      "proteinG": 5.88,
+      "carbsG": 11.76,
+      "fatG": 0,
+      "fiberG": null,
+      "sugarG": 11.76,
+      "quantityG": 100,
+      "piecesPerServing": null,
+      "source": "user-diary",
+      "createdAt": "2026-10-04T17:41:15.794Z",
+      "updatedAt": "2026-10-04T18:15:22.060Z",
+      "version": 4
+    },
+    "libraryRecords": [
+      {
+        "id": "cmkmm1cx3gs8b1305b72ir29a",
+        "source": "usda_branded",
+        "fdcId": 1463556,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "HT TRADERS",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:08:47.652Z",
+        "updatedAt": "2026-10-04T15:38:26.543Z"
+      },
+      {
+        "id": "cmkmlxf1h0z461305tspspuzs",
+        "source": "usda_branded",
+        "fdcId": 357264,
+        "gtinUpc": "072036761163",
+        "name": "H.T. TRADERS, TERIYAKI SAUCE",
+        "brand": "Harris-Teeter Inc.",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:05:43.774Z",
+        "updatedAt": "2026-10-04T15:35:19.962Z"
+      },
+      {
+        "id": "cmkmlz730867z13055647tz67",
+        "source": "usda_branded",
+        "fdcId": 811622,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "Harris-Teeter Inc.",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": null,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:07:06.774Z",
+        "updatedAt": "2026-10-04T15:37:04.367Z"
+      },
+      {
+        "id": "cmkmlx5hc005p13059x6xjsdu",
+        "source": "usda_branded",
+        "fdcId": 1106110,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "Harris-Teeter Inc.",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:05:31.388Z",
+        "updatedAt": "2026-10-04T15:37:31.961Z"
+      },
+      {
+        "id": "cmkmm056tc2ub1305l7uxtul6",
+        "source": "usda_branded",
+        "fdcId": 1171536,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "HT TRADERS",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:07:50.971Z",
+        "updatedAt": "2026-10-04T15:37:45.184Z"
+      },
+      {
+        "id": "cmkmm3yphr18e13059sr7o6i3",
+        "source": "usda_branded",
+        "fdcId": 2008378,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "HT TRADERS",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:10:49.201Z",
+        "updatedAt": "2026-10-04T15:39:57.935Z"
+      }
+    ]
+  },
+  "committedSource": "da5568bd5e47f3d849f2e5d65a16c51d52dd5863",
+  "normalRuntimePlan": {
+    "barcode": "072036761163",
+    "actualSelectedSource": "Current test account privateuser-diary correction v4",
+    "expectedServing": "100 g",
+    "expectedRawNutrition": {
+      "calories": 88,
+      "protein": 5.88,
+      "carbs": 11.76,
+      "fat": 0,
+      "fiber": null,
+      "sugar": 11.76
+    },
+    "expectedCards": {
+      "calories": "88",
+      "protein": "5.9g",
+      "carbs": "11.8g",
+      "fat": "0g",
+      "fiber": "\u2014",
+      "sugar": "11.8g"
+    },
+    "validationScope": "Displays existing private source record; no claim current manufacturer accuracy. Do not Save or rewrite source. Rejected missing-core path only actual-source fixtures because no natural test/private/publictrustedmissingcore records."
+  },
+  "recordsAfterNormalWebAndNativeCancelled": {
+    "verifiedAt": "2026-10-05T10:05:04.738Z",
+    "readOnly": true,
+    "diaryCount": 23,
+    "allDiaryRecordsHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+    "original23Unchanged": true,
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      },
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "hash": "e982c33ff19bf09e3b0b299025437f3deb0fe553f15142bbfc722df7fed6225e"
+      },
+      {
+        "id": "cmuuvpib70001tvel0mwqie66",
+        "hash": "087b826bbcbd58c08a70526ec8199b1a672b64987c695978d7d03a98d64710e4"
+      },
+      {
+        "id": "cmuuyyj7o0001tvsuw8q7707g",
+        "hash": "76ab9c950f4d7a9c41ae00877dd1a829166e95baf940fb9b486e32566836a362"
+      }
+    ],
+    "newMeals": [],
+    "library": [
+      {
+        "id": "cmkmtly83011y11ap57mfwgzg",
+        "source": "usda_sr_legacy",
+        "fdcId": 168878,
+        "gtinUpc": null,
+        "name": "Rice, white, long-grain, regular, enriched, cooked",
+        "brand": null,
+        "servingSize": "100 g",
+        "calories": 130,
+        "proteinG": 2.69,
+        "carbsG": 28.17,
+        "fatG": 0.28,
+        "fiberG": 0.4,
+        "sugarG": 0.05,
+        "createdAt": "2026-01-20T16:40:45.700Z",
+        "updatedAt": "2026-01-20T16:40:45.700Z"
+      }
+    ]
+  },
+  "exactSauceStoredSourcesBefore": {
+    "readOnly": true,
+    "barcode": "072036761163",
+    "globalRecord": null,
+    "privateRecord": {
+      "id": "cmuu3xok2000410jdrn5owkoc",
+      "barcode": "072036761163",
+      "name": "TERIYAKI SAUCE",
+      "brand": "HT TRADERS",
+      "servingSize": "100 g",
+      "calories": 88,
+      "proteinG": 5.88,
+      "carbsG": 11.76,
+      "fatG": 0,
+      "fiberG": null,
+      "sugarG": 11.76,
+      "quantityG": 100,
+      "piecesPerServing": null,
+      "source": "user-diary",
+      "createdAt": "2026-10-04T17:41:15.794Z",
+      "updatedAt": "2026-10-04T18:15:22.060Z",
+      "version": 4
+    },
+    "libraryRecords": [
+      {
+        "id": "cmkmm1cx3gs8b1305b72ir29a",
+        "source": "usda_branded",
+        "fdcId": 1463556,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "HT TRADERS",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:08:47.652Z",
+        "updatedAt": "2026-10-04T15:38:26.543Z"
+      },
+      {
+        "id": "cmkmlxf1h0z461305tspspuzs",
+        "source": "usda_branded",
+        "fdcId": 357264,
+        "gtinUpc": "072036761163",
+        "name": "H.T. TRADERS, TERIYAKI SAUCE",
+        "brand": "Harris-Teeter Inc.",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:05:43.774Z",
+        "updatedAt": "2026-10-04T15:35:19.962Z"
+      },
+      {
+        "id": "cmkmlz730867z13055647tz67",
+        "source": "usda_branded",
+        "fdcId": 811622,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "Harris-Teeter Inc.",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": null,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:07:06.774Z",
+        "updatedAt": "2026-10-04T15:37:04.367Z"
+      },
+      {
+        "id": "cmkmlx5hc005p13059x6xjsdu",
+        "source": "usda_branded",
+        "fdcId": 1106110,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "Harris-Teeter Inc.",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:05:31.388Z",
+        "updatedAt": "2026-10-04T15:37:31.961Z"
+      },
+      {
+        "id": "cmkmm056tc2ub1305l7uxtul6",
+        "source": "usda_branded",
+        "fdcId": 1171536,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "HT TRADERS",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:07:50.971Z",
+        "updatedAt": "2026-10-04T15:37:45.184Z"
+      },
+      {
+        "id": "cmkmm3yphr18e13059sr7o6i3",
+        "source": "usda_branded",
+        "fdcId": 2008378,
+        "gtinUpc": "072036761163",
+        "name": "TERIYAKI SAUCE",
+        "brand": "HT TRADERS",
+        "servingSize": "100 g",
+        "calories": 88,
+        "proteinG": 5.88,
+        "carbsG": 11.76,
+        "fatG": 0,
+        "fiberG": null,
+        "sugarG": 11.76,
+        "createdAt": "2026-01-20T13:10:49.201Z",
+        "updatedAt": "2026-10-04T15:39:57.935Z"
+      }
+    ]
+  },
+  "sourceRecordsUnchanged": true,
+  "verifiedAt": "2026-10-05T10:06:36.749293+00:00",
+  "deployment": {
+    "verifiedAt": "2026-10-05T09:55:14.098Z",
+    "summary": {
+      "jobId": "80",
+      "status": "SUCCEED",
+      "commitId": "da5568bd5e47f3d849f2e5d65a16c51d52dd5863"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"hk49ddsb4w1z15\"",
+        "via": "1.1 6f01da654ce062002b93fece7e4b0d9e.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"hk49ddsb4w1z15\"",
+        "via": "1.1 d2b31ea3e45656c5cec23b1e53165a1c.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "normalRuntime": {
+    "method": "Normal logged-in native iPhone16e Release39 and fresh website barcode entry/preview; no Add/Save",
+    "barcode": "072036761163",
+    "source": "existing private user-diary correction v4, unchanged",
+    "nativeCards": "88 kcal/P5.9/C11.8/F0/Fibre\u2014/S11.8; six correct colors",
+    "webCards": "88 kcal/P5.9/C11.8/F0/Fibre0/S11.8; six correct colors; OPTIONAL FIBRE FALSE ZERO remains next82",
+    "screenshots": [
+      "docs/release-evidence/2026-10-05/iphone-barcode-valid-zero-unknown-six-cards.png",
+      "docs/release-evidence/2026-10-05/web-barcode-optional-fibre-before.png"
+    ],
+    "cancelled": true,
+    "dailyCaloriesAfterCancel": 2776,
+    "credits": "Two valid normal barcode lookups cost3each; server/web616->613->610; native stale616 remains separate refresh follow-up",
+    "limits": "Missing-core live path not forced with false data; actual endpoint fixtures cover rejection. Existing source display check does not certify current manufacturer label. Web previewdaily fibre/sugar completeness remains separate."
+  }
 }

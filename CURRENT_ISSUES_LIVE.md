@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify
+- Date/time: 5October2026, verified09:55:14UTC (20:55 Melbourne)
+- What changed: Missing/invalid required barcode nutrients reject with existing label prompt before accepting/charging. Genuine zero and optional unknown nutrients stay usable. Source da5568bd5e47f3d849f2e5d65a16c51d52dd5863/AWS80 BUILD/DEPLOY/VERIFY SUCCEED, bothdomains200CloudFront/newmatchingETag hk49ddsb4w1z15.
+- Where to see it (page/link): https://helfi.ai/food — normal barcode072036761163; existing private source, not current-label certification.
+- What to quickly test: Core88/P5.9/C11.8/F0/S11.8 on website+iPhone39 with six colored cards. Native unknownfibre— correct; web false0 requires next82. Cancel/noSave;23originalrecords/hash/source unchanged,daily2776. Two successful checks cost6credits/server610; native refresh remained stale616. Missingcore rejection covered by192actual endpoint fixtures; no fabricated production records. Admin comparison and signed Apple/Google gates remain open.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify
 - Date/time: 5October2026, verified09:36:04UTC (20:36 Melbourne)
 - What changed: OpenFoodFacts records declaring nutrition errors are rejected by packaged search/barcode, instead of offering misleading values. Reliable alternate exact-barcode sources remain; otherwise existing label prompt appears without charging. Source8d054eb05e4861739234b17b752b34da033085fb/AWS79 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag9qtlyj2wyl1z15.
 - Where to see it (page/link): https://helfi.ai/food — normal Weet-Bix Original575g barcode9300652805048.

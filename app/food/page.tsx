@@ -15883,10 +15883,6 @@ Please add nutritional information manually if needed.`);
   }
 
   const buildBarcodeIngredientItem = (food: any, code?: string) => {
-    const toNumber = (value: any) => {
-      const num = Number(value)
-      return Number.isFinite(num) ? num : null
-    }
     const piecesPerServingRaw =
       Number.isFinite(Number(food?.piecesPerServing)) && Number(food?.piecesPerServing) > 0
         ? Number(food?.piecesPerServing)
@@ -15904,29 +15900,23 @@ Please add nutritional information manually if needed.`);
     const servingSizeRaw =
       food?.serving_size ||
       (Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0 ? `${Number(food.quantity_g)} g` : null)
-    let serving_size = servingSizeRaw || '1 serving'
-    const liquidItem = isLikelyLiquidFood(String(food?.name || ''), serving_size)
-    if (liquidItem && /\b(\d+(?:\.\d+)?)\s*g\b/i.test(serving_size) && !/\bml\b/i.test(serving_size)) {
-      serving_size = serving_size.replace(/\b(\d+(?:\.\d+)?)\s*g\b/i, '$1 ml')
-    }
-    if (!liquidItem) {
-      const normalizedServing = normalizeServingSizeForLiquid(serving_size, liquidItem)
-      if (normalizedServing) serving_size = normalizedServing
-    }
+    // Keep the supplier's declared basis. A liquid name cannot turn grams into ml.
+    const serving_size = servingSizeRaw || '1 serving'
     const servingInfo = parseServingSizeInfo({ serving_size })
+    const quantityMl =
+      servingInfo?.mlPerServing && servingInfo.mlPerServing > 0
+        ? Number(servingInfo.mlPerServing)
+        : null
     const quantityG =
+      quantityMl ? null :
       Number.isFinite(Number(food?.quantity_g)) && Number(food?.quantity_g) > 0
         ? Number(food?.quantity_g)
         : servingInfo?.gramsPerServing && servingInfo.gramsPerServing > 0
         ? Number(servingInfo.gramsPerServing)
         : null
-    const quantityMl =
-      !quantityG && servingInfo?.mlPerServing && servingInfo.mlPerServing > 0
-        ? Number(servingInfo.mlPerServing)
-        : null
-    const useMl = liquidItem && ((quantityMl && quantityMl > 0) || (quantityG && quantityG > 0))
-    const mlValue = useMl ? (quantityMl && quantityMl > 0 ? quantityMl : quantityG) : null
-    const gramValue = useMl ? null : (quantityG && quantityG > 0 ? quantityG : quantityMl)
+    const useMl = quantityMl != null
+    const mlValue = quantityMl
+    const gramValue = quantityG
     const customGramsPerServing = gramValue ? gramValue : null
     const customMlPerServing = mlValue ? mlValue : null
     const weightUnit = useMl ? 'ml' : 'g'
@@ -15946,12 +15936,12 @@ Please add nutritional information manually if needed.`);
       weightUnit,
       customGramsPerServing,
       customMlPerServing,
-      calories: toNumber(food?.calories),
-      protein_g: toNumber(food?.protein_g),
-      carbs_g: toNumber(food?.carbs_g),
-      fat_g: toNumber(food?.fat_g),
-      fiber_g: toNumber(food?.fiber_g),
-      sugar_g: toNumber(food?.sugar_g),
+      calories: optionalNutrient(food?.calories),
+      protein_g: optionalNutrient(food?.protein_g),
+      carbs_g: optionalNutrient(food?.carbs_g),
+      fat_g: optionalNutrient(food?.fat_g),
+      fiber_g: optionalNutrient(food?.fiber_g),
+      sugar_g: optionalNutrient(food?.sugar_g),
       piecesPerServing: piecesPerServingRaw,
       pieces: piecesRaw,
       source: food?.source || 'barcode',

@@ -3347,3 +3347,13 @@ for guidance first.
 - Final canonical barcode results require usable calories, protein, carbs and fat through `hasCoreFoodNutrition`. `Number(null)` or `Number(blank)` must never mark missing data complete. Reject with the existing422 label prompt before accepting/charging a product.
 - Preserve genuine zero, original source precision and large valid kcal values; missing optional fibre/sugar stay unknown. Do not rewrite stored source records or alter wallet/credit-manager behavior.
 - `npm run check:food-provider-quality` executes the actual final normalization/GET with192invalid/missing-core cases across4source tags and valid zero/unknownoptional/precision/largeenergy/alternate-source cases. Source fixtures and strictcheck/fullproductionbuild13679exit0/requiredchecks/protected/root278/native79 PASS. Exact deployment/runtime pending. Previous stable8d054eb05e4861739234b17b752b34da033085fb/AWS79 on2026-10-05.
+
+- Task81 stable source da5568bd5e47f3d849f2e5d65a16c51d52dd5863/AWS80, BUILD/DEPLOY/VERIFY SUCCEED,2026-10-05T09:55:14UTC; bothdomains200CloudFront/newmatchingETag hk49ddsb4w1z15. Fullbuild13679exit0/protected/root278native79 PASS. Native valid barcode displays truezero and unknownfibre correctly; web mapper falsezero remains separate82. Cancel/noSave original23/source unchanged; positive lookups charged3each, nativewalletrefresh not verified. No manufacturer/signedstore/model accuracy claim.
+
+### Web barcode canonical mapping (2026-10-05, task82)
+
+- buildBarcodeIngredientItem must preserve missing/invalid nutrients through optionalNutrient; genuine0 remains0 and original precision is retained. Allsix colored cards remain. Preserve brand/barcode identity/detection metadata, original records and barcode rename callback.
+- Keep the exact original serving label and declared gram/ml basis. A liquid name cannot relabel100g as100ml with unchanged nutrients. An explicit volume label takes precedence over quantity_g compatibility data; a quantity without a volume label stays grams. Do not change the scanner engine, lookup chooser/routing, protected rename code or wallet.
+- check:food-barcode-mapping executes actual source mapping/totals with105offline cases and runs in fullproductionprebuild. Actual baseline46cases fail; new105PASS plus existingmissingnutrients/protected/root278/native79 PASS, onlyfoodpagehash refreshed. Fullbuild/exactlive/normalruntime pending; last stableda5568bd5e47f3d849f2e5d65a16c51d52dd5863/AWS80.
+
+- Task82 finalproductionbuild87375exit0/allrequiredchecks/strictregressiontypecheck/protected/root278/native79 PASS. Onlyapprovedfoodpagehash refreshed; actual105casesPASS. Exact source deployment and normal browser verification pending.
