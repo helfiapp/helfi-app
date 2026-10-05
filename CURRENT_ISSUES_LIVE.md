@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October2026,11:36am Melbourne (00:36UTC).
+- What changed: task58 native new-food captions show amount consumed (half100g portion says50g), while original source basis/nutrients/IDs/options remain intact. Source 0cd14c5b6ad1f90134815ab264cc3edebfff6465; AWS job57 BUILD/DEPLOY/VERIFY all SUCCEED, both domains200/CloudFront/new matchingetagx51ro2nz3s1z15. This native change is tested in the rebuilt Release39 simulator and awaits the final signed store binary.
+- Where to see it: native Add Ingredient → new saved food entry; same entry on website Food Diary.
+- What to quickly test: half recorded100g oat serving → caption50g,24kcal and allsixcards; original100g basis/0.5servings/source2257046 precision/options remain. Rebuilt logged-in iPhone new11:25 entry and website save/reopen passed, bothdaily1090/wallet619. iPadPro13M5 rebuilt58 signed-in same11:25 reopen allsixcards and fresh live website reload pass; daily1090/wallet619. Historical captions were not rewritten. Broader food/photo/store validation remains incomplete.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify master job56, all BUILD/DEPLOY/VERIFY steps SUCCEED
 - Date/time: 2026-10-04T23:59:02.891955+00:00 (5 October2026 Melbourne)
 - What changed: Reject invalid/negative/blank/boolean core food nutrition before source selection and serving choices; preserve genuine zero and unknown optional nutrients. Public library mapping is read-only; customer records/UI/credits/rename unchanged. Commit 4b93104e0deec21d71a1fa72be7f080a6e45a671

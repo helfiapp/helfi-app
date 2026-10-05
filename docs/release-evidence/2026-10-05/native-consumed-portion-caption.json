@@ -36,13 +36,33 @@
     ],
     "sourceReadOnly": "PASS: originalUSDA2257046,48.3298kcal/F2.749,selected optionusda:2257046:100g retained; no database writes",
     "dailyCalories": 1090,
-    "credits": 619
+    "credits": 619,
+    "iPad": "iPad Pro13M5 Release39 rebuilt from source58; visually logged in; same new11:25 record reopened all six cards24/P0.4/C2.6/F1.4/Fibre0/Sugar1.2 and daily1090/wallet619",
+    "freshLiveWebsiteAfterDeploy": "PASS: full reload retains new50g caption/24kcal/daily1090/wallet619"
   },
-  "deployment": "PENDING; not a new store upload",
+  "deployment": {
+    "commit": "0cd14c5b6ad1f90134815ab264cc3edebfff6465",
+    "awsJob": "57",
+    "steps": {
+      "BUILD": "SUCCEED",
+      "DEPLOY": "SUCCEED",
+      "VERIFY": "SUCCEED"
+    },
+    "verifiedAtUTC": "2026-10-05T00:36:45Z",
+    "domains": [
+      "helfi.ai",
+      "www.helfi.ai"
+    ],
+    "bothStatus": 200,
+    "hosting": "CloudFront",
+    "matchingNewEtag": "x51ro2nz3s1z15",
+    "storeUploads": "none"
+  },
   "historicalRecords": "No rewrite",
   "evidence": [
     "iphone-consumed-half-24-cards.jpg",
     "iphone-reopened-consumed-half-24-cards.jpg",
-    "native-consumed-half-source-saved.json"
+    "native-consumed-half-source-saved.json",
+    "ipad-reopened-consumed-half-24-cards.jpg"
   ]
 }

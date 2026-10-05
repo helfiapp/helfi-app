@@ -28,8 +28,8 @@ for (const name of ['normalizeFoodText', 'isLikelyLiquidFoodName', 'liquidDensit
 const ctx: any = vm.createContext({ PRODUCE_MEASUREMENTS, convertFoodAmount, parseFoodServing, console, URLSearchParams, authHeaders: { Fixture: 'no-real-token' }, API_BASE_URL: 'https://fixture.invalid', servingOverrideCacheRef: { current: new Map() }, servingOverridePendingRef: { current: new Set() }, Alert: { alert: (...args: any[]) => { throw new Error(`Unexpected food error: ${args[0]}`) } } })
 const pure = screen.statements.filter(node => ts.isVariableStatement(node) || (ts.isFunctionDeclaration(node) && node.name?.text !== 'AddIngredientScreen')).map(node => node.getText(screen)).join('\n')
 vm.runInContext(ts.transpileModule(pure, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText, ctx)
-for (const name of ['loadServingOverride', 'openAdjust', 'addAdjustedItem']) bind(screen, ctx, name)
-for (const key of ['AdjustOpeningId', 'AdjustBase', 'AdjustServingOptions', 'AdjustServingId', 'AdjustItem', 'AdjustUnit', 'AdjustAmountInput', 'AdjustPickerMode', 'Error', 'AdjustSaving']) ctx[`set${key}`] = (value: any) => { const field = key[0].toLowerCase() + key.slice(1); ctx[field] = typeof value === 'function' ? value(ctx[field]) : value }
+for (const name of ['loadServingOverride', 'openAdjust', 'applyAdjustServingOption', 'addAdjustedItem']) bind(screen, ctx, name)
+for (const key of ['AdjustOpeningId', 'AdjustBase', 'AdjustServingOptions', 'AdjustServingId', 'AdjustItem', 'AdjustUnit', 'AdjustAmountInput', 'AdjustPickerMode', 'AdjustDropdownLayout', 'Error', 'AdjustSaving']) ctx[`set${key}`] = (value: any) => { const field = key[0].toLowerCase() + key.slice(1); ctx[field] = typeof value === 'function' ? value(ctx[field]) : value }
 ctx.loadDynamicSizeLookup = async () => null
 let providerCalls = 0; let payload: any
 ctx.fetch = async (url: string, init: any) => {
@@ -46,6 +46,7 @@ async function open(item: any) {
   assert.equal(ctx.adjustItem.id, item.id); assert.equal(ctx.adjustItem.source, item.source)
 }
 async function save(amount: number, unit: string) {
+  payload = undefined
   ctx.adjustAmountInput = String(amount); ctx.safeAdjustUnit = unit; ctx.mergedAdjustUnitGrams = {}; ctx.selectedServingLabel = ctx.adjustItem.serving_size
   await ctx.addAdjustedItem(); assert.ok(payload); return payload
 }
@@ -111,6 +112,66 @@ async function run() {
   assert.equal(halfCup.description, 'Diluted apple juice, 119.5 g')
   assert.equal(halfCup.items[0].serving_size, 'cup — 239g'); assert.equal(halfCup.items[0].servings, .5)
   assert.equal(ctx.formatConsumedServing(.5, 'serving', .5, '1 fillet', 'Fish'), '0.5 × 1 fillet', 'unweighed original source must not acquire an invented metric quantity')
+  for (const servingSize of ['1 fillet', '1 slice', '1 serving']) {
+    const item = { ...original('Fish fillet', 200), id: 'fixture-no-weight', source: 'custom', serving_size: servingSize, protein_g: 25, fat_g: 8 }
+    await open(item)
+    assert.equal(ctx.adjustBase, null, 'unweighed original portion must not acquire a guessed100g base')
+    assert.deepEqual(Array.from(ctx.defaultUnitOptions(ctx.adjustBase, item.name)), ['serving'])
+    assert.equal(ctx.adjustUnit, 'serving'); assert.equal(ctx.adjustAmountInput, '1')
+    const saved = await save(.5, 'serving')
+    assert.equal(saved.total.calories, 100); assert.equal(saved.items[0].servings, .5)
+    assert.equal(saved.items[0].serving_size, servingSize)
+    assert.equal(saved.items[0].id, item.id); assert.equal(saved.items[0].fiber_g, null)
+    assert.equal(saved.description, `Fish fillet, 0.5 × ${servingSize}`)
+    for (const unit of ['g', 'ml', 'oz', 'fl oz', 'tsp', 'piece']) {
+      assert.equal(ctx.computeServings(50, unit, null, {}), 0, 'unsupported units cannot become50 servings')
+      assert.equal(ctx.convertAmountBetweenUnits(1, 'serving', unit, null, {}), 0)
+    }
+  }
+  for (const servingSize of ['', ' ', null]) {
+    const alerts: any[] = []; const oldAlert = ctx.Alert
+    ctx.Alert = { alert: (...args: any[]) => alerts.push(args) }; ctx.adjustItem = null; payload = undefined
+    await ctx.openAdjust({ ...original('Fish fillet', 200), source: 'custom', serving_size: servingSize })
+    assert.equal(ctx.adjustItem, null, 'a missing source denominator cannot become an invented serving')
+    await ctx.addAdjustedItem(); assert.equal(payload, undefined)
+    assert.equal(alerts[0][0], 'Cannot add this item'); ctx.Alert = oldAlert
+  }
+  for (const value of ['', ' ', true, [], [100], {}, 0, -1, NaN, Infinity]) {
+    const options = ctx.normalizeServingOptionsForAdjust([{ id: 'fixture-invalid-measure', serving_size: '1 fillet', grams: value, ml: value, calories: 200, protein_g: 25, carbs_g: 0, fat_g: 8 }])
+    assert.equal(options[0].grams, null); assert.equal(options[0].ml, null)
+    assert.equal(ctx.recordedServingBase('1 fillet', 'Fish', options[0]), null)
+  }
+  assert.equal(ctx.recordedServingBase('1 small shot', 'Unknown drink', { ml: 25, unit: 'ml' }).amount, 25)
+  assert.equal(ctx.recordedServingBase('1 small shot', 'Unknown drink', { ml: 25, unit: 'ml' }).unit, 'ml')
+  assert.equal(ctx.recordedServingBase('8 fl oz', 'Unknown drink').unit, 'fl oz')
+  for (const [name, countUnit] of [['Bananas, raw', 'piece-medium'], ['Egg, whole, raw, fresh', 'egg-medium']] as const) {
+    await open({ ...original(name, 100), source: 'custom' })
+    assert.equal(ctx.adjustBase.amount, 100); assert.equal(ctx.adjustBase.unit, 'g')
+    const units = ctx.getFoodUnitGrams(name)
+    assert.ok(ctx.defaultUnitOptions(ctx.adjustBase, name, units).includes(countUnit), 'recorded100g sized produce/egg paths stay available')
+    close(ctx.computeServings(1, countUnit, ctx.adjustBase, units), ctx.resolveUnitGrams(countUnit, units) / 100)
+  }
+  const portions = [
+    { id: 'fixture-fillets:unknown', serving_size: '1 fillet', calories: 200, protein_g: 25, carbs_g: 0, fat_g: 8, fiber_g: null, sugar_g: 0 },
+    { id: 'fixture-fillets:measured', serving_size: '1 large fillet', grams: 200, unit: 'g', calories: 400, protein_g: 50, carbs_g: 0, fat_g: 16, fiber_g: null, sugar_g: 0 },
+  ]
+  await open({ ...original('Fish fillet', 200), source: 'custom', serving_size: '1 fillet', servingOptions: portions, selectedServingId: portions[0].id })
+  assert.equal(ctx.adjustBase, null)
+  ctx.applyAdjustServingOption(ctx.adjustServingOptions[1])
+  assert.equal(ctx.adjustBase.amount, 200, 'explicit provider weight remains usable even with a count-only label')
+  assert.equal(ctx.adjustBase.unit, 'g')
+  const measured = await save(100, 'g')
+  assert.equal(measured.total.calories, 200); assert.equal(measured.items[0].servings, .5)
+  assert.equal(measured.items[0].serving_size, '1 large fillet'); assert.equal(measured.items[0].selectedServingId, portions[1].id)
+  await open({ ...original('Fish fillet', 200), source: 'custom', serving_size: '1 large fillet', servingOptions: portions, selectedServingId: portions[1].id })
+  ctx.applyAdjustServingOption(ctx.adjustServingOptions[0])
+  assert.equal(ctx.adjustBase, null, 'switching back to an unweighed choice cannot keep the previous mass')
+  const alerts: any[] = []
+  const oldAlert = ctx.Alert; ctx.Alert = { alert: (...args: any[]) => alerts.push(args) }
+  ctx.adjustAmountInput = '50'; ctx.safeAdjustUnit = 'g'; payload = undefined
+  await ctx.addAdjustedItem()
+  assert.equal(payload, undefined, 'actual save handler blocks an unsupported weight')
+  assert.ok(alerts.length); ctx.Alert = oldAlert
   assert.equal(ctx.unitLabel('three-quarter-cup', 'Milk, whole', {}), '3/4 cup — 180 ml')
   console.log('PASS: actual USDA detail/serving options, native override/cache/open/save preserve source basis/IDs/options, compatible milk/oil density, null/zero and fraction labels; no network or credentials.')
 }

@@ -165,14 +165,6 @@ function is100gServing(label?: string | null) {
   return /\b100\s*g\b/i.test(String(label || ''))
 }
 
-function parseServingGrams(label?: string | null) {
-  const raw = String(label || '').toLowerCase()
-  const match = raw.match(/(\d+(?:\.\d+)?)\s*g\b/)
-  if (!match) return null
-  const grams = Number(match[1])
-  return Number.isFinite(grams) ? grams : null
-}
-
 function roundTo(value: number, decimals = 2) {
   const factor = Math.pow(10, decimals)
   return Math.round(value * factor) / factor
@@ -188,17 +180,34 @@ function parseServingBase(servingSize?: string | null, foodName = ''): BaseServi
   return parseFoodServing(String(servingSize || ''), foodName)
 }
 
+function positiveRecordedMeasure(value: unknown) {
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  if (typeof value === 'string' && !value.trim()) return null
+  const amount = Number(value)
+  return Number.isFinite(amount) && amount > 0 ? amount : null
+}
+
+function recordedServingBase(servingSize: string, foodName: string, option?: ServingOption | null): BaseServing {
+  const labelledBase = parseServingBase(servingSize, foodName)
+  if (labelledBase && Number.isFinite(labelledBase.amount) && labelledBase.amount > 0) return labelledBase
+  const grams = positiveRecordedMeasure(option?.grams)
+  const ml = positiveRecordedMeasure(option?.ml)
+  if (ml != null && (option?.unit === 'ml' || grams == null)) return parseServingBase(`${ml} ml`, foodName)
+  if (grams != null) return parseServingBase(`${grams} g`, foodName)
+  return null
+}
+
 function formatConsumedAmount(value: number) {
   const rounded = roundTo(value, 6)
   return String(Number.isFinite(rounded) && rounded > 0 ? rounded : value)
 }
 
-function formatConsumedServing(amount: number, unit: AdjustUnit, servings: number, servingText: string, foodName: string) {
+function formatConsumedServing(amount: number, unit: AdjustUnit, servings: number, servingText: string, foodName: string, measuredBase: BaseServing = null) {
   if (unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz') {
     return `${formatConsumedAmount(amount)} ${unit}`
   }
-  // Read the recorded source label, never a guessed adjustment weight.
-  const recordedBase = parseServingBase(servingText, foodName)
+  // Use the recorded label or provider measurement, never a guessed weight.
+  const recordedBase = parseServingBase(servingText, foodName) || measuredBase
   const consumedAmount = recordedBase ? recordedBase.amount * servings : null
   if (recordedBase && consumedAmount != null && Number.isFinite(consumedAmount) && consumedAmount > 0) {
     return `${formatConsumedAmount(consumedAmount)} ${recordedBase.unit}`
@@ -556,8 +565,8 @@ function normalizeServingOptionsForAdjust(raw: any): ServingOption[] {
         id,
         serving_size: resolvedServingSize,
         label: label || undefined,
-        grams: safeNumber(option?.grams),
-        ml: safeNumber(option?.ml),
+        grams: positiveRecordedMeasure(option?.grams),
+        ml: positiveRecordedMeasure(option?.ml),
         unit: option?.unit === 'ml' || option?.unit === 'g' || option?.unit === 'oz' ? option.unit : undefined,
         calories: safeNumber(option?.calories),
         protein_g: safeNumber(option?.protein_g),
@@ -702,8 +711,8 @@ function amountFromBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing,
 
 function convertAmountBetweenUnits(amount: number, from: AdjustUnit, to: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams) {
   if (!Number.isFinite(amount)) return 0
+  if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return from === 'serving' && to === 'serving' ? amount : 0
   if (from === to) return amount
-  if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return amount
   const baseAmount = amountInBaseUnit(amount, from, base, foodUnitGrams)
   if (!Number.isFinite(baseAmount) || baseAmount <= 0) return 0
   return amountFromBaseUnit(baseAmount, to, base, foodUnitGrams)
@@ -712,7 +721,7 @@ function convertAmountBetweenUnits(amount: number, from: AdjustUnit, to: AdjustU
 function computeServings(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams) {
   if (!Number.isFinite(amount) || amount <= 0) return 0
   if (unit === 'serving') return amount
-  if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return amount
+  if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return 0
 
   const converted = amountInBaseUnit(amount, unit, base, foodUnitGrams)
   if (!Number.isFinite(converted) || converted <= 0) return 0
@@ -1206,11 +1215,12 @@ export function AddIngredientScreen() {
         return
       }
 
-      const resolvedServingSize = String(authoritativeItem.serving_size || '100 g')
-      const base: BaseServing = parseServingBase(resolvedServingSize, authoritativeItem.name) || (() => {
-        const grams = parseServingGrams(resolvedServingSize)
-        return grams && grams > 0 ? { amount: grams, unit: 'g' as const } : { amount: 100, unit: 'g' as const }
-      })()
+      const resolvedServingSize = String(authoritativeItem.serving_size || '').trim()
+      if (!resolvedServingSize) {
+        Alert.alert('Cannot add this item', 'This result has no serving size. Please pick another one.')
+        return
+      }
+      const base = recordedServingBase(resolvedServingSize, authoritativeItem.name, defaultServingOption)
 
       setAdjustBase(base)
       setAdjustServingOptions(resolvedServingOptions)
@@ -1242,7 +1252,7 @@ export function AddIngredientScreen() {
         units = ['serving', ...units]
       }
       const liquidDefault = isLikelyLiquidFood(authoritativeItem?.name || '') && units.includes('ml')
-      const nextUnit = liquidDefault ? 'ml' : resolvedServingOptions.length > 0 ? 'serving' : units[0] || 'g'
+      const nextUnit = liquidDefault ? 'ml' : resolvedServingOptions.length > 0 ? 'serving' : units[0] || 'serving'
       setAdjustUnit(nextUnit)
       if (liquidDefault) {
         setAdjustAmountInput(formatAmount(base ? convertBaseUnit(base.amount, base.unit, 'ml', base.density) : 100))
@@ -1303,7 +1313,7 @@ export function AddIngredientScreen() {
     const servingText = String(
       safeAdjustUnit === 'serving' ? selectedServingLabel : adjustItem.serving_size || '1 serving',
     ).trim()
-    const consumedServing = formatConsumedServing(amount, safeAdjustUnit, servings, servingText, title)
+    const consumedServing = formatConsumedServing(amount, safeAdjustUnit, servings, servingText, title, adjustBase)
     const detail = `${consumedServing}${adjustItem.brand ? ` • ${adjustItem.brand}` : ''}`
     const description = detail ? `${title}, ${detail}` : title
 
@@ -1504,7 +1514,7 @@ export function AddIngredientScreen() {
     unitOptions = unitOptions.filter((unit) => unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz')
     unitOptions = ['serving', ...unitOptions]
   }
-  const safeAdjustUnit = unitOptions.includes(adjustUnit) ? adjustUnit : unitOptions[0] || 'g'
+  const safeAdjustUnit = unitOptions.includes(adjustUnit) ? adjustUnit : unitOptions[0] || 'serving'
   const selectedServing =
     adjustServingOptions.length > 0 && adjustServingId
       ? adjustServingOptions.find((option) => option.id === adjustServingId) || null
@@ -1547,10 +1557,7 @@ export function AddIngredientScreen() {
       }
     })
     const nextLabel = option.serving_size || option.label || '1 serving'
-    const nextBase = parseServingBase(nextLabel, adjustItem?.name || '') || (() => {
-      const grams = parseServingGrams(nextLabel)
-      return grams && grams > 0 ? { amount: grams, unit: 'g' as const } : { amount: 100, unit: 'g' as const }
-    })()
+    const nextBase = recordedServingBase(nextLabel, adjustItem?.name || '', option)
     setAdjustBase(nextBase)
     setAdjustUnit('serving')
     setAdjustAmountInput('1')

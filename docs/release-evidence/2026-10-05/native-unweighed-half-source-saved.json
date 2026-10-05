@@ -1,0 +1,50 @@
+{
+  "name": "Big Mac",
+  "description": "Big Mac, 0.5 × 1 serving • McDonald's",
+  "localDate": "2026-10-05",
+  "nutrients": {
+    "fat": 14.7,
+    "carbs": 22.45,
+    "fiber": null,
+    "sugar": 4.4,
+    "protein": 12.3,
+    "calories": 279
+  },
+  "items": [
+    {
+      "id": "custom:cmlc49usf000512sx03uqnzy4",
+      "kind": "FAST_FOOD",
+      "name": "Big Mac",
+      "brand": "McDonald's",
+      "fat_g": 29.4,
+      "label": "Big Mac",
+      "source": "custom",
+      "carbs_g": 44.9,
+      "fiber_g": null,
+      "sugar_g": 8.8,
+      "__custom": true,
+      "calories": 557,
+      "servings": 0.5,
+      "protein_g": 24.6,
+      "unitGrams": {},
+      "serving_size": "1 serving",
+      "calories_kcal": 557,
+      "servingOptions": [
+        {
+          "id": "serving-mcdonald s big mac 1 serving",
+          "ml": null,
+          "fat_g": 29.4,
+          "grams": null,
+          "label": "1 serving",
+          "carbs_g": 44.9,
+          "fiber_g": null,
+          "sugar_g": 8.8,
+          "calories": 557,
+          "protein_g": 24.6,
+          "serving_size": "1 serving"
+        }
+      ],
+      "selectedServingId": "serving-mcdonald s big mac 1 serving"
+    }
+  ]
+}

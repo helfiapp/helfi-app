@@ -1,0 +1,48 @@
+{
+  "task": 59,
+  "date": "2026-10-05",
+  "scope": "Native Add Ingredient recorded serving bases and unsupported conversions",
+  "preFix": "Actual openAdjust fixture1fillet manufactured100g/default100g with gram/ounce/spoon choices",
+  "sourceChecks": {
+    "actualOpenSelectedOptionSave": "PASS",
+    "unknownCounts": "1fillet/1slice/1serving retain count-only base; half scaling and original labels/IDs retained",
+    "missingDenominator": "Blank/null serving_size stops add; no invented one-serving denominator",
+    "invalidMeasurements": "Blank/boolean/array/object/zero/negative/nonfinite provider grams/ml are unknown",
+    "realMeasurements": "Recorded provider200g/count-label and25ml choices remain usable; label metric/fluidounce basis preserved; switching to unweighed clears prior mass",
+    "protectedPaths": "Recorded cups, milk/oil density, sized banana/egg, precision/options/null/truezero/captions preserved",
+    "saveFailureAndConsent": "PASS",
+    "nativeDiaryEditorReload": "PASS",
+    "nativeTypecheck": "PASS",
+    "fullProductionBuild": "PASS",
+    "rootNativeLocks": "278/79 PASS; only approved AddIngredientScreen hash refreshed"
+  },
+  "runtime": {
+    "source": "Original AU customcmlc49usf000512sx03uqnzy4 BigMac, one serving557kcal, provider grams/mlnull",
+    "iPhone": "Release39 rebuilt from59, visually logged in; picker only1serving",
+    "halfPreview": {
+      "calories": 279,
+      "protein": 12.3,
+      "carbsDisplayed": 22.5,
+      "fat": 14.7,
+      "fiber": null,
+      "sugar": 4.4,
+      "allSixCards": true
+    },
+    "newSave": "Once11:51 half original count, caption0.5 \u00d71serving; originalsourcevalues/identity/option preserved",
+    "bothReopens": "Original1serving basis/0.5count preserved; no invented weight; allsixcards remain",
+    "sourceReadOnly": "PASS; no database writes by proof check",
+    "webReopenCards": "279/P12.3/C22.5/F14.7/FibreMissing/Sugar4.4",
+    "nativeReopenFields": "Exact amount values preserved; existing card formatter rounds >=10g toP12/C22/F15, recorded as next60",
+    "dailyCalories": 1369,
+    "credits": 619,
+    "latestManufacturerLabelCertification": "Not claimed; stored source/count mechanics checked"
+  },
+  "evidence": [
+    "native-unweighed-half-source-saved.json",
+    "iphone-unweighed-whole-serving-cards.jpg",
+    "iphone-unweighed-half-279-cards.jpg",
+    "iphone-unweighed-half-reopen-before-rounding-fix.jpg",
+    "iphone-unweighed-half-original-count-basis.jpg"
+  ],
+  "deployment": "PENDING; no signed store upload"
+}
