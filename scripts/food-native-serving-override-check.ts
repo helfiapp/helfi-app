@@ -75,6 +75,42 @@ async function run() {
     assert.equal(saved.total.calories, name.startsWith('Milk') ? 63 : 133)
     assert.equal(saved.items[0].sugar_g, 0); assert.equal(saved.items[0].fiber_g, null)
   }
+  detail = { description: 'Oat milk, unsweetened, plain, refrigerated', dataType: 'Foundation', foodNutrients: [
+    { nutrientId: 2047, unitName: 'KCAL', value: 48.3298 },
+    { nutrientId: 1003, unitName: 'G', value: .796875 },
+    { nutrientId: 1005, unitName: 'G', value: 5.100325 },
+    { nutrientId: 1004, unitName: 'G', value: 2.749 },
+    { nutrientId: 1079, unitName: 'G', value: 0 },
+    { nutrientId: 1063, unitName: 'G', value: 2.3216 },
+  ] }
+  await open(original(detail.description, 48.3298))
+  const halfOat = await save(.5, 'serving')
+  assert.equal(halfOat.description, `${detail.description}, 50 g`, 'saved caption must show amount eaten, not the provider denominator')
+  assert.equal(halfOat.total.calories, 24)
+  assert.equal(halfOat.items[0].servings, .5)
+  assert.equal(halfOat.items[0].serving_size, '100 g', 'caption must not replace the original nutrient basis')
+  assert.equal(halfOat.items[0].calories, 48.3298); assert.equal(halfOat.items[0].fat_g, 2.749)
+  assert.equal(halfOat.items[0].selectedServingId, 'usda:original-id:100g')
+  assert.equal(halfOat.items[0].servingOptions.length, 1)
+  for (const [amount, unit, label] of [[50, 'g', '50 g'], [200, 'g', '200 g'], [1.25, 'oz', '1.25 oz'], [.0001, 'g', '0.0001 g']] as const) {
+    await open(original(detail.description, 48.3298))
+    const saved = await save(amount, unit)
+    assert.equal(saved.description, `${detail.description}, ${label}`)
+    assert.equal(saved.items[0].serving_size, '100 g')
+  }
+  for (const [amount, unit, label] of [[.5, 'serving', '50 ml'], [100, 'ml', '100 ml'], [15, 'g', '15 g'], [.5, 'fl oz', '0.5 fl oz'], [2, 'tbsp', '30 ml']] as const) {
+    detail = { description: 'Milk, whole', dataType: 'SR Legacy', foodNutrients: nutrients(61, 3.3, 0) }
+    await open({ ...original(detail.description, 61), fat_g: 3.3 })
+    const saved = await save(amount, unit)
+    assert.equal(saved.description, `Milk, whole, ${label}`, 'weight, volume and serving-count descriptions remain distinct')
+    assert.equal(saved.items[0].serving_size, '100 ml')
+    assert.equal(saved.items[0].fiber_g, null); assert.equal(saved.items[0].sugar_g, 0)
+  }
+  detail = { description: 'Diluted apple juice', dataType: 'SR Legacy', foodNutrients: nutrients(47, 0), foodPortions: [{ gramWeight: 239, portionDescription: 'cup' }] }
+  await open(original(detail.description)); const halfCup = await save(.5, 'serving')
+  assert.equal(halfCup.description, 'Diluted apple juice, 119.5 g')
+  assert.equal(halfCup.items[0].serving_size, 'cup — 239g'); assert.equal(halfCup.items[0].servings, .5)
+  assert.equal(ctx.formatConsumedServing(.5, 'serving', .5, '1 fillet', 'Fish'), '0.5 × 1 fillet', 'unweighed original source must not acquire an invented metric quantity')
   assert.equal(ctx.unitLabel('three-quarter-cup', 'Milk, whole', {}), '3/4 cup — 180 ml')
   console.log('PASS: actual USDA detail/serving options, native override/cache/open/save preserve source basis/IDs/options, compatible milk/oil density, null/zero and fraction labels; no network or credentials.')
 }

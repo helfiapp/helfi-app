@@ -2,7 +2,7 @@
   "checkedAt": "2026-10-04T23:50:17.810841+00:00",
   "task": 56,
   "issue": "HEL-440",
-  "status": "source-build-passed-deploy-runtime-pending",
+  "status": "source-deployed-live-ui-regression-checks-passed",
   "reproducedBeforeFix": [
     "negative calorie Foundation masks valid Legacy peer",
     "library mapper returns negative nutrient unchanged",
@@ -38,9 +38,24 @@
     "fullProductionBuild": "PASS"
   },
   "remaining": [
-    "Full production build and live runtime verification",
+    "Complete broader food/photo/source matrix and signed-store checks",
     "Original negative Foundation carbs and source-unavailable energy remain preserved",
     "Native oat provider detail precision",
     "Signed device/store release matrix"
-  ]
+  ],
+  "commit": "4b93104e0deec21d71a1fa72be7f080a6e45a671",
+  "awsJob": 56,
+  "verifiedAt": "2026-10-04T23:59:02.891955+00:00",
+  "deploy": {
+    "allSteps": "SUCCEED",
+    "domains": "both200CloudFront",
+    "etag": "dwy8emuhij1z15"
+  },
+  "runtime": {
+    "freshWebsiteDiary": "1042kcal/wallet619; saved entries retained",
+    "realZeroWater": "Fresh Single food -> Water bottled generic ->100ml preview: calories/protein/carbs/fat/fibre/sugar all0, allsixcards; cancel without saving",
+    "nativeSavedSoy": "Current logged-in iPhone saved38/P3.5/C1.3/F2.1/F0/S.6, allsixcards; no restart/new native build or changes in56",
+    "negativeAndInvalidProof": "Actual synthetic functions/endpoint fixtures only; did not create invalid live user data",
+    "freshSoyLookup": "Fresh Single food soy milk unsweetened returns correct USDA shelf-stable100g38; preview sixcards38/P3.5/C1.3/F2.1/F0/S.6; cancel without saving"
+  }
 }

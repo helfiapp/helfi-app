@@ -1,0 +1,53 @@
+{
+  "checkedAt": "2026-10-05T00:13:42.534276+00:00",
+  "task": 57,
+  "status": "current-live-native-web-source-preview-save-reopen-verified-no-source-rewrite",
+  "source": "normal Helfi Single food search and its automatic serving request; read existing public-food responses through Chrome developer observation, no direct provider calls",
+  "id": "2257046",
+  "name": "Oat milk, unsweetened, plain, refrigerated",
+  "searchBasis": "100 g",
+  "searchNutrition": {
+    "calories": 48.3298,
+    "protein_g": 0.796875,
+    "carbs_g": 5.100325,
+    "fat_g": 2.749,
+    "fiber_g": 0,
+    "sugar_g": 2.3216
+  },
+  "servingOptions": [
+    {
+      "id": "usda:2257046:100g",
+      "serving_size": "100 g",
+      "grams": 100,
+      "ml": null,
+      "nutrition": {
+        "calories": 48.3298,
+        "protein_g": 0.796875,
+        "carbs_g": 5.100325,
+        "fat_g": 2.749,
+        "fiber_g": 0,
+        "sugar_g": 2.3216
+      }
+    }
+  ],
+  "originalArchiveAndSavedEntryMatch": true,
+  "historicalObservation": "Native new Add fat2.8 vs saved/web2.7 before Foundation calorie recovery; origin not proven",
+  "currentFinding": "Current live original archive/library/search/serving endpoint all retain2.749 fat and48.3298kcal/100g. Fresh restarted logged-in iPhone and website preview100g48/F2.7 agree; earlier2.8 observation not reproduced after55 Foundation calorie recovery. Historical cause is unproven; no forced provider/source edits.",
+  "customerDataChanged": "one authorized native half-portion test food added; existing history/records unchanged",
+  "sourceChangesMade": false,
+  "remaining": [
+    "Saved caption says100g basis despite consumed50g: next display repair",
+    "Native meal ordering differs from shown local times; separate date/order trace",
+    "Other portion/photo/signed-release matrix remains"
+  ],
+  "nativePreview": {
+    "100g": "48/P0.8/C5.1/F2.7/Fibre0/Sugar2.3; all6cards",
+    "50g": "24/P0.4/C2.6/F1.4/Fibre0/Sugar1.2; all6cards"
+  },
+  "savedAndReopened": {
+    "native": "half serving saved once Breakfast11:08; reopened24/all6cards",
+    "web": "manual refresh1066/wallet619; reopen same half50g24/all6cards",
+    "savedSource": "USDA2257046 original100g/cal48.3298/fat2.749/servings0.5; optionusda:2257046:100g and full source options retained",
+    "savedProof": "native-oat-half-source-saved.json"
+  }
+}

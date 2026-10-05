@@ -1,0 +1,48 @@
+{
+  "task": 58,
+  "date": "2026-10-05",
+  "scope": "New native Add Ingredient saved description only",
+  "baselineReproduced": {
+    "source": "USDA2257046",
+    "basis": "100 g",
+    "servings": 0.5,
+    "calories": 24,
+    "incorrectCaption": "100 g",
+    "requiredCaption": "50 g"
+  },
+  "sourceChecks": {
+    "actualOverrideOpenSave": "PASS",
+    "actualSaveFailureUnknownConversionConsent": "PASS",
+    "actualNativeDiaryEditorReload": "PASS",
+    "nativeTypecheck": "PASS",
+    "productionBuild": "PASS",
+    "pageLocks": "PASS; only approved AddIngredientScreen.tsx hash refreshed"
+  },
+  "fixtures": [
+    "half original 100g oat serving -> 50 g; original basis/precision/id/options unchanged",
+    "explicit g/ml/oz/fl oz -> amount actually entered",
+    "two milk tablespoons -> 30 ml; source remains100 ml",
+    "half recorded239g cup ->119.5 g; recorded cup retained",
+    "unweighed fillet -> 0.5 \u00d7 1 fillet; no invented mass",
+    "small .0001g amount retained; no rounded zero",
+    "unknown optional nutrients remain null; true zero remains0"
+  ],
+  "runtime": {
+    "iPhone": "Release39 rebuilt from current main; visually confirmed logged in",
+    "save": "New half-portion saved once11:25; caption50g, source100g/0.5servings",
+    "reopen": [
+      "Website: caption50g, basis100g, servings0.5, all six cards24/P0.4/C2.6/F1.4/Fibre0/Sugar1.2",
+      "iPhone: same11:25 record reopens all six cards matching website"
+    ],
+    "sourceReadOnly": "PASS: originalUSDA2257046,48.3298kcal/F2.749,selected optionusda:2257046:100g retained; no database writes",
+    "dailyCalories": 1090,
+    "credits": 619
+  },
+  "deployment": "PENDING; not a new store upload",
+  "historicalRecords": "No rewrite",
+  "evidence": [
+    "iphone-consumed-half-24-cards.jpg",
+    "iphone-reopened-consumed-half-24-cards.jpg",
+    "native-consumed-half-source-saved.json"
+  ]
+}

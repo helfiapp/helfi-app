@@ -188,6 +188,24 @@ function parseServingBase(servingSize?: string | null, foodName = ''): BaseServi
   return parseFoodServing(String(servingSize || ''), foodName)
 }
 
+function formatConsumedAmount(value: number) {
+  const rounded = roundTo(value, 6)
+  return String(Number.isFinite(rounded) && rounded > 0 ? rounded : value)
+}
+
+function formatConsumedServing(amount: number, unit: AdjustUnit, servings: number, servingText: string, foodName: string) {
+  if (unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz') {
+    return `${formatConsumedAmount(amount)} ${unit}`
+  }
+  // Read the recorded source label, never a guessed adjustment weight.
+  const recordedBase = parseServingBase(servingText, foodName)
+  const consumedAmount = recordedBase ? recordedBase.amount * servings : null
+  if (recordedBase && consumedAmount != null && Number.isFinite(consumedAmount) && consumedAmount > 0) {
+    return `${formatConsumedAmount(consumedAmount)} ${recordedBase.unit}`
+  }
+  return `${formatConsumedAmount(servings)} × ${servingText}`
+}
+
 type FoodUnitGrams = Partial<Record<AdjustUnit, number>>
 
 const DISCRETE_COUNT_UNITS = new Set<AdjustUnit>([
@@ -1285,7 +1303,8 @@ export function AddIngredientScreen() {
     const servingText = String(
       safeAdjustUnit === 'serving' ? selectedServingLabel : adjustItem.serving_size || '1 serving',
     ).trim()
-    const detail = `${servingText}${adjustItem.brand ? ` • ${adjustItem.brand}` : ''}`
+    const consumedServing = formatConsumedServing(amount, safeAdjustUnit, servings, servingText, title)
+    const detail = `${consumedServing}${adjustItem.brand ? ` • ${adjustItem.brand}` : ''}`
     const description = detail ? `${title}, ${detail}` : title
 
     try {

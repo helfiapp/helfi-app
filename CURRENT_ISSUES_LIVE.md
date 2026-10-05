@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify master job56, all BUILD/DEPLOY/VERIFY steps SUCCEED
+- Date/time: 2026-10-04T23:59:02.891955+00:00 (5 October2026 Melbourne)
+- What changed: Reject invalid/negative/blank/boolean core food nutrition before source selection and serving choices; preserve genuine zero and unknown optional nutrients. Public library mapping is read-only; customer records/UI/credits/rename unchanged. Commit 4b93104e0deec21d71a1fa72be7f080a6e45a671
+- Where to see it (page/link): https://helfi.ai/food — Add ingredient and source portion choices
+- What to quickly test: Fresh valid food search/portions; real zero water; optional unknowns; existing diary entry/cards. Both live domains200/CloudFront with matching new etagdwy8emuhij1z15. Runtime follow-up in progress; full audit/model/signed-store release remains active.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE; AWS55 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront, matching new etagvjch1e8fnp1z15.
 - Date/time: 2026-10-04T23:39:33.302810+00:00
 - What changed: Original Foundation calorie fields recognized;230 exact archive-backed null calorie values restored. All6250 Foundation rows/IDs/other nutrient values and all customer records preserved. Commit74f3ea0e22327fab5eab1d15a456fb6618b559ad. Whole audit/model/store work incomplete.

@@ -1,0 +1,49 @@
+{
+  "name": "Oat milk",
+  "localDate": "2026-10-05",
+  "description": "Oat milk, unsweetened, plain, refrigerated, 50 g",
+  "nutrients": {
+    "fat": 1.37,
+    "carbs": 2.55,
+    "fiber": 0,
+    "sugar": 1.16,
+    "protein": 0.4,
+    "calories": 24
+  },
+  "items": [
+    {
+      "id": "2257046",
+      "name": "Oat milk, unsweetened, plain, refrigerated",
+      "brand": null,
+      "fat_g": 2.749,
+      "label": "Oat milk, unsweetened, plain, refrigerated",
+      "source": "usda",
+      "carbs_g": 5.100325,
+      "fiber_g": 0,
+      "sugar_g": 2.3216,
+      "calories": 48.3298,
+      "servings": 0.5,
+      "protein_g": 0.796875,
+      "unitGrams": {},
+      "serving_size": "100 g",
+      "calories_kcal": 48.3298,
+      "servingOptions": [
+        {
+          "id": "usda:2257046:100g",
+          "ml": null,
+          "unit": "g",
+          "fat_g": 2.749,
+          "grams": 100,
+          "label": "100 g",
+          "carbs_g": 5.100325,
+          "fiber_g": 0,
+          "sugar_g": 2.3216,
+          "calories": 48.3298,
+          "protein_g": 0.796875,
+          "serving_size": "100 g"
+        }
+      ],
+      "selectedServingId": "usda:2257046:100g"
+    }
+  ]
+}
