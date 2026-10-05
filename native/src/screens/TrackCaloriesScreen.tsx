@@ -158,11 +158,12 @@ const BARCODE_TYPES: BarcodeType[] = ['ean13', 'ean8', 'upc_a', 'upc_e', 'code12
 
 function formatFavoriteNutrientValue(key: FavoriteNutrientKey, value: number | null, energyUnit: 'kcal' | 'kj') {
   if (value == null) return '—'
-  const safeValue = Number.isFinite(Number(value)) ? Number(value) : 0
+  if (!Number.isFinite(value)) return '—'
+  const safeValue = value
   if (key === 'calories') {
     return energyUnit === 'kj' ? `${Math.round(safeValue * 4.184)} kJ` : String(Math.round(safeValue))
   }
-  return `${formatMacroAmount(safeValue)}g`
+  return `${formatNutrientGrams(safeValue)}g`
 }
 
 type FavoriteAdjustItem = {
@@ -1304,6 +1305,11 @@ function buildDailyTargetsFromUserData(raw: any): DailyTargets {
   }
 }
 
+function formatNutrientGrams(value: number | null | undefined) {
+  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
+  return String(Math.round(value * 10) / 10)
+}
+
 function formatMacroAmount(value: number | null | undefined) {
   if (value == null) return '—'
   const numeric = Number(value)
@@ -1748,11 +1754,11 @@ function buildFavoriteShareText(item: FavoritesListItem, adjustItems?: FavoriteA
   const ingredients = Array.isArray(adjustItems) && adjustItems.length > 0 ? adjustItems : buildFavoriteAdjustItems(item)
   const totals = calculateFavoriteAdjustTotals(ingredients)
   lines.push(`Calories: ${Math.round(totals.calories)} kcal`)
-  lines.push(`Protein: ${formatMacroAmount(totals.protein)} g`)
-  lines.push(`Carbs: ${formatMacroAmount(totals.carbs)} g`)
-  lines.push(`Fat: ${formatMacroAmount(totals.fat)} g`)
-  lines.push(`Fibre: ${formatMacroAmount(totals.fiber)} g`)
-  lines.push(`Sugar: ${formatMacroAmount(totals.sugar)} g`)
+  lines.push(`Protein: ${formatNutrientGrams(totals.protein)} g`)
+  lines.push(`Carbs: ${formatNutrientGrams(totals.carbs)} g`)
+  lines.push(`Fat: ${formatNutrientGrams(totals.fat)} g`)
+  lines.push(`Fibre: ${formatNutrientGrams(totals.fiber)} g`)
+  lines.push(`Sugar: ${formatNutrientGrams(totals.sugar)} g`)
   if (ingredients.length > 0) {
     lines.push('', 'Ingredients:')
     ingredients.forEach((entry) => {
@@ -5222,12 +5228,12 @@ export function TrackCaloriesScreen() {
 
   const recommendedMacroLine = (meal: RecommendedMeal) => {
     const n = recommendedMealTotals(meal)
-    return `${Math.round(n.calories)} kcal • Protein ${formatMacroAmount(n.protein)}g • Carbs ${formatMacroAmount(n.carbs)}g • Fat ${formatMacroAmount(n.fat)}g`
+    return `${Math.round(n.calories)} kcal • Protein ${formatNutrientGrams(n.protein)}g • Carbs ${formatNutrientGrams(n.carbs)}g • Fat ${formatNutrientGrams(n.fat)}g`
   }
 
   const recommendedSecondaryMacroLine = (meal: RecommendedMeal) => {
     const n = recommendedMealTotals(meal)
-    return `Fiber ${formatMacroAmount(n.fiber)}g • Sugar ${formatMacroAmount(n.sugar)}g`
+    return `Fiber ${formatNutrientGrams(n.fiber)}g • Sugar ${formatNutrientGrams(n.sugar)}g`
   }
 
   const recommendedMealTags = (meal: RecommendedMeal) =>
@@ -5244,7 +5250,7 @@ export function TrackCaloriesScreen() {
       { label: 'Sugar', value: n.sugar, unit: 'g', target: macroTargetsWithExercise.sugar, color: '#F97316' },
     ].map((row) => ({
       ...row,
-      display: row.unit === 'kcal' ? row.value == null ? '—' : String(Math.round(row.value)) : `${formatMacroAmount(row.value)}g`,
+      display: row.unit === 'kcal' ? row.value == null ? '—' : String(Math.round(row.value)) : `${formatNutrientGrams(row.value)}g`,
       percent: row.target > 0 ? clamp((Number(row.value) / Number(row.target)) * 100, 0, 100) : 0,
     }))
   }
@@ -5837,7 +5843,7 @@ export function TrackCaloriesScreen() {
         color: '#3B82F6',
         bg: '#EFF6FF',
         border: '#BFDBFE',
-        value: `${formatMacroAmount(totals.protein + entryTotals.protein)} g / ${formatMacroAmount(macroTargetsWithExercise.protein)} g`,
+        value: `${formatNutrientGrams(totals.protein + entryTotals.protein)} g / ${formatNutrientGrams(macroTargetsWithExercise.protein)} g`,
       },
       {
         key: 'carbs',
@@ -5847,7 +5853,7 @@ export function TrackCaloriesScreen() {
         color: '#22C55E',
         bg: '#ECFDF5',
         border: '#A7F3D0',
-        value: `${formatMacroAmount(totals.carbs + entryTotals.carbs)} g / ${formatMacroAmount(macroTargetsWithExercise.carbs)} g`,
+        value: `${formatNutrientGrams(totals.carbs + entryTotals.carbs)} g / ${formatNutrientGrams(macroTargetsWithExercise.carbs)} g`,
       },
       {
         key: 'fat',
@@ -5857,7 +5863,7 @@ export function TrackCaloriesScreen() {
         color: '#8B5CF6',
         bg: '#F5F3FF',
         border: '#DDD6FE',
-        value: `${formatMacroAmount(totals.fat + entryTotals.fat)} g / ${formatMacroAmount(macroTargetsWithExercise.fat)} g`,
+        value: `${formatNutrientGrams(totals.fat + entryTotals.fat)} g / ${formatNutrientGrams(macroTargetsWithExercise.fat)} g`,
       },
       {
         key: 'fiber',
@@ -5867,7 +5873,7 @@ export function TrackCaloriesScreen() {
         color: '#EAB308',
         bg: '#FEFCE8',
         border: '#FDE68A',
-        value: `${formatMacroAmount(sumOptionalNutrients(totals.fiber, entryTotals.fiber))} g / ${formatMacroAmount(macroTargetsWithExercise.fiber)} g`,
+        value: `${formatNutrientGrams(sumOptionalNutrients(totals.fiber, entryTotals.fiber))} g / ${formatNutrientGrams(macroTargetsWithExercise.fiber)} g`,
       },
       {
         key: 'sugar',
@@ -5877,7 +5883,7 @@ export function TrackCaloriesScreen() {
         color: '#EC4899',
         bg: '#FDF2F8',
         border: '#FBCFE8',
-        value: `${formatMacroAmount(sumOptionalNutrients(totals.sugar, entryTotals.sugar))} g / ${formatMacroAmount(macroTargetsWithExercise.sugar)} g`,
+        value: `${formatNutrientGrams(sumOptionalNutrients(totals.sugar, entryTotals.sugar))} g / ${formatNutrientGrams(macroTargetsWithExercise.sugar)} g`,
       },
     ]
 
@@ -7876,11 +7882,11 @@ export function TrackCaloriesScreen() {
                 <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                   {[
                     `${Math.round(favoriteEditTotals.calories)} kcal`,
-                    `${formatMacroAmount(favoriteEditTotals.protein)} g protein`,
-                    `${formatMacroAmount(favoriteEditTotals.carbs)} g carbs`,
-                    `${formatMacroAmount(favoriteEditTotals.fat)} g fat`,
-                    `${formatMacroAmount(favoriteEditTotals.fiber)} g fibre`,
-                    `${formatMacroAmount(favoriteEditTotals.sugar)} g sugar`,
+                    `${formatNutrientGrams(favoriteEditTotals.protein)} g protein`,
+                    `${formatNutrientGrams(favoriteEditTotals.carbs)} g carbs`,
+                    `${formatNutrientGrams(favoriteEditTotals.fat)} g fat`,
+                    `${formatNutrientGrams(favoriteEditTotals.fiber)} g fibre`,
+                    `${formatNutrientGrams(favoriteEditTotals.sugar)} g sugar`,
                   ].map((value) => (
                     <View key={value} style={{ borderRadius: 999, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: theme.colors.card, paddingHorizontal: 10, paddingVertical: 6 }}>
                       <Text style={{ color: theme.colors.muted, fontSize: 11, fontWeight: '700' }}>{value}</Text>
@@ -8106,7 +8112,7 @@ export function TrackCaloriesScreen() {
                                           {selected ? <MaterialCommunityIcons name="check" size={17} color="#059669" /> : null}
                                         </View>
                                         <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4 }}>
-                                          {Math.round(numberOrZero(option.calories))} kcal • P {formatMacroAmount(numberOrZero(option.protein_g))}g • C {formatMacroAmount(numberOrZero(option.carbs_g))}g • F {formatMacroAmount(numberOrZero(option.fat_g))}g
+                                          {Math.round(numberOrZero(option.calories))} kcal • P {formatNutrientGrams(numberOrZero(option.protein_g))}g • C {formatNutrientGrams(numberOrZero(option.carbs_g))}g • F {formatNutrientGrams(numberOrZero(option.fat_g))}g
                                         </Text>
                                       </Pressable>
                                     )
@@ -8190,23 +8196,7 @@ export function TrackCaloriesScreen() {
                   ? 'Your portion is based on the ingredient amounts shown above.'
                   : 'This meal is 100% of the full amount.'}
               </Text>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                {[
-                  { label: energyUnit === 'kj' ? 'Kilojoules' : 'Calories', value: energyUnit === 'kj' ? `${Math.round(favoriteEditTotals.calories * 4.184)} kJ` : `${Math.round(favoriteEditTotals.calories)} kcal`, bg: '#FFF7ED', color: '#F97316' },
-                  { label: 'Protein', value: `${formatMacroAmount(favoriteEditTotals.protein)} g`, bg: '#EFF6FF', color: '#3B82F6' },
-                  { label: 'Carbs', value: `${formatMacroAmount(favoriteEditTotals.carbs)} g`, bg: '#ECFDF5', color: '#22C55E' },
-                  { label: 'Fat', value: `${formatMacroAmount(favoriteEditTotals.fat)} g`, bg: '#F5F3FF', color: '#8B5CF6' },
-                  { label: 'Fibre', value: `${formatMacroAmount(favoriteEditTotals.fiber)} g`, bg: '#FEFCE8', color: '#EAB308' },
-                  { label: 'Sugar', value: `${formatMacroAmount(favoriteEditTotals.sugar)} g`, bg: '#FDF2F8', color: '#EC4899' },
-                ].map((card) => (
-                  <View key={card.label} style={{ width: '47%', borderRadius: 16, padding: 14, backgroundColor: card.bg }}>
-                    <Text style={{ color: card.color, fontSize: 16, fontWeight: '700' }}>{card.value}</Text>
-                    <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginTop: 6, textTransform: 'uppercase' }}>
-                      {card.label}
-                    </Text>
-                  </View>
-                ))}
-              </View>
+              <NutrientCards energyUnit={energyUnit} values={favoriteEditTotals} />
             </View>
 
             <Pressable onPress={() => void updateFavoriteFromEditor()} style={primaryButton}>
@@ -9392,7 +9382,7 @@ function CircleMetric({
   const ringBorder = compact ? 6 : 7
   const valueFontSize = compact ? 16 : 18
   const labelFontSize = compact ? 13 : 14
-  const display = unit === 'kj' ? Math.round(value * 4.184) : unit === 'kcal' ? Math.round(value) : formatMacroAmount(value)
+  const display = unit === 'kj' ? Math.round(value * 4.184) : unit === 'kcal' ? Math.round(value) : formatNutrientGrams(value)
 
   return (
     <View style={{ alignItems: 'center' }}>

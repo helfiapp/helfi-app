@@ -35,14 +35,25 @@
     "nativeReopenFields": "Exact amount values preserved; existing card formatter rounds >=10g toP12/C22/F15, recorded as next60",
     "dailyCalories": 1369,
     "credits": 619,
-    "latestManufacturerLabelCertification": "Not claimed; stored source/count mechanics checked"
+    "latestManufacturerLabelCertification": "Not claimed; stored source/count mechanics checked",
+    "iPad": "Pro13M5 Release39 rebuilt from a41924c; visually logged in, daily1369/credits619; same11:51 saved half reopened original1serving/0.5count, no invented grams, allsixingredientcards279/P12.3/C22.5/F14.7/FibreMissing/S4.4. Existing meal-total cards round P12/C22/F15, next60. No edits or Save pressed."
   },
   "evidence": [
     "native-unweighed-half-source-saved.json",
     "iphone-unweighed-whole-serving-cards.jpg",
     "iphone-unweighed-half-279-cards.jpg",
     "iphone-unweighed-half-reopen-before-rounding-fix.jpg",
-    "iphone-unweighed-half-original-count-basis.jpg"
+    "iphone-unweighed-half-original-count-basis.jpg",
+    "ipad-unweighed-half-original-count-and-cards.jpg"
   ],
-  "deployment": "PENDING; no signed store upload"
+  "deployment": {
+    "commit": "a41924ccca827b8ea7e08b48ddde94973a0495c9",
+    "awsJob": 58,
+    "steps": "BUILD/DEPLOY/VERIFY SUCCEED",
+    "bothDomains": "200/CloudFront",
+    "etag": "108k58bboc11z15",
+    "verifiedUtc": "2026-10-05T01:05:13Z",
+    "freshWebsite": "1369kcal/619credits; original half caption retained",
+    "signedStoreUpload": false
+  }
 }

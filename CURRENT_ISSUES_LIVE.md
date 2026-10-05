@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 12:05pm Melbourne (01:05UTC).
+- What changed: task59 native unweighed serving choices retain their original count basis; recorded provider weights remain usable, missing source labels stop add and unsupported weight conversions cannot save. Source a41924ccca827b8ea7e08b48ddde94973a0495c9; AWS58 BUILD/DEPLOY/VERIFY all SUCCEED, both domains200/CloudFront/new matchingetag108k58bboc11z15. Native repair is in tested Release39 simulators and awaits a final signed store binary.
+- Where to see it: native Add Ingredient and saved count-only entry; same record on website Food Diary.
+- What to quickly test: original AU BigMac1serving557 -> half279, only serving unit when no mass exists; source values/IDs/options and unknown fibre preserved. Rebuilt logged-in iPhone/iPad and website same11:51 save/reopen original1serving/0.5count, allsixingredientcards279/P12.3/C22.5/F14.7/FibreMissing/S4.4; daily1369/wallet619. Fresh live website reload passes. Existing native meal-total rounding remains next60. No current manufacturer-label or signed-store certification; full audit/model/release goal active.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October2026,11:36am Melbourne (00:36UTC).
 - What changed: task58 native new-food captions show amount consumed (half100g portion says50g), while original source basis/nutrients/IDs/options remain intact. Source 0cd14c5b6ad1f90134815ab264cc3edebfff6465; AWS job57 BUILD/DEPLOY/VERIFY all SUCCEED, both domains200/CloudFront/new matchingetagx51ro2nz3s1z15. This native change is tested in the rebuilt Release39 simulator and awaits the final signed store binary.
 - Where to see it: native Add Ingredient → new saved food entry; same entry on website Food Diary.

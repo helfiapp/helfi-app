@@ -8,6 +8,7 @@ import * as nutrientValues from '../native/src/lib/nutrientValues'
 
 // Execute the actual screen's pure read/editor/save functions, without React or network calls.
 const source = ts.createSourceFile('screen.tsx', fs.readFileSync('native/src/screens/TrackCaloriesScreen.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+assert.equal((source as any).parseDiagnostics.length, 0, 'native screen JSX parses before exercising result fragments')
 const code = source.statements.filter((node) => ts.isFunctionDeclaration(node) && node.name && !/^[A-Z]/.test(node.name.text)).map(node => node.getText(source)).join('\n')
 const context: any = { ...nutrientValues, materializeMealPortion, convertFoodAmount, parseFoodServing, liquidDensity }
 vm.createContext(context)
@@ -52,3 +53,59 @@ const salmonG = context.updateFavoriteAdjustItemUnit(salmon, 'g')
 assert.equal(Number(salmonG.amountInput), 200)
 const halfSalmon = context.updateFavoriteAdjustItemAmount(salmonG, '100')
 assert.equal(context.calculateFavoriteAdjustTotals([halfSalmon]).calories, 206)
+
+// Reproduce the saved-half result through the real result formatters and meal card JSX.
+assert.equal(context.formatFavoriteNutrientValue('protein', 12.3, 'kcal'), '12.3g', 'saved protein must agree with ingredient result cards')
+assert.equal(context.formatFavoriteNutrientValue('carbs', 22.45, 'kcal'), '22.5g', 'round only displayed grams to one decimal')
+assert.equal(context.formatFavoriteNutrientValue('fat', 14.7, 'kcal'), '14.7g')
+assert.equal(context.formatFavoriteNutrientValue('fiber', null, 'kcal'), '—')
+assert.equal(context.formatFavoriteNutrientValue('sugar', 0, 'kcal'), '0g')
+assert.equal(context.formatFavoriteNutrientValue('protein', Number.NaN, 'kcal'), '—', 'nonfinite nutrition is unknown')
+assert.equal(context.formatFavoriteNutrientValue('calories', 278.5, 'kcal'), '279')
+assert.equal(context.formatFavoriteNutrientValue('calories', 278.5, 'kj'), '1165 kJ')
+assert.equal(context.formatMacroAmount(12.3), '12', 'unrelated water/serving quantity display must stay unchanged')
+
+const jsxResults: ts.JsxElement[] = []
+function collectMealResults(node: ts.Node) {
+  if (ts.isJsxElement(node)) {
+    const text = node.getText(source)
+    if (text.includes("'Recipe portion totals'") && text.includes('favoriteEditTotals')) jsxResults.push(node)
+  }
+  ts.forEachChild(node, collectMealResults)
+}
+collectMealResults(source)
+const resultJsx = jsxResults.sort((a, b) => a.getWidth(source) - b.getWidth(source))[0]
+assert.ok(resultJsx, 'find actual meal result card container')
+const createElement = (type: any, props: any, ...children: any[]) => {
+  if (typeof type === 'function') return type({ ...props, children })
+  return { type, props, children: children.flat(Infinity).filter((child) => child != null && child !== false) }
+}
+const rendered: any = { React: { createElement }, useState: () => [640, () => {}], Text: 'Text', View: 'View', Pressable: 'Pressable' }
+vm.createContext(rendered)
+const cardSource = ts.createSourceFile('cards.tsx', fs.readFileSync('native/src/components/NutrientCards.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const cardCode = cardSource.statements.filter((node) => !ts.isImportDeclaration(node)).map((node) => node.getText(cardSource).replace(/^export /, '')).join('\n')
+vm.runInContext(ts.transpileModule(cardCode, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None, jsx: ts.JsxEmit.React } }).outputText, rendered)
+Object.assign(rendered, {
+  theme: { colors: { card: '#fff', bg: '#fff', text: '#111' } }, mealRecipe: null, favoriteEditPortionControlEnabled: false,
+  recipeServingsEaten: '1', favoriteEditTotals: { calories: 278.5, protein: 12.3, carbs: 22.45, fat: 14.7, fiber: null, sugar: 4.4 },
+  setEnergyUnit: () => {}, formatMacroAmount: context.formatMacroAmount,
+})
+function resultTexts(node: any): string[] {
+  if (typeof node === 'string' || typeof node === 'number') return [String(node)]
+  return (node?.children || []).flatMap(resultTexts)
+}
+const resultCode = ts.transpileModule(`const output = (${resultJsx.getText(source)}); result = output;`, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None, jsx: ts.JsxEmit.React } }).outputText
+for (const energyUnit of ['kcal', 'kj']) {
+  rendered.energyUnit = energyUnit
+  vm.runInContext(resultCode.replace('const output', 'var output'), rendered)
+  const texts = resultTexts(rendered.result)
+  for (const text of [energyUnit === 'kj' ? '1165 kJ' : '279 kcal', '12.3 g', '22.5 g', '14.7 g', '—', '4.4 g', energyUnit === 'kj' ? 'Kilojoules' : 'Calories', 'Protein', 'Carbs', 'Fat', 'Fibre', 'Sugar']) {
+    assert.ok(texts.includes(text), `actual ${energyUnit} meal cards render ${text}`)
+  }
+}
+rendered.favoriteEditTotals = { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: undefined }
+vm.runInContext(resultCode.replace('const output', 'var output'), rendered)
+assert.ok(resultTexts(rendered.result).includes('0 kJ'), 'actual zero calorie card remains')
+assert.equal(resultTexts(rendered.result).filter((text) => text === '0 g').length, 4, 'all genuine zero gram cards remain')
+assert.ok(resultTexts(rendered.result).includes('—'), 'unknown sugar keeps its card')
+console.log('PASS: actual saved nutrient formatting and meal result JSX, both energy units, all six cards, missing/zero values and unchanged quantity display.')
