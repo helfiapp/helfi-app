@@ -35,10 +35,41 @@
     "onlyRefreshedUIHash": "RecommendedIngredientCard",
     "nativeChanged": false
   },
-  "liveRuntime": "pending",
-  "remaining": "Full photo/model/real labels/signed Apple-Google matrix remains open; real recommended missing-value UI/save not proved by synthetic fixtures.",
+  "liveRuntime": {
+    "result": "PASS normal Generate-first/history opening, live precision display, one Quick save and web/restarted signed-in iPhone39 reopen",
+    "meal": "Chicken, rice and vegetable bowl",
+    "chicken": {
+      "originalBasis": "120 g cooked",
+      "originalCalories": 198,
+      "servings": 0.5,
+      "eatenGrams": 60,
+      "displayedCalories": 99
+    },
+    "displayedMeal": {
+      "calories": 330,
+      "protein": 24.2,
+      "carbs": 41.4,
+      "fat": 7.4,
+      "fibre": 3.8,
+      "sugar": 1.5
+    },
+    "storedFat": 7.35,
+    "dailyUsed": 2482,
+    "remaining": 0,
+    "credits": 619,
+    "website": "All six saved ingredient cards; original120g/.5/60g; Recipe and Reason tabs preserved",
+    "iPhone": "Restarted and visually signed in, matching daily total and six reopened meal cards; no native save",
+    "persistence": "One normal website Quick save creates21st row; original20 hashes unchanged. History legitimately stores edited meal330 on save; reopening alone preserves all21 diary and history hashes.",
+    "screenshots": [
+      "web-recommended-nutrition-consistent.jpg",
+      "web-recommended-saved-chicken-cards.jpg",
+      "iphone-recommended-saved-330-cards.jpg"
+    ],
+    "limitations": "Three real histories contain numeric optional nutrients. Missing-value and failed-save tests use actual functions with synthetic HTTP/DB state, not a real missing-value recommendation UI/save."
+  },
+  "remaining": "Current AU labels/serving bases, known-weight photos/model comparison, broader web/iOS/Android matrix and signed Apple/Google releases remain open.",
   "recordsBefore": {
-    "verifiedAt": "2026-10-05T05:58:16.104Z",
+    "verifiedAt": "2026-10-05T06:00:46.951Z",
     "diaryCount": 20,
     "allDiaryRecordsHash": "655164280f2187f6b3dabb6a7d14752c6fd8f66130be3c338045a16b149961d7",
     "historyRecordsHash": "4125abd33f1b4cd6c5bbd7e153f71228227c85ef4b8ac93671405b6df8ef4ae1",
@@ -99,6 +130,585 @@
         "fiber_g": 3.8,
         "sugar_g": 1.5
       }
-    }
+    },
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      }
+    ]
+  },
+  "deployment": {
+    "verifiedAt": "2026-10-05T06:06:59.287Z",
+    "summary": {
+      "jobId": "71",
+      "status": "SUCCEED",
+      "commitId": "b4ad81b527ea58c55617a103f2f704289a09c3f7"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"11odfi3i2lr1z15\"",
+        "via": "1.1 72fead31894942259585d2ed27324fb4.cloudfront.net (CloudFront)",
+        "cache": "Hit from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"11odfi3i2lr1z15\"",
+        "via": "1.1 ba12fc64f48b750ce37ebde8e885847e.cloudfront.net (CloudFront)",
+        "cache": "Hit from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "deploymentTransient": "First completed-job check observed old root cache; same authoritative job rechecked without rebuilding/redeploying. Both roots then return matching new11odfi3i2lr1z15, final verificationexit0.",
+  "recordsAfterSave": {
+    "verifiedAt": "2026-10-05T06:08:29.271Z",
+    "diaryCount": 21,
+    "allDiaryRecordsHash": "3a2fe1ecc46af0b7d4538501cd5b501dbfcd0ea56ce3428a1e1b5a61a1d20d46",
+    "historyRecordsHash": "059aec07dafcd0442cebfbce0fe814a34dc14a8a3d8881ebe96f6d173f3e6086",
+    "originalRecipe": {
+      "id": "air-fallback-1781889050934-6404ba20b8451",
+      "mealName": "Chicken, rice and vegetable bowl",
+      "items": [
+        {
+          "name": "Chicken breast",
+          "serving_size": "120 g cooked",
+          "calories": 198,
+          "protein_g": 37.2,
+          "carbs_g": 0,
+          "fat_g": 4.3,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 0.5
+        },
+        {
+          "name": "Cooked rice",
+          "serving_size": "120 g",
+          "calories": 156,
+          "protein_g": 3.2,
+          "carbs_g": 34.2,
+          "fat_g": 0.3,
+          "fiber_g": 0.5,
+          "sugar_g": 0.1,
+          "servings": 1
+        },
+        {
+          "name": "Broccoli",
+          "serving_size": "100 g",
+          "calories": 35,
+          "protein_g": 2.4,
+          "carbs_g": 7.2,
+          "fat_g": 0.4,
+          "fiber_g": 3.3,
+          "sugar_g": 1.4,
+          "servings": 1
+        },
+        {
+          "name": "Olive oil",
+          "serving_size": "1 tsp",
+          "calories": 40,
+          "protein_g": 0,
+          "carbs_g": 0,
+          "fat_g": 4.5,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        }
+      ],
+      "totals": {
+        "calories": 330,
+        "protein_g": 24.2,
+        "carbs_g": 41.400000000000006,
+        "fat_g": 7.35,
+        "fiber_g": 3.8,
+        "sugar_g": 1.5
+      }
+    },
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      },
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "hash": "e982c33ff19bf09e3b0b299025437f3deb0fe553f15142bbfc722df7fed6225e"
+      }
+    ],
+    "newMeals": [
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "description": "Chicken, rice and vegetable bowl",
+        "localDate": "2026-10-05",
+        "createdAt": "2026-10-05T06:07:56.116Z",
+        "nutrients": {
+          "fat": 7.35,
+          "carbs": 41.4,
+          "fiber": 3.8,
+          "sugar": 1.5,
+          "__aiWhy": "This is a practical balanced option with lean protein, steady carbohydrates, and vegetables. Portions can be adjusted to match the remaining energy target for the day.",
+          "protein": 24.2,
+          "__origin": "ai-recommended",
+          "calories": 330,
+          "__aiMealId": "air-fallback-1781889050934-6404ba20b8451",
+          "__aiRecipe": {
+            "steps": [
+              "Prep your ingredients: measure the servings and chop/trim anything that needs it.",
+              "Cook the protein through in a pan or oven until done.",
+              "Cook the grains according to the package directions.",
+              "Steam or saut\u00e9 the vegetables until tender-crisp.",
+              "Combine everything in a bowl/plate and mix gently.",
+              "Finish with your listed herbs/spices (and lemon/lime if included) to taste."
+            ],
+            "servings": 1,
+            "cookMinutes": 15,
+            "prepMinutes": 10
+          }
+        },
+        "items": [
+          {
+            "name": "Chicken breast",
+            "fat_g": 4.3,
+            "carbs_g": 0,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "calories": 198,
+            "servings": 0.5,
+            "protein_g": 37.2,
+            "serving_size": "120 g cooked"
+          },
+          {
+            "name": "Cooked rice",
+            "fat_g": 0.3,
+            "carbs_g": 34.2,
+            "fiber_g": 0.5,
+            "sugar_g": 0.1,
+            "calories": 156,
+            "servings": 1,
+            "protein_g": 3.2,
+            "serving_size": "120 g"
+          },
+          {
+            "name": "Broccoli",
+            "fat_g": 0.4,
+            "carbs_g": 7.2,
+            "fiber_g": 3.3,
+            "sugar_g": 1.4,
+            "calories": 35,
+            "servings": 1,
+            "protein_g": 2.4,
+            "serving_size": "100 g"
+          },
+          {
+            "name": "Olive oil",
+            "fat_g": 4.5,
+            "carbs_g": 0,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "calories": 40,
+            "servings": 1,
+            "protein_g": 0,
+            "serving_size": "1 tsp"
+          }
+        ]
+      }
+    ]
+  },
+  "recordsFinalReopening": {
+    "verifiedAt": "2026-10-05T06:14:46.497Z",
+    "diaryCount": 21,
+    "allDiaryRecordsHash": "3a2fe1ecc46af0b7d4538501cd5b501dbfcd0ea56ce3428a1e1b5a61a1d20d46",
+    "historyRecordsHash": "059aec07dafcd0442cebfbce0fe814a34dc14a8a3d8881ebe96f6d173f3e6086",
+    "originalRecipe": {
+      "id": "air-fallback-1781889050934-6404ba20b8451",
+      "mealName": "Chicken, rice and vegetable bowl",
+      "items": [
+        {
+          "name": "Chicken breast",
+          "serving_size": "120 g cooked",
+          "calories": 198,
+          "protein_g": 37.2,
+          "carbs_g": 0,
+          "fat_g": 4.3,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 0.5
+        },
+        {
+          "name": "Cooked rice",
+          "serving_size": "120 g",
+          "calories": 156,
+          "protein_g": 3.2,
+          "carbs_g": 34.2,
+          "fat_g": 0.3,
+          "fiber_g": 0.5,
+          "sugar_g": 0.1,
+          "servings": 1
+        },
+        {
+          "name": "Broccoli",
+          "serving_size": "100 g",
+          "calories": 35,
+          "protein_g": 2.4,
+          "carbs_g": 7.2,
+          "fat_g": 0.4,
+          "fiber_g": 3.3,
+          "sugar_g": 1.4,
+          "servings": 1
+        },
+        {
+          "name": "Olive oil",
+          "serving_size": "1 tsp",
+          "calories": 40,
+          "protein_g": 0,
+          "carbs_g": 0,
+          "fat_g": 4.5,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        }
+      ],
+      "totals": {
+        "calories": 330,
+        "protein_g": 24.2,
+        "carbs_g": 41.400000000000006,
+        "fat_g": 7.35,
+        "fiber_g": 3.8,
+        "sugar_g": 1.5
+      }
+    },
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      },
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "hash": "e982c33ff19bf09e3b0b299025437f3deb0fe553f15142bbfc722df7fed6225e"
+      }
+    ],
+    "newMeals": [
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "description": "Chicken, rice and vegetable bowl",
+        "localDate": "2026-10-05",
+        "createdAt": "2026-10-05T06:07:56.116Z",
+        "nutrients": {
+          "fat": 7.35,
+          "carbs": 41.4,
+          "fiber": 3.8,
+          "sugar": 1.5,
+          "__aiWhy": "This is a practical balanced option with lean protein, steady carbohydrates, and vegetables. Portions can be adjusted to match the remaining energy target for the day.",
+          "protein": 24.2,
+          "__origin": "ai-recommended",
+          "calories": 330,
+          "__aiMealId": "air-fallback-1781889050934-6404ba20b8451",
+          "__aiRecipe": {
+            "steps": [
+              "Prep your ingredients: measure the servings and chop/trim anything that needs it.",
+              "Cook the protein through in a pan or oven until done.",
+              "Cook the grains according to the package directions.",
+              "Steam or saut\u00e9 the vegetables until tender-crisp.",
+              "Combine everything in a bowl/plate and mix gently.",
+              "Finish with your listed herbs/spices (and lemon/lime if included) to taste."
+            ],
+            "servings": 1,
+            "cookMinutes": 15,
+            "prepMinutes": 10
+          }
+        },
+        "items": [
+          {
+            "name": "Chicken breast",
+            "fat_g": 4.3,
+            "carbs_g": 0,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "calories": 198,
+            "servings": 0.5,
+            "protein_g": 37.2,
+            "serving_size": "120 g cooked"
+          },
+          {
+            "name": "Cooked rice",
+            "fat_g": 0.3,
+            "carbs_g": 34.2,
+            "fiber_g": 0.5,
+            "sugar_g": 0.1,
+            "calories": 156,
+            "servings": 1,
+            "protein_g": 3.2,
+            "serving_size": "120 g"
+          },
+          {
+            "name": "Broccoli",
+            "fat_g": 0.4,
+            "carbs_g": 7.2,
+            "fiber_g": 3.3,
+            "sugar_g": 1.4,
+            "calories": 35,
+            "servings": 1,
+            "protein_g": 2.4,
+            "serving_size": "100 g"
+          },
+          {
+            "name": "Olive oil",
+            "fat_g": 4.5,
+            "carbs_g": 0,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "calories": 40,
+            "servings": 1,
+            "protein_g": 0,
+            "serving_size": "1 tsp"
+          }
+        ]
+      }
+    ]
   }
 }

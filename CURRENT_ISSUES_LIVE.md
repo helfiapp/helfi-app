@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify71, helfi.ai/www.helfi.ai200CloudFront/newmatchingetag11odfi3i2lr1z15.
+- Date/time: 5 October2026, verified06:06:59UTC (17:06 Melbourne); saved/reopened cards verified17:17.
+- What changed: b4ad81b527ea58c55617a103f2f704289a09c3f7; recommended-meal precise sums preserve unknown nutrients and reject incomplete core/empty saves; summary/progress and cards round consistently. Native unchanged.
+- Where to see it (page/link): https://helfi.ai/food — Recommended > existing chicken/rice bowl > portion; saved17:07 Lunch > Edit Entry.
+- What to quickly test: Chicken60g/.5/99 yields330/P24.2/C41.4/F7.4/Fibre3.8/S1.5 across meal displays. One normal Quick save retained original120g198/.5/storedfat7.35/recipe/reason; website saved ingredient and restarted signed-in iPhone39 meal reopen allsixcards/daily2482/0remaining/619. Original20rows untouched, reopening21rows/history untouched; history legitimately updates330 when saved. Actual-function synthetic missing/zero/save-failure tests and fullproductionbuild60680exit0/protected/root278native79 pass. Real recommended missing-value save remains unproved. Current AU labels/photo/model/fullmatrix/signed stores remain open.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify70, both helfi.ai/www.helfi.ai200CloudFront/newmatchingetagwqbymcxdxy1z15.
 - Date/time: 5October2026, verified05:42:32UTC (16:42 Melbourne).
 - What changed: c199981d6e6224fe4e138ec583eacea1c3d57ced; recommended ingredient recorded bases/density/regional measures and precise serving counts replace invented weights. Native unchanged.

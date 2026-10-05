@@ -328,7 +328,9 @@ export async function searchLocalFoods(
     const normalizedQuery = normalizePrefixToken(q)
     const rawTokens = normalizedQuery.split(' ').filter(Boolean)
     const toTitleCase = (value: string) => value.replace(/\b([a-z])/g, (match) => match.toUpperCase())
-    const prefixTokens = rawTokens.length > 0 ? rawTokens.slice(0, 3) : [normalizedQuery || q]
+    // Packaged callers filter by every typed word after this query. Apply those
+    // words before the row limit so broad brands cannot crowd out the product.
+    const prefixTokens = rawTokens.length > 0 ? (mode === 'prefix' ? rawTokens : rawTokens.slice(0, 3)) : [normalizedQuery || q]
     const sourceFilter = sources ? { source: { in: sources } } : null
 
     // Word-prefix matching for USDA names like: "Squash, summer, zucchini, raw".
@@ -363,7 +365,7 @@ export async function searchLocalFoods(
 
     // For multi-word searches, require all words to match somewhere (AND),
     // otherwise big generic words like "potato" can crowd out "sweet potato".
-    const isMultiToken = mode !== 'prefix' && prefixTokens.length > 1
+    const isMultiToken = prefixTokens.length > 1
 
     const prefixFilter = (() => {
       if (prefixTokens.length === 0) return null

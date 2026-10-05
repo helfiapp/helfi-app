@@ -1,0 +1,1720 @@
+{
+  "task": 72,
+  "readOnly": true,
+  "verifiedAt": "2026-10-05T06:19:02.044Z",
+  "diaryCount": 21,
+  "allDiaryRecordsHash": "3a2fe1ecc46af0b7d4538501cd5b501dbfcd0ea56ce3428a1e1b5a61a1d20d46",
+  "saved": [
+    {
+      "id": "cmuu0dlsr000123yir14fww5q",
+      "description": "Sanitarium Crunchy Peanut Butter 500g",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-04T16:01:00.000Z",
+      "nutrients": {
+        "fat": 10.7,
+        "carbs": 2,
+        "fiber": 1.2,
+        "sugar": 0.8,
+        "protein": 5.4,
+        "calories": 127
+      },
+      "items": [
+        {
+          "id": "2317111",
+          "name": "Sanitarium Crunchy Peanut Butter 500g",
+          "brand": "Sanitarium",
+          "fat_g": 10.7,
+          "label": "Sanitarium Crunchy Peanut Butter 500g",
+          "__unit": "g",
+          "source": "usda",
+          "carbs_g": 2,
+          "fiber_g": 1.2,
+          "sugar_g": 0.8,
+          "__amount": 100,
+          "calories": 127.2,
+          "servings": 1,
+          "protein_g": 5.4,
+          "unitGrams": {},
+          "weightUnit": "g",
+          "serving_size": "Serving \u2014 20g",
+          "weightAmount": 20,
+          "servingOptions": null,
+          "selectedServingId": null,
+          "customMlPerServing": null,
+          "customGramsPerServing": 20
+        }
+      ]
+    },
+    {
+      "id": "cmuu1684800014qk8h44fbqk5",
+      "description": "Sanitarium Crunchy Peanut Butter 500g",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-04T16:23:00.000Z",
+      "nutrients": {
+        "fat": 10.7,
+        "carbs": 2,
+        "fat_g": 10.7,
+        "fiber": 1.2,
+        "sugar": 0.8,
+        "method": "meal-builder",
+        "carbs_g": 2,
+        "fiber_g": 1.2,
+        "protein": 5.4,
+        "sugar_g": 0.8,
+        "calories": 127,
+        "protein_g": 5.4,
+        "customMeal": true,
+        "calories_kcal": 127
+      },
+      "items": [
+        {
+          "id": "2317111",
+          "name": "Sanitarium Crunchy Peanut Butter 500g",
+          "brand": "Sanitarium",
+          "fat_g": 10.7,
+          "label": "Sanitarium Crunchy Peanut Butter 500g",
+          "__unit": "g",
+          "source": "usda",
+          "carbs_g": 2,
+          "fiber_g": 1.2,
+          "sugar_g": 0.8,
+          "__amount": 20,
+          "calories": 127.2,
+          "servings": 1,
+          "protein_g": 5.4,
+          "unitGrams": {},
+          "weightUnit": "g",
+          "serving_size": "Serving \u2014 20g",
+          "weightAmount": 20,
+          "calories_kcal": 127.2,
+          "servingOptions": null,
+          "selectedServingId": null,
+          "customMlPerServing": null,
+          "customGramsPerServing": 20
+        }
+      ]
+    }
+  ],
+  "library": [
+    {
+      "id": "cmkmm5f6fwjdd1305uhxl7fyt",
+      "source": "usda_branded",
+      "fdcId": 2317111,
+      "gtinUpc": "9300652012255",
+      "name": "Sanitarium Crunchy Peanut Butter 500g",
+      "brand": "Sanitarium",
+      "servingSize": "100 g",
+      "calories": 636,
+      "proteinG": 27,
+      "carbsG": 10,
+      "fatG": 53.5,
+      "fiberG": 6,
+      "sugarG": 4,
+      "createdAt": "2026-01-20T13:11:57.204Z",
+      "updatedAt": "2026-10-04T15:40:40.831Z"
+    },
+    {
+      "id": "cmkmm5f6hwjin1305ucx23d6k",
+      "source": "usda_branded",
+      "fdcId": 2317301,
+      "gtinUpc": "9300652800654",
+      "name": "Sanitarium Crunchy Peanut Butter 500g",
+      "brand": "Sanitarium",
+      "servingSize": "100 g",
+      "calories": 590,
+      "proteinG": 30,
+      "carbsG": 8.5,
+      "fatG": 48,
+      "fiberG": 6,
+      "sugarG": 4,
+      "createdAt": "2026-01-20T13:11:57.204Z",
+      "updatedAt": "2026-10-04T15:40:40.831Z"
+    }
+  ],
+  "barcode": [],
+  "localQueryBefore": {
+    "task": 72,
+    "phase": "before",
+    "readOnly": true,
+    "verifiedAt": "2026-10-05T06:22:35.775Z",
+    "query": "Sanitarium Crunchy Peanut Butter",
+    "requests": [
+      {
+        "options": {
+          "where": {
+            "AND": [
+              {
+                "source": {
+                  "in": [
+                    "usda_branded"
+                  ]
+                }
+              },
+              {
+                "OR": [
+                  {
+                    "name": {
+                      "startsWith": "sanitarium"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "sanitarium"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "SANITARIUM"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "SANITARIUM"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "Sanitarium"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "Sanitarium"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "crunchy"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "crunchy"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "CRUNCHY"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "CRUNCHY"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "Crunchy"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "Crunchy"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "peanut"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "peanut"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "PEANUT"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "PEANUT"
+                    }
+                  },
+                  {
+                    "name": {
+                      "startsWith": "Peanut"
+                    }
+                  },
+                  {
+                    "brand": {
+                      "startsWith": "Peanut"
+                    }
+                  }
+                ]
+              }
+            ]
+          },
+          "take": 20,
+          "orderBy": {
+            "name": "asc"
+          }
+        },
+        "count": 20,
+        "names": [
+          {
+            "name": "100% NATURAL CINNAMON HONEY PEANUT BUTTER",
+            "brand": "PEANUT BUTTER AMERICANO",
+            "fdcId": 721880
+          },
+          {
+            "name": "100% NATURAL CINNAMON HONEY PEANUT BUTTER, CINNAMON HONEY",
+            "brand": "PEANUT BUTTER AMERICANO",
+            "fdcId": 1824607
+          },
+          {
+            "name": "100% NATURAL CINNAMON HONEY PEANUT BUTTER, CINNAMON HONEY",
+            "brand": "PEANUT BUTTER AMERICANO",
+            "fdcId": 1969522
+          },
+          {
+            "name": "ALMOND & CASHEW BUTTER",
+            "brand": "Peanut Butter & Co, Inc.",
+            "fdcId": 798613
+          },
+          {
+            "name": "APPLE CINNAMON ORGANIC RICE ROLLERS, APPLE CINNAMON",
+            "brand": "CRUNCHY ROLLERS",
+            "fdcId": 2587081
+          },
+          {
+            "name": "APPLE CINNAMON SESAME STICKS",
+            "brand": "CRUNCHY CRAVINGS",
+            "fdcId": 730368
+          },
+          {
+            "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+            "brand": "CRUNCHY CRAVINGS",
+            "fdcId": 1825829
+          },
+          {
+            "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+            "brand": "CRUNCHY CRAVINGS",
+            "fdcId": 2546413
+          },
+          {
+            "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+            "brand": "CRUNCHY CRAVINGS",
+            "fdcId": 2586266
+          },
+          {
+            "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+            "brand": "CRUNCHY CRAVINGS",
+            "fdcId": 1971532
+          },
+          {
+            "name": "BERRY MY HEART GRANOLA, BERRY MY HEART",
+            "brand": "CRUNCHY MAMA GRANOLA",
+            "fdcId": 2586106
+          },
+          {
+            "name": "BERRY MY HEART GRANOLA, BERRY MY HEART",
+            "brand": "CRUNCHY MAMA GRANOLA",
+            "fdcId": 2627322
+          },
+          {
+            "name": "BOILED PEANUTS",
+            "brand": "PEANUT PATCH",
+            "fdcId": 360804
+          },
+          {
+            "name": "BOILED PEANUTS, ORIGINAL",
+            "brand": "PEANUT PATCH",
+            "fdcId": 1760098
+          },
+          {
+            "name": "BOILED PEANUTS, ORIGINAL",
+            "brand": "PEANUT PATCH",
+            "fdcId": 1851426
+          },
+          {
+            "name": "BOILED PEANUTS, ORIGINAL",
+            "brand": "PEANUT PATCH",
+            "fdcId": 2432793
+          },
+          {
+            "name": "BOILED PEANUTS, SALT 'N VINEGAR",
+            "brand": "PEANUT PATCH",
+            "fdcId": 1707653
+          },
+          {
+            "name": "BOILED PEANUTS, SALT 'N VINEGAR",
+            "brand": "PEANUT PATCH",
+            "fdcId": 2429297
+          },
+          {
+            "name": "BOILED PEANUTS, SALT 'N VINEGAR",
+            "brand": "PEANUT PATCH",
+            "fdcId": 1977537
+          },
+          {
+            "name": "CANDY RING",
+            "brand": "PEANUTS WORLDWIDE",
+            "fdcId": 1569334
+          }
+        ]
+      }
+    ],
+    "result": [
+      {
+        "source": "usda",
+        "id": "721880",
+        "name": "100% NATURAL CINNAMON HONEY PEANUT BUTTER",
+        "brand": "PEANUT BUTTER AMERICANO",
+        "serving_size": "100 g",
+        "calories": 567,
+        "protein_g": 23.33,
+        "carbs_g": 16.67,
+        "fat_g": 50,
+        "fiber_g": 6.7,
+        "sugar_g": 6.67
+      },
+      {
+        "source": "usda",
+        "id": "1824607",
+        "name": "100% NATURAL CINNAMON HONEY PEANUT BUTTER, CINNAMON HONEY",
+        "brand": "PEANUT BUTTER AMERICANO",
+        "serving_size": "100 g",
+        "calories": 567,
+        "protein_g": 23.33,
+        "carbs_g": 16.67,
+        "fat_g": 50,
+        "fiber_g": 6.7,
+        "sugar_g": 6.67
+      },
+      {
+        "source": "usda",
+        "id": "1969522",
+        "name": "100% NATURAL CINNAMON HONEY PEANUT BUTTER, CINNAMON HONEY",
+        "brand": "PEANUT BUTTER AMERICANO",
+        "serving_size": "100 g",
+        "calories": 567,
+        "protein_g": 23.33,
+        "carbs_g": 16.67,
+        "fat_g": 50,
+        "fiber_g": 6.7,
+        "sugar_g": 6.67
+      },
+      {
+        "source": "usda",
+        "id": "798613",
+        "name": "ALMOND & CASHEW BUTTER",
+        "brand": "Peanut Butter & Co, Inc.",
+        "serving_size": "100 g",
+        "calories": 594,
+        "protein_g": 18.75,
+        "carbs_g": 28.12,
+        "fat_g": 50,
+        "fiber_g": 6.2,
+        "sugar_g": 6.25
+      },
+      {
+        "source": "usda",
+        "id": "2587081",
+        "name": "APPLE CINNAMON ORGANIC RICE ROLLERS, APPLE CINNAMON",
+        "brand": "CRUNCHY ROLLERS",
+        "serving_size": "100 g",
+        "calories": 400,
+        "protein_g": 8,
+        "carbs_g": 88,
+        "fat_g": 0,
+        "fiber_g": 0,
+        "sugar_g": 24
+      },
+      {
+        "source": "usda",
+        "id": "730368",
+        "name": "APPLE CINNAMON SESAME STICKS",
+        "brand": "CRUNCHY CRAVINGS",
+        "serving_size": "100 g",
+        "calories": 536,
+        "protein_g": 7.14,
+        "carbs_g": 57.14,
+        "fat_g": 32.14,
+        "fiber_g": 3.6,
+        "sugar_g": 17.86
+      },
+      {
+        "source": "usda",
+        "id": "1825829",
+        "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+        "brand": "CRUNCHY CRAVINGS",
+        "serving_size": "100 g",
+        "calories": 536,
+        "protein_g": 7.14,
+        "carbs_g": 57.14,
+        "fat_g": 32.14,
+        "fiber_g": 3.6,
+        "sugar_g": 17.86
+      },
+      {
+        "source": "usda",
+        "id": "2546413",
+        "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+        "brand": "CRUNCHY CRAVINGS",
+        "serving_size": "100 g",
+        "calories": 536,
+        "protein_g": 7.14,
+        "carbs_g": 57.14,
+        "fat_g": 32.14,
+        "fiber_g": 3.6,
+        "sugar_g": 17.86
+      },
+      {
+        "source": "usda",
+        "id": "2586266",
+        "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+        "brand": "CRUNCHY CRAVINGS",
+        "serving_size": "100 g",
+        "calories": 536,
+        "protein_g": 7.14,
+        "carbs_g": 57.14,
+        "fat_g": 32.14,
+        "fiber_g": 3.6,
+        "sugar_g": 17.86
+      },
+      {
+        "source": "usda",
+        "id": "1971532",
+        "name": "APPLE CINNAMON SESAME STICKS, APPLE CINNAMON",
+        "brand": "CRUNCHY CRAVINGS",
+        "serving_size": "100 g",
+        "calories": 536,
+        "protein_g": 7.14,
+        "carbs_g": 57.14,
+        "fat_g": 32.14,
+        "fiber_g": 3.6,
+        "sugar_g": 17.86
+      },
+      {
+        "source": "usda",
+        "id": "2586106",
+        "name": "BERRY MY HEART GRANOLA, BERRY MY HEART",
+        "brand": "CRUNCHY MAMA GRANOLA",
+        "serving_size": "100 g",
+        "calories": 464,
+        "protein_g": 14.29,
+        "carbs_g": 53.57,
+        "fat_g": 21.43,
+        "fiber_g": 10.7,
+        "sugar_g": 7.14
+      },
+      {
+        "source": "usda",
+        "id": "2627322",
+        "name": "BERRY MY HEART GRANOLA, BERRY MY HEART",
+        "brand": "CRUNCHY MAMA GRANOLA",
+        "serving_size": "100 g",
+        "calories": 464,
+        "protein_g": 14.29,
+        "carbs_g": 53.57,
+        "fat_g": 21.43,
+        "fiber_g": 10.7,
+        "sugar_g": 7.14
+      },
+      {
+        "source": "usda",
+        "id": "360804",
+        "name": "BOILED PEANUTS",
+        "brand": "PEANUT PATCH",
+        "serving_size": "100 g",
+        "calories": 278,
+        "protein_g": 13.89,
+        "carbs_g": 8.33,
+        "fat_g": 22.22,
+        "fiber_g": 8.3,
+        "sugar_g": 0
+      },
+      {
+        "source": "usda",
+        "id": "1760098",
+        "name": "BOILED PEANUTS, ORIGINAL",
+        "brand": "PEANUT PATCH",
+        "serving_size": "100 g",
+        "calories": 278,
+        "protein_g": 13.89,
+        "carbs_g": 8.33,
+        "fat_g": 22.22,
+        "fiber_g": 8.3,
+        "sugar_g": 0
+      },
+      {
+        "source": "usda",
+        "id": "1851426",
+        "name": "BOILED PEANUTS, ORIGINAL",
+        "brand": "PEANUT PATCH",
+        "serving_size": "100 g",
+        "calories": 278,
+        "protein_g": 13.89,
+        "carbs_g": 8.33,
+        "fat_g": 22.22,
+        "fiber_g": 8.3,
+        "sugar_g": 0
+      },
+      {
+        "source": "usda",
+        "id": "2432793",
+        "name": "BOILED PEANUTS, ORIGINAL",
+        "brand": "PEANUT PATCH",
+        "serving_size": "100 g",
+        "calories": 278,
+        "protein_g": 13.89,
+        "carbs_g": 8.33,
+        "fat_g": 22.22,
+        "fiber_g": 8.3,
+        "sugar_g": 0
+      },
+      {
+        "source": "usda",
+        "id": "1707653",
+        "name": "BOILED PEANUTS, SALT 'N VINEGAR",
+        "brand": "PEANUT PATCH",
+        "serving_size": "100 g",
+        "calories": 250,
+        "protein_g": 13.89,
+        "carbs_g": 19.44,
+        "fat_g": 12.5,
+        "fiber_g": 8.3,
+        "sugar_g": 0
+      },
+      {
+        "source": "usda",
+        "id": "2429297",
+        "name": "BOILED PEANUTS, SALT 'N VINEGAR",
+        "brand": "PEANUT PATCH",
+        "serving_size": "100 g",
+        "calories": 250,
+        "protein_g": 13.89,
+        "carbs_g": 19.44,
+        "fat_g": 12.5,
+        "fiber_g": 8.3,
+        "sugar_g": 0
+      },
+      {
+        "source": "usda",
+        "id": "1977537",
+        "name": "BOILED PEANUTS, SALT 'N VINEGAR",
+        "brand": "PEANUT PATCH",
+        "serving_size": "100 g",
+        "calories": 250,
+        "protein_g": 13.89,
+        "carbs_g": 19.44,
+        "fat_g": 12.5,
+        "fiber_g": 8.3,
+        "sugar_g": 0
+      },
+      {
+        "source": "usda",
+        "id": "1569334",
+        "name": "CANDY RING",
+        "brand": "PEANUTS WORLDWIDE",
+        "serving_size": "100 g",
+        "calories": 412,
+        "protein_g": 0,
+        "carbs_g": 94.12,
+        "fat_g": 0,
+        "fiber_g": null,
+        "sugar_g": 76.47
+      }
+    ]
+  },
+  "localQueryAfter": {
+    "task": 72,
+    "phase": "after",
+    "readOnly": true,
+    "verifiedAt": "2026-10-05T06:24:22.286Z",
+    "query": "Sanitarium Crunchy Peanut Butter",
+    "requests": [
+      {
+        "options": {
+          "where": {
+            "AND": [
+              {
+                "source": {
+                  "in": [
+                    "usda_branded"
+                  ]
+                }
+              },
+              {
+                "AND": [
+                  {
+                    "OR": [
+                      {
+                        "name": {
+                          "startsWith": "sanitarium"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "SANITARIUM"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "Sanitarium"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "sanitarium"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "SANITARIUM"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "Sanitarium"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "sanitarium",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "SANITARIUM",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "Sanitarium",
+                          "mode": "insensitive"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "OR": [
+                      {
+                        "name": {
+                          "startsWith": "crunchy"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "CRUNCHY"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "Crunchy"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "crunchy"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "CRUNCHY"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "Crunchy"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/Crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "crunchy",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "CRUNCHY",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "Crunchy",
+                          "mode": "insensitive"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "OR": [
+                      {
+                        "name": {
+                          "startsWith": "peanut"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "PEANUT"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "Peanut"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "peanut"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "PEANUT"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "Peanut"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/Peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "peanut",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "PEANUT",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "Peanut",
+                          "mode": "insensitive"
+                        }
+                      }
+                    ]
+                  },
+                  {
+                    "OR": [
+                      {
+                        "name": {
+                          "startsWith": "butter"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "BUTTER"
+                        }
+                      },
+                      {
+                        "name": {
+                          "startsWith": "Butter"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "butter"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "BUTTER"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "startsWith": "Butter"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": " Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": ", Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "(Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "-Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "name": {
+                          "contains": "/Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": " Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": ", Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "(Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "-Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "/Butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "butter",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "BUTTER",
+                          "mode": "insensitive"
+                        }
+                      },
+                      {
+                        "brand": {
+                          "contains": "Butter",
+                          "mode": "insensitive"
+                        }
+                      }
+                    ]
+                  }
+                ]
+              }
+            ]
+          },
+          "take": 20,
+          "orderBy": {
+            "name": "asc"
+          }
+        },
+        "count": 2,
+        "names": [
+          {
+            "name": "Sanitarium Crunchy Peanut Butter 500g",
+            "brand": "Sanitarium",
+            "fdcId": 2317111
+          },
+          {
+            "name": "Sanitarium Crunchy Peanut Butter 500g",
+            "brand": "Sanitarium",
+            "fdcId": 2317301
+          }
+        ]
+      }
+    ],
+    "result": [
+      {
+        "source": "usda",
+        "id": "2317111",
+        "name": "Sanitarium Crunchy Peanut Butter 500g",
+        "brand": "Sanitarium",
+        "serving_size": "100 g",
+        "calories": 636,
+        "protein_g": 27,
+        "carbs_g": 10,
+        "fat_g": 53.5,
+        "fiber_g": 6,
+        "sugar_g": 4
+      },
+      {
+        "source": "usda",
+        "id": "2317301",
+        "name": "Sanitarium Crunchy Peanut Butter 500g",
+        "brand": "Sanitarium",
+        "serving_size": "100 g",
+        "calories": 590,
+        "protein_g": 30,
+        "carbs_g": 8.5,
+        "fat_g": 48,
+        "fiber_g": 6,
+        "sugar_g": 4
+      }
+    ]
+  },
+  "liveBefore": {
+    "query": "Sanitarium Crunchy Peanut Butter",
+    "capturedAt": "2026-10-05T06:25:43.998Z",
+    "responses": [
+      {
+        "url": "https://helfi.ai/api/food-data?source=auto&q=sanitarium+butter&kind=packaged&limit=20&country=AU&localOnly=1",
+        "status": 200,
+        "body": {
+          "success": true,
+          "source": "auto",
+          "items": []
+        }
+      },
+      {
+        "url": "https://helfi.ai/api/food-data?source=auto&q=Sanitarium+Crunchy+Peanut+Butter&kind=packaged&limit=20&country=AU",
+        "status": 200,
+        "body": {
+          "success": true,
+          "source": "auto",
+          "items": [
+            {
+              "source": "openfoodfacts",
+              "id": "9300652012224",
+              "name": "Crunchy Peanut Butter",
+              "brand": "Sanitarium",
+              "serving_size": "100 g",
+              "calories": 610,
+              "protein_g": 29.5,
+              "carbs_g": 11.5,
+              "fat_g": 49,
+              "fiber_g": 55,
+              "sugar_g": 6.5,
+              "basis": "per_serving",
+              "energyUnit": "kcal"
+            },
+            {
+              "source": "openfoodfacts",
+              "id": "9310645100975",
+              "name": "Peanut Butter Crunchy - No added Salt",
+              "brand": "Coles, Sanitarium",
+              "serving_size": "15g (3 metric teaspoons)",
+              "calories": 95.60229445506691,
+              "protein_g": 4.29,
+              "carbs_g": 1.14,
+              "fat_g": 8.1,
+              "fiber_g": null,
+              "sugar_g": 0.69,
+              "basis": "per_serving",
+              "energyUnit": "kcal"
+            },
+            {
+              "source": "openfoodfacts",
+              "id": "9300652122671",
+              "name": "Natural Crunchy Peanut Butter",
+              "brand": "sanitarium",
+              "serving_size": "20 g",
+              "calories": 123,
+              "protein_g": 5.9,
+              "carbs_g": 2.3,
+              "fat_g": 9.9,
+              "fiber_g": 1.2,
+              "sugar_g": 0.9,
+              "basis": "per_serving",
+              "energyUnit": "kcal"
+            },
+            {
+              "source": "openfoodfacts",
+              "id": "9300652800654",
+              "name": "Sanitarium Crunchy Peanut Butter",
+              "brand": "Sanitarium",
+              "serving_size": "100 g",
+              "calories": 605,
+              "protein_g": 30,
+              "carbs_g": 7.2,
+              "fat_g": 50,
+              "fiber_g": null,
+              "sugar_g": 4.7,
+              "basis": "per_serving",
+              "energyUnit": "kcal"
+            }
+          ]
+        }
+      }
+    ]
+  },
+  "baselineFixture": "Actual local query fails to return exact2317111 before20-row limit; synthetic full-name fixture reproduced FAIL before repair.",
+  "sourceChecks": "Actual local query and full endpoint fixtures now PASS all-word/reordered/partial/fourth-word matching, bounded limit, source priority, precise100g636, missing fibre/truezero, existing single-food. Source/serving/FatSecret/protected/278+79locks PASS.",
+  "sourceChange": "lib/food-data.ts packaged modeprefix uses all query tokens and AND before row limit. Single-food prefix-contains3-token behavior unchanged. No source nutrients or database records edited.",
+  "sourceCommit": "pending",
+  "build": {
+    "session": 16851,
+    "exitCode": 0,
+    "result": "PASS full production build/prebuild/typecheck/protected/278+79locks; no UI lock refresh/native edits"
+  },
+  "deployment": "pending",
+  "liveAfter": "pending",
+  "remaining": "Exact current AU barcode/label certification is still open: same-name source records use different barcodes, and old manufacturer sheet/current retailer panel do not establish current2317111 formulation. External first resultfibre55g suspicious. Historical inconsistent__amount100/physical20g record preserved; do not auto-rewrite history. Full photo/model/favorite/signed-store matrix remains open."
+}
