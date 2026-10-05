@@ -1522,7 +1522,7 @@ export function AddIngredientScreen() {
   const selectedServingLabel =
     selectedServing?.label || selectedServing?.serving_size || adjustItem?.serving_size || '1 serving'
   const adjustServings = computeServings(adjustAmount, safeAdjustUnit, adjustBase, mergedAdjustUnitGrams)
-  const servingsForPreview = Number.isFinite(adjustServings) && adjustServings > 0 ? adjustServings : 0
+  const servingsForPreview = Number.isFinite(adjustServings) && adjustServings > 0 ? adjustServings : null
   const useCustomServingLabel = safeAdjustUnit === 'serving' && Math.abs(adjustAmount - 1) > 0.001
   const activeUnitLabel =
     safeAdjustUnit === 'serving'
@@ -1531,12 +1531,12 @@ export function AddIngredientScreen() {
         : selectedServingLabel
       : unitLabel(safeAdjustUnit, adjustItem?.name || '', mergedAdjustUnitGrams)
 
-  const previewCalories = Math.round(numberOrZero(adjustItem?.calories ?? adjustItem?.calories_kcal) * servingsForPreview)
-  const previewProtein = roundTo(numberOrZero(adjustItem?.protein_g) * servingsForPreview, 1)
-  const previewCarbs = roundTo(numberOrZero(adjustItem?.carbs_g) * servingsForPreview, 1)
-  const previewFat = roundTo(numberOrZero(adjustItem?.fat_g) * servingsForPreview, 1)
-  const previewFiber = safeNumber(adjustItem?.fiber_g) == null ? null : roundTo(Number(adjustItem?.fiber_g) * servingsForPreview, 1)
-  const previewSugar = safeNumber(adjustItem?.sugar_g) == null ? null : roundTo(Number(adjustItem?.sugar_g) * servingsForPreview, 1)
+  const previewCalories = servingsForPreview == null ? null : Math.round(numberOrZero(adjustItem?.calories ?? adjustItem?.calories_kcal) * servingsForPreview)
+  const previewProtein = servingsForPreview == null ? null : roundTo(numberOrZero(adjustItem?.protein_g) * servingsForPreview, 1)
+  const previewCarbs = servingsForPreview == null ? null : roundTo(numberOrZero(adjustItem?.carbs_g) * servingsForPreview, 1)
+  const previewFat = servingsForPreview == null ? null : roundTo(numberOrZero(adjustItem?.fat_g) * servingsForPreview, 1)
+  const previewFiber = servingsForPreview == null ? null : safeNumber(adjustItem?.fiber_g) == null ? null : roundTo(Number(adjustItem?.fiber_g) * servingsForPreview, 1)
+  const previewSugar = servingsForPreview == null ? null : safeNumber(adjustItem?.sugar_g) == null ? null : roundTo(Number(adjustItem?.sugar_g) * servingsForPreview, 1)
 
   const formatAdjustUnitChoiceLabel = (
     unit: AdjustUnit,
@@ -2224,7 +2224,12 @@ export function AddIngredientScreen() {
                   </Pressable>
                 </View>
               </View>
-              <Text style={{ marginTop: 6, fontSize: 12, color: '#6B7280' }}>Servings: {formatAmount(servingsForPreview || 1)}</Text>
+              <Text accessibilityRole={servingsForPreview == null ? 'alert' : undefined}
+                style={{ marginTop: 6, fontSize: 12, color: servingsForPreview == null ? '#DC2626' : '#6B7280' }}>
+                {servingsForPreview == null
+                  ? adjustAmount <= 0 ? 'Enter an amount bigger than 0.' : 'Choose a measured amount in one of the available units.'
+                  : `Servings: ${formatAmount(servingsForPreview)}`}
+              </Text>
             </View>
 
             <NutrientCards values={{ calories: previewCalories, protein: previewProtein, carbs: previewCarbs, fat: previewFat, fiber: previewFiber, sugar: previewSugar }} />
@@ -2235,8 +2240,8 @@ export function AddIngredientScreen() {
               <Pressable
                 accessibilityRole="button"
                 accessibilityLabel={adjustSaving ? 'Adding to diary' : 'Add to diary'}
-                accessibilityState={{ disabled: adjustSaving }}
-                disabled={adjustSaving}
+                accessibilityState={{ disabled: adjustSaving || servingsForPreview == null }}
+                disabled={adjustSaving || servingsForPreview == null}
                 onPress={() => void addAdjustedItem()}
                 style={({ pressed }) => ({
                   flex: 1,
@@ -2245,7 +2250,7 @@ export function AddIngredientScreen() {
                   alignItems: 'center',
                   justifyContent: 'center',
                   paddingVertical: 11,
-                  opacity: adjustSaving ? 0.65 : pressed ? 0.9 : 1,
+                  opacity: adjustSaving || servingsForPreview == null ? 0.65 : pressed ? 0.9 : 1,
                 })}
               >
                 <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 17 }}>{adjustSaving ? 'Adding…' : 'Add to diary'}</Text>

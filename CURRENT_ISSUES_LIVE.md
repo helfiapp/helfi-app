@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 12:22pm Melbourne (01:22UTC).
+- What changed: task60 native detailed nutrient results show one decimal consistently; meal/recipe/favorite-portion totals use the familiar responsive six-card grid. Source51062e1be405b38f0b8e1363b50c0f6c6978e3ad; AWS59 BUILD/DEPLOY/VERIFY all SUCCEED, both domains200/CloudFront/new matchingetagw3ni0kj30p1z15. Native source is verified in rebuilt Release39 simulators and awaits a final signed store binary.
+- Where to see it: native saved food/meal/recipe/favorite editor result cards and nutrient summary text.
+- What to quickly test: same saved11:51 half BigMac allsixmeal cards279/P12.3/C22.5/F14.7/FibreMissing/S4.4 match ingredient cards and website; iPhone two columns/iPad three columns and matching portion chips verified. Native/web logged in daily1369/wallet619; no new saves/history writes during this display check. Actual kcal/kJ/null/zero source-render regressions, native typecheck/full production build/protected guards and root278/native79 locks pass. Physical quantity formatting/calculations/payloads/rename/billing unchanged. Full food-photo and signed-store release remains incomplete.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 12:05pm Melbourne (01:05UTC).
 - What changed: task59 native unweighed serving choices retain their original count basis; recorded provider weights remain usable, missing source labels stop add and unsupported weight conversions cannot save. Source a41924ccca827b8ea7e08b48ddde94973a0495c9; AWS58 BUILD/DEPLOY/VERIFY all SUCCEED, both domains200/CloudFront/new matchingetag108k58bboc11z15. Native repair is in tested Release39 simulators and awaits a final signed store binary.
 - Where to see it: native Add Ingredient and saved count-only entry; same record on website Food Diary.

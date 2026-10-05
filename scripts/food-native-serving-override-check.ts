@@ -12,6 +12,7 @@ import { hasCoreFoodNutrition } from '../lib/food/openfoodfacts'
 // open adjustment -> saved payload, without environment values or network.
 const provider = ts.createSourceFile('food-data.ts', fs.readFileSync('lib/food-data.ts', 'utf8'), ts.ScriptTarget.Latest, true)
 const screen = ts.createSourceFile('screen.tsx', fs.readFileSync('native/src/screens/AddIngredientScreen.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+assert.equal((screen as any).parseDiagnostics.length, 0, 'actual adjustment screen JSX must parse')
 function bind(source: ts.SourceFile, ctx: any, name: string) {
   let expression = ''
   const visit = (node: ts.Node) => {
@@ -175,4 +176,63 @@ async function run() {
   assert.equal(ctx.unitLabel('three-quarter-cup', 'Milk, whole', {}), '3/4 cup — 180 ml')
   console.log('PASS: actual USDA detail/serving options, native override/cache/open/save preserve source basis/IDs/options, compatible milk/oil density, null/zero and fraction labels; no network or credentials.')
 }
+
+// Exercise the real adjustment expressions and rendered cards/button, not a second calculation.
+const previewNames = ['adjustAmount', 'adjustServings', 'servingsForPreview', 'previewCalories', 'previewProtein', 'previewCarbs', 'previewFat', 'previewFiber', 'previewSugar']
+const realJsx: ts.JsxElement[] = []
+function collectPreviewJsx(node: ts.Node) {
+  if (ts.isJsxElement(node)) realJsx.push(node)
+  ts.forEachChild(node, collectPreviewJsx)
+}
+collectPreviewJsx(screen)
+const labelJsx = realJsx.filter(node => node.openingElement.tagName.getText(screen) === 'Text' && node.getText(screen).includes('servingsForPreview')).sort((a,b) => a.getWidth(screen)-b.getWidth(screen))[0]
+const addJsx = realJsx.find(node => node.openingElement.tagName.getText(screen) === 'Pressable' && node.openingElement.getText(screen).includes("'Adding to diary' : 'Add to diary'"))
+assert.ok(labelJsx && addJsx, 'use the actual amount label and add button')
+let cardsJsx: ts.JsxSelfClosingElement | undefined
+function findCards(node: ts.Node) {
+  if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(screen) === 'NutrientCards' && node.getText(screen).includes('previewCalories')) cardsJsx=node
+  ts.forEachChild(node, findCards)
+}
+findCards(screen); assert.ok(cardsJsx, 'actual adjustment result cards remain')
+const createElement = (type: any, props: any, ...children: any[]) => typeof type === 'function'
+  ? type({ ...props, children }) : { type, props, children: children.flat(Infinity).filter(x => x != null && x !== false) }
+ctx.React = { createElement }; ctx.useState=() => [320, () => {}]; ctx.Text='Text'; ctx.View='View'; ctx.Pressable='Pressable'; ctx.theme={colors:{text:'#111',card:'#fff'}}
+const cardSource=ts.createSourceFile('cards.tsx',fs.readFileSync('native/src/components/NutrientCards.tsx','utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
+const cardCode=cardSource.statements.filter(n=>!ts.isImportDeclaration(n)).map(n=>n.getText(cardSource).replace(/^export /,'')).join('\n')
+vm.runInContext(ts.transpileModule(cardCode,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.None,jsx:ts.JsxEmit.React}}).outputText,ctx)
+function renderJsx(node: ts.Node) {
+  return vm.runInContext(ts.transpileModule(`(${node.getText(screen)})`,{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.None,jsx:ts.JsxEmit.React}}).outputText,ctx)
+}
+function texts(node: any): string[] {
+  return typeof node==='string'||typeof node==='number' ? [String(node)] : (node?.children||[]).flatMap(texts)
+}
+function preview(amount: string, unit='g', base: any={amount:100,unit:'g',density:null}, zero=false) {
+  ctx.adjustItem={name:'Fixture',calories:200,protein_g:24.6,carbs_g:44.9,fat_g:29.4,fiber_g:null,sugar_g:8.8}
+  if(zero)Object.assign(ctx.adjustItem,{calories:0,protein_g:0,carbs_g:0,fat_g:0,fiber_g:0,sugar_g:0})
+  ctx.adjustAmountInput=amount;ctx.safeAdjustUnit=unit;ctx.adjustBase=base;ctx.mergedAdjustUnitGrams={};ctx.adjustSaving=false
+  for(const name of previewNames)bind(screen,ctx,name)
+  return {cards:texts(renderJsx(cardsJsx!)),label:texts(renderJsx(labelJsx!)).join(''),button:renderJsx(addJsx!)}
+}
+for(const amount of ['0','',' ','-1','bad','Infinity']) {
+  const result=preview(amount)
+  assert.equal(ctx.previewCalories,null,`${JSON.stringify(amount)} is not genuine zero-calorie food`)
+  assert.equal(result.cards.filter(t=>t==='—').length,6,'invalid quantity keeps all six unavailable cards')
+  for(const label of ['Calories','Protein','Carbs','Fat','Fibre','Sugar'])assert.ok(result.cards.includes(label))
+  assert.ok(result.label.includes('Enter an amount bigger than 0.'),'actual inline warning explains correction')
+  assert.ok(!result.label.includes('Servings: 1'),'no fabricated serving count')
+  assert.equal(result.button.props.disabled,true,'actual invalid Add button is disabled')
+  assert.equal(result.button.props.accessibilityState.disabled,true)
+}
+const unsupported=preview('50','g',null)
+assert.equal(unsupported.cards.filter(t=>t==='—').length,6)
+assert.ok(unsupported.label.includes('Choose a measured amount'))
+assert.equal(unsupported.button.props.disabled,true)
+const validHalf=preview('50')
+assert.equal(ctx.servingsForPreview,.5);assert.ok(validHalf.label.includes('0.5'));assert.ok(validHalf.cards.includes('100 kcal'))
+assert.equal(validHalf.button.props.disabled,false)
+const validZero=preview('100','g',{amount:100,unit:'g',density:null},true)
+assert.ok(validZero.cards.includes('0 kcal'));assert.equal(validZero.cards.filter(t=>t==='0 g').length,5)
+assert.equal(validZero.button.props.disabled,false,'valid zero food remains addable')
+console.log('PASS: actual native invalid amount expressions and card/label/button JSX reject false servings/zero results, retain all six cards and preserve valid half/true-zero portions.')
+
 void run().catch(error => { console.error(error); process.exitCode = 1 })

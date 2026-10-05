@@ -1,0 +1,29 @@
+{
+  "task": 61,
+  "date": "2026-10-05",
+  "scope": "Native AddIngredient invalid quantity preview only",
+  "preFix": "Actual0 amount expressions produce0kcal while actual label substitutes1serving; actual save already blocks invalid amounts",
+  "sourceChecks": {
+    "actualExpressionsAndResultJSX": "PASS invalid0/empty/whitespace/negative/nonfinite/unsupported ->six unavailable cards/clear warning/disabled Add; validhalf/truezero recover",
+    "originalProviderServingOpenSave": "PASS",
+    "saveFailureConsentMissingIntegration": "PASS",
+    "nativeTypecheck": "PASS",
+    "fullProductionBuild": "PASS; initial test-helper optional-node typing error fixed, actual app checks pass",
+    "locks": "278/79 PASS; only approved AddIngredientScreen hash refreshed"
+  },
+  "runtime": {
+    "iPhone": "Release39 rebuilt61, visually signed in1369kcal/619credits; actual AU BigMac0 and empty field (three native Backspaces from0.5) show inlinewarning/all6dashes/Add disabled;0.5 recovers279/P12.3/C22.5/F14.7/FibreMissing/S4.4/Add enabled. Actual USDA bottled water100ml keeps allsixzeros/Add enabled;0mlinvalid then100ml recovered. Both cancelled without save.",
+    "iPad": "Pro13M5 Release39 rebuilt61, visually signed in1369/619. Actual same AU BigMac0 and empty field via Backspace show inlinewarning/six unavailablecards/disabled Add; valid0.5 recovers279/P12.3/C22.5/F14.7/FibreMissing/S4.4/enabledAdd. Actual responsive threecolumn grid retained. Cancelled without save.",
+    "note": "Tool rejects empty/whitespace text; native HID Backspace clear succeeded, screenshot shows grey1 placeholder but no Servings1 and correct warning."
+  },
+  "evidence": [
+    "iphone-invalid-amount-all-six-cards.jpg",
+    "iphone-empty-amount-all-six-cards.jpg",
+    "iphone-valid-half-after-invalid-amount.jpg",
+    "iphone-valid-zero-nutrients-amount-preview.jpg",
+    "ipad-invalid-amount-all-six-cards.jpg",
+    "ipad-empty-amount-all-six-cards.jpg",
+    "ipad-valid-half-after-invalid-amount.jpg"
+  ],
+  "deployment": "PENDING; no signed store upload"
+}

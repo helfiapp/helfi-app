@@ -17,7 +17,16 @@
     "website": "Normal fresh live editor same11:51 original1serving/0.5count, allsixcards279/P12.3/C22.5/F14.7/FibreMissing/S4.4; credits619",
     "saveOrHistoryWrites": "None during this display test; original59 record retained"
   },
-  "deployment": "PENDING, no signed store binary",
+  "deployment": {
+    "sourceCommit": "51062e1be405b38f0b8e1363b50c0f6c6978e3ad",
+    "awsJob": 59,
+    "steps": "BUILD/DEPLOY/VERIFY SUCCEED",
+    "bothDomains": "200/CloudFront",
+    "etag": "w3ni0kj30p1z15",
+    "verifiedUtc": "2026-10-05T01:22:28Z",
+    "signedStoreBinary": false,
+    "freshWebsiteAfterDeploy": "PASS visually logged in1369kcal/619credits; incomplete daily fibre/sugar remain honest"
+  },
   "historyOrDatabaseChanged": false,
   "evidence": [
     "iphone-meal-nutrient-precision-cards.jpg",
