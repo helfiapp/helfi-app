@@ -25,5 +25,26 @@
     "ipad-empty-amount-all-six-cards.jpg",
     "ipad-valid-half-after-invalid-amount.jpg"
   ],
-  "deployment": "PENDING; no signed store upload"
+  "deployment": {
+    "sourceCommit": "a4fbfb7ee4c9e14365066a675a153749c87c3a64",
+    "awsJob": "60",
+    "steps": "BUILD/DEPLOY/VERIFY SUCCEED",
+    "verifiedAt": "2026-10-05T01:45:44.915047+00:00",
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "cloudFront": true,
+        "etag": "\"keoe1q180c1z15\""
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "cloudFront": true,
+        "etag": "\"keoe1q180c1z15\""
+      }
+    ],
+    "freshWebsiteDiary": "PASS: full reload signed in, daily1369kcal/619credits, original saved rows preserved; no task61 saves"
+  },
+  "signedStoreUpload": "NOT COMPLETE"
 }

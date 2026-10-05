@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T01:27:22.699Z",
+  "generatedAt": "2026-10-05T01:59:34.499Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -269,7 +269,7 @@
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "b0456e82e3cae345d3722cb0a0ea1d791d5c26ff773840ee37a7b997d1334800",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "540b5d1a8c5c05dc48f5dd4050e591ca8c5b8a0562cf3685d50fdc05a092eb65",
+    "native/src/screens/TrackCaloriesScreen.tsx": "a991d6646ac48a88c665b9f6532dbcbef642c926efd86fe55f4ee45d7d74a9f2",
     "native/src/screens/WaterIntakeScreen.tsx": "1b3aae043fcb347c0198b6aa25e6b4caad76d6105911d632b55fdd61fbd0c2f9",
     "native/src/state/AppModeContext.tsx": "ce70c2670e359ca8fba27a78a2bd817b551490a422b30dabe3b87b3837739321",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",

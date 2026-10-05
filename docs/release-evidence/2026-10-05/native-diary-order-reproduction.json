@@ -1,0 +1,112 @@
+{
+  "task": 63,
+  "status": "SOURCE_BUILD_IPHONE_IPAD_RUNTIME_PASS_DEPLOYMENT_PENDING",
+  "scope": "Native main food-list sort only",
+  "timezone": "Australia/Melbourne",
+  "sourceFile": "native/src/screens/TrackCaloriesScreen.tsx",
+  "actualSortExpression": "[...section].sort(\n                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),\n              )",
+  "actualOrder": [
+    "Soy milk:10:32 am",
+    "Oat milk:10:10 am",
+    "Milk:09:43 am",
+    "Water:12:48 pm",
+    "Big Mac:11:51 am",
+    "Oat milk:11:25 am",
+    "Oat milk:11:08 am",
+    "Apple juice:09:19 am",
+    "Sanitarium Crunchy Peanut Butter 500g:03:01 am",
+    "Oil:01:10 am"
+  ],
+  "sameLocalCalendarDateOrder": [
+    "Water:12:48 pm",
+    "Big Mac:11:51 am",
+    "Oat milk:11:25 am",
+    "Oat milk:11:08 am",
+    "Soy milk:10:32 am",
+    "Oat milk:10:10 am",
+    "Milk:09:43 am",
+    "Apple juice:09:19 am",
+    "Sanitarium Crunchy Peanut Butter 500g:03:01 am",
+    "Oil:01:10 am"
+  ],
+  "notes": "Live website displays12:48 water first; actual native sort puts older-clock Soy/Oat/Milk above it because their persisted UTC timestamps fall on a different local calendar day despite localDate2026-10-05. Same timezone-aware clock/date anchoring as website needed for native display sorting only; do not rewrite saved records or alter protected Favorites added-order contract.",
+  "originalSavedTimes": [
+    {
+      "id": "cmuugh97f000110bdsi1jxujt",
+      "name": "Soy milk",
+      "createdAt": "2026-10-05T23:32:23.652Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuufpm4o0001fhmq4tblo15a",
+      "name": "Oat milk",
+      "createdAt": "2026-10-05T23:10:54.008Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuueqrbh0001kfrttcssnqpo",
+      "name": "Milk",
+      "createdAt": "2026-10-05T22:43:47.381Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuulbw9f0001dasulwn74c6w",
+      "name": "Water",
+      "createdAt": "2026-10-05T01:48:12.435Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuujb0jg00011cyh40bs4xcx",
+      "name": "Big Mac",
+      "createdAt": "2026-10-05T00:51:32.092Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuuids4m0001sjse4uykjojj",
+      "name": "Oat milk",
+      "createdAt": "2026-10-05T00:25:41.543Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuuhrvrc0001xhkq337djjfp",
+      "name": "Oat milk",
+      "createdAt": "2026-10-05T00:08:39.817Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuudvn3a0001rww4fljtai6p",
+      "name": "Apple juice",
+      "createdAt": "2026-10-04T22:19:36.742Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmuu0dlsr000123yir14fww5q",
+      "name": "Sanitarium Crunchy Peanut Butter 500g",
+      "createdAt": "2026-10-04T16:01:00.000Z",
+      "localDate": "2026-10-05"
+    },
+    {
+      "id": "cmutweeqt0001ctzo773ksga6",
+      "name": "Oil",
+      "createdAt": "2026-10-04T14:10:00.000Z",
+      "localDate": "2026-10-05"
+    }
+  ],
+  "sourceChanges": true,
+  "manufacturerModelAndSignedStores": "INCOMPLETE",
+  "repair": "Main native comparison timestamp anchors the existing displayed local clock to entry localDate. No stored timestamp/date or save/history/Favorites/water changes.",
+  "sourceChecks": "PASS actual sortedSection pre-fix failure ->correct order,3timezones/DSTdates/editedclock/missing-invalid dates/input preservation/Favorites recency; original serving/missing/save/failure/consent checks/nativeTSC/full production build/278and79locks",
+  "runtime": {
+    "iPhone": "Rebuilt Release39 from63 visually loggedin; daily1369/915remaining/wallet619. ActualWater12:48,BigMac11:51,Oat11:25,Oat11:08,Soy10:32,Oat10:10,Milk9:43 order matcheswebsite. Same11:51 halfmeal retains6cards279/P12.3/C22.5/F14.7/FibreMissing/S4.4. No Save tapped.",
+    "iPad": "Rebuilt Release39 from63 visually signedin daily1369/915remaining/619credits. Actual main listWater12:48,BigMac11:51,Oat11:25,Oat11:08,Soy10:32 matcheswebsite. Same saved11:51 halfmeal allsixcards279/P12.3/C22.5/F14.7/FibreMissing/S4.4, threecolumn grid. NoSave."
+  },
+  "savedRecordsPreserved": "Readonly all10 original breakfast identities/timestamps/localdates/metadata unchanged; water6truezero retained",
+  "evidence": [
+    "iphone-meal-order-matches-website.jpg",
+    "iphone-meal-order-repair-six-cards.jpg",
+    "ipad-meal-order-matches-website.jpg",
+    "ipad-meal-order-repair-six-cards.jpg"
+  ],
+  "deployment": "PENDING",
+  "updatedAt": "2026-10-05T02:06:19.524067+00:00"
+}

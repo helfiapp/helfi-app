@@ -13,6 +13,54 @@ const code = source.statements.filter((node) => ts.isFunctionDeclaration(node) &
 const context: any = { ...nutrientValues, materializeMealPortion, convertFoodAmount, parseFoodServing, liquidDensity }
 vm.createContext(context)
 vm.runInContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText, context)
+
+// Exercise the actual main diary sort, including legacy timestamps on the wrong
+// calendar day. The comparison must follow the clock displayed for localDate.
+let diarySort: ts.VariableDeclaration | undefined
+function findDiarySort(node: ts.Node) {
+  if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'sortedSection') diarySort = node
+  ts.forEachChild(node, findDiarySort)
+}
+findDiarySort(source)
+assert.ok(diarySort?.initializer, 'find the actual native main diary sort')
+const diarySortCode = ts.transpileModule(`var checkedDiaryOrder = ${diarySort!.initializer!.getText(source)}`, {
+  compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None },
+}).outputText
+const originalTimezone = process.env.TZ
+context.Date = Date
+try {
+  for (const timezone of ['Australia/Melbourne', 'UTC', 'America/Los_Angeles']) {
+    process.env.TZ = timezone
+    for (const localDate of ['2026-10-05', '2026-10-04', '2026-03-08']) {
+      const [year, month, day] = localDate.split('-').map(Number)
+      const older = new Date(year, month - 1, day, 10, 32, 23, 652)
+      older.setDate(older.getDate() + 1)
+      const addedOrder = Date.now() + 10000
+      const section = [
+        { id: 'earlier', localDate, createdAt: older.toISOString(), raw: { __addedOrder: addedOrder } },
+        { id: 'latest', localDate, createdAt: new Date(year, month - 1, day, 12, 48, 12, 435).toISOString() },
+        { id: 'middle', localDate, createdAt: new Date(year, month - 1, day, 11, 51, 32, 92).toISOString() },
+      ]
+      const before = JSON.stringify(section)
+      context.section = section
+      vm.runInContext(diarySortCode, context)
+      assert.deepEqual(Array.from(context.checkedDiaryOrder, (entry: any) => entry.id), ['latest', 'middle', 'earlier'], `${timezone}/${localDate}: sort by displayed meal time, not a mismatched stored day or added-order stamp`)
+      assert.equal(JSON.stringify(section), before, 'sorting must not rewrite original timestamps or metadata')
+      assert.equal(context.foodEntryRecencyMs(section[0]), addedOrder, 'protected Favorites recency must remain unchanged')
+      const rawMs = new Date(section[0].createdAt).getTime()
+      assert.equal(context.foodEntryDisplayTimestampMs({ ...section[0], localDate: null }), rawMs, 'legacy missing date retains its actual timestamp')
+      assert.equal(context.foodEntryDisplayTimestampMs({ ...section[0], localDate: '2026-02-30' }), rawMs, 'invalid date cannot invent a comparison day')
+      assert.equal(context.foodEntryDisplayTimestampMs({ localDate, createdAt: 'invalid' }), 0, 'invalid timestamp cannot produce a NaN comparator')
+      const edited = { ...section[0], createdAt: new Date(year, month - 1, day, 14, 0).toISOString() }
+      assert.ok(context.foodEntryDisplayTimestampMs(edited) > context.foodEntryDisplayTimestampMs(section[1]), 'an explicit edited clock time remains the comparison time')
+    }
+  }
+} finally {
+  if (originalTimezone === undefined) delete process.env.TZ
+  else process.env.TZ = originalTimezone
+}
+console.log('PASS: actual native main diary ordering across calendar mismatch, time zones, daylight-saving days and edited times; history and Favorites recency preserved.')
+
 for (const scale of [0.5, 1, 2]) {
   const items = [{ name: 'Rice cooked', serving_size: '100 g', calories: 120, protein_g: 3, carbs_g: 25, fat_g: 1, servings: 1 }, { name: 'Chicken cooked', serving_size: '100 g', calories: 160, protein_g: 30, carbs_g: 0, fat_g: 3, servings: 1 }]
   const raw = { id: 'fixture', name: 'Meal', items, nutrition: { __portionScale: scale }, total: { __portionScale: scale } }

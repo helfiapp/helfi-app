@@ -1360,6 +1360,21 @@ function formatClockTime(raw?: string | null) {
   return d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
 }
 
+function foodEntryDisplayTimestampMs(entry: Pick<FoodEntry, 'createdAt' | 'localDate'>) {
+  const recorded = new Date(entry.createdAt)
+  const recordedMs = recorded.getTime()
+  if (!Number.isFinite(recordedMs)) return 0
+  if (!entry.localDate || !/^\d{4}-\d{2}-\d{2}$/.test(entry.localDate)) return recordedMs
+  const [year, month, day] = entry.localDate.split('-').map(Number)
+  // Match the website's local-day display without changing the saved timestamp.
+  const displayed = new Date(
+    year, month - 1, day,
+    recorded.getHours(), recorded.getMinutes(), recorded.getSeconds(), recorded.getMilliseconds(),
+  )
+  if (displayed.getFullYear() !== year || displayed.getMonth() !== month - 1 || displayed.getDate() !== day) return recordedMs
+  return displayed.getTime()
+}
+
 function formatEditorTime(raw?: string | null) {
   const date = raw ? new Date(raw) : new Date()
   if (Number.isNaN(date.getTime())) return '12:00'
@@ -6382,7 +6397,7 @@ export function TrackCaloriesScreen() {
                 return parts.length > 0 ? parts.join(', ') : 'No entries yet'
               })()
               const sortedSection = [...section].sort(
-                (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),
+                (a, b) => foodEntryDisplayTimestampMs(b) - foodEntryDisplayTimestampMs(a),
               )
               const sortedWaterEntries = [...mealWaterEntries].sort(
                 (a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime(),

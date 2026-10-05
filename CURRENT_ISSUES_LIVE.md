@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 12:45pm Melbourne (01:45UTC).
+- What changed: task61 native invalid amount previews keep all six colorful cards visible with unavailable values, show an inline correction message and disable Add. Valid portions and genuine zero-calorie foods remain usable. Source a4fbfb7ee4c9e14365066a675a153749c87c3a64; AWS60 BUILD/DEPLOY/VERIFY all SUCCEED. Both domains200/CloudFront/new matching etag keoe1q180c1z15. Native repair is verified in rebuilt Release39 simulators; final signed store uploads remain incomplete.
+- Where to see it: native Food Diary > Add Ingredient > Adjust ingredient.
+- What to quickly test: actual0/empty amounts keep six unavailable cards and cannot Add; restoring0.5 shows279/P12.3/C22.5/F14.7/FibreMissing/S4.4 on iPhone and iPad. Actual bottled water100ml shows six genuine zeros and stays addable. All checks/build/locks pass. Fresh live website reload preserves daily1369/wallet619 and existing rows; no task61 saves or history changes.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 12:22pm Melbourne (01:22UTC).
 - What changed: task60 native detailed nutrient results show one decimal consistently; meal/recipe/favorite-portion totals use the familiar responsive six-card grid. Source51062e1be405b38f0b8e1363b50c0f6c6978e3ad; AWS59 BUILD/DEPLOY/VERIFY all SUCCEED, both domains200/CloudFront/new matchingetagw3ni0kj30p1z15. Native source is verified in rebuilt Release39 simulators and awaits a final signed store binary.
 - Where to see it: native saved food/meal/recipe/favorite editor result cards and nutrient summary text.

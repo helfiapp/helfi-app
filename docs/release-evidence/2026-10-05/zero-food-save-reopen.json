@@ -1,0 +1,69 @@
+{
+  "task": 62,
+  "verifiedAt": "2026-10-05T01:53:25.153144+00:00",
+  "sourceCommit": "a4fbfb7ee4c9e14365066a675a153749c87c3a64",
+  "scope": "Genuine zero-calorie source food save/reopen, existing authorized test account",
+  "savedOnce": "iPhone Add Ingredient,100ml,12:48",
+  "savedRecord": {
+    "id": "cmuulbw9f0001dasulwn74c6w",
+    "name": "Water",
+    "description": "Water, bottled, generic, 100 ml",
+    "localDate": "2026-10-05",
+    "createdAt": "2026-10-05T01:48:12.435Z",
+    "nutrients": {
+      "fat": 0,
+      "carbs": 0,
+      "fiber": 0,
+      "sugar": 0,
+      "protein": 0,
+      "calories": 0
+    },
+    "items": [
+      {
+        "id": "174158",
+        "name": "Water, bottled, generic",
+        "brand": null,
+        "fat_g": 0,
+        "label": "Water, bottled, generic",
+        "source": "usda",
+        "carbs_g": 0,
+        "fiber_g": 0,
+        "sugar_g": 0,
+        "calories": 0,
+        "servings": 1,
+        "protein_g": 0,
+        "unitGrams": {},
+        "serving_size": "100 ml",
+        "calories_kcal": 0,
+        "servingOptions": null,
+        "selectedServingId": null
+      }
+    ]
+  },
+  "iPhone": "PASS: save then reopen meal and ingredient; app stop/launch retains login, same12:48 record,100ml original basis/amount and allsixzero meal cards",
+  "web": "PASS: normal reload initially old cache; completed Refresh diary brings same12:48 record, normal Edit Entry retains100ml/1serving and allsixzero cards; Cancel changes, no update",
+  "iPad": "PASS: Release39 from61 restart remains loggedin, same12:48 record/100ml basis/amount/all6zero cards, threecolumn grid",
+  "totals": "All devices daily1369kcal,915remaining,619credits; truezero does not alter calories, unknown daily optional nutrients remain unknown",
+  "sourceChanges": false,
+  "newDeploymentRequired": false,
+  "fullPhotoAndSignedStores": "INCOMPLETE",
+  "evidence": [
+    "iphone-zero-food-save-preview.jpg",
+    "iphone-saved-zero-food-six-cards.jpg",
+    "iphone-restarted-zero-food-six-cards.jpg",
+    "web-saved-zero-food-six-cards.jpg",
+    "ipad-saved-zero-food-six-cards.jpg"
+  ],
+  "originalLibrarySource": {
+    "source": "usda_sr_legacy",
+    "fdcId": 174158,
+    "name": "Water, bottled, generic",
+    "servingSize": "100 g",
+    "calories": 0,
+    "proteinG": 0,
+    "carbsG": 0,
+    "fatG": 0,
+    "fiberG": 0,
+    "sugarG": 0
+  }
+}
