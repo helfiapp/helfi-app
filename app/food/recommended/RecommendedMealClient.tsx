@@ -388,6 +388,7 @@ export default function RecommendedMealClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { userData, updateUserData } = useUserData()
+  const userCountry = String(userData?.country || '').trim()
 
   const date = searchParams.get('date') || buildTodayIso()
   const category = normalizeMealCategory(searchParams.get('category'))
@@ -1038,6 +1039,7 @@ export default function RecommendedMealClient() {
                                 item={item}
                                 index={idx}
                                 onServingsChange={updateServings}
+                                country={userCountry}
                               />
                             ))
                           )}

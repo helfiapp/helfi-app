@@ -57,6 +57,442 @@
     "rootLocks": 278,
     "nativeLocks": 79,
     "lockChange": "Only root food-page hash refreshed",
-    "liveSaveReopen": "Pending deployment"
+    "liveSaveReopen": "PASS"
+  },
+  "deployment": {
+    "verifiedAt": "2026-10-05T05:11:36.978Z",
+    "summary": {
+      "jobId": "69",
+      "status": "SUCCEED",
+      "commitId": "684f16091936c5ee057e51d406c70cb77cf26856"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"17b2f9s3qow1z15\"",
+        "via": "1.1 7a5c91d647f6dd26b64d7ae2192f64fe.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"17b2f9s3qow1z15\"",
+        "via": "1.1 cb362359a49224128ee8b3e01bf3d55c.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "recordsBeforeSave": {
+    "verifiedAt": "2026-10-05T05:11:58.856Z",
+    "recordCount": 20,
+    "allRecordsHash": "dc84fc15a0b1cdbf83c010b950c918efbd200c610d670fe6aad70282cf98aaf6",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 57.5,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 508
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.625,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "serving_size": "100 ml",
+          "weightAmount": 62.5,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "recordsAfterSave": {
+    "verifiedAt": "2026-10-05T05:12:51.668Z",
+    "recordCount": 20,
+    "allRecordsHash": "dc84fc15a0b1cdbf83c010b950c918efbd200c610d670fe6aad70282cf98aaf6",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 57.5,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 508
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.625,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "serving_size": "100 ml",
+          "weightAmount": 62.5,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "recordsHalfSave": {
+    "verifiedAt": "2026-10-05T05:14:24.627Z",
+    "recordCount": 20,
+    "allRecordsHash": "5d6d59be67b5dc88772b1f574a8fa3bd344bfc068babb4ce2530766e77f6355d",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 28.8,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 254
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.3125,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 31.25,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "recordsHalfReopening": {
+    "verifiedAt": "2026-10-05T05:15:13.097Z",
+    "recordCount": 20,
+    "allRecordsHash": "5d6d59be67b5dc88772b1f574a8fa3bd344bfc068babb4ce2530766e77f6355d",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 28.8,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 254
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.3125,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 31.25,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "recordsHalfBeforePhoneOpen": {
+    "verifiedAt": "2026-10-05T05:16:12.316Z",
+    "recordCount": 20,
+    "allRecordsHash": "5d6d59be67b5dc88772b1f574a8fa3bd344bfc068babb4ce2530766e77f6355d",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 28.8,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 254
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.3125,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 31.25,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "recordsHalfAfterPhoneOpen": {
+    "verifiedAt": "2026-10-05T05:17:21.477Z",
+    "recordCount": 20,
+    "allRecordsHash": "5d6d59be67b5dc88772b1f574a8fa3bd344bfc068babb4ce2530766e77f6355d",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 28.8,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 254
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.3125,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 31.25,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "recordsRestoredSave": {
+    "verifiedAt": "2026-10-05T05:17:55.286Z",
+    "recordCount": 20,
+    "allRecordsHash": "655164280f2187f6b3dabb6a7d14752c6fd8f66130be3c338045a16b149961d7",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 57.5,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 508
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.625,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 62.5,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "restoredIntegrityCheck": {
+    "status": "PASS",
+    "timestampExact": true,
+    "other19RowsUnchanged": true,
+    "originalSourceBasisPrecisionOptionsAmountsAndNutrientsRestored": true,
+    "onlyAdditionalField": "portionMode=weight, expected existing committed physical-amount edit intent rule",
+    "originalFullRowsHashClaim": "Not identical after a real weight edit because explicit portion mode is now recorded; do not claim exact pre-edit full-row hash"
+  },
+  "recordsFinalReopening": {
+    "verifiedAt": "2026-10-05T05:20:58.930Z",
+    "recordCount": 20,
+    "allRecordsHash": "655164280f2187f6b3dabb6a7d14752c6fd8f66130be3c338045a16b149961d7",
+    "meal": {
+      "id": "cmuunpqf400017mmimw3zpgjd",
+      "description": "Oil, olive, salad or cooking",
+      "localDate": "2026-10-05",
+      "createdAt": "2026-10-05T02:54:56.548Z",
+      "nutrients": {
+        "fat": 57.5,
+        "carbs": 0,
+        "fiber": 0,
+        "sugar": 0,
+        "protein": 0,
+        "calories": 508
+      },
+      "items": [
+        {
+          "id": "171413",
+          "name": "Oil, olive, salad or cooking",
+          "brand": null,
+          "fat_g": 92,
+          "source": "usda",
+          "carbs_g": 0,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "calories": 813.2800000000001,
+          "servings": 0.625,
+          "protein_g": 0,
+          "unitGrams": {},
+          "weightUnit": "ml",
+          "portionMode": "weight",
+          "serving_size": "100 ml",
+          "weightAmount": 62.5,
+          "servingOptions": null,
+          "selectedServingId": null
+        }
+      ]
+    },
+    "otherRecordsHash": "1d273781053d2fc56e05ba70f15090fb571783f492e8f5bfa92110b3b72425e1"
+  },
+  "finalRuntime": {
+    "verifiedAt": "2026-10-05T05:23:09.855702+00:00",
+    "originalTimestamp": "2026-10-05T02:54:56.548Z",
+    "unchangedSave": {
+      "count": 1,
+      "all20RowsHashUnchanged": true
+    },
+    "realPortionChanges": {
+      "normalHalfSave": {
+        "ml": 31.25,
+        "servings": 0.3125,
+        "calories": 254,
+        "fat": 28.8,
+        "fiveRealZeros": true,
+        "timestampExact": true,
+        "other19RowsUnchanged": true,
+        "websiteReopenSixCards": true,
+        "restartedSignedInIPhone39SixCards": true,
+        "dailyCalories": 1898,
+        "remaining": 386,
+        "credits": 619,
+        "clock": "13:54"
+      },
+      "normalRestoredSave": {
+        "ml": 62.5,
+        "servings": 0.625,
+        "calories": 508,
+        "fat": 57.5,
+        "fiveRealZeros": true,
+        "timestampExact": true,
+        "other19RowsUnchanged": true,
+        "websiteReopenSixCards": true,
+        "restartedSignedInIPhone39SixCards": true,
+        "dailyCalories": 2152,
+        "remaining": 132,
+        "credits": 619,
+        "clock": "13:54"
+      },
+      "source": 171413,
+      "originalBasis": "100 ml",
+      "originalSourcePrecisionOptionsRetained": true,
+      "nativeSavePressed": false,
+      "onlyExtraRestoredItemField": "portionMode=weight, existing explicit physical-input intent"
+    },
+    "openingOnlyWrites": false,
+    "nativeSourceUnchanged": true,
+    "signedStoreUpload": false,
+    "screenshots": [
+      "web-saved-time-half-reopened.jpg",
+      "iphone-saved-time-half-reopened.jpg",
+      "web-saved-time-restored-reopened.jpg",
+      "iphone-saved-time-restored-reopened.jpg"
+    ]
   }
 }

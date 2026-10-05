@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 4:11pm Melbourne; real portion Save/web-iPhone reopen verified 4:20pm.
+- What changed: Task69 root saved-food Update preserves the exact original timestamp unless the displayed clock changes. Source684f16091936c5ee057e51d406c70cb77cf26856; AWS69 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag17b2f9s3qow1z15.
+- Where to see it: Food Diary > saved oil13:54 > Edit Entry > amount and all six nutrient cards.
+- What to quickly test: Unchanged Save leaves all20rows/hash unchanged. Genuine half31.25ml254 and restored62.5ml508 normalSaves preserve exact original02:54:56.548Z and original source171413/100ml813.28/precision/options/title/date; other19rows unchanged. Website and restarted signed-in iPhone39 half/final reopen all6cards/fivezeros/13:54; halfdaily1898/386remaining and final2152/132remaining, credits619. Opening-only hashes unchanged. Restored physical edit adds expected portionMode=weight; do not claim exact pre-edit full-row hash for that path. Fullproductionbuild11813exit0/all96actual clock tests/protected/root278native79 pass; native unchanged. Recommended measurements, full photo/model and signed stores remain open; Apple saved login stillblockedMaclocked and Googlefirstbundle missing.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 3:53pm Melbourne; normal Save/web/iPhone reopen verified 3:56pm.
 - What changed: Task68 final saved-editor Australian household measures and clear cup-fraction captions. Sourceb353089270651a4c42dda4aa9b0f583a2f925957; AWS68 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag47srm8bu9x1z15.
 - Where to see it: Food Diary > saved oil20ml > Edit Entry > Weight/unit and all six nutrient cards.

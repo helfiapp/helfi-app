@@ -1,0 +1,57 @@
+{
+  "task": 70,
+  "baselineCommit": "684f16091936c5ee057e51d406c70cb77cf26856",
+  "baselineActualComponent": {
+    "fixture": "100 ml olive oil -> grams",
+    "actualGrams": 100,
+    "expectedGrams": 92,
+    "result": "FAIL reproduced"
+  },
+  "baselineActualUI": {
+    "method": "Existing signed-in Chrome; normal Food Diary Add to Lunch -> Recommended; explicit Chicken, rice and vegetable bowl history choice; expand Olive oil",
+    "recipe": "Chicken, rice and vegetable bowl",
+    "originalLabel": "1 tsp",
+    "displayedInventedAmount": "5 g",
+    "offeredWrongCupMass": "165 g",
+    "cards": {
+      "calories": 40,
+      "protein": 0,
+      "carbs": 0,
+      "fat": 4.5,
+      "fiber": 0,
+      "sugar": 0
+    },
+    "mealCalories": 429,
+    "credits": 619,
+    "screenshot": "web-recommended-oil-before.jpg"
+  },
+  "sourceCheck": {
+    "command": "npm run check:food-recommended-measurement",
+    "result": "PASS actual component/hooks/handlers",
+    "coverage": [
+      "oil ml/g food density",
+      "AU/non-AU cups/spoons/fractions",
+      "recorded provider cup239g/spoon13.5g priority",
+      "dual metric/ounce labels and fluid ounce distinction",
+      "unknown density compatibility",
+      "unweighed original count-only bases",
+      "precise unit-only and repeated conversions",
+      "invalid unfinished drafts cannot overwrite committed count",
+      "intentional zero-ingredient recipe exclusion retained",
+      "measured egg/produce choices",
+      "all six nutrient props with optional null and genuine zero",
+      "account country handoff"
+    ],
+    "network": false,
+    "credentials": false,
+    "liveRenderedProof": false
+  },
+  "fullBuild": {
+    "session": 44140,
+    "exitCode": 0,
+    "result": "PASS full production build/type checks/prebuild",
+    "lockScope": "RecommendedIngredientCard only; all278 web/shared and79 native locks pass; protected regions pass"
+  },
+  "liveRuntime": "pending",
+  "remaining": "Recommended parent missing-value aggregation, broader food/photo/model and final signed Apple/Google matrix remain open; no Apple/Google submission."
+}
