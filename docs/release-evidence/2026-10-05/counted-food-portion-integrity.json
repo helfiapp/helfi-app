@@ -1,7 +1,7 @@
 {
   "scope": 87,
   "updatedAt": "2026-10-05T11:26:05.474942+00:00",
-  "status": "ACTUAL_ROUTE_FIXTURES_NULL_REFINEMENT_FULL_PRODUCTION_BUILD_PASS_FINAL_DEPLOY_PENDING",
+  "status": "COMPLETE_CHAIN_COUNT_FIXTURES_FULL_PRODUCTION_BUILD_PASS_FINAL_DEPLOY_PENDING",
   "baselineSource": "e295b3b38f62372b065e2b6c7eac1d1cb11330d4",
   "observedProductionResult": {
     "wholeEggPortion": "3 eggs",
@@ -27,12 +27,14 @@
     "unknownAndZeroPreserved": true,
     "inputImmutable": true,
     "changedCountsRefreshResponseTotal": true,
-    "singlePieceCorrectionPreservesUnknownFibreAndSugar": true
+    "singlePieceCorrectionPreservesUnknownFibreAndSugar": true,
+    "wholeTwoEggNutritionWithSingularLabelPreserved": 140,
+    "upstreamNormalizationThenHarmonizationThenEnforcement": "PASS: whole3egg250, alreadywhole2egg140 withsingularlabel, singleegg70->three210"
   },
   "guardCommand": "npm run check:food-egg-count",
   "automaticPrebuildGuard": true,
   "firstBuild": "85829 exit0",
-  "finalBuild": "94192 exit0",
+  "finalBuild": "14268 exit0",
   "pageLocks": {
     "web": 278,
     "native": 79,
@@ -54,5 +56,46 @@
   ],
   "finalPrebuild": "60480 exit0",
   "initialCommit": "e0383e000324655fa19565dca50bc94fa1bd5adf",
-  "initialJob": 84
+  "initialJob": 84,
+  "initialDeployment": {
+    "verifiedAt": "2026-10-05T11:33:48.526Z",
+    "summary": {
+      "jobId": "84",
+      "status": "SUCCEED",
+      "commitId": "e0383e000324655fa19565dca50bc94fa1bd5adf"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"s220op8u7d1z15\"",
+        "via": "1.1 6f01da654ce062002b93fece7e4b0d9e.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"s220op8u7d1z15\"",
+        "via": "1.1 10c0f0a08cb4762d25731ebf16a686e0.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "finalSourceRefinement": "Require nutrient evidence of the smaller count before correcting conflicting labels, not the label ratio alone."
 }

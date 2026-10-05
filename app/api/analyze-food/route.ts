@@ -354,7 +354,18 @@ const enforceEggCountFromAnalysis = (items: any[] | null | undefined, analysis: 
   );
   if (!currentCount) return items;
   if (currentCount === inferredCount && Number(first.servings) === 1) return items;
-  const factor = inferredCount / currentCount;
+  const countFactor = inferredCount / currentCount;
+  const calories = foodNumberOrNull(first.calories);
+  const protein = foodNumberOrNull(first.protein_g);
+  const fat = foodNumberOrNull(first.fat_g);
+  // A conflicting singular label can accompany nutrition already covering all
+  // visible eggs. Scale only when the values also look like the smaller count.
+  const nutritionLooksUndercounted = inferredCount > currentCount && calories !== null &&
+    calories / currentCount >= 70 * 0.6 && calories / currentCount <= 70 * 1.5 &&
+    calories / inferredCount < 70 * 0.9 &&
+    ((protein !== null && protein / inferredCount < 6 * 0.9) ||
+      (fat !== null && fat / inferredCount < 5 * 0.9));
+  const factor = nutritionLooksUndercounted ? countFactor : 1;
   const scaleField = (v: any) => {
     const value = foodNumberOrNull(v);
     return value === null ? null : Math.round(value * factor * 10) / 10;
@@ -371,7 +382,7 @@ const enforceEggCountFromAnalysis = (items: any[] | null | undefined, analysis: 
   if (first.fiber_g !== null && first.fiber_g !== undefined) first.fiber_g = scaleField(first.fiber_g);
   if (first.sugar_g !== null && first.sugar_g !== undefined) first.sugar_g = scaleField(first.sugar_g);
   const currentWeight = foodNumberOrNull(first.customGramsPerServing);
-  if (currentWeight !== null && currentWeight > 0) first.customGramsPerServing = currentWeight * factor;
+  if (currentWeight !== null && currentWeight > 0) first.customGramsPerServing = currentWeight * countFactor;
 
   next[0] = first;
   return next;

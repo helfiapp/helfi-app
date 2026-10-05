@@ -1,4 +1,12 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05 11:33:48 UTC
+- What changed: Initial counted-egg correction preserves a whole three-egg portion instead of multiplying it again; refreshes changed-count totals and per-serving weights. Final same-task missing-value refinement still pending.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Analyse a fresh meal photo with multiple eggs; whole-portion nutrition must not multiply twice. Actual normal-photo recheck follows final refinement.
+- Verified source: e0383e000324655fa19565dca50bc94fa1bd5adf / AWS84 BUILD-DEPLOY-VERIFY SUCCEED; both domains200CloudFront/matching new ETag s220op8u7d1z15. Model unchanged; six photo-summary cards and signed-store release remain open.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify
 - Date/time: 5 October 2026, verified10:56:43UTC (21:56 Melbourne); publicassets verified10:57:03UTC.
 - What changed: Added two unmodified measured-reference food photos and CC-BY4.0 attribution for the existing model comparison. Sourcee295b3b38f62372b065e2b6c7eac1d1cb11330d4/AWS83 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag9nnwpz92ru1z15. Application source unchanged from verified83daily completeness repair.

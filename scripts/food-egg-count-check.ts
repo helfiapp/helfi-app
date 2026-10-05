@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import { foodNumberOrNull } from '../lib/food/openfoodfacts'
+import { normalizeDiscreteItems } from '../lib/food-normalization'
 
 // Run the real route's pure portion helpers without loading its server, keys or AI client.
 const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/analyze-food/route.ts', 'utf8'), ts.ScriptTarget.Latest, true)
@@ -46,6 +47,11 @@ assert.equal(context.enforce([{ ...single, calories: 0 }], 'There are three eggs
 assert.equal(context.enforce([egg], 'Scrambled eggs on the plate.')[0].calories, 250)
 const nonEgg = { ...egg, name: 'rice', serving_size: '1 cup' }
 assert.deepEqual(plain(context.enforce([nonEgg], 'There are three eggs.')), [nonEgg])
+const wholeTwoWithSingularLabel = { ...single, name: 'Fried egg', calories: 140, protein_g: 12, fat_g: 10 }
+const normalizeChain = (items: any[], text: string) => finish(normalizeDiscreteItems(items, { analysisText: text }).items, text)
+assert.equal(normalizeChain([wholeTwoWithSingularLabel], 'Two fried eggs on a plate')[0].calories, 140, 'upstream whole-two-egg nutrition must not double because its old label is singular')
+assert.equal(normalizeChain([single], 'Three eggs on a plate')[0].calories, 210, 'upstream count hints still allow genuine single-egg undercounts to be corrected')
+assert.equal(normalizeChain([egg], 'Three eggs on a plate')[0].calories, 250)
 // The production result's unchanged six companions: 559 kcal plus the correct 250-kcal eggs.
 const companions = [240, 190, 40, 27, 21, 41].map((calories, i) => ({ name: `companion ${i}`, serving_size: '1 serving', servings: 1, calories }))
 assert.equal(context.total(finish([egg, ...companions], 'Estimated portions are about 3 eggs.')).calories, 809)
