@@ -2,7 +2,7 @@ import 'server-only'
 import { liquidDensity } from '../native/src/lib/foodUnits'
 import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } from './food/usda-nutrition'
 import { usdaLibraryServingSize } from './food/usda-library'
-import { foodNumberOrNull, hasCoreFoodNutrition, normalizeOffNutrition } from './food/openfoodfacts'
+import { foodNumberOrNull, hasCoreFoodNutrition, hasOffNutritionError, normalizeOffNutrition } from './food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
 import {
   formatUnitLabel,
@@ -479,7 +479,7 @@ export async function searchLocalFoods(
 }
 
 function normalizeOpenFoodFactsProduct(product: any): NormalizedFoodItem | null {
-  if (!product) return null
+  if (!product || hasOffNutritionError(product)) return null
   const nutr = product.nutriments || {}
 
   const name: string =

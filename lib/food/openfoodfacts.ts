@@ -12,6 +12,12 @@ export const foodNumberOrNull = (value: unknown): number | null => {
 export const hasCoreFoodNutrition = (item: any): boolean =>
   ['calories', 'protein_g', 'carbs_g', 'fat_g'].every(key => foodNumberOrNull(item?.[key]) !== null)
 
+// A provider-declared nutrition error is not a safe label to log. Ordinary
+// warnings or incomplete packaging details do not invalidate nutrient values.
+export const hasOffNutritionError = (product: any): boolean =>
+  Array.isArray(product?.data_quality_errors_tags) &&
+  product.data_quality_errors_tags.some((tag: unknown) => typeof tag === 'string' && tag.startsWith('en:nutrition-'))
+
 export function normalizeOffNutrition(product: any) {
   const nutr = product?.nutriments || {}
   const label = String(product?.serving_size || '').trim()

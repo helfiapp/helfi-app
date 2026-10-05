@@ -1,0 +1,328 @@
+{
+  "task": 80,
+  "status": "SOURCE_FULL_BUILD_PASS_DEPLOYMENT_PENDING",
+  "sourceCommit": "14656ae8dd07b3968d60c5cfeb359cc431f0fe2b",
+  "checkedAt": "2026-10-05T09:15:19.847902+00:00",
+  "manufacturer": {
+    "url": "https://weetbix.com.au/products/weet-bix/Original-575g",
+    "product": "Weet-Bix Original575g",
+    "servingGrams": 31,
+    "servingDescription": "2 biscuits",
+    "per100g": {
+      "calories": 355,
+      "protein": 12.4,
+      "carbs": 65.9,
+      "fat": 1.3,
+      "fiber": 12.9,
+      "sugar": 3
+    },
+    "perServe": {
+      "calories": 110,
+      "protein": 3.8,
+      "carbs": 20.4,
+      "fat": 0.4,
+      "fiber": 4,
+      "sugar": 0.9
+    }
+  },
+  "exactRetailIdentity": {
+    "url": "https://www.coles.com.au/product/sanitarium-weet-bix-breakfast-cereal-575g-2001784",
+    "publicProductJsonLd": {
+      "type": "Product",
+      "name": "Sanitarium Weet-bix Breakfast Cereal | 575g",
+      "gtin": "9300652805048",
+      "sku": 2001784
+    },
+    "visibleNutritionMatchesManufacturer": true,
+    "servingGrams": 31
+  },
+  "historicalManufacturerSheet": {
+    "url": "https://superiorfs.com.au/documents/PDF/WB575_1.pdf",
+    "date": "2018-07-23",
+    "barcodeSame": true,
+    "servingGrams": 30,
+    "per100g": {
+      "energyKj": 1490,
+      "protein": 12.4,
+      "fat": 1.3,
+      "carbs": 67,
+      "sugar": 3.3,
+      "fiber": 11
+    },
+    "limitation": "Not current package nutrition; sheet explicitly refers to current artwork."
+  },
+  "expectedCurrentPortionDisplays": {
+    "31g": {
+      "calories": 110,
+      "protein": 3.8,
+      "carbs": 20.4,
+      "fat": 0.4,
+      "fiber": 4,
+      "sugar": 0.9
+    },
+    "30g": {
+      "calories": 107,
+      "protein": 3.7,
+      "carbs": 19.8,
+      "fat": 0.4,
+      "fiber": 3.9,
+      "sugar": 0.9
+    },
+    "100g": {
+      "calories": 355,
+      "protein": 12.4,
+      "carbs": 65.9,
+      "fat": 1.3,
+      "fiber": 12.9,
+      "sugar": 3
+    }
+  },
+  "actualLookup": "Normal Chrome Barcode Scanner > Type Barcode > 9300652805048 > Search > Preview. No camera permission, Add or Save. All six correctly colored cards showed115kcal/P1.2/C6.3/F1.2/Fibre1.2/S0.3 at31g. Wallet updated619 to616 for normal3-credit lookup.",
+  "recordsDuringNormalLookup": {
+    "verifiedAt": "2026-10-05T09:15:20.231Z",
+    "readOnly": true,
+    "diaryCount": 23,
+    "allDiaryRecordsHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+    "original23Unchanged": true,
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      },
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "hash": "e982c33ff19bf09e3b0b299025437f3deb0fe553f15142bbfc722df7fed6225e"
+      },
+      {
+        "id": "cmuuvpib70001tvel0mwqie66",
+        "hash": "087b826bbcbd58c08a70526ec8199b1a672b64987c695978d7d03a98d64710e4"
+      },
+      {
+        "id": "cmuuyyj7o0001tvsuw8q7707g",
+        "hash": "76ab9c950f4d7a9c41ae00877dd1a829166e95baf940fb9b486e32566836a362"
+      }
+    ],
+    "newMeals": [],
+    "library": [
+      {
+        "id": "cmkmtly83011y11ap57mfwgzg",
+        "source": "usda_sr_legacy",
+        "fdcId": 168878,
+        "gtinUpc": null,
+        "name": "Rice, white, long-grain, regular, enriched, cooked",
+        "brand": null,
+        "servingSize": "100 g",
+        "calories": 130,
+        "proteinG": 2.69,
+        "carbsG": 28.17,
+        "fatG": 0.28,
+        "fiberG": 0.4,
+        "sugarG": 0.05,
+        "createdAt": "2026-01-20T16:40:45.700Z",
+        "updatedAt": "2026-01-20T16:40:45.700Z"
+      }
+    ]
+  },
+  "exactBarcodeStoredSources": {
+    "readOnly": true,
+    "verifiedAt": "2026-10-05T09:21:22.354Z",
+    "barcode": "9300652805048",
+    "globalRecord": null,
+    "privateRecord": null,
+    "libraryRecords": []
+  },
+  "publicOpenFoodFactsPayload": {
+    "url": "https://world.openfoodfacts.org/api/v0/product/9300652805048.json",
+    "code": "9300652805048",
+    "product_name": "Weet-Bix",
+    "brands": "Sanitarium",
+    "quantity": "575 g",
+    "serving_size": "1 serving (31 g)",
+    "serving_quantity": 31,
+    "serving_quantity_unit": "g",
+    "nutrition_data_per": "100g",
+    "nutrition_data_prepared_per": "100g",
+    "last_modified_t": 1785106755,
+    "states_tags": [
+      "en:to-be-completed",
+      "en:nutrition-facts-completed",
+      "en:ingredients-completed",
+      "en:expiration-date-to-be-completed",
+      "en:packaging-code-to-be-completed",
+      "en:characteristics-to-be-completed",
+      "en:origins-to-be-completed",
+      "en:categories-completed",
+      "en:brands-completed",
+      "en:packaging-completed",
+      "en:quantity-completed",
+      "en:product-name-completed",
+      "en:photos-to-be-validated",
+      "en:packaging-photo-to-be-selected",
+      "en:nutrition-photo-selected",
+      "en:ingredients-photo-selected",
+      "en:front-photo-selected",
+      "en:photos-uploaded"
+    ],
+    "data_quality_errors_tags": [
+      "en:nutrition-packaging-as-sold-100g-energy-value-in-kcal-does-not-match-value-computed-from-other-nutrients"
+    ],
+    "data_quality_warnings_tags": [
+      "en:nutrition-packaging-as-sold-100g-energy-value-in-kcal-may-not-match-value-computed-from-other-nutrients",
+      "en:nutrition-energy-value-in-kcal-does-not-match-value-in-kj",
+      "en:nutrition-energy-value-in-kcal-does-not-match-value-computed-from-other-nutrients",
+      "en:nutrition-energy-value-in-kcal-may-not-match-value-computed-from-other-nutrients",
+      "en:nutrition-value-very-low-for-category-energy",
+      "en:nutrition-value-very-low-for-category-carbohydrates",
+      "en:environmental-score-origins-of-ingredients-origins-are-100-percent-unknown",
+      "en:environmental-score-packaging-unspecified-shape",
+      "en:environmental-score-production-system-no-label"
+    ],
+    "nutriments": {
+      "carbohydrates": 20.4,
+      "carbohydrates_100g": 20.4,
+      "carbohydrates_serving": 6.32,
+      "carbohydrates_unit": "g",
+      "carbohydrates_value": 20.4,
+      "energy": 584,
+      "energy-kcal": 370.967741935484,
+      "energy-kcal_100g": 370.967741935484,
+      "energy-kcal_serving": 115,
+      "energy-kcal_unit": "kcal",
+      "energy-kcal_value": 370.967741935484,
+      "energy-kj": 584,
+      "energy-kj_100g": 584,
+      "energy-kj_modifier": "~",
+      "energy-kj_serving": 181,
+      "energy-kj_unit": "kJ",
+      "energy-kj_value": 584,
+      "energy_100g": 584,
+      "energy_modifier": "~",
+      "energy_serving": 181,
+      "energy_unit": "kJ",
+      "energy_value": 584,
+      "fat": 3.8,
+      "fat_100g": 3.8,
+      "fat_serving": 1.18,
+      "fat_unit": "g",
+      "fat_value": 3.8,
+      "fiber": 4,
+      "fiber_100g": 4,
+      "fiber_serving": 1.24,
+      "fiber_unit": "g",
+      "fiber_value": 4,
+      "proteins": 3.8,
+      "proteins_100g": 3.8,
+      "proteins_serving": 1.18,
+      "proteins_unit": "g",
+      "proteins_value": 3.8,
+      "sugars": 0.9,
+      "sugars_100g": 0.9,
+      "sugars_serving": 0.279,
+      "sugars_unit": "g",
+      "sugars_value": 0.9
+    }
+  },
+  "beforeScreenshot": "web-weetbix-barcode-before.png",
+  "currentLabelScreenshot": "coles-current-weetbix-label.png",
+  "confirmedSource": "Actual live AWS BARCODE_DEBUG source openfoodfacts, serving1serving31g,115/P1.18/C6.32/F1.18/Fibre1.24/S0.279, per_serving/kcal. Server normalization unchanged. Exact Helfi shared/private/local records absent.",
+  "repair": "Reject OpenFoodFacts data_quality_errors_tags starting en:nutrition- at actual packaged mapper/barcode provider boundary. Preserve warnings/non-nutrition errors, all original data, zero/unknown/precision and exact alternate sources. Existing422 prompts label review with product identity; no charge for rejected source.",
+  "regression": {
+    "before": "FAIL actual mapper produced recorded115/P1.18/C6.32/F1.18/Fibre1.24/S0.279 instead of rejecting",
+    "after": "PASS actual mapper plus GET422/no charge, good exact values, warning-only/non-nutrition errors, exact USDA fallback, true zero and missing optional fields",
+    "command": "npm run check:food-provider-quality",
+    "network": false,
+    "database": false,
+    "credentials": false
+  },
+  "separateFollowups": [
+    "Barcode preview daily fibre/sugar totals claim completeness while saved diary contains missing values.",
+    "Barcode required-macro gate Number(null) accepts missing values; separate task, not changed here."
+  ],
+  "productionBuild": {
+    "command": "npm run build",
+    "session": 78219,
+    "exitCode": 0,
+    "allRequiredPrebuildChecks": "PASS",
+    "rootPageLocks": 278,
+    "nativePageLocks": 79,
+    "protectedRegions": "PASS",
+    "lockHashesChanged": false,
+    "nativeAppSourceChanged": false
+  }
+}

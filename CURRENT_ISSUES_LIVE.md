@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify
+- Date/time: 5 October 2026, verified 09:06:54 UTC (20:06 Melbourne)
+- What changed: Saved ingredient/favourite nutrient cards now use the same colors as shared/native results: green carbs, purple fat, yellow fibre. Exactly three style metadata lines; values unchanged. Source 14656ae8dd07b3968d60c5cfeb359cc431f0fe2b; AWS78 BUILD/DEPLOY/VERIFY SUCCEED; both domains200CloudFront/new matching ETag1bk88mz4od1z15.
+- Where to see it (page/link): https://helfi.ai/food — saved rice entry, 5 October19:09.
+- What to quickly test: Allsix familiar colors,0.5serving—158g/103kcal/P2.1/C22.3/F0.2/Fibre0.3/S0. Cancelled/no Save; original23/hash/time/daily2776/619 retained. Challenging-photo model comparison still unrun/admin sign-in pending; current-package matrix and exact signed Apple/Google runtime/submission remain open.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify
 - Date/time: 5 October 2026, verified 08:52:16 UTC (19:52 Melbourne)
 - What changed: Saved serving amounts retain their recorded serving option instead of displaying a misleading gram label. Source 57faa2e9249368f6db0ffd02ead7c8fafd482dda; AWS job 77 BUILD/DEPLOY/VERIFY SUCCEED; both live domains 200 via CloudFront with matching new ETag 16ls0dgx9jc1z15.
 - Where to see it (page/link): https://helfi.ai/food — saved rice entry, 5 October, 19:09.

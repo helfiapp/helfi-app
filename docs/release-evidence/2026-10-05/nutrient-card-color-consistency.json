@@ -1,6 +1,6 @@
 {
   "task": 79,
-  "status": "SOURCE_FULL_BUILD_PASS_DEPLOYMENT_PENDING",
+  "status": "SOURCE_FULL_BUILD_EXACT_LIVE_RENDERED_RUNTIME_PASS",
   "baselineCommit": "57faa2e9249368f6db0ffd02ead7c8fafd482dda",
   "baselineScreenshot": "web-saved-rice-unit-after-six-cards.png",
   "before": {
@@ -149,5 +149,196 @@
     "exitCode": 0,
     "log": "tmp/task79-production-build.log",
     "allPrebuildChecksPass": true
-  }
+  },
+  "recordsAfterLiveCancel": {
+    "verifiedAt": "2026-10-05T09:09:05.972Z",
+    "readOnly": true,
+    "diaryCount": 23,
+    "allDiaryRecordsHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+    "original23Unchanged": true,
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      },
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "hash": "e982c33ff19bf09e3b0b299025437f3deb0fe553f15142bbfc722df7fed6225e"
+      },
+      {
+        "id": "cmuuvpib70001tvel0mwqie66",
+        "hash": "087b826bbcbd58c08a70526ec8199b1a672b64987c695978d7d03a98d64710e4"
+      },
+      {
+        "id": "cmuuyyj7o0001tvsuw8q7707g",
+        "hash": "76ab9c950f4d7a9c41ae00877dd1a829166e95baf940fb9b486e32566836a362"
+      }
+    ],
+    "newMeals": [],
+    "library": [
+      {
+        "id": "cmkmtly83011y11ap57mfwgzg",
+        "source": "usda_sr_legacy",
+        "fdcId": 168878,
+        "gtinUpc": null,
+        "name": "Rice, white, long-grain, regular, enriched, cooked",
+        "brand": null,
+        "servingSize": "100 g",
+        "calories": 130,
+        "proteinG": 2.69,
+        "carbsG": 28.17,
+        "fatG": 0.28,
+        "fiberG": 0.4,
+        "sugarG": 0.05,
+        "createdAt": "2026-01-20T16:40:45.700Z",
+        "updatedAt": "2026-01-20T16:40:45.700Z"
+      }
+    ]
+  },
+  "deployment": {
+    "verifiedAt": "2026-10-05T09:06:54.490Z",
+    "summary": {
+      "jobId": "78",
+      "status": "SUCCEED",
+      "commitId": "14656ae8dd07b3968d60c5cfeb359cc431f0fe2b"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"1bk88mz4od1z15\"",
+        "via": "1.1 cda8eb0743e0425d24799494002a8d72.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"1bk88mz4od1z15\"",
+        "via": "1.1 69b737af1efcebe93fe9d0963bec99ac.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "liveAfter": {
+    "freshReload": true,
+    "allSixColoredCardsVisible": true,
+    "colors": {
+      "calories": "orange",
+      "protein": "blue",
+      "carbs": "green",
+      "fat": "purple",
+      "fiber": "yellow",
+      "sugar": "pink"
+    },
+    "values": {
+      "calories": 103,
+      "protein": 2.1,
+      "carbs": 22.3,
+      "fat": 0.2,
+      "fiber": 0.3,
+      "sugar": 0
+    },
+    "weightAmount": 0.5,
+    "selectedWeightLabel": "serving — 158 g",
+    "savedTime": "19:09",
+    "diaryUsed": 2776,
+    "credits": 619,
+    "noUpdateOrSave": true,
+    "cancelled": true,
+    "screenshot": "web-saved-rice-consistent-colors-six-cards.png",
+    "inspectionNote": "First menu opened before asynchronous initial diary load settled, which dismissed menu. Reopened from fresh full visible diary state; no settings or data changed."
+  },
+  "updatedAt": "2026-10-05T09:09:06.009996+00:00"
 }

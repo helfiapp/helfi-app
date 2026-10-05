@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { normalizeOffNutrition } from '@/lib/food/openfoodfacts'
+import { hasOffNutritionError, normalizeOffNutrition } from '@/lib/food/openfoodfacts'
 import { normalizeExactUsdaBarcode } from '@/lib/food/usda-barcode'
 import { usdaLibraryServingSize } from '@/lib/food/usda-library'
 import { getServerSession } from 'next-auth'
@@ -63,6 +63,7 @@ interface NormalizedFood {
 type OpenFoodFactsResult = {
   food: NormalizedFood | null
   productName: string | null
+  unreliableProduct?: { name: string; brand: string | null; serving_size: string | null }
 }
 
 const parseNumber = (val?: string | number | null): number | null => {
@@ -471,6 +472,14 @@ async function fetchFoodFromOpenFoodFacts(barcode: string): Promise<OpenFoodFact
 
     if (!name) return { food: null, productName: null }
 
+    if (hasOffNutritionError(product)) {
+      return {
+        food: null,
+        productName: name,
+        unreliableProduct: { name, brand: product.brands || null, serving_size: product.serving_size || null },
+      }
+    }
+
     const nutrition = normalizeOffNutrition(product)
     const { calories, protein_g, carbs_g, fat_g, fiber_g, sugar_g } = nutrition
     const finalServingSize = nutrition.serving_size
@@ -678,8 +687,8 @@ export async function GET(req: NextRequest) {
   if (!food) {
     for (const candidate of barcodeCandidates) {
       const result = await fetchFoodFromOpenFoodFacts(candidate)
-      if (!openFoodFacts?.productName && result.productName) {
-        openFoodFacts = { food: null, productName: result.productName }
+      if (result.unreliableProduct || (!openFoodFacts?.productName && result.productName)) {
+        openFoodFacts = result
       }
       if (result.food) {
         openFoodFacts = result
@@ -812,6 +821,19 @@ export async function GET(req: NextRequest) {
       )
     }
     return NextResponse.json({ found: true, food })
+  }
+
+  if (openFoodFacts?.unreliableProduct) {
+    return NextResponse.json(
+      {
+        found: false,
+        error: 'nutrition_suspect',
+        message: 'Product found, but its nutrition has a reported error. Please scan the nutrition label instead.',
+        product: openFoodFacts.unreliableProduct,
+        barcode: code,
+      },
+      { status: 422 },
+    )
   }
 
   console.log('⚠️ No barcode match found after FatSecret, OpenFoodFacts, or USDA for:', code)
