@@ -50,7 +50,7 @@ async function checkLibrary() {
 async function checkProvider() {
   let detail: any
   const ctx: any = vm.createContext({ hasCoreFoodNutrition, extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions, liquidDensity, getFoodUnitGrams, formatUnitLabel, USDA_API_KEY: 'fixture-only', console: { warn() {} }, fetchWithTimeout: async () => ({ ok: true, json: async () => detail }) })
-  for (const name of ['normalizeFoodText', 'isLikelyLiquidFoodName', 'liquidDensityGramsPerMl', 'buildScaledServingOption', 'appendOptionIfMissing', 'appendLiquidServingOptions', 'appendCommonFoodServingOptions', 'fetchUsdaServingOptions']) bind(provider, ctx, name)
+  for (const name of ['normalizeFoodText', 'isLikelyLiquidFoodName', 'liquidDensityGramsPerMl', 'buildScaledServingOption', 'appendOptionIfMissing', 'hasMeasuredHouseholdServing', 'appendLiquidServingOptions', 'appendCommonFoodServingOptions', 'fetchUsdaServingOptions']) bind(provider, ctx, name)
   const original = { description: 'Milk, whole', dataType: 'SR Legacy', foodNutrients: [
     { nutrientId: 1008, unitName: 'KCAL', value: 61 },
     { nutrientId: 1003, unitName: 'G', value: 3.3 },
@@ -68,6 +68,32 @@ async function checkProvider() {
   const result = await ctx.fetchUsdaServingOptions('fixture')
   const cup = result.find((o: any) => o.grams === 244)
   assert.ok(cup); assert.equal(cup.calories, 61 * 2.44); assert.equal(cup.fiber_g, null); assert.equal(cup.sugar_g, null)
+  // A recorded household serving must not acquire a conflicting generic cup
+  // or spoon. Exercise the actual provider function and preserve its source.
+  const rice = { ...original, description: 'Rice, white, long-grain, regular, enriched, cooked', foodNutrients: original.foodNutrients.map((n, i) => ({ ...n, value: [130, 2.69, 28.17, .28][i] })), foodPortions: [{ gramWeight: 158, portionDescription: 'cup' }] }
+  for (const portions of [rice.foodPortions, [{ gramWeight: 79, portionDescription: '1/2 cup' }], [{ gramWeight: 158, portionDescription: 'cup' }, { gramWeight: 174, portionDescription: 'cup, packed' }]]) {
+    detail = { ...rice, foodPortions: portions }
+    const before = JSON.stringify(detail)
+    const choices = await ctx.fetchUsdaServingOptions('original-rice')
+    const cups = choices.filter((o: any) => /\bcups?\b/i.test(o.serving_size))
+    assert.equal(cups.length, portions.length, 'retain original measured cups only; generic180g/90g must not compete')
+    portions.forEach(portion => {
+      const measured = cups.find((o: any) => o.grams === portion.gramWeight)
+      assert.ok(measured); assert.equal(measured.calories, 130 * portion.gramWeight / 100)
+      assert.equal(measured.fiber_g, null); assert.equal(measured.sugar_g, null)
+    })
+    assert.equal(JSON.stringify(detail), before, 'original provider detail never mutated')
+  }
+  detail = { ...rice, foodPortions: [] }
+  const fallback = await ctx.fetchUsdaServingOptions('unmeasured-rice')
+  assert.ok(fallback.some((o: any) => o.grams === 180), 'retain existing generic fallback when no recorded household quantity exists')
+  detail = original
+  const measuredMilk = await ctx.fetchUsdaServingOptions('original-milk')
+  assert.equal(measuredMilk.filter((o: any) => /\bcups?\b/i.test(o.serving_size)).length, 1, 'original244g milk cup must not acquire a competing240ml cup')
+  assert.ok(measuredMilk.some((o: any) => o.ml === 100)); assert.ok(measuredMilk.some((o: any) => o.ml === 250), 'retain compatible metric choices')
+  detail = { ...original, foodPortions: [{ gramWeight: 12, portionDescription: 'tablespoon' }] }
+  const measuredSpoon = await ctx.fetchUsdaServingOptions('original-spoon')
+  assert.equal(measuredSpoon.filter((o: any) => /\b(tbsp|tablespoons?)\b/i.test(o.serving_size)).length, 1, 'original measured spoon must not compete with generic15ml spoon')
   detail = { ...original, foodNutrients: original.foodNutrients.map(n => ({ ...n, value: 0 })) }
   const zeros = await ctx.fetchUsdaServingOptions('fixture')
   assert.ok(zeros.length > 0); assert.ok(zeros.every((o: any) => fields.every(k => o[k] === 0)), 'genuine zero nutrient choices remain usable')

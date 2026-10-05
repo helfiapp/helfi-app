@@ -170,6 +170,14 @@ const appendOptionIfMissing = (options: ServingOption[], option: ServingOption |
   if (!exists) options.push(option)
 }
 
+const hasMeasuredHouseholdServing = (options: ServingOption[], unit: 'cup' | 'tbsp') => {
+  const pattern = unit === 'cup' ? /\bcups?\b/i : /\b(tbsp|tablespoons?)\b/i
+  return options.some((option) =>
+    pattern.test(`${option.serving_size || ''} ${option.label || ''}`) &&
+    [option.grams, option.ml].some((amount) => typeof amount === 'number' && Number.isFinite(amount) && amount > 0),
+  )
+}
+
 const appendLiquidServingOptions = (
   options: ServingOption[],
   fdcId: string,
@@ -180,6 +188,8 @@ const appendLiquidServingOptions = (
   if (!isLikelyLiquidFoodName(foodName)) return
   const density = liquidDensityGramsPerMl(foodName)
   if (density == null) return
+  const measuredCup = hasMeasuredHouseholdServing(options, 'cup')
+  const measuredTablespoon = hasMeasuredHouseholdServing(options, 'tbsp')
   const addMl = (idSuffix: string, label: string, ml: number) => {
     appendOptionIfMissing(
       options,
@@ -198,8 +208,8 @@ const appendLiquidServingOptions = (
 
   addMl('100ml', '100 ml', 100)
   addMl('250ml', '250 ml', 250)
-  addMl('cup-240ml', '1 cup (240 ml)', 240)
-  addMl('tbsp-15ml', '1 tbsp (15 ml)', 15)
+  if (!measuredCup) addMl('cup-240ml', '1 cup (240 ml)', 240)
+  if (!measuredTablespoon) addMl('tbsp-15ml', '1 tbsp (15 ml)', 15)
 }
 
 const appendCommonFoodServingOptions = (
@@ -212,6 +222,7 @@ const appendCommonFoodServingOptions = (
   if (isLikelyLiquidFoodName(foodName)) return
   const foodUnitGrams = getFoodUnitGrams(foodName)
   if (!foodUnitGrams) return
+  const measuredCup = hasMeasuredHouseholdServing(options, 'cup')
 
   const units: MeasurementUnit[] = [
     'piece-small',
@@ -227,6 +238,9 @@ const appendCommonFoodServingOptions = (
   ]
 
   units.forEach((unit) => {
+    // A recorded cup (including a fractional cup) already defines this food's
+    // household measure. Generic weights must not compete with that source.
+    if (measuredCup && (unit === 'half-cup' || unit === 'cup')) return
     const grams = Number(foodUnitGrams[unit])
     if (!Number.isFinite(grams) || grams <= 0) return
     const label = formatUnitLabel(unit, foodName, grams)

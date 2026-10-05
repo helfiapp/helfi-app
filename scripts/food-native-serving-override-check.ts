@@ -25,7 +25,7 @@ function bind(source: ts.SourceFile, ctx: any, name: string) {
 }
 let detail: any
 const server: any = vm.createContext({ hasCoreFoodNutrition, extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions, liquidDensity, getFoodUnitGrams, formatUnitLabel, USDA_API_KEY: 'fixture-only', console: { warn() {} }, fetchWithTimeout: async () => ({ ok: true, json: async () => detail }) })
-for (const name of ['normalizeFoodText', 'isLikelyLiquidFoodName', 'liquidDensityGramsPerMl', 'buildScaledServingOption', 'appendOptionIfMissing', 'appendLiquidServingOptions', 'appendCommonFoodServingOptions', 'fetchUsdaServingOptions']) bind(provider, server, name)
+for (const name of ['normalizeFoodText', 'isLikelyLiquidFoodName', 'liquidDensityGramsPerMl', 'buildScaledServingOption', 'appendOptionIfMissing', 'hasMeasuredHouseholdServing', 'appendLiquidServingOptions', 'appendCommonFoodServingOptions', 'fetchUsdaServingOptions']) bind(provider, server, name)
 const ctx: any = vm.createContext({ PRODUCE_MEASUREMENTS, convertFoodAmount, parseFoodServing, liquidHouseholdMl, userCountry: '', console, URLSearchParams, authHeaders: { Fixture: 'no-real-token' }, API_BASE_URL: 'https://fixture.invalid', servingOverrideCacheRef: { current: new Map() }, servingOverridePendingRef: { current: new Set() }, Alert: { alert: (...args: any[]) => { throw new Error(`Unexpected food error: ${args[0]}`) } } })
 const pure = screen.statements.filter(node => ts.isVariableStatement(node) || (ts.isFunctionDeclaration(node) && node.name?.text !== 'AddIngredientScreen')).map(node => node.getText(screen)).join('\n')
 vm.runInContext(ts.transpileModule(pure, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText, ctx)

@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify job75, all steps SUCCEED)
+- Date/time: 5 October2026, verified08:08:20UTC
+- What changed: Task76 original supplier serving choices and selected basis preserved in standalone Add Ingredient, source1da712c85be4e9e7b7e49f1fd68e8ef7c2b3a9fa.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient (Single food, Rice white cooked).
+- What to quickly test: Original158g cup205, half103; original100g half65. Normal halfcup Save and web/restarted signed-in iPhone sixcards/reopen103/daily2776/619 pass. Original22 untouched; all23 reopening hashes unchanged. Conflicting generated cup180g/halfcup90g and saved web Weight caption.5g remain separate follow-ups; no signedstore/model certification.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify74; both helfi.ai/www.helfi.ai200CloudFront/new matchingetagyhauq0j4az1z15.
 - Date/time: 5October2026, verified07:33:37UTC (18:33 Melbourne); fresh website saved-editor reopening confirmed afterwards.
 - What changed: 5d71534d784b815d6abe56ff8fccb5cdde151e8d; native six-card, meal summary and actual editable ingredient field decimal ties now agree16.1 for original10.7x1.5. Original nutrient calculations/storage and all6colors preserved. Rebuilt signed-in Release39 iPhone/iPad checked; no signed store upload.
