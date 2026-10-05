@@ -1,0 +1,30 @@
+{
+  "task": 65,
+  "scope": "Build a Meal liquid identity, typed mass/volume and region-aware generic kitchen measures",
+  "before": {
+    "runtime": "Live normal draft USDA olive oil100ml813/F92 switchedg ->100g813 and Full recipe100g. Cup165g alias was olive-fruit; draft discarded withoutsaving.",
+    "screenshot": "web-builder-oil-density-before.jpg",
+    "actualSourceFailure": "Actual convertAmount100ml->g returned100; expected92. New check failed before source edit."
+  },
+  "repair": {
+    "density": "Shared actual-food density and original selected provider dual metric quantities; unknown conversion cannot be selected.",
+    "region": "Working new generic AU20ml tablespoon/250ml cup; non-AU original fallback retained.",
+    "persistence": "Both actual save paths persist physical ml/g and original source id/basis/nutrients/serving options. Historical recorded servings conserved in hydration; no database migration.",
+    "unweighed": "Bare liquid provider household labels retain one original count-only serving; no guessed100g. Unknown complete recipe weight cannot be used to save a gram/ounce portion."
+  },
+  "checks": [
+    "Actual unit/amount handlers100ml->92g and100g->884kcal",
+    "AU/nonAU cups/spoons/cupfractions",
+    "Original provider239g cup and unknown sugar",
+    "Original older liquid quantities conserve recorded servings withoutmutation",
+    "Actual imported2AUtbsp oil ->36.8g325.312kcal",
+    "Actual autosave/manual save maps source171413/basis100ml813.28/physical62.5ml",
+    "Actual save->hydrate nutrition conservation",
+    "Unknown density/partial recipe weight restriction",
+    "Real zero and missing nutrient guards",
+    "Root278/native79 page locks PASS"
+  ],
+  "productionBuild": "PASS final full production build session58727 exit0; prebuild protected guards and builder check passed",
+  "deployment": "not pushed; live65 runtime pending",
+  "remaining": "Whole audit/photo/model/signed store release unfinished"
+}

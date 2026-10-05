@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 1:49pm Melbourne (02:49UTC); final save/reopen verified 1:58pm.
+- What changed: Task64 normal Add Ingredient uses Australian liquid measures (20ml tablespoon, 250ml cup and measured cup fractions) consistently on web/native. Source47b5ca0604155c36540ae8e17f43d1b3acb4aa42; AWS62 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag ymsrzox1yo1z15. Native repair tested in rebuilt Release39 iPhone/iPad; signed store uploads incomplete.
+- Where to see it: Food Diary > Add Ingredient > Adjust ingredient.
+- What to quickly test: AU one tablespoon oil163/F18.4/fivezeros, quarter cup62.5ml508/F57.5/fivezeros, all six colorful cards. One normal iPad tablespoon save/reopen web/iPhone/iPad passed. Fresh live website quarter-cup one save/reopen web and restarted logged-in iPhone passed; original USDA171413/100ml813.28/0.625servings/62.5ml retained. Both daily2040/244remaining/619. Full production build/native typecheck/root278-native79 locks pass. Saved-editor household choices, Build a Meal conversion, photos/model and signed releases remain open.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 1:15pm Melbourne (02:15UTC).
 - What changed: task63 main native food list follows displayed clock time on the declared meal date, matching website order. Original saved timestamps and entries remain unchanged. Source98a79c5db3f8759a9b52c8a83a230265f9d15d36; AWS61 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetagw4wxd3vpyu1z15. Native source verified in rebuilt Release39 iPhone/iPad simulators; final signed store uploads remain incomplete.
 - Where to see it: native Food Diary meal-category list.

@@ -56,5 +56,85 @@
     "native typecheckPASS",
     "root278/native79 locksPASS"
   ],
-  "deployment": "Not yet pushed or deployed; finalstore goal incomplete"
+  "deployment": {
+    "sourceCommit": "47b5ca0604155c36540ae8e17f43d1b3acb4aa42",
+    "job": {
+      "summary": {
+        "jobId": "62",
+        "status": "SUCCEED",
+        "commitId": "47b5ca0604155c36540ae8e17f43d1b3acb4aa42"
+      },
+      "steps": [
+        {
+          "stepName": "BUILD",
+          "status": "SUCCEED"
+        },
+        {
+          "stepName": "DEPLOY",
+          "status": "SUCCEED"
+        },
+        {
+          "stepName": "VERIFY",
+          "status": "SUCCEED"
+        }
+      ]
+    },
+    "domains": [
+      {
+        "domain": "helfi.ai",
+        "status": 200,
+        "etag": "\"ymsrzox1yo1z15\"",
+        "viaCloudFront": true
+      },
+      {
+        "domain": "www.helfi.ai",
+        "status": 200,
+        "etag": "\"ymsrzox1yo1z15\"",
+        "viaCloudFront": true
+      }
+    ],
+    "verifiedAt": "2026-10-05T02:49:24.744324+00:00"
+  },
+  "webQuarterCup": {
+    "country": "AU",
+    "kind": "read-only after one normal website Add to diary",
+    "rows": [
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "description": "Oil, olive, salad or cooking",
+        "localDate": "2026-10-05",
+        "createdAt": "2026-10-05T02:54:56.548Z",
+        "nutrients": {
+          "fat": 57.5,
+          "carbs": 0,
+          "fiber": 0,
+          "sugar": 0,
+          "protein": 0,
+          "calories": 508
+        },
+        "items": [
+          {
+            "id": "171413",
+            "name": "Oil, olive, salad or cooking",
+            "brand": null,
+            "fat_g": 92,
+            "source": "usda",
+            "carbs_g": 0,
+            "fiber_g": 0,
+            "sugar_g": 0,
+            "calories": 813.2800000000001,
+            "servings": 0.625,
+            "protein_g": 0,
+            "unitGrams": {},
+            "weightUnit": "ml",
+            "serving_size": "100 ml",
+            "weightAmount": 62.5,
+            "servingOptions": null,
+            "selectedServingId": null
+          }
+        ]
+      }
+    ],
+    "runtime": "Fresh AWS62 website AU quarter-cup62.5ml preview508/F57.5/fivezeros/all6cards; one normal13:54Save; normalEdit0.625servings/62.5ml retains508/sixcards. Cancel noUpdate. Restarted signed-in iPhone same2040/244remaining/619 and13:54savedMeal508/F57.5/fivezeros/all6cards; noSave. Saved-editor generic householdchoices15/240 separately pending."
+  }
 }

@@ -121,7 +121,7 @@ assert.equal(ctx.normalizeFoodApiEntry(savedBody).nutrients.fiber, null)
 
 const builder = sourceFile('app/food/build-meal/MealBuilderClient.tsx')
 const web = vm.createContext({ ...webValues, console })
-bind(web, builder, ['toNumber', 'round3', 'macroOrZero', 'computeItemTotals', 'applyPortionScaleToTotals'])
+bind(web, builder, ['toNumber', 'round3', 'macroOrZero', 'computeItemTotals', 'applyPortionScaleToTotals', 'isLikelyLiquidItem', 'isMeasuredLiquidItem', 'serializeBuilderMeasurement', 'builderMeasurementError'])
 web.computeServingsFromAmount = (item: any) => item.servings ?? 1
 for (const item of [sauce, zero, missingSugar]) {
   const totals = web.computeItemTotals(item)

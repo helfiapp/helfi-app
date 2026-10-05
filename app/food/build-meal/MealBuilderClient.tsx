@@ -10,6 +10,7 @@ import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
 import MissingFoodReport from '@/components/food/MissingFoodReport'
 import RollerTimePicker from '@/components/food/RollerTimePicker'
+import { convertFoodAmount, liquidDensity, liquidHouseholdMl, parseFoodServing } from '@/native/src/lib/foodUnits'
 import { DRY_FOOD_MEASUREMENTS } from '@/lib/food/dry-food-measurements'
 import { PRODUCE_MEASUREMENTS } from '@/lib/food/produce-measurements'
 import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '@/lib/food/dairy-semi-solid-measurements'
@@ -100,6 +101,7 @@ type BuilderItem = {
   __sourceId?: string | null
   __matchedName?: string | null
   __importKey?: string | null
+  __measurementCountry?: string
 }
 
 type RecipePanelData = {
@@ -1245,6 +1247,11 @@ const DISPLAY_UNITS: BuilderUnit[] = [
 ]
 
 const parseServingBase = (servingSize: any): { amount: number | null; unit: BuilderUnit | null } => {
+  const metric = parseFoodServing(String(servingSize || ''))
+  if (metric) {
+    const unit = metric.unit === 'fl oz' ? 'ml' : metric.unit === 'oz' ? 'g' : metric.unit
+    return { amount: convertFoodAmount(metric.amount, metric.unit, unit), unit }
+  }
   const raw = String(servingSize || '').trim()
   if (!raw) return { amount: null, unit: null }
 
@@ -1308,8 +1315,9 @@ const seedBaseServing = (base: { amount: number | null; unit: BuilderUnit | null
   return { amount: 1, unit: 'serving' as BuilderUnit }
 }
 
-const normalizeLegacyBaseUnit = (amount: number | null, unit: BuilderUnit | null) => {
+const normalizeLegacyBaseUnit = (amount: number | null, unit: BuilderUnit | null, liquid = false) => {
   if (!amount || !unit) return { amount, unit }
+  if (liquid && unit !== 'g' && unit !== 'ml' && unit !== 'oz') return { amount: 1, unit: 'serving' as BuilderUnit }
   if (unit === 'serving') return { amount: amount * DEFAULT_SERVING_GRAMS, unit: 'g' as BuilderUnit }
   if (unit === 'slice') return { amount: amount * UNIT_GRAMS.slice, unit: 'g' as BuilderUnit }
   if (unit === 'handful') return { amount: amount * UNIT_GRAMS.handful, unit: 'g' as BuilderUnit }
@@ -1427,6 +1435,22 @@ const isLikelyLiquidItem = (nameRaw: string, servingRaw?: string | null) => {
   return liquidHints.some((hint) => new RegExp(`\\b${hint}(?:s|es)?\\b`).test(label))
 }
 
+// Kitchen choices describe volume; they must not inherit olive-fruit weights.
+const isMeasuredLiquidItem = (item?: BuilderItem | null) => Boolean(
+  item && (item.__baseUnit === 'g' || item.__baseUnit === 'ml') &&
+  isLikelyLiquidItem(item.__matchedName || item.name, item.serving_size),
+)
+
+const builderLiquidDensity = (item: BuilderItem) => {
+  const selected = item.__servingOptions?.find(option => option.id === item.__selectedServingId)
+  const grams = Number(selected?.grams), ml = Number(selected?.ml)
+  if (Number.isFinite(grams) && grams > 0 && Number.isFinite(ml) && ml > 0) return grams / ml
+  return liquidDensity(item.__matchedName || item.name)
+}
+
+const builderVolumeMl = (unit: BuilderUnit, item: BuilderItem) =>
+  liquidHouseholdMl(item.__measurementCountry || '')[unit]
+
 const isLikelyPieceItem = (nameRaw: string, servingRaw?: string | null) => {
   const name = String(nameRaw || '').toLowerCase()
   const serving = String(servingRaw || '').toLowerCase()
@@ -1461,7 +1485,15 @@ const resolveUnitGrams = (
   baseUnit?: BuilderUnit | null,
   pieceGrams?: number | null,
   foodUnitGrams?: FoodUnitGrams | null,
+  item?: BuilderItem | null,
 ) => {
+  if (isMeasuredLiquidItem(item)) {
+    if (unit === 'g') return 1
+    if (unit === 'oz') return 28.349523125
+    const ml = builderVolumeMl(unit, item!)
+    const density = builderLiquidDensity(item!)
+    return ml && density ? ml * density : NaN
+  }
   const foodOverride = foodUnitGrams?.[unit]
   if (Number.isFinite(Number(foodOverride)) && Number(foodOverride) > 0) return Number(foodOverride)
   if (
@@ -1493,7 +1525,16 @@ const convertAmount = (
   baseUnit?: BuilderUnit | null,
   pieceGrams?: number | null,
   foodUnitGrams?: FoodUnitGrams | null,
+  item?: BuilderItem | null,
 ) => {
+  if (isMeasuredLiquidItem(item)) {
+    const fromMl = builderVolumeMl(from, item!), toMl = builderVolumeMl(to, item!)
+    const fromUnit = fromMl ? 'ml' : from === 'g' || from === 'oz' ? from : null
+    const toUnit = toMl ? 'ml' : to === 'g' || to === 'oz' ? to : null
+    if (!fromUnit || !toUnit) return NaN
+    const converted = convertFoodAmount(amount * (fromMl || 1), fromUnit, toUnit, builderLiquidDensity(item!))
+    return converted / (toMl || 1)
+  }
   if (!Number.isFinite(amount)) return amount
   if (from === to) return amount
 
@@ -1511,6 +1552,15 @@ const convertAmount = (
 }
 
 const allowedUnitsForItem = (item?: BuilderItem) => {
+  if (item?.__baseUnit === 'serving' && isLikelyLiquidItem(item.__matchedName || item.name, item.serving_size)) return ['serving'] as BuilderUnit[]
+  if (isMeasuredLiquidItem(item)) {
+    const density = builderLiquidDensity(item!)
+    const mass = item!.__baseUnit === 'g' || Boolean(density)
+    const volume = item!.__baseUnit === 'ml' || Boolean(density)
+    return DISPLAY_UNITS.filter(unit =>
+      (mass && (unit === 'g' || unit === 'oz')) || (volume && Boolean(builderVolumeMl(unit, item!))),
+    )
+  }
   let units = [...DISPLAY_UNITS]
   const normalizedName = normalizeFoodValue(String(item?.name || ''))
   const isSolidProtein = /\b(chicken|turkey|duck|beef|steak|pork|bacon|ham|lamb|veal|fish|salmon|tuna|cod|tofu|tempeh)\b/.test(
@@ -1572,6 +1622,11 @@ const allowedUnitsForItem = (item?: BuilderItem) => {
 }
 
 const formatUnitLabel = (unit: BuilderUnit, item?: BuilderItem) => {
+  if (isMeasuredLiquidItem(item) && unit !== 'ml') {
+    const ml = builderVolumeMl(unit, item!)
+    const label = unit === 'quarter-cup' ? '1/4 cup' : unit === 'half-cup' ? '1/2 cup' : unit === 'three-quarter-cup' ? '3/4 cup' : unit
+    if (ml) return `${label} — ${ml} ml`
+  }
   const foodUnitGrams = item?.name ? getFoodUnitGrams(item.name) : null
   const produceUnits = item?.name ? getProduceUnitGrams(item.name) : null
   const normalizedProduceName = produceUnits ? normalizeFoodValue(String(item?.name || '').trim()) : ''
@@ -1660,12 +1715,52 @@ const computeServingsFromAmount = (item: BuilderItem) => {
   const pieceGrams = item.__pieceGrams
   const foodUnitGrams = getFoodUnitGrams(item.name)
   if (baseAmount && baseUnit && unit && Number.isFinite(amount)) {
-    const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+    const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams, item)
     const servings = baseAmount > 0 ? inBase / baseAmount : 0
-    return round3(Math.max(0, servings))
+    return isMeasuredLiquidItem(item) ? Math.max(0, servings) : round3(Math.max(0, servings))
   }
   const fallback = Number.isFinite(Number(item.servings)) ? Number(item.servings) : Number(amount)
   return round3(Math.max(0, fallback || 0))
+}
+
+// Saved servings are authoritative for older records. Show their physical
+// consumed amount without reinterpreting an old spoon/cup in a new region.
+const restoreBuilderLiquidAmount = (item: BuilderItem) => {
+  if (!isMeasuredLiquidItem(item)) return item
+  const unit = allowedUnitsForItem(item).includes(item.__unit!) ? item.__unit! : item.__baseUnit!
+  const amount = convertAmount(Number(item.servings) * Number(item.__baseAmount), item.__baseUnit!, unit,
+    item.__baseAmount, item.__baseUnit, item.__pieceGrams, getFoodUnitGrams(item.name), item)
+  if (!Number.isFinite(amount)) return item
+  return { ...item, __unit: unit, __amount: amount, __amountInput: String(round3(amount)) }
+}
+
+const serializeBuilderMeasurement = (item: BuilderItem) => {
+  const identity = isLikelyLiquidItem(item.__matchedName || item.name, item.serving_size) ? {
+    ...(item.__source ? { source: item.__source } : {}),
+    ...(item.__sourceId ? { id: item.__sourceId } : {}),
+    servingOptions: item.__servingOptions || null, selectedServingId: item.__selectedServingId || null,
+  } : {}
+  if (!isMeasuredLiquidItem(item)) return { __amount: item.__amount, __unit: item.__unit, ...identity }
+  const unit = builderVolumeMl(item.__unit!, item) ? 'ml' : 'g'
+  const amount = convertAmount(item.__amount, item.__unit!, unit, item.__baseAmount,
+    item.__baseUnit, item.__pieceGrams, getFoodUnitGrams(item.name), item)
+  return {
+    __amount: amount, __unit: unit, weightAmount: amount, weightUnit: unit,
+    ...identity,
+  }
+}
+
+const builderMeasurementError = (items: BuilderItem[], portionEnabled = false, portionUnit: PortionUnit = 'serving') => {
+  for (const item of items) {
+    if (!isLikelyLiquidItem(item.__matchedName || item.name, item.serving_size)) continue
+    if (!String(item.__amountInput ?? '').trim() || !(item.__amount > 0) || !Number.isFinite(computeServingsFromAmount(item))) {
+      return 'Enter a valid amount and measurement for each ingredient before saving.'
+    }
+  }
+  if (portionEnabled && portionUnit !== 'serving' && !Number.isFinite(computeTotalRecipeWeightG(items))) {
+    return 'The full recipe weight is unavailable. Use a serving portion or ingredients with known weights.'
+  }
+  return null
 }
 
 const computeItemTotals = (item: BuilderItem) => {
@@ -1696,9 +1791,10 @@ const unitToGrams = (
   baseAmount?: number | null,
   baseUnit?: BuilderUnit | null,
   foodUnitGrams?: FoodUnitGrams | null,
+  item?: BuilderItem | null,
 ): number | null => {
   if (!Number.isFinite(amount)) return null
-  const gramsPerUnit = resolveUnitGrams(unit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+  const gramsPerUnit = resolveUnitGrams(unit, baseAmount, baseUnit, pieceGrams, foodUnitGrams, item)
   if (!Number.isFinite(gramsPerUnit)) return null
   return amount * gramsPerUnit
 }
@@ -1720,8 +1816,10 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
     const baseUnit = it?.__baseUnit
     const pieceGrams = it?.__pieceGrams
     const foodUnitGrams = getFoodUnitGrams(it?.name)
+    if (isLikelyLiquidItem(it.__matchedName || it.name, it.serving_size) && baseUnit !== 'g' && baseUnit !== 'ml') return NaN
+    if (isMeasuredLiquidItem(it) && baseUnit === 'ml' && !builderLiquidDensity(it)) return NaN
     if (baseAmount && baseUnit) {
-      const perServing = unitToGrams(baseAmount, baseUnit, pieceGrams, baseAmount, baseUnit, foodUnitGrams)
+      const perServing = unitToGrams(baseAmount, baseUnit, pieceGrams, baseAmount, baseUnit, foodUnitGrams, it)
       if (perServing && Number.isFinite(perServing)) {
         total += perServing * servings
         continue
@@ -1729,7 +1827,7 @@ const computeTotalRecipeWeightG = (items: BuilderItem[]) => {
     }
     const unit = (it?.__unit || it?.__baseUnit) as BuilderUnit | null
     if (!unit) continue
-    const grams = unitToGrams(Number(it.__amount || 0), unit, pieceGrams, baseAmount, baseUnit, foodUnitGrams)
+    const grams = unitToGrams(Number(it.__amount || 0), unit, pieceGrams, baseAmount, baseUnit, foodUnitGrams, it)
     if (grams && Number.isFinite(grams)) total += grams
   }
   return total
@@ -1889,6 +1987,7 @@ export default function MealBuilderClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { userData, updateUserData } = useUserData()
+  const measurementCountry = String((userData as any)?.country || '')
 
   const [foodNameOverridesFallback, setFoodNameOverridesFallback] = useState<any[] | null>(null)
   useEffect(() => {
@@ -2429,16 +2528,16 @@ export default function MealBuilderClient() {
         baseAmount = Number.isFinite(converted) ? converted : baseAmount
         baseUnit = 'g'
       }
-      const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+      const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit, liquidItem)
       baseAmount = normalized.amount
       baseUnit = normalized.unit
       const id = `edit:${Date.now()}:${Math.random().toString(16).slice(2)}`
       const resolvedServings = Number.isFinite(servings) && servings > 0 ? servings : 1
-      const savedUnitRaw = typeof raw?.__unit === 'string' ? raw.__unit.trim() : ''
+      const savedUnitRaw = String(raw?.__unit || raw?.weightUnit || '').trim()
       const savedUnit = ALL_UNITS.includes(savedUnitRaw as BuilderUnit) ? (savedUnitRaw as BuilderUnit) : null
-      const savedAmount = toNumber(raw?.__amount)
+      const savedAmount = toNumber(raw?.__amount ?? raw?.weightAmount)
       const savedAmountInput = typeof raw?.__amountInput === 'string' ? raw.__amountInput.trim() : ''
-      const allowedUnits = allowedUnitsForItem({ name, __pieceGrams: pieceGrams } as BuilderItem)
+      const allowedUnits = allowedUnitsForItem({ name, __baseAmount: baseAmount, __baseUnit: baseUnit, __pieceGrams: pieceGrams } as BuilderItem)
       const fallbackAmount = baseAmount && baseUnit ? round3(baseAmount * resolvedServings) : round3(resolvedServings)
       const savedUnitAllowed = savedUnit && allowedUnits.includes(savedUnit)
       const initialUnit = savedUnitAllowed ? savedUnit : baseUnit || allowedUnits[0] || null
@@ -2447,7 +2546,7 @@ export default function MealBuilderClient() {
           ? Number(savedAmount)
           : fallbackAmount
       const initialAmountInput = savedUnitAllowed && savedAmountInput ? savedAmountInput : String(initialAmount)
-      next.push({
+      next.push(restoreBuilderLiquidAmount({
         id,
         name,
         brand,
@@ -2459,6 +2558,7 @@ export default function MealBuilderClient() {
         fiber_g: toNumber(raw?.fiber_g),
         sugar_g: toNumber(raw?.sugar_g),
         servings: resolvedServings,
+        __measurementCountry: measurementCountry,
         __baseAmount: baseAmount,
         __baseUnit: baseUnit,
         __amount: initialAmount,
@@ -2473,7 +2573,7 @@ export default function MealBuilderClient() {
         __selectedServingId: raw?.selectedServingId ?? null,
         __matchedName: typeof raw?.__matchedName === 'string' ? raw.__matchedName : null,
         __importKey: typeof raw?.__importKey === 'string' ? raw.__importKey : null,
-      })
+      }))
     }
     return next
   }
@@ -4373,7 +4473,7 @@ export default function MealBuilderClient() {
       baseUnit = parsed.unit
     }
 
-    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit, isLikelyLiquidItem(next.__matchedName || next.name, next.serving_size))
     baseAmount = normalized.amount
     baseUnit = normalized.unit
 
@@ -4417,7 +4517,7 @@ export default function MealBuilderClient() {
       baseAmount = Number.isFinite(converted) ? converted : baseAmount
       baseUnit = 'g'
     }
-    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit, liquidItem)
     baseAmount = normalized.amount
     baseUnit = normalized.unit
 
@@ -4440,6 +4540,7 @@ export default function MealBuilderClient() {
       fiber_g: toNumber(r.fiber_g),
       sugar_g: toNumber(r.sugar_g),
       servings: 1,
+      __measurementCountry: measurementCountry,
       __baseAmount: baseAmount,
       __baseUnit: baseUnit,
       __amount: defaultAmount,
@@ -4476,11 +4577,12 @@ export default function MealBuilderClient() {
 	      baseAmount = Number.isFinite(converted) ? converted : baseAmount
 	      baseUnit = 'g'
 	    }
-	    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+	    const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit, liquidItem)
 	    baseAmount = normalized.amount
 	    baseUnit = normalized.unit
 
-	    const defaultAmount = baseAmount && baseUnit ? baseAmount : 1
+	    const measurementItem = { name: r.name, __baseAmount: baseAmount, __baseUnit: baseUnit, __measurementCountry: measurementCountry } as BuilderItem
+    const defaultAmount = baseAmount && baseUnit ? baseAmount : 1
 	    const id = `${r.source}:${r.id}:${Date.now()}:${Math.random().toString(16).slice(2)}`
 
     let nextUnit = overrides?.unit ?? baseUnit
@@ -4495,7 +4597,7 @@ export default function MealBuilderClient() {
       const importedName = String(options?.displayName || r?.name || '').trim()
       if (isEggFood(importedName) || isEggFood(r?.name || '')) {
         nextUnit = eggUnitFromSizeHint(sizeHint)
-      } else {
+      } else if (!isMeasuredLiquidItem(measurementItem)) {
         const produceUnits = getProduceUnitGrams(r?.name || importedName)
         const preferred = pieceUnitFromSizeHint(sizeHint)
         const preferredGrams = Number(produceUnits?.[preferred])
@@ -4527,12 +4629,12 @@ export default function MealBuilderClient() {
             Number.isFinite(Number(foodUnitGrams?.[nextUnit])) &&
             Number(foodUnitGrams?.[nextUnit]) > 0))
       if (!keepEggUnit && !keepPieceUnit) {
-      const fromGrams = resolveUnitGrams(nextUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
-      const toGrams = resolveUnitGrams('g', baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+      const fromGrams = resolveUnitGrams(nextUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams, measurementItem)
+      const toGrams = resolveUnitGrams('g', baseAmount, baseUnit, pieceGrams, foodUnitGrams, measurementItem)
       if (Number.isFinite(fromGrams) && fromGrams > 0 && Number.isFinite(toGrams) && toGrams > 0) {
-        const converted = convertAmount(nextAmount, nextUnit, 'g', baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+        const converted = convertAmount(nextAmount, nextUnit, 'g', baseAmount, baseUnit, pieceGrams, foodUnitGrams, measurementItem)
         if (Number.isFinite(converted) && converted > 0) {
-          nextAmount = round3(converted)
+          nextAmount = isMeasuredLiquidItem(measurementItem) ? converted : round3(converted)
           nextUnit = 'g'
         }
       }
@@ -4551,6 +4653,7 @@ export default function MealBuilderClient() {
 	      fiber_g: toNumber(r.fiber_g),
 	      sugar_g: toNumber(r.sugar_g),
 	      servings: 1,
+	      __measurementCountry: measurementCountry,
 	      __baseAmount: baseAmount,
 	      __baseUnit: baseUnit,
 	      __amount: nextAmount,
@@ -4623,7 +4726,7 @@ export default function MealBuilderClient() {
         baseAmount = Number.isFinite(converted) ? converted : baseAmount
         baseUnit = 'g'
       }
-      const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit)
+      const normalized = normalizeLegacyBaseUnit(baseAmount, baseUnit, liquidItem)
       baseAmount = normalized.amount
       baseUnit = normalized.unit
 
@@ -4640,6 +4743,7 @@ export default function MealBuilderClient() {
         fiber_g: toNumber(ai?.fiber_g),
         sugar_g: toNumber(ai?.sugar_g),
         servings: Number.isFinite(servings) && servings > 0 ? servings : 1,
+        __measurementCountry: measurementCountry,
         __baseAmount: baseAmount,
         __baseUnit: baseUnit,
         __amount: baseAmount && baseUnit ? round3(baseAmount * (Number.isFinite(servings) ? servings : 1)) : round3(Number.isFinite(servings) ? servings : 1),
@@ -5431,14 +5535,14 @@ export default function MealBuilderClient() {
         let servings = it.servings
 
         if (baseAmount && baseUnit && unit) {
-          const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+          const inBase = convertAmount(amount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams, it)
           servings = baseAmount > 0 ? inBase / baseAmount : 0
         } else {
           // Fallback: treat amount as servings
           servings = amount
         }
 
-        return { ...it, __amountInput: v, __amount: amount, servings: round3(Math.max(0, servings)) }
+        return { ...it, __amountInput: v, __amount: amount, servings: isMeasuredLiquidItem(it) ? Math.max(0, servings) : round3(Math.max(0, servings)) }
       }),
     )
   }
@@ -5454,14 +5558,16 @@ export default function MealBuilderClient() {
         const amountInput = typeof it.__amountInput === 'string' ? it.__amountInput : String(amount)
         const currentUnit = it.__unit || it.__baseUnit
         const foodUnitGrams = getFoodUnitGrams(it.name)
+        if (isMeasuredLiquidItem(it) && !allowedUnitsForItem(it).includes(unit)) return it
         let nextAmount = amount
         let nextAmountInput = amountInput
 
-        if (isOpenUnit(unit)) {
+        if (isMeasuredLiquidItem(it) || isOpenUnit(unit)) {
           if (currentUnit) {
-            const converted = convertAmount(amount, currentUnit, unit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
-            nextAmount = round3(Math.max(0, converted))
-            nextAmountInput = String(nextAmount)
+            const converted = convertAmount(amount, currentUnit, unit, baseAmount, baseUnit, pieceGrams, foodUnitGrams, it)
+            if (!Number.isFinite(converted)) return it
+            nextAmount = isMeasuredLiquidItem(it) ? Math.max(0, converted) : round3(Math.max(0, converted))
+            nextAmountInput = String(round3(nextAmount))
           }
         } else if (!currentUnit || isOpenUnit(currentUnit)) {
           nextAmount = 1
@@ -5471,9 +5577,9 @@ export default function MealBuilderClient() {
         if (!baseAmount || !baseUnit) {
           return { ...it, __unit: unit, __amount: nextAmount, __amountInput: nextAmountInput }
         }
-        const inBase = convertAmount(nextAmount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams)
+        const inBase = convertAmount(nextAmount, unit, baseUnit, baseAmount, baseUnit, pieceGrams, foodUnitGrams, it)
         const servings = baseAmount > 0 ? inBase / baseAmount : 0
-        return { ...it, __unit: unit, __amount: nextAmount, __amountInput: nextAmountInput, servings: round3(Math.max(0, servings)) }
+        return { ...it, __unit: unit, __amount: nextAmount, __amountInput: nextAmountInput, servings: isMeasuredLiquidItem(it) ? Math.max(0, servings) : round3(Math.max(0, servings)) }
       }),
     )
   }
@@ -5483,6 +5589,8 @@ export default function MealBuilderClient() {
     if (!sourceLogId) return null
     const itemsForSave = itemsRef.current?.length ? itemsRef.current : items
     if (!itemsForSave || itemsForSave.length === 0) return null
+
+    if (builderMeasurementError(itemsForSave, portionControlEnabled, portionUnit)) return null
 
     const title = sanitizeMealTitle(mealName) || buildDefaultMealName(itemsForSave)
     const description = title
@@ -5541,7 +5649,7 @@ export default function MealBuilderClient() {
         __sourceId,
         ...rest
       } = it
-      return { ...rest, __amount: it.__amount, __unit: it.__unit, servings: computeServingsFromAmount(it) }
+      return { ...rest, ...serializeBuilderMeasurement(it), servings: computeServingsFromAmount(it) }
     })
 
     const shouldScaleTotals = Number.isFinite(portionScaleForSave) && portionScaleForSave !== 1
@@ -5653,6 +5761,9 @@ export default function MealBuilderClient() {
       return
     }
 
+    const measurementError = builderMeasurementError(itemsRef.current?.length ? itemsRef.current : items, portionControlEnabled, portionUnit)
+    if (measurementError) { setError(measurementError); return }
+
     setError(null)
 
     const title = sanitizeMealTitle(mealName) || buildDefaultMealName(items)
@@ -5716,7 +5827,7 @@ export default function MealBuilderClient() {
         __sourceId,
         ...rest
       } = it
-      const next: any = { ...rest, __amount: it.__amount, __unit: it.__unit, servings: computeServingsFromAmount(it) }
+      const next: any = { ...rest, ...serializeBuilderMeasurement(it), servings: computeServingsFromAmount(it) }
       const source =
         Array.isArray(sourceItemsForMerge) && sourceItemsForMerge[index]
           ? sourceItemsForMerge[index]
@@ -7396,7 +7507,7 @@ export default function MealBuilderClient() {
                 const expanded = expandedId === it.id
                 const compactCollapsedHeader = Boolean((editFavoriteId || sourceLogId) && !expanded)
                 const baseUnits = allowedUnitsForItem(it)
-                const hasCustomUnits = Boolean(getFoodUnitGrams(it.name))
+                const hasCustomUnits = !isMeasuredLiquidItem(it) && Boolean(getFoodUnitGrams(it.name))
                 const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
                 const isImportedRecipeView = Boolean(activeRecipePanel || recipeImportDraft || recipeImportFlag)
                 const totals = computeItemTotals(it)
