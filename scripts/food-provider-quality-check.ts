@@ -58,6 +58,30 @@ async function check() {
   product={...good,nutriments:{'energy-kcal_100g':0,proteins_100g:0,carbohydrates_100g:0,fat_100g:0}}
   const zero=await lookup();assert.equal(zero.body.food.calories,0);assert.equal(zero.body.food.fat_g,0)
   assert.equal(zero.body.food.fiber_g,null);assert.equal(zero.body.food.sugar_g,null)
-  console.log('PASS: actual packaged mapper and barcode endpoint reject recorded public nutrition errors, retain warning-only/good/zero/unknown values and exact alternate sources, request label review, never repair source records or charge for rejected data. No network, database or credentials.')
+  // Exercise the actual final normalization/acceptance boundary for every
+  // provider, rather than assuming Number(null) is a complete nutrient.
+  product=good
+  for (const source of ['helfi','usda','fatsecret','openfoodfacts']) {
+    for (const field of ['calories','protein_g','carbs_g','fat_g']) {
+      for (const value of [null,undefined,'','  ',false,true,-1,NaN,Infinity,{},[],'unknown']) {
+        const candidate={...usable.body.food,source,[field]:value}
+        const before=JSON.stringify(candidate)
+        ctx.fetchFoodFromHelfiBarcode=async()=>candidate
+        const chargeCount:number=charges
+        const missing=await lookup()
+        assert.equal(missing.status,422,`${source}/${field}=${String(value)} must request label review`)
+        assert.equal(missing.body.error,'nutrition_missing');assert.equal(missing.body.food,undefined)
+        assert.equal(charges,chargeCount,'Missing core nutrition cannot charge')
+        assert.equal(JSON.stringify(candidate),before,'Never rewrite existing provider/cache data')
+      }
+    }
+    ctx.fetchFoodFromHelfiBarcode=async()=>({...zero.body.food,source})
+    const completeZero=await lookup();assert.equal(completeZero.status,200)
+    assert.equal(completeZero.body.food.calories,0);assert.equal(completeZero.body.food.fiber_g,null)
+    ctx.fetchFoodFromHelfiBarcode=async()=>({...usable.body.food,source,calories:5000})
+    const large=await lookup();assert.equal(large.status,200);assert.equal(large.body.food.calories,5000)
+    assert.equal(large.body.food.protein_g,12.4*.31,'Preserve precision for accepted values')
+  }
+  console.log('PASS: actual packaged mapper/barcode GET reject recorded nutrition errors and192missing/invalid core cases; preserve genuine zero, optional unknowns, precision, large kcal and exact alternates. Rejected results request label review without charging or rewriting source records. No network, database or credentials.')
 }
 void check().catch(error=>{console.error(error);process.exitCode=1})

@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { hasOffNutritionError, normalizeOffNutrition } from '@/lib/food/openfoodfacts'
+import { hasCoreFoodNutrition, hasOffNutritionError, normalizeOffNutrition } from '@/lib/food/openfoodfacts'
 import { normalizeExactUsdaBarcode } from '@/lib/food/usda-barcode'
 import { usdaLibraryServingSize } from '@/lib/food/usda-library'
 import { getServerSession } from 'next-auth'
@@ -787,9 +787,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Owner rule: never return a barcode result without calories + protein + carbs + fat.
-    const required = [food.calories, food.protein_g, food.carbs_g, food.fat_g]
-    const hasRequiredMacros = required.every((v) => Number.isFinite(Number(v)))
-    if (!hasRequiredMacros) {
+    if (!hasCoreFoodNutrition(food)) {
       return NextResponse.json(
         {
           found: false,

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify
+- Date/time: 5October2026, verified09:36:04UTC (20:36 Melbourne)
+- What changed: OpenFoodFacts records declaring nutrition errors are rejected by packaged search/barcode, instead of offering misleading values. Reliable alternate exact-barcode sources remain; otherwise existing label prompt appears without charging. Source8d054eb05e4861739234b17b752b34da033085fb/AWS79 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag9qtlyj2wyl1z15.
+- Where to see it (page/link): https://helfi.ai/food — normal Weet-Bix Original575g barcode9300652805048.
+- What to quickly test: Website says Nutrition label needed/Weet-Bix Sanitarium; signed-in iPhone39 reports the nutrition error and requests label details. Cancelled without Save;23originalrecords/hash unchanged, daily2776 and616credits retained. This rejects faulty source data, without inventing currentlabel values. Model comparison/admin approval and signed Apple/Google gates remain open.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify
 - Date/time: 5 October 2026, verified 09:06:54 UTC (20:06 Melbourne)
 - What changed: Saved ingredient/favourite nutrient cards now use the same colors as shared/native results: green carbs, purple fat, yellow fibre. Exactly three style metadata lines; values unchanged. Source 14656ae8dd07b3968d60c5cfeb359cc431f0fe2b; AWS78 BUILD/DEPLOY/VERIFY SUCCEED; both domains200CloudFront/new matching ETag1bk88mz4od1z15.
 - Where to see it (page/link): https://helfi.ai/food — saved rice entry, 5 October19:09.
