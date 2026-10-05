@@ -73,10 +73,45 @@ close(ctx.getBaseWeightPerServing({ ...volumeJuice, serving_size: '8 fl oz', wei
 close(ctx.getBaseWeightPerServing({ ...juice, serving_size: '8 oz', weightUnit: 'oz' }), 8)
 close(ctx.getBaseGramsPerServing({ ...juice, serving_size: '6 oz (177 g)' }), 177)
 
+// Reopening a saved measured half-serving must not let the browser select its
+// first option (g) beside a number that still means servings. Execute the actual
+// three Weight selectors, including their option mapping and selected value.
+const weightSelects: ts.JsxElement[] = []
+const findWeightSelects = (node: ts.Node) => {
+  if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'select' && node.children.some(child => ts.isJsxExpression(child) && child.expression?.getText(source).startsWith('getWeightUnitOptions('))) weightSelects.push(node)
+  ts.forEachChild(node, findWeightSelects)
+}
+findWeightSelects(source); assert.equal(weightSelects.length, 3)
+ctx.React = { createElement: (tag: any, props: any, ...children: any[]) => ({ tag, props, children: children.flat() }) }
+const rice = { ...juice, id: 'recorded-rice', name: 'Rice, white, long-grain, regular, enriched, cooked', serving_size: 'cup — 158g', calories: 205.4, protein_g: 4.2502, carbs_g: 44.5086, fat_g: 0.4424, fiber_g: 0.632, sugar_g: 0.079, servings: 0.5, weightAmount: 0.5, weightUnit: 'serving', portionMode: 'servings', selectedServingId: 'usda:168878:0' }
+for (const item of [rice, { ...milk, weightUnit: 'serving', weightAmount: 0.5, servings: 0.5, portionMode: 'servings' }, unweighed]) {
+  const original = JSON.stringify(item)
+  ctx.item = item; ctx.adjustItem = item; ctx.pieceGrams = null
+  ctx.weightUnit = ctx.normalizeWeightUnit(item.weightUnit); ctx.unit = ctx.weightUnit
+  for (const select of weightSelects) {
+    const rendered = vm.runInContext(ts.transpile(`(${select.getText(source)})`, { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), ctx)
+    const selected = rendered.children.find((option: any) => option.props.value === rendered.props.value)
+    assert.ok(selected, 'actual saved Weight selector must contain its recorded selected serving unit')
+    assert.equal(selected.children.join(''), recorded.formatItemMeasurementUnit(item, 'serving'))
+  }
+  close(ctx.getBaseWeightPerServing(item), 1)
+  close(ctx.effectiveServings(item), item.servings)
+  assert.equal(JSON.stringify(item), original, 'opening selectors must preserve all recorded fields')
+}
+assert.equal(ctx.recalculateNutritionFromItems([rice]).calories, 103)
+assert.equal(ctx.recalculateNutritionFromItems([{ ...rice, sugar_g: null }]).sugar, null)
+assert.equal(ctx.recalculateNutritionFromItems([{ ...rice, sugar_g: 0 }]).sugar, 0)
+
 let notice = ''
 ctx.showQuickToast = (text: string) => { notice = text }
 ctx.setAnalyzedItems = (items: any[]) => { ctx.analyzedItems = items }
 ctx.applyRecalculatedNutrition = () => {}
+ctx.analyzedItems = [{ ...rice }]
+ctx.updateItemField(0, 'weightUnit', 'g')
+close(ctx.analyzedItems[0].weightAmount, 79)
+close(ctx.effectiveServings(ctx.analyzedItems[0]), 0.5)
+assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).calories, 103, 'switching recorded half-serving to grams must retain its calories')
+assert.equal(ctx.analyzedItems[0].selectedServingId, rice.selectedServingId)
 ctx.analyzedItems = [{ ...milk }]
 ctx.updateItemField(0, 'weightUnit', 'ml')
 close(ctx.analyzedItems[0].weightAmount, 100 / 1.03)

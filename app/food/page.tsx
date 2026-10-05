@@ -127,7 +127,11 @@ const WEIGHT_UNIT_OPTIONS: Array<{ value: WeightUnit; label: string }> = [
 const getItemMeasurementCountry = (item: any): string => typeof item?.__measurementCountry === 'string' ? item.__measurementCountry : ''
 
 const getWeightUnitOptions = (item?: any, current?: WeightUnit, pieceGrams?: number | null, country = '') => {
-  return itemMeasurementUnitOptions(item, pieceGrams, country).map((unit) => ({
+  const units = itemMeasurementUnitOptions(item, pieceGrams, country)
+  // Saved amounts can count recorded servings even when that serving has a
+  // known weight. Keep the selected unit so the browser cannot display g instead.
+  if (current === 'serving' && !units.includes('serving')) units.unshift('serving')
+  return units.map((unit) => ({
     value: unit,
     label: formatItemMeasurementUnit(item, unit, pieceGrams, unit === current ? getItemMeasurementCountry(item) : country),
   }))

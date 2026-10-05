@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify job76, all steps SUCCEED)
+- Date/time: 5October2026 verified08:27:19UTC
+- What changed: Task77 USDA recorded household servings take priority over conflicting generic cups/spoons; source746ef5aa3bcb61549af4538d833e5ee457e07aff.
+- Where to see it (page/link): https://helfi.ai/food/add-ingredient and native Add ingredient.
+- What to quickly test: Fresh original rice168878 chooser has only100g and recorded158g cup, no180g/90g competitors. Full205/half103/all6cards on web and signed-in iPhone39 PASS. Preview-only/no Save; all23history/source hashes unchanged. Existing stored4choices untouched; saved web serving Weight caption still separate. Milk/spoon coverage actual-source fixtures only; model/admin/signedstore checks remain.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify job75, all steps SUCCEED)
 - Date/time: 5 October2026, verified08:08:20UTC
 - What changed: Task76 original supplier serving choices and selected basis preserved in standalone Add Ingredient, source1da712c85be4e9e7b7e49f1fd68e8ef7c2b3a9fa.
