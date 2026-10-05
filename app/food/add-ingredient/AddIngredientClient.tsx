@@ -1042,7 +1042,7 @@ export default function AddIngredientClient() {
   const prefillAppliedRef = useRef(false)
 
   const abortRef = useRef<AbortController | null>(null)
-  const servingCacheRef = useRef<Map<string, ServingOption>>(new Map())
+  const servingCacheRef = useRef<Map<string, { option: ServingOption; options: ServingOption[] }>>(new Map())
   const servingPendingRef = useRef<Set<string>>(new Set())
   const sizeUnitCacheRef = useRef<Map<string, DynamicSizeLookup>>(new Map())
   const sizeUnitPendingRef = useRef<Set<string>>(new Set())
@@ -1294,6 +1294,7 @@ export default function AddIngredientClient() {
   const applyServingOptionToResult = (r: NormalizedFoodItem, opt: ServingOption): NormalizedFoodItem => ({
     ...r,
     serving_size: opt.serving_size || r.serving_size,
+    selectedServingId: opt.id,
     calories: safeNumber(opt.calories),
     protein_g: safeNumber(opt.protein_g),
     carbs_g: safeNumber(opt.carbs_g),
@@ -1366,7 +1367,7 @@ export default function AddIngredientClient() {
     if (hasSizedCountUnits(getFoodUnitGrams(r.name))) return null
     const key = `${r.source}:${r.id}`
     const cached = servingCacheRef.current.get(key)
-    if (cached) return applyServingOptionToResult(r, cached)
+    if (cached) return { ...applyServingOptionToResult(r, cached.option), servingOptions: cached.options }
     if (servingPendingRef.current.has(key)) return null
     servingPendingRef.current.add(key)
     try {
@@ -1374,13 +1375,13 @@ export default function AddIngredientClient() {
       const res = await fetch(`/api/food-data/servings?${params.toString()}`, { method: 'GET' })
       if (!res.ok) return null
       const data = await res.json().catch(() => ({}))
-      const options: ServingOption[] = Array.isArray(data?.options) ? data.options : []
+      const options = normalizeServingOptionsForAdjust(data?.options)
       const best = pickBestServingOption(options)
       if (!best) return null
-      servingCacheRef.current.set(key, best)
-      const updated = applyServingOptionToResult(r, best)
-      if (!hasMeaningfulChange(r, updated)) return null
-      return updated
+      // Keep all measured choices with the selected basis, including unchanged
+      // nutrition and later cache reads. Opening and saving need this identity.
+      servingCacheRef.current.set(key, { option: best, options })
+      return { ...applyServingOptionToResult(r, best), servingOptions: options }
     } catch {
       return null
     } finally {
@@ -1708,7 +1709,9 @@ export default function AddIngredientClient() {
       const resolvedTarget = upgraded || target
 
       const servingOptions = normalizeServingOptionsForAdjust((resolvedTarget as any)?.servingOptions)
-      const defaultServingOption = pickDefaultServingOptionForAdjust(servingOptions)
+      const defaultServingOption =
+        servingOptions.find((option) => option.id === resolvedTarget.selectedServingId) ||
+        pickDefaultServingOptionForAdjust(servingOptions)
       const resolvedWithServing =
         defaultServingOption && hasServingOptionMacroData(defaultServingOption)
           ? applyServingOptionToResult(resolvedTarget, defaultServingOption)

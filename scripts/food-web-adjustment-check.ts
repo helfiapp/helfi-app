@@ -132,6 +132,106 @@ async function main() {
   ctx.userCountry = ''
   ctx.drinkOverride = ctx.parseDrinkOverride('1', 'fl oz'); await open(milk); assert.equal(ctx.adjustUnit, 'ml'); close(Number(ctx.adjustAmountInput), 29.57)
   error = null; ctx.adjustItem = null; await open({ ...milk, name: 'Apple juice', serving_size: '100 g' }); assert.equal(ctx.adjustItem, null); assert.ok(error)
-  console.log('PASS: actual web adjustment/default/save preserves milk/oil density, liquid household volumes, source identity, precise servings, null/zero and invalid-amount blocking; no network or credentials.')
+  // Provider choices must survive the actual override, cache, opening and save.
+  // These fixtures never contact a provider or write a real diary entry.
+  for (const name of ['is100gServing', 'sameNumber', 'hasSizedCountUnits', 'scoreServingOption', 'pickBestServingOption', 'applyServingOptionToResult', 'hasMeaningfulChange', 'hasServingOptionMacroData', 'normalizeServingOptionsForAdjust', 'pickDefaultServingOptionForAdjust', 'loadServingOverride']) bind(name)
+  const rice = { source: 'usda', id: 'fixture-original-cooked-rice', name: 'Rice, white, long-grain, cooked', serving_size: '100 g', calories: 130, protein_g: 2.69, carbs_g: 28.17, fat_g: .28, fiber_g: null, sugar_g: 0 }
+  const providerOptions = [
+    { ...rice, id: 'rice:100g', label: '100 g', grams: 100 },
+    { ...rice, id: 'rice:cup', label: 'cup — 158g', serving_size: 'cup — 158g', grams: 158, calories: 205.4, protein_g: 4.2502, carbs_g: 44.5086, fat_g: .4424 },
+  ]
+  let optionsResponse: any[] = providerOptions
+  let lookupCount = 0
+  Object.assign(ctx, { drinkOverride: null, servingCacheRef: { current: new Map() }, servingPendingRef: { current: new Set() }, URLSearchParams,
+    loadDynamicSizeLookup: async () => null,
+    fetch: async (url: string) => { assert.ok(url.startsWith('/api/food-data/servings?')); lookupCount++; return { ok: true, json: async () => ({ options: optionsResponse }) } },
+  })
+  const adjusted = (): any => {
+    const result: any = ctx.adjustItem
+    assert.ok(result, 'Actual web adjustment opened')
+    return result
+  }
+  const savedResult = (): any => {
+    const result: any = saved
+    assert.ok(result, 'Actual save produced a payload')
+    return result
+  }
+  const beforeRice = JSON.stringify(rice)
+  await open(rice)
+  assert.equal(adjusted().servingOptions?.length, 2, 'Fetched original choices must reach the actual web adjustment')
+  assert.equal(adjusted().selectedServingId, 'rice:cup', 'Selected id must match original provider nutrient basis')
+  assert.equal(adjusted().serving_size, 'cup — 158g')
+  assert.equal(adjusted().calories, 205.4)
+  ctx.adjustAmountInput = '.5'; ctx.adjustUnit = 'serving'; await save()
+  assert.equal(savedResult().items[0].servingOptions.length, 2)
+  assert.equal(savedResult().items[0].selectedServingId, 'rice:cup')
+  assert.equal(savedResult().items[0].serving_size, 'cup — 158g')
+  assert.equal(savedResult().items[0].calories, 205.4)
+  assert.equal(savedResult().items[0].servings, .5)
+  assert.equal(savedResult().nutrition.calories, 103)
+  assert.equal(savedResult().nutrition.fiber, null); assert.equal(savedResult().nutrition.sugar, 0)
+  await open(rice)
+  ctx.adjustAmountInput = '.5'; ctx.adjustUnit = 'serving'
+  let servingChange: ts.JsxAttribute | undefined
+  const findServingChange = (node: ts.Node) => {
+    if (ts.isJsxOpeningElement(node) && node.tagName.getText(source) === 'select' && node.attributes.getText(source).includes('value={adjustServingId')) {
+      servingChange = node.attributes.properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === 'onChange') as ts.JsxAttribute
+    }
+    ts.forEachChild(node, findServingChange)
+  }
+  findServingChange(source); assert.ok(servingChange, 'Actual supplier-choice dropdown exists')
+  ctx.servingOptions = adjusted().servingOptions
+  ctx.setAdjustItem = (value: any) => { ctx.adjustItem = typeof value === 'function' ? value(ctx.adjustItem) : value }
+  ctx.setAdjustServingId = (value: string) => { ctx.adjustServingId = value }
+  ctx.setAdjustPieceGrams = (value: number | null) => { ctx.adjustPieceGrams = value }
+  const choose = vm.runInContext(ts.transpile(`(${(servingChange.initializer as ts.JsxExpression).expression!.getText(source)})`, { target: ts.ScriptTarget.ES2020 }), ctx)
+  choose({ target: { value: 'rice:100g' } })
+  await save()
+  assert.equal(savedResult().items[0].selectedServingId, 'rice:100g')
+  assert.equal(savedResult().items[0].serving_size, '100 g')
+  assert.equal(savedResult().items[0].servingOptions.length, 2)
+  assert.equal(savedResult().items[0].servings, .5)
+  assert.equal(savedResult().nutrition.calories, 65, 'Actual choice change preserves half-serving count at original100g basis')
+  await open(rice)
+  assert.equal(lookupCount, 1, 'Cached original choices avoid a repeated provider lookup')
+  assert.equal(adjusted().servingOptions.length, 2)
+  assert.equal(adjusted().selectedServingId, 'rice:cup')
+  assert.equal(JSON.stringify(rice), beforeRice, 'Opening cannot rewrite the original source')
+
+  // Even one unchanged100g choice carries provider identity and must not vanish.
+  ctx.servingCacheRef.current.clear(); optionsResponse = [providerOptions[0]]
+  await open(rice)
+  assert.equal(adjusted().servingOptions.length, 1)
+  assert.equal(adjusted().selectedServingId, 'rice:100g')
+  assert.equal(adjusted().calories, rice.calories)
+  await open(rice); assert.equal(lookupCount, 2)
+  assert.equal(adjusted().selectedServingId, 'rice:100g')
+
+  // An explicitly selected supplier option wins over the generic medium default.
+  const selectedOptions = [
+    { ...rice, id: 'medium', label: 'Medium serving — 100g', grams: 100 },
+    { ...rice, id: 'large', label: 'Large serving — 200g', serving_size: '200 g', grams: 200, calories: 260, protein_g: 5.38, carbs_g: 56.34, fat_g: .56 },
+  ]
+  const selected = { ...rice, source: 'custom', servingOptions: selectedOptions, selectedServingId: 'large' }
+  await open(selected)
+  assert.equal(adjusted().selectedServingId, 'large')
+  assert.equal(adjusted().calories, 260)
+  ctx.adjustAmountInput = '1.5'; ctx.adjustUnit = 'serving'; await save()
+  assert.equal(savedResult().items[0].selectedServingId, 'large')
+  assert.equal(savedResult().items[0].servingOptions.length, 2)
+  assert.equal(savedResult().items[0].id, rice.id)
+  assert.equal(savedResult().items[0].source, 'custom')
+  assert.equal(savedResult().nutrition.calories, 390)
+  ctx.servingCacheRef.current.clear()
+  optionsResponse = [{ ...providerOptions[1], calories: null }]
+  await open(rice)
+  assert.equal(adjusted().servingOptions, null, 'Incomplete provider choices cannot replace valid original nutrition')
+  assert.equal(adjusted().selectedServingId, null)
+  assert.equal(adjusted().calories, 130)
+  ctx.adjustAmountInput = '50'; ctx.adjustUnit = 'g'; await save()
+  assert.equal(savedResult().nutrition.calories, 65)
+  assert.equal(savedResult().items[0].id, rice.id)
+  assert.equal(savedResult().items[0].serving_size, '100 g')
+  console.log('PASS: actual web adjustment/default/save and provider override/cache retain original choices, selected basis, density, regional measures, precise source, null/zero and invalid-amount blocking; no network or credentials.')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

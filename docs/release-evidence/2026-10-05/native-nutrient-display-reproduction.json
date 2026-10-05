@@ -1,7 +1,7 @@
 {
   "task": 74,
   "baselineSource": "8a020a0b533ca51f7db6059c18883b838deee85d",
-  "status": "SOURCE_BUILD_AND_NATIVE_RUNTIME_PASS_DEPLOYMENT_PENDING",
+  "status": "SOURCE_BUILD_DEPLOYMENT_NATIVE_RUNTIME_AND_FRESH_WEB_PASS",
   "sourceScope": [
     "native/src/components/NutrientCards.tsx",
     "native/src/screens/TrackCaloriesScreen.tsx"
@@ -76,7 +76,7 @@
     "savedMealId": "cmuuvpib70001tvel0mwqie66",
     "name": "Sanitarium Crunchy Peanut Butter 500g",
     "clock": "17:38",
-    "originalServing": "Serving — 20g",
+    "originalServing": "Serving \u2014 20g",
     "amount": "30 g",
     "dailyCalories": 2673,
     "remainingCalories": 0,
@@ -105,7 +105,7 @@
     "allDiaryRecordsHash": "34b88b671201191d4adb12a54605b0c08a6fff61a2fc72311189a1615efc3f95",
     "original21Unchanged": true,
     "all22OpeningHashUnchanged": true,
-    "checkpoint": "packaged-food-label-review.json recordsFinalNativeDisplayReopening",
+    "checkpoint": "packaged-food-label-review.json recordsFinalNativeDisplayLiveReopening",
     "storedFat": 16.05,
     "originalSourceUnchanged": true
   },
@@ -114,5 +114,65 @@
     "No native Save in task74; normal website Save and cross-device reopen recorded in task72",
     "No new signed store binaries uploaded",
     "Current food label/barcode certification, image-model comparison and complete release matrix remain open"
-  ]
+  ],
+  "sourceCommit": "5d71534d784b815d6abe56ff8fccb5cdde151e8d",
+  "deployment": {
+    "verifiedAt": "2026-10-05T07:33:37.413Z",
+    "summary": {
+      "jobId": "74",
+      "status": "SUCCEED",
+      "commitId": "5d71534d784b815d6abe56ff8fccb5cdde151e8d"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"yhauq0j4az1z15\"",
+        "via": "1.1 72fead31894942259585d2ed27324fb4.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"yhauq0j4az1z15\"",
+        "via": "1.1 2f9144de1a7be7186d07b65feb7a92da.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "freshLiveWeb": {
+    "verifiedAt": "2026-10-05T07:36:24.927882+00:00",
+    "normalReload": true,
+    "accountSignedIn": true,
+    "meal": "Lunch17:38 Sanitarium Crunchy Peanut Butter 500g",
+    "weightGrams": 30,
+    "allSixIngredientCards": [
+      191,
+      8.1,
+      3,
+      16.1,
+      1.8,
+      1.2
+    ],
+    "dailyCalories": 2673,
+    "credits": 619,
+    "noSaveOrUpdate": true,
+    "all22DiaryRecordsHashUnchanged": true
+  }
 }

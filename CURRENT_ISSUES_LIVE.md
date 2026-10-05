@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify74; both helfi.ai/www.helfi.ai200CloudFront/new matchingetagyhauq0j4az1z15.
+- Date/time: 5October2026, verified07:33:37UTC (18:33 Melbourne); fresh website saved-editor reopening confirmed afterwards.
+- What changed: 5d71534d784b815d6abe56ff8fccb5cdde151e8d; native six-card, meal summary and actual editable ingredient field decimal ties now agree16.1 for original10.7x1.5. Original nutrient calculations/storage and all6colors preserved. Rebuilt signed-in Release39 iPhone/iPad checked; no signed store upload.
+- Where to see it (page/link): Phone/iPad Food Diary > Lunch17:38 Sanitarium > Edit entry > Meal totals/Your ingredients; website https://helfi.ai/food matches.
+- What to quickly test: Original20g/30g191/P8.1/C3/F16.1/Fibre1.8/S1.2 displays consistently in all6meal/ingredient cards, summary and nutrient fields on rebuilt iPhone+iPad. Fresh live website all6cards/daily2673/619 agree. No Save/Update; all22rows/source/hash unchanged34b88b...cf3f95. Actual-source baseline FAIL/final PASS, missing/zero/boundaries/kcal-kJ/responsive layout; finalproductionbuild93861exit0/native typecheck86640/protected/root278native79 PASS, exactly two approved native hashes refreshed. AWS BUILD/DEPLOY/VERIFY allSUCCEED. Full labels/photo/model/signed stores remain open; next owner-requested5.6Sol-vs6.1Sol challenging-photo/speed comparison awaits normal Helfi admin QR approval.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify73, helfi.ai/www.helfi.ai200CloudFront/new matchingetagzcs3p7lh4k1z15.
 - Date/time: 5 October2026, verified07:00:12UTC (18:00 Melbourne); fresh live saved-card check18:01.
 - What changed: 8a020a0b533ca51f7db6059c18883b838deee85d; saved website ingredient nutrients retain original multiplication precision until display and decimal ties round consistently. Native unchanged; matching native display fix is next74.
