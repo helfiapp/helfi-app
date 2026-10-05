@@ -1,0 +1,104 @@
+{
+  "task": 71,
+  "baselineCommit": "c199981d6e6224fe4e138ec583eacea1c3d57ced",
+  "baselineActualParentFixture": {
+    "fiberPerServing": null,
+    "servings": 0.5,
+    "actualFiberTotal": 0,
+    "expectedFiberTotal": null,
+    "result": "FAIL reproduced"
+  },
+  "baselineActualRuntime": "Task70 normal halfchicken60g shows parent/progress7.3fat vs mealcard7.4; original70 evidence/screenshot retained.",
+  "sourceChecks": {
+    "result": "PASS actual parent/server calculations, source normalization, diary context, both save handlers, history PUT commit, recipe-import prefill and existing70component/portion hooks",
+    "credentials": false,
+    "network": false,
+    "HTTPAndDB": "synthetic only",
+    "liveProof": false
+  },
+  "buildAttempts": [
+    {
+      "session": 69969,
+      "exitCode": 1,
+      "reason": "removed round3 helper still needed by recipe import; restored before shipping"
+    },
+    {
+      "session": 79682,
+      "exitCode": 1,
+      "reason": "new actual prefill fixture exposed null fibre ->0 in handoff helper; replaced only nutrient normalization with shared optional reader"
+    }
+  ],
+  "finalBuild": {
+    "session": 60680,
+    "exitCode": 0,
+    "result": "PASS full production build/typecheck/prebuild/protected/278+79locks",
+    "onlyRefreshedUIHash": "RecommendedIngredientCard",
+    "nativeChanged": false
+  },
+  "liveRuntime": "pending",
+  "remaining": "Full photo/model/real labels/signed Apple-Google matrix remains open; real recommended missing-value UI/save not proved by synthetic fixtures.",
+  "recordsBefore": {
+    "verifiedAt": "2026-10-05T05:58:16.104Z",
+    "diaryCount": 20,
+    "allDiaryRecordsHash": "655164280f2187f6b3dabb6a7d14752c6fd8f66130be3c338045a16b149961d7",
+    "historyRecordsHash": "4125abd33f1b4cd6c5bbd7e153f71228227c85ef4b8ac93671405b6df8ef4ae1",
+    "originalRecipe": {
+      "id": "air-fallback-1781889050934-6404ba20b8451",
+      "mealName": "Chicken, rice and vegetable bowl",
+      "items": [
+        {
+          "name": "Chicken breast",
+          "serving_size": "120 g cooked",
+          "calories": 198,
+          "protein_g": 37.2,
+          "carbs_g": 0,
+          "fat_g": 4.3,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        },
+        {
+          "name": "Cooked rice",
+          "serving_size": "120 g",
+          "calories": 156,
+          "protein_g": 3.2,
+          "carbs_g": 34.2,
+          "fat_g": 0.3,
+          "fiber_g": 0.5,
+          "sugar_g": 0.1,
+          "servings": 1
+        },
+        {
+          "name": "Broccoli",
+          "serving_size": "100 g",
+          "calories": 35,
+          "protein_g": 2.4,
+          "carbs_g": 7.2,
+          "fat_g": 0.4,
+          "fiber_g": 3.3,
+          "sugar_g": 1.4,
+          "servings": 1
+        },
+        {
+          "name": "Olive oil",
+          "serving_size": "1 tsp",
+          "calories": 40,
+          "protein_g": 0,
+          "carbs_g": 0,
+          "fat_g": 4.5,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        }
+      ],
+      "totals": {
+        "calories": 429,
+        "protein_g": 42.8,
+        "carbs_g": 41.4,
+        "fat_g": 9.5,
+        "fiber_g": 3.8,
+        "sugar_g": 1.5
+      }
+    }
+  }
+}

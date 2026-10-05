@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useState } from 'react'
 import NutrientCards from './NutrientCards'
+import { roundOptionalNutrient, scaleOptionalNutrient } from '@/lib/food/nutrient-values'
 import {
   convertItemMeasurement,
   formatItemMeasurementUnit,
@@ -24,8 +25,6 @@ type RecommendedItem = {
 
 type BuilderUnit = ItemMeasurementUnit
 const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(min, n))
-const round3 = (n: number) => Math.round(n * 1000) / 1000
-const macroOrZero = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? Math.max(0, v) : 0)
 // Keep calculation precision in editable amounts; round only nutrient displays.
 const formatDecimal = (value: number) => Number.isFinite(value) && value >= 0 ? String(value) : ''
 const extractPieceGramsFromLabel = (label: string) => {
@@ -80,12 +79,12 @@ export default function RecommendedIngredientCard({
 
   const totals = useMemo(
     () => ({
-      calories: Math.round(macroOrZero(item.calories) * servings),
-      protein_g: round3(macroOrZero(item.protein_g) * servings),
-      carbs_g: round3(macroOrZero(item.carbs_g) * servings),
-      fat_g: round3(macroOrZero(item.fat_g) * servings),
-      fiber_g: round3(macroOrZero(item.fiber_g) * servings),
-      sugar_g: round3(macroOrZero(item.sugar_g) * servings),
+      calories: roundOptionalNutrient(scaleOptionalNutrient(item.calories, servings), 0),
+      protein_g: roundOptionalNutrient(scaleOptionalNutrient(item.protein_g, servings), 3),
+      carbs_g: roundOptionalNutrient(scaleOptionalNutrient(item.carbs_g, servings), 3),
+      fat_g: roundOptionalNutrient(scaleOptionalNutrient(item.fat_g, servings), 3),
+      fiber_g: roundOptionalNutrient(scaleOptionalNutrient(item.fiber_g, servings), 3),
+      sugar_g: roundOptionalNutrient(scaleOptionalNutrient(item.sugar_g, servings), 3),
     }),
     [item.calories, item.carbs_g, item.fat_g, item.fiber_g, item.protein_g, item.sugar_g, servings],
   )
@@ -156,12 +155,12 @@ export default function RecommendedIngredientCard({
           </div>
 
           <NutrientCards values={{
-            calories: item.calories == null ? null : totals.calories,
-            protein: item.protein_g == null ? null : totals.protein_g,
-            carbs: item.carbs_g == null ? null : totals.carbs_g,
-            fat: item.fat_g == null ? null : totals.fat_g,
-            fiber: item.fiber_g == null ? null : totals.fiber_g,
-            sugar: item.sugar_g == null ? null : totals.sugar_g,
+            calories: totals.calories,
+            protein: totals.protein_g,
+            carbs: totals.carbs_g,
+            fat: totals.fat_g,
+            fiber: totals.fiber_g,
+            sugar: totals.sugar_g,
           }} />
         </div>
       )}

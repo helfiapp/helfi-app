@@ -1,3 +1,5 @@
+import { optionalNutrient, readOptionalNutrient } from '@/lib/food/nutrient-values'
+import { computeRecommendedTotals, recommendationNutritionError } from '@/lib/food/recommended-nutrition'
 import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
@@ -78,28 +80,7 @@ const clamp = (n: number, min: number, max: number) => Math.min(max, Math.max(mi
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
-const macroOrZero = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
-
-const computeTotalsFromItems = (items: RecommendedItem[]): MacroTotals => {
-  const total = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
-  for (const item of items) {
-    const servings = typeof item.servings === 'number' && Number.isFinite(item.servings) ? item.servings : 0
-    total.calories += macroOrZero(item.calories) * servings
-    total.protein_g += macroOrZero(item.protein_g) * servings
-    total.carbs_g += macroOrZero(item.carbs_g) * servings
-    total.fat_g += macroOrZero(item.fat_g) * servings
-    total.fiber_g += macroOrZero(item.fiber_g) * servings
-    total.sugar_g += macroOrZero(item.sugar_g) * servings
-  }
-  return {
-    calories: Math.round(total.calories),
-    protein_g: round3(total.protein_g),
-    carbs_g: round3(total.carbs_g),
-    fat_g: round3(total.fat_g),
-    fiber_g: round3(total.fiber_g),
-    sugar_g: round3(total.sugar_g),
-  }
-}
+const computeTotalsFromItems = (items: RecommendedItem[]): MacroTotals => computeRecommendedTotals(items)
 
 function parseJsonRelaxed(raw: string): any | null {
   try {
@@ -400,45 +381,16 @@ const truncate = (value: string, maxChars: number) => {
 
 const safeJsonCompact = (value: any, maxChars: number) => truncate(JSON.stringify(value ?? null), maxChars)
 
-const extractTotalsFromNutrients = (nutrients: any): MacroTotals => {
-  if (!nutrients || typeof nutrients !== 'object') {
-    return { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
-  }
-  const calories = Number((nutrients as any)?.calories ?? (nutrients as any)?.Calories ?? 0)
-  const protein = Number((nutrients as any)?.protein ?? (nutrients as any)?.protein_g ?? 0)
-  const carbs = Number((nutrients as any)?.carbs ?? (nutrients as any)?.carbs_g ?? 0)
-  const fat = Number((nutrients as any)?.fat ?? (nutrients as any)?.fat_g ?? 0)
-  const fiber = Number((nutrients as any)?.fiber ?? (nutrients as any)?.fiber_g ?? 0)
-  const sugar = Number((nutrients as any)?.sugar ?? (nutrients as any)?.sugar_g ?? 0)
-  return {
-    calories: Number.isFinite(calories) ? calories : 0,
-    protein_g: Number.isFinite(protein) ? protein : 0,
-    carbs_g: Number.isFinite(carbs) ? carbs : 0,
-    fat_g: Number.isFinite(fat) ? fat : 0,
-    fiber_g: Number.isFinite(fiber) ? fiber : 0,
-    sugar_g: Number.isFinite(sugar) ? sugar : 0,
-  }
-}
+const extractTotalsFromNutrients = (nutrients: any): MacroTotals => ({
+  calories: readOptionalNutrient(nutrients, ['calories', 'Calories']),
+  protein_g: readOptionalNutrient(nutrients, ['protein', 'protein_g']),
+  carbs_g: readOptionalNutrient(nutrients, ['carbs', 'carbs_g']),
+  fat_g: readOptionalNutrient(nutrients, ['fat', 'fat_g']),
+  fiber_g: readOptionalNutrient(nutrients, ['fiber', 'fiber_g']),
+  sugar_g: readOptionalNutrient(nutrients, ['sugar', 'sugar_g']),
+})
 
-const sumTotals = (rows: MacroTotals[]): MacroTotals => {
-  const total = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
-  for (const r of rows) {
-    total.calories += macroOrZero(r.calories)
-    total.protein_g += macroOrZero(r.protein_g)
-    total.carbs_g += macroOrZero(r.carbs_g)
-    total.fat_g += macroOrZero(r.fat_g)
-    total.fiber_g += macroOrZero(r.fiber_g)
-    total.sugar_g += macroOrZero(r.sugar_g)
-  }
-  return {
-    calories: Math.round(total.calories),
-    protein_g: round3(total.protein_g),
-    carbs_g: round3(total.carbs_g),
-    fat_g: round3(total.fat_g),
-    fiber_g: round3(total.fiber_g),
-    sugar_g: round3(total.sugar_g),
-  }
-}
+const sumTotals = (rows: MacroTotals[]): MacroTotals => computeRecommendedTotals(rows.map(row => ({ ...row, servings: 1 })))
 
 const subtractTotals = (a: MacroTotals, b: MacroTotals): MacroTotals => ({
   calories: a.calories !== null && b.calories !== null ? a.calories - b.calories : null,
@@ -734,12 +686,12 @@ const normalizeAndValidateItems = (items: any[]): RecommendedItem[] => {
       id: raw?.id ? String(raw.id) : undefined,
       name,
       serving_size: raw?.serving_size ? String(raw.serving_size) : null,
-      calories: Number.isFinite(Number(raw?.calories)) ? Number(raw.calories) : null,
-      protein_g: Number.isFinite(Number(raw?.protein_g)) ? Number(raw.protein_g) : null,
-      carbs_g: Number.isFinite(Number(raw?.carbs_g)) ? Number(raw.carbs_g) : null,
-      fat_g: Number.isFinite(Number(raw?.fat_g)) ? Number(raw.fat_g) : null,
-      fiber_g: Number.isFinite(Number(raw?.fiber_g)) ? Number(raw.fiber_g) : null,
-      sugar_g: Number.isFinite(Number(raw?.sugar_g)) ? Number(raw.sugar_g) : null,
+      calories: optionalNutrient(raw?.calories),
+      protein_g: optionalNutrient(raw?.protein_g),
+      carbs_g: optionalNutrient(raw?.carbs_g),
+      fat_g: optionalNutrient(raw?.fat_g),
+      fiber_g: optionalNutrient(raw?.fiber_g),
+      sugar_g: optionalNutrient(raw?.sugar_g),
       servings: Number.isFinite(servings) ? clamp(servings, 0, 20) : 1,
     })
   }
@@ -905,6 +857,8 @@ export async function PUT(req: NextRequest) {
 
     const mealNameRaw = typeof (rawRec as any).mealName === 'string' ? String((rawRec as any).mealName).trim() : ''
     const { mealName: safeMealName, items: itemsWithNameFixes } = applyMealNameConsistency(category, mealNameRaw, itemsInitial)
+    const nutritionError = recommendationNutritionError(itemsWithNameFixes)
+    if (nutritionError) return NextResponse.json({ error: nutritionError }, { status: 400 })
     const recipe = normalizeRecipe((rawRec as any).recipe) || buildFallbackRecipe(category, itemsWithNameFixes)
     const totals = computeTotalsFromItems(itemsWithNameFixes)
 

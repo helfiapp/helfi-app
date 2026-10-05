@@ -1,6 +1,8 @@
 'use client'
 
 import NutrientCards from '@/components/food/NutrientCards'
+import { optionalNutrient, roundOptionalNutrient } from '@/lib/food/nutrient-values'
+import { computeRecommendedTotals, recommendedFoodLogTotals, recommendationNutritionError } from '@/lib/food/recommended-nutrition'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import Link from 'next/link'
@@ -110,28 +112,7 @@ const buildTodayIso = () => {
 
 const round3 = (n: number) => Math.round(n * 1000) / 1000
 
-const macroOrZero = (v: any) => (typeof v === 'number' && Number.isFinite(v) ? v : 0)
-
-const computeTotalsFromItems = (items: RecommendedItem[]): MacroTotals => {
-  const total = { calories: 0, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }
-  for (const item of items) {
-    const servings = typeof item.servings === 'number' && Number.isFinite(item.servings) ? item.servings : 0
-    total.calories += macroOrZero(item.calories) * servings
-    total.protein_g += macroOrZero(item.protein_g) * servings
-    total.carbs_g += macroOrZero(item.carbs_g) * servings
-    total.fat_g += macroOrZero(item.fat_g) * servings
-    total.fiber_g += macroOrZero(item.fiber_g) * servings
-    total.sugar_g += macroOrZero(item.sugar_g) * servings
-  }
-  return {
-    calories: Math.round(total.calories),
-    protein_g: round3(total.protein_g),
-    carbs_g: round3(total.carbs_g),
-    fat_g: round3(total.fat_g),
-    fiber_g: round3(total.fiber_g),
-    sugar_g: round3(total.sugar_g),
-  }
-}
+const computeTotalsFromItems = (items: RecommendedItem[]): MacroTotals => computeRecommendedTotals(items)
 
 const alignTimestampToLocalDate = (iso: string, localDate: string) => {
   try {
@@ -147,14 +128,7 @@ const alignTimestampToLocalDate = (iso: string, localDate: string) => {
   }
 }
 
-const normalizeTotalsForFoodLog = (totals: MacroTotals) => ({
-  calories: typeof totals.calories === 'number' ? Math.round(totals.calories) : 0,
-  protein: typeof totals.protein_g === 'number' ? round3(totals.protein_g) : 0,
-  carbs: typeof totals.carbs_g === 'number' ? round3(totals.carbs_g) : 0,
-  fat: typeof totals.fat_g === 'number' ? round3(totals.fat_g) : 0,
-  fiber: typeof totals.fiber_g === 'number' ? round3(totals.fiber_g) : 0,
-  sugar: typeof totals.sugar_g === 'number' ? round3(totals.sugar_g) : 0,
-})
+const normalizeTotalsForFoodLog = (totals: MacroTotals) => recommendedFoodLogTotals(totals)
 
 const parseFractionToken = (value: string) => {
   const raw = String(value || '').trim()
@@ -264,12 +238,12 @@ const buildRecipeImportDraftFromRecommendation = (
     id: pair.item?.id ? String(pair.item.id) : undefined,
     name: String(pair.item?.name || '').trim() || 'Food',
     serving_size: pair.item?.serving_size || null,
-    calories: Number.isFinite(Number(pair.item?.calories)) ? Number(pair.item?.calories) : null,
-    protein_g: Number.isFinite(Number(pair.item?.protein_g)) ? Number(pair.item?.protein_g) : null,
-    carbs_g: Number.isFinite(Number(pair.item?.carbs_g)) ? Number(pair.item?.carbs_g) : null,
-    fat_g: Number.isFinite(Number(pair.item?.fat_g)) ? Number(pair.item?.fat_g) : null,
-    fiber_g: Number.isFinite(Number(pair.item?.fiber_g)) ? Number(pair.item?.fiber_g) : null,
-    sugar_g: Number.isFinite(Number(pair.item?.sugar_g)) ? Number(pair.item?.sugar_g) : null,
+    calories: optionalNutrient(pair.item?.calories),
+    protein_g: optionalNutrient(pair.item?.protein_g),
+    carbs_g: optionalNutrient(pair.item?.carbs_g),
+    fat_g: optionalNutrient(pair.item?.fat_g),
+    fiber_g: optionalNutrient(pair.item?.fiber_g),
+    sugar_g: optionalNutrient(pair.item?.sugar_g),
   }))
 
   const recipe = rec?.recipe || null
@@ -299,8 +273,9 @@ const buildRecipeImportDraftFromRecommendation = (
 }
 
 const formatNumber = (value: number | null | undefined, decimals = 0) => {
-  if (typeof value !== 'number' || !Number.isFinite(value)) return '—'
-  return decimals > 0 ? value.toFixed(decimals) : String(Math.round(value))
+  const rounded = roundOptionalNutrient(value, decimals)
+  if (rounded == null) return '—'
+  return decimals > 0 ? rounded.toFixed(decimals) : String(rounded)
 }
 
 const formatMacroValue = (value: number | null | undefined, unit: string, decimals = 0) => {
@@ -671,6 +646,8 @@ export default function RecommendedMealClient() {
 
   const saveToFavorites = async () => {
     if (!active) return
+    const nutritionError = recommendationNutritionError(currentItems)
+    if (nutritionError) { setError(nutritionError); return }
     const totals = draftTotals
     const favorites = Array.isArray((userData as any)?.favorites) ? ((userData as any).favorites as any[]) : []
     const payload = {
@@ -727,6 +704,8 @@ export default function RecommendedMealClient() {
 
   const addToDiary = async () => {
     if (!active) return
+    const nutritionError = recommendationNutritionError(currentItems)
+    if (nutritionError) { setError(nutritionError); return }
     const totals = normalizeTotalsForFoodLog(draftTotals)
     const nutritionPayload = {
       ...totals,

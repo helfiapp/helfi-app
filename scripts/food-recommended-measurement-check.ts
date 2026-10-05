@@ -4,6 +4,7 @@ import vm from 'node:vm'
 import ts from 'typescript'
 import { execFileSync } from 'node:child_process'
 import * as measurements from '../lib/food/serving-measurements'
+import * as nutrients from '../lib/food/nutrient-values'
 import { DRY_FOOD_MEASUREMENTS } from '../lib/food/dry-food-measurements'
 import { PRODUCE_MEASUREMENTS } from '../lib/food/produce-measurements'
 import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '../lib/food/dairy-semi-solid-measurements'
@@ -15,7 +16,7 @@ const baseline = process.argv.includes('--baseline')
 const source = ts.createSourceFile(path, baseline ? execFileSync('git', ['show', `HEAD:${path}`], { encoding: 'utf8' }) : fs.readFileSync(path, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 let slots: any[] = [], dependencies: any[][] = [], effects: (() => void)[] = [], cursor = 0, effectCursor = 0, changed = false
 const context = vm.createContext({
-  ...measurements, DRY_FOOD_MEASUREMENTS, PRODUCE_MEASUREMENTS, DAIRY_SEMI_SOLID_MEASUREMENTS,
+  ...measurements, ...nutrients, DRY_FOOD_MEASUREMENTS, PRODUCE_MEASUREMENTS, DAIRY_SEMI_SOLID_MEASUREMENTS,
   NutrientCards: 'NutrientCards',
   createElement: (type: any, props: any, ...children: any[]) => ({ type, props: props || {}, children: children.flat() }),
   useMemo: (fn: any) => fn(),

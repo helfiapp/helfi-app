@@ -52,6 +52,251 @@
     "result": "PASS full production build/type checks/prebuild",
     "lockScope": "RecommendedIngredientCard only; all278 web/shared and79 native locks pass; protected regions pass"
   },
-  "liveRuntime": "pending",
-  "remaining": "Recommended parent missing-value aggregation, broader food/photo/model and final signed Apple/Google matrix remain open; no Apple/Google submission."
+  "liveRuntime": {
+    "result": "PASS normal signed-in existing Chrome rendered UI",
+    "GenerateFirstAfterReload": true,
+    "originalHistoryChoice": "Chicken, rice and vegetable bowl",
+    "originalOilLabel": "1 tsp",
+    "originalOilUnits": [
+      "serving"
+    ],
+    "inventedGramsAndOliveFruitCupsRemoved": true,
+    "oilPreviews": [
+      {
+        "servings": 1,
+        "calories": 40,
+        "fat": 4.5,
+        "mealCalories": 429
+      },
+      {
+        "servings": 0.5,
+        "calories": 20,
+        "fat": 2.3,
+        "mealCalories": 409
+      },
+      {
+        "servings": 2,
+        "calories": 80,
+        "fat": 9,
+        "mealCalories": 469
+      },
+      {
+        "servings": 1,
+        "calories": 40,
+        "fat": 4.5,
+        "mealCalories": 429
+      }
+    ],
+    "chickenPreviews": [
+      {
+        "grams": 120,
+        "calories": 198,
+        "mealCalories": 429
+      },
+      {
+        "ounces": 4.2328754339496495,
+        "calories": 198,
+        "mealCalories": 429
+      },
+      {
+        "grams": 60,
+        "calories": 99,
+        "protein": 18.6,
+        "fat": 2.2,
+        "mealCalories": 330
+      },
+      {
+        "grams": 120,
+        "calories": 198,
+        "mealCalories": 429
+      }
+    ],
+    "sixIngredientAndMealCards": true,
+    "credits": 619,
+    "all20DiaryRowsUnchanged": true,
+    "storedHistoryUnchanged": true,
+    "savedNoNewMeal": true,
+    "screenshots": [
+      "web-recommended-oil-half-cards.jpg",
+      "web-recommended-chicken-half-cards.jpg",
+      "web-recommended-oil-restored-cards.jpg"
+    ],
+    "limits": "Density, AU/non-AU and recorded provider conversions use actual synthetic component fixtures; runtime history exercises count-only oil and measured chicken. This does not certify newly generated model accuracy or signed stores."
+  },
+  "remaining": "Recommended parent missing-value aggregation, broader food/photo/model and final signed Apple/Google matrix remain open; no Apple/Google submission.",
+  "recordsBefore": {
+    "verifiedAt": "2026-10-05T05:37:05.890Z",
+    "diaryCount": 20,
+    "allDiaryRecordsHash": "655164280f2187f6b3dabb6a7d14752c6fd8f66130be3c338045a16b149961d7",
+    "historyRecordsHash": "4125abd33f1b4cd6c5bbd7e153f71228227c85ef4b8ac93671405b6df8ef4ae1",
+    "originalRecipe": {
+      "id": "air-fallback-1781889050934-6404ba20b8451",
+      "mealName": "Chicken, rice and vegetable bowl",
+      "items": [
+        {
+          "name": "Chicken breast",
+          "serving_size": "120 g cooked",
+          "calories": 198,
+          "protein_g": 37.2,
+          "carbs_g": 0,
+          "fat_g": 4.3,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        },
+        {
+          "name": "Cooked rice",
+          "serving_size": "120 g",
+          "calories": 156,
+          "protein_g": 3.2,
+          "carbs_g": 34.2,
+          "fat_g": 0.3,
+          "fiber_g": 0.5,
+          "sugar_g": 0.1,
+          "servings": 1
+        },
+        {
+          "name": "Broccoli",
+          "serving_size": "100 g",
+          "calories": 35,
+          "protein_g": 2.4,
+          "carbs_g": 7.2,
+          "fat_g": 0.4,
+          "fiber_g": 3.3,
+          "sugar_g": 1.4,
+          "servings": 1
+        },
+        {
+          "name": "Olive oil",
+          "serving_size": "1 tsp",
+          "calories": 40,
+          "protein_g": 0,
+          "carbs_g": 0,
+          "fat_g": 4.5,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        }
+      ],
+      "totals": {
+        "calories": 429,
+        "protein_g": 42.8,
+        "carbs_g": 41.4,
+        "fat_g": 9.5,
+        "fiber_g": 3.8,
+        "sugar_g": 1.5
+      }
+    }
+  },
+  "deployment": {
+    "verifiedAt": "2026-10-05T05:42:32.445Z",
+    "summary": {
+      "jobId": "70",
+      "status": "SUCCEED",
+      "commitId": "c199981d6e6224fe4e138ec583eacea1c3d57ced"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"wqbymcxdxy1z15\"",
+        "via": "1.1 90e357f79129076605b5cfbfea2e329c.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"wqbymcxdxy1z15\"",
+        "via": "1.1 dbb6b920c5cfab7c5dbd93c18314d8ce.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "recordsAfter": {
+    "verifiedAt": "2026-10-05T05:45:00.271Z",
+    "diaryCount": 20,
+    "allDiaryRecordsHash": "655164280f2187f6b3dabb6a7d14752c6fd8f66130be3c338045a16b149961d7",
+    "historyRecordsHash": "4125abd33f1b4cd6c5bbd7e153f71228227c85ef4b8ac93671405b6df8ef4ae1",
+    "originalRecipe": {
+      "id": "air-fallback-1781889050934-6404ba20b8451",
+      "mealName": "Chicken, rice and vegetable bowl",
+      "items": [
+        {
+          "name": "Chicken breast",
+          "serving_size": "120 g cooked",
+          "calories": 198,
+          "protein_g": 37.2,
+          "carbs_g": 0,
+          "fat_g": 4.3,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        },
+        {
+          "name": "Cooked rice",
+          "serving_size": "120 g",
+          "calories": 156,
+          "protein_g": 3.2,
+          "carbs_g": 34.2,
+          "fat_g": 0.3,
+          "fiber_g": 0.5,
+          "sugar_g": 0.1,
+          "servings": 1
+        },
+        {
+          "name": "Broccoli",
+          "serving_size": "100 g",
+          "calories": 35,
+          "protein_g": 2.4,
+          "carbs_g": 7.2,
+          "fat_g": 0.4,
+          "fiber_g": 3.3,
+          "sugar_g": 1.4,
+          "servings": 1
+        },
+        {
+          "name": "Olive oil",
+          "serving_size": "1 tsp",
+          "calories": 40,
+          "protein_g": 0,
+          "carbs_g": 0,
+          "fat_g": 4.5,
+          "fiber_g": 0,
+          "sugar_g": 0,
+          "servings": 1
+        }
+      ],
+      "totals": {
+        "calories": 429,
+        "protein_g": 42.8,
+        "carbs_g": 41.4,
+        "fat_g": 9.5,
+        "fiber_g": 3.8,
+        "sugar_g": 1.5
+      }
+    }
+  },
+  "newOpenFinding": {
+    "surface": "Recommended parent summary/progress vs six meal cards",
+    "trigger": "Chicken120g\u219260g with original oil1serving",
+    "summaryFat": "7.3g",
+    "cardFat": "7.4g",
+    "causeToReview": "Different display rounding at the same fractional total; parent missing-value aggregation/save separately still substitutes0."
+  }
 }

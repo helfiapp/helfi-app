@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify70, both helfi.ai/www.helfi.ai200CloudFront/newmatchingetagwqbymcxdxy1z15.
+- Date/time: 5October2026, verified05:42:32UTC (16:42 Melbourne).
+- What changed: c199981d6e6224fe4e138ec583eacea1c3d57ced; recommended ingredient recorded bases/density/regional measures and precise serving counts replace invented weights. Native unchanged.
+- Where to see it (page/link): https://helfi.ai/food — Add to Lunch → Recommended → explicit existing chicken/rice bowl history → Ingredients.
+- What to quickly test: original unweighed oil1tsp stays count-only; .5/1/2 servings20/40/80kcal and sixcards. Measured chicken120g198↔4.2328754339496495oz198;60g99; restoredmeal429. Actual normal previews restored originals, all20saved diary rows and stored history hashes unchanged, credits619. Fullproductionbuild44140exit0/protected/278+79locks PASS. Parent missing-value/rounding review and fullphoto/model/signed stores remain open.
+
+DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 4:11pm Melbourne; real portion Save/web-iPhone reopen verified 4:20pm.
 - What changed: Task69 root saved-food Update preserves the exact original timestamp unless the displayed clock changes. Source684f16091936c5ee057e51d406c70cb77cf26856; AWS69 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag17b2f9s3qow1z15.
