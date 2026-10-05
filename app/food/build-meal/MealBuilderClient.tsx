@@ -5704,12 +5704,13 @@ export default function MealBuilderClient() {
     if (!itemsForSave || itemsForSave.length === 0) return
 
     // Loading/collapsing an existing meal is read-only. Only edits after this
-    // baseline (or a deliberately restored draft) may trigger an autosave.
+    // baseline may trigger an autosave. Restored drafts remain editable, but
+    // restoring one alone must not write over the server record.
     if (diaryAutosaveBaselineRef.current !== sourceLogId) {
       const initial = buildDiaryAutosaveBundle()
       if (!initial) return
       diaryAutosaveBaselineRef.current = sourceLogId
-      if (!draftAppliedRef.current) lastDiaryAutosaveSignatureRef.current = initial.signature
+      lastDiaryAutosaveSignatureRef.current = initial.signature
     }
 
     try {

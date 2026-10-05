@@ -80,6 +80,9 @@ async function run() {
     const autosave = effect('lastDiaryAutosaveSignatureRef.current')
     autosave(); for (const timer of timers.splice(0)) await timer()
     assert.equal(writes, 0, 'hydration must not PUT the meal')
+    ctx.draftAppliedRef.current = true; ctx.diaryAutosaveBaselineRef.current = null; ctx.lastDiaryAutosaveSignatureRef.current = ''
+    autosave(); for (const timer of timers.splice(0)) await timer()
+    assert.equal(writes, 0, 'restoring a local draft is also read-only until an edit or explicit Save')
     ctx.entryTime = '15:00'; autosave(); for (const timer of timers.splice(0)) await timer()
     assert.equal(writes, 1); assert.equal(vm.runInContext('extractTimeFromTimestamp', ctx)(latestBody.createdAt), '15:00')
     autosave(); for (const timer of timers.splice(0)) await timer(); assert.equal(writes, 1, 'unchanged render does not duplicate save')
