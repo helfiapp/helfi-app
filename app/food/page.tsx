@@ -30,6 +30,7 @@ import { useSession, signOut } from 'next-auth/react'
 import Link from 'next/link'
 import Image from 'next/image'
 import DailyMacroSummary from '@/components/food/DailyMacroSummary'
+import NutrientCards from '@/components/food/NutrientCards'
 import RollerTimePicker from '@/components/food/RollerTimePicker'
 import { usePathname, useRouter } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
@@ -23375,6 +23376,12 @@ Please add nutritional information manually if needed.`);
                         </div>
                       </div>
                     </div>
+                  )}
+
+                  {(analyzedNutrition || analyzedItems.length > 0) && (
+                    <section aria-label="Nutrient results" data-testid="food-result-nutrient-cards" className="mb-6 mt-3 px-4 sm:px-6">
+                      <NutrientCards values={analyzedNutrition || {}} energyUnit={energyUnit} />
+                    </section>
                   )}
 
                   {/* Mobile + non-editing macro layout (photo on top, circle + vertical labels beneath) */}

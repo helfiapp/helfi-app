@@ -1,5 +1,21 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05 11:50:39 UTC
+- What changed: Counted-food calorie correction now preserves nutrition already covering the whole stated portion, requires smaller-portion evidence before scaling conflicting egg labels, retains unknown nutrients and refreshes changed-count totals.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Multiple-egg photo nutrition must not multiply twice; alreadywhole3egg250 and alreadywhole2egg140 fixtures retained, genuine70->three210 correction preserved exactlyonce. Fresh normal production breakfast photo recheck running.
+- Verified source: 2c5a023ee6fd519c00d06c4e633808eb6e8ef257 / AWS86 BUILD-DEPLOY-VERIFY SUCCEED; both live domains200CloudFront/new matching ETag cob4f0rjyn1z15. Model unchanged; six photo-summary cards and signed stores/model comparison remain open.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05 11:41:42 UTC
+- What changed: Counted-food scaling preserves missing fibre/sugar rather than creating zero. Complete-chain singular-label refinement follows as the same calculation task.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: A corrected counted portion retains unknown nutrients; no repeated whole-portion multiplication. Fresh photo retest follows final count refinement.
+- Verified source: 43a28d697790fa6ce3671cf18e314e47ff700f33 / AWS85 all steps SUCCEED; both live domains200CloudFront/new matching ETag rad2d51n211z15. No production-model/UI/native/credit/history change; full release goal remains open.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-05 11:33:48 UTC
 - What changed: Initial counted-egg correction preserves a whole three-egg portion instead of multiplying it again; refreshes changed-count totals and per-serving weights. Final same-task missing-value refinement still pending.
 - Where to see it (page/link): https://helfi.ai/food

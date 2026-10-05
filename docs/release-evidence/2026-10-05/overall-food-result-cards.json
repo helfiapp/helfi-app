@@ -1,0 +1,41 @@
+{
+  "scope": 88,
+  "recordedAt": "2026-10-05T12:01:30.821656+00:00",
+  "status": "ACTUAL_SUMMARY_JSX_32_CARD_RENDERS_FULL_PRODUCTION_BUILD_PASS_DEPLOY_PENDING",
+  "baselineSource": "2c5a023ee6fd519c00d06c4e633808eb6e8ef257",
+  "baselineFailure": "Common overall-result nutrient-card block absent; actual JSX presence fixture fails. Real photo summary shows only chart and labels.",
+  "implementation": "Reuse existing shared NutrientCards in the common food-result area whenever totals or ingredient results exist, independent of editing/photo/viewport; all-unknown results retain six cards.",
+  "fixtureCommand": "npm run check:food-result-cards",
+  "renderedCases": 32,
+  "emptyPreAnalysisStatePassed": true,
+  "cases": [
+    "fresh photo and saved entry branch flags",
+    "photo/no photo branch flags",
+    "kcal and kJ",
+    "known values, missing optional values, all known zero, all unknown",
+    "existing six colours and accessible labels",
+    "no mutation of source nutrition or items",
+    "no hidden/editing-specific gates"
+  ],
+  "build": "7874 exit0",
+  "automaticPrebuildGuard": true,
+  "pageLocks": {
+    "web": 278,
+    "native": 79,
+    "status": "PASS",
+    "changedSnapshots": [
+      "app/food/page.tsx"
+    ]
+  },
+  "protectedRegions": "PASS",
+  "nutritionMathChanged": false,
+  "modelChanged": false,
+  "nativeChanged": false,
+  "sharedCardComponentChanged": false,
+  "billingChanged": false,
+  "historyChanged": false,
+  "apiChanged": false,
+  "deployment": null,
+  "actualLiveResult": null,
+  "wholeGoalComplete": false
+}
