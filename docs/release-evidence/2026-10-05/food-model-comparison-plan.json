@@ -191,5 +191,12 @@
     "Selection quality/California cafeteria coverage limits; no modelresults usedforselection"
   ],
   "results": [],
-  "updatedAt": "2026-10-05T10:48:18.591664+00:00"
+  "updatedAt": "2026-10-05T10:58:02.917645+00:00",
+  "publicAssetVerification": {
+    "sourceCommit": "e295b3b38f62372b065e2b6c7eac1d1cb11330d4",
+    "awsJob": "83",
+    "verifiedAt": "2026-10-05T10:57:03.735Z",
+    "allSixImagesAndAttribution": "200/exact SHA match",
+    "modelCalls": 0
+  }
 }

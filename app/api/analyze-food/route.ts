@@ -347,8 +347,18 @@ const enforceEggCountFromAnalysis = (items: any[] | null | undefined, analysis: 
     return items;
   }
 
-  const factor = inferredCount / Math.max(Number(first.servings) || 1, 1);
-  const scaleField = (v: any) => (Number.isFinite(Number(v)) ? Math.round(Number(v) * factor * 10) / 10 : null);
+  // Nutrition is already for the complete serving label, not for one egg.
+  // Only an explicit structured count tells us how that portion can be scaled.
+  const currentCount = extractExplicitPieceCount(
+    `${first.name || ''} ${first.serving_size || ''}`, ['egg', 'eggs'],
+  );
+  if (!currentCount) return items;
+  if (currentCount === inferredCount && Number(first.servings) === 1) return items;
+  const factor = inferredCount / currentCount;
+  const scaleField = (v: any) => {
+    const value = foodNumberOrNull(v);
+    return value === null ? null : Math.round(value * factor * 10) / 10;
+  };
 
   first.serving_size = `${inferredCount} eggs`;
   first.servings = 1;
@@ -360,6 +370,8 @@ const enforceEggCountFromAnalysis = (items: any[] | null | undefined, analysis: 
   first.fat_g = scaleField(first.fat_g);
   if (first.fiber_g !== null && first.fiber_g !== undefined) first.fiber_g = scaleField(first.fiber_g);
   if (first.sugar_g !== null && first.sugar_g !== undefined) first.sugar_g = scaleField(first.sugar_g);
+  const currentWeight = foodNumberOrNull(first.customGramsPerServing);
+  if (currentWeight !== null && currentWeight > 0) first.customGramsPerServing = currentWeight * factor;
 
   next[0] = first;
   return next;
@@ -1782,7 +1794,6 @@ const harmonizeDiscretePortionItems = (
       Number.isFinite(Number(item?.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1;
 
     const piecesPerServing = explicitCount;
-    const totalPieces = Math.max(1, existingServings * piecesPerServing);
 
     item.servings = Math.round(existingServings * 1000) / 1000;
     (item as any).piecesPerServing = piecesPerServing;
@@ -1813,7 +1824,8 @@ const harmonizeDiscretePortionItems = (
         item.serving_size = label;
       }
 
-      const totalPiecesForMacros = Math.max(totalPieces, piecesPerServing * item.servings);
+      // Item macros are per serving; servings are applied only when computing totals.
+      const totalPiecesForMacros = piecesPerServing;
       const calories = Number(item?.calories ?? NaN);
       const protein = Number(item?.protein_g ?? NaN);
       const fat = Number(item?.fat_g ?? NaN);
@@ -1834,7 +1846,8 @@ const harmonizeDiscretePortionItems = (
 
       // If the "total" looks like it's only for a single piece, prefer scaling the model's numbers
       // (this keeps photo-specific portion sizes), otherwise fall back to conservative defaults.
-      if (caloriesLow && (proteinLow || fatLow)) {
+      if (caloriesLow && (proteinLow || fatLow) && totalPiecesForMacros > 1 &&
+          Number.isFinite(calories) && calories > 0 && calories <= defaults.caloriesPerPiece * 1.5) {
         const looksLikePerPieceCalories = Number.isFinite(calories) && calories >= defaults.caloriesPerPiece * 0.6;
         if (looksLikePerPieceCalories) {
           const mult = totalPiecesForMacros;
@@ -4291,10 +4304,11 @@ CRITICAL REQUIREMENTS:
       }
     }
 
-    // Egg-specific enforcement: if analysis text says "two eggs" (or any number >=2),
-    // force the payload to that count, with pieces/serving_size updated and macros scaled.
+    // Align an explicitly counted egg serving with the analysis without recounting
+    // a portion that already covers that many eggs.
+    const eggCountItemsBefore = resp.items;
     resp.items = enforceEggCountFromAnalysis(resp.items, analysis);
-    if (resp.items && (!resp.total || !isPlausibleTotal(resp.total))) {
+    if (resp.items && (eggCountItemsBefore !== resp.items || !resp.total || !isPlausibleTotal(resp.total))) {
       resp.total = computeTotalsFromItems(resp.items);
     }
     if (resp.items && Array.isArray(resp.items) && resp.items.length > 0) {

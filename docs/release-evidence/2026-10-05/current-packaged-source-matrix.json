@@ -1,0 +1,703 @@
+{
+  "task": 85,
+  "checkedAt": "2026-10-05T11:07:04.858363+00:00",
+  "status": "SOURCE_ID_AND_WEB_PORTION_PASS_CURRENT_PACKAGE_FORMULATION_UNCERTIFIED",
+  "readOnly": true,
+  "liveSourceCommit": "e295b3b38f62372b065e2b6c7eac1d1cb11330d4",
+  "actualBrowserSearch": {
+    "url": "https://helfi.ai/api/food-data?source=auto&q=Bega+Crunchy+Peanut+Butter&kind=packaged&limit=20&country=AU",
+    "status": 200,
+    "body": {
+      "success": true,
+      "source": "auto",
+      "items": [
+        {
+          "source": "openfoodfacts",
+          "id": "9352042000137",
+          "name": "Peanut Butter Crunchy",
+          "brand": "Bega",
+          "serving_size": "1 portion (22 g)",
+          "calories": 137,
+          "protein_g": 5.3,
+          "carbs_g": 2.6,
+          "fat_g": 11.6,
+          "fiber_g": 1.6,
+          "sugar_g": 1.7,
+          "basis": "per_serving",
+          "energyUnit": "kcal"
+        },
+        {
+          "source": "openfoodfacts",
+          "id": "3352642000137",
+          "name": "Crunchy peanut butter",
+          "brand": "Bega",
+          "serving_size": "22g",
+          "calories": 137,
+          "protein_g": 5.24,
+          "carbs_g": 2.93,
+          "fat_g": 11.3,
+          "fiber_g": null,
+          "sugar_g": 1.74,
+          "basis": "per_serving",
+          "energyUnit": "kcal"
+        },
+        {
+          "source": "openfoodfacts",
+          "id": "93650076",
+          "name": "Kraft Crunchy Peanut Butter",
+          "brand": "Bega",
+          "serving_size": "100 g",
+          "calories": 616,
+          "protein_g": 24,
+          "carbs_g": 13.4,
+          "fat_g": 51.3,
+          "fiber_g": null,
+          "sugar_g": 8.4,
+          "basis": "per_serving",
+          "energyUnit": "kcal"
+        },
+        {
+          "source": "openfoodfacts",
+          "id": "5336536992799",
+          "name": "Simply crunchy peanut butter",
+          "brand": "Bega",
+          "serving_size": "22.0g",
+          "calories": 131,
+          "protein_g": 6.05,
+          "carbs_g": 2.49,
+          "fat_g": 10.8,
+          "fiber_g": null,
+          "sugar_g": 1.17,
+          "basis": "per_serving",
+          "energyUnit": "kcal"
+        },
+        {
+          "source": "openfoodfacts",
+          "id": "9352042002599",
+          "name": "Simply Nuts Crunchy Peanut Butter",
+          "brand": "Bega",
+          "serving_size": "22 g",
+          "calories": 135,
+          "protein_g": 6.1,
+          "carbs_g": 2.2,
+          "fat_g": 11.1,
+          "fiber_g": 1.8,
+          "sugar_g": 1.2,
+          "basis": "per_serving",
+          "energyUnit": "kcal"
+        }
+      ]
+    }
+  },
+  "quickLocalSearch": {
+    "url": "https://helfi.ai/api/food-data?source=auto&q=bega+butter&kind=packaged&limit=20&country=AU&localOnly=1",
+    "status": 200,
+    "body": {
+      "success": true,
+      "source": "auto",
+      "items": []
+    }
+  },
+  "onePublicEndpointRead": {
+    "url": "https://helfi.ai/api/food-data?source=auto&q=Bega+Crunchy+Peanut+Butter&kind=packaged&limit=20&country=AU",
+    "status": 200,
+    "verifiedAt": "2026-10-05T11:01:53.093Z",
+    "body": {
+      "success": true,
+      "source": "auto",
+      "items": []
+    }
+  },
+  "publicEndpointLimit": "Separate unauthenticated publicread returned empty; actual normalpage search with samequery returned5OFFitems. No universalprovideravailability claim.",
+  "selectedReference": {
+    "url": "https://world.openfoodfacts.org/api/v2/product/9352042000137.json",
+    "status": 200,
+    "code": "9352042000137",
+    "name": "Peanut Butter Crunchy",
+    "brands": "Bega",
+    "quantity": "375 g",
+    "serving_size": "1 portion (22 g)",
+    "nutriments": {
+      "added-sugars": 33.0578512396694,
+      "added-sugars_100g": 33.0578512396694,
+      "added-sugars_serving": 7.27,
+      "added-sugars_unit": "g",
+      "added-sugars_value": 33.0578512396694,
+      "caffeine": 0,
+      "caffeine_100g": 0,
+      "caffeine_serving": 0,
+      "caffeine_unit": "g",
+      "caffeine_value": 0,
+      "carbohydrates": 11.8181818181818,
+      "carbohydrates_100g": 11.8181818181818,
+      "carbohydrates_serving": 2.6,
+      "carbohydrates_unit": "g",
+      "carbohydrates_value": 11.8181818181818,
+      "choline": 0,
+      "choline_100g": 0,
+      "choline_serving": 0,
+      "choline_unit": "g",
+      "choline_value": 0,
+      "copper": 0,
+      "copper_100g": 0,
+      "copper_serving": 0,
+      "copper_unit": "g",
+      "copper_value": 0,
+      "energy": 2609,
+      "energy-kcal": 623.587693377368,
+      "energy-kcal_100g": 623.587693377368,
+      "energy-kcal_serving": 137,
+      "energy-kcal_unit": "kcal",
+      "energy-kcal_value": 623.587693377368,
+      "energy_100g": 2609,
+      "energy_serving": 574,
+      "energy_unit": "kJ",
+      "energy_value": 2609,
+      "fat": 52.7272727272727,
+      "fat_100g": 52.7272727272727,
+      "fat_serving": 11.6,
+      "fat_unit": "g",
+      "fat_value": 52.7272727272727,
+      "fiber": 7.27272727272727,
+      "fiber_100g": 7.27272727272727,
+      "fiber_serving": 1.6,
+      "fiber_unit": "g",
+      "fiber_value": 7.27272727272727,
+      "iron": 0,
+      "iron_100g": 0,
+      "iron_serving": 0,
+      "iron_unit": "g",
+      "iron_value": 0,
+      "magnesium": 0.743801652892564,
+      "magnesium_100g": 0.743801652892564,
+      "magnesium_serving": 0.164,
+      "magnesium_unit": "g",
+      "magnesium_value": 0.743801652892564,
+      "manganese": 0,
+      "manganese_100g": 0,
+      "manganese_serving": 0,
+      "manganese_unit": "g",
+      "manganese_value": 0,
+      "nova-group": 13.6363636363636,
+      "nova-group_100g": 13.6363636363636,
+      "nova-group_serving": 13.6363636363636,
+      "nova-group_unit": "",
+      "nova-group_value": 13.6363636363636,
+      "phosphorus": 0,
+      "phosphorus_100g": 0,
+      "phosphorus_serving": 0,
+      "phosphorus_unit": "g",
+      "phosphorus_value": 0,
+      "proteins": 24.0909090909091,
+      "proteins_100g": 24.0909090909091,
+      "proteins_serving": 5.3,
+      "proteins_unit": "g",
+      "proteins_value": 24.0909090909091,
+      "salt": 1.35227272727273,
+      "salt_100g": 1.35227272727273,
+      "salt_serving": 0.297,
+      "salt_unit": "g",
+      "salt_value": 1.35227272727273,
+      "saturated-fat": 10.4545454545455,
+      "saturated-fat_100g": 10.4545454545455,
+      "saturated-fat_serving": 2.3,
+      "saturated-fat_unit": "g",
+      "saturated-fat_value": 10.4545454545455,
+      "selenium": 0,
+      "selenium_100g": 0,
+      "selenium_serving": 0,
+      "selenium_unit": "g",
+      "selenium_value": 0,
+      "sodium": 0.540909090909091,
+      "sodium_100g": 0.540909090909091,
+      "sodium_serving": 0.119,
+      "sodium_unit": "g",
+      "sodium_value": 0.540909090909091,
+      "starch": 0,
+      "starch_100g": 0,
+      "starch_serving": 0,
+      "starch_unit": "g",
+      "starch_value": 0,
+      "sugars": 7.72727272727273,
+      "sugars_100g": 7.72727272727273,
+      "sugars_serving": 1.7,
+      "sugars_unit": "g",
+      "sugars_value": 7.72727272727273,
+      "trans-fat": 4.54545454545455,
+      "trans-fat_100g": 4.54545454545455,
+      "trans-fat_serving": 1,
+      "trans-fat_unit": "g",
+      "trans-fat_value": 4.54545454545455,
+      "vitamin-a": 0,
+      "vitamin-a_100g": 0,
+      "vitamin-a_serving": 0,
+      "vitamin-a_unit": "g",
+      "vitamin-a_value": 0,
+      "vitamin-c": 0,
+      "vitamin-c_100g": 0,
+      "vitamin-c_serving": 0,
+      "vitamin-c_unit": "g",
+      "vitamin-c_value": 0,
+      "vitamin-e": 0,
+      "vitamin-e_100g": 0,
+      "vitamin-e_serving": 0,
+      "vitamin-e_unit": "g",
+      "vitamin-e_value": 0,
+      "vitamin-k": 0,
+      "vitamin-k_100g": 0,
+      "vitamin-k_serving": 0,
+      "vitamin-k_unit": "g",
+      "vitamin-k_value": 0,
+      "zinc": 0,
+      "zinc_100g": 0,
+      "zinc_serving": 0,
+      "zinc_unit": "g",
+      "zinc_value": 0
+    },
+    "qualityErrors": [],
+    "last_modified_t": 1769839380
+  },
+  "labelReferences": [
+    {
+      "url": "https://www.coles.com.au/product/bega-spread-peanut-butter-crunchy-470g-5390911",
+      "identity": "Bega original crunchy470g retailer listing",
+      "per22g": {
+        "energyKj": 574,
+        "protein": 5.3,
+        "carbs": 2.6,
+        "fat": 11.6,
+        "fibre": 1.6,
+        "sugar": 1.7
+      },
+      "per100g": {
+        "energyKj": 2610,
+        "protein": 23.9,
+        "carbs": 11.8,
+        "fat": 52.5,
+        "fibre": 7,
+        "sugar": 7.9
+      },
+      "ingredients": "86% roastedpeanuts; vegetableoil/sugar/salt"
+    },
+    {
+      "url": "https://begapeanutbutter.com.au/our-range/",
+      "identity": "Manufacturer original crunchy470g",
+      "per22g": {
+        "energyKj": 568,
+        "protein": 5.2,
+        "carbs": 3,
+        "fat": 11.3,
+        "sugar": 1.9,
+        "fibre": null
+      },
+      "per100g": {
+        "energyKj": 2580,
+        "protein": 23.7,
+        "carbs": 13.4,
+        "fat": 51.3,
+        "sugar": 8.4,
+        "fibre": null
+      },
+      "ingredients": "85% roastedpeanuts; vegetableoil/sugar/salt"
+    }
+  ],
+  "identityBoundary": "OFF source barcode9352042000137 reports375g; currentretailer/manufacturer470g panels differ. All6selected22gvaluesmatchretailerper-serving rounding; no physicalcurrentbarcode/formulation proof. Preserve historicalSanitarium two distinctbarcodes636/590; no globalrewrite or guessed currentlabel substitution.",
+  "webPortions": [
+    {
+      "grams": 22,
+      "nutrientCards": [
+        [
+          "Calories",
+          "137 kcal"
+        ],
+        [
+          "Protein",
+          "5.3 g"
+        ],
+        [
+          "Carbs",
+          "2.6 g"
+        ],
+        [
+          "Fat",
+          "11.6 g"
+        ],
+        [
+          "Fibre",
+          "1.6 g"
+        ],
+        [
+          "Sugar",
+          "1.7 g"
+        ]
+      ]
+    },
+    {
+      "grams": 11,
+      "nutrientCards": [
+        [
+          "Calories",
+          "69 kcal"
+        ],
+        [
+          "Protein",
+          "2.7 g"
+        ],
+        [
+          "Carbs",
+          "1.3 g"
+        ],
+        [
+          "Fat",
+          "5.8 g"
+        ],
+        [
+          "Fibre",
+          "0.8 g"
+        ],
+        [
+          "Sugar",
+          "0.9 g"
+        ]
+      ]
+    },
+    {
+      "grams": 44,
+      "nutrientCards": [
+        [
+          "Calories",
+          "274 kcal"
+        ],
+        [
+          "Protein",
+          "10.6 g"
+        ],
+        [
+          "Carbs",
+          "5.2 g"
+        ],
+        [
+          "Fat",
+          "23.2 g"
+        ],
+        [
+          "Fibre",
+          "3.2 g"
+        ],
+        [
+          "Sugar",
+          "3.4 g"
+        ]
+      ]
+    },
+    {
+      "grams": 100,
+      "nutrientCards": [
+        [
+          "Calories",
+          "623 kcal"
+        ],
+        [
+          "Protein",
+          "24.1 g"
+        ],
+        [
+          "Carbs",
+          "11.8 g"
+        ],
+        [
+          "Fat",
+          "52.7 g"
+        ],
+        [
+          "Fibre",
+          "7.3 g"
+        ],
+        [
+          "Sugar",
+          "7.7 g"
+        ]
+      ]
+    }
+  ],
+  "renderedScreenshot": "docs/release-evidence/2026-10-05/web-bega-22g-six-cards.png",
+  "renderedColors": "Visually inspected all6orange/blue/green/purple/yellow/pink",
+  "savePerformed": false,
+  "original23Unchanged": true,
+  "recordsBefore": {
+    "verifiedAt": "2026-10-05T11:04:14.577Z",
+    "readOnly": true,
+    "original23Unchanged": true,
+    "diaryCount": 23,
+    "diaryHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      },
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "hash": "e982c33ff19bf09e3b0b299025437f3deb0fe553f15142bbfc722df7fed6225e"
+      },
+      {
+        "id": "cmuuvpib70001tvel0mwqie66",
+        "hash": "087b826bbcbd58c08a70526ec8199b1a672b64987c695978d7d03a98d64710e4"
+      },
+      {
+        "id": "cmuuyyj7o0001tvsuw8q7707g",
+        "hash": "76ab9c950f4d7a9c41ae00877dd1a829166e95baf940fb9b486e32566836a362"
+      }
+    ],
+    "library": [
+      {
+        "id": "cmkmm5f6fwjdd1305uhxl7fyt",
+        "fdcId": 2317111,
+        "source": "usda_branded",
+        "gtinUpc": "9300652012255",
+        "name": "Sanitarium Crunchy Peanut Butter 500g",
+        "brand": "Sanitarium",
+        "servingSize": "100 g",
+        "calories": 636,
+        "proteinG": 27,
+        "carbsG": 10,
+        "fatG": 53.5,
+        "fiberG": 6,
+        "sugarG": 4,
+        "updatedAt": "2026-10-04T15:40:40.831Z"
+      },
+      {
+        "id": "cmkmm5f6hwjin1305ucx23d6k",
+        "fdcId": 2317301,
+        "source": "usda_branded",
+        "gtinUpc": "9300652800654",
+        "name": "Sanitarium Crunchy Peanut Butter 500g",
+        "brand": "Sanitarium",
+        "servingSize": "100 g",
+        "calories": 590,
+        "proteinG": 30,
+        "carbsG": 8.5,
+        "fatG": 48,
+        "fiberG": 6,
+        "sugarG": 4,
+        "updatedAt": "2026-10-04T15:40:40.831Z"
+      }
+    ]
+  },
+  "recordsAfter": {
+    "verifiedAt": "2026-10-05T11:07:04.809Z",
+    "readOnly": true,
+    "original23Unchanged": true,
+    "diaryCount": 23,
+    "diaryHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+    "diaryRows": [
+      {
+        "id": "cmutweeqt0001ctzo773ksga6",
+        "hash": "9d4bd720de67dbc3ecf6ffddf8ca5de6c586f64f32d8bc068b90e9031b657864"
+      },
+      {
+        "id": "cmuu0dlsr000123yir14fww5q",
+        "hash": "b1aa30c313294e5ed9ee524941158ae51bb5218bbae014aaca373d7c2ad5cc43"
+      },
+      {
+        "id": "cmuu1684800014qk8h44fbqk5",
+        "hash": "1653dda52ed8fcca64d1e7ac7b4309a85361fa00908b6ec9c03fe66860d62be8"
+      },
+      {
+        "id": "cmuu39gk40001pwkllp4rws7h",
+        "hash": "e462257d1546b7b4dfb6dbaf550b99b8f9579427907a311e19b8034ffb48909b"
+      },
+      {
+        "id": "cmuu3xojk000210jd5fhuriiu",
+        "hash": "e3d9332d7dea71fbce8f25f00365c2fa45fef8771a0a4938ab56e9962b45b748"
+      },
+      {
+        "id": "cmuu61tr10001v9b1u5w67dxh",
+        "hash": "5a32f88ef11dfc51e07c4aef8ca8c4d66fc25fc7d1656654ff3e9aa86297be5b"
+      },
+      {
+        "id": "cmuu8iyss00011kmqg6gr2u49",
+        "hash": "60e92f96b9473463ac1b1887c00b56cd19c0d88567388a7a34e5b0a5941e688e"
+      },
+      {
+        "id": "cmuu9l16g0001ycacwf4spqry",
+        "hash": "d7641baffd60d5e19687c3fb10bcbe5573dcd75397d1661052bcfc0edfa232c6"
+      },
+      {
+        "id": "cmuuazzx1000112n14ysydmrq",
+        "hash": "dea066694f15ec9eeed51c5ce52d6436ce5250249a1e10c874ded6f45ebe4ef7"
+      },
+      {
+        "id": "cmuudvn3a0001rww4fljtai6p",
+        "hash": "dd75007ca45715837389c84814ceb087dd160cfe529ac2e838bd9d1e3a242926"
+      },
+      {
+        "id": "cmuueqrbh0001kfrttcssnqpo",
+        "hash": "b37019133e5b289914d2c22e349b7acf4e26aa4dea30e3ddf3cc99813a7754a1"
+      },
+      {
+        "id": "cmuufpm4o0001fhmq4tblo15a",
+        "hash": "de853d6358f28b5643ef3aa2a311c49c387f2ce19917261b2e343882b716dc62"
+      },
+      {
+        "id": "cmuugh97f000110bdsi1jxujt",
+        "hash": "7452fd40c2713a63e4cf76809dc0013ac16b89253de5e6a7e556d095784685f1"
+      },
+      {
+        "id": "cmuuhrvrc0001xhkq337djjfp",
+        "hash": "577050d7f2bca72d84e814393cdb42bc2771d862ca216b40129f15d6705359f1"
+      },
+      {
+        "id": "cmuuids4m0001sjse4uykjojj",
+        "hash": "ab59d5abbc82de3f5c1cba0ac9832831faf772242700f85a2c45cdffee59f00e"
+      },
+      {
+        "id": "cmuujb0jg00011cyh40bs4xcx",
+        "hash": "e67b2894e251a6650df603100143c63af9cc8ab113314170901ad54f135f510b"
+      },
+      {
+        "id": "cmuulbw9f0001dasulwn74c6w",
+        "hash": "54b28dbd3b62908f2fb8d3c7211bea0a7a2a7a23f7a7ee203ea10c4d08c0766d"
+      },
+      {
+        "id": "cmuumzmvc0001c6dmhk4wguy8",
+        "hash": "41bd7cb3361c8609d4361f46e0fa2aec7333873d486c77f25b6dcc8ce2225196"
+      },
+      {
+        "id": "cmuunpqf400017mmimw3zpgjd",
+        "hash": "4916c08316b7c3725c621aac426d4422511ecf965c62edc9d764bdc12d0c13cb"
+      },
+      {
+        "id": "cmuuoomxt0001g1tjuf3n7shr",
+        "hash": "5c34a7539b7b17bd1202b9ef3100c5ae950821674f65656252177fcbe3c956db"
+      },
+      {
+        "id": "cmuuulxfe0001dqwvmhlql68j",
+        "hash": "e982c33ff19bf09e3b0b299025437f3deb0fe553f15142bbfc722df7fed6225e"
+      },
+      {
+        "id": "cmuuvpib70001tvel0mwqie66",
+        "hash": "087b826bbcbd58c08a70526ec8199b1a672b64987c695978d7d03a98d64710e4"
+      },
+      {
+        "id": "cmuuyyj7o0001tvsuw8q7707g",
+        "hash": "76ab9c950f4d7a9c41ae00877dd1a829166e95baf940fb9b486e32566836a362"
+      }
+    ],
+    "library": [
+      {
+        "id": "cmkmm5f6fwjdd1305uhxl7fyt",
+        "fdcId": 2317111,
+        "source": "usda_branded",
+        "gtinUpc": "9300652012255",
+        "name": "Sanitarium Crunchy Peanut Butter 500g",
+        "brand": "Sanitarium",
+        "servingSize": "100 g",
+        "calories": 636,
+        "proteinG": 27,
+        "carbsG": 10,
+        "fatG": 53.5,
+        "fiberG": 6,
+        "sugarG": 4,
+        "updatedAt": "2026-10-04T15:40:40.831Z"
+      },
+      {
+        "id": "cmkmm5f6hwjin1305ucx23d6k",
+        "fdcId": 2317301,
+        "source": "usda_branded",
+        "gtinUpc": "9300652800654",
+        "name": "Sanitarium Crunchy Peanut Butter 500g",
+        "brand": "Sanitarium",
+        "servingSize": "100 g",
+        "calories": 590,
+        "proteinG": 30,
+        "carbsG": 8.5,
+        "fatG": 48,
+        "fiberG": 6,
+        "sugarG": 4,
+        "updatedAt": "2026-10-04T15:40:40.831Z"
+      }
+    ]
+  },
+  "dailyCalories": 2776,
+  "credits": 604,
+  "applicationOrNativeChanges": false,
+  "deploymentPerformed": false,
+  "modelCalls": 0,
+  "remaining": "ActualcurrentphysicalAUpackage identity/label and broaderfullsignedrelease matrix unverified; admin5.6-vs6.1comparison36planned/0run. Next ordinary5.6productionphoto baseline on matchedrecordedweightpublicphotos."
+}

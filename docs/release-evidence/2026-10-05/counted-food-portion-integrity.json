@@ -1,0 +1,55 @@
+{
+  "scope": 87,
+  "updatedAt": "2026-10-05T11:26:05.474942+00:00",
+  "status": "ACTUAL_ROUTE_FIXTURES_FULL_PRODUCTION_BUILD_PASS_DEPLOY_PENDING",
+  "baselineSource": "e295b3b38f62372b065e2b6c7eac1d1cb11330d4",
+  "observedProductionResult": {
+    "wholeEggPortion": "3 eggs",
+    "eggCalories": 750,
+    "wholeMealCalories": 1309,
+    "analysisTextCalories": 809
+  },
+  "oldActualSourceFixture": {
+    "status": "FAIL_REPRODUCED",
+    "wholePortionCalories": 250,
+    "actualAfterEnforcement": 750
+  },
+  "repairedActualSourceFixtures": {
+    "status": "PASS",
+    "wholePortionCalories": 250,
+    "wholeMealCalories": 809,
+    "singleToThreeEggCalories": 210,
+    "repeatNormalizationUnchanged": true,
+    "weightGrams": 150,
+    "doubleServingCalories": 500,
+    "smallerCompletePortionPreserved": true,
+    "baconPerServingPreserved": true,
+    "unknownAndZeroPreserved": true,
+    "inputImmutable": true,
+    "changedCountsRefreshResponseTotal": true
+  },
+  "guardCommand": "npm run check:food-egg-count",
+  "automaticPrebuildGuard": true,
+  "firstBuild": "85829 exit0",
+  "finalBuild": "80559 exit0",
+  "pageLocks": {
+    "web": 278,
+    "native": 79,
+    "status": "PASS",
+    "snapshotChanged": false
+  },
+  "protectedRegions": "PASS",
+  "modelChanged": false,
+  "nativeChanged": false,
+  "uiChanged": false,
+  "creditCodeChanged": false,
+  "databaseChanged": false,
+  "deployment": null,
+  "livePhotoRetest": null,
+  "remaining": [
+    "Model portion estimates still need paired accuracy/speed comparison.",
+    "Photo overall summary six cards require separate display repair.",
+    "Signed Apple/Google release matrix remains open."
+  ],
+  "finalPrebuild": "60480 exit0"
+}

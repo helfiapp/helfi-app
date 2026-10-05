@@ -1,0 +1,264 @@
+{
+  "scope": 86,
+  "recordedAt": "2026-10-05T11:24:36.066171+00:00",
+  "status": "TWO_NORMAL_PRODUCTION_PHOTOS_COMPLETE_APP_COUNT_INFLATION_REPRODUCED",
+  "sourceCommit": "e295b3b38f62372b065e2b6c7eac1d1cb11330d4",
+  "actualNormalPhotoRequests": 2,
+  "matchedAdminComparisonRequests": 0,
+  "productionModelUnchanged": true,
+  "cases": [
+    {
+      "referenceId": "dish_1558546663",
+      "mode": "Homemade/restaurant",
+      "hint": "",
+      "model": "gpt-5.6-sol",
+      "httpStatus": 200,
+      "networkCompletionSeconds": 24.157656,
+      "uiCompletionSeconds": 24,
+      "returnedTotal": {
+        "calories": 266,
+        "protein_g": 7.4,
+        "carbs_g": 32.3,
+        "fat_g": 14.6,
+        "fiber_g": 8.6,
+        "sugar_g": 20.2
+      },
+      "referenceCalories": 330.734009,
+      "returnedCalorieDifference": -64.734009,
+      "returnedCalorieRelativeDifferencePercent": -19.5728,
+      "analysisText": "The plate contains 1 medium apple, roughly 1 oz almonds, and about 1 cup raw spinach. Portion estimates are based on the visible plate proportions; the exact almond and spinach weights are approximate.\n\nComponents: apple, almonds, raw spinach\n\n\n\nApple with almonds and raw spinach (1 medium apple, 1 oz almonds, and 1 cup spinach)\n\nCalories: 266, Protein: 7.4g, Carbs: 32.2g, Fat: 14.6g",
+      "items": [
+        {
+          "name": "Apple",
+          "brand": null,
+          "serving_size": "1 medium apple",
+          "servings": 1,
+          "calories": 95,
+          "protein_g": 0.5,
+          "carbs_g": 25.1,
+          "fat_g": 0.3,
+          "fiber_g": 4.4,
+          "sugar_g": 18.9,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "Almonds",
+          "brand": null,
+          "serving_size": "1 oz (28 g)",
+          "servings": 1,
+          "calories": 164,
+          "protein_g": 6,
+          "carbs_g": 6.1,
+          "fat_g": 14.2,
+          "fiber_g": 3.5,
+          "sugar_g": 1.2,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "Raw spinach",
+          "brand": null,
+          "serving_size": "1 cup (30 g)",
+          "servings": 1,
+          "calories": 7,
+          "protein_g": 0.9,
+          "carbs_g": 1.1,
+          "fat_g": 0.1,
+          "fiber_g": 0.7,
+          "sugar_g": 0.1,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        }
+      ],
+      "nutritionNotice": "Photo nutrition is an estimate. Check the food and portion amounts before saving.",
+      "adminComparison": false
+    },
+    {
+      "referenceId": "dish_1562691064",
+      "mode": "Homemade/restaurant",
+      "hint": "",
+      "model": "gpt-5.6-sol",
+      "httpStatus": 200,
+      "networkCompletionSeconds": 12.645813,
+      "uiCompletionSeconds": 13,
+      "returnedTotal": {
+        "calories": 1309,
+        "protein_g": 69.3,
+        "carbs_g": 116,
+        "fat_g": 65.9,
+        "fiber_g": 12,
+        "sugar_g": 24
+      },
+      "referenceCalories": 555.303711,
+      "returnedCalorieDifference": 753.696289,
+      "returnedCalorieRelativeDifferencePercent": 135.7269,
+      "analysisText": "The plate appears to contain scrambled eggs, roasted potatoes, seasoned rice, broccoli, strawberries, blueberries, and pineapple. Estimated portions are about 3 eggs, \u00be cup potatoes, 1 cup rice, \u00be cup broccoli, \u00bd cup strawberries, \u00bc cup blueberries, and \u00bd cup pineapple; added cooking fat is not separately included because it cannot be measured visually.\n\nScrambled eggs, seasoned rice, roasted potatoes, broccoli, strawberries, blueberries, and pineapple (about 4\u00be cups total)\n\nComponents: scrambled eggs, seasoned rice, roasted potatoes, broccoli, strawberries, blueberries, pineapple\n\n\n\nCalories: 809, Protein: 31.3g, Carbs: 110g, Fat: 29.9g",
+      "items": [
+        {
+          "name": "scrambled eggs",
+          "brand": null,
+          "serving_size": "3 eggs",
+          "servings": 1,
+          "calories": 750,
+          "protein_g": 57,
+          "carbs_g": 9,
+          "fat_g": 54,
+          "fiber_g": 0,
+          "sugar_g": 3,
+          "isGuess": true,
+          "piecesPerServing": 3,
+          "pieces": 3,
+          "customGramsPerServing": 150,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "seasoned rice",
+          "brand": null,
+          "serving_size": "1 cup (8 oz)",
+          "servings": 1,
+          "calories": 240,
+          "protein_g": 5,
+          "carbs_g": 46,
+          "fat_g": 4,
+          "fiber_g": 2,
+          "sugar_g": 2,
+          "isGuess": true,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "roasted potatoes",
+          "brand": null,
+          "serving_size": "3/4 cup (5 oz)",
+          "servings": 1,
+          "calories": 190,
+          "protein_g": 3,
+          "carbs_g": 30,
+          "fat_g": 7,
+          "fiber_g": 3,
+          "sugar_g": 1,
+          "isGuess": true,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "broccoli",
+          "brand": null,
+          "serving_size": "3/4 cup (3.5 oz)",
+          "servings": 1,
+          "calories": 40,
+          "protein_g": 3,
+          "carbs_g": 8,
+          "fat_g": 0.5,
+          "fiber_g": 3,
+          "sugar_g": 2,
+          "isGuess": true,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "strawberries",
+          "brand": null,
+          "serving_size": "1/2 cup (3 oz)",
+          "servings": 1,
+          "calories": 27,
+          "protein_g": 0.5,
+          "carbs_g": 7,
+          "fat_g": 0.2,
+          "fiber_g": 2,
+          "sugar_g": 4,
+          "isGuess": true,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "blueberries",
+          "brand": null,
+          "serving_size": "1/4 cup (1.3 oz)",
+          "servings": 1,
+          "calories": 21,
+          "protein_g": 0.3,
+          "carbs_g": 5,
+          "fat_g": 0.1,
+          "fiber_g": 1,
+          "sugar_g": 4,
+          "isGuess": true,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        },
+        {
+          "name": "pineapple",
+          "brand": null,
+          "serving_size": "1/2 cup (3 oz)",
+          "servings": 1,
+          "calories": 41,
+          "protein_g": 0.5,
+          "carbs_g": 11,
+          "fat_g": 0.1,
+          "fiber_g": 1,
+          "sugar_g": 8,
+          "isGuess": true,
+          "nutritionProvenance": {
+            "status": "ai-estimate",
+            "portionEstimated": true
+          }
+        }
+      ],
+      "nutritionNotice": "Photo nutrition is an estimate. Check the food and portion amounts before saving.",
+      "adminComparison": false
+    }
+  ],
+  "charges": {
+    "before": 604,
+    "afterFirst": 594,
+    "afterSecond": 584,
+    "perRequest": 10,
+    "healthReviewDeclined": true
+  },
+  "noDiarySave": true,
+  "original23Unchanged": true,
+  "diaryHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+  "photoSummarySixCardsMissing": true,
+  "screenshots": [
+    "web-photo-apple-production-summary.png",
+    "web-photo-apple-almonds-expanded.png",
+    "web-photo-mixed-production-summary.png"
+  ],
+  "mixedEggInflation": {
+    "returnedEggCalories": 750,
+    "wholePortionBeforeCountEnforcementReconstructed": 250,
+    "modelAnalysisTextTotalCalories": 809,
+    "deliveredTotalCalories": 1309,
+    "appAddedCalories": 500,
+    "cause": "enforceEggCountFromAnalysis uses inferred egg count divided by servings rather than existing counted serving label; exact actual-source fixture reproduces 250 -> 750",
+    "preEnforcementModelEstimateRelativeDifferencePercent": 45.686
+  },
+  "limits": [
+    "Normal UI may resize/re-encode image; this is not the identical raw-byte/prompt admin comparison.",
+    "Two observations do not establish representative model speed or general photo accuracy.",
+    "Recorded food weights and USDA annotations are references, not laboratory calorie measurements.",
+    "No nutrient ground truth for fibre or sugar.",
+    "Both current-model baseline requests completed; GPT-6.1 has not been compared.",
+    "Removing app count inflation still leaves model portion estimation error to evaluate."
+  ]
+}

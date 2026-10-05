@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify
+- Date/time: 5 October 2026, verified10:56:43UTC (21:56 Melbourne); publicassets verified10:57:03UTC.
+- What changed: Added two unmodified measured-reference food photos and CC-BY4.0 attribution for the existing model comparison. Sourcee295b3b38f62372b065e2b6c7eac1d1cb11330d4/AWS83 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag9nnwpz92ru1z15. Application source unchanged from verified83daily completeness repair.
+- Where to see it (page/link): https://helfi.ai/FOOD%20TEST%20IMAGES/nutrition5k-dish_1558546663.png and https://helfi.ai/FOOD%20TEST%20IMAGES/nutrition5k-dish_1562691064.png.
+- What to quickly test: All6 comparisonphotos and attribution return200/exactoriginalSHA. Weightedreference197g/330.734kcal and501g/555.304kcal totals/ingredients visually/source verified; USDAannotations are not laboratory-calorie or unseen-model proof. Plan6photosx3repeatsx2models=36actualUI/servercalls;0run/adminauthenticationrequired. Production5.6model unchanged; signedstores andfullaudit goal remainopen.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify
 - Date/time:5October2026,verified10:35:36UTC(21:35Melbourne)
 - What changed: Food barcode/favorite daily-after-adding previews preserve incomplete fibre/sugar through calculation and summary display; missing rows show—/Incomplete data without false remaining amounts or percentages. Source3638e308ef1db0c7959a0c2fb67feba2eb38945e/AWS82 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag13u9azx1oo91z15.
 - Where to see it (page/link):https://helfi.ai/food — barcode072036761163 chooserPreview.
