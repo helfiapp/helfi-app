@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 1:15pm Melbourne (02:15UTC).
+- What changed: task63 main native food list follows displayed clock time on the declared meal date, matching website order. Original saved timestamps and entries remain unchanged. Source98a79c5db3f8759a9b52c8a83a230265f9d15d36; AWS61 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetagw4wxd3vpyu1z15. Native source verified in rebuilt Release39 iPhone/iPad simulators; final signed store uploads remain incomplete.
+- Where to see it: native Food Diary meal-category list.
+- What to quickly test: same originalWater12:48,BigMac11:51,Oat11:25,Oat11:08,Soy10:32 now match website. Rebuilt phone/iPad daily1369/915remaining/wallet619; same saved halfmeal sixcards279/P12.3/C22.5/F14.7/FibreMissing/S4.4 preserved. Actual sort timezone/DST/editedtime/history/Favorites-preservation checks, full production build/native typecheck and278/79locks pass. Readonly all10original timestamp/date/identity/metadata rows unchanged; no task63 Save. Fresh live website reload passes. Broader photos/model/signed-store work remains active.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 12:45pm Melbourne (01:45UTC).
 - What changed: task61 native invalid amount previews keep all six colorful cards visible with unavailable values, show an inline correction message and disable Add. Valid portions and genuine zero-calorie foods remain usable. Source a4fbfb7ee4c9e14365066a675a153749c87c3a64; AWS60 BUILD/DEPLOY/VERIFY all SUCCEED. Both domains200/CloudFront/new matching etag keoe1q180c1z15. Native repair is verified in rebuilt Release39 simulators; final signed store uploads remain incomplete.
 - Where to see it: native Food Diary > Add Ingredient > Adjust ingredient.

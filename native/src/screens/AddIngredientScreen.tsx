@@ -18,7 +18,7 @@ import {
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
-import { convertFoodAmount, parseFoodServing } from '../lib/foodUnits'
+import { convertFoodAmount, parseFoodServing, liquidHouseholdMl } from '../lib/foodUnits'
 import { PRODUCE_MEASUREMENTS, type ProduceMeasurement } from '../data/produceMeasurements'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { requestAiDataSharingPermission } from '../lib/aiConsent'
@@ -664,15 +664,14 @@ function convertBaseUnit(value: number, from: 'g' | 'ml' | 'oz' | 'fl oz', to: '
   return convertFoodAmount(value, from, to, density)
 }
 
-const LIQUID_UNIT_ML: Partial<Record<AdjustUnit, number>> = { tsp: 5, tbsp: 15, 'quarter-cup': 60, 'half-cup': 120, 'three-quarter-cup': 180, cup: 240 }
-
-function amountInBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams) {
+function amountInBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams, country = '') {
   if (!Number.isFinite(amount) || amount <= 0 || !base) return 0
   if (unit === 'serving') return amount * base.amount
   if (unit === base.unit) return amount
 
-  if ((base.unit === 'ml' || base.unit === 'fl oz' || base.density) && LIQUID_UNIT_ML[unit]) {
-    return convertBaseUnit(amount * LIQUID_UNIT_ML[unit]!, 'ml', base.unit, base.density)
+  const householdMl = liquidHouseholdMl(country)
+  if ((base.unit === 'ml' || base.unit === 'fl oz' || base.density) && householdMl[unit]) {
+    return convertBaseUnit(amount * householdMl[unit]!, 'ml', base.unit, base.density)
   }
   if (unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz') {
     return convertBaseUnit(amount, unit, base.unit, base.density)
@@ -687,13 +686,14 @@ function amountInBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing, f
   return amount
 }
 
-function amountFromBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams) {
+function amountFromBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams, country = '') {
   if (!Number.isFinite(amount) || amount <= 0 || !base) return 0
   if (unit === 'serving') return amount / base.amount
   if (unit === base.unit) return amount
 
-  if ((base.unit === 'ml' || base.unit === 'fl oz' || base.density) && LIQUID_UNIT_ML[unit]) {
-    return convertBaseUnit(amount, base.unit, 'ml', base.density) / LIQUID_UNIT_ML[unit]!
+  const householdMl = liquidHouseholdMl(country)
+  if ((base.unit === 'ml' || base.unit === 'fl oz' || base.density) && householdMl[unit]) {
+    return convertBaseUnit(amount, base.unit, 'ml', base.density) / householdMl[unit]!
   }
   if (unit === 'g' || unit === 'ml' || unit === 'oz' || unit === 'fl oz') {
     return convertBaseUnit(amount, base.unit, unit, base.density)
@@ -709,21 +709,21 @@ function amountFromBaseUnit(amount: number, unit: AdjustUnit, base: BaseServing,
   return amount
 }
 
-function convertAmountBetweenUnits(amount: number, from: AdjustUnit, to: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams) {
+function convertAmountBetweenUnits(amount: number, from: AdjustUnit, to: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams, country = '') {
   if (!Number.isFinite(amount)) return 0
   if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return from === 'serving' && to === 'serving' ? amount : 0
   if (from === to) return amount
-  const baseAmount = amountInBaseUnit(amount, from, base, foodUnitGrams)
+  const baseAmount = amountInBaseUnit(amount, from, base, foodUnitGrams, country)
   if (!Number.isFinite(baseAmount) || baseAmount <= 0) return 0
-  return amountFromBaseUnit(baseAmount, to, base, foodUnitGrams)
+  return amountFromBaseUnit(baseAmount, to, base, foodUnitGrams, country)
 }
 
-function computeServings(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams) {
+function computeServings(amount: number, unit: AdjustUnit, base: BaseServing, foodUnitGrams: FoodUnitGrams, country = '') {
   if (!Number.isFinite(amount) || amount <= 0) return 0
   if (unit === 'serving') return amount
   if (!base || !Number.isFinite(base.amount) || base.amount <= 0) return 0
 
-  const converted = amountInBaseUnit(amount, unit, base, foodUnitGrams)
+  const converted = amountInBaseUnit(amount, unit, base, foodUnitGrams, country)
   if (!Number.isFinite(converted) || converted <= 0) return 0
   return converted / base.amount
 }
@@ -776,8 +776,9 @@ function defaultUnitOptions(
   return units
 }
 
-function unitLabel(unit: AdjustUnit, foodName: string | null | undefined, foodUnitGrams: FoodUnitGrams) {
-  if (isLikelyLiquidFood(foodName) && LIQUID_UNIT_ML[unit]) return `${unit.replace('three-quarter-cup', '3/4 cup').replace('quarter-cup', '1/4 cup').replace('half-cup', '1/2 cup')} — ${LIQUID_UNIT_ML[unit]} ml`
+function unitLabel(unit: AdjustUnit, foodName: string | null | undefined, foodUnitGrams: FoodUnitGrams, country = '') {
+  const householdMl = liquidHouseholdMl(country)
+  if (unit !== 'ml' && isLikelyLiquidFood(foodName) && householdMl[unit]) return `${unit.replace('three-quarter-cup', '3/4 cup').replace('quarter-cup', '1/4 cup').replace('half-cup', '1/2 cup')} — ${householdMl[unit]} ml`
   const grams = roundTo(resolveUnitGrams(unit, foodUnitGrams), 1)
   if (unit === 'quarter-cup') return `1/4 cup — ${grams}g`
   if (unit === 'half-cup') return `1/2 cup — ${grams}g`
@@ -1288,7 +1289,7 @@ export function AddIngredientScreen() {
       return
     }
 
-    const servingsRaw = computeServings(amount, safeAdjustUnit, adjustBase, mergedAdjustUnitGrams)
+    const servingsRaw = computeServings(amount, safeAdjustUnit, adjustBase, mergedAdjustUnitGrams, userCountry)
     if (!Number.isFinite(servingsRaw) || servingsRaw <= 0) {
       Alert.alert('Check the amount', 'Choose a measured amount in one of the available units.')
       return
@@ -1521,7 +1522,7 @@ export function AddIngredientScreen() {
       : null
   const selectedServingLabel =
     selectedServing?.label || selectedServing?.serving_size || adjustItem?.serving_size || '1 serving'
-  const adjustServings = computeServings(adjustAmount, safeAdjustUnit, adjustBase, mergedAdjustUnitGrams)
+  const adjustServings = computeServings(adjustAmount, safeAdjustUnit, adjustBase, mergedAdjustUnitGrams, userCountry)
   const servingsForPreview = Number.isFinite(adjustServings) && adjustServings > 0 ? adjustServings : null
   const useCustomServingLabel = safeAdjustUnit === 'serving' && Math.abs(adjustAmount - 1) > 0.001
   const activeUnitLabel =
@@ -1529,7 +1530,7 @@ export function AddIngredientScreen() {
       ? useCustomServingLabel
         ? 'Custom'
         : selectedServingLabel
-      : unitLabel(safeAdjustUnit, adjustItem?.name || '', mergedAdjustUnitGrams)
+      : unitLabel(safeAdjustUnit, adjustItem?.name || '', mergedAdjustUnitGrams, userCountry)
 
   const previewCalories = servingsForPreview == null ? null : Math.round(numberOrZero(adjustItem?.calories ?? adjustItem?.calories_kcal) * servingsForPreview)
   const previewProtein = servingsForPreview == null ? null : roundTo(numberOrZero(adjustItem?.protein_g) * servingsForPreview, 1)
@@ -1543,7 +1544,7 @@ export function AddIngredientScreen() {
     servingLabel: string,
   ) => {
     if (unit === 'serving') return servingLabel
-    return unitLabel(unit, adjustItem?.name || '', mergedAdjustUnitGrams)
+    return unitLabel(unit, adjustItem?.name || '', mergedAdjustUnitGrams, userCountry)
   }
 
   const applyAdjustServingOption = (option: ServingOption) => {
@@ -1576,6 +1577,7 @@ export function AddIngredientScreen() {
         unit,
         adjustBase,
         mergedAdjustUnitGrams,
+        userCountry,
       )
       if (Number.isFinite(converted) && converted > 0) {
         setAdjustAmountInput(formatAmount(converted))

@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
-import { convertFoodAmount, parseFoodServing } from '../native/src/lib/foodUnits'
+import { convertFoodAmount, parseFoodServing, liquidHouseholdMl } from '../native/src/lib/foodUnits'
 
 // Run the real screen handlers with isolated network/navigation adapters.
 const source = ts.createSourceFile('ingredient.tsx', fs.readFileSync('native/src/screens/AddIngredientScreen.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
@@ -17,7 +17,7 @@ assert.equal(handlers.length, 2)
 async function run(overrides: Record<string, any> = {}, handler = 'addAdjustedItem') {
   const calls: any[] = []
   const context: any = {
-    convertFoodAmount, parseFoodServing, LIQUID_UNIT_ML: {}, STATIC_UNIT_GRAMS: {},
+    convertFoodAmount, parseFoodServing, liquidHouseholdMl, userCountry: '', LIQUID_UNIT_ML: {}, STATIC_UNIT_GRAMS: {},
     adjustItem: { name: 'Bananas', serving_size: '100 g', calories: 89, protein_g: 1.09, carbs_g: 22.84, fat_g: 0.33, fiber_g: null, sugar_g: 0 },
     adjustAmountInput: '200', safeAdjustUnit: 'g', adjustBase: { amount: 100, unit: 'g' }, mergedAdjustUnitGrams: {},
     authHeaders: {}, adjustSaving: false, session: { token: 'test-fixture' }, selectedDate: '2026-10-04', targetMeal: 'lunch', selectedServingLabel: '100 g', API_BASE_URL: 'https://fixture.invalid',

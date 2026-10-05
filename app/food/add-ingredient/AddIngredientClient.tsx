@@ -6,7 +6,7 @@ import { useUserData } from '@/components/providers/UserDataProvider'
 import UsageMeter from '@/components/UsageMeter'
 import MissingFoodReport from '@/components/food/MissingFoodReport'
 import NutrientCards from '@/components/food/NutrientCards'
-import { convertFoodAmount, liquidDensity, parseFoodServing } from '@/native/src/lib/foodUnits'
+import { convertFoodAmount, liquidDensity, parseFoodServing, liquidHouseholdMl } from '@/native/src/lib/foodUnits'
 import { scaleOptionalNutrient, roundOptionalNutrient } from '@/lib/food/nutrient-values'
 import {
   DEFAULT_UNIT_GRAMS,
@@ -695,7 +695,11 @@ const extractPieceGramsFromLabel = (label: string) => {
 
 const normalizeLegacyBaseUnit = (amount: number | null, unit: MeasurementUnit | null) => {
   // A provider's serving label describes one recorded portion, without implying a weight.
-  if (unit === 'serving' && amount) return { amount: 1, unit }
+  // A bare provider cup/spoon is also unmeasured: its country/volume is unknown.
+  // Labels with a recorded g/ml amount already parsed to that physical basis.
+  if (amount && unit && ['serving', 'tsp', 'tbsp', 'cup', 'quarter-cup', 'half-cup', 'three-quarter-cup'].includes(unit)) {
+    return { amount: 1, unit: 'serving' as MeasurementUnit }
+  }
   return { amount, unit }
 }
 
@@ -758,9 +762,7 @@ const mergeFoodUnitGrams = (foodName: string, unitGrams?: DynamicUnitGrams | nul
   ...(getFoodUnitGrams(foodName) || {}),
 })
 
-const LIQUID_UNIT_ML: Partial<Record<MeasurementUnit, number>> = {
-  ml: 1, tsp: 5, tbsp: 15, 'quarter-cup': 60, 'half-cup': 120, 'three-quarter-cup': 180, cup: 240,
-}
+const LIQUID_UNIT_ML = liquidHouseholdMl()
 
 const convertAdjustAmount = (
   amount: number,
@@ -770,18 +772,20 @@ const convertAdjustAmount = (
   pieceGrams: number | null,
   foodName: string,
   unitGrams?: DynamicUnitGrams | null,
+  country = '',
 ): number => {
   if (!Number.isFinite(amount) || amount < 0) return NaN
   if (from === to) return amount
   if (from === 'serving' || to === 'serving') {
     if (!base?.amount || !base.unit || base.unit === 'serving') return NaN
     return from === 'serving'
-      ? convertAdjustAmount(amount * base.amount, base.unit, to, base, pieceGrams, foodName, unitGrams)
-      : convertAdjustAmount(amount, from, base.unit, base, pieceGrams, foodName, unitGrams) / base.amount
+      ? convertAdjustAmount(amount * base.amount, base.unit, to, base, pieceGrams, foodName, unitGrams, country)
+      : convertAdjustAmount(amount, from, base.unit, base, pieceGrams, foodName, unitGrams, country) / base.amount
   }
   if (isLiquidFood(foodName)) {
-    const fromMl = LIQUID_UNIT_ML[from]
-    const toMl = LIQUID_UNIT_ML[to]
+    const householdMl = liquidHouseholdMl(country)
+    const fromMl = householdMl[from]
+    const toMl = householdMl[to]
     const fromUnit = fromMl ? 'ml' : from === 'g' || from === 'oz' ? from : null
     const toUnit = toMl ? 'ml' : to === 'g' || to === 'oz' ? to : null
     if (fromUnit && toUnit) {
@@ -836,8 +840,9 @@ const formatAdjustUnitLabel = (
   name?: string | null,
   pieceGrams?: number | null,
   unitGrams?: DynamicUnitGrams | null,
+  country = '',
 ) => {
-  const ml = LIQUID_UNIT_ML[unit]
+  const ml = liquidHouseholdMl(country)[unit]
   if (ml && unit !== 'ml' && isLiquidFood(name)) {
     const label = unit === 'quarter-cup' ? '1/4 cup' : unit === 'half-cup' ? '1/2 cup' : unit === 'three-quarter-cup' ? '3/4 cup' : unit
     return `${label} — ${ml} ml`
@@ -995,6 +1000,7 @@ export default function AddIngredientClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
   const { userData } = useUserData()
+  const userCountry = String(userData?.country || '').trim()
 
   const selectedDate = searchParams.get('date') || buildTodayIso()
   const category = normalizeCategory(searchParams.get('category'))
@@ -1679,7 +1685,7 @@ export default function AddIngredientClient() {
     if (!Number.isFinite(amount) || amount <= 0) return NaN
     if (unit === 'serving') return base?.unit === 'serving' && base.amount ? amount / base.amount : amount
     if (!base?.amount || !base?.unit) return NaN
-    const inBase = convertAdjustAmount(amount, unit, base.unit, base, pieceGrams, foodName, unitGrams)
+    const inBase = convertAdjustAmount(amount, unit, base.unit, base, pieceGrams, foodName, unitGrams, userCountry)
     return Number.isFinite(inBase) && inBase > 0 ? inBase / base.amount : NaN
   }
 
@@ -1775,7 +1781,7 @@ export default function AddIngredientClient() {
         nextAmount = drinkOverride.amountMl
       } else if (isLiquidFood(baseItem.name) && allowedUnits.includes('ml')) {
         nextUnit = 'ml'
-        nextAmount = convertAdjustAmount(base.amount || 1, base.unit || 'g', 'ml', base, pieceGrams, baseItem.name, baseItem.unitGrams)
+        nextAmount = convertAdjustAmount(base.amount || 1, base.unit || 'g', 'ml', base, pieceGrams, baseItem.name, baseItem.unitGrams, userCountry)
       } else if (servingOptions.length > 0) {
         // Fast-food menu items: default to "1 serving" so users can pick Small/Medium/Large.
         nextUnit = 'serving'
@@ -1813,12 +1819,17 @@ export default function AddIngredientClient() {
         return
       }
       const finalServings = servings
+      // Persist the measured volume, not a country-dependent spoon/cup name.
+      // This keeps a later edit or country change on the quantity just previewed.
+      const householdVolume = isLiquidFood(adjustItem.name || '') && unit !== 'ml'
+        ? liquidHouseholdMl(userCountry)[unit]
+        : null
 
       const item = {
         ...adjustItem,
         servings: finalServings,
-        weightAmount: Number.isFinite(amount) ? amount : null,
-        weightUnit: unit,
+        weightAmount: Number.isFinite(amount) ? amount * (householdVolume || 1) : null,
+        weightUnit: householdVolume ? 'ml' : unit,
       }
 
       const nutrition = {
@@ -2377,6 +2388,7 @@ export default function AddIngredientClient() {
                                 pieceGrams,
                                 adjustItem.name,
                                 adjustItem.unitGrams,
+                                userCountry,
                               )
                               if (Number.isFinite(converted)) setAdjustAmountInput(formatNumber(converted))
                             }
@@ -2388,7 +2400,7 @@ export default function AddIngredientClient() {
                             <option key={unit} value={unit}>
                               {unit === 'serving'
                                 ? selectedServingLabel
-                                : formatAdjustUnitLabel(unit, adjustItem.name, pieceGrams, adjustItem.unitGrams)}
+                                : formatAdjustUnitLabel(unit, adjustItem.name, pieceGrams, adjustItem.unitGrams, userCountry)}
                             </option>
                           ))}
                         </select>

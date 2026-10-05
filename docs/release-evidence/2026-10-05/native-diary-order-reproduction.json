@@ -1,6 +1,6 @@
 {
   "task": 63,
-  "status": "SOURCE_BUILD_IPHONE_IPAD_RUNTIME_PASS_DEPLOYMENT_PENDING",
+  "status": "SOURCE_BUILD_IPHONE_IPAD_RUNTIME_DEPLOYMENT_PASS",
   "scope": "Native main food-list sort only",
   "timezone": "Australia/Melbourne",
   "sourceFile": "native/src/screens/TrackCaloriesScreen.tsx",
@@ -107,6 +107,27 @@
     "ipad-meal-order-matches-website.jpg",
     "ipad-meal-order-repair-six-cards.jpg"
   ],
-  "deployment": "PENDING",
-  "updatedAt": "2026-10-05T02:06:19.524067+00:00"
+  "deployment": {
+    "sourceCommit": "98a79c5db3f8759a9b52c8a83a230265f9d15d36",
+    "awsJob": "61",
+    "steps": "BUILD/DEPLOY/VERIFY SUCCEED",
+    "verifiedAt": "2026-10-05T02:15:07.163961+00:00",
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "cloudFront": true,
+        "etag": "\"w4wxd3vpyu1z15\""
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "cloudFront": true,
+        "etag": "\"w4wxd3vpyu1z15\""
+      }
+    ],
+    "freshWebsite": "PASS: signedin fullreload, originalWater12:48/BigMac11:51/Oat11:25/Oat11:08/Soy10:32 order and daily1369/915remaining/619credits preserved"
+  },
+  "updatedAt": "2026-10-05T02:06:19.524067+00:00",
+  "signedStoreUpload": "NOT COMPLETE"
 }

@@ -1,0 +1,60 @@
+{
+  "task": 64,
+  "country": "AU",
+  "kind": "read-only saved-record check after one normal iPad UI save",
+  "saved": {
+    "id": "cmuumzmvc0001c6dmhk4wguy8",
+    "description": "Oil, olive, salad or cooking, 20 ml",
+    "localDate": "2026-10-05",
+    "createdAt": "2026-10-05T02:34:39.624Z",
+    "nutrients": {
+      "fat": 18.4,
+      "carbs": 0,
+      "fiber": 0,
+      "sugar": 0,
+      "protein": 0,
+      "calories": 163
+    },
+    "items": [
+      {
+        "id": "171413",
+        "name": "Oil, olive, salad or cooking",
+        "brand": null,
+        "fat_g": 92,
+        "label": "Oil, olive, salad or cooking",
+        "source": "usda",
+        "carbs_g": 0,
+        "fiber_g": 0,
+        "sugar_g": 0,
+        "calories": 813.2800000000001,
+        "servings": 0.2,
+        "protein_g": 0,
+        "unitGrams": {},
+        "serving_size": "100 ml",
+        "calories_kcal": 813.2800000000001,
+        "servingOptions": null,
+        "selectedServingId": null
+      }
+    ]
+  },
+  "references": [
+    "https://www.islhd.health.nsw.gov.au/sites/default/files/Health_Promotion/Cookbooks/Cooking_terms_and_knife_safety.pdf",
+    "https://www.sanitarium.com/au/health-nutrition/weight-measurement-and-temperature-conversions"
+  ],
+  "runtime": {
+    "iPad": "Release39 task64 rebuilt/signedin; actualgenericpicker20mltbsp/250mlcup and62.5/125/187.5 fractions; one oiltbsp preview163/sixcards then normalSave13:34 and reopen163/F18.4/otherfive0; daily1532/752remaining/wallet619.",
+    "website": "Existing live63 normalRefresh sees same20ml163 row; normalEdit0.2\u00d7100ml preserves163/F18.4/fivezeros/sixcards; Cancelchanges noUpdate. Saved-editor genericchoices still15/240, tracked separately.",
+    "iPhone": "Release39task64 rebuilt/signedin1532/752remaining/619; actualgenericpickerAU20mltbsp/250mlcup and62.5/125/187.5 fractions; realUSDA oil1tbsp0.2serving preview163/F18.4/fivezero/sixcards matchesiPad. Cancel withoutsecondSave; saved entry reopenpending. OriginaliPad13:34savedentry normalphoneOpenandmealcard163/F18.4/fivezerosPASS; noSave."
+  },
+  "checks": [
+    "actualAUweb/nativepre-fix0.15!=0.2fail",
+    "actualwebdropdownAU100ml\u21920.4cup",
+    "actualAU/nonAUpreview/savepayloads",
+    "actualnativeoriginal239gproviderhalfCup unchangedAU",
+    "actualwebbare1cup/2tbsp/1tsp originalprovidercount-only",
+    "fullproductionbuildPASS afternewtestfixture typing fix",
+    "native typecheckPASS",
+    "root278/native79 locksPASS"
+  ],
+  "deployment": "Not yet pushed or deployed; finalstore goal incomplete"
+}

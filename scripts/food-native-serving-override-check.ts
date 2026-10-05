@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } from '../lib/food/usda-nutrition'
-import { liquidDensity, convertFoodAmount, parseFoodServing } from '../native/src/lib/foodUnits'
+import { liquidDensity, convertFoodAmount, parseFoodServing, liquidHouseholdMl } from '../native/src/lib/foodUnits'
 import { getFoodUnitGrams, formatUnitLabel } from '../lib/food/measurement-units'
 import { PRODUCE_MEASUREMENTS } from '../native/src/data/produceMeasurements'
 import { hasCoreFoodNutrition } from '../lib/food/openfoodfacts'
@@ -26,7 +26,7 @@ function bind(source: ts.SourceFile, ctx: any, name: string) {
 let detail: any
 const server: any = vm.createContext({ hasCoreFoodNutrition, extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions, liquidDensity, getFoodUnitGrams, formatUnitLabel, USDA_API_KEY: 'fixture-only', console: { warn() {} }, fetchWithTimeout: async () => ({ ok: true, json: async () => detail }) })
 for (const name of ['normalizeFoodText', 'isLikelyLiquidFoodName', 'liquidDensityGramsPerMl', 'buildScaledServingOption', 'appendOptionIfMissing', 'appendLiquidServingOptions', 'appendCommonFoodServingOptions', 'fetchUsdaServingOptions']) bind(provider, server, name)
-const ctx: any = vm.createContext({ PRODUCE_MEASUREMENTS, convertFoodAmount, parseFoodServing, console, URLSearchParams, authHeaders: { Fixture: 'no-real-token' }, API_BASE_URL: 'https://fixture.invalid', servingOverrideCacheRef: { current: new Map() }, servingOverridePendingRef: { current: new Set() }, Alert: { alert: (...args: any[]) => { throw new Error(`Unexpected food error: ${args[0]}`) } } })
+const ctx: any = vm.createContext({ PRODUCE_MEASUREMENTS, convertFoodAmount, parseFoodServing, liquidHouseholdMl, userCountry: '', console, URLSearchParams, authHeaders: { Fixture: 'no-real-token' }, API_BASE_URL: 'https://fixture.invalid', servingOverrideCacheRef: { current: new Map() }, servingOverridePendingRef: { current: new Set() }, Alert: { alert: (...args: any[]) => { throw new Error(`Unexpected food error: ${args[0]}`) } } })
 const pure = screen.statements.filter(node => ts.isVariableStatement(node) || (ts.isFunctionDeclaration(node) && node.name?.text !== 'AddIngredientScreen')).map(node => node.getText(screen)).join('\n')
 vm.runInContext(ts.transpileModule(pure, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText, ctx)
 for (const name of ['loadServingOverride', 'openAdjust', 'applyAdjustServingOption', 'addAdjustedItem']) bind(screen, ctx, name)
@@ -52,6 +52,13 @@ async function save(amount: number, unit: string) {
   await ctx.addAdjustedItem(); assert.ok(payload); return payload
 }
 async function run() {
+  // Actual native conversion and labels, with the saved account country.
+  const auBase = { amount: 100, unit: 'ml', density: 1.03 }
+  close(ctx.computeServings(1, 'tbsp', auBase, {}, 'AU'), .2)
+  close(ctx.computeServings(1, 'cup', auBase, {}, 'AU'), 2.5)
+  assert.equal(ctx.unitLabel('tbsp', 'Milk, whole', {}, 'AU'), 'tbsp — 20 ml')
+  assert.equal(ctx.unitLabel('cup', 'Milk, whole', {}, 'AU'), 'cup — 250 ml')
+  assert.equal(ctx.unitLabel('ml', 'Milk, whole', {}, 'AU'), 'ml')
   for (const name of ['Apple juice, frozen concentrate, diluted with 3 volume water', 'Mayonnaise, reduced fat, with olive oil', 'Egg, scrambled, with milk', 'Milk, canned, condensed, sweetened', 'Milk, dry, whole', 'Almond milk', 'Water chestnuts, chinese, raw']) {
     detail = { description: name, dataType: 'SR Legacy', foodNutrients: nutrients(47, 0), foodPortions: [{ gramWeight: 239, portionDescription: 'cup' }] }
     const options = await server.fetchUsdaServingOptions('original-id')
@@ -77,6 +84,19 @@ async function run() {
     assert.equal(saved.total.calories, name.startsWith('Milk') ? 63 : 133)
     assert.equal(saved.items[0].sugar_g, 0); assert.equal(saved.items[0].fiber_g, null)
   }
+  for (const [country, unit, amount, ml] of [['AU', 'tbsp', 2, 40], ['AU', 'cup', 1, 250], ['AU', 'quarter-cup', 1, 62.5], ['US', 'tbsp', 2, 30], ['US', 'cup', 1, 240]] as const) {
+    detail = { description: 'Milk, whole', dataType: 'SR Legacy', foodNutrients: nutrients(61, 3.3, 0) }
+    await open({ ...original(detail.description, 61), fat_g: 3.3 }); ctx.userCountry = country
+    const saved = await save(amount, unit)
+    assert.equal(saved.description, `Milk, whole, ${ml} ml`)
+    close(saved.items[0].servings, ml / 100)
+    assert.equal(saved.items[0].serving_size, '100 ml'); assert.equal(saved.items[0].id, 'original-id')
+    close(saved.items[0].calories, 62.83); assert.equal(saved.items[0].fiber_g, null)
+    assert.equal(saved.total.calories, Math.round(62.83 * ml / 100))
+    close(ctx.convertAmountBetweenUnits(amount, unit, 'ml', ctx.adjustBase, {}, country), ml)
+    close(ctx.convertAmountBetweenUnits(ml, 'ml', unit, ctx.adjustBase, {}, country), amount)
+  }
+  ctx.userCountry = ''
   detail = { description: 'Oat milk, unsweetened, plain, refrigerated', dataType: 'Foundation', foodNutrients: [
     { nutrientId: 2047, unitName: 'KCAL', value: 48.3298 },
     { nutrientId: 1003, unitName: 'G', value: .796875 },
@@ -112,6 +132,10 @@ async function run() {
   await open(original(detail.description)); const halfCup = await save(.5, 'serving')
   assert.equal(halfCup.description, 'Diluted apple juice, 119.5 g')
   assert.equal(halfCup.items[0].serving_size, 'cup — 239g'); assert.equal(halfCup.items[0].servings, .5)
+  await open(original(detail.description)); ctx.userCountry = 'AU'; const auRecordedCup = await save(.5, 'serving')
+  assert.equal(auRecordedCup.description, halfCup.description); assert.equal(auRecordedCup.total.calories, halfCup.total.calories)
+  assert.equal(auRecordedCup.items[0].serving_size, 'cup — 239g'); assert.equal(auRecordedCup.items[0].selectedServingId, halfCup.items[0].selectedServingId)
+  ctx.userCountry = ''
   assert.equal(ctx.formatConsumedServing(.5, 'serving', .5, '1 fillet', 'Fish'), '0.5 × 1 fillet', 'unweighed original source must not acquire an invented metric quantity')
   for (const servingSize of ['1 fillet', '1 slice', '1 serving']) {
     const item = { ...original('Fish fillet', 200), id: 'fixture-no-weight', source: 'custom', serving_size: servingSize, protein_g: 25, fat_g: 8 }

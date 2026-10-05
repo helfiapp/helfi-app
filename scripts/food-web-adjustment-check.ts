@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { execFileSync } from 'node:child_process'
 import * as measures from '../lib/food/measurement-units'
 import * as nutrients from '../lib/food/nutrient-values'
-import { convertFoodAmount, liquidDensity, parseFoodServing } from '../native/src/lib/foodUnits'
+import { convertFoodAmount, liquidDensity, parseFoodServing, liquidHouseholdMl } from '../native/src/lib/foodUnits'
 
 // Actual web calculation/default/save functions, with no React, credentials or network.
 const file = 'app/food/add-ingredient/AddIngredientClient.tsx'
@@ -22,13 +22,24 @@ function actual(name: string, optional = false) {
   assert.ok(text, `Actual ${name} exists`)
   return ts.transpile(text, { target: ts.ScriptTarget.ES2020 })
 }
-const ctx = vm.createContext({ ...measures, ...nutrients, convertFoodAmount, liquidDensity, parseFoodServing, formatMeasurementUnitLabel: measures.formatUnitLabel, getAdjustPieceDisplayName: () => '' })
+const ctx = vm.createContext({ ...measures, ...nutrients, convertFoodAmount, liquidDensity, parseFoodServing, liquidHouseholdMl, userCountry: '', formatMeasurementUnitLabel: measures.formatUnitLabel, getAdjustPieceDisplayName: () => '' })
 const bind = (name: string, optional = false) => { const code = actual(name, optional); if (code) ctx[name] = vm.runInContext(code, ctx) }
 for (const name of ['safeNumber', 'round3', 'formatNumber', 'CUSTOM_SINGLE_BRAND_DESCRIPTORS', 'MERGEABLE_SIZE_UNITS', 'ADJUST_UNIT_ORDER', 'hasPositiveUnitGrams', 'mergeFoodUnitGrams', 'computeServingsFromAmount']) bind(name)
 for (const name of ['LIQUID_UNIT_ML', 'convertAdjustAmount', 'formatAdjustUnitLabel', 'buildAdjustUnitOptions', 'parseServingQuantity', 'parseServingBase', 'parseServingGrams', 'normalizeLegacyBaseUnit', 'normalizeDrinkUnit', 'parseDrinkOverride']) bind(name, baseline)
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} must equal ${expected}`)
 const milk = { source: 'usda', id: 'fixture-original-milk', name: 'Milk, whole,3.25% milkfat,without added vitamin A and vitamin D', serving_size: '100 ml', calories: 62.83, protein_g: 3.193, carbs_g: 4.944, fat_g: 3.3475, fiber_g: null, sugar_g: 5.2427 }
 const base = { amount: 100, unit: 'ml' }
+// The actual preview/save closure must use the Australian account's measures.
+ctx.userCountry = 'AU'
+close(ctx.computeServingsFromAmount(1, 'tbsp', base, null, milk.name), 0.2)
+close(ctx.computeServingsFromAmount(1, 'cup', base, null, milk.name), 2.5)
+assert.equal(ctx.formatAdjustUnitLabel('tbsp', milk.name, null, null, 'AU'), 'tbsp — 20 ml')
+assert.equal(ctx.formatAdjustUnitLabel('cup', milk.name, null, null, 'AU'), 'cup — 250 ml')
+for (const country of ['AU', ' au ', 'Australia', 'AUS']) {
+  close(ctx.convertAdjustAmount(1, 'quarter-cup', 'ml', base, null, milk.name, null, country), 62.5)
+  close(ctx.convertAdjustAmount(20, 'ml', 'tbsp', base, null, milk.name, null, country), 1)
+}
+ctx.userCountry = ''
 const ratio = ctx.computeServingsFromAmount(100, 'g', base, null, milk.name)
 close(milk.calories * ratio, 61)
 close(ctx.computeServingsFromAmount(1, 'oz', base, null, milk.name) * milk.calories, 61 * 28.349523125 / 100)
@@ -59,8 +70,20 @@ close(ctx.parseServingBase('0.5 L').amount, 500)
 assert.deepEqual(Array.from(ctx.buildAdjustUnitOptions('Unweighed bar', null, null, 'serving')), ['serving'])
 assert.equal(ctx.normalizeLegacyBaseUnit(1, 'serving').unit, 'serving', 'no invented100g serving')
 assert.equal(ctx.normalizeLegacyBaseUnit(2, 'serving').amount, 1, 'one provider portion keeps its whole stated serving label')
+for (const unit of ['tsp', 'tbsp', 'cup']) assert.equal(ctx.normalizeLegacyBaseUnit(2, unit).unit, 'serving', 'bare provider household labels must not inherit the account country volume')
 
 async function main() {
+  const unitSelects: ts.JsxAttributes[] = []
+  const findUnitSelect = (node: ts.Node) => {
+    if (ts.isJsxOpeningElement(node) && node.tagName.getText(source) === 'select' && node.attributes.getText(source).includes('value={safeUnit}')) unitSelects.push(node.attributes)
+    ts.forEachChild(node, findUnitSelect)
+  }
+  findUnitSelect(source); assert.equal(unitSelects.length, 1)
+  const onChange = unitSelects[0].properties.find(p => ts.isJsxAttribute(p) && p.name.getText(source) === 'onChange') as ts.JsxAttribute
+  const handler = vm.runInContext(ts.transpile(`(${(onChange.initializer as ts.JsxExpression).expression!.getText(source)})`, { target: ts.ScriptTarget.ES2020 }), ctx)
+  Object.assign(ctx, { userCountry: 'AU', safeUnit: 'ml', adjustAmountInput: '100', adjustBase: base, pieceGrams: null, adjustItem: milk, isDiscreteCountUnit: () => false, setAdjustAmountInput: (value: string) => { ctx.adjustAmountInput = value }, setAdjustUnit: (value: string) => { ctx.adjustUnit = value } })
+  handler({ target: { value: 'cup' } }); close(Number(ctx.adjustAmountInput), .4)
+  assert.equal(ctx.adjustUnit, 'cup'); ctx.userCountry = ''
   let saved: any = null, error: string | null = null
   Object.assign(ctx, { adjustItem: milk, adjustSaving: false, adjustBase: base, adjustPieceGrams: null, adjustAmountInput: '100', adjustUnit: 'g', drinkMeta: null, selectedDate: '2026-10-05', category: 'snacks', setAdjustSaving: () => {}, setError: (value: string) => { error = value }, alignTimestampToLocalDate: (iso: string) => iso, addFoodEntry: async (payload: any) => { saved = JSON.parse(JSON.stringify(payload)); return { id: 'fixture-saved' } }, sessionStorage: { setItem: () => {} }, setAdjustItem: () => {}, returnToDiaryAfterSave: () => {} })
   const save = vm.runInContext(actual('confirmAdjustAdd')!, ctx)
@@ -71,6 +94,15 @@ async function main() {
   assert.equal(saved.items[0].id, milk.id)
   assert.equal(saved.items[0].weightAmount, 100)
   assert.equal(saved.items[0].weightUnit, 'g')
+  for (const [country, unit, amount, ml] of [['AU', 'tbsp', 2, 40], ['AU', 'cup', 1, 250], ['AU', 'quarter-cup', 1, 62.5], ['US', 'tbsp', 2, 30], ['US', 'cup', 1, 240]] as const) {
+    ctx.userCountry = country; ctx.adjustUnit = unit; ctx.adjustAmountInput = String(amount); await save()
+    close(saved.items[0].weightAmount, ml); assert.equal(saved.items[0].weightUnit, 'ml')
+    close(saved.items[0].servings, ml / 100); assert.equal(saved.items[0].serving_size, '100 ml')
+    assert.equal(saved.items[0].calories, milk.calories); assert.equal(saved.items[0].id, milk.id)
+    assert.equal(saved.nutrition.calories, Math.round(milk.calories * ml / 100))
+    assert.equal(saved.nutrition.fiber, null)
+  }
+  ctx.userCountry = ''; ctx.adjustUnit = 'g'; ctx.adjustAmountInput = '100'
   for (const unknown of [null, undefined, '', false]) {
     ctx.adjustItem = { ...milk, sugar_g: unknown }; await save(); assert.equal(saved.nutrition.sugar, null)
   }
@@ -87,6 +119,17 @@ async function main() {
   const open = vm.runInContext(actual('openAdjustModalForItem')!, ctx)
   ctx.drinkOverride = null; await open({ ...milk, name: 'Apple juice', serving_size: '100 g' }); assert.equal(ctx.adjustUnit, 'g'); assert.equal(ctx.adjustAmountInput, '100')
   await open({ ...milk, name: 'Unweighed bar', serving_size: '1 bar' }); assert.equal(ctx.adjustBase.unit, 'serving'); assert.equal(ctx.adjustBase.amount, 1); assert.equal(ctx.adjustUnit, 'serving')
+  for (const serving_size of ['1 cup', '2 tbsp', '1 tsp']) {
+    ctx.userCountry = 'AU'; await open({ ...milk, serving_size })
+    assert.equal(ctx.adjustBase.unit, 'serving'); assert.equal(ctx.adjustBase.amount, 1)
+    assert.equal(ctx.adjustUnit, 'serving'); assert.equal(ctx.adjustAmountInput, '1')
+    assert.equal(ctx.adjustItem.serving_size, serving_size)
+    ctx.adjustAmountInput = '.5'; await save()
+    const providerSaved: any = saved; assert.ok(providerSaved)
+    close(providerSaved.items[0].servings, .5); assert.equal(providerSaved.items[0].serving_size, serving_size)
+    assert.equal(providerSaved.items[0].weightUnit, 'serving'); assert.equal(providerSaved.nutrition.calories, Math.round(milk.calories / 2))
+  }
+  ctx.userCountry = ''
   ctx.drinkOverride = ctx.parseDrinkOverride('1', 'fl oz'); await open(milk); assert.equal(ctx.adjustUnit, 'ml'); close(Number(ctx.adjustAmountInput), 29.57)
   error = null; ctx.adjustItem = null; await open({ ...milk, name: 'Apple juice', serving_size: '100 g' }); assert.equal(ctx.adjustItem, null); assert.ok(error)
   console.log('PASS: actual web adjustment/default/save preserves milk/oil density, liquid household volumes, source identity, precise servings, null/zero and invalid-amount blocking; no network or credentials.')

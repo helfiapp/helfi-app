@@ -1,4 +1,15 @@
 export type FoodBaseUnit = 'g' | 'ml' | 'oz' | 'fl oz'
+// Generic kitchen choices only. Recorded provider portions and saved metric
+// quantities retain their own basis; never apply this to historical amounts.
+export function liquidHouseholdMl(country = ''): Partial<Record<string, number>> {
+  const australian = /^(AU|AUS|AUSTRALIA)$/.test(country.trim().toUpperCase())
+  const cup = australian ? 250 : 240
+  return {
+    ml: 1, tsp: 5, tbsp: australian ? 20 : 15,
+    'quarter-cup': cup / 4, 'half-cup': cup / 2,
+    'three-quarter-cup': cup * 3 / 4, cup,
+  }
+}
 export const liquidDensity = (name: string): number | null => {
   const label = name.toLowerCase()
   // A named ingredient is not the density of the whole food (e.g. mayonnaise

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-05T01:59:34.499Z",
+  "generatedAt": "2026-10-05T02:34:40.317Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -213,7 +213,7 @@
     "native/src/lib/dailyTargets.ts": "8ada3e9e7f09218f025bb4041ebfeeadb2c249c512ea3edcfff85bc800da7776",
     "native/src/lib/foodPhoto.ts": "cd3263caa424dd69c88c494977bfdc3a205f3ac3a647d6612423900e61213b2b",
     "native/src/lib/foodPreparation.ts": "b0db28b4b9a93184b335708f801c12993a79400f5f586f959b759008e9750e42",
-    "native/src/lib/foodUnits.ts": "6fafcbe263f3360337b3ed4d98edf46dfa269c1e1803906635363d84679a06ab",
+    "native/src/lib/foodUnits.ts": "9555664f0e30088600e2a773fe91e028da4b2d2ac5b8077738ade8bb6d0e168d",
     "native/src/lib/inAppPurchase.ts": "90402ffd3070379cc354526a3e39f05f114e7cf16a828edf6fb2097ebaa51a9d",
     "native/src/lib/mealPortions.ts": "1da52b62b53f3bacbfbbe1e0f7afc0047c5dca3991851d972f08b7e7f1a6e858",
     "native/src/lib/nativeAuthHeaders.ts": "8b6a8a2b33b95d497a4d7bab4fe9003ea91db6a6a3c78bcd80ce63bb6f1dbdf9",
@@ -229,7 +229,7 @@
     "native/src/navigation/NativeBottomNav.tsx": "6939c54d1d7f206c98fe57be46df98e7fe9c0edd1f12f03266a142f88ece17a8",
     "native/src/navigation/RootNavigator.tsx": "3e133cdb0f9721dc140baa6aafd370fc74c046cb72bfc049fcb890ecd1fd11d0",
     "native/src/screens/AccountSettingsScreen.tsx": "78f1b46ff4e18c1498e3c171e688ddfbd4ed6803cdc5dfe355d79e1d3bfa1478",
-    "native/src/screens/AddIngredientScreen.tsx": "7d5e6f98e636b471dc00953a126f5cdc473ce4e52cca678aaac5e4bede173ed8",
+    "native/src/screens/AddIngredientScreen.tsx": "14b3c359d4a8a95c944180ab8371010da7e1c6b3e3b2c09d7b26e0b454671121",
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
     "native/src/screens/BillingScreen.tsx": "55dc417bd398eeef5bb4cc5dcbc44e109bf4de77ac7c187dfd9fb0583c6fc6a8",
     "native/src/screens/DailyCheckInScreen.tsx": "7e3f91adf203aa1af835757542f635201a927837a51fd8cbf7244e3c91fb3039",
