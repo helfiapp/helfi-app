@@ -1,0 +1,39 @@
+{
+  "scope": 91,
+  "recordedAt": "2026-10-05T12:59:29.816706+00:00",
+  "status": "SOURCE_ACTUAL_JSX_FULL_BUILD_PROTECTED_LOCKS_PASS_EXACT_DEPLOY_PENDING",
+  "baselineSource": "d41e5e1761875806ea881d9bf6eeaec4b1b38b97",
+  "baselineFailure": "Actual saved sauce88 has fibreunknown. Cards correctly show\u2014; actual390px phone chart showsFibre0g. Actual JSX regression fails missing fibre before fix.",
+  "implementation": "Keep numeric zero fallbacks used only for existing ring drawing; derive displayed labels and centre energy from original nullable values in both real chart branches. No source/amount/math/controls/colors/sharedRing changes.",
+  "fixtureCommand": "npm run check:food-result-chart",
+  "renderCases": 56,
+  "cases": [
+    "actual desktop editing and common photo/phone JSX",
+    "kcal/kJ",
+    "editing/nonediting context",
+    "known values",
+    "missing fibre and sugar",
+    "missing and invalid energy",
+    "all genuine zeros",
+    "all unknown",
+    "source nonmutation",
+    "existing ring still rendered"
+  ],
+  "build": "25047 exit0",
+  "pageLocks": {
+    "web": 278,
+    "native": 79,
+    "snapshotsChanged": [
+      "app/food/page.tsx"
+    ],
+    "other277Unchanged": true
+  },
+  "nativeChanged": false,
+  "apiChanged": false,
+  "modelChanged": false,
+  "billingChanged": false,
+  "nutritionCalculationsChanged": false,
+  "databaseChanged": false,
+  "wholeGoalComplete": false,
+  "protectedRegions": "PASS"
+}

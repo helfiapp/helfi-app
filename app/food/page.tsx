@@ -23323,8 +23323,8 @@ Please add nutritional information manually if needed.`);
                               },
                             ]
 
-                            const caloriesValue = (analyzedNutrition as any)?.calories || 0
-                            const caloriesInUnit =
+                            const caloriesValue = foodNumberOrNull((analyzedNutrition as any)?.calories)
+                            const caloriesInUnit = caloriesValue === null ? '—' :
                               energyUnit === 'kJ'
                                 ? Math.round(caloriesValue * 4.184)
                                 : Math.round(caloriesValue)
@@ -23353,7 +23353,7 @@ Please add nutritional information manually if needed.`);
                                 {/* Horizontal macro chips under the photo+circle row */}
                                 <div className="mt-4 flex flex-wrap gap-3">
                                   {macroSegments.map((macro) => {
-                                    const displayValue = formatMacroValue(macro.grams, 'g')
+                                    const displayValue = formatMacroValue(foodNumberOrNull((analyzedNutrition as any)?.[macro.key === 'fibre' ? 'fiber' : macro.key]), 'g')
                                     return (
                                       <div
                                         key={macro.key}
@@ -23407,8 +23407,8 @@ Please add nutritional information manually if needed.`);
                       macroSegments.find(m => m.key === 'sugar'),
                     ].filter(Boolean) as MacroSegment[]
                     
-                    const caloriesValue = (analyzedNutrition as any)?.calories || 0
-                    const caloriesInUnit =
+                    const caloriesValue = foodNumberOrNull((analyzedNutrition as any)?.calories)
+                    const caloriesInUnit = caloriesValue === null ? '—' :
                       energyUnit === 'kJ' ? Math.round(caloriesValue * 4.184) : Math.round(caloriesValue)
                     
                     return (
@@ -23460,7 +23460,7 @@ Please add nutritional information manually if needed.`);
                           <div className="flex-1 flex flex-col justify-center py-2">
                             <div className="space-y-1 text-sm text-gray-700">
                               {macroSegments.map((macro) => {
-                                const displayValue = formatMacroValue(macro.grams, 'g')
+                                const displayValue = formatMacroValue(foodNumberOrNull((analyzedNutrition as any)?.[macro.key === 'fibre' ? 'fiber' : macro.key]), 'g')
                                 return (
                                   <div key={macro.key} className="flex items-center gap-2">
                                     <span

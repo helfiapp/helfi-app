@@ -1,5 +1,13 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05 12:52:58 UTC
+- What changed: Food Analyzer rejects incompatible dried/canned/processed database records for plain photo ingredients. Explicit matching forms and original food preparation/brand/portion rules preserved; model/credits/UI/native/history unchanged.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Fresh fruit must not be enriched from dried or canned fruit. Explicit matching preserved food remains supported; when no compatible record exists, keep the photo estimate. Actual freshmeal200/12.644s/UI14s: pineapple41/strawberries27 remain AI-estimates without incompatible dried/canned replacement; allsummaries/cards819 agree. NoSave/original23/hash/daily2776 unchanged/wallet554->544. Portion estimates still above recorded reference; no broader accuracy/model claim.
+- Verified source: d41e5e1761875806ea881d9bf6eeaec4b1b38b97 / AWS89 BUILD-DEPLOY-VERIFY SUCCEED; both domains200CloudFront/new matching ETag dr14xs0otj1z15. Build88070/protected/root278native79 PASS. Paired newer model and signed-store/full goal unfinished.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-05 12:37:53 UTC
 - What changed: Final written Food Analyzer nutrition summary now matches final structured totals after the existing portion corrections; no extra AI request or model/credit/history change.
 - Where to see it (page/link): https://helfi.ai/food

@@ -1,7 +1,7 @@
 {
   "scope": 90,
   "recordedAt": "2026-10-05T12:46:44.967766+00:00",
-  "status": "SOURCE_ACTUAL_CALIBRATION_FULL_PRODUCTION_BUILD_PASS_EXACT_LIVE_PENDING",
+  "status": "PASS_SOURCE_ACTUAL_CALIBRATION_FULL_BUILD_EXACT_AWS_NORMAL_UI",
   "baselineSource": "ccbfeca42d57523e1b1312c58d68037abf434fef",
   "actualLiveWrongItems": [
     {
@@ -90,5 +90,110 @@
     "status": "PASS",
     "snapshotsChanged": false
   },
-  "protectedRegions": "PASS"
+  "protectedRegions": "PASS",
+  "deployment": {
+    "verifiedAt": "2026-10-05T12:52:58.614Z",
+    "summary": {
+      "jobId": "89",
+      "status": "SUCCEED",
+      "commitId": "d41e5e1761875806ea881d9bf6eeaec4b1b38b97"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"dr14xs0otj1z15\"",
+        "via": "1.1 69cac571635e1ec23a4c27aa669ef624.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"dr14xs0otj1z15\"",
+        "via": "1.1 6f85f72a8a8ab7ba2dc1a4949b378abe.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "actualLiveResult": {
+    "httpStatus": 200,
+    "networkSeconds": 12.643810999987181,
+    "uiSeconds": 14,
+    "total": {
+      "calories": 819,
+      "protein_g": 31,
+      "carbs_g": 110,
+      "fat_g": 30,
+      "fiber_g": 13,
+      "sugar_g": 23
+    },
+    "writtenSummaryAndSixCardsMatch": true,
+    "fruit": [
+      {
+        "name": "strawberries",
+        "brand": null,
+        "serving_size": "1/2 cup (3 oz)",
+        "servings": 1,
+        "calories": 27,
+        "protein_g": 1,
+        "carbs_g": 7,
+        "fat_g": 0,
+        "fiber_g": 2,
+        "sugar_g": 4,
+        "isGuess": false,
+        "nutritionProvenance": {
+          "status": "ai-estimate",
+          "portionEstimated": true
+        }
+      },
+      {
+        "name": "pineapple",
+        "brand": null,
+        "serving_size": "1/2 cup (3 oz)",
+        "servings": 1,
+        "calories": 41,
+        "protein_g": 0,
+        "carbs_g": 11,
+        "fat_g": 0,
+        "fiber_g": 1,
+        "sugar_g": 8,
+        "isGuess": false,
+        "nutritionProvenance": {
+          "status": "ai-estimate",
+          "portionEstimated": true
+        }
+      }
+    ],
+    "incompatibleFruitDatabaseSubstitution": false,
+    "wholeThreeEggCalories": 250,
+    "saved": false,
+    "paidHealthReviewUsed": false,
+    "walletBefore": 554,
+    "walletAfter": 544,
+    "original23Unchanged": true,
+    "diaryHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+    "dailyCalories": 2776,
+    "screenshot": "web-photo-food-forms-fixed.png",
+    "limitations": [
+      "Fresh model output and portion estimates vary; do not attribute all1053->819 difference to code.",
+      "Actual fruit provenance proves no incompatible canned/dried replacement, and controlled43->295 fixture isolates the repair.",
+      "Current819 still47.487% above recorded555.303711; no generalphotoaccuracy certification or6.1winner."
+    ]
+  }
 }
