@@ -1,0 +1,195 @@
+{
+  "task": 75,
+  "preparedAt": "2026-10-05T07:34:21.983102+00:00",
+  "status": "PREPARED_NOT_RUN_ADMIN_LOGIN_REQUIRED",
+  "models": [
+    "gpt-5.6-sol",
+    "gpt-6.1-sol"
+  ],
+  "channel": "Actual authenticated Helfi admin UI/server only",
+  "adminPage": "https://helfi.ai/admin-panel",
+  "repetitionsPerImage": 3,
+  "plannedModelCalls": 36,
+  "images": [
+    {
+      "id": "eggs",
+      "filename": "Fried-Egg-blog-768x1024.jpg",
+      "difficulty": "baseline",
+      "url": "https://helfi.ai/FOOD%20TEST%20IMAGES/Fried-Egg-blog-768x1024.jpg",
+      "sha256": "9e7257ac7bf60faed1d3153dac2fcf2aab61adaded8bec17e33335e89680a502",
+      "preRunVisualChecklist": [
+        "Three clearly visible fried eggs; count must be three",
+        "Cooked/fried preparation preserved",
+        "Oil or butter quantity cannot be measured from this photo"
+      ],
+      "knownIngredientWeights": null,
+      "verifiedCalorieReference": null
+    },
+    {
+      "id": "salmon",
+      "filename": "FOOD-SCAN-SALMON-MEAL-01-09-2026_01_31_AM.jpg",
+      "difficulty": "challenging",
+      "url": "https://helfi.ai/FOOD%20TEST%20IMAGES/FOOD-SCAN-SALMON-MEAL-01-09-2026_01_31_AM.jpg",
+      "sha256": "a9c238ac93dbaa3402d07af820877457fb6841891aa1f416fa646bbb635c527b",
+      "preRunVisualChecklist": [
+        "Cooked/grilled salmon rather than raw fish",
+        "Multiple visible grilled vegetables: green and yellow squash/courgette, red onion, tomatoes, asparagus",
+        "Separate visible meal components; no invented rice or avocado",
+        "Hidden cooking oil and individual ingredient weights remain estimated"
+      ],
+      "knownIngredientWeights": null,
+      "verifiedCalorieReference": null
+    },
+    {
+      "id": "burger-meal",
+      "filename": "HJD0042_Triple_Cheeseburger_SS_Sml_WEB_800x600px_2.png",
+      "difficulty": "challenging",
+      "url": "https://helfi.ai/FOOD%20TEST%20IMAGES/HJD0042_Triple_Cheeseburger_SS_Sml_WEB_800x600px_2.png",
+      "sha256": "ed4157b185421acd67aa6b3d471a97cf3429bc4b845f07ea1f7afd1a2859e032",
+      "preRunVisualChecklist": [
+        "Stacked burger with multiple beef patties, cheese, bun and condiments",
+        "Fries, cola-looking drink, nuggets, dipping sauce and chocolate-topped frozen dessert are also visible",
+        "Occluded ingredients and branded product identity cannot be certified solely from the photograph",
+        "Account for whole visible meal, not burger alone"
+      ],
+      "knownIngredientWeights": null,
+      "verifiedCalorieReference": null
+    },
+    {
+      "id": "breaded-chicken",
+      "filename": "1980-crunchy-chicken-twisties-drumsticks-951509-1.jpg",
+      "difficulty": "challenging",
+      "url": "https://helfi.ai/FOOD%20TEST%20IMAGES/1980-crunchy-chicken-twisties-drumsticks-951509-1.jpg",
+      "sha256": "5643f94e6d4df67d8de8077fc9d41331fadf7e64adfe6c8a19026ca5947fe33f",
+      "preRunVisualChecklist": [
+        "Multiple overlapping crumbed/breaded cooked chicken drumsticks",
+        "Red dipping sauce and partially cropped crinkle-cut fries visible",
+        "Do not use plain chicken nutrition for coated chicken",
+        "Exact coating recipe, oil and edible meat weight are unknown"
+      ],
+      "knownIngredientWeights": null,
+      "verifiedCalorieReference": null
+    },
+    {
+      "id": "nutrition5k-dish_1558546663",
+      "filename": "nutrition5k-dish_1558546663.png",
+      "difficulty": "measured-reference",
+      "url": "https://helfi.ai/FOOD%20TEST%20IMAGES/nutrition5k-dish_1558546663.png",
+      "sha256": "8b28092086f2309c1ed19fc1ce02eb99b1ec5b6b0e410d096fe1dc9f2120089c",
+      "preRunVisualChecklist": [
+        "One whole apple, raw spinach leaves and almonds visible; matches all3recorded components",
+        "Almond quantity important to energy; no image weight overlay/answers supplied"
+      ],
+      "knownIngredientWeights": [
+        {
+          "name": "spinach (raw)",
+          "grams": 11.0
+        },
+        {
+          "name": "almonds",
+          "grams": 44.0
+        },
+        {
+          "name": "apple",
+          "grams": 142.0
+        }
+      ],
+      "recordedNutritionReference": {
+        "calories": 330.734009,
+        "grams": 197.0,
+        "fat": 22.108002,
+        "carbs": 30.264,
+        "protein": 10.601
+      },
+      "verifiedCalorieReference": {
+        "type": "Nutrition5k recordedweights/USDAannotation",
+        "calories": 330.734009,
+        "laboratoryCalorieMeasurement": false
+      },
+      "referenceProof": "docs/release-evidence/2026-10-05/food-model-weighted-references.json",
+      "referenceNotSentToModel": true
+    },
+    {
+      "id": "nutrition5k-dish_1562691064",
+      "filename": "nutrition5k-dish_1562691064.png",
+      "difficulty": "challenging-measured-reference",
+      "url": "https://helfi.ai/FOOD%20TEST%20IMAGES/nutrition5k-dish_1562691064.png",
+      "sha256": "4a1490b2b1e78c2ba35ead23bb88fbb1dbf5c9eaf6d3ba1a7a1dc7273bf1a7c1",
+      "preRunVisualChecklist": [
+        "Scrambled eggs and fried rice overlap; roasted potatoes, broccoli, berries and pineapple visible",
+        "Recorded oliveoil0.902439g is hidden/recipe-associated; do not score failuretoidentify oil as a visibleingredient miss",
+        "Plate edges cropped; retain uncertainty about portions"
+      ],
+      "knownIngredientWeights": [
+        {
+          "name": "berries",
+          "grams": 85.0
+        },
+        {
+          "name": "fried rice",
+          "grams": 86.0
+        },
+        {
+          "name": "olive oil",
+          "grams": 0.902439
+        },
+        {
+          "name": "pineapple",
+          "grams": 80.0
+        },
+        {
+          "name": "scrambled eggs",
+          "grams": 147.0
+        },
+        {
+          "name": "roasted potatoes",
+          "grams": 66.0
+        },
+        {
+          "name": "broccoli",
+          "grams": 36.097561
+        }
+      ],
+      "recordedNutritionReference": {
+        "calories": 555.303711,
+        "grams": 501.0,
+        "fat": 23.931829,
+        "carbs": 64.772835,
+        "protein": 21.98934
+      },
+      "verifiedCalorieReference": {
+        "type": "Nutrition5k recordedweights/USDAannotation",
+        "calories": 555.303711,
+        "laboratoryCalorieMeasurement": false
+      },
+      "referenceProof": "docs/release-evidence/2026-10-05/food-model-weighted-references.json",
+      "referenceNotSentToModel": true
+    }
+  ],
+  "measurements": [
+    "Raw model output, ingredient completeness, totals consistency, declared estimated portions",
+    "Same-photo repeated latency: median and range, completed and failed runs",
+    "Recorded token usage and uncached vendor cost estimate",
+    "For the2weightedreferenceplates only: signed/absolute calorie error and relativeerror, protein/carbs/fat and portion-mass error against recordedannotations; percase repeatedresults. No generalaccuracypercentage from4unweighedphotos."
+  ],
+  "fairness": [
+    "Same image bytes, same prompt, same high image detail, same public-image restriction",
+    "Current5.6 Sol deployed low-latency configuration versus supported6.1 Sol low reasoning; record this configuration difference",
+    "Current comparison endpoint sends5.6 then6.1 in fixed UI order; disclose order and possible warmed-image/cache effects",
+    "Simplified comparison is not complete production analysis pipeline timing",
+    "Reference numbers remain outside actual model input/prompt/anonymousfile names; same unmodifiedRGBbytes. Publicdataset may have appeared in training, so no unseen-test claim."
+  ],
+  "limitations": [
+    "No paid comparison results collected yet",
+    "Public test image names are not weight references",
+    "No automatic switch of normal Helfi production model",
+    "No key access, direct OpenAI scripts or direct agent API calls",
+    "Only2 selectedpublicreferenceplates, not generalphotoaccuracy certification",
+    "Recorded weights and USDA-based nutrition; not calorimeter-measured calories",
+    "No fibre/sugar reference data in these metadata; do not invent those groundtruth values",
+    "Officialpaper test split does not prove unseenby currentOpenAI models",
+    "Selection quality/California cafeteria coverage limits; no modelresults usedforselection"
+  ],
+  "results": [],
+  "updatedAt": "2026-10-05T10:48:18.591664+00:00"
+}

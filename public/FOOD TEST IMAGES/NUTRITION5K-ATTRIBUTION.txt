@@ -1,0 +1,9 @@
+Nutrition5k reference photos
+
+Images: nutrition5k-dish_1558546663.png and nutrition5k-dish_1562691064.png
+Source: Google Research Nutrition5k dataset, Quin Thames, Arjun Karpur, Wade Norris, Fangting Xia, Liviu Panait, Tobias Weyand and Jack Sim, CVPR 2021.
+Dataset: https://github.com/google-research-datasets/Nutrition5k
+Paper: https://openaccess.thecvf.com/content/CVPR2021/html/Thames_Nutrition5k_Towards_Automatic_Nutritional_Understanding_of_Generic_Food_CVPR_2021_paper.html
+License: Creative Commons Attribution 4.0 International — https://creativecommons.org/licenses/by/4.0/
+These selected overhead RGB photos are reproduced without modification.
+Recorded ingredient weights and USDA-based nutrition are reference annotations, not laboratory calorie measurements. The official dataset test split does not establish that the photos were unseen by later OpenAI models.

@@ -1,5 +1,12 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify
+- Date/time:5October2026,verified10:35:36UTC(21:35Melbourne)
+- What changed: Food barcode/favorite daily-after-adding previews preserve incomplete fibre/sugar through calculation and summary display; missing rows show—/Incomplete data without false remaining amounts or percentages. Source3638e308ef1db0c7959a0c2fb67feba2eb38945e/AWS82 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag13u9azx1oo91z15.
+- Where to see it (page/link):https://helfi.ai/food — barcode072036761163 chooserPreview.
+- What to quickly test: All6correctcoloredcards100g/88/P5.9/C11.8/F0/Fibre—/S11.8. Dailyafteradding2864kcal/coremacros unchanged; fibre/sugar bothIncomplete data/—percent/emptybar. Cancel/noSave original23/source/hash/daily2776 preserved. Normalpositivecheck3credits/fullreload604; immediatewalletstale607remains separateguardedfollowup. Emptyday/genuinezero/exercisevariantsfixtureonly/nativeunchanged; realmodelbenchmark andsignedstores unverified.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify
 - Date/time: 5October2026, verified10:20:16UTC (21:20 Melbourne)
 - What changed: Barcode ingredient mapping preserves unknownnutrients versus truezero and keeps declared gram/ml serving labels without silently relabelling. Source906e68ac649051cd0ba90d7bcdc924f3aed94030/AWS81 BUILD/DEPLOY/VERIFY SUCCEED; bothdomains200CloudFront/newmatchingETag b0xppesrh61z15.
 - Where to see it (page/link): https://helfi.ai/food — normal barcode072036761163 chooserPreview.

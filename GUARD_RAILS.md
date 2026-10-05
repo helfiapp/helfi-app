@@ -3367,3 +3367,11 @@ for guidance first.
 - check:food-daily-preview executes the real parent and ReactsummaryJSX offline; HEAD30of33fail/new33PASS including zero, knownprecision/source and exercise. Fullbuild/exactdeployment/runtime pending; laststable906e68ac649051cd0ba90d7bcdc924f3aed94030/AWS81.
 
 - Task83 fullproductionbuild91930exit0/allrequiredchecks/strict/protected/root278native79 PASS;33actualparent/componentcasesPASS and105barcodemappingcasesPASS. Onlyfoodpage+DailyMacroSummary lockhashes refreshed. Exactdeployment/normalruntime pending.
+
+- Task83 stable source3638e308ef1db0c7959a0c2fb67feba2eb38945e/AWS82 allstepsSUCCEED, bothdomains200CloudFront/newmatchingETag13u9azx1oo91z15 verified2026-10-05T10:35:36UTC. Fresh normalprivatebarcode preview all6cards/unknownfibre/truezerofat anddayfibre/sugarIncomplete data/—percent/emptybarsPASS; coretotals2864unchanged. Cancel/noSave original23/source/hash/daily2776preserved; positivecheck3credits/fullreload604, immediatewalletstale607guardedfollowup. Emptydayoptionalzero/exercisevariantsfixturesonly; nativeunchanged/no signedstore/currentmanufacturer/modelaccuracycertification.
+
+### Food model comparison references (2026-10-05, task84)
+
+- Both5.6Sol/6.1Sol must receive identical unmodifiedphoto bytes/prompt and repeated permodel timing. The2Nutrition5k photos have matchedsource IDs, originalingredientdensity and total checks, sourceSHA/CRC, visualreview, officialtestsplit andCC-BY4.0 attribution. Benchmarkmodel input is only the anonymouspublicphoto URL; never include referenceweights/calories as answers in theprompt or filename.
+- Score those2cases against recordedweights/USDAannotations; do not call them calorimeter measurements, guaranteedunseenbyOpenAI models or generalaccuracy certification. Hidden oil is not a missed visible ingredient. Fibre/sugar truth is absent; do notinvent it. Preserve the4unweighedchallengingphotos/visibilitychecks separately.
+- Plan6photosx3repeatsx2models=36actualadminUI/servercalls;0run until existingadmin sign-in completes. No directOpenAI/key scripts and no productionmodelswitch beforeactualresults. Staticasset exactdeployment pending; application/native/source/history/credits unchanged.

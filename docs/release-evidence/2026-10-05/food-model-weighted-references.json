@@ -1,0 +1,335 @@
+{
+  "task": 84,
+  "status": "MATCHED_VISUALLY_VERIFIED_REFERENCE_ASSETS_DEPLOYMENT_PENDING_MODELS_NOT_RUN",
+  "checkedAt": "2026-10-05T10:48:18.591664+00:00",
+  "priorLiveSource": "3638e308ef1db0c7959a0c2fb67feba2eb38945e",
+  "source": "https://github.com/google-research-datasets/Nutrition5k",
+  "paper": "https://openaccess.thecvf.com/content/CVPR2021/html/Thames_Nutrition5k_Towards_Automatic_Nutritional_Understanding_of_Generic_Food_CVPR_2021_paper.html",
+  "license": "CC-BY4.0",
+  "attributionFile": "public/FOOD TEST IMAGES/NUTRITION5K-ATTRIBUTION.txt",
+  "selectionBeforeModelCalls": true,
+  "modelCalls": 0,
+  "dataSchema": "Six dish columns then seven fields for each ingredient, no num_ingrs column; actual official CSV verified, differsREADME. Official plural ingredients_metadata.csv discovered by objectlist after singular404; no credentials/archive download.",
+  "sourceHashes": {
+    "dish_metadata_cafe1.csv": "881df31f27c2343d0ce219964527e0796f6ddadd60701ce6840fa801e8c2a960",
+    "dish_metadata_cafe2.csv": "ef9f800d7b9c2e7e9a9e7cda5cbb4cfe51c760a8c1af4c05786ccf051bf5d77d",
+    "ingredients_metadata.csv": "87a9bbd1fd2e28f09f16305a04946ddbe31eb7d9d03686d7e2fb3d8f19f3effb",
+    "depth_test_ids.txt": "6e43a5334a72bd06fa9c0d4b3bc86e2f57e5342b0b260d3fa003a76f7e39eca2"
+  },
+  "validation": {
+    "testIds": 507,
+    "validCandidates": 99,
+    "rejectedRows": 477,
+    "rejectionExamples": [
+      {
+        "id": "dish_1550876012",
+        "reason": "masssum",
+        "errors": [
+          3.999999989900971e-06,
+          8.0,
+          1.000000000139778e-06,
+          1.7763568394002505e-15,
+          1.9999999949504854e-06
+        ]
+      },
+      {
+        "id": "dish_1551492561",
+        "reason": "masssum",
+        "errors": [
+          6.999999982326699e-06,
+          2.0,
+          3.552713678800501e-15,
+          0.0,
+          1.0000000010279564e-06
+        ]
+      },
+      {
+        "id": "dish_1551233434",
+        "reason": "masssum",
+        "errors": [
+          0.0,
+          2.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "id": "dish_1551376970",
+        "reason": "masssum",
+        "errors": [
+          9.999999974752427e-07,
+          2.0,
+          0.0,
+          1.0000000010279564e-06,
+          0.0
+        ]
+      },
+      {
+        "id": "dish_1551223114",
+        "reason": "masssum",
+        "errors": [
+          0.0,
+          2.0,
+          2.220446049250313e-16,
+          1.00000000458067e-06,
+          0.0
+        ]
+      },
+      {
+        "id": "dish_1551314967",
+        "reason": "masssum",
+        "errors": [
+          9.000000034120603e-06,
+          3.0,
+          8.881784197001252e-16,
+          1.0000000010279564e-06,
+          8.881784197001252e-16
+        ]
+      },
+      {
+        "id": "dish_1550772027",
+        "reason": "masssum",
+        "errors": [
+          3.000000006636583e-06,
+          2.0,
+          0.0,
+          0.0,
+          0.0
+        ]
+      },
+      {
+        "id": "dish_1550797833",
+        "reason": "masssum",
+        "errors": [
+          1.9999999949504854e-06,
+          4.0,
+          3.552713678800501e-15,
+          0.0,
+          0.0
+        ]
+      }
+    ]
+  },
+  "cases": [
+    {
+      "id": "dish_1558546663",
+      "cafe": "cafe1",
+      "totals": {
+        "calories": 330.734009,
+        "grams": 197.0,
+        "fat": 22.108002,
+        "carbs": 30.264,
+        "protein": 10.601
+      },
+      "ingredients": [
+        {
+          "id": "ingr_0000000036",
+          "name": "spinach (raw)",
+          "grams": 11.0,
+          "calories": 2.53,
+          "fat": 0.044,
+          "carbs": 0.396,
+          "protein": 0.319
+        },
+        {
+          "id": "ingr_0000000077",
+          "name": "almonds",
+          "grams": 44.0,
+          "calories": 254.364,
+          "fat": 21.78,
+          "carbs": 9.988,
+          "protein": 9.856
+        },
+        {
+          "id": "ingr_0000000054",
+          "name": "apple",
+          "grams": 142.0,
+          "calories": 73.84,
+          "fat": 0.284,
+          "carbs": 19.88,
+          "protein": 0.426
+        }
+      ],
+      "sumErrors": [
+        9.000000034120603e-06,
+        0.0,
+        1.999999998503199e-06,
+        0.0,
+        1.7763568394002505e-15
+      ],
+      "availableImages": [
+        {
+          "name": "nutrition5k_dataset/imagery/realsense_overhead/dish_1558546663/depth_color.png",
+          "size": "302265"
+        },
+        {
+          "name": "nutrition5k_dataset/imagery/realsense_overhead/dish_1558546663/depth_raw.png",
+          "size": "195609"
+        },
+        {
+          "name": "nutrition5k_dataset/imagery/realsense_overhead/dish_1558546663/rgb.png",
+          "size": "547394"
+        }
+      ],
+      "image": {
+        "originalUrl": "https://storage.googleapis.com/nutrition5k_dataset/nutrition5k_dataset/imagery/realsense_overhead/dish_1558546663/rgb.png",
+        "publicFile": "public/FOOD TEST IMAGES/nutrition5k-dish_1558546663.png",
+        "publicUrl": "https://helfi.ai/FOOD%20TEST%20IMAGES/nutrition5k-dish_1558546663.png",
+        "bytes": 547394,
+        "sha256": "8b28092086f2309c1ed19fc1ce02eb99b1ec5b6b0e410d096fe1dc9f2120089c",
+        "dimensions": [
+          640,
+          480
+        ],
+        "modified": false
+      }
+    },
+    {
+      "id": "dish_1562691064",
+      "cafe": "cafe1",
+      "totals": {
+        "calories": 555.303711,
+        "grams": 501.0,
+        "fat": 23.931829,
+        "carbs": 64.772835,
+        "protein": 21.98934
+      },
+      "ingredients": [
+        {
+          "id": "ingr_0000000013",
+          "name": "berries",
+          "grams": 85.0,
+          "calories": 48.45,
+          "fat": 0.255,
+          "carbs": 11.9,
+          "protein": 0.595
+        },
+        {
+          "id": "ingr_0000000194",
+          "name": "fried rice",
+          "grams": 86.0,
+          "calories": 135.622,
+          "fat": 1.892,
+          "carbs": 25.714,
+          "protein": 4.042
+        },
+        {
+          "id": "ingr_0000000161",
+          "name": "olive oil",
+          "grams": 0.902439,
+          "calories": 7.97756076,
+          "fat": 0.902439,
+          "carbs": 0.0,
+          "protein": 0.0
+        },
+        {
+          "id": "ingr_0000000038",
+          "name": "pineapple",
+          "grams": 80.0,
+          "calories": 40.0,
+          "fat": 0.08,
+          "carbs": 10.4,
+          "protein": 0.4
+        },
+        {
+          "id": "ingr_0000000008",
+          "name": "scrambled eggs",
+          "grams": 147.0,
+          "calories": 217.56,
+          "fat": 16.17,
+          "carbs": 2.352,
+          "protein": 14.7
+        },
+        {
+          "id": "ingr_0000000433",
+          "name": "roasted potatoes",
+          "grams": 66.0,
+          "calories": 93.06,
+          "fat": 4.488,
+          "carbs": 11.88,
+          "protein": 1.386
+        },
+        {
+          "id": "ingr_0000000027",
+          "name": "broccoli",
+          "grams": 36.097561,
+          "calories": 12.63414635,
+          "fat": 0.144390244,
+          "carbs": 2.52682927,
+          "protein": 0.866341464
+        }
+      ],
+      "sumErrors": [
+        3.890000016326667e-06,
+        0.0,
+        2.4400000242508213e-07,
+        5.729999998038693e-06,
+        1.464000000339638e-06
+      ],
+      "availableImages": [
+        {
+          "name": "nutrition5k_dataset/imagery/realsense_overhead/dish_1562691064/depth_color.png",
+          "size": "329368"
+        },
+        {
+          "name": "nutrition5k_dataset/imagery/realsense_overhead/dish_1562691064/depth_raw.png",
+          "size": "210696"
+        },
+        {
+          "name": "nutrition5k_dataset/imagery/realsense_overhead/dish_1562691064/rgb.png",
+          "size": "408514"
+        }
+      ],
+      "image": {
+        "originalUrl": "https://storage.googleapis.com/nutrition5k_dataset/nutrition5k_dataset/imagery/realsense_overhead/dish_1562691064/rgb.png",
+        "publicFile": "public/FOOD TEST IMAGES/nutrition5k-dish_1562691064.png",
+        "publicUrl": "https://helfi.ai/FOOD%20TEST%20IMAGES/nutrition5k-dish_1562691064.png",
+        "bytes": 408514,
+        "sha256": "4a1490b2b1e78c2ba35ead23bb88fbb1dbf5c9eaf6d3ba1a7a1dc7273bf1a7c1",
+        "dimensions": [
+          640,
+          480
+        ],
+        "modified": false
+      }
+    }
+  ],
+  "visualReview": {
+    "dish_1558546663": [
+      "One whole apple, raw spinach leaves and almonds visible; matches all3recorded components",
+      "Almond quantity important to energy; no image weight overlay/answers supplied"
+    ],
+    "dish_1562691064": [
+      "Scrambled eggs and fried rice overlap; roasted potatoes, broccoli, berries and pineapple visible",
+      "Recorded oliveoil0.902439g is hidden/recipe-associated; do not score failuretoidentify oil as a visibleingredient miss",
+      "Plate edges cropped; retain uncertainty about portions"
+    ]
+  },
+  "checks": {
+    "exactPublicObjectIds": "PASS",
+    "sourceIngredientNamesAndDensities": "PASS each supplied nutrient within1e-5 of grams xoriginal pergram",
+    "dishSums": "PASS: energy/macros<0.01 discrepancy, mass exact in bothselectedrows",
+    "pngByteCountSignatureChunkCrc": "PASS",
+    "imageDimensions": [
+      640,
+      480
+    ],
+    "imagesModified": false,
+    "visualMatch": "PASS",
+    "rootPageLocks": 278,
+    "nativePageLocks": 79,
+    "protectedRegions": "PASS"
+  },
+  "applicationSourceChanged": false,
+  "remaining": "Publish exactpublicPNG assets for existingadminUIcomparison. Model75realruns requireadminauthentication; current5.6model unchanged. SignedAndroid/Apple andfullaudit goal remainopen.",
+  "limits": [
+    "Only2 selectedpublicreferenceplates, not generalphotoaccuracy certification",
+    "Recorded weights and USDA-based nutrition; not calorimeter-measured calories",
+    "No fibre/sugar reference data in these metadata; do not invent those groundtruth values",
+    "Officialpaper test split does not prove unseenby currentOpenAI models",
+    "Selection quality/California cafeteria coverage limits; no modelresults usedforselection",
+    "No AIrequests, localOpenAIkey access, wallet/credit changes or customerDB writes"
+  ],
+  "buildScope": "Staticassets/attribution/referenceprotocol only; application source identical to verified3638e308/fullproductionbuild91930/AWS82. No redundant localfullbuild; nextAWSdeployment runs requiredfullbuild."
+}
