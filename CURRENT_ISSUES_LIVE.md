@@ -1,5 +1,13 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05T13:05:30.467Z
+- What changed: Result chart labels and centre energy preserve missing values as— rather than displaying drawing-only0; both chart layouts retain true zero, existing drawing/colors/controls and allsixcards.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Reopen a saved entry with missing fibre; card and phone chart both show—. Known0fat/water stays0. Actual saved sauce88kcal/368kJ and allzero water390pxphone passed; cancelled/noSave/23hash/date5October daily2776/wallet544 unchanged.
+- Verified source: 78e482180eb79e518a92e502f2448527bf1c7994 / AWS90 allstepsSUCCEED; bothdomains200CloudFront/new matching ETag9gnn8inudz1z15. Fullbuild25047/protected/root278native79PASS; onlyfoodpagehash refreshed. Fullpairedmodel/signedstore/audit goal remainsunfinished.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-05 12:52:58 UTC
 - What changed: Food Analyzer rejects incompatible dried/canned/processed database records for plain photo ingredients. Explicit matching forms and original food preparation/brand/portion rules preserved; model/credits/UI/native/history unchanged.
 - Where to see it (page/link): https://helfi.ai/food

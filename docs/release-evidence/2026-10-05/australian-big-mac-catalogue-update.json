@@ -1,0 +1,105 @@
+{
+  "verifiedAt": "2026-10-05T13:20:49.725Z",
+  "task": 93,
+  "mode": "APPLY",
+  "targetBefore": {
+    "id": "cmlc49usf000512sx03uqnzy4",
+    "key": "mcdonald s big mac|FAST_FOOD|au",
+    "name": "Big Mac",
+    "brand": "McDonald's",
+    "country": "AU",
+    "kind": "FAST_FOOD",
+    "group": "fast_food",
+    "caloriesPer100g": null,
+    "proteinPer100g": null,
+    "carbsPer100g": null,
+    "fatPer100g": null,
+    "fiberPer100g": null,
+    "sugarPer100g": null,
+    "aliases": [
+      "Big Mac (McDonald's)",
+      "McDonald's Big Mac",
+      "Big Mac (McDonald s)",
+      "McDonald s Big Mac",
+      "Big Mac (McDonalds)",
+      "McDonalds Big Mac"
+    ],
+    "servingOptions": [
+      {
+        "id": "serving-mcdonald s big mac 1 serving",
+        "ml": null,
+        "fat_g": 29.4,
+        "grams": null,
+        "label": "1 serving",
+        "carbs_g": 44.9,
+        "fiber_g": null,
+        "sugar_g": 8.8,
+        "calories": 557,
+        "protein_g": 24.6,
+        "serving_size": "1 serving"
+      }
+    ],
+    "createdAt": "2026-02-07T09:33:31.552Z",
+    "updatedAt": "2026-06-10T16:08:32.951Z"
+  },
+  "targetServingAfter": [
+    {
+      "id": "serving-mcdonald s big mac 1 serving",
+      "ml": null,
+      "fat_g": 34.4,
+      "grams": null,
+      "label": "1 serving",
+      "carbs_g": 46.5,
+      "fiber_g": null,
+      "sugar_g": 8,
+      "calories": 621,
+      "protein_g": 28.7,
+      "serving_size": "1 serving"
+    }
+  ],
+  "otherRowCount": 8259,
+  "otherRowsHash": "bec8aa2529f6348aa276d06f9b91a36dae4c965e2e1ebd0a392bdd36a1a58599",
+  "manufacturerUrl": "https://www.mcdonalds.com/au/en-au/menu/beef/big-mac.html",
+  "targetAfter": {
+    "id": "cmlc49usf000512sx03uqnzy4",
+    "key": "mcdonald s big mac|FAST_FOOD|au",
+    "name": "Big Mac",
+    "brand": "McDonald's",
+    "country": "AU",
+    "kind": "FAST_FOOD",
+    "group": "fast_food",
+    "caloriesPer100g": null,
+    "proteinPer100g": null,
+    "carbsPer100g": null,
+    "fatPer100g": null,
+    "fiberPer100g": null,
+    "sugarPer100g": null,
+    "aliases": [
+      "Big Mac (McDonald's)",
+      "McDonald's Big Mac",
+      "Big Mac (McDonald s)",
+      "McDonald s Big Mac",
+      "Big Mac (McDonalds)",
+      "McDonalds Big Mac"
+    ],
+    "servingOptions": [
+      {
+        "id": "serving-mcdonald s big mac 1 serving",
+        "ml": null,
+        "fat_g": 34.4,
+        "grams": null,
+        "label": "1 serving",
+        "carbs_g": 46.5,
+        "fiber_g": null,
+        "sugar_g": 8,
+        "calories": 621,
+        "protein_g": 28.7,
+        "serving_size": "1 serving"
+      }
+    ],
+    "createdAt": "2026-02-07T09:33:31.552Z",
+    "updatedAt": "2026-10-05T13:20:49.763Z"
+  },
+  "otherRowsUnchanged": true,
+  "totalRows": 8260
+}

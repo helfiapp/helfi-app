@@ -1,0 +1,88 @@
+{
+  "verifiedAt": "2026-10-05T13:17:52.887Z",
+  "manufacturerUrl": "https://www.mcdonalds.com/au/en-au/menu/beef/big-mac.html#accordion-41b8a67226-item-e484706e67",
+  "manufacturerText": "Nutritional Information\nNutritional Information\nNutritional Information\tAvg Qty / Serve\nper portion\n\t% Daily Intake*\n\tPer 100g\nper 100 grams\n\nEnergy (kJ)\nEnergy inkilojoules\n\t2600\t30% RI*\n30% daily value\n\t1070\nEnergy (kcal)\nEnergy incalories\n\t621\t\n\t255\nProtein (g)\nProtein ingram\n\t28.7\t\n\t11.8\nFat, Total (g)\nFat, Total ingram\n\t34.4\t\n\t14.1\nSaturated Fat (g)\nSaturated Fat ingram\n\t13.8\t\n\t5.7\nCarbohydrate (g)\nCarbohydrate ingram\n\t46.5\t\n\t19.1\nSugars (g)\nSugars ingram\n\t8.0\t\n\t3.3\nSodium (mg)\nSodium inmilligram\n\t1119\t\n\t459",
+  "currentItem": {
+    "id": "custom:cmlc49usf000512sx03uqnzy4",
+    "name": "Big Mac",
+    "brand": "McDonald's",
+    "kind": "FAST_FOOD",
+    "serving_size": "1 serving",
+    "servingOptions": [
+      {
+        "id": "serving-mcdonald s big mac 1 serving",
+        "ml": null,
+        "fat_g": 29.4,
+        "grams": null,
+        "label": "1 serving",
+        "carbs_g": 44.9,
+        "fiber_g": null,
+        "sugar_g": 8.8,
+        "calories": 557,
+        "protein_g": 24.6,
+        "serving_size": "1 serving"
+      }
+    ],
+    "calories": 557,
+    "protein_g": 24.6,
+    "carbs_g": 44.9,
+    "fat_g": 29.4,
+    "fiber_g": null,
+    "sugar_g": 8.8,
+    "source": "custom",
+    "__custom": true
+  },
+  "whole": "- generic: Adjust ingredient\n- button \"Close\": \u2715\n- generic: Big Mac\n- generic: McDonald's\n- generic: Serving size\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: Amount\n- spinbutton: \"1\"\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: \"Servings: 1\"\n- 'generic \"Calories: 557 kcal\"':\n  - generic: 557 kcal\n  - generic: Calories\n- 'generic \"Protein: 24.6 g\"':\n  - generic: 24.6 g\n  - generic: Protein\n- 'generic \"Carbs: 44.9 g\"':\n  - generic: 44.9 g\n  - generic: Carbs\n- 'generic \"Fat: 29.4 g\"':\n  - generic: 29.4 g\n  - generic: Fat\n- 'generic \"Fibre: \u2014\"':\n  - generic: \u2014\n  - generic: Fibre\n- 'generic \"Sugar: 8.8 g\"':\n  - generic: 8.8 g\n  - generic: Sugar\n- button \"Add to diary\"\n- button \"Cancel\"\n",
+  "half": "- generic: Adjust ingredient\n- button \"Close\": \u2715\n- generic: Big Mac\n- generic: McDonald's\n- generic: Serving size\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: Amount\n- spinbutton [active]: \"0.5\"\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: \"Servings: 0.5\"\n- 'generic \"Calories: 279 kcal\"':\n  - generic: 279 kcal\n  - generic: Calories\n- 'generic \"Protein: 12.3 g\"':\n  - generic: 12.3 g\n  - generic: Protein\n- 'generic \"Carbs: 22.5 g\"':\n  - generic: 22.5 g\n  - generic: Carbs\n- 'generic \"Fat: 14.7 g\"':\n  - generic: 14.7 g\n  - generic: Fat\n- 'generic \"Fibre: \u2014\"':\n  - generic: \u2014\n  - generic: Fibre\n- 'generic \"Sugar: 4.4 g\"':\n  - generic: 4.4 g\n  - generic: Sugar\n- button \"Add to diary\"\n- button \"Cancel\"\n",
+  "double": "- generic: Adjust ingredient\n- button \"Close\": \u2715\n- generic: Big Mac\n- generic: McDonald's\n- generic: Serving size\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: Amount\n- spinbutton [active]: \"2\"\n- combobox:\n  - option \"1 serving\" [selected]\n- generic: \"Servings: 2\"\n- 'generic \"Calories: 1114 kcal\"':\n  - generic: 1114 kcal\n  - generic: Calories\n- 'generic \"Protein: 49.2 g\"':\n  - generic: 49.2 g\n  - generic: Protein\n- 'generic \"Carbs: 89.8 g\"':\n  - generic: 89.8 g\n  - generic: Carbs\n- 'generic \"Fat: 58.8 g\"':\n  - generic: 58.8 g\n  - generic: Fat\n- 'generic \"Fibre: \u2014\"':\n  - generic: \u2014\n  - generic: Fibre\n- 'generic \"Sugar: 17.6 g\"':\n  - generic: 17.6 g\n  - generic: Sugar\n- button \"Add to diary\"\n- button \"Cancel\"\n",
+  "noSaveClicked": true,
+  "wallet": 544,
+  "task": 93,
+  "status": "EXACT_PUBLIC_CATALOGUE_UPDATED_SOURCE_BUILD_PASSED_AWS_DEPLOYMENT_PENDING",
+  "csvBefore": {
+    "country": "AU",
+    "chain": "McDonald's",
+    "item": "Big Mac",
+    "size_label": "1 serving",
+    "grams": "",
+    "ml": "",
+    "calories": "557",
+    "protein_g": "24.6",
+    "carbs_g": "44.9",
+    "fat_g": "29.4",
+    "fiber_g": "",
+    "sugar_g": "8.8",
+    "source_url": "https://promo.mcdonalds.com.au/sites/mcdonalds.com.au/files/Aus%20Core%20Food%20Menu_January%202026.pdf"
+  },
+  "csvAfter": {
+    "country": "AU",
+    "chain": "McDonald's",
+    "item": "Big Mac",
+    "size_label": "1 serving",
+    "grams": "",
+    "ml": "",
+    "calories": "621",
+    "protein_g": "28.7",
+    "carbs_g": "46.5",
+    "fat_g": "34.4",
+    "fiber_g": "",
+    "sugar_g": "8.0",
+    "source_url": "https://www.mcdonalds.com/au/en-au/menu/beef/big-mac.html"
+  },
+  "recordsBefore": {
+    "verifiedAt": "2026-10-05T13:18:21.452Z",
+    "readOnly": true,
+    "original23Unchanged": true,
+    "diaryCount": 23,
+    "diaryHash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e"
+  },
+  "noModelChange": true,
+  "catalogueUpdateProof": "docs/release-evidence/2026-10-05/australian-big-mac-catalogue-update.json",
+  "sourceChecks": {
+    "productionBuildExit": 0,
+    "webLockedFiles": 278,
+    "nativeLockedFiles": 79,
+    "sourceCsvRowsChanged": 1,
+    "uiNativeSourceFilesChanged": 0
+  }
+}
