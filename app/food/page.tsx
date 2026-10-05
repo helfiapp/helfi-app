@@ -42,7 +42,7 @@ import { STARTER_FOODS } from '@/data/foods-starter'
 import { COMMON_USDA_FOODS } from '@/data/usda-common'
 import { calculateDailyTargets } from '@/lib/daily-targets'
 import { foodNumberOrNull } from '@/lib/food/openfoodfacts'
-import { hasSameDiaryNutrientContent } from '@/lib/food/diary-entry-comparison'
+import { hasSameDiaryNutrientContent, hasSameDiaryEntryTime } from '@/lib/food/diary-entry-comparison'
 import { convertFoodAmount, liquidDensity } from '@/native/src/lib/foodUnits'
 import { convertItemMeasurement, recordedServingBasis, itemMeasurementUnitOptions, formatItemMeasurementUnit, type ItemMeasurementUnit } from '@/lib/food/serving-measurements'
 import { AI_MEAL_RECOMMENDATION_CREDITS, AI_MEAL_RECOMMENDATION_GOAL_NAME } from '@/lib/ai-meal-recommendation'
@@ -10038,6 +10038,7 @@ const applyStructuredItems = (
       const localDbId = localDbByKey.get(key) || ''
       if (mergedDbId && !localDbId) return false
       if (!hasSameDiaryNutrientContent(localEntryByKey.get(key), entry)) return false
+      if (!hasSameDiaryEntryTime(localEntryByKey.get(key), entry)) return false
     }
     return true
   }

@@ -1,5 +1,19 @@
 DEPLOYED:
 - LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 2:53pm Melbourne; final live save/reopen verified 2:58pm.
+- What changed: Task66 Build a Meal waits for the original saved clock and preserves its exact timestamp unless edited. Opening, including restored local drafts, no longer autosaves. Both save paths retain exact portion weights/ratios. Final source1b8cb1864eaaff10615b473a2901645cd3b11cab; AWS65 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag9y9x6o22yi1z15.
+- Where to see it: Food Diary > saved Build a Meal > Edit Entry.
+- What to quickly test: Actual original20foodrows unchanged on opening. Full121.4g224/double242.8g449/half60.7g112 actual normal autosaves retain original03:26UTC time and original sourceitems171413/322892. Final exact121.4/60.7/.5 metadata saved; normal website and restarted signed-in iPhone reopen112/P1.7/C2.4/F10.8/FibreMissing/S2.5/all6cards/daily2152/132remaining/619; read-only reopen keeps all20rows unchanged. Both full production builds/final actual-source checks/protectedguards/root278-native79 locks pass. Separate root manual Refresh still displays stale14:22 while saved/backend/editor14:26; next67 investigation. Photos/model/signed-store release remains unfinished. Apple saved-login controls blocked by locked Mac; Google account accessible/no first bundle.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
+- Date/time: 5 October 2026, 2:46pm Melbourne.
+- What changed: Initial task66 saved-builder time/portion integrity source9ce2e673f2d500af4d6eca3a0b1569b279e5c086; AWS64 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag2r5kxk2yo71z15. Exact weights and original loaded time preserved; hydration baseline prevents normal opening-only saves.
+- Where to see it: Food Diary > saved Build a Meal > Edit Entry.
+- What to quickly test: Final restored-draft follow-up1b8cb1864eaaff10615b473a2901645cd3b11cab built25580exit0 and is being released next. Initial source still permits opening-only save after restoring a draft; do not claim saved-editor fix complete or signed-store readiness until final follow-up and live read-only/portion/save/reopen checks pass.
+
+DEPLOYED:
+- LIVE: https://helfi.ai and https://www.helfi.ai
 - Date/time: 5 October 2026, 2:17pm Melbourne; save/reopen verified 2:29pm.
 - What changed: Task65 Build a Meal uses actual liquid density and Australian generic kitchen volumes. Oil100ml converts to92g at the same813kcal;100g is884kcal. New saves retain physical ml/g, exact original food sources and missing nutrient values. Source34c0db913ff4999c51e7e8f927401a3071bc197b; AWS63 BUILD/DEPLOY/VERIFY SUCCEED; both domains200/CloudFront/new matchingetag nylfbg6rj21z15.
 - Where to see it: Food Diary > Build a Meal.

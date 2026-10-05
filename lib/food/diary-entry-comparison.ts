@@ -13,3 +13,8 @@ const canonicalContent = (value: unknown): unknown => {
 export const hasSameDiaryNutrientContent = (a: any, b: any): boolean =>
   JSON.stringify(canonicalContent({ nutrition: a?.nutrition, total: a?.total, items: a?.items })) ===
   JSON.stringify(canonicalContent({ nutrition: b?.nutrition, total: b?.total, items: b?.items }))
+
+/** Saved clock/date changes must refresh even when nutrients and IDs match. */
+export const hasSameDiaryEntryTime = (a: any, b: any): boolean =>
+  JSON.stringify(canonicalContent({ createdAt: a?.createdAt, time: a?.time, localDate: a?.localDate })) ===
+  JSON.stringify(canonicalContent({ createdAt: b?.createdAt, time: b?.time, localDate: b?.localDate }))
