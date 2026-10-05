@@ -1,5 +1,13 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
+- Date/time: 2026-10-05 12:37:53 UTC
+- What changed: Final written Food Analyzer nutrition summary now matches final structured totals after the existing portion corrections; no extra AI request or model/credit/history change.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Analyse a fresh photo; written Calories/Protein/Carbs/Fat/Fibre/Sugar summary must match final totals and six cards. Unknown remains unknown, zero remains zero. Actual fresh normalphoto200/11.768s/UI12s written/structured/UI1053 all agree; 3eggs250, six desktop and390px phonecards. NoSave/original23/hash/daily2776 unchanged; wallet564->554 normal10. This does not certify photo accuracy: incompatible dried/canned fruit enrichment next scope90.
+- Verified source: ccbfeca42d57523e1b1312c58d68037abf434fef / AWS88 BUILD-DEPLOY-VERIFY SUCCEED; both domains200CloudFront/new matching ETag j67tcuxv9b1z15. Build17290/protected/root278native79 PASS. Signed stores/model comparison/full goal unfinished.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-05 12:08:25 UTC
 - What changed: Restored six colourful nutrient cards in the common overall food-result summary, including photo/saved and unknown-total results. Source numbers, existing chart/controls, model and native app unchanged.
 - Where to see it (page/link): https://helfi.ai/food

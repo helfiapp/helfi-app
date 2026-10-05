@@ -1,7 +1,7 @@
 {
   "scope": 89,
   "recordedAt": "2026-10-05T12:31:51.315890+00:00",
-  "status": "SOURCE_FULL_BUILD_PROTECTED_AND_LOCKS_PASS_EXACT_DEPLOY_PENDING",
+  "status": "PASS_SOURCE_BUILD_EXACT_AWS_NORMAL_UI",
   "baselineSource": "843f104506122675e47862a9642fbffcdd913d51",
   "baselineEvidence": "Actual normal production photo response: prose Calories885/P33/C122/F33; final seven structured items/total/UI962/P32.7/C142/F33.3. Local raw receipt tmp/task88-live-production-response.json.",
   "implementation": "Synchronize only standalone single-line meal nutrition summaries after all final structured-item sanitization, using final response total. Retain original photo observations, ingredient count/portion descriptions and unknown-versus-zero. No extra AI calls.",
@@ -21,7 +21,7 @@
   "nativeChanged": false,
   "pageLocksChanged": false,
   "databaseChanged": false,
-  "liveVerified": false,
+  "liveVerified": true,
   "wholeGoalComplete": false,
   "build": "17290 exit0",
   "pageLocks": {
@@ -30,5 +30,75 @@
     "status": "PASS",
     "snapshotsChanged": false
   },
-  "protectedRegions": "PASS"
+  "protectedRegions": "PASS",
+  "deployment": {
+    "verifiedAt": "2026-10-05T12:37:53.284Z",
+    "summary": {
+      "jobId": "88",
+      "status": "SUCCEED",
+      "commitId": "ccbfeca42d57523e1b1312c58d68037abf434fef"
+    },
+    "steps": [
+      {
+        "name": "BUILD",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "DEPLOY",
+        "status": "SUCCEED"
+      },
+      {
+        "name": "VERIFY",
+        "status": "SUCCEED"
+      }
+    ],
+    "domains": [
+      {
+        "url": "https://helfi.ai",
+        "status": 200,
+        "etag": "\"j67tcuxv9b1z15\"",
+        "via": "1.1 69b737af1efcebe93fe9d0963bec99ac.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://helfi.ai/"
+      },
+      {
+        "url": "https://www.helfi.ai",
+        "status": 200,
+        "etag": "\"j67tcuxv9b1z15\"",
+        "via": "1.1 8ef6c009633cc92707c74302b393925a.cloudfront.net (CloudFront)",
+        "cache": "Miss from cloudfront",
+        "finalUrl": "https://www.helfi.ai/"
+      }
+    ]
+  },
+  "actualLiveResult": {
+    "httpStatus": 200,
+    "networkSeconds": 11.767861999978777,
+    "uiSeconds": 12,
+    "total": {
+      "calories": 1053,
+      "protein_g": 30.4,
+      "carbs_g": 171.6,
+      "fat_g": 28.2,
+      "fiber_g": 11.1,
+      "sugar_g": 92.8
+    },
+    "writtenSummaryMatches": true,
+    "sixCardValuesMatch": true,
+    "wholeThreeEggCalories": 250,
+    "desktopSixCards": true,
+    "actualPhoneWidth390SixCards": true,
+    "walletBefore": 564,
+    "walletAfter": 554,
+    "paidHealthReviewUsed": false,
+    "saved": false,
+    "original23RowsUnchanged": true,
+    "hash": "3d7db20d42e2eb0c4ec8e549af2c8d2070de50f0ef128394f00dbf46520f5a7e",
+    "dailyCalories": 2776,
+    "screenshots": [
+      "web-photo-summary-consistent.png",
+      "web-phone-photo-overall-six-cards.png"
+    ],
+    "limitation": "This proves summary consistency, not photo accuracy. Actual pineapple enrichment uses dried2709210 and strawberries canned2709284 for unlabeled fresh fruit; next scope90 source-identity fix, phone chart missing-fibre follow-up after it."
+  }
 }

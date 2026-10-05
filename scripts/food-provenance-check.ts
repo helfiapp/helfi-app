@@ -1,5 +1,10 @@
 import assert from 'node:assert/strict'
-import { fillMissingNutrition } from '../lib/food/nutrition-provenance'
+import { fillMissingNutrition, nutritionCandidateScale } from '../lib/food/nutrition-provenance'
+import fs from 'node:fs'
+import vm from 'node:vm'
+import ts from 'typescript'
+import { foodNumberOrNull } from '../lib/food/openfoodfacts'
+import { convertFoodAmount, parseFoodServing } from '../native/src/lib/foodUnits'
 const item = { name: 'Chicken breast cooked', serving_size: '200 g', calories: null, protein_g: null, carbs_g: 0, fat_g: 0 }
 const candidate = { source: 'usda', id: '123', name: 'Chicken breast cooked', serving_size: '100 g', calories: 165, protein_g: 31, carbs_g: 1, fat_g: 3 }
 const filled = fillMissingNutrition(item, candidate)
@@ -11,4 +16,53 @@ assert.deepEqual(fillMissingNutrition(item, { ...candidate, name: 'Chicken breas
 assert.deepEqual(fillMissingNutrition(item, { ...candidate, brand: 'Different brand' }), item)
 assert.deepEqual(fillMissingNutrition({ ...item, serving_size: 'one plate' }, candidate), { ...item, serving_size: 'one plate' })
 assert.deepEqual(fillMissingNutrition(item, { ...candidate, serving_size: '100 ml' }), item)
-console.log('PASS: scaled database nutrition, preparation/brand compatibility, retained true zeros, unknown portions and field provenance.')
+const fruit = { name: 'pineapple', serving_size: '1/2 cup (3 oz)', servings: 1, calories: 43, protein_g: 0.5, carbs_g: 11, fat_g: 0.1, fiber_g: null, sugar_g: null, isGuess: true }
+const dried = { source: 'usda', id: '2709210', name: 'Pineapple, dried', serving_size: '100 g', calories: 347, protein_g: 1.2, carbs_g: 84.1, fat_g: 0.7, fiber_g: 2.4, sugar_g: 77.1 }
+const canned = { ...dried, id: '2709284', name: 'Strawberries, canned', calories: 92 }
+assert.equal(nutritionCandidateScale(fruit, dried), null, 'actual dried pineapple supplier record must not replace fresh-looking plain pineapple')
+assert.equal(nutritionCandidateScale({ ...fruit, name: 'strawberries' }, canned), null, 'actual canned strawberry record must not replace plain strawberries')
+for (const form of ['dried', 'dehydrated', 'freeze dried', 'canned', 'tinned', 'juice', 'puree', 'powder', 'concentrate', 'candied', 'in syrup', 'jam', 'jelly', 'pickled']) {
+  const candidate = { ...dried, name: `Pineapple, ${form}` }
+  assert.equal(nutritionCandidateScale(fruit, candidate), null, form)
+  const matching = { ...fruit, name: `Pineapple ${form}` }
+  assert.ok(nutritionCandidateScale(matching, candidate)! > 0, `explicit matching ${form} remains supported`)
+  assert.equal(nutritionCandidateScale(matching, { ...dried, name: 'Pineapple, raw' }), null)
+}
+assert.ok(nutritionCandidateScale(fruit, { ...dried, name: 'Pineapple, raw' })! > 0)
+assert.ok(nutritionCandidateScale(fruit, { ...dried, name: 'Pineapple, fresh' })! > 0)
+assert.equal(fillMissingNutrition(fruit, dried), fruit, 'missing nutrients cannot borrow from an incompatible food form')
+
+// Execute the real calibration route with only an offline supplier stub.
+const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/analyze-food/route.ts', 'utf8'), ts.ScriptTarget.Latest, true)
+const wanted = new Set(['replaceWordNumbers', 'normalizeLookupQuery', 'scoreLookupNameMatch', 'getItemWeightInGrams', 'selectDatabaseCandidate', 'enrichItemsWithDatabaseIfOutlier', 'computeTotalsFromItems'])
+const declarations = source.statements.filter(ts.isVariableStatement).filter(statement => statement.declarationList.declarations.some(d => ts.isIdentifier(d.name) && wanted.has(d.name.text))).map(s => s.getText(source))
+assert.equal(declarations.length, wanted.size)
+const context: any = { foodNumberOrNull, parseFoodServing, convertFoodAmount, nutritionCandidateScale, NUTRITION_FIELDS: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'], lookupFoodNutrition: async () => [dried], console: { warn: () => {} } }
+vm.createContext(context)
+vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
+const run = async () => {
+  const original = JSON.stringify(fruit)
+  const rejected = await context.calibrate([fruit])
+  assert.equal(rejected.changed, false)
+  assert.equal(rejected.items[0].calories, 43, 'real calibration must not inflate85g fresh pineapple to295 dried calories')
+  assert.equal(rejected.items[0].fiber_g, null)
+  assert.equal(rejected.items[0].nutritionProvenance, undefined)
+  assert.equal(JSON.stringify(fruit), original)
+  const matched = await context.calibrate([{ ...fruit, name: 'dried pineapple' }])
+  assert.equal(matched.changed, true, 'explicit dried pineapple still uses its measured compatible source')
+  assert.equal(matched.items[0].calories, 295)
+  assert.equal(matched.items[0].nutritionProvenance.recordId, '2709210')
+  context.lookupFoodNutrition = async () => [canned]
+  assert.equal((await context.calibrate([{ ...fruit, name: 'strawberries' }])).changed, false)
+  const fresh = { ...dried, id: 'fresh-reference', name: 'Pineapple, raw', calories: 50, protein_g: 0.5, carbs_g: 13, fat_g: 0.1, fiber_g: null, sugar_g: 0 }
+  context.lookupFoodNutrition = async () => [dried, fresh]
+  const freshMatched = await context.calibrate([{ ...fruit, calories: 100 }])
+  assert.equal(freshMatched.changed, true)
+  assert.equal(freshMatched.items[0].calories, 43, 'choose the compatible raw source rather than the denser dried source')
+  assert.equal(freshMatched.items[0].nutritionProvenance.recordId, 'fresh-reference')
+  assert.equal(freshMatched.items[0].fiber_g, null)
+  assert.equal(freshMatched.items[0].sugar_g, 0)
+  assert.equal(freshMatched.items[0].isGuess, true, 'photo portion remains an estimate after compatible database nutrition')
+  console.log('PASS: real source-form identity and calibration reject incompatible dried/canned/processed food; matching forms, measured portions, unknown/zero, brands and original records preserved. No network or credentials.')
+}
+run().catch(error => { console.error(error); process.exitCode = 1 })

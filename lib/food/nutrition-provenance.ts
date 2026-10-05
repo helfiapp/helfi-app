@@ -5,9 +5,25 @@ import { convertFoodAmount, parseFoodServing } from '../../native/src/lib/foodUn
 export const NUTRITION_FIELDS = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'] as const
 const text = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 const tokens = (value: unknown) => text(value).split(' ').filter((word) => word && !/^\d+$/.test(word) && !['a', 'an', 'the', 'of', 'estimated', 'serving'].includes(word))
+// A matching food word alone does not make preserved or processed food equivalent.
+// Plain photo ingredients must not inherit dried/canned/juice nutrition silently.
+const foodForms = [
+  /\b(dried|dehydrated)\b/,
+  /\b(canned|tinned)\b/,
+  /\b(juice|juiced)\b/,
+  /\b(puree|pureed)\b/,
+  /\b(powder|powdered)\b/,
+  /\b(concentrate|concentrated)\b/,
+  /\b(candied|sweetened|in syrup)\b/,
+  /\b(jam|jelly|preserve|preserves)\b/,
+  /\b(pickled)\b/,
+]
 
 export function nutritionCandidateScale(item: any, candidate: any): number | null {
   if (!candidate?.id || !candidate?.source || !isFoodPreparationCompatible(candidate.name, item.name)) return null
+  const requestedName = text(item.name)
+  const actualName = text(candidate.name)
+  if (foodForms.some(form => form.test(requestedName) !== form.test(actualName))) return null
   const requested = tokens(item.name)
   const actual = tokens(candidate.name)
   if (!requested.length || !requested.every((word) => actual.includes(word) || actual.includes(`${word}s`))) return null
