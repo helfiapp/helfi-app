@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { extractAdminFromHeaders } from '@/lib/admin-auth'
-import jwt from 'jsonwebtoken'
+import { issueAdminSession } from '@/lib/admin-session'
 import crypto from 'crypto'
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
@@ -173,7 +173,8 @@ export async function POST(request: NextRequest) {
         email: true,
         name: true,
         role: true,
-        isActive: true
+        isActive: true,
+        password: true
       }
     })
 
@@ -182,15 +183,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Create JWT token for the mobile session - extended to 7 days
-    const jwtToken = jwt.sign(
-      {
-        adminId: adminUser.id,
-        email: adminUser.email,
-        role: adminUser.role
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    )
+    const jwtToken = issueAdminSession(adminUser, JWT_SECRET)
 
     // Remove QR token (one-time use)
     await prisma.$executeRawUnsafe(`DELETE FROM QRTokens WHERE token = $1`, token)

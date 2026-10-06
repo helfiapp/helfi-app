@@ -1,0 +1,24 @@
+{
+  "scope": 102,
+  "status": "SOURCE_BUILD_PASS_DEPLOY_PENDING",
+  "ownerRequest": "No automatic admin-panel logout after elapsed time",
+  "implementation": [
+    "Signed credential-bound remembered session; no idle cutoff after normal session migration",
+    "Seven-day API access expiry retained; active-account/password/role/email change blocks renewal",
+    "Current local browser session wins over stale tab; hourly/focus/online/visibility renewal",
+    "Network/5xx retain session; delayed response cannot replace fresh login or revive Logout"
+  ],
+  "checks": {
+    "regression": "npm run check:admin-session PASS",
+    "typecheck": "npx tsc --noEmit PASS",
+    "fullBuild": "npm run build session3825 exit0; all required prebuild checks PASS",
+    "rootLocks": 278,
+    "nativeLocks": 79,
+    "otherLockHashesUnchanged": 277,
+    "onlyChangedLockedFile": "app/admin-panel/page.tsx",
+    "protectedRegions": "PASS"
+  },
+  "previousLiveSource": "e05cb39438f70338f2d3a6caab50e527270e3347",
+  "runtimeLongIdle": "Offline signed-token fixture366days; no simulated live clock/secret/session seeding",
+  "updatedAt": "2026-10-06T06:54:44.932898+00:00"
+}

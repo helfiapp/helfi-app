@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react'
 import Image from 'next/image'
+import { getStoredAdminToken, readStoredAdminSession, writeStoredAdminSession, refreshStoredAdminSession } from '@/lib/admin-browser-session'
 import { useRouter } from 'next/navigation'
 import {
   FEEDBACK_REQUEST_EMAIL_SUBJECT,
@@ -414,50 +415,14 @@ export default function AdminPanel() {
     let handleWindowFocus: (() => void) | null = null
 
     ;(async () => {
-      const storedToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
-      const storedUser = sessionStorage.getItem('adminUser') || localStorage.getItem('adminUser')
-
-      if (!storedToken || !storedUser) return
-
-      let tokenToUse = storedToken
-      let userToUse: any = null
-      try {
-        userToUse = JSON.parse(storedUser)
-      } catch {
-        userToUse = null
+      const restored = await refreshStoredAdminSession(window)
+      if (restored.invalid) {
+        handleLogout()
+        return
       }
-
-      // Try to refresh token automatically on page load so admins don't get logged out.
-      try {
-        const refreshResponse = await fetch('/api/admin/refresh-token', {
-          method: 'POST',
-          headers: {
-            Authorization: `Bearer ${storedToken}`,
-          },
-        })
-
-        if (refreshResponse.ok) {
-          const refreshData = await refreshResponse.json()
-          if (refreshData?.token) {
-            tokenToUse = refreshData.token
-          }
-          if (refreshData?.admin) {
-            userToUse = refreshData.admin
-          }
-        } else {
-          // If we can't refresh, log out so the page isn't stuck in a broken state.
-          handleLogout()
-          return
-        }
-      } catch (error) {
-        console.error('Auto refresh token failed:', error)
-        // Do not hard-logout on network hiccups; just try using the stored token.
-      }
-
-      sessionStorage.setItem('adminToken', tokenToUse)
-      sessionStorage.setItem('adminUser', JSON.stringify(userToUse))
-      localStorage.setItem('adminToken', tokenToUse)
-      localStorage.setItem('adminUser', JSON.stringify(userToUse))
+      if (!restored.session) return
+      const tokenToUse = restored.session.token
+      const userToUse = restored.session.admin
 
       setAdminToken(tokenToUse)
       setAdminUser(userToUse)
@@ -471,11 +436,11 @@ export default function AdminPanel() {
       const checkHashAndLoadData = () => {
         const queryTab = new URLSearchParams(window.location.search).get('tab')
         if (queryTab) {
-          handleTabChange(queryTab, tokenToUse)
+          handleTabChange(queryTab, getStoredAdminToken() || tokenToUse)
           return
         }
         if (window.location.hash === '#tickets') {
-          handleTabChange('tickets', tokenToUse)
+          handleTabChange('tickets', getStoredAdminToken() || tokenToUse)
           return
         }
         const storedTab = (() => {
@@ -486,7 +451,7 @@ export default function AdminPanel() {
           }
         })()
         if (storedTab) {
-          handleTabChange(storedTab, tokenToUse)
+          handleTabChange(storedTab, getStoredAdminToken() || tokenToUse)
         }
       }
 
@@ -501,14 +466,14 @@ export default function AdminPanel() {
       handleVisibilityChange = () => {
         if (!document.hidden && window.location.hash === '#tickets') {
           // Auto-load tickets when returning to visible tab with tickets hash
-          handleTabChange('tickets', tokenToUse)
+          handleTabChange('tickets', getStoredAdminToken() || tokenToUse)
         }
       }
 
       // New: Add focus detection for returning via back button
       handleWindowFocus = () => {
         if (window.location.hash === '#tickets') {
-          handleTabChange('tickets', tokenToUse)
+          handleTabChange('tickets', getStoredAdminToken() || tokenToUse)
         }
       }
 
@@ -528,10 +493,7 @@ export default function AdminPanel() {
     setAdminToken(tokenValue)
     setAdminUser(adminValue)
     setIsAuthenticated(true)
-    sessionStorage.setItem('adminToken', tokenValue)
-    sessionStorage.setItem('adminUser', JSON.stringify(adminValue))
-    localStorage.setItem('adminToken', tokenValue)
-    localStorage.setItem('adminUser', JSON.stringify(adminValue))
+    writeStoredAdminSession(window, { token: tokenValue, admin: adminValue })
     loadAnalyticsData()
     loadWaitlistData(tokenValue)
     loadUserStats(tokenValue)
@@ -744,9 +706,61 @@ export default function AdminPanel() {
     setVisionRecent([])
   }
 
+  useEffect(() => {
+    const syncSession = () => {
+      const session = readStoredAdminSession(window)
+      if (!session) {
+        handleLogout()
+        return
+      }
+      setAdminToken(session.token)
+      setAdminUser(session.admin)
+      setIsAuthenticated(true)
+    }
+    const onStorage = (event: StorageEvent) => {
+      if (event.key === null || (event.key === 'adminToken' && event.newValue === null)) handleLogout()
+      else if (event.key === 'adminToken') syncSession()
+    }
+    window.addEventListener('storage', onStorage)
+    return () => window.removeEventListener('storage', onStorage)
+  }, [])
+
+  useEffect(() => {
+    if (!isAuthenticated) return
+    let disposed = false
+    let refreshing = false
+    const renew = async () => {
+      if (refreshing || document.hidden) return
+      refreshing = true
+      try {
+        const renewed = await refreshStoredAdminSession(window)
+        if (disposed) return
+        if (renewed.invalid) {
+          handleLogout()
+        } else if (renewed.session) {
+          setAdminToken(renewed.session.token)
+          setAdminUser(renewed.session.admin)
+        }
+      } finally {
+        refreshing = false
+      }
+    }
+    const timer = window.setInterval(renew, 60 * 60 * 1000)
+    window.addEventListener('focus', renew)
+    document.addEventListener('visibilitychange', renew)
+    window.addEventListener('online', renew)
+    return () => {
+      disposed = true
+      window.clearInterval(timer)
+      window.removeEventListener('focus', renew)
+      document.removeEventListener('visibilitychange', renew)
+      window.removeEventListener('online', renew)
+    }
+  }, [isAuthenticated])
+
   const loadAnalyticsData = async () => {
     try {
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       if (!authToken) return
       const headers = { Authorization: `Bearer ${authToken}` }
       // Load raw data
@@ -779,7 +793,7 @@ export default function AdminPanel() {
     setVisionUsageLoading(true)
     setVisionUsageError('')
     try {
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       const params = new URLSearchParams()
       params.set('rangeDays', String(days))
       if (filter) params.set('user', filter)
@@ -807,7 +821,7 @@ export default function AdminPanel() {
     setFoodCostSimLoading(true)
     setFoodCostSimError('')
     try {
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       const params = new URLSearchParams()
       params.set('rangeDays', String(days))
       const res = await fetch(`/api/admin/food-cost-sim?${params.toString()}`, {
@@ -833,7 +847,7 @@ export default function AdminPanel() {
     setFoodServerUsageLoading(true)
     setFoodServerUsageError('')
     try {
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       if (!authToken) return
       const res = await fetch(`/api/admin/food-analysis-usage?rangeDays=${days}`, {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -854,7 +868,7 @@ export default function AdminPanel() {
     setServerCallUsageLoading(true)
     setServerCallUsageError('')
     try {
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       if (!authToken) return
       const res = await fetch(`/api/admin/server-call-usage?rangeDays=${days}`, {
         headers: { Authorization: `Bearer ${authToken}` },
@@ -874,7 +888,7 @@ export default function AdminPanel() {
     setFoodBenchmarkError('')
     setFoodBenchmarkResult(null)
     try {
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       const models = Object.entries(foodBenchmarkModels)
         .filter(([, enabled]) => enabled)
         .map(([m]) => m)
@@ -1228,7 +1242,7 @@ https://www.helfi.ai`)
     try {
       const authToken = token || adminToken || (() => {
         try {
-          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || ''
+          return getStoredAdminToken() || ''
         } catch {
           return ''
         }
@@ -1278,7 +1292,7 @@ https://www.helfi.ai`)
     try {
       const authToken = adminToken || (() => {
         try {
-          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || ''
+          return getStoredAdminToken() || ''
         } catch {
           return ''
         }
@@ -1523,7 +1537,7 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
     try {
       const storedToken = (() => {
         try {
-          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+          return getStoredAdminToken()
         } catch {
           return null
         }
@@ -1553,7 +1567,7 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
     try {
       const storedToken = (() => {
         try {
-          return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+          return getStoredAdminToken()
         } catch {
           return null
         }
@@ -1663,7 +1677,7 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
   const loadAiInsights = async () => {
     setLoadingInsights(true)
     try {
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       if (!authToken) {
         setAiInsights('Admin login required to view insights.')
         setLoadingInsights(false)
@@ -2233,7 +2247,7 @@ To stop receiving messages from Helfi, reply with "unsubscribe" and we will not 
   const handleSelectAllMatchingUsers = async () => {
     const storedToken = (() => {
       try {
-        return sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken')
+        return getStoredAdminToken()
       } catch {
         return null
       }
@@ -2989,7 +3003,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
       return
     }
 
-    const authToken = sessionStorage.getItem('adminToken') || adminToken
+    const authToken = getStoredAdminToken() || adminToken
     if (!authToken) {
       alert('Session expired. Please log in again and retry.')
       return
@@ -3040,7 +3054,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     setTicketsError('')
     try {
       // Get token from storage directly to avoid state timing issues
-      const authToken = (sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken || '').trim()
+      const authToken = (getStoredAdminToken() || adminToken || '').trim()
       if (!authToken) {
         setTicketsError('Your admin session expired. Please log in again.')
         setSupportTickets([])
@@ -3085,7 +3099,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
   const handleTicketAction = async (action: string, ticketId: string, data?: any) => {
     try {
       // Get token from sessionStorage directly to avoid state timing issues
-      const authToken = sessionStorage.getItem('adminToken') || adminToken
+      const authToken = getStoredAdminToken() || adminToken
       const response = await fetch('/api/admin/tickets', {
         method: 'POST',
         headers: {
@@ -3128,7 +3142,7 @@ P.S. Need quick help? We're always here at support@helfi.ai`)
     setIsDeletingTickets(true)
     setTicketsError('')
     try {
-      const authToken = (sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken || '').trim()
+      const authToken = (getStoredAdminToken() || adminToken || '').trim()
       if (!authToken) {
         setTicketsError('Your admin session expired. Please log in again.')
         setIsAuthenticated(false)
@@ -6965,7 +6979,7 @@ The Helfi Team`,
                       onClick={async () => {
                         try {
                           // Try to refresh the token first
-                          const storedToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken
+                          const storedToken = getStoredAdminToken() || adminToken
                           if (storedToken) {
                             const refreshResponse = await fetch('/api/admin/refresh-token', {
                               method: 'POST',
@@ -7053,7 +7067,7 @@ The Helfi Team`,
                                 onClick={async () => {
                                   try {
                                     // Try to refresh the token first
-                                    const storedToken = sessionStorage.getItem('adminToken') || localStorage.getItem('adminToken') || adminToken
+                                    const storedToken = getStoredAdminToken() || adminToken
                                     if (storedToken) {
                                       const refreshResponse = await fetch('/api/admin/refresh-token', {
                                         method: 'POST',

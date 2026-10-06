@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import bcrypt from 'bcryptjs'
-import jwt from 'jsonwebtoken'
+import { issueAdminSession } from '@/lib/admin-session'
 import { authenticator } from 'otplib'
 
 const JWT_SECRET = process.env.JWT_SECRET || process.env.NEXTAUTH_SECRET
@@ -82,16 +82,7 @@ export async function POST(request: NextRequest) {
       data: { lastLogin: new Date() }
     })
 
-    // Create JWT token - extended to 7 days for admin convenience
-    const token = jwt.sign(
-      { 
-        adminId: adminUser.id, 
-        email: adminUser.email, 
-        role: adminUser.role 
-      },
-      JWT_SECRET,
-      { expiresIn: '7d' }
-    )
+    const token = issueAdminSession(adminUser, JWT_SECRET)
 
     return NextResponse.json({
       success: true,
