@@ -1810,7 +1810,7 @@ const hasExplicitPieceCountInLabel = (value: string) => {
     .replace(/\b(a|an)\b/g, '1')
   const cleaned = stripWeightPhrasesFromLabel(normalized)
   const keywordPattern = DISCRETE_UNIT_KEYWORDS.map((k) => k.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('|')
-  return new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})\\b`).test(
+  return new RegExp(`\\b(\\d+(?:\\.\\d+)?)\\s*(?:x\\s*)?(?:[a-z-]+\\s+){0,2}(?:${keywordPattern})(?:s|es)?\\b`).test(
     cleaned,
   )
 }
@@ -2098,6 +2098,7 @@ const normalizeDiscreteItem = (item: any) => {
   const servingMeta = parseServingUnitMetadata(working?.serving_size || '')
   const servingPieces =
     servingMeta &&
+    hasExplicitPieceCountInLabel(normalizedServingSize) &&
     isDiscreteUnitLabel(servingMeta.unitLabel) &&
     servingMeta.quantity >= 1 &&
     !isFractionalServingQuantity(servingMeta.quantity)
@@ -8027,8 +8028,7 @@ const applyStructuredItems = (
       if (n.startsWith('this image shows')) return true
       if (n.includes('image shows')) return true
       if (analysisTrimmed && n === analysisTrimmed) return true
-      const summaryKeywords = ['plate', 'platter', 'dish', 'bowl', 'meal']
-      const hasSummaryKeyword = summaryKeywords.some((k) => n.includes(k))
+      const hasSummaryKeyword = /\b(?:plate|platter|dish|bowl|meal)\b/i.test(n)
       const hasListDelimiters = n.includes(',') || n.includes(' and ') || n.includes(' with ')
       const longPhrase = n.split(/\s+/).length >= 7
       const mentionsBurgerWith = n.includes('burger with')

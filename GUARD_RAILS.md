@@ -7,6 +7,7 @@
 - Keep normal consent, wallet checks, and the existing 10-credit food-photo charge. Do not replace this narrow routing change with a global model override.
 - Meal-photo database checks may run together at concurrency4; preserve all eligible lookups, original ingredient order, compatible-source/portion rules, unknown values and item limit. Serial and parallel outcomes must match in `check:food-provenance`. Other food modes retain serial checks.
 - Keep the6.1primary meal prompt concise through `buildFoodPhotoPrompt`, retaining all visible foods, full discrete counts, preparation identity, estimated portions, unknown/zero nutrients, label precedence, user hints/feedback and matching Components/JSON/totals. Other prompts retain their existing behavior.
+- Web photo result filters must match whole summary words; radish/radishes are foods, not a dish summary. Serving metadata may assign a piece count only when the label explicitly states one (including plurals); estimated75g/60g sliced vegetables must retain gram portions, never75/60pieces. Preserve every returned ingredient and summed six-card totals; exercise the actual web helpers with the recorded1093kcal bowl in `check:food-photo-model`.
 - Required offline regression: `npm run check:food-photo-model`. The benchmark is a comparison of two weighed references and seven unweighed photos, not a guarantee of accuracy or a 20-second maximum.
 
 This file is the **single source of truth** for sections of the app that are considered
