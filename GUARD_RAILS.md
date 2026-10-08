@@ -2,6 +2,7 @@
 
 ## Food photo model scope (8 October 2026)
 
+- For plain photo ingredients, check curated CustomFoodItem records before the imported foundation/SR-legacy libraries. Restrict imported plain-food queries by indexed generic sources; never scan the large branded archive for a generic meal ingredient. Keep provider cache options consistent and never log credential-bearing URLs, raw provider errors or upstream error bodies.
 - Meal photos must search the saved Helfi food library first, then use compatible USDA/FatSecret fallback records. Prefer sourced nutrients over model values, scale once to the estimated gram portion, retain unknown fibre/sugar, and reject babyfood/cereal records for plain ingredients. A whole-food count is not a whole-wheat/milk identity; preserve those meaningful qualifiers. The actual lookup and calibration fixtures must verify source order, wrong-match fallback and no external call on a saved hit. Result rendering must use the explicit-count helper without a second weight-to-piece fallback.
 - Owner approved GPT-6.1 Sol for meal photo analysis after the repeated three-model comparison. Text food entry, packaged food/label scans, alternatives without images, and other AI features retain their existing model.
 - Route all meal-photo image follow-ups through `prepareFoodPhotoCompletion`; the metered wrapper may retain 6.1 only for the `food:photo-analysis` feature. Use low reasoning and enough completion allowance for all ingredients and six nutrient cards. Preserve any primary wallet-capped allowance.

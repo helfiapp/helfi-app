@@ -4,6 +4,7 @@ import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } f
 import { usdaLibraryServingSize } from './food/usda-library'
 import { foodNumberOrNull, hasCoreFoodNutrition, hasOffNutritionError, normalizeOffNutrition } from './food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
+import { searchCustomFoodMacros } from './food/custom-foods'
 import {
   formatUnitLabel,
   getFoodUnitGrams,
@@ -626,12 +627,11 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
-      next: { revalidate: 0 },
       timeoutMs: 3500,
     })
 
     if (!res.ok) {
-      console.warn('USDA food detail failed', res.status, await res.text())
+      console.warn('USDA food detail failed', res.status)
       return []
     }
 
@@ -664,7 +664,7 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
     })
     return Array.from(deduped.values())
   } catch (err) {
-    console.warn('USDA serving lookup error', err)
+    console.warn('USDA serving request failed')
     return []
   }
 }
@@ -704,12 +704,11 @@ export async function searchUsdaFoods(
         'Content-Type': 'application/json',
       },
       cache: 'no-store',
-      next: { revalidate: 0 },
       timeoutMs: 3500,
     })
 
     if (!res.ok) {
-      console.warn('USDA search failed', res.status, await res.text())
+      console.warn('USDA search failed', res.status)
       return []
     }
 
@@ -722,7 +721,7 @@ export async function searchUsdaFoods(
     }
     return out
   } catch (err) {
-    console.warn('USDA API error', err)
+    console.warn('USDA API request failed; trying compatible fallback')
     return []
   }
 }
@@ -1178,7 +1177,19 @@ export async function lookupFoodNutrition(
 
   // Try sources in order of preference
   const sources: Array<() => Promise<NormalizedFoodItem[]>> = []
-  if (options?.localFirst) sources.push(() => searchLocalFoods(query, { pageSize: maxResults }))
+  if (options?.localFirst) {
+    sources.push(async () => (await searchCustomFoodMacros(query, maxResults, { allowTypo: false })).map(item => ({
+      source: 'custom' as const, id: `custom:${item.id}`, name: item.name, brand: item.brand,
+      serving_size: '100 g', calories: item.calories, protein_g: item.protein_g,
+      carbs_g: item.carbs_g, fat_g: item.fat_g, fiber_g: item.fiber_g, sugar_g: item.sugar_g,
+    })))
+    // Plain photo ingredients should search the small generic libraries, rather
+    // than scan the branded product archive before checking preparation identity.
+    sources.push(() => searchLocalFoods(query, {
+      pageSize: maxResults,
+      sources: usdaDataType === 'generic' ? ['usda_foundation', 'usda_sr_legacy'] : undefined,
+    }))
+  }
 
   if (preferSource === 'usda') {
     sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))

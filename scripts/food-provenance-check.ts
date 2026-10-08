@@ -53,22 +53,27 @@ const run = async () => {
   const rawApple = { ...appleCereal, id: 'raw-apple', name: 'Apples, raw, with skin', calories: 52, protein_g: 0.3, carbs_g: 13.8, fat_g: 0.2, fiber_g: null, sugar_g: 10.4 }
   let providerCalls: string[] = []
   const providers: any = { hasCoreFoodNutrition, console: { log: () => {}, warn: () => {} },
-    searchLocalFoods: async () => { providerCalls.push('local'); return [appleCereal, rawApple] },
+    searchCustomFoodMacros: async () => { providerCalls.push('custom'); return [{ ...rawApple, id: 'curated-apple' }] },
+    searchLocalFoods: async (_query: string, options: any) => { assert.deepEqual(Array.from(options.sources), ['usda_foundation', 'usda_sr_legacy']); providerCalls.push('local'); return [appleCereal, rawApple] },
     searchUsdaFoods: async () => { providerCalls.push('usda'); return [rawApple] },
     searchFatSecretFoods: async () => { providerCalls.push('fatsecret'); return [rawApple] } }
   vm.createContext(providers)
   vm.runInContext(ts.transpileModule(lookupDeclaration.getText(foodDataAst).replace(/^export /, '') + '\nthis.lookup = lookupFoodNutrition;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, providers)
-  const lookupOptions = { localFirst: true, preferSource: 'usda', maxResults: 20, acceptCandidate: (x: any) => nutritionCandidateScale(wholeApple, x) != null }
+  const lookupOptions = { localFirst: true, preferSource: 'usda', usdaDataType: 'generic', maxResults: 20, acceptCandidate: (x: any) => nutritionCandidateScale(wholeApple, x) != null }
+  assert.equal((await providers.lookup('apple', lookupOptions))[0].id, 'custom:curated-apple')
+  assert.deepEqual(providerCalls, ['custom'], 'Helfi curated database must be checked before imported libraries or APIs')
+  providers.searchCustomFoodMacros = async () => { providerCalls.push('custom'); return [] }
+  providerCalls = []
   assert.equal((await providers.lookup('apple', lookupOptions))[0].id, 'raw-apple')
-  assert.deepEqual(providerCalls, ['local'], 'compatible saved food must prevent external API calls')
+  assert.deepEqual(providerCalls, ['custom', 'local'], 'compatible saved food must prevent external API calls')
   providers.searchLocalFoods = async () => { providerCalls.push('local'); return [appleCereal] }
   providerCalls = []
   assert.equal((await providers.lookup('apple', lookupOptions))[0].id, 'raw-apple')
-  assert.deepEqual(providerCalls, ['local', 'usda'], 'wrong saved match must fall back to compatible external source')
+  assert.deepEqual(providerCalls, ['custom', 'local', 'usda'], 'wrong saved match must fall back to compatible external source')
   providers.searchUsdaFoods = async () => { providerCalls.push('usda'); return [appleCereal] }
   providerCalls = []
   assert.equal((await providers.lookup('apple', lookupOptions))[0].id, 'raw-apple')
-  assert.deepEqual(providerCalls, ['local', 'usda', 'fatsecret'], 'wrong external match must not stop the next provider')
+  assert.deepEqual(providerCalls, ['custom', 'local', 'usda', 'fatsecret'], 'wrong external match must not stop the next provider')
   context.lookupFoodNutrition = (query: string, options: any) => providers.lookup(query, options)
   const localFirstApple = await context.calibrate([wholeApple], { preferDatabase: true, lookupConcurrency: 4 })
   assert.equal(localFirstApple.items[0].calories, 88, 'saved/source52kcal per100g must scale once to170g')
