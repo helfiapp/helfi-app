@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict'
 import { mapFoodNutritionChecks } from '../lib/food-photo-model'
-import { fillMissingNutrition, foodNutritionLookupName, nutritionCandidateScale } from '../lib/food/nutrition-provenance'
+import { fillMissingNutrition, foodNutritionLookupName, isFoodPhotoCandidateIdentity, nutritionCandidateScale } from '../lib/food/nutrition-provenance'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
@@ -43,7 +43,7 @@ const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/analyze-
 const wanted = new Set(['replaceWordNumbers', 'normalizeLookupQuery', 'scoreLookupNameMatch', 'getItemWeightInGrams', 'selectDatabaseCandidate', 'enrichItemsWithDatabaseIfOutlier', 'computeTotalsFromItems', 'enrichItemsWithFatSecretIfMissing'])
 const declarations = source.statements.filter(ts.isVariableStatement).filter(statement => statement.declarationList.declarations.some(d => ts.isIdentifier(d.name) && wanted.has(d.name.text))).map(s => s.getText(source))
 assert.equal(declarations.length, wanted.size)
-const context: any = { mapFoodNutritionChecks, foodNumberOrNull, parseFoodServing, convertFoodAmount, nutritionCandidateScale, foodNutritionLookupName, fillMissingNutrition, NUTRITION_FIELDS: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'], lookupFoodNutrition: async () => [dried], console: { warn: () => {} } }
+const context: any = { mapFoodNutritionChecks, foodNumberOrNull, parseFoodServing, convertFoodAmount, nutritionCandidateScale, foodNutritionLookupName, isFoodPhotoCandidateIdentity, fillMissingNutrition, NUTRITION_FIELDS: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'], lookupFoodNutrition: async () => [dried], console: { warn: () => {} } }
 vm.createContext(context)
 vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier; this.fill = enrichItemsWithFatSecretIfMissing;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
 const run = async () => {
@@ -82,6 +82,19 @@ const run = async () => {
   assert.equal(localFirstApple.items[0].isGuess, true, 'photo portion is still estimated')
   console.log('PASS: actual photo lookup checks saved library first, uses APIs only for a compatible fallback, replaces estimated nutrients with sourced values and retains unknowns/estimated portions.')
   const original = JSON.stringify(fruit)
+  const spinach = { ...wholeApple, name: 'Raw spinach', serving_size: '20g', calories: 5 }
+  const spinachSource = { ...rawApple, id: 'spinach-raw', name: 'Spinach, raw', calories: 23 }
+  const mustardSource = { ...spinachSource, id: '168438', name: 'Mustard spinach, (tendergreen), raw', calories: 21 }
+  assert.equal(isFoodPhotoCandidateIdentity(spinach, mustardSource), false)
+  assert.equal(isFoodPhotoCandidateIdentity(spinach, spinachSource), true)
+  assert.equal(isFoodPhotoCandidateIdentity({ name: 'Almonds' }, { name: 'Nuts, almonds' }), true)
+  assert.equal(isFoodPhotoCandidateIdentity({ name: 'Cooked salmon' }, { name: 'Fish, salmon, cooked' }), true)
+  context.lookupFoodNutrition = async () => [mustardSource, spinachSource]
+  const selectedSpinach = await context.calibrate([spinach], { preferDatabase: true })
+  assert.equal(selectedSpinach.items[0].nutritionProvenance.recordId, 'spinach-raw', 'primary identity must beat a food that merely contains spinach in its name')
+  for (const food of ['pie', 'cereal', 'cake', 'juice', 'sauce', 'smoothie']) {
+    assert.equal(nutritionCandidateScale({ ...wholeApple, name: 'Apple' }, { ...rawApple, name: `Apple ${food}` }), null, 'plain apple cannot borrow processed/composite '+food+' nutrition')
+  }
   context.lookupFoodNutrition = async () => [appleCereal]
   for (const lookupConcurrency of [1, 4]) {
     const appleChecked = await context.calibrate([wholeApple], { lookupConcurrency })

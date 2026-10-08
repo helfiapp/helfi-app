@@ -17,7 +17,7 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { lookupFoodNutrition, searchFatSecretFoods } from '@/lib/food-data';
-import { fillMissingNutrition, foodNutritionLookupName, nutritionCandidateScale, NUTRITION_FIELDS } from '@/lib/food/nutrition-provenance';
+import { fillMissingNutrition, foodNutritionLookupName, isFoodPhotoCandidateIdentity, nutritionCandidateScale, NUTRITION_FIELDS } from '@/lib/food/nutrition-provenance';
 import { foodNumberOrNull } from '@/lib/food/openfoodfacts';
 import { convertFoodAmount, parseFoodServing } from '@/native/src/lib/foodUnits';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
@@ -1524,7 +1524,9 @@ const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: nu
     const per100 = (calories / weight) * 100;
     if (!Number.isFinite(per100) || per100 <= 0) continue;
     const sourceBonus = candidate?.source === 'usda' ? 3 : candidate?.source === 'fatsecret' ? 2 : 1;
-    const score = scoreLookupNameMatch(queryNorm, candidate?.name || '') + sourceBonus;
+    const orderedQueryWords = queryNorm.split(' ').filter(Boolean).sort().join(' ');
+    const orderedCandidateWords = normalizeLookupQuery(candidate?.name || '').split(' ').filter(Boolean).sort().join(' ');
+    const score = (preserveSourceOrder && orderedQueryWords === orderedCandidateWords ? 100 : scoreLookupNameMatch(queryNorm, candidate?.name || '')) + sourceBonus;
     candidatesWithMetrics.push({ candidate, weight, per100, score });
   }
   if (candidatesWithMetrics.length === 0) return null;
@@ -1616,7 +1618,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
         maxResults: options.preferDatabase ? 20 : 3,
         usdaDataType: 'generic',
         localFirst: options.preferDatabase,
-        acceptCandidate: options.preferDatabase ? (candidate: any) => nutritionCandidateScale(item, candidate) != null : undefined,
+        acceptCandidate: options.preferDatabase ? (candidate: any) => isFoodPhotoCandidateIdentity(item, candidate) && nutritionCandidateScale(item, candidate) != null : undefined,
       });
     } catch (err) {
       console.warn('Database lookup failed (non-fatal)', err);
@@ -1624,7 +1626,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
     }
 
     const aiPer100 = (calories / weight) * 100;
-    const selected = selectDatabaseCandidate(query, dbResults.filter((candidate) => nutritionCandidateScale(item, candidate) != null), options.preferDatabase ? null : aiPer100, options.preferDatabase === true);
+    const selected = selectDatabaseCandidate(query, dbResults.filter((candidate) => (!options.preferDatabase || isFoodPhotoCandidateIdentity(item, candidate)) && nutritionCandidateScale(item, candidate) != null), options.preferDatabase ? null : aiPer100, options.preferDatabase === true);
     if (!selected) return;
 
     const { candidate, weight: candidateWeight } = selected;

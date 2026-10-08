@@ -20,7 +20,22 @@ const foodForms = [
   /\b(pickled)\b/,
   /\b(babyfood|baby food|infant food)\b/,
   /\b(cereal|cereals)\b/,
+  /\b(bread|breads)\b/,
+  /\b(cake|cakes|cookie|cookies|biscuit|biscuits|pie|pies|pastry|pastries)\b/,
+  /\b(soup|soups|stew|stews)\b/,
+  /\b(salad|salads)\b/,
+  /\b(sauce|sauces|dressing|dressings)\b/,
+  /\b(smoothie|smoothies)\b/,
 ]
+
+// A word buried in another food's name is not its primary identity. USDA
+// category prefixes (e.g. Nuts, almonds) and preparation labels are metadata.
+export function isFoodPhotoCandidateIdentity(item: any, candidate: any): boolean {
+  const metadata = new Set(['raw', 'uncooked', 'cooked', 'grilled', 'roasted', 'roast', 'boiled', 'baked', 'fried', 'steamed', 'fresh', 'nuts', 'nut', 'seeds', 'seed', 'fish', 'fruits', 'fruit', 'vegetables', 'vegetable'])
+  const requested = tokens(item.name).filter(word => !metadata.has(word))
+  const first = tokens(candidate.name).find(word => !metadata.has(word))
+  return !!first && requested.some(word => first === word || first === `${word}s` || word === `${first}s`)
+}
 
 export function nutritionCandidateScale(item: any, candidate: any): number | null {
   if (!candidate?.id || !candidate?.source || !isFoodPreparationCompatible(candidate.name, item.name)) return null
