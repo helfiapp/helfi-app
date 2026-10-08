@@ -39,7 +39,7 @@ const STRICT_AI_ONLY_ITEMS = true;
 // asks to pause billing. Do not toggle it off as a "quick fix" for other bugs.
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
-import { FOOD_PHOTO_COMPLETION_TOKENS, isMealPhotoAnalysis, mapFoodNutritionChecks, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '@/lib/food-photo-model';
+import { FOOD_PHOTO_COMPLETION_TOKENS, buildFoodPhotoPrompt, isMealPhotoAnalysis, mapFoodNutritionChecks, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '@/lib/food-photo-model';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
@@ -2825,7 +2825,7 @@ CRITICAL REQUIREMENTS:
           content: [
             {
               type: "text",
-              text: `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences.${hintBlock}${feedbackBlock}
+              text: isMealPhotoAnalysis(true, packagedMode, labelScan) ? buildFoodPhotoPrompt(hintBlock, feedbackBlock) : `Analyze this food image and provide accurate nutrition information based on the visible portion size. Be precise about size differences.${hintBlock}${feedbackBlock}
 
 CRITICAL FOR MEALS WITH MULTIPLE COMPONENTS:
 - If the image contains multiple distinct foods (e.g., plate with protein, vegetables, grains, salads, soups, stews, sandwiches with multiple fillings, bowls with toppings), you MUST:

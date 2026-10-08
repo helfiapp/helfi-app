@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import { HELFI_ANALYSIS_MODEL, isSpecialistOpenAIModel } from '../lib/ai-models'
-import { HELFI_FOOD_PHOTO_MODEL, FOOD_PHOTO_MODEL_FEATURE, FOOD_PHOTO_COMPLETION_TOKENS, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '../lib/food-photo-model'
+import { HELFI_FOOD_PHOTO_MODEL, FOOD_PHOTO_MODEL_FEATURE, FOOD_PHOTO_COMPLETION_TOKENS, buildFoodPhotoPrompt, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '../lib/food-photo-model'
 
 function load(file: string, adapters: Record<string, any>) {
   const ast = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true)
@@ -19,6 +19,9 @@ async function main() {
   for (const args of [[false, false, false], [true, true, false], [true, false, true]]) {
     assert.equal(selectFoodAnalysisModel(...args as [boolean, boolean, boolean]), HELFI_ANALYSIS_MODEL)
   }
+  const prompt = buildFoodPhotoPrompt('USER HINT: beef vs lamb', 'FEEDBACK: missing small sides')
+  assert.ok(prompt.length < 3300, 'the primary meal-photo prompt must stay compact for6.1 latency/cost')
+  for (const essential of ['every visible food', 'FULL count', 'exactly once', 'raw/cooked/fried/breaded', 'servings:1', 'Unknown fibre/sugar are null', 'isGuess:true', 'PER-SERVING', 'Components:', '<ITEMS_JSON>', '</ITEMS_JSON>', 'USER HINT: beef vs lamb', 'FEEDBACK: missing small sides']) assert.ok(prompt.includes(essential), essential)
   const calls: any[] = []
   let safetyChecks = 0
   const wrapper = load('lib/metered-openai.ts', { HELFI_ANALYSIS_MODEL, isSpecialistOpenAIModel,
@@ -61,6 +64,7 @@ async function main() {
   assert.equal(safetyChecks, calls.length, 'consent/usage safety still gates every provider call')
   const body = routeText.slice(routeText.indexOf('    let primaryUsageEvent: any = null;'))
   assert.ok(!body.includes('chatCompletionWithCost(openai,'), 'all in-route vision fallbacks must use the approved adapter')
+  assert.ok(routeText.includes('isMealPhotoAnalysis(true, packagedMode, labelScan) ? buildFoodPhotoPrompt(hintBlock, feedbackBlock)'), 'only ordinary meal photos use the compact prompt; text/label instructions remain intact')
   assert.ok(routeText.includes('capMaxTokensToBudget(model, promptText, maxTokens, wallet.totalAvailableCents)'))
   console.log('PASS: actual production food adapter routes only meal photos to6.1, keeps low reasoning/full fallback output, respects primary budget and leaves text/labels/other AI and safety gates unchanged.')
 }
