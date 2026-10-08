@@ -23730,14 +23730,7 @@ Please add nutritional information manually if needed.`);
                             : 1
                         const totalsLabel = formattedServings
 
-                        const piecesPerServing =
-                          getPiecesPerServing(item) ||
-                          (servingUnitMeta &&
-                            isDiscreteUnitLabel(servingUnitMeta.unitLabel) &&
-                            servingUnitMeta.quantity >= 1 &&
-                            !isFractionalServingQuantity(servingUnitMeta.quantity)
-                            ? servingUnitMeta.quantity
-                            : null)
+                        const piecesPerServing = getPiecesPerServing(item)
                         const piecesDisplayMultiplier =
                           piecesPerServing && piecesPerServing > 1 && declaredQty <= 1 ? piecesPerServing : null
                         const servingsStep =

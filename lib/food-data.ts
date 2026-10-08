@@ -1168,6 +1168,8 @@ export async function lookupFoodNutrition(
     preferSource?: 'usda' | 'fatsecret' | 'openfoodfacts'
     maxResults?: number
     usdaDataType?: 'branded' | 'generic' | 'all'
+    localFirst?: boolean
+    acceptCandidate?: (candidate: NormalizedFoodItem) => boolean
   },
 ): Promise<NormalizedFoodItem[]> {
   const maxResults = options?.maxResults ?? 3
@@ -1176,6 +1178,7 @@ export async function lookupFoodNutrition(
 
   // Try sources in order of preference
   const sources: Array<() => Promise<NormalizedFoodItem[]>> = []
+  if (options?.localFirst) sources.push(() => searchLocalFoods(query, { pageSize: maxResults }))
 
   if (preferSource === 'usda') {
     sources.push(() => searchUsdaFoods(query, { pageSize: maxResults, dataType: usdaDataType }))
@@ -1192,7 +1195,10 @@ export async function lookupFoodNutrition(
   // Try each source until we get results
   for (const sourceFn of sources) {
     try {
-      const results = await sourceFn()
+      const results = (await sourceFn()).filter(candidate =>
+        (!options?.localFirst || hasCoreFoodNutrition(candidate)) &&
+        (!options?.acceptCandidate || options.acceptCandidate(candidate)),
+      )
       if (results && results.length > 0) {
         console.log(`✅ Found ${results.length} results from ${results[0].source} for query: ${query}`)
         return results

@@ -4,7 +4,8 @@ import { convertFoodAmount, parseFoodServing } from '../../native/src/lib/foodUn
 
 export const NUTRITION_FIELDS = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'] as const
 const text = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
-const tokens = (value: unknown) => text(value).split(' ').filter((word) => word && !/^\d+$/.test(word) && !['a', 'an', 'the', 'of', 'estimated', 'serving'].includes(word))
+export const foodNutritionLookupName = (value: unknown) => text(value).replace(/\bwhole\s+(?!wheat\b|grain\b|grains\b|milk\b)/g, '')
+const tokens = (value: unknown) => foodNutritionLookupName(value).split(' ').filter((word) => word && !/^\d+$/.test(word) && !['a', 'an', 'the', 'of', 'estimated', 'serving'].includes(word))
 // A matching food word alone does not make preserved or processed food equivalent.
 // Plain photo ingredients must not inherit dried/canned/juice nutrition silently.
 const foodForms = [
@@ -17,6 +18,8 @@ const foodForms = [
   /\b(candied|sweetened|in syrup)\b/,
   /\b(jam|jelly|preserve|preserves)\b/,
   /\b(pickled)\b/,
+  /\b(babyfood|baby food|infant food)\b/,
+  /\b(cereal|cereals)\b/,
 ]
 
 export function nutritionCandidateScale(item: any, candidate: any): number | null {

@@ -17,7 +17,7 @@ import { getToken } from 'next-auth/jwt';
 import { authOptions } from '@/lib/auth';
 import { prisma } from '@/lib/prisma';
 import { lookupFoodNutrition, searchFatSecretFoods } from '@/lib/food-data';
-import { fillMissingNutrition, nutritionCandidateScale, NUTRITION_FIELDS } from '@/lib/food/nutrition-provenance';
+import { fillMissingNutrition, foodNutritionLookupName, nutritionCandidateScale, NUTRITION_FIELDS } from '@/lib/food/nutrition-provenance';
 import { foodNumberOrNull } from '@/lib/food/openfoodfacts';
 import { convertFoodAmount, parseFoodServing } from '@/native/src/lib/foodUnits';
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system';
@@ -1512,7 +1512,7 @@ const applyRoastedChickenCalorieFloor = (items: any[]): { items: any[]; changed:
   return { items: nextItems, changed };
 };
 
-const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: number | null) => {
+const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: number | null, preserveSourceOrder = false) => {
   if (!Array.isArray(candidates) || candidates.length === 0) return null;
   const queryNorm = normalizeLookupQuery(query);
   const candidatesWithMetrics: Array<{ candidate: any; weight: number; per100: number; score: number }> = [];
@@ -1551,6 +1551,7 @@ const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: nu
 
   pool.sort((a, b) => {
     if (b.score !== a.score) return b.score - a.score;
+    if (preserveSourceOrder) return 0;
     if (aiTooLow) return b.per100 - a.per100;
     if (aiTooHigh) return a.per100 - b.per100;
     return b.per100 - a.per100;
@@ -1564,9 +1565,10 @@ type DbOutlierOptions = {
   outlierRatio?: number;
   allowIncrease?: boolean;
   preferSource?: 'usda' | 'fatsecret' | 'auto';
+  preferDatabase?: boolean;
 };
 
-// Database-backed calibration for single foods when AI macros look wildly off vs USDA/FatSecret.
+// Meal photos prefer compatible saved/database nutrition; other modes retain outlier calibration.
 const enrichItemsWithDatabaseIfOutlier = async (
   items: any[],
   options: DbOutlierOptions = {},
@@ -1591,12 +1593,12 @@ const enrichItemsWithDatabaseIfOutlier = async (
     if (checked >= maxItems) return;
 
     const weight = getItemWeightInGrams(item);
-    if (!weight || weight < 15) return;
+    if (!weight || weight <= 0 || (!options.preferDatabase && weight < 15)) return;
 
     const calories = Number(item?.calories ?? 0);
-    if (!Number.isFinite(calories) || calories <= 0) return;
+    if (!options.preferDatabase && (!Number.isFinite(calories) || calories <= 0)) return;
 
-    const query = normalizeLookupQuery(item?.name || '');
+    const query = normalizeLookupQuery(options.preferDatabase ? foodNutritionLookupName(item?.name || '') : item?.name || '');
     if (!query) return;
 
     checked += 1;
@@ -1611,8 +1613,10 @@ const enrichItemsWithDatabaseIfOutlier = async (
           : 'usda';
       dbResults = await lookupFoodNutrition(query, {
         preferSource,
-        maxResults: 3,
+        maxResults: options.preferDatabase ? 20 : 3,
         usdaDataType: 'generic',
+        localFirst: options.preferDatabase,
+        acceptCandidate: options.preferDatabase ? (candidate: any) => nutritionCandidateScale(item, candidate) != null : undefined,
       });
     } catch (err) {
       console.warn('Database lookup failed (non-fatal)', err);
@@ -1620,7 +1624,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
     }
 
     const aiPer100 = (calories / weight) * 100;
-    const selected = selectDatabaseCandidate(query, dbResults.filter((candidate) => nutritionCandidateScale(item, candidate) != null), aiPer100);
+    const selected = selectDatabaseCandidate(query, dbResults.filter((candidate) => nutritionCandidateScale(item, candidate) != null), options.preferDatabase ? null : aiPer100, options.preferDatabase === true);
     if (!selected) return;
 
     const { candidate, weight: candidateWeight } = selected;
@@ -1628,13 +1632,13 @@ const enrichItemsWithDatabaseIfOutlier = async (
     if (!Number.isFinite(candidateCalories) || candidateCalories <= 0) return;
 
     const dbPer100 = (candidateCalories / candidateWeight) * 100;
-    if (!Number.isFinite(aiPer100) || !Number.isFinite(dbPer100) || dbPer100 <= 0) return;
+    if ((!options.preferDatabase && !Number.isFinite(aiPer100)) || !Number.isFinite(dbPer100) || dbPer100 <= 0) return;
 
     const ratio = Math.abs(aiPer100 - dbPer100) / dbPer100;
     const dbScaledCalories = Math.round(candidateCalories * (weight / candidateWeight));
     const calorieDiff = Math.abs(calories - dbScaledCalories);
-    if (ratio < OUTLIER_RATIO && calorieDiff < 180) return;
-    if (!allowIncrease) {
+    if (!options.preferDatabase && ratio < OUTLIER_RATIO && calorieDiff < 180) return;
+    if (!options.preferDatabase && !allowIncrease) {
       const aiIsGuess = item?.isGuess === true;
       const aiHigherThanDb = aiPer100 > dbPer100;
       const extremeLow = aiPer100 < dbPer100 * 0.65;
@@ -1669,6 +1673,10 @@ const enrichItemsWithDatabaseIfOutlier = async (
       item.fiber_g = scaleMacro(candidate.fiber_g);
     }
     if (candidate?.sugar_g !== null && candidate?.sugar_g !== undefined) {
+      item.sugar_g = scaleMacro(candidate.sugar_g);
+    }
+    if (options.preferDatabase) {
+      item.fiber_g = scaleMacro(candidate.fiber_g);
       item.sugar_g = scaleMacro(candidate.sugar_g);
     }
 
@@ -4411,7 +4419,7 @@ CRITICAL REQUIREMENTS:
     // General (non-packaged) enrichment when macros are missing/zero
     if (!labelScan && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
       const needsEnrichment = resp.items.some((item: any) => NUTRITION_FIELDS.some((field) => foodNumberOrNull(item?.[field]) == null));
-      if (needsEnrichment) {
+      if (needsEnrichment && !useFoodPhotoModel) {
         const enriched = await enrichItemsWithFatSecretIfMissing(resp.items, useFoodPhotoModel ? 4 : 1);
         if (enriched.changed) {
           resp.items = enriched.items;
@@ -4429,6 +4437,7 @@ CRITICAL REQUIREMENTS:
         lookupConcurrency: useFoodPhotoModel ? 4 : 1,
         outlierRatio: feedbackDown ? 0.15 : 0.2,
         allowIncrease: feedbackDown,
+        preferDatabase: useFoodPhotoModel,
       });
       if (calibrated.changed) {
         resp.items = calibrated.items;
