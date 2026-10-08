@@ -4,6 +4,7 @@ import { extractUsdaNutrients, usdaNutrientBasis, usdaStandardServingOptions } f
 import { usdaLibraryServingSize } from './food/usda-library'
 import { foodNumberOrNull, hasCoreFoodNutrition, hasOffNutritionError, normalizeOffNutrition } from './food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
+import { Prisma } from '@prisma/client'
 import { searchCustomFoodMacros } from './food/custom-foods'
 import {
   formatUnitLabel,
@@ -1161,6 +1162,36 @@ export async function fetchFatSecretBrandList(
 }
 
 // Enhanced lookup function that tries multiple sources with fallback
+export async function searchPhotoGenericLibrary(query: string, maxResults = 20): Promise<NormalizedFoodItem[]> {
+  const tokens = query.toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim().split(/\s+/).filter(Boolean)
+    .map(token => token.endsWith('ies') && token.length > 4 ? `${token.slice(0, -3)}y` : token.endsWith('s') && !token.endsWith('ss') && token.length > 3 ? token.slice(0, -1) : token)
+  if (!tokens.length) return []
+  const clauses = tokens.map(token => Prisma.sql`
+    regexp_replace(lower(coalesce("name", '') || ' ' || coalesce("brand", '')), '[^a-z0-9]+', ' ', 'g')
+      ~ ${`(^| )${token}[a-z0-9]*($| )`}
+  `)
+  // Materialize the indexed generic sources BEFORE name matching and sorting.
+  // A global name-order index can otherwise walk the entire branded archive
+  // looking for twenty rare generic rows, even with a source WHERE filter.
+  const rows = await prisma.$queryRaw<any[]>(Prisma.sql`
+    WITH generic_foods AS MATERIALIZED (
+      SELECT "id", "source", "fdcId", "name", "brand", "servingSize", "calories", "proteinG", "carbsG", "fatG", "fiberG", "sugarG"
+      FROM "FoodLibraryItem"
+      WHERE "source" IN ('usda_foundation', 'usda_sr_legacy')
+    )
+    SELECT * FROM generic_foods WHERE ${Prisma.join(clauses, ' AND ')}
+    ORDER BY "name" ASC, "id" ASC LIMIT ${Math.min(50, Math.max(1, Math.floor(maxResults)))}
+  `)
+  return rows.flatMap(row => {
+    const servingSize = usdaLibraryServingSize(row)
+    if (servingSize == null) return []
+    return [{ source: 'usda' as const, id: String(row.fdcId ?? row.id), name: row.name, brand: row.brand,
+      serving_size: servingSize, calories: foodNumberOrNull(row.calories), protein_g: foodNumberOrNull(row.proteinG),
+      carbs_g: foodNumberOrNull(row.carbsG), fat_g: foodNumberOrNull(row.fatG),
+      fiber_g: foodNumberOrNull(row.fiberG), sugar_g: foodNumberOrNull(row.sugarG) }]
+  })
+}
+
 export async function lookupFoodNutrition(
   query: string,
   options?: {
@@ -1185,10 +1216,9 @@ export async function lookupFoodNutrition(
     })))
     // Plain photo ingredients should search the small generic libraries, rather
     // than scan the branded product archive before checking preparation identity.
-    sources.push(() => searchLocalFoods(query, {
-      pageSize: maxResults,
-      sources: usdaDataType === 'generic' ? ['usda_foundation', 'usda_sr_legacy'] : undefined,
-    }))
+    sources.push(() => usdaDataType === 'generic'
+      ? searchPhotoGenericLibrary(query, maxResults)
+      : searchLocalFoods(query, { pageSize: maxResults }))
   }
 
   if (preferSource === 'usda') {

@@ -6,6 +6,8 @@ import vm from 'node:vm'
 import ts from 'typescript'
 import { foodNumberOrNull, hasCoreFoodNutrition } from '../lib/food/openfoodfacts'
 import { convertFoodAmount, parseFoodServing } from '../native/src/lib/foodUnits'
+import { Prisma } from '@prisma/client'
+import { usdaLibraryServingSize } from '../lib/food/usda-library'
 const item = { name: 'Chicken breast cooked', serving_size: '200 g', calories: null, protein_g: null, carbs_g: 0, fat_g: 0 }
 const candidate = { source: 'usda', id: '123', name: 'Chicken breast cooked', serving_size: '100 g', calories: 165, protein_g: 31, carbs_g: 1, fat_g: 3 }
 const filled = fillMissingNutrition(item, candidate)
@@ -48,13 +50,37 @@ vm.createContext(context)
 vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier; this.fill = enrichItemsWithFatSecretIfMissing; this.sanitize = sanitizeStructuredItems; this.total = computeTotalsFromItems;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
 const run = async () => {
   const foodDataAst = ts.createSourceFile('food-data.ts', fs.readFileSync('lib/food-data.ts', 'utf8'), ts.ScriptTarget.Latest, true)
+  const genericDeclaration = foodDataAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'searchPhotoGenericLibrary')!
+  assert.ok(genericDeclaration)
+  const observedQueries: any[] = []
+  const genericContext: any = { Prisma, usdaLibraryServingSize, foodNumberOrNull, prisma: { $queryRaw: async (query: any) => {
+    observedQueries.push(query)
+    return [{ source: 'usda_sr_legacy', id: 'spinach-local', fdcId: 168462, name: 'Spinach, raw', servingSize: '100 g', calories: 23, proteinG: 2.9, carbsG: 3.6, fatG: 0.4, fiberG: null, sugarG: 0 }]
+  } } }
+  vm.createContext(genericContext)
+  vm.runInContext(ts.transpileModule(genericDeclaration.getText(foodDataAst).replace(/^export /, '')+'\nthis.search = searchPhotoGenericLibrary;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, genericContext)
+  const genericItems = await genericContext.search('raw spinach', 20)
+  const sql = observedQueries[0]
+  assert.ok(sql.text.includes('WITH generic_foods AS MATERIALIZED'))
+  assert.ok(sql.text.indexOf('WHERE "source" IN') < sql.text.indexOf('SELECT * FROM generic_foods WHERE'), 'generic-source extraction must precede name matching/sorting to avoid a global branded-archive name-index walk')
+  assert.ok(sql.text.includes("'usda_foundation', 'usda_sr_legacy'"))
+  assert.deepEqual(sql.values, ['(^| )raw[a-z0-9]*($| )', '(^| )spinach[a-z0-9]*($| )', 20])
+  assert.equal(genericItems[0].id, '168462'); assert.equal(genericItems[0].calories, 23)
+  assert.equal(genericItems[0].fiber_g, null); assert.equal(genericItems[0].sugar_g, 0)
+  await genericContext.search('almonds', 1000)
+  assert.deepEqual(observedQueries[1].values, ['(^| )almond[a-z0-9]*($| )', 50])
+  await genericContext.search("apple'); DROP TABLE food;--", 20)
+  assert.ok(!observedQueries[2].text.includes('DROP'), 'typed food words must stay bound parameters, never SQL text')
+  const beforeBlank = observedQueries.length
+  assert.equal((await genericContext.search('  ',20)).length,0)
+  assert.equal(observedQueries.length,beforeBlank)
   const lookupDeclaration = foodDataAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'lookupFoodNutrition')!
   assert.ok(lookupDeclaration)
   const rawApple = { ...appleCereal, id: 'raw-apple', name: 'Apples, raw, with skin', calories: 52, protein_g: 0.3, carbs_g: 13.8, fat_g: 0.2, fiber_g: null, sugar_g: 10.4 }
   let providerCalls: string[] = []
   const providers: any = { hasCoreFoodNutrition, console: { log: () => {}, warn: () => {} },
     searchCustomFoodMacros: async () => { providerCalls.push('custom'); return [{ ...rawApple, id: 'curated-apple' }] },
-    searchLocalFoods: async (_query: string, options: any) => { assert.deepEqual(Array.from(options.sources), ['usda_foundation', 'usda_sr_legacy']); providerCalls.push('local'); return [appleCereal, rawApple] },
+    searchPhotoGenericLibrary: async () => { providerCalls.push('local'); return [appleCereal, rawApple] },
     searchUsdaFoods: async () => { providerCalls.push('usda'); return [rawApple] },
     searchFatSecretFoods: async () => { providerCalls.push('fatsecret'); return [rawApple] } }
   vm.createContext(providers)
@@ -66,7 +92,7 @@ const run = async () => {
   providerCalls = []
   assert.equal((await providers.lookup('apple', lookupOptions))[0].id, 'raw-apple')
   assert.deepEqual(providerCalls, ['custom', 'local'], 'compatible saved food must prevent external API calls')
-  providers.searchLocalFoods = async () => { providerCalls.push('local'); return [appleCereal] }
+  providers.searchPhotoGenericLibrary = async () => { providerCalls.push('local'); return [appleCereal] }
   providerCalls = []
   assert.equal((await providers.lookup('apple', lookupOptions))[0].id, 'raw-apple')
   assert.deepEqual(providerCalls, ['custom', 'local', 'usda'], 'wrong saved match must fall back to compatible external source')
