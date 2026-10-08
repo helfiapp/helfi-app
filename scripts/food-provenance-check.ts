@@ -40,12 +40,12 @@ assert.ok(nutritionCandidateScale({ ...wholeApple, name: appleCereal.name }, app
 
 // Execute the real calibration route with only an offline supplier stub.
 const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/analyze-food/route.ts', 'utf8'), ts.ScriptTarget.Latest, true)
-const wanted = new Set(['replaceWordNumbers', 'normalizeLookupQuery', 'scoreLookupNameMatch', 'getItemWeightInGrams', 'selectDatabaseCandidate', 'enrichItemsWithDatabaseIfOutlier', 'computeTotalsFromItems', 'enrichItemsWithFatSecretIfMissing'])
+const wanted = new Set(['replaceWordNumbers', 'normalizeLookupQuery', 'scoreLookupNameMatch', 'getItemWeightInGrams', 'selectDatabaseCandidate', 'enrichItemsWithDatabaseIfOutlier', 'computeTotalsFromItems', 'enrichItemsWithFatSecretIfMissing', 'sanitizeStructuredItems', 'looksLikeNonFoodArtifact', 'normalizeComponentName'])
 const declarations = source.statements.filter(ts.isVariableStatement).filter(statement => statement.declarationList.declarations.some(d => ts.isIdentifier(d.name) && wanted.has(d.name.text))).map(s => s.getText(source))
 assert.equal(declarations.length, wanted.size)
 const context: any = { mapFoodNutritionChecks, foodNumberOrNull, parseFoodServing, convertFoodAmount, nutritionCandidateScale, foodNutritionLookupName, isFoodPhotoCandidateIdentity, fillMissingNutrition, NUTRITION_FIELDS: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'], lookupFoodNutrition: async () => [dried], console: { warn: () => {} } }
 vm.createContext(context)
-vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier; this.fill = enrichItemsWithFatSecretIfMissing;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
+vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier; this.fill = enrichItemsWithFatSecretIfMissing; this.sanitize = sanitizeStructuredItems; this.total = computeTotalsFromItems;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
 const run = async () => {
   const foodDataAst = ts.createSourceFile('food-data.ts', fs.readFileSync('lib/food-data.ts', 'utf8'), ts.ScriptTarget.Latest, true)
   const lookupDeclaration = foodDataAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'lookupFoodNutrition')!
@@ -78,6 +78,29 @@ const run = async () => {
   const localFirstApple = await context.calibrate([wholeApple], { preferDatabase: true, lookupConcurrency: 4 })
   assert.equal(localFirstApple.items[0].calories, 88, 'saved/source52kcal per100g must scale once to170g')
   assert.equal(localFirstApple.items[0].fiber_g, null, 'unknown supplier nutrient stays unknown')
+  const finalApple = context.sanitize(localFirstApple.items, true)[0]
+  assert.equal(finalApple.fiber_g, null, 'final photo response must not turn unavailable supplier fibre into a claimed zero')
+  for (const unknown of [null, undefined, '', 'unknown', -1]) {
+    const result = context.sanitize([{ ...wholeApple, fiber_g: unknown, sugar_g: unknown }], true)[0]
+    assert.equal(result.fiber_g, null); assert.equal(result.sugar_g, null)
+  }
+  const genuineZero = context.sanitize([{ ...wholeApple, fiber_g: 0, sugar_g: 0 }], true)[0]
+  assert.equal(genuineZero.fiber_g, 0); assert.equal(genuineZero.sugar_g, 0)
+  const partial = context.total([finalApple, genuineZero], true)
+  assert.equal(partial.fiber_g, null, 'meal total must not claim complete fibre when a component is unreported')
+  assert.equal(partial.calories, finalApple.calories + genuineZero.calories)
+  assert.equal(context.total([genuineZero], true).fiber_g, 0)
+  assert.equal(context.total([genuineZero], true).sugar_g, 0)
+  assert.equal(context.total([finalApple]).fiber_g, 0, 'other analysis modes keep their current total behavior')
+  const sanitizerCalls: ts.CallExpression[] = []
+  const collectCalls = (node: ts.Node) => {
+    if (ts.isCallExpression(node) && node.expression.getText(source) === 'sanitizeStructuredItems') sanitizerCalls.push(node)
+    ts.forEachChild(node, collectCalls)
+  }
+  collectCalls(source)
+  assert.equal(sanitizerCalls.length, 13)
+  for (const call of sanitizerCalls) assert.equal(call.arguments[1]?.getText(source), 'useFoodPhotoModel', 'every ordinary photo repair pass must preserve unknown optional nutrients')
+  assert.equal(context.sanitize([{ ...wholeApple, fiber_g: null }])[0].fiber_g, 0, 'other analysis modes retain their existing sanitizer behavior')
   assert.equal(localFirstApple.items[0].nutritionProvenance.recordId, 'raw-apple')
   assert.equal(localFirstApple.items[0].isGuess, true, 'photo portion is still estimated')
   console.log('PASS: actual photo lookup checks saved library first, uses APIs only for a compatible fallback, replaces estimated nutrients with sourced values and retains unknowns/estimated portions.')

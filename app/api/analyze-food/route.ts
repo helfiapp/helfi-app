@@ -123,7 +123,7 @@ const sanitizeFeedbackItems = (items: string[], limit = 12): string[] => {
     .slice(0, limit);
 };
 
-const computeTotalsFromItems = (items: any[]): any | null => {
+const computeTotalsFromItems = (items: any[], preserveUnknownNutrients = false): any | null => {
   if (!Array.isArray(items) || items.length === 0) {
     return null;
   }
@@ -159,8 +159,8 @@ const computeTotalsFromItems = (items: any[]): any | null => {
     protein_g: round(totals.protein_g),
     carbs_g: round(totals.carbs_g),
     fat_g: round(totals.fat_g),
-    fiber_g: round(totals.fiber_g),
-    sugar_g: round(totals.sugar_g),
+    fiber_g: preserveUnknownNutrients && items.some(item => foodNumberOrNull(item?.fiber_g) == null) ? null : round(totals.fiber_g),
+    sugar_g: preserveUnknownNutrients && items.some(item => foodNumberOrNull(item?.sugar_g) == null) ? null : round(totals.sugar_g),
   };
 };
 
@@ -2248,9 +2248,10 @@ const looksLikeNonFoodArtifact = (nameRaw: any): boolean => {
   return false;
 };
 
-const sanitizeStructuredItems = (items: any[]): any[] => {
+const sanitizeStructuredItems = (items: any[], preserveUnknownNutrients = false): any[] => {
   if (!Array.isArray(items)) return [];
   const normalizeOptionalNutrient = (value: any) => {
+    if (preserveUnknownNutrients) return foodNumberOrNull(value);
     const numeric = Number(value);
     return Number.isFinite(numeric) && numeric > 0 ? numeric : 0;
   };
@@ -3346,7 +3347,7 @@ CRITICAL REQUIREMENTS:
                 : null;
             if (parsedItems.length > 0) {
               // Use the parsed items/total directly; do not overwrite them with fallback/default items
-              resp.items = sanitizeStructuredItems(parsedItems);
+              resp.items = sanitizeStructuredItems(parsedItems, useFoodPhotoModel);
               resp.total = parsedTotal || computeTotalsFromItems(resp.items) || null;
               itemsSource = 'items_json';
               itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
@@ -3464,7 +3465,7 @@ CRITICAL REQUIREMENTS:
                 ? (parsed as any).total
                 : null;
             if (items.length > 0) {
-              resp.items = sanitizeStructuredItems(items);
+              resp.items = sanitizeStructuredItems(items, useFoodPhotoModel);
               resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
               itemsSource = itemsSource === 'none' ? 'text_extractor' : `${itemsSource}+text_extractor`;
               itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
@@ -3630,7 +3631,7 @@ CRITICAL REQUIREMENTS:
 
               const requireMultiple = listedComponents.length > 1;
               if (orderedItems.length === listedComponents.length && !itemsResultIsInvalid(orderedItems, requireMultiple)) {
-                resp.items = sanitizeStructuredItems(orderedItems);
+                resp.items = sanitizeStructuredItems(orderedItems, useFoodPhotoModel);
                 resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
                 itemsSource = itemsSource === 'none' ? 'component_bound' : `${itemsSource}+component_bound`;
                 itemsQuality = validateStructuredItems(resp.items) ? 'valid' : 'weak';
@@ -3730,7 +3731,7 @@ CRITICAL REQUIREMENTS:
           const requiresMultiple = listedComponents.length > 1 || analysisLooksMulti;
           const hasEnoughItems = requiresMultiple ? items.length > 1 : items.length > 0;
           if (hasEnoughItems && !looksLikeSingleGenericItem(items) && !looksLikeMultiIngredientSummary(items)) {
-            resp.items = sanitizeStructuredItems(items);
+            resp.items = sanitizeStructuredItems(items, useFoodPhotoModel);
             resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
             const sourceLabel = imageDataUrl ? 'vision_multi_followup' : 'multi_followup';
             itemsSource = itemsSource === 'none' ? sourceLabel : `${itemsSource}+${sourceLabel}`;
@@ -3811,7 +3812,7 @@ CRITICAL REQUIREMENTS:
               ? (parsed as any).total
               : null;
           if (!itemsResultIsInvalid(items, requireMultiple)) {
-            resp.items = sanitizeStructuredItems(items);
+            resp.items = sanitizeStructuredItems(items, useFoodPhotoModel);
             resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
             itemsSource = itemsSource === 'none' ? 'forced_image_followup' : `${itemsSource}+forced_image_followup`;
             itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
@@ -3886,7 +3887,7 @@ CRITICAL REQUIREMENTS:
               ? (parsed as any).total
               : null;
           if (!itemsResultIsInvalid(items, requireMultiple)) {
-            resp.items = sanitizeStructuredItems(items);
+            resp.items = sanitizeStructuredItems(items, useFoodPhotoModel);
             resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
             itemsSource = itemsSource === 'none' ? 'text_only_fallback' : `${itemsSource}+text_only_fallback`;
             itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
@@ -3980,6 +3981,7 @@ CRITICAL REQUIREMENTS:
                     : Array.isArray((parsed as any).items)
                     ? (parsed as any).items
                     : [],
+                  useFoodPhotoModel,
                 )
               : [];
             if (followUpItems.length > 0) {
@@ -3995,7 +3997,7 @@ CRITICAL REQUIREMENTS:
                       ...additions.map((item: any) => ({ ...item, isGuess: item?.isGuess === true })),
                     ]
                   : followUpItems;
-              resp.items = sanitizeStructuredItems(merged);
+              resp.items = sanitizeStructuredItems(merged, useFoodPhotoModel);
               resp.total = computeTotalsFromItems(resp.items) || resp.total;
               itemsSource = itemsSource === 'none' ? 'component_backfill' : `${itemsSource}+component_backfill`;
               itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
@@ -4107,7 +4109,7 @@ CRITICAL REQUIREMENTS:
               orderedItems.length === forcedComponents.length &&
               !itemsResultIsInvalid(orderedItems, true)
             ) {
-              resp.items = sanitizeStructuredItems(orderedItems);
+              resp.items = sanitizeStructuredItems(orderedItems, useFoodPhotoModel);
               resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
               itemsSource =
                 itemsSource === 'none' ? 'component_bound_repair' : `${itemsSource}+component_bound_repair`;
@@ -4131,7 +4133,7 @@ CRITICAL REQUIREMENTS:
     if (resp.items && Array.isArray(resp.items) && listedComponents.length > 0) {
       const renamed = renameGenericItemsWithComponents(resp.items, listedComponents);
       if (renamed.changed) {
-        resp.items = sanitizeStructuredItems(renamed.items);
+        resp.items = sanitizeStructuredItems(renamed.items, useFoodPhotoModel);
         itemsSource = itemsSource === 'none' ? 'component_rename' : `${itemsSource}+component_rename`;
         itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
         console.log('ℹ️ Renamed generic item labels using components list.', {
@@ -4546,7 +4548,7 @@ CRITICAL REQUIREMENTS:
               ? (parsed as any).total
               : null;
           if (items.length > 0 && !itemsResultIsInvalid(items, componentCount > 1)) {
-            resp.items = sanitizeStructuredItems(items);
+            resp.items = sanitizeStructuredItems(items, useFoodPhotoModel);
             resp.total = total || computeTotalsFromItems(resp.items) || resp.total;
             itemsSource = itemsSource === 'none' ? 'consistency_repair' : `${itemsSource}+consistency_repair`;
             itemsQuality = validateStructuredItems(resp.items) ? 'valid' : itemsQuality;
@@ -4611,6 +4613,7 @@ CRITICAL REQUIREMENTS:
                 : Array.isArray((parsed as any).items)
                 ? (parsed as any).items
                 : [],
+              useFoodPhotoModel,
             )
           : [];
         const total =
@@ -4934,8 +4937,8 @@ CRITICAL REQUIREMENTS:
     }
 
     if (!packagedMode && !labelScan && Array.isArray(resp.items) && resp.items.length > 0) {
-      resp.items = sanitizeStructuredItems(resp.items);
-      resp.total = computeTotalsFromItems(resp.items) || resp.total;
+      resp.items = sanitizeStructuredItems(resp.items, useFoodPhotoModel);
+      resp.total = computeTotalsFromItems(resp.items, useFoodPhotoModel) || resp.total;
     }
 
     resp.analysis = synchronizeAnalysisNutritionSummary(resp.analysis, resp.total);
