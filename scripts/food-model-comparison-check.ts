@@ -28,7 +28,7 @@ async function main() {
   assert.deepEqual(getModelPrices('gpt-6.1-sol-2026-09-30'), { inputCentsPer1k: 0.2, outputCentsPer1k: 1 })
   const calls: any[] = []
   let safetyChecks = 0
-  const wrapper = load('lib/metered-openai.ts', { HELFI_ANALYSIS_MODEL: 'gpt-5.6-sol', isSpecialistOpenAIModel: () => false,
+  const wrapper = load('lib/metered-openai.ts', { HELFI_ANALYSIS_MODEL: 'gpt-5.6-sol', HELFI_FOOD_PHOTO_MODEL: 'gpt-6.1-sol', FOOD_PHOTO_MODEL_FEATURE: 'food:photo-analysis', isSpecialistOpenAIModel: () => false,
     costCentsForTokens, estimateTokensFromText: () => 1, getRunContext: () => null,
     assertAiUsageAllowed: async () => { safetyChecks++ }, reportCriticalError: () => {} })
   const fakeProvider = { chat: { completions: { create: async (params: any) => { calls.push(params); return { model: params.model, choices: [{ message: { content: output }, finish_reason: 'stop' }], usage: { prompt_tokens: 1000, completion_tokens: 1000 } } } } } }

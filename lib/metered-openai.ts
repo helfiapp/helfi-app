@@ -4,6 +4,7 @@ import { reportCriticalError } from '@/lib/error-reporter';
 import { assertAiUsageAllowed } from '@/lib/ai-safety';
 import { getRunContext } from './run-context';
 import { HELFI_ANALYSIS_MODEL, isSpecialistOpenAIModel } from './ai-models';
+import { HELFI_FOOD_PHOTO_MODEL, FOOD_PHOTO_MODEL_FEATURE } from './food-photo-model';
 
 type CreateParams = Parameters<OpenAI['chat']['completions']['create']>[0];
 type AiCallContext = {
@@ -59,6 +60,7 @@ export async function chatCompletionWithCost(
   const requestedModel = String((params as any).model || '').trim()
   const keepRequestedModel =
     mergedContext.feature === 'admin:food-benchmark' ||
+    (mergedContext.feature === FOOD_PHOTO_MODEL_FEATURE && requestedModel === HELFI_FOOD_PHOTO_MODEL) ||
     isSpecialistOpenAIModel(requestedModel)
   const effectiveModel = keepRequestedModel ? requestedModel : HELFI_ANALYSIS_MODEL
   const effectiveParams: any = { ...params, model: effectiveModel }

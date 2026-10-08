@@ -39,6 +39,7 @@ const STRICT_AI_ONLY_ITEMS = true;
 // asks to pause billing. Do not toggle it off as a "quick fix" for other bugs.
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
+import { FOOD_PHOTO_COMPLETION_TOKENS, isMealPhotoAnalysis, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '@/lib/food-photo-model';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
@@ -3096,13 +3097,14 @@ CRITICAL REQUIREMENTS:
       );
     }
 
-    // Owner-approved single model for both text and image food analysis.
-    const model = 'gpt-5.6-sol'
+    // Owner-approved meal photo model; text and packaged labels retain their model.
+    const useFoodPhotoModel = isMealPhotoAnalysis(Boolean(imageDataUrl), packagedMode, labelScan)
+    const model = selectFoodAnalysisModel(Boolean(imageDataUrl), packagedMode, labelScan)
 
     // Multi-item food cards need enough visible output for the explanation,
     // totals, and structured JSON. A smaller GPT-5 budget can end with no
     // visible content on complex plates even when the image was understood.
-    let maxTokens = feedbackDown ? 1600 : 1200;
+    let maxTokens = useFoodPhotoModel ? FOOD_PHOTO_COMPLETION_TOKENS : feedbackDown ? 1600 : 1200;
 
     // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
     if (BILLING_ENFORCED && !allowViaFreeUse) {
@@ -3138,14 +3140,17 @@ CRITICAL REQUIREMENTS:
       hasImageContent: messages[0]?.content && Array.isArray(messages[0].content)
     });
 
-    const runOpenAICompletion = async (params: any) => chatCompletionWithCost(openai, params);
+    const runOpenAICompletion = async (params: any) => {
+      const prepared = prepareFoodPhotoCompletion(params, useFoodPhotoModel)
+      return chatCompletionWithCost(openai, prepared.params, { feature: prepared.feature })
+    };
 
     // Call food analysis model (metered)
     const runCompletion = async (runModel: string, runMessages: any[] = messages) =>
       runOpenAICompletion({
         model: runModel,
         messages: runMessages,
-        ...(runModel.toLowerCase().includes('gpt-5')
+        ...(/gpt-[56]/.test(runModel.toLowerCase())
           ? { max_completion_tokens: maxTokens }
           : { max_tokens: maxTokens }),
         temperature: 0,
@@ -3397,7 +3402,7 @@ CRITICAL REQUIREMENTS:
       ) {
         try {
           console.log('ℹ️ No ITEMS_JSON found, running lightweight items extractor (text-only)');
-          const extractor = await chatCompletionWithCost(openai, {
+          const extractor = await runOpenAICompletion({
             model: 'gpt-5.6-sol',
             messages: [
               {
@@ -3565,7 +3570,7 @@ CRITICAL REQUIREMENTS:
 
           let componentBound: any = null;
             try {
-              componentBound = await chatCompletionWithCost(openai, {
+              componentBound = await runOpenAICompletion({
                 model: 'gpt-5.6-sol',
                 response_format: {
                   type: 'json_schema',
@@ -3577,7 +3582,7 @@ CRITICAL REQUIREMENTS:
               } as any);
             } catch (schemaErr) {
               console.warn('Component-bound schema follow-up failed; retrying with json_object.', schemaErr);
-              componentBound = await chatCompletionWithCost(openai, {
+              componentBound = await runOpenAICompletion({
                 model: 'gpt-5.6-sol',
                 response_format: { type: 'json_object' } as any,
                 messages: componentBoundMessages,
@@ -3673,7 +3678,7 @@ CRITICAL REQUIREMENTS:
             : '') +
           '\nAnalysis text:\n' +
           analysisTextForFollowUp;
-        const followUpModel = imageDataUrl ? 'gpt-5.6-sol' : 'gpt-5.6-sol';
+        const followUpModel = model;
         const followUpMessages = imageDataUrl
           ? [
               {
@@ -3690,7 +3695,7 @@ CRITICAL REQUIREMENTS:
                 content: followUpPrompt,
               },
             ];
-        const followUp = await chatCompletionWithCost(openai, {
+        const followUp = await runOpenAICompletion({
                 model: followUpModel,
                 response_format: { type: 'json_object' } as any,
                 messages: followUpMessages,
@@ -3765,7 +3770,7 @@ CRITICAL REQUIREMENTS:
           '\nAnalysis text:\n' +
           analysisTextForFollowUp;
         console.warn('⚠️ Analyzer: forcing structured image follow-up (items missing).');
-        const forcedFollowUp = await chatCompletionWithCost(openai, {
+        const forcedFollowUp = await runOpenAICompletion({
               model: 'gpt-5.6-sol',
               response_format: { type: 'json_object' } as any,
               messages: [
@@ -3834,7 +3839,7 @@ CRITICAL REQUIREMENTS:
           ? `- Return at least ${Math.max(fallbackComponents.length, 2)} items.\n`
           : '';
         console.warn('⚠️ Analyzer: running final text-only structured fallback.');
-        const fallback = await chatCompletionWithCost(openai, {
+        const fallback = await runOpenAICompletion({
           model: 'gpt-5.6-sol',
           response_format: { type: 'json_object' } as any,
           messages: [
@@ -3905,7 +3910,7 @@ CRITICAL REQUIREMENTS:
         if (missingComponents.length > 0) {
           try {
             const followUp = isImageAnalysis
-              ? await chatCompletionWithCost(openai, {
+              ? await runOpenAICompletion({
                   model: 'gpt-5.6-sol',
                   response_format: { type: 'json_object' } as any,
                   messages: [
@@ -3932,7 +3937,7 @@ CRITICAL REQUIREMENTS:
                   max_tokens: 360,
                   temperature: 0,
                 } as any)
-              : await chatCompletionWithCost(openai, {
+              : await runOpenAICompletion({
                   model: 'gpt-5.6-sol',
                   response_format: { type: 'json_object' } as any,
                   messages: [
@@ -4049,7 +4054,7 @@ CRITICAL REQUIREMENTS:
                   content: componentPrompt,
                 },
               ];
-          const componentFollowUp = await chatCompletionWithCost(openai, {
+          const componentFollowUp = await runOpenAICompletion({
             model: 'gpt-5.6-sol',
             response_format: { type: 'json_schema', json_schema: buildComponentBoundSchema(forcedComponents) } as any,
             messages: componentMessages,
@@ -4499,7 +4504,7 @@ CRITICAL REQUIREMENTS:
             '- Use realistic restaurant portion sizes.\n' +
             '- Return one item per distinct component.\n';
           console.warn('⚠️ Analyzer: totals too low; running consistency repair pass.');
-          const repair = await chatCompletionWithCost(openai, {
+          const repair = await runOpenAICompletion({
             model: 'gpt-5.6-sol',
             response_format: { type: 'json_object' } as any,
             messages: [
@@ -4564,7 +4569,7 @@ CRITICAL REQUIREMENTS:
           '- Include small visible components like egg, tofu/chicken, corn, edamame, cucumber, cabbage, tomato, avocado, sauce, or dressing.\n' +
           '\nEarlier analysis text:\n' +
           (analysisTextForFollowUp || resp.analysis || '');
-        const repair = await chatCompletionWithCost(openai, {
+        const repair = await runOpenAICompletion({
           model: 'gpt-5.6-sol',
           response_format: {
             type: 'json_schema',
@@ -4811,7 +4816,7 @@ CRITICAL REQUIREMENTS:
             '  Recipe: step 1; step 2; step 3.\n' +
             '  Why: ...';
 
-          const alternatives = await chatCompletionWithCost(openai, {
+          const alternatives = await runOpenAICompletion({
             model: 'gpt-5.6-sol',
             messages: [{ role: 'user', content: alternativesPrompt }],
             max_tokens: 220,
