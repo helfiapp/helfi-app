@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { mapFoodNutritionChecks } from '../lib/food-photo-model'
 import { fillMissingNutrition, nutritionCandidateScale } from '../lib/food/nutrition-provenance'
 import fs from 'node:fs'
 import vm from 'node:vm'
@@ -34,12 +35,12 @@ assert.equal(fillMissingNutrition(fruit, dried), fruit, 'missing nutrients canno
 
 // Execute the real calibration route with only an offline supplier stub.
 const source = ts.createSourceFile('route.ts', fs.readFileSync('app/api/analyze-food/route.ts', 'utf8'), ts.ScriptTarget.Latest, true)
-const wanted = new Set(['replaceWordNumbers', 'normalizeLookupQuery', 'scoreLookupNameMatch', 'getItemWeightInGrams', 'selectDatabaseCandidate', 'enrichItemsWithDatabaseIfOutlier', 'computeTotalsFromItems'])
+const wanted = new Set(['replaceWordNumbers', 'normalizeLookupQuery', 'scoreLookupNameMatch', 'getItemWeightInGrams', 'selectDatabaseCandidate', 'enrichItemsWithDatabaseIfOutlier', 'computeTotalsFromItems', 'enrichItemsWithFatSecretIfMissing'])
 const declarations = source.statements.filter(ts.isVariableStatement).filter(statement => statement.declarationList.declarations.some(d => ts.isIdentifier(d.name) && wanted.has(d.name.text))).map(s => s.getText(source))
 assert.equal(declarations.length, wanted.size)
-const context: any = { foodNumberOrNull, parseFoodServing, convertFoodAmount, nutritionCandidateScale, NUTRITION_FIELDS: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'], lookupFoodNutrition: async () => [dried], console: { warn: () => {} } }
+const context: any = { mapFoodNutritionChecks, foodNumberOrNull, parseFoodServing, convertFoodAmount, nutritionCandidateScale, fillMissingNutrition, NUTRITION_FIELDS: ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'], lookupFoodNutrition: async () => [dried], console: { warn: () => {} } }
 vm.createContext(context)
-vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
+vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier; this.fill = enrichItemsWithFatSecretIfMissing;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
 const run = async () => {
   const original = JSON.stringify(fruit)
   const rejected = await context.calibrate([fruit])
@@ -63,6 +64,40 @@ const run = async () => {
   assert.equal(freshMatched.items[0].fiber_g, null)
   assert.equal(freshMatched.items[0].sugar_g, 0)
   assert.equal(freshMatched.items[0].isGuess, true, 'photo portion remains an estimate after compatible database nutrition')
+  // Real multi-food calibration must keep the serial nutrition result while
+  // avoiding seven consecutive waits in the slower6.1 photo pipeline.
+  const referenceCalories: Record<string, number> = { apple: 52, spinach: 23, almonds: 579, strawberries: 32, pineapple: 50, blueberries: 57, broccoli: 35 }
+  const plate = Object.keys(referenceCalories).map(name => ({ name, serving_size: '100 g', servings: 1, calories: 900, protein_g: 1, carbs_g: 1, fat_g: 1, fiber_g: null, sugar_g: 0, isGuess: true }))
+  const plateOriginal = JSON.stringify(plate)
+  let active = 0, peak = 0, requests: string[] = []
+  const delayedLookup = async (query: string) => {
+    requests.push(query); active++; peak = Math.max(peak, active)
+    await new Promise(resolve => setTimeout(resolve, 2))
+    active--
+    return [{ source: 'usda', id: 'offline-' + query, name: query, serving_size: '100 g', calories: referenceCalories[query], protein_g: 1, carbs_g: 1, fat_g: 1, fiber_g: null, sugar_g: 0 }]
+  }
+  context.lookupFoodNutrition = delayedLookup
+  const serial = await context.calibrate(plate)
+  assert.equal(peak, 1, 'existing text/label path stays serial')
+  requests = []; peak = 0
+  const parallel = await context.calibrate(plate, { lookupConcurrency: 4 })
+  assert.equal(peak, 4, 'normal meal photos must check foods together with a bounded provider load')
+  assert.deepEqual(requests, Object.keys(referenceCalories), 'every food still gets the same lookup')
+  assert.deepEqual(JSON.parse(JSON.stringify(parallel)), JSON.parse(JSON.stringify(serial)), 'same corrections, order, provenance, unknowns and totals as the existing serial path')
+  assert.deepEqual(parallel.items.map((x: any) => x.calories), Object.values(referenceCalories))
+  assert.equal(JSON.stringify(plate), plateOriginal, 'do not mutate the model result')
+  requests = []; peak = 0
+  await context.calibrate(plate, { lookupConcurrency: 99, maxItems: 2 })
+  assert.equal(peak, 2)
+  assert.equal(requests.length, 2, 'item limit still applies with parallel lookups')
+  context.searchFatSecretFoods = delayedLookup
+  const missingPlate = plate.map(x => ({ ...x, calories: null }))
+  const serialFill = await context.fill(missingPlate)
+  peak = 0
+  const parallelFill = await context.fill(missingPlate, 4)
+  assert.equal(peak, 4)
+  assert.deepEqual(JSON.parse(JSON.stringify(parallelFill)), JSON.parse(JSON.stringify(serialFill)), 'missing-value enrichment also preserves exactly the serial result')
+  console.log('PASS: actual meal nutrition checks overlap at most4 supplier requests, retain every eligible lookup/item limit and produce the same sourced results as serial calibration and missing-value enrichment.')
   console.log('PASS: real source-form identity and calibration reject incompatible dried/canned/processed food; matching forms, measured portions, unknown/zero, brands and original records preserved. No network or credentials.')
 }
 run().catch(error => { console.error(error); process.exitCode = 1 })

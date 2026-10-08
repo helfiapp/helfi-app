@@ -5,6 +5,7 @@
 - Owner approved GPT-6.1 Sol for meal photo analysis after the repeated three-model comparison. Text food entry, packaged food/label scans, alternatives without images, and other AI features retain their existing model.
 - Route all meal-photo image follow-ups through `prepareFoodPhotoCompletion`; the metered wrapper may retain 6.1 only for the `food:photo-analysis` feature. Use low reasoning and enough completion allowance for all ingredients and six nutrient cards. Preserve any primary wallet-capped allowance.
 - Keep normal consent, wallet checks, and the existing 10-credit food-photo charge. Do not replace this narrow routing change with a global model override.
+- Meal-photo database checks may run together at concurrency4; preserve all eligible lookups, original ingredient order, compatible-source/portion rules, unknown values and item limit. Serial and parallel outcomes must match in `check:food-provenance`. Other food modes retain serial checks.
 - Required offline regression: `npm run check:food-photo-model`. The benchmark is a comparison of two weighed references and seven unweighed photos, not a guarantee of accuracy or a 20-second maximum.
 
 This file is the **single source of truth** for sections of the app that are considered

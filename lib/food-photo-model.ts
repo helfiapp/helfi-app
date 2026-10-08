@@ -23,3 +23,18 @@ export function prepareFoodPhotoCompletion(params: any, enabled: boolean) {
 export function selectFoodAnalysisModel(hasImage: boolean, packagedMode: boolean, labelScan: boolean) {
   return isMealPhotoAnalysis(hasImage, packagedMode, labelScan) ? HELFI_FOOD_PHOTO_MODEL : HELFI_ANALYSIS_MODEL
 }
+
+// Keep every lookup and the original result order while limiting provider load.
+export async function mapFoodNutritionChecks<T, R>(items: T[], concurrency: number, check: (item: T) => Promise<R>): Promise<R[]> {
+  const width = Number.isFinite(concurrency) ? Math.max(1, Math.min(4, Math.floor(concurrency))) : 1
+  const results = new Array<R>(items.length)
+  let next = 0
+  const worker = async () => {
+    while (next < items.length) {
+      const index = next++
+      results[index] = await check(items[index])
+    }
+  }
+  await Promise.all(Array.from({ length: Math.min(width, items.length) }, worker))
+  return results
+}

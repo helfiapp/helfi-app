@@ -39,7 +39,7 @@ const STRICT_AI_ONLY_ITEMS = true;
 // asks to pause billing. Do not toggle it off as a "quick fix" for other bugs.
 import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
-import { FOOD_PHOTO_COMPLETION_TOKENS, isMealPhotoAnalysis, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '@/lib/food-photo-model';
+import { FOOD_PHOTO_COMPLETION_TOKENS, isMealPhotoAnalysis, mapFoodNutritionChecks, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '@/lib/food-photo-model';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
 import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
 import { getImageMetadata } from '@/lib/image-metadata';
@@ -1366,11 +1366,10 @@ const stripPiecesWithoutExplicitCount = (items: any[]): { items: any[]; changed:
 }
 
 // Fill absent values only, using a preparation/brand compatible record and one measured basis.
-const enrichItemsWithFatSecretIfMissing = async (items: any[]): Promise<{ items: any[]; total: any | null; changed: boolean }> => {
+const enrichItemsWithFatSecretIfMissing = async (items: any[], lookupConcurrency = 1): Promise<{ items: any[]; total: any | null; changed: boolean }> => {
   if (!Array.isArray(items)) return { items, total: null, changed: false };
   let changed = false;
-  const enriched: any[] = [];
-  for (const item of items) {
+  const enriched = await mapFoodNutritionChecks(items, lookupConcurrency, async (item) => {
     let next = item;
     if (NUTRITION_FIELDS.some((field) => foodNumberOrNull(item?.[field]) == null)) {
       const query = [item.brand, item.name].filter(Boolean).join(' ').trim();
@@ -1384,8 +1383,8 @@ const enrichItemsWithFatSecretIfMissing = async (items: any[]): Promise<{ items:
         } catch (err) { console.warn('Nutrition lookup unavailable; keeping original estimate.'); }
       }
     }
-    enriched.push(next);
-  }
+    return next;
+  });
   return { items: enriched, total: changed ? computeTotalsFromItems(enriched) : null, changed };
 };
 const enrichPackagedItemsWithFatSecret = enrichItemsWithFatSecretIfMissing;
@@ -1561,6 +1560,7 @@ const selectDatabaseCandidate = (query: string, candidates: any[], aiPer100?: nu
 
 type DbOutlierOptions = {
   maxItems?: number;
+  lookupConcurrency?: number;
   outlierRatio?: number;
   allowIncrease?: boolean;
   preferSource?: 'usda' | 'fatsecret' | 'auto';
@@ -1587,17 +1587,17 @@ const enrichItemsWithDatabaseIfOutlier = async (
   const isPreparedFoodName = (name: string) =>
     /\b(roast|roasted|rotisserie|fried|grilled|baked|bbq|barbecue|smoked|whole|cooked)\b/i.test(name || '');
 
-  for (const item of nextItems) {
-    if (checked >= maxItems) break;
+  await mapFoodNutritionChecks(nextItems, options.lookupConcurrency ?? 1, async (item) => {
+    if (checked >= maxItems) return;
 
     const weight = getItemWeightInGrams(item);
-    if (!weight || weight < 15) continue;
+    if (!weight || weight < 15) return;
 
     const calories = Number(item?.calories ?? 0);
-    if (!Number.isFinite(calories) || calories <= 0) continue;
+    if (!Number.isFinite(calories) || calories <= 0) return;
 
     const query = normalizeLookupQuery(item?.name || '');
-    if (!query) continue;
+    if (!query) return;
 
     checked += 1;
 
@@ -1616,29 +1616,29 @@ const enrichItemsWithDatabaseIfOutlier = async (
       });
     } catch (err) {
       console.warn('Database lookup failed (non-fatal)', err);
-      continue;
+      return;
     }
 
     const aiPer100 = (calories / weight) * 100;
     const selected = selectDatabaseCandidate(query, dbResults.filter((candidate) => nutritionCandidateScale(item, candidate) != null), aiPer100);
-    if (!selected) continue;
+    if (!selected) return;
 
     const { candidate, weight: candidateWeight } = selected;
     const candidateCalories = Number(candidate?.calories ?? 0);
-    if (!Number.isFinite(candidateCalories) || candidateCalories <= 0) continue;
+    if (!Number.isFinite(candidateCalories) || candidateCalories <= 0) return;
 
     const dbPer100 = (candidateCalories / candidateWeight) * 100;
-    if (!Number.isFinite(aiPer100) || !Number.isFinite(dbPer100) || dbPer100 <= 0) continue;
+    if (!Number.isFinite(aiPer100) || !Number.isFinite(dbPer100) || dbPer100 <= 0) return;
 
     const ratio = Math.abs(aiPer100 - dbPer100) / dbPer100;
     const dbScaledCalories = Math.round(candidateCalories * (weight / candidateWeight));
     const calorieDiff = Math.abs(calories - dbScaledCalories);
-    if (ratio < OUTLIER_RATIO && calorieDiff < 180) continue;
+    if (ratio < OUTLIER_RATIO && calorieDiff < 180) return;
     if (!allowIncrease) {
       const aiIsGuess = item?.isGuess === true;
       const aiHigherThanDb = aiPer100 > dbPer100;
       const extremeLow = aiPer100 < dbPer100 * 0.65;
-      if (!aiIsGuess && !aiHigherThanDb && !extremeLow) continue;
+      if (!aiIsGuess && !aiHigherThanDb && !extremeLow) return;
     }
 
     const scale = weight / candidateWeight;
@@ -1673,7 +1673,7 @@ const enrichItemsWithDatabaseIfOutlier = async (
     }
 
     changed = true;
-  }
+  });
 
   return {
     items: nextItems,
@@ -4412,7 +4412,7 @@ CRITICAL REQUIREMENTS:
     if (!labelScan && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
       const needsEnrichment = resp.items.some((item: any) => NUTRITION_FIELDS.some((field) => foodNumberOrNull(item?.[field]) == null));
       if (needsEnrichment) {
-        const enriched = await enrichItemsWithFatSecretIfMissing(resp.items);
+        const enriched = await enrichItemsWithFatSecretIfMissing(resp.items, useFoodPhotoModel ? 4 : 1);
         if (enriched.changed) {
           resp.items = enriched.items;
           resp.total = enriched.total || resp.total || computeTotalsFromItems(enriched.items);
@@ -4426,6 +4426,7 @@ CRITICAL REQUIREMENTS:
     if (!labelScan && !packagedMode && resp.items && Array.isArray(resp.items) && resp.items.length > 0) {
       const calibrated = await enrichItemsWithDatabaseIfOutlier(resp.items, {
         maxItems: Math.min(resp.items.length, 20),
+        lookupConcurrency: useFoodPhotoModel ? 4 : 1,
         outlierRatio: feedbackDown ? 0.15 : 0.2,
         allowIncrease: feedbackDown,
       });
