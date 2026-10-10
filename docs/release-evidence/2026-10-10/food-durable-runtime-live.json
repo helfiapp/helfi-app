@@ -1,0 +1,86 @@
+{
+  "verifiedAt": "2026-10-10T04:51:11.728501+00:00",
+  "commit": "e68293322caf694fe40613d185be15ea684f5c25",
+  "awsJob": "104",
+  "awsSteps": {
+    "BUILD": "SUCCEED",
+    "DEPLOY": "SUCCEED",
+    "VERIFY": "SUCCEED"
+  },
+  "domains": {
+    "helfi.ai": 200,
+    "www.helfi.ai": 200,
+    "matchingETag": "ndepumjj6o1z15",
+    "CloudFront": true
+  },
+  "normalUiPhoto": {
+    "fixture": "nutrition5k-dish_1562691064.png",
+    "recordedReferenceCalories": 555.303711,
+    "resultCalories": 739,
+    "accuracyLimit": "Estimated portions/identification still vary; this is delivery, serving consistency and charging proof, not accuracy certification.",
+    "uiSeconds": 34,
+    "durableJobSeconds": 33.591,
+    "shortRequestPath": {
+      "initialPost": 202,
+      "pendingResponsesIncludingPost": 12,
+      "sameJobFinalGet": 200,
+      "gatewayTimeout": false
+    },
+    "total": {
+      "calories": 739,
+      "protein_g": 37.6,
+      "carbs_g": 93.4,
+      "fat_g": 24.6,
+      "fiber_g": null,
+      "sugar_g": null
+    },
+    "allSixCardsMatch": true,
+    "egg": {
+      "label": "3 Scrambled eggs",
+      "grams": 150,
+      "calories": 224,
+      "wholeServingMarker": true,
+      "halfWeightGrams": 75,
+      "halfCalories": 112,
+      "halfMealCalories": 627,
+      "restoredMealCalories": 739
+    },
+    "creditsBefore": 414,
+    "creditsAfter": 404,
+    "monthlyUsesBefore": 20,
+    "monthlyUsesAfter": 21,
+    "savedFoodEntry": false,
+    "usage": [
+      {
+        "feature": "food:analysis",
+        "model": "gpt-6.1-sol",
+        "promptTokens": 884,
+        "completionTokens": 1115,
+        "costCents": 3,
+        "success": true
+      },
+      {
+        "feature": "food:image-analysis",
+        "model": "gpt-6.1-sol",
+        "promptTokens": 884,
+        "completionTokens": 1115,
+        "costCents": 3,
+        "success": true
+      }
+    ]
+  },
+  "schedule": {
+    "scheduleId": "helfi-food-photo-cleanup",
+    "cron": "0 4 * * *",
+    "method": "GET",
+    "retries": 2,
+    "paused": false,
+    "forwardAuthorizationConfigured": true,
+    "otherSchedulesUnchanged": true
+  },
+  "screenshots": [
+    "web-live-durable-six-cards.png",
+    "web-live-durable-half-egg.png"
+  ],
+  "storeSubmission": "Not yet submitted; signed binary and actual store purchase configuration/testing proceed separately."
+}

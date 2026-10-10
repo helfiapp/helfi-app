@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS Amplify job104 / e68293322caf694fe40613d185be15ea684f5c25
+- Date/time: 10 October 2026, verified 04:50 UTC.
+- What changed: Meal photo analysis now finishes through short authenticated requests with one completed-result charge; whole-serving nutrients do not multiply again by pieces. Measured150g eggs stay3eggs; plain rice cannot borrow rice-noodle records.
+- Where to see it (page/link): https://helfi.ai/food
+- What to quickly test: Analyse a meal photo, see all6cards, confirm grams/pieces and use Enter to confirm a weight change. Live challenging breakfast739server=UI, 150g eggs224→75g112, 34s, one10credit charge; no diary Save. This verifies delivery/calculation consistency, not perfect estimated portions. Exact food cleanup schedule now uses its existing bearer credential. Evidence: docs/release-evidence/2026-10-10/food-durable-runtime-live.json.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE (AWS Amplify)
 - Date/time: 2026-10-05T13:26:29.092Z
 - What changed: Refreshed the ONE Australian McDonald's Big Mac public catalogue serving and CSV source to the current manufacturer per-serving621kcal/P28.7/C46.5/F34.4/S8.0. Fibre and serve mass remain unknown; original serving identity unchanged.
