@@ -43,7 +43,7 @@ async function main() {
   }
   visit(ast)
   assert.ok(declaration)
-  const context: any = { prepareFoodPhotoCompletion, useFoodPhotoModel: true, openai: fakeProvider, chatCompletionWithCost: wrapper.chatCompletionWithCost }
+  const context: any = { prepareFoodPhotoCompletion, useFoodPhotoModel: true, foodJob: null, openai: fakeProvider, chatCompletionWithCost: wrapper.chatCompletionWithCost }
   vm.createContext(context)
   vm.runInContext(ts.transpileModule('this.run = ' + declaration.initializer!.getText(ast), { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
   const photoMessages = [{ role: 'user', content: [{ type: 'text', text: 'Synthetic fixture' }, { type: 'image_url', image_url: { url: 'https://example.invalid/offline-only.jpg' } }] }]
@@ -63,6 +63,18 @@ async function main() {
   await wrapper.chatCompletionWithCost(fakeProvider, { model: HELFI_FOOD_PHOTO_MODEL, messages: photoMessages, max_tokens: 900 }, { feature: 'health-image' })
   assert.equal(calls[4].model, HELFI_ANALYSIS_MODEL, 'other app features cannot inherit food upgrade')
   assert.equal(safetyChecks, calls.length, 'consent/usage safety still gates every provider call')
+  const jobCalls: any[] = []
+  const beforeJob = calls.length
+  context.useFoodPhotoModel = true
+  context.foodJob = { completion: async (...args: any[]) => { jobCalls.push(args); return { completion: { id: 'offline-persisted-stage' } } } }
+  const memoized = await context.run({ model: HELFI_ANALYSIS_MODEL, messages: photoMessages, max_completion_tokens: 2200 })
+  assert.equal(memoized.completion.id, 'offline-persisted-stage')
+  assert.equal(jobCalls[0][0], fakeProvider)
+  assert.equal(jobCalls[0][1].model, HELFI_FOOD_PHOTO_MODEL)
+  assert.equal(jobCalls[0][1].max_completion_tokens, 2200)
+  assert.equal(jobCalls[0][2], FOOD_PHOTO_MODEL_FEATURE)
+  assert.equal(calls.length, beforeJob, 'durable stages must use the job adapter rather than another synchronous provider call')
+  context.foodJob = null
   const body = routeText.slice(routeText.indexOf('    let primaryUsageEvent: any = null;'))
   assert.ok(!body.includes('chatCompletionWithCost(openai,'), 'all in-route vision fallbacks must use the approved adapter')
   assert.ok(routeText.includes('isMealPhotoAnalysis(true, packagedMode, labelScan) ? buildFoodPhotoPrompt(hintBlock, feedbackBlock)'), 'only ordinary meal photos use the compact prompt; text/label instructions remain intact')
@@ -70,7 +82,7 @@ async function main() {
   // Execute the real web result filter and count normalizer against the
   // ten-component bowl that the live UI reduced from1093 to1087kcal.
   const pageAst = ts.createSourceFile('page.tsx', fs.readFileSync('app/food/page.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-  const pageHelpers = new Set(['DEFAULT_SERVING_GRAMS', 'WEIGHT_UNIT_TO_GRAMS', 'stripNutritionFromServingSize', 'replaceWordNumbers', 'parseServingQuantity', 'isFractionalServingQuantity', 'singularizeUnitLabel', 'isGenericSizeLabel', 'parseServingUnitMetadata', 'DISCRETE_UNIT_KEYWORDS', 'isDiscreteUnitLabel', 'stripWeightPhrasesFromLabel', 'replaceWordNumbersForLabel', 'hasExplicitPieceCountInLabel', 'getExplicitPieces', 'getPiecesPerServing', 'quickParseServingSize', 'normalizeDiscreteItem', 'isMacroOnlyName', 'stripGenericPlateItems'])
+  const pageHelpers = new Set(['DEFAULT_SERVING_GRAMS', 'WEIGHT_UNIT_TO_GRAMS', 'stripNutritionFromServingSize', 'replaceWordNumbers', 'parseServingQuantity', 'isFractionalServingQuantity', 'singularizeUnitLabel', 'isGenericSizeLabel', 'parseServingUnitMetadata', 'DISCRETE_UNIT_KEYWORDS', 'isDiscreteUnitLabel', 'stripWeightPhrasesFromLabel', 'replaceWordNumbersForLabel', 'hasExplicitPieceCountInLabel', 'getExplicitPieces', 'getPiecesPerServing', 'quickParseServingSize', 'normalizeDiscreteItem', 'DISCRETE_SERVING_RULES', 'normalizeDiscreteServingsWithLabel', 'piecesMultiplierForServing', 'macroMultiplierForItem', 'isMacroOnlyName', 'stripGenericPlateItems'])
   const actualPageHelpers: string[] = []
   function collectPage(node: ts.Node) {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && pageHelpers.has(node.name.text)) actualPageHelpers.push('const ' + node.getText(pageAst) + ';')
@@ -85,7 +97,7 @@ async function main() {
   collectRenderedPieces(pageAst); assert.ok(renderedPieceExpression, 'exercise the detected-food rendering expression, not only normalized data')
   const pageContext: any = { DEFAULT_UNIT_GRAMS, defaultGramsForItem: () => null }
   vm.createContext(pageContext)
-  vm.runInContext(ts.transpileModule(actualPageHelpers.join('\n') + '\nthis.filter = stripGenericPlateItems; this.normalize = normalizeDiscreteItem; this.parseServing = parseServingUnitMetadata;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, pageContext)
+  vm.runInContext(ts.transpileModule(actualPageHelpers.join('\n') + '\nthis.filter = stripGenericPlateItems; this.normalize = normalizeDiscreteItem; this.parseServing = parseServingUnitMetadata; this.normalizeLabels = normalizeDiscreteServingsWithLabel; this.multiplier = macroMultiplierForItem;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, pageContext)
   pageContext.renderedPieces = (item: any) => {
     pageContext.item = item
     pageContext.servingUnitMeta = pageContext.parseServing(item.serving_size || item.name || '')
@@ -113,6 +125,15 @@ async function main() {
   const crackers = pageContext.normalize({ name: 'Crackers', serving_size: '10 g (6 crackers)', servings: 1, calories: 40 })
   assert.equal(crackers.piecesPerServing, 6)
   assert.equal(pageContext.renderedPieces(crackers), 6)
+  const capturedEgg = { name: 'Scrambled eggs', serving_size: 'About 150 g, estimated equivalent of 3 large eggs', servings: 1, calories: 224, protein_g: 15, carbs_g: 2.4, fat_g: 16.5, fiber_g: 0, sugar_g: 2.1, piecesPerServing: 3, pieces: 3, nutritionCoversServing: true }
+  const safeEgg = pageContext.normalize(pageContext.normalizeLabels([capturedEgg])[0])
+  assert.equal(pageContext.parseServing(capturedEgg.serving_size).unitLabel, 'g')
+  assert.equal(safeEgg.piecesPerServing, 3, '150 grams cannot replace the provided count with150 eggs')
+  assert.equal(pageContext.multiplier(safeEgg), 1, 'per-serving photo nutrients already describe the entire estimated portion')
+  for (const field of ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g']) assert.equal(safeEgg[field], (capturedEgg as any)[field])
+  assert.equal(pageContext.parseServing('150 g (estimated equivalent of 3 large eggs)').unitLabel, 'g', 'an estimated equivalent is not an explicit counted serving')
+  const unmarkedEgg = pageContext.normalizeLabels([{ ...capturedEgg, nutritionCoversServing: undefined }])[0]
+  assert.equal(unmarkedEgg.calories, 224, 'measured-unit parser must also prevent the150x heuristic on older responses')
   const withSummary = pageContext.filter([...bowl, { name: 'Whole salmon meal', calories: 1093 }], '')
   assert.equal(withSummary.length, 10, 'genuine duplicate summary still excluded')
   console.log('PASS: actual web result helpers keep ten bowl components/1093kcal, retain radish, do not turn measured sliced vegetables into piece counts, and preserve real egg/cracker counts.')

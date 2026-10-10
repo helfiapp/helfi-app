@@ -92,6 +92,7 @@ model User {
   garminRequestTokens GarminRequestToken[]
   garminWebhookLogs   GarminWebhookLog[]
   foodAnalysisFeedback FoodAnalysisFeedback[]
+  foodAnalysisJobs FoodAnalysisJob[]
   medicalImageAnalyses MedicalImageAnalysis[]
   foodMissingReports  FoodMissingReport[]
   barcodeCorrections  BarcodeUserCorrection[]
@@ -506,6 +507,32 @@ model AIUsageEvent {
   runId             String?
 
   @@index([runId])
+}
+
+// Private encrypted food-photo work, resumed by authenticated short polls.
+// Provider response IDs, images, prompts and results remain encrypted.
+model FoodAnalysisJob {
+  id             String   @id
+  userId         String
+  requestId      String
+  inputHash      String
+  status         String   @default("pending")
+  encryptedState String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  expiresAt      DateTime
+  retainUntil    DateTime
+  leaseOwner     String?
+  leaseUntil     DateTime?
+  settledAt      DateTime?
+  errorCode      String?
+  errorStatus    Int?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, requestId])
+  @@index([userId, status, expiresAt])
+  @@index([status, expiresAt])
+  @@index([retainUntil])
 }
 
 model FoodAnalysisFeedback {

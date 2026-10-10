@@ -1,0 +1,45 @@
+{
+  "date": "2026-10-10",
+  "scope": "HEL-297 durable photo completion and whole-serving calorie display; narrow rice identity repair",
+  "baseline": {
+    "commit": "a3cc1731e44b22b994476af110ba67575cbecee1",
+    "awsJob": "103"
+  },
+  "verification": {
+    "productionBuild": {
+      "exitCode": 0,
+      "log": "/tmp/helfi-food-runtime-final-build-2026-10-10.log"
+    },
+    "nativeTypecheck": {
+      "exitCode": 0
+    },
+    "pageLocks": {
+      "webFiles": 279,
+      "nativeFiles": 80,
+      "passed": true
+    },
+    "offlineChecks": [
+      "food-photo-background",
+      "food-analysis-jobs",
+      "food-analysis-request",
+      "food-photo-model",
+      "food-saved-measurement",
+      "food-native-integration",
+      "food-native-display",
+      "food-native-serving-override"
+    ],
+    "independentReview": "Fixed stale lease acquisition by rereading latest row after claim; checkpoint and prepared-result regressions pass.",
+    "recordedResult": "Captured 636 kcal breakfast retains all six totals instead of converting 150 grams into 150 eggs. Portion edits, snapshots and half-serving reopening pass."
+  },
+  "migration": {
+    "name": "20261010050000_food_analysis_jobs",
+    "sha256": "d66f59ffe050b2f725f814161c4cc53eff128710912eff5695dc80a6d7726121",
+    "productionApplied": true,
+    "atomicStatements": 6,
+    "columns": 15,
+    "olderUnrelatedMigrationsApplied": false,
+    "existingFoodOrUserRowsModifiedByDDL": false
+  },
+  "runtimeEvidence": "New exact AWS deployment and normal live UI analysis still to be recorded; offline fixtures are not live provider proof.",
+  "retention": "Input cleared upon completion; access expires under job TTL; physical expired-row cleanup runs authenticated daily schedule."
+}

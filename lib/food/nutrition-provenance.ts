@@ -31,16 +31,17 @@ const foodForms = [
   /\b(smoothie|smoothies)\b/,
 ]
 
-// Raab/rabe and Chinese broccoli are different vegetables, despite sharing
-// the word broccoli. Preparation and a common first word do not identify them.
-const broccoliSubtypes = [
+// A common ingredient word does not identify a distinct vegetable or a
+// processed product: rice noodles cannot supply ordinary cooked rice values.
+const distinctFoodTypes = [
   /\b(broccoli (raab|rabe)|rapini)\b/,
   /\b(chinese broccoli|broccoli chinese|gai lan)\b/,
+  /\bnoodles?\b/,
 ]
 const sameFoodSubtype = (requested: unknown, actual: unknown) => {
   const requestedName = text(requested)
   const actualName = text(actual)
-  return broccoliSubtypes.every(subtype => subtype.test(requestedName) === subtype.test(actualName))
+  return distinctFoodTypes.every(subtype => subtype.test(requestedName) === subtype.test(actualName))
 }
 
 // A word buried in another food's name is not its primary identity. USDA

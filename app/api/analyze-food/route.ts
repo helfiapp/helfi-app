@@ -1,4 +1,4 @@
-import { aiConsentRequiredResponse } from '@/lib/ai-consent'
+import { aiConsentRequiredResponse, getAiConsentRequestUserId } from '@/lib/ai-consent'
 import { NextRequest, NextResponse } from 'next/server';
 /**
  * IMPORTANT – DO NOT CHANGE OUTPUT FORMAT WITHOUT UPDATING UI PARSER
@@ -41,7 +41,8 @@ import OpenAI from 'openai';
 import { chatCompletionWithCost } from '@/lib/metered-openai';
 import { FOOD_PHOTO_COMPLETION_TOKENS, buildFoodPhotoPrompt, isMealPhotoAnalysis, mapFoodNutritionChecks, prepareFoodPhotoCompletion, selectFoodAnalysisModel } from '@/lib/food-photo-model';
 import { capMaxTokensToBudget } from '@/lib/cost-meter';
-import { logAiUsageEvent, runChatCompletionWithLogging } from '@/lib/ai-usage-logger';
+import { logAiUsageEvent as persistAiUsageEvent, type UsageLogInput } from '@/lib/ai-usage-logger';
+import { createFoodJob, existingFoodJob, ownedFoodJob, photoJobInput, foodJobForm, validatedFoodRequestId, FoodJobExecution, FoodJobPending, FoodJobError, decryptFoodJobState, foodJobPendingBody, foodJobPublicError, rethrowFoodJobControl, type FoodJobRecord } from '@/lib/food-analysis-jobs';
 import { getImageMetadata } from '@/lib/image-metadata';
 import { checkMultipleDietCompatibility, normalizeDietTypes } from '@/lib/diets';
 import { normalizeImageForAi, resolveImageContentType } from '@/lib/ai-image-normalize';
@@ -2407,9 +2408,112 @@ const getOpenAIClient = () => {
   });
 };
 
+// Each HTTP request performs only a short, durable step. The provider keeps
+// working between polls; no work is scheduled after an Amplify response.
 export async function POST(req: NextRequest) {
-  const consentResponse = await aiConsentRequiredResponse(req)
-  if (consentResponse) return consentResponse
+  const resumedJobId = req.nextUrl.searchParams.get('foodJobId')
+  if (resumedJobId) return pollFoodAnalysisJob(req, resumedJobId)
+  if (!req.headers.get('content-type')?.includes('multipart/form-data')) return analyzeFood(req)
+  const consent = await aiConsentRequiredResponse(req)
+  if (consent) return consent
+  try {
+    const form = await req.clone().formData()
+    if (form.get('analysisMode') === 'packaged' || String(form.get('labelScan') || '') === '1') return analyzeFood(req)
+    const userId = await getAiConsentRequestUserId(req)
+    if (!userId) return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+    const input = await photoJobInput(form)
+    const requestId = validatedFoodRequestId(form.get('analysisRequestId'))
+    if (!(await existingFoodJob(userId, requestId))) {
+      const rateCheck = await consumeRateLimit('food-analyzer', `user:${userId}`, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS)
+      if (!rateCheck.allowed) return NextResponse.json({ error: 'Too many analyses in a short period. Please wait and try again.' }, { status: 429, headers: { 'Retry-After': String(Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000))) } })
+    }
+    const job = await createFoodJob(userId, requestId, input)
+    return await advanceFoodJob(req, job)
+  } catch (error) {
+    if (error instanceof FoodJobError) return NextResponse.json({ error: foodJobPublicError({ errorCode: error.code, errorStatus: error.status }).error, code: error.code }, { status: error.status })
+    console.warn('Food-photo request could not be prepared.', { name: error instanceof Error ? error.name : 'Error' })
+    return NextResponse.json({ error: 'The photo result could not be checked. Please retry the same request.', code: 'food_job_check_unavailable' }, { status: 503 })
+  }
+}
+
+async function pollFoodAnalysisJob(req: NextRequest, jobId: string) {
+  const consent = await aiConsentRequiredResponse(req)
+  if (consent) return consent
+  const userId = await getAiConsentRequestUserId(req)
+  if (!userId) return NextResponse.json({ error: 'Please sign in.' }, { status: 401 })
+  const job = await ownedFoodJob(userId, jobId)
+  if (!job) return NextResponse.json({ error: 'Photo analysis was not found.' }, { status: 404 })
+  return advanceFoodJob(req, job)
+}
+
+async function advanceFoodJob(req: NextRequest, job: FoodJobRecord): Promise<NextResponse> {
+  let execution: FoodJobExecution | null = null
+  try {
+    if (job.retainUntil <= new Date()) throw new FoodJobError(job.settledAt ? 'food_job_result_expired' : 'food_job_expired', 410)
+    if (job.status === 'completed') {
+      const state = decryptFoodJobState(job)
+      if (!state.result || !job.settledAt) throw new FoodJobError('food_job_result_unavailable', 503)
+      return NextResponse.json(state.result, { headers: { 'Cache-Control': 'private, no-store' } })
+    }
+    if (job.status === 'failed' || job.status === 'expired') {
+      const failed = foodJobPublicError(job)
+      return NextResponse.json({ error: failed.error, code: failed.code, status: 'failed', jobId: job.id }, { status: failed.status, headers: { 'Cache-Control': 'private, no-store' } })
+    }
+    execution = await FoodJobExecution.acquire(job)
+    if (!execution) return NextResponse.json(foodJobPendingBody(job), { status: 202, headers: { 'Cache-Control': 'private, no-store' } })
+    if (execution.state.prepared) return NextResponse.json(await execution.settle(), { headers: { 'Cache-Control': 'private, no-store' } })
+    if (execution.state.stages.some(stage => stage.status === 'pending' || stage.status === 'starting')) {
+      const openai = getOpenAIClient()
+      if (!openai) throw new FoodJobError('food_job_service_unavailable', 503)
+      await execution.pollPendingStage(openai)
+    }
+    // Fresh request identity is checked above and is kept only in this request.
+    // The stored multipart input contains no session cookies or native tokens.
+    const headers = new Headers(req.headers)
+    headers.delete('content-type'); headers.delete('content-length')
+    const replay = new NextRequest(req.url, { method: 'POST', headers, body: foodJobForm(execution.state) })
+    const response = await analyzeFood(replay, execution)
+    if (response.status >= 400) {
+      const body = await response.clone().json().catch(() => ({}))
+      await execution.fail(typeof body.code === 'string' ? body.code : 'food_job_analysis_failed', response.status)
+    }
+    return response
+  } catch (error) {
+    if (error instanceof FoodJobPending) return NextResponse.json(foodJobPendingBody(job), { status: 202, headers: { 'Cache-Control': 'private, no-store' } })
+    const code = error instanceof FoodJobError ? error.code : typeof (error as any)?.code === 'string' && /^food_background_[a-z_]+$/.test((error as any).code) ? (error as any).code : 'food_job_failed'
+    const status = error instanceof FoodJobError ? error.status : Number((error as any)?.status) >= 400 && Number((error as any)?.status) < 600 ? Number((error as any)?.status) : 503
+    if (execution) {
+      // If a commit's acknowledgement was lost, recover its durable result
+      // before showing an error. Never claim "not charged" from an uncertain
+      // transaction or allow a second charge on a repeated request.
+      try {
+        const latest = await ownedFoodJob(job.userId, job.id)
+        if (latest?.status === 'completed' && latest.settledAt) {
+          return NextResponse.json(decryptFoodJobState(latest).result, { headers: { 'Cache-Control': 'private, no-store' } })
+        }
+        const failed = await execution.fail(code, status)
+        if (!failed) return NextResponse.json(foodJobPendingBody(job), { status: 202, headers: { 'Cache-Control': 'private, no-store' } })
+      } catch {
+        return NextResponse.json({ error: 'The photo result could not be checked. Please retry the same request.', code: 'food_job_check_unavailable', jobId: job.id }, { status: 503, headers: { 'Cache-Control': 'private, no-store' } })
+      }
+    }
+    const failed = foodJobPublicError({ errorCode: code, errorStatus: status, status: execution ? 'failed' : job.status, settledAt: job.settledAt })
+    return NextResponse.json({ error: failed.error, code, status: 'failed', jobId: job.id }, { status, headers: { 'Cache-Control': 'private, no-store' } })
+  } finally {
+    if (execution) await execution.release().catch(() => {})
+  }
+}
+
+async function analyzeFood(req: NextRequest, foodJob?: FoodJobExecution) {
+  if (!foodJob) {
+    const consentResponse = await aiConsentRequiredResponse(req)
+    if (consentResponse) return consentResponse
+  }
+  const foodJobUsageEvents: UsageLogInput[] = []
+  const logAiUsageEvent = async (entry: UsageLogInput) => {
+    if (foodJob) { foodJobUsageEvents.push(entry); return }
+    return persistAiUsageEvent(entry)
+  }
 
   try {
     console.log('=== FOOD ANALYZER DEBUG START ===');
@@ -2419,15 +2523,17 @@ export async function POST(req: NextRequest) {
     let imageBytes: number | null = null;
     let imageMime: string | null = null;
     let visionDetail: "low" | "high" = "low";
-    
+
     // Check authentication - pass request headers for proper session resolution
-    const session = await getServerSession(authOptions);
-    let userEmail: string | null = session?.user?.email ?? null;
+    const session = foodJob ? null : await getServerSession(authOptions);
+    const foodJobUser = foodJob ? await prisma.user.findUnique({ where: { id: foodJob.job.userId } }) : null
+    if (foodJob && !foodJobUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    let userEmail: string | null = foodJobUser?.email ?? session?.user?.email ?? null;
     let usedTokenFallback = false;
 
     // Some recent route-handler changes made getServerSession unreliable for this endpoint.
     // Safeguard the analyzer by grabbing the JWT directly if the normal session lookup fails.
-    if (!userEmail) {
+    if (!userEmail && !foodJob) {
       try {
         const token = await getToken({
           req,
@@ -2438,6 +2544,7 @@ export async function POST(req: NextRequest) {
           usedTokenFallback = true;
         }
       } catch (tokenError) {
+        rethrowFoodJobControl(tokenError)
         console.error('Failed to read JWT token for food analyzer auth:', tokenError);
       }
     }
@@ -2474,6 +2581,7 @@ export async function POST(req: NextRequest) {
           include: includeRelations,
         });
       } catch (creationError) {
+        rethrowFoodJobControl(creationError)
         console.error('❌ Failed to find or create user for food analyzer:', creationError);
         return null;
       }
@@ -2482,7 +2590,7 @@ export async function POST(req: NextRequest) {
     // Find user
     const user = await findOrCreateUser({ subscription: true });
 
-    if (user?.id) {
+    if (user?.id && (!foodJob || foodJob.state.stages.length === 0)) {
       logServerCall({
         feature: 'foodAnalysis',
         endpoint: '/api/analyze-food',
@@ -2498,6 +2606,9 @@ export async function POST(req: NextRequest) {
 
     let allergySettings: { allergies: string[]; diabetesType?: string } = { allergies: [], diabetesType: '' };
     try {
+      if (foodJob?.state.context) {
+        allergySettings = foodJob.state.context.allergies
+      } else {
       const storedAllergies = await prisma.healthGoal.findFirst({
         where: { userId: user.id, name: '__ALLERGIES_DATA__' },
       });
@@ -2510,12 +2621,17 @@ export async function POST(req: NextRequest) {
           diabetesType: typeof parsed?.diabetesType === 'string' ? parsed.diabetesType : '',
         };
       }
+      }
     } catch (error) {
+      rethrowFoodJobControl(error)
       console.warn('⚠️ Could not load allergy settings for analyzer:', error);
     }
 
     let dietTypes: string[] = []
     try {
+      if (foodJob?.state.context) {
+        dietTypes = foodJob.state.context.dietTypes
+      } else {
       const storedDiet = await prisma.healthGoal.findFirst({
         where: { userId: user.id, name: '__DIET_PREFERENCE__' },
       })
@@ -2524,15 +2640,19 @@ export async function POST(req: NextRequest) {
         const raw = Array.isArray(parsed?.dietTypes) ? parsed.dietTypes : parsed?.dietType
         dietTypes = normalizeDietTypes(raw)
       }
+      }
     } catch (error) {
+      rethrowFoodJobControl(error)
       console.warn('⚠️ Could not load diet preference for analyzer:', error)
     }
+    if (foodJob) await foodJob.freezeContext({ allergies: allergySettings, dietTypes, country: foodJobUser?.country })
 
     // We'll check free use, premium, or credits below
     let creditManager: CreditManager | null = null;
-    
+
     // Check if API key is configured
     if (!process.env.OPENAI_API_KEY) {
+      if (foodJob) return NextResponse.json({ error: 'Food analysis service is unavailable.', code: 'food_job_service_unavailable' }, { status: 503 })
       const localPhotoFallback = await buildLocalNoKeyPhotoFallback(req);
       if (localPhotoFallback) return localPhotoFallback;
       console.log('❌ AI service not configured');
@@ -2541,13 +2661,13 @@ export async function POST(req: NextRequest) {
         { status: 500 }
       );
     }
-    
+
     console.log('✅ OpenAI API key configured');
 
     // Quick rate limit to stop accidental loops or repeated triggers
     const clientIp = (req.headers.get('x-forwarded-for') || '').split(',')[0]?.trim() || 'unknown';
     const rateKey = user.id ? `user:${user.id}` : `ip:${clientIp}`;
-    const rateCheck = await consumeRateLimit('food-analyzer', rateKey, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
+    const rateCheck = foodJob?.state.rateChecked ? { allowed: true, retryAfterMs: 0 } : await consumeRateLimit('food-analyzer', rateKey, RATE_LIMIT_MAX_REQUESTS, RATE_LIMIT_WINDOW_MS);
     if (!rateCheck.allowed) {
       const retryAfter = Math.max(1, Math.ceil(rateCheck.retryAfterMs / 1000));
       return NextResponse.json(
@@ -2702,7 +2822,7 @@ ${preferMultiDetect ? `The description likely contains multiple foods or compone
 
 IMPORTANT: Different sizes have different nutrition values:
 - Large egg: ~70 calories, 6g protein
-- Medium egg: ~55 calories, 5g protein  
+- Medium egg: ~55 calories, 5g protein
 - Small egg: ~45 calories, 4g protein
 
 CRITICAL STRUCTURED OUTPUT RULES:
@@ -2747,7 +2867,7 @@ CRITICAL REQUIREMENTS:
     } else {
       // Handle image-based food analysis
       console.log('🖼️ Image analysis mode');
-      
+
       // NextRequest.formData() returns a standard web FormData, but type
       // definitions can vary between runtimes and cause build-time TS errors.
       // Cast to `any` here to preserve runtime behavior without changing logic.
@@ -2767,7 +2887,7 @@ CRITICAL REQUIREMENTS:
         String(formData.get('feedbackMissing') || '') === '1' ||
         feedbackReasons.some((reason) => /missing ingredients/i.test(String(reason)));
       feedbackItems = sanitizeFeedbackItems(parseFeedbackList(formData.get('feedbackItems')));
-      
+
       console.log('📊 Image file info:', {
         hasImageFile: !!imageFile,
         name: imageFile?.name || 'none',
@@ -2792,10 +2912,10 @@ CRITICAL REQUIREMENTS:
       imageMeta = getImageMetadata(normalizedImage.buffer);
       imageDataUrl = `data:${normalizedImage.mimeType};base64,${imageBase64}`;
       const baseHash = crypto.createHash('sha256').update(originalImageBuffer).digest('hex');
-      imageHash = forceFresh ? `${baseHash}-${Date.now()}` : baseHash;
+      imageHash = forceFresh ? `${baseHash}-${foodJob?.job.createdAt.getTime() ?? Date.now()}` : baseHash;
       imageBytes = normalizedImage.buffer.byteLength;
       imageMime = normalizedImage.mimeType || null;
-      
+
       console.log('✅ Image conversion complete:', {
         originalMime: imageFile.type || null,
         resolvedMime: resolvedImageType,
@@ -3030,17 +3150,17 @@ CRITICAL REQUIREMENTS:
     }
 
     const isPremium = isSubscriptionActive(currentUser.subscription);
-    
+
     // Check if user has purchased credits (non-expired)
     const now = new Date();
     const hasPurchasedCredits = currentUser.creditTopUps.some(
       (topUp: any) => topUp.expiresAt > now && (topUp.amountCents - topUp.usedCents) > 0
     );
-    
+
     // Check if user has free credits remaining
     const hasFreeFoodCredits = await hasFreeCredits(currentUser.id, 'FOOD_ANALYSIS');
     const hasFreeFoodReanalysisCredits = await hasFreeCredits(currentUser.id, 'FOOD_REANALYSIS');
-    
+
     // Billing is now stable again – enforce credit checks for Food Analysis.
     // This controls wallet pre-checks and charges; free credits are consumed first.
     const BILLING_ENFORCED = true;
@@ -3054,7 +3174,7 @@ CRITICAL REQUIREMENTS:
           allowViaFreeUse = true;
         } else if (BILLING_ENFORCED) {
           return NextResponse.json(
-            { 
+            {
               error: 'Payment required',
               message: 'You\'ve used all your free food re-analyses. Subscribe to a monthly plan or purchase credits to continue.',
               requiresPayment: true,
@@ -3069,7 +3189,7 @@ CRITICAL REQUIREMENTS:
       } else if (BILLING_ENFORCED) {
         // No subscription, no credits, and no free credits - require payment
         return NextResponse.json(
-          { 
+          {
             error: 'Payment required',
             message: 'You\'ve used all your free food analyses. Subscribe to a monthly plan or purchase credits to continue.',
             requiresPayment: true,
@@ -3115,7 +3235,7 @@ CRITICAL REQUIREMENTS:
     // Multi-item food cards need enough visible output for the explanation,
     // totals, and structured JSON. A smaller GPT-5 budget can end with no
     // visible content on complex plates even when the image was understood.
-    let maxTokens = useFoodPhotoModel ? FOOD_PHOTO_COMPLETION_TOKENS : feedbackDown ? 1600 : 1200;
+    let maxTokens = foodJob?.state.context?.tokenCap ?? (useFoodPhotoModel ? FOOD_PHOTO_COMPLETION_TOKENS : feedbackDown ? 1600 : 1200);
 
     // Wallet pre-check (skip if allowed via free use OR billing checks are disabled)
     if (BILLING_ENFORCED && !allowViaFreeUse) {
@@ -3139,7 +3259,11 @@ CRITICAL REQUIREMENTS:
       if (cappedMaxTokens <= 0) {
         return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
       }
-      maxTokens = cappedMaxTokens;
+      if (!foodJob?.state.context?.tokenCap) maxTokens = cappedMaxTokens;
+    }
+    if (foodJob?.state.context && !foodJob.state.context.tokenCap) {
+      foodJob.state.context.tokenCap = maxTokens
+      await foodJob.save()
     }
 
     // Charge only after analysis succeeds. Failed provider calls must not use credits.
@@ -3153,6 +3277,7 @@ CRITICAL REQUIREMENTS:
 
     const runOpenAICompletion = async (params: any) => {
       const prepared = prepareFoodPhotoCompletion(params, useFoodPhotoModel)
+      if (foodJob) return foodJob.completion(openai, prepared.params, prepared.feature)
       return chatCompletionWithCost(openai, prepared.params, { feature: prepared.feature })
     };
 
@@ -3190,6 +3315,7 @@ CRITICAL REQUIREMENTS:
     try {
       primary = await runCompletion(model);
     } catch (primaryErr: any) {
+      rethrowFoodJobControl(primaryErr)
       // A valid food photo can occasionally fail during the provider's
       // high-detail image pass. Retry once with the same approved model and
       // automatic image detail before showing an error to the user.
@@ -3276,6 +3402,7 @@ CRITICAL REQUIREMENTS:
         response = retry.completion;
         analysis = extractAnalysisText(response);
       } catch (retryErr) {
+        rethrowFoodJobControl(retryErr)
         console.warn('Retry attempt failed (non-fatal):', retryErr);
       }
     }
@@ -3302,7 +3429,7 @@ CRITICAL REQUIREMENTS:
       analysis = `${analysis}\n${fallbackLine}`;
       console.log('ℹ️ Nutrition line missing; appended static fallback to avoid extra AI calls');
     }
-    
+
     console.log('=== FOOD ANALYZER DEBUG END ===');
 
     const resp: any = {
@@ -3357,6 +3484,7 @@ CRITICAL REQUIREMENTS:
           resp.analysis = resp.analysis.replace(m[0], '').trim();
         }
       } catch (e) {
+        rethrowFoodJobControl(e)
         console.warn('ITEMS_JSON handling failed (non-fatal):', e);
       }
 
@@ -3488,6 +3616,7 @@ CRITICAL REQUIREMENTS:
             }
           }
         } catch (e) {
+          rethrowFoodJobControl(e)
           console.warn('ITEMS_JSON extractor follow-up failed (non-fatal):', e);
         }
 
@@ -3592,6 +3721,7 @@ CRITICAL REQUIREMENTS:
                 temperature: 0,
               } as any);
             } catch (schemaErr) {
+              rethrowFoodJobControl(schemaErr)
               console.warn('Component-bound schema follow-up failed; retrying with json_object.', schemaErr);
               componentBound = await runOpenAICompletion({
                 model: 'gpt-5.6-sol',
@@ -3642,6 +3772,7 @@ CRITICAL REQUIREMENTS:
             }
           }
         } catch (componentErr) {
+          rethrowFoodJobControl(componentErr)
           console.warn('Component-bound vision follow-up failed (non-fatal):', componentErr);
         }
       }
@@ -3741,6 +3872,7 @@ CRITICAL REQUIREMENTS:
           }
         }
       } catch (multiErr) {
+        rethrowFoodJobControl(multiErr)
         console.warn('Multi-item follow-up failed (non-fatal):', multiErr);
       }
     }
@@ -3821,6 +3953,7 @@ CRITICAL REQUIREMENTS:
           }
         }
       } catch (forcedErr) {
+        rethrowFoodJobControl(forcedErr)
         console.warn('Forced image follow-up failed (non-fatal):', forcedErr);
       }
     }
@@ -3896,6 +4029,7 @@ CRITICAL REQUIREMENTS:
           }
         }
       } catch (fallbackErr) {
+        rethrowFoodJobControl(fallbackErr)
         console.warn('Text-only fallback failed (non-fatal):', fallbackErr);
       }
     }
@@ -4007,6 +4141,7 @@ CRITICAL REQUIREMENTS:
               refreshItemsReady();
             }
           } catch (missingErr) {
+            rethrowFoodJobControl(missingErr)
             console.warn('Missing component AI follow-up failed (non-fatal):', missingErr);
           }
         }
@@ -4120,6 +4255,7 @@ CRITICAL REQUIREMENTS:
             }
           }
         } catch (repairErr) {
+          rethrowFoodJobControl(repairErr)
           console.warn('Component split repair failed (non-fatal):', repairErr);
         }
       }
@@ -4284,6 +4420,7 @@ CRITICAL REQUIREMENTS:
                 })
               }
             } catch (saveErr) {
+              rethrowFoodJobControl(saveErr)
               console.warn('Label barcode save failed (non-fatal):', saveErr)
             }
           }
@@ -4325,6 +4462,7 @@ CRITICAL REQUIREMENTS:
           resp.total = computeTotalsFromItems(resp.items) || resp.total
         }
       } catch (labelErr) {
+        rethrowFoodJobControl(labelErr)
         console.warn('Label per-serving extraction failed (non-fatal):', labelErr)
       }
     }
@@ -4555,6 +4693,7 @@ CRITICAL REQUIREMENTS:
             console.log('✅ Consistency repair produced items:', resp.items.length);
           }
         } catch (repairErr) {
+          rethrowFoodJobControl(repairErr)
           console.warn('Consistency repair failed (non-fatal):', repairErr);
         }
       }
@@ -4628,6 +4767,7 @@ CRITICAL REQUIREMENTS:
           console.log('✅ Final card-ready image repair produced items:', resp.items.length);
         }
       } catch (repairErr) {
+        rethrowFoodJobControl(repairErr)
         console.warn('Final card-ready image repair failed (non-fatal):', repairErr);
       }
     }
@@ -4842,6 +4982,7 @@ CRITICAL REQUIREMENTS:
           const text = alternatives.completion?.choices?.[0]?.message?.content?.trim() || '';
           resp.alternatives = text.replace(/```/g, '').trim() || null;
         } catch (alternativesError) {
+          rethrowFoodJobControl(alternativesError)
           console.warn('Health alternatives generation failed (non-fatal):', alternativesError);
           resp.alternatives = null;
         }
@@ -4849,6 +4990,7 @@ CRITICAL REQUIREMENTS:
         resp.alternatives = null;
       }
     } catch (healthError) {
+      rethrowFoodJobControl(healthError)
       console.warn('⚠️ Health compatibility section skipped due to error:', healthError);
     }
 
@@ -4885,45 +5027,47 @@ CRITICAL REQUIREMENTS:
         ;(resp as any).dietAlternatives = null
       }
     } catch (dietError) {
+      rethrowFoodJobControl(dietError)
       console.warn('⚠️ Diet compatibility section skipped due to error:', dietError)
     }
 
-    // Fixed per-use price. Charge only after a successful analysis is ready.
-    // Failed provider calls or failed parsing must not use credits.
-    if (allowViaFreeUse) {
-      const consumed = await consumeFreeCredit(currentUser.id, isReanalysis ? 'FOOD_REANALYSIS' : 'FOOD_ANALYSIS');
-      if (!consumed) {
-        return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
-      }
-    } else if (BILLING_ENFORCED) {
-      try {
-        const cm = new CreditManager(currentUser.id);
-        const ok = await cm.chargeCents(analysisChargeCents);
-        if (!ok) {
+    if (!foodJob) {
+      // Fixed per-use price. Charge only after a successful analysis is ready.
+      // Failed provider calls or failed parsing must not use credits.
+      if (allowViaFreeUse) {
+        const consumed = await consumeFreeCredit(currentUser.id, isReanalysis ? 'FOOD_REANALYSIS' : 'FOOD_ANALYSIS');
+        if (!consumed) {
           return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
         }
-      } catch (e) {
-        console.warn('Wallet charge failed:', e);
-        return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+      } else if (BILLING_ENFORCED) {
+        try {
+          const cm = new CreditManager(currentUser.id);
+          const ok = await cm.chargeCents(analysisChargeCents);
+          if (!ok) {
+            return NextResponse.json({ error: 'Insufficient credits' }, { status: 402 });
+          }
+        } catch (e) {
+          rethrowFoodJobControl(e)
+          console.warn('Wallet charge failed:', e);
+          return NextResponse.json({ error: 'Billing error' }, { status: 402 });
+        }
       }
-    }
 
-    // Update counters only after the analysis and charge/free-use step succeed.
-    await prisma.user.update({
-      where: { id: currentUser.id },
-      data: ( isReanalysis ? {
-        dailyFoodReanalysisUsed: { increment: 1 },
-        totalAnalysisCount: { increment: 1 },
-      } : {
-        dailyFoodAnalysisUsed: { increment: 1 },
-        totalFoodAnalysisCount: { increment: 1 },
-        totalAnalysisCount: { increment: 1 },
-        monthlyFoodAnalysisUsed: { increment: 1 },
-      } ) as any
-    });
+      // Update counters only after the analysis and charge/free-use step succeed.
+      await prisma.user.update({
+        where: { id: currentUser.id },
+        data: ( isReanalysis ? {
+          dailyFoodReanalysisUsed: { increment: 1 },
+          totalAnalysisCount: { increment: 1 },
+        } : {
+          dailyFoodAnalysisUsed: { increment: 1 },
+          totalFoodAnalysisCount: { increment: 1 },
+          totalAnalysisCount: { increment: 1 },
+          monthlyFoodAnalysisUsed: { increment: 1 },
+        } ) as any
+      });
 
-    if (primaryUsageEvent) {
-      logAiUsageEvent(primaryUsageEvent).catch(() => {});
+
     }
 
     if (packagedMode && Array.isArray(resp.items) && resp.items.length > 0) {
@@ -4939,6 +5083,7 @@ CRITICAL REQUIREMENTS:
     if (!packagedMode && !labelScan && Array.isArray(resp.items) && resp.items.length > 0) {
       resp.items = sanitizeStructuredItems(resp.items, useFoodPhotoModel);
       resp.total = computeTotalsFromItems(resp.items, useFoodPhotoModel) || resp.total;
+      if (foodJob) resp.items = resp.items.map((item: any) => ({ ...item, nutritionCoversServing: true }));
     }
 
     resp.analysis = synchronizeAnalysisNutritionSummary(resp.analysis, resp.total);
@@ -5010,15 +5155,24 @@ CRITICAL REQUIREMENTS:
           : null,
         });
     } catch (logErr) {
+      rethrowFoodJobControl(logErr)
       console.warn('[FOOD_DEBUG] log error', logErr);
     }
 
-    resp.analysisId = analysisId;
+    resp.analysisId = foodJob ? `food-${foodJob.job.id}` : analysisId;
+    if (primaryUsageEvent) logAiUsageEvent(primaryUsageEvent).catch(() => {})
+    if (foodJob) {
+      await foodJob.prepare(resp, allowViaFreeUse, isReanalysis, foodJobUsageEvents)
+      const completed = await foodJob.settle()
+      return NextResponse.json(completed, { headers: { 'Cache-Control': 'private, no-store' } })
+    }
     return NextResponse.json(resp);
 
   } catch (error) {
+    rethrowFoodJobControl(error)
+    if (foodJob) throw new FoodJobError('food_job_analysis_failed', 503)
     console.error('💥 AI API Error:', error);
-    
+
     // Handle specific OpenAI errors
     if (error instanceof Error) {
       const errorCode = String((error as any)?.code || (error as any)?.error?.code || '').toLowerCase();
@@ -5028,7 +5182,7 @@ CRITICAL REQUIREMENTS:
         name: error.name,
         stack: error.stack?.substring(0, 200)
       });
-      
+
       if (errorCode === 'insufficient_quota' || lowerMessage.includes('insufficient quota') || lowerMessage.includes('quota')) {
         return NextResponse.json(
           { error: 'AI service quota exceeded. Please check your billing.' },
@@ -5054,4 +5208,4 @@ CRITICAL REQUIREMENTS:
       { status: 500 }
     );
   }
-} 
+}

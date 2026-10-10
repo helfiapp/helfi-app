@@ -28,6 +28,7 @@ function bind(name: string) {
 }
 for (const name of ['DEFAULT_SERVING_GRAMS', 'WEIGHT_UNIT_LABELS', 'WEIGHT_UNIT_TO_GRAMS', 'DISCRETE_UNIT_KEYWORDS', 'escapeRegex', 'parseServingQuantity', 'singularizeUnitLabel', 'isGenericSizeLabel', 'isDiscreteUnitLabel', 'isFractionalServingQuantity', 'stripWeightPhrasesFromLabel', 'replaceWordNumbersForLabel', 'hasExplicitPieceCountInLabel', 'getExplicitPieces', 'getPiecesPerServing', 'parseServingUnitMetadata', 'piecesMultiplierForServing', 'macroMultiplierForItem', 'defaultGramsForItem', 'getDiscreteWeightFloor', 'normalizeWeightUnit', 'roundWeightValue', 'parseServingSizeInfo', 'getPieceGramsForItem', 'getMeasurementItem', 'getItemMeasurementCountry', 'getWeightUnitOptions', 'measurementItemForStorage', 'getUnitGramsForItem', 'weightAmountToGrams', 'gramsToWeightAmount', 'getBaseGramsPerServing', 'getBaseWeightPerServing', 'effectiveServings', 'recalculateNutritionFromItems', 'stripNutritionFromServingSize', 'updateItemField']) bind(name)
 const close = (actual: number, expected: number) => assert.ok(Math.abs(actual - expected) < 1e-9, `${actual} must equal ${expected}`)
+for (const name of ['replaceWordNumbers', 'quickParseServingSize', 'normalizeDiscreteItem', 'DISCRETE_SERVING_RULES', 'normalizeDiscreteServingsWithLabel']) bind(name)
 bind('formatNumberInputValue')
 if (source.text.includes('const formatWeightAmountLabel')) bind('formatWeightAmountLabel')
 const amountCaptions: string[] = []
@@ -310,6 +311,73 @@ close(ctx.analyzedItems[0].weightAmount, 20 / 15)
 ctx.updateItemField(0, 'weightAmount', '1')
 close(ctx.measurementItemForStorage(ctx.analyzedItems[0]).weightAmount, 15)
 ctx.userCountry = ''
+
+// Safe food-only fields from the captured AWS103 breakfast response. The real
+// UI previously changed this636kcal plate into34012kcal by reading150g as150eggs.
+const capturedBreakfast = [
+  { name: 'Scrambled eggs', serving_size: 'About 150 g, estimated equivalent of 3 large eggs', servings: 1, calories: 224, protein_g: 15, carbs_g: 2.4, fat_g: 16.5, fiber_g: 0, sugar_g: 2.1, piecesPerServing: 3, pieces: 3 },
+  { name: 'Roasted potatoes', serving_size: 'About 110 g', servings: 1, calories: 103, protein_g: 2.8, carbs_g: 23.3, fat_g: 0.1, fiber_g: 2.4, sugar_g: 1.3 },
+  { name: 'Cooked rice', serving_size: 'About 180 g, approximately 1 cup', servings: 1, calories: 194, protein_g: 3.2, carbs_g: 43.2, fat_g: 0.4, fiber_g: 1.8, sugar_g: 0.1 },
+  { name: 'Cooked broccoli', serving_size: 'About 75 g', servings: 1, calories: 26, protein_g: 1.8, carbs_g: 5.4, fat_g: 0.3, fiber_g: 2.5, sugar_g: 1 },
+  { name: 'Strawberries', serving_size: 'About 70 g of sliced strawberries', servings: 1, calories: 25, protein_g: 0.4, carbs_g: 5.6, fat_g: 0.2, fiber_g: 1.3, sugar_g: 3.4 },
+  { name: 'Blueberries', serving_size: 'About 40 g, approximately 1/4 cup', servings: 1, calories: 24, protein_g: 0.5, carbs_g: 4.9, fat_g: 0.3, fiber_g: 1, sugar_g: 2.6 },
+  { name: 'Pineapple', serving_size: 'About 80 g of pineapple chunks', servings: 1, calories: 40, protein_g: 0.4, carbs_g: 10.5, fat_g: 0.1, fiber_g: 1.1, sugar_g: 7.9 },
+]
+const originalBreakfast = JSON.stringify(capturedBreakfast)
+const photoBreakfast = ctx.normalizeDiscreteServingsWithLabel(capturedBreakfast.map(item => ({ ...item, isGuess: true, nutritionCoversServing: true }))).map((item: any) => ctx.normalizeDiscreteItem(item))
+const expectedBreakfast: Record<string, number> = { calories: 636, protein: 24.1, carbs: 95.3, fat: 17.9, fiber: 10.1, sugar: 18.4 }
+const nutrientNames = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g']
+const fullBreakfast = ctx.recalculateNutritionFromItems(photoBreakfast)
+for (const [field, expected] of Object.entries(expectedBreakfast)) close(fullBreakfast[field], expected)
+for (let index = 0; index < photoBreakfast.length; index++) {
+  for (const field of nutrientNames) assert.equal(photoBreakfast[index][field], (capturedBreakfast[index] as any)[field], 'normalization cannot alter any source nutrient')
+  assert.equal(ctx.macroMultiplierForItem(photoBreakfast[index]), 1)
+}
+assert.equal(photoBreakfast[0].piecesPerServing, 3)
+assert.equal(photoBreakfast[0].pieces, 3)
+assert.equal(ctx.parseServingUnitMetadata(capturedBreakfast[0].serving_size).unitLabel, 'g')
+assert.equal(ctx.parseServingUnitMetadata('150 g (estimated equivalent of 3 large eggs)').unitLabel, 'g')
+assert.equal(JSON.stringify(capturedBreakfast), originalBreakfast, 'the recorded source remains intact')
+
+// Change the actual measured egg amount, then restore it and reopen the stored
+// portion: all six totals must scale once, without reapplying the piece count.
+const photoEgg = { ...photoBreakfast[0], weightUnit: 'g', weightAmount: 150, portionMode: 'weight' }
+const expectedEgg: Record<string, number> = { calories: 224, protein: 15, carbs: 2.4, fat: 16.5, fiber: 0, sugar: 2.1 }
+ctx.analyzedItems = [photoEgg]; ctx.editingEntry = { items: [] }
+const photoUpdateStored = vm.runInContext(ts.transpile(`(${updateMapping})`, { target: ts.ScriptTarget.ES2020 }), ctx)
+ctx.finalItems = [{ ...photoEgg }]
+vm.runInContext(ts.transpile(addMapping, { target: ts.ScriptTarget.ES2020 }), ctx)
+for (const items of [photoUpdateStored, ctx.finalItems]) {
+  const reopened = JSON.parse(JSON.stringify(items))
+  assert.equal(reopened[0].nutritionCoversServing, true, 'actual add/update storage mappings preserve the full-serving nutrient basis')
+  assert.equal(ctx.recalculateNutritionFromItems(reopened).calories, 224)
+}
+ctx.editingEntry = null
+bind('compactItemForSnapshot')
+const snapshottedPhotoEgg = JSON.parse(JSON.stringify(ctx.compactItemForSnapshot(photoEgg)))
+assert.equal(snapshottedPhotoEgg.nutritionCoversServing, true, 'actual offline/session snapshot must retain the photo nutrient basis')
+assert.equal(ctx.macroMultiplierForItem(snapshottedPhotoEgg), 1)
+ctx.analyzedItems = [photoEgg]
+ctx.updateItemField(0, 'weightAmount', '75')
+close(ctx.effectiveServings(ctx.analyzedItems[0]), 0.5)
+const halfEgg = ctx.recalculateNutritionFromItems(ctx.analyzedItems)
+for (const [field, expected] of Object.entries(expectedEgg)) close(halfEgg[field], Math.round(expected * 0.5 * (field === 'calories' ? 1 : 10)) / (field === 'calories' ? 1 : 10))
+assert.equal(ctx.analyzedItems[0].nutritionCoversServing, true)
+const reopenedHalf = JSON.parse(JSON.stringify(ctx.measurementItemForStorage(ctx.analyzedItems[0])))
+close(ctx.effectiveServings(reopenedHalf), 0.5)
+assert.equal(ctx.recalculateNutritionFromItems([reopenedHalf]).calories, 112)
+ctx.updateItemField(0, 'weightAmount', '150')
+for (const [field, expected] of Object.entries(expectedEgg)) close(ctx.recalculateNutritionFromItems(ctx.analyzedItems)[field], expected)
+ctx.analyzedItems = [{ ...photoEgg, fiber_g: null, sugar_g: 0 }]
+ctx.updateItemField(0, 'weightAmount', '75')
+assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).fiber, null)
+assert.equal(ctx.recalculateNutritionFromItems(ctx.analyzedItems).sugar, 0)
+for (const [name, label, pieces] of [['Fried eggs', '3 eggs (150 g)', 3], ['Crackers', '10 g (6 crackers)', 6]] as const) {
+  const legacy = ctx.normalizeDiscreteItem({ name, serving_size: label, servings: 1, calories: name === 'Crackers' ? 40 : 210 })
+  assert.equal(legacy.piecesPerServing, pieces)
+  assert.equal(ctx.parseServingUnitMetadata(label).quantity, pieces, 'legacy directly counted portions retain their original count')
+}
+console.log('PASS: captured636kcal breakfast preserves all six nutrients,150g stays a measured weight, per-serving photo totals scale once through real half/full edits and saved reopening, null/zero and legacy egg/cracker counts remain intact.')
 console.log('PASS: actual saved-food page options, recorded basis, density, source quantity, unknown nutrients, precise updates and invalid/unsupported measurements; no credentials or network.')
 
 async function checkSaveGates() {

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { del, isObjectStorageConfigured, list } from '@/lib/object-storage'
 import { prisma } from '@/lib/prisma'
+import { purgeExpiredFoodJobs } from '@/lib/food-analysis-jobs'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,6 +30,16 @@ export async function GET(request: NextRequest) {
 
   if (!(isVercelCron || (expected && authHeader === `Bearer ${expected}`))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  }
+
+  // The old photo-only scheduler header cannot authorize private analysis
+  // housekeeping. The existing scheduled request must carry its secret.
+  if (expected && authHeader === `Bearer ${expected}`) {
+    try {
+      await purgeExpiredFoodJobs()
+    } catch {
+      return NextResponse.json({ error: 'Analysis cleanup failed' }, { status: 503 })
+    }
   }
 
   if (!isObjectStorageConfigured()) {

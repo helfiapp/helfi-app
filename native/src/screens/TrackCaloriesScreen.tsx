@@ -1,4 +1,5 @@
 import { NutrientCards } from '../components/NutrientCards'
+import { requestFoodAnalysis } from '../lib/foodAnalysisRequest'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
@@ -4522,7 +4523,7 @@ export function TrackCaloriesScreen() {
       form.append('image', photo as any)
 
       setFavoriteEditPhotoLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/analyze-food`, {
+      const res = await requestFoodAnalysis(`${API_BASE_URL}/api/analyze-food`, {
         method: 'POST',
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
         body: form,
@@ -4938,7 +4939,7 @@ export function TrackCaloriesScreen() {
       form.append('image', photo as any)
 
       setSaving(true)
-      const res = await fetch(`${API_BASE_URL}/api/analyze-food`, {
+      const res = await requestFoodAnalysis(`${API_BASE_URL}/api/analyze-food`, {
         method: 'POST',
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
         body: form,

@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { requestFoodAnalysis } from '../lib/foodAnalysisRequest'
 import * as ImagePicker from 'expo-image-picker'
 import { prepareFoodPhotoForUpload } from '../lib/foodPhoto'
 import {
@@ -8,6 +9,7 @@ import {
   DeviceEventEmitter,
   Image,
   Modal,
+  Platform,
   Pressable,
   SafeAreaView,
   ScrollView,
@@ -16,6 +18,7 @@ import {
   View,
 } from 'react-native'
 import { RouteProp, useNavigation, useRoute } from '@react-navigation/native'
+import { SafeAreaProvider, SafeAreaView as AndroidSafeAreaView } from 'react-native-safe-area-context'
 
 import { API_BASE_URL } from '../config'
 import { convertFoodAmount, parseFoodServing, liquidHouseholdMl } from '../lib/foodUnits'
@@ -27,6 +30,19 @@ import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 import { NutrientCards } from '../components/NutrientCards'
+
+function AdjustModalSafeArea({ children }: { children: React.ReactNode }) {
+  const style = { flex: 1, backgroundColor: theme.colors.card }
+  if (Platform.OS === 'android') {
+    // Full-screen modals need insets measured in their own Android window.
+    return (
+      <SafeAreaProvider>
+        <AndroidSafeAreaView style={style}>{children}</AndroidSafeAreaView>
+      </SafeAreaProvider>
+    )
+  }
+  return <SafeAreaView style={style}>{children}</SafeAreaView>
+}
 
 type SearchKind = 'packaged' | 'single'
 type SearchSource = 'auto'
@@ -1466,7 +1482,7 @@ export function AddIngredientScreen() {
       const photo = await prepareFoodPhotoForUpload(asset)
       form.append('image', photo as any)
 
-      const res = await fetch(`${API_BASE_URL}/api/analyze-food`, {
+      const res = await requestFoodAnalysis(`${API_BASE_URL}/api/analyze-food`, {
         method: 'POST',
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
         body: form,
@@ -2110,7 +2126,7 @@ export function AddIngredientScreen() {
           resetAdjustState()
         }}
       >
-        <SafeAreaView style={{ flex: 1, backgroundColor: theme.colors.card }}>
+        <AdjustModalSafeArea>
           <View
             style={{
               borderBottomWidth: 1,
@@ -2279,7 +2295,7 @@ export function AddIngredientScreen() {
               </Pressable>
             </View>
           </View>
-        </SafeAreaView>
+        </AdjustModalSafeArea>
 
         <Modal transparent visible={!!adjustPickerMode} animationType="none" onRequestClose={closeAdjustPicker}>
           <View style={{ flex: 1 }}>

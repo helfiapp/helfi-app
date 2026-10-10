@@ -366,6 +366,16 @@ export class CreditManager {
     }, CREDIT_CHARGE_TRANSACTION_OPTIONS);
   }
 
+  /**
+   * Food-job finalization joins the existing wallet algorithm to the result,
+   * free-use and counter transaction. The caller must hold the same per-user
+   * advisory lock used by chargeCents; no wallet calculation is changed here.
+   */
+  async chargeFoodJobInTransaction(costCents: number, tx: any): Promise<boolean> {
+    if (costCents <= 0) return true;
+    return this.chargeCentsInTransaction(costCents, tx);
+  }
+
   async chargeCentsOnce(costCents: number, options: {
     feature: string;
     runId: string;

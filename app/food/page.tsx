@@ -1,4 +1,5 @@
 'use client'
+import { requestFoodAnalysis } from '@/native/src/lib/foodAnalysisRequest'
 import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '@/lib/food/nutrient-values'
 import { Cog6ToothIcon, HandThumbDownIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/24/outline'
 /**
@@ -1726,11 +1727,17 @@ const parseServingUnitMetadata = (servingSize: string | number | null | undefine
   let unitLabel = ''
   const numberToken = normalized.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
   unitLabel = numberToken ? normalized.replace(numberToken[0], '').trim().replace(/^of\s+/i, '').trim() : normalized.trim()
+  // A measured amount remains a weight/volume even when later prose names
+  // pieces: "150 g, estimated equivalent of 3 eggs" is not 150 eggs.
+  const following = numberToken ? normalized.slice((numberToken.index ?? 0) + numberToken[0].length).trim() : ''
+  const measuredUnit = following.match(/^(g|grams?|kg|kilograms?|ml|milliliters?|millilitres?|l|liters?|litres?|oz|ounces?|lb|pounds?|cups?|tbsp|tablespoons?|tsp|teaspoons?)\b/i)?.[0]
+  if (measuredUnit) unitLabel = measuredUnit
 
   // If parentheses contain a discrete count (e.g., "(6 crackers)"), prefer that for step sizing.
   const parenSegments = normalized.match(/\(([^)]*)\)/g) || []
   for (const seg of parenSegments) {
     const cleaned = seg.replace(/[()]/g, '').trim()
+    if (/\b(?:estimated equivalent|equivalent of)\b/i.test(cleaned)) continue
     const altQty = parseServingQuantity(cleaned)
     const altNumberToken = cleaned.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
     const altUnit = altNumberToken ? cleaned.replace(altNumberToken[0], '').trim().replace(/^of\s+/i, '').trim() : cleaned
@@ -2071,6 +2078,7 @@ const quickParseServingSize = (servingSize: string | null | undefined) => {
 // When a serving label says "1 medium (200g)" but piecesPerServing is 6, scale per-serving
 // weight to cover all pieces unless the label already declares multiple units.
 const piecesMultiplierForServing = (item: any) => {
+  if (item?.nutritionCoversServing === true) return 1
   const pieces = Number((item as any)?.piecesPerServing)
   if (!Number.isFinite(pieces) || pieces <= 1) return 1
   const servingMeta = parseServingUnitMetadata(String(item?.serving_size || ''))
@@ -2104,13 +2112,13 @@ const normalizeDiscreteItem = (item: any) => {
     !isFractionalServingQuantity(servingMeta.quantity)
       ? servingMeta.quantity
       : null
-  if (servingPieces && servingPieces > 0) {
+  if (getExplicitPieces(working) == null && servingPieces && servingPieces > 0) {
     piecesPerServing = servingPieces
   }
   if (piecesPerServing && piecesPerServing > 0) {
     working.piecesPerServing = piecesPerServing
-    if (servingPieces && servingPieces > 0) {
-      working.pieces = servingPieces
+    if (!working.pieces || working.pieces <= 0) {
+      working.pieces = piecesPerServing
     }
   }
 
@@ -2378,6 +2386,7 @@ const normalizeDiscreteServingsWithLabel = (items: any[]) => {
     if (cleanedServingSize && cleanedServingSize !== String(item?.serving_size || '').trim()) {
       next.serving_size = cleanedServingSize
     }
+    if (next.nutritionCoversServing === true) return next
     const labelSource = `${item?.name || ''} ${cleanedServingSize || item?.serving_size || ''}`.toLowerCase()
     if (!labelSource.trim()) return next
     if (!hasExplicitPieceCountInLabel(labelSource)) return next
@@ -3064,6 +3073,7 @@ export default function FoodDiary() {
       serving_size: item?.serving_size,
       pieces: (item as any)?.pieces,
       piecesPerServing: (item as any)?.piecesPerServing,
+      nutritionCoversServing: item?.nutritionCoversServing,
       unit: (item as any)?.unit,
       weight_g: (item as any)?.weight_g,
       barcode: (item as any)?.barcode,
@@ -11066,7 +11076,7 @@ const applyStructuredItems = (
       formData.append('image', compressedFile)
       formData.append('analysisMode', preserveLabelDetail ? 'packaged' : 'meal')
       formData.append('forceFresh', '1')
-      const response = await fetch('/api/analyze-food', {
+      const response = await requestFoodAnalysis('/api/analyze-food', {
         method: 'POST',
         body: formData,
       })
@@ -11843,7 +11853,7 @@ function sanitizeNutritionTotals(raw: any): NutritionTotals | null {
       // Step 3: API call with detailed logging
       console.log('🌐 Calling API endpoint...');
       setAnalysisPhase('analyzing');
-      const response = await fetch('/api/analyze-food', {
+      const response = await requestFoodAnalysis('/api/analyze-food', {
         method: 'POST',
         body: formData,
       });
@@ -12048,7 +12058,7 @@ Meanwhile, you can describe your food manually:
       console.log('🚀 PERFORMANCE: Analyzing text (faster than photo estimate)...');
       
       // Call OpenAI to analyze the manual food entry
-      const response = await fetch('/api/analyze-food', {
+      const response = await requestFoodAnalysis('/api/analyze-food', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -13078,7 +13088,7 @@ Please add nutritional information manually if needed.`);
     setIsAnalyzing(true);
     setAnalysisPhase('analyzing');
     try {
-      const response = await fetch('/api/analyze-food', {
+      const response = await requestFoodAnalysis('/api/analyze-food', {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -13642,7 +13652,7 @@ Please add nutritional information manually if needed.`);
     const mergedHint = buildFeedbackHint(analysisHint, comment || '')
     setFeedbackRescanState({ scope: 'item', itemIndex })
     try {
-      const response = await fetch('/api/analyze-food', {
+      const response = await requestFoodAnalysis('/api/analyze-food', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
