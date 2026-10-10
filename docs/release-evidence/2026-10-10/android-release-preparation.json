@@ -1,0 +1,197 @@
+{
+  "recordedAt": "2026-10-10T04:04:15.079674+00:00",
+  "linearIssue": "HEL-469",
+  "sourceDirectory": "/Volumes/U34 Bolt/HELFI APP/helfi-app/native",
+  "packageName": "ai.helfi.app",
+  "versionName": "1.0.0",
+  "versionCode": 39,
+  "verified": {
+    "jdk": "Homebrew17.0.20.1",
+    "gradle": "8.14.3",
+    "nativeTypecheck": "pass",
+    "nativeUiLockCount": 79,
+    "nativeVoiceChecks": "pass",
+    "terminalOpenAiKeyGuard": "pass",
+    "gradleProjectConfiguration": {
+      "minSdk": 24,
+      "targetSdk": 36,
+      "compileSdk": 36,
+      "buildTools": "36.0.0",
+      "ndk": "27.1.12297006",
+      "kotlin": "2.1.20",
+      "configurationFailure": "LicenceNotAcceptedException for missing NDK licence",
+      "sourceCompileAttempted": false
+    },
+    "webrtcPrebuilt64BitAlignment": {
+      "dependency": "org.jitsi:webrtc:124.0.0",
+      "arm64-v8a": "all3LOADsegments16384",
+      "x86_64": "all3LOADsegments16384",
+      "evidence": "android-webrtc-native-alignment.json",
+      "note": "Dependency check only; verify complete final bundle separately."
+    }
+  },
+  "androidSdk": {
+    "path": "/Users/louieveleski/Library/Android/sdk",
+    "installedPackages": [
+      "platform-tools",
+      "platforms;android-36",
+      "build-tools;36.0.0",
+      "ndk;27.1.12297006",
+      "cmake;3.22.1",
+      "emulator",
+      "system-images;android-36;google_apis;arm64-v8a",
+      "cmdline-tools;latest"
+    ],
+    "required": [
+      "platform-tools",
+      "platforms;android-36",
+      "build-tools;36.0.0",
+      "ndk;27.1.12297006",
+      "cmake;3.22.1",
+      "emulator",
+      "system-images;android-36;google_apis;arm64-v8a"
+    ],
+    "licensePrompt": {
+      "name": "android-sdk-arm-dbt-license",
+      "agreementDate": "January 16, 2019",
+      "prompt": "Accept? (y/N):",
+      "accepted": true,
+      "terminalSession": 81798
+    },
+    "necessaryLicencesAccepted": [
+      "android-sdk-arm-dbt-license",
+      "android-sdk-license"
+    ],
+    "acceptanceAuthorisation": "Owner current explicit repairs, builds and store submissions; root confirmed no extra shell tool confirmation required and historical generic question superseded.",
+    "installationStarted": true,
+    "installationCompleted": true
+  },
+  "signing": {
+    "storeReleaseRejectsDebugKey": true,
+    "privateUploadVariablesPresent": false,
+    "keyFound": false,
+    "newKeyGenerated": true,
+    "priorGoogleCertificateVerified": true,
+    "priorGoogleUploadCertificate": "not set; actual Console says fingerprints appear after first bundle",
+    "encryptedKeystoreFormat": "PKCS12",
+    "rsaBits": 4096,
+    "privateDirectory": "/Users/louieveleski/.config/helfi/android-release",
+    "privateSettingsFilename": "upload-signing.json",
+    "privateSettingsPermissions": "0600",
+    "publicCertificateFilename": "upload-certificate.pem",
+    "credentialsPrinted": false,
+    "publicUploadCertificateSha256": "E7:44:10:E8:1B:C5:98:EB:86:45:22:B4:5D:CA:43:6F:A8:B2:14:76:D8:1D:41:03:04:A9:F8:AB:05:CC:AC:34"
+  },
+  "runtime": {
+    "adbInventory": [
+      "emulator-5562 offline"
+    ],
+    "androidAppLaunched": false,
+    "authenticatedUiVerified": false,
+    "screenshotsCaptured": [],
+    "developerBuildStarted": true,
+    "developerBuildPurpose": "Compile and genuine Android UI validation only; debug artifact is not for store upload.",
+    "emulator": {
+      "name": "HelfiReleasePhone20261010",
+      "device": "Pixel8",
+      "androidApi": 36,
+      "architecture": "arm64-v8a",
+      "port": 5580,
+      "uiInspection": "adb UI tree and actual screenshots; no new browser"
+    },
+    "emulatorBootCompleted": true,
+    "emulatorStartupScreenshot": "android-emulator-ready.png"
+  },
+  "store": {
+    "signedAabProduced": false,
+    "uploaded": false,
+    "submitted": false
+  },
+  "sharedSourceEdits": [
+    "native/src/ui/theme.ts",
+    "native/src/screens/LoginScreen.tsx",
+    "native/src/ui/Screen.tsx",
+    "native/src/screens/AddIngredientScreen.tsx (Android modal wrapper only; root owns transport)"
+  ],
+  "otherAgentBrowserOwnership": "Apple agent, Android agent has not opened or controlled browser",
+  "nextActions": [
+    "Resolve exact SDK legal confirmation",
+    "Confirm first upload-key registration from authenticated Google Console",
+    "Install required Android packages and build signed release",
+    "Test actual Android UI and preserve test-account session",
+    "Verify all arm64/x86_64 native ELF LOAD segments and APK zip alignment satisfy 16KB support",
+    "Capture genuine Android phone screenshots",
+    "Root integrates source and submits verified artifact"
+  ],
+  "officialReferences": [
+    "https://developer.android.com/guide/practices/page-sizes",
+    "https://docs.expo.dev/guides/permissions/"
+  ],
+  "runtimeVerification": {
+    "debugEmulator": "emulator-5580",
+    "testAccountLoginThroughNormalUI": true,
+    "rememberMeEnabled": true,
+    "restartPreservedSession": true,
+    "lightAndDarkLoginTextVerified": true,
+    "unsupportedAndroidAppleLoginHidden": true,
+    "foodHeaderStatusBarOverlapFixed": true,
+    "signedRelease16KBEmulator": "emulator-5582",
+    "signedRelease16KBLaunch": true,
+    "pageSizeBytes": 16384,
+    "finalRebuildRequiredAfterSourceFreeze": true,
+    "adjustIngredientModalTopAndBottomSafeAreaVerified": true,
+    "USDAFujiApple100gAllSixCards": {
+      "calories": 63,
+      "protein": 0.2,
+      "carbs": 15.2,
+      "fat": 0.2,
+      "fibre": 2.1,
+      "sugar": 11.7
+    },
+    "USDAFujiApple50gAllSixCards": {
+      "displayCalories": 32,
+      "protein": 0.1,
+      "carbs": 7.6,
+      "fat": 0.1,
+      "fibre": 1.1,
+      "sugar": 5.8,
+      "servings": 0.5,
+      "savedToDiary": false
+    },
+    "signedRelease16KBNormalUILoginVerified": true,
+    "signedRelease16KBSessionSurvivesRestart": true,
+    "darkFoodNavigationHeadingsDateCaloriesReadable": true,
+    "darkFoodPhotoBarcodeFavouriteActionsReadable": true,
+    "darkFoodSixNutrientCardsReadable": true,
+    "darkDiaryStatusForegroundMatchesActualBackground": true,
+    "savedWaterZeroAllSixCards": true,
+    "noDiarySaveOrDeleteDuringVerification": true,
+    "releaseBillingScreenLoadedLiveAccount": true,
+    "actualFreePlanAndCredits414Displayed": true,
+    "termsAndPrivacyLinksOnSubscriptionPage": true,
+    "financialPurchaseConfirmed": false
+  },
+  "preparationArtifactVerification": {
+    "apkSignatureVerified": true,
+    "uploadCertificateSHA256": "e74410e81bc598eb864522b45dca436fa8b21476d81d410304a9f8ab05ccac34",
+    "zipalign16KBPassed": true,
+    "all50ARM64AndX8664NativeLibraries16KBAligned": true,
+    "finalStoreUpload": false,
+    "aabJarsignerVerified": true,
+    "installedVersionCode": 39,
+    "actualTargetSdk": 36,
+    "billingPermissionPresent": true,
+    "releaseNotDebuggable": true
+  },
+  "rootIntegratedAndroidUIEdits": [
+    "native/src/screens/TrackCaloriesScreen.tsx Android local food palette and current secondary text"
+  ],
+  "billingPreflight": {
+    "normalUISignedRelease": true,
+    "plan": "plan_10_monthly",
+    "observedMessage": "Google product ID is not set for plan_10_monthly.",
+    "purchaseConfirmed": false,
+    "moneyCharged": false,
+    "nextAction": "First signed BILLING-enabled AAB upload, actual Play product creation and matching backend setup, then repeat UI preflight."
+  }
+}

@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react'
-import { Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, View, useWindowDimensions } from 'react-native'
+import { Alert, KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, Text, View, useColorScheme, useWindowDimensions } from 'react-native'
 import { Image } from 'react-native'
 
 import { useNavigation, useRoute } from '@react-navigation/native'
@@ -12,7 +12,7 @@ import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { HelfiTextField } from '../ui/HelfiTextField'
 import { Screen } from '../ui/Screen'
-import { theme } from '../ui/theme'
+import { getThemeColors, theme } from '../ui/theme'
 
 export function LoginScreen() {
   const { signIn } = useAppMode()
@@ -20,6 +20,8 @@ export function LoginScreen() {
   const route = useRoute<any>()
   const accountType = route?.params?.accountType
   const isPractitionerFlow = accountType === 'practitioner'
+  const colorScheme = useColorScheme()
+  const colors = Platform.OS === 'android' ? getThemeColors(colorScheme) : theme.colors
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [showPassword, setShowPassword] = useState(false)
@@ -133,7 +135,7 @@ export function LoginScreen() {
 
   return (
     <Screen>
-      <LinearGradient colors={['#FFFFFF', '#E9F6F1']} style={{ flex: 1 }}>
+      <LinearGradient colors={Platform.OS === 'android' && colorScheme === 'dark' ? [colors.bg, colors.card] : ['#FFFFFF', '#E9F6F1']} style={{ flex: 1 }}>
         <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
           <ScrollView
             contentContainerStyle={{
@@ -153,13 +155,13 @@ export function LoginScreen() {
                     onPress={goBackFromPractitioner}
                     style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 8, paddingHorizontal: 4 })}
                   >
-                    <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Back</Text>
+                    <Text style={{ color: colors.primary, fontWeight: '700' }}>Back</Text>
                   </Pressable>
                   <Pressable
                     onPress={goToDashboard}
                     style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 8, paddingHorizontal: 4 })}
                   >
-                    <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Back to dashboard</Text>
+                    <Text style={{ color: colors.primary, fontWeight: '700' }}>Back to dashboard</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -167,16 +169,17 @@ export function LoginScreen() {
               <View style={{ alignItems: 'center', marginBottom: theme.spacing.xl }}>
                 <Image source={require('../../assets/helfi-logo.png')} style={{ width: 92, height: 92 }} resizeMode="contain" />
 
-                <Text style={{ marginTop: theme.spacing.md, fontSize: 26, fontWeight: '700', color: theme.colors.text }}>
+                <Text style={{ marginTop: theme.spacing.md, fontSize: 26, fontWeight: '700', color: colors.text }}>
                   {isPractitionerFlow ? 'Practitioner portal sign in' : 'Welcome to Helfi'}
                 </Text>
-                <Text style={{ marginTop: 6, fontSize: 14, color: theme.colors.muted, textAlign: 'center', lineHeight: 20 }}>
+                <Text style={{ marginTop: 6, fontSize: 14, color: colors.muted, textAlign: 'center', lineHeight: 20 }}>
                   {isPractitionerFlow ? 'Sign in to manage your listing and boosts.' : 'Sign in to your account'}
                 </Text>
               </View>
 
               {/* Flat layout (no big white "card" behind everything) */}
               <View>
+                {Platform.OS !== 'android' ? <>
                 <Pressable
                   onPress={onApple}
                   disabled={loading || !!socialLoading}
@@ -199,10 +202,11 @@ export function LoginScreen() {
                 </Pressable>
 
               <View style={{ marginTop: theme.spacing.md, marginBottom: theme.spacing.md, flexDirection: 'row', alignItems: 'center', gap: 12 }}>
-                <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.border }} />
-                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700' }}>Or with email</Text>
-                <View style={{ flex: 1, height: 1, backgroundColor: theme.colors.border }} />
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
+                <Text style={{ color: colors.muted, fontSize: 12, fontWeight: '700' }}>Or with email</Text>
+                <View style={{ flex: 1, height: 1, backgroundColor: colors.border }} />
               </View>
+                </> : null}
 
               <HelfiTextField
                 label="Email address"
@@ -227,14 +231,14 @@ export function LoginScreen() {
                     accessibilityLabel={showPassword ? 'Hide password' : 'Show password'}
                     style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, padding: 2 })}
                   >
-                    <FontAwesome name={showPassword ? 'eye-slash' : 'eye'} size={18} color={theme.colors.muted} />
+                    <FontAwesome name={showPassword ? 'eye-slash' : 'eye'} size={18} color={colors.muted} />
                   </Pressable>
                 }
               />
 
               <View style={{ marginTop: -6, alignItems: 'flex-end' }}>
                 <Pressable onPress={openForgotPassword} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, paddingVertical: 6, paddingHorizontal: 4 })}>
-                  <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '600' }}>Forgot password?</Text>
+                  <Text style={{ color: colors.primary, fontSize: 13, fontWeight: '600' }}>Forgot password?</Text>
                 </Pressable>
               </View>
 
@@ -256,18 +260,18 @@ export function LoginScreen() {
                       height: 18,
                       borderRadius: 4,
                       borderWidth: 1,
-                      borderColor: theme.colors.border,
-                      backgroundColor: rememberMe ? theme.colors.primary : '#FFFFFF',
+                      borderColor: colors.border,
+                      backgroundColor: rememberMe ? colors.primary : '#FFFFFF',
                       alignItems: 'center',
                       justifyContent: 'center',
                     }}
                   >
                     {rememberMe ? <FontAwesome name="check" size={12} color="#FFFFFF" /> : null}
                   </View>
-                  <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }}>Keep me signed in</Text>
+                  <Text style={{ color: colors.text, fontSize: 13, fontWeight: '700' }}>Keep me signed in</Text>
                 </Pressable>
 
-                <Text style={{ marginLeft: 30, marginTop: 2, color: theme.colors.muted, fontSize: 12, lineHeight: 16 }}>
+                <Text style={{ marginLeft: 30, marginTop: 2, color: colors.muted, fontSize: 12, lineHeight: 16 }}>
                   If unchecked, you stay signed in for at least 24 hours.
                 </Text>
               </View>
@@ -278,21 +282,21 @@ export function LoginScreen() {
 
                 <View style={{ marginTop: theme.spacing.md, alignItems: 'center' }}>
                   <Pressable onPress={openSignup} style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, padding: 8 })}>
-                    <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700' }}>
+                    <Text style={{ color: colors.muted, fontSize: 13, fontWeight: '700' }}>
                       {isPractitionerFlow ? 'Need a practitioner account? ' : "Don't have an account? "}
-                      <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>
+                      <Text style={{ color: colors.primary, fontWeight: '700' }}>
                         {isPractitionerFlow ? 'Create practitioner account' : 'Sign up'}
                       </Text>
                     </Text>
                   </Pressable>
 
-                  <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 15 }}>
+                  <Text style={{ marginTop: 4, color: colors.muted, fontSize: 11, textAlign: 'center', lineHeight: 15 }}>
                     By continuing, you agree to our{' '}
-                    <Text onPress={openTerms} style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                    <Text onPress={openTerms} style={{ color: colors.primary, fontWeight: '600' }}>
                       Terms of Service
                     </Text>{' '}
                     and{' '}
-                    <Text onPress={openPrivacy} style={{ color: theme.colors.primary, fontWeight: '600' }}>
+                    <Text onPress={openPrivacy} style={{ color: colors.primary, fontWeight: '600' }}>
                       Privacy Policy
                     </Text>
                     .

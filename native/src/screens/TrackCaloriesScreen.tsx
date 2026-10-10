@@ -38,9 +38,13 @@ import { convertFoodAmount, parseFoodServing, liquidDensity, type FoodBaseUnit }
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
-import { theme } from '../ui/theme'
+import { getThemeColors, theme as sharedTheme } from '../ui/theme'
 import { useVoiceAssistant } from '../voice/VoiceAssistant'
 import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
+
+// This diary uses fixed light surfaces. Keep Android text and its editors on
+// the same palette; iOS retains its original adaptive colours.
+const theme = Platform.OS === 'android' ? { ...sharedTheme, colors: getThemeColors('light') } : sharedTheme
 
 type Nutrients = {
   calories?: number | null
@@ -10015,7 +10019,7 @@ const miniSecondaryButton = {
 }
 
 const miniSecondaryText = {
-  color: theme.colors.text,
+  get color() { return theme.colors.text },
   fontWeight: '700' as const,
 }
 

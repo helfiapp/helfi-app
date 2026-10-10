@@ -1,4 +1,4 @@
-import { ColorSchemeName, DynamicColorIOS, Platform, PlatformColor } from 'react-native'
+import { Appearance, ColorSchemeName, DynamicColorIOS, Platform } from 'react-native'
 
 const lightColors = {
   bg: '#F7FAF9',
@@ -26,12 +26,6 @@ function adaptiveColor(light: string, dark: string) {
   if (Platform.OS === 'ios') {
     return DynamicColorIOS({ light, dark })
   }
-  if (Platform.OS === 'android') {
-    if (light === lightColors.text) return PlatformColor('?attr/textColorPrimary')
-    if (light === lightColors.muted) return PlatformColor('?attr/textColorSecondary')
-    if (light === lightColors.border) return PlatformColor('?attr/colorControlNormal')
-    if (light === lightColors.bg || light === lightColors.card) return PlatformColor('?attr/colorBackground')
-  }
   return light
 }
 
@@ -39,16 +33,23 @@ export function getThemeColors(colorScheme: ColorSchemeName) {
   return colorScheme === 'dark' ? darkColors : lightColors
 }
 
+const adaptiveColors = {
+  bg: adaptiveColor(lightColors.bg, darkColors.bg),
+  card: adaptiveColor(lightColors.card, darkColors.card),
+  text: adaptiveColor(lightColors.text, darkColors.text),
+  muted: adaptiveColor(lightColors.muted, darkColors.muted),
+  border: adaptiveColor(lightColors.border, darkColors.border),
+  primary: lightColors.primary,
+  primaryText: lightColors.primaryText,
+  danger: adaptiveColor(lightColors.danger, darkColors.danger),
+}
+
 export const theme = {
-  colors: {
-    bg: adaptiveColor(lightColors.bg, darkColors.bg),
-    card: adaptiveColor(lightColors.card, darkColors.card),
-    text: adaptiveColor(lightColors.text, darkColors.text),
-    muted: adaptiveColor(lightColors.muted, darkColors.muted),
-    border: adaptiveColor(lightColors.border, darkColors.border),
-    primary: lightColors.primary,
-    primaryText: lightColors.primaryText,
-    danger: adaptiveColor(lightColors.danger, darkColors.danger),
+  get colors() {
+    // Android theme attributes can resolve to ColorStateList resource identifiers,
+    // which PlatformColor treats as nearly transparent numeric colors. Use Helfi's
+    // actual palette and read the current scheme whenever a screen renders.
+    return Platform.OS === 'android' ? getThemeColors(Appearance.getColorScheme()) : adaptiveColors
   },
   spacing: {
     xs: 8,

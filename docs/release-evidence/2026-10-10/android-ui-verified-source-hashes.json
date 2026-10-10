@@ -1,0 +1,21 @@
+{
+  "stage": "UI verified before final integration commit",
+  "files": {
+    "native/src/ui/theme.ts": "60e389709fa224cbf99d06e4b29d10ea451988ed176cc5a1f038dcc4907a88a0",
+    "native/src/ui/Screen.tsx": "7f3e8eab601f2dea38f605dc113bfb8395e2a3a99995bb72fe9aa30855514dd4",
+    "native/src/screens/LoginScreen.tsx": "a0357b2e57aece49d8404cc0a8119ba47bb2cfbaaa93f3ed4d02210b440a0efe",
+    "native/src/screens/AddIngredientScreen.tsx": "d5b001b8933e6ca8ac02d95f7f0631e85b9276a6b0c50928ad1aef8cd2bd2bd7",
+    "native/src/screens/TrackCaloriesScreen.tsx": "74e259ec69405a3e8b8acd1d1f3b1bdc67543748250f46779b372f981f3ec67a"
+  },
+  "typecheckPassed": true,
+  "actualUIEvidence": [
+    "android-login-fixed-light.png",
+    "android-login-fixed-dark.png",
+    "android-dashboard-safe-header.png",
+    "android-food-safe-header.png",
+    "android-apple-modal-safe-six-cards.png",
+    "android-dark-diary-readable-after-navigation.png",
+    "android-dark-food-buttons-readable.png",
+    "android-dark-food-six-cards-readable.png"
+  ]
+}
