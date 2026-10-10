@@ -1,0 +1,25 @@
+{
+  "timeUtc": "2026-10-10T04:45:54.049714+00:00",
+  "source": "native/src/lib/inAppPurchase.ts",
+  "sourceSha256": "c21bd8318f274e983fc7ef5afc699d9fe0f194a05407981b4c34545b75df12ab",
+  "typecheck": "pass",
+  "diffCheck": "pass",
+  "requestFixtures": {
+    "passed": 7,
+    "legacyMonthlyBasePreferred": true,
+    "standardMonthlyToken": true,
+    "rejectUnrelatedProduct": true,
+    "rejectAnnualOnly": true,
+    "rejectMissingToken": true,
+    "topupUnchanged": true,
+    "iosUnchanged": true,
+    "realStoreCalls": false,
+    "credentialsUsed": false
+  },
+  "actualAndroidScreenshots": [
+    "android-billing-after-offer-fix.png",
+    "android-billing-plans-after-offer-fix.png"
+  ],
+  "realGooglePurchase": "No purchase made. Live product mapping and Play catalog must be configured after first bundle upload; previous native preflight showed missing Google product ID.",
+  "finalBinary": "Awaiting committed native source freeze, then matching signed AAB/APK rebuild."
+}

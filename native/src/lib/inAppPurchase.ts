@@ -174,6 +174,37 @@ function buildAuthHeaders(token: string) {
   }
 }
 
+function getAndroidMonthlyOfferToken(product: any): string {
+  // Prefer the ordinary base plan so a discount cannot change the selected price.
+  const legacyOffers = Array.isArray(product?.subscriptionOfferDetailsAndroid)
+    ? product.subscriptionOfferDetailsAndroid.map((offer: any) => ({
+        token: offer?.offerToken,
+        basePlan: !offer?.offerId,
+        phases: offer?.pricingPhases?.pricingPhaseList,
+      }))
+    : []
+  const standardOffers = Array.isArray(product?.subscriptionOffers)
+    ? product.subscriptionOffers.map((offer: any) => ({
+        token: offer?.offerTokenAndroid,
+        basePlan: !offer?.id || offer.id === offer?.basePlanIdAndroid,
+        phases: offer?.pricingPhasesAndroid?.pricingPhaseList,
+      }))
+    : []
+  const monthlyOffers = [...legacyOffers, ...standardOffers].filter((offer) => {
+    const phases = Array.isArray(offer.phases) ? offer.phases : []
+    const recurringPhase = phases[phases.length - 1]
+    return (
+      typeof offer.token === 'string' && offer.token.trim() &&
+      recurringPhase?.billingPeriod === 'P1M' && recurringPhase?.recurrenceMode === 1
+    )
+  })
+  const selected = monthlyOffers.find((offer) => offer.basePlan) || monthlyOffers[0]
+  if (!selected) {
+    throw new Error('This monthly plan is not available from Google Play yet. Please try again later.')
+  }
+  return selected.token
+}
+
 export async function runNativePurchase(opts: {
   code: NativePurchaseCode
   kind: NativePurchaseKind
@@ -204,17 +235,16 @@ export async function runNativePurchase(opts: {
 
   await IAP.initConnection()
   try {
-    const purchaseWaiter = createPurchaseWaiter(storeProductId, 30000)
     const fetchedProducts = await IAP
       .fetchProducts({
         skus: [storeProductId],
         type: opts.kind === 'subscription' ? 'subs' : 'in-app',
       } as any)
       .catch(() => [])
-    const hasStoreProduct = Array.isArray(fetchedProducts)
-      ? fetchedProducts.some((p: any) => String(p?.id || p?.productId || '') === storeProductId)
-      : false
-    if (!hasStoreProduct && platform === 'ios') {
+    const storeProduct = Array.isArray(fetchedProducts)
+      ? fetchedProducts.find((p: any) => String(p?.id || p?.productId || '') === storeProductId)
+      : null
+    if (!storeProduct && platform === 'ios') {
       throw new Error(
         'This product is not available from Apple yet. Wait a few minutes and try again.',
       )
@@ -227,11 +257,19 @@ export async function runNativePurchase(opts: {
             type: opts.kind === 'subscription' ? 'subs' : 'in-app',
           }
         : {
-            request: { android: { skus: [storeProductId] } },
+            request: {
+              android: {
+                skus: [storeProductId],
+                ...(opts.kind === 'subscription'
+                  ? { subscriptionOffers: [{ sku: storeProductId, offerToken: getAndroidMonthlyOfferToken(storeProduct) }] }
+                  : {}),
+              },
+            },
             type: opts.kind === 'subscription' ? 'subs' : 'in-app',
           }
 
     const purchaseStartedAtMs = Date.now()
+    const purchaseWaiter = createPurchaseWaiter(storeProductId, 30000)
     let requested: any
     try {
       requested = await IAP.requestPurchase(requestPayload as any)
