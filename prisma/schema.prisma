@@ -93,6 +93,7 @@ model User {
   garminWebhookLogs   GarminWebhookLog[]
   foodAnalysisFeedback FoodAnalysisFeedback[]
   foodAnalysisJobs FoodAnalysisJob[]
+  nativePurchaseClaims NativePurchaseClaim[]
   medicalImageAnalyses MedicalImageAnalysis[]
   foodMissingReports  FoodMissingReport[]
   barcodeCorrections  BarcodeUserCorrection[]
@@ -1522,4 +1523,16 @@ enum ReportStatus {
   COMPLETED // Successfully processed
   FAILED // Processing failed
   DECRYPTION_FAILED // Password incorrect or PDF corrupted
+}
+
+model NativePurchaseClaim {
+  id         String   @id @default(cuid())
+  platform   String
+  purchaseId String
+  userId     String?
+  createdAt  DateTime @default(now())
+  user       User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@unique([platform, purchaseId])
+  @@index([userId])
 }

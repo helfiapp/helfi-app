@@ -1,0 +1,33 @@
+{
+  "verifiedAt": "2026-10-10T05:07:21.192909+00:00",
+  "files": {
+    "native/src/screens/BillingScreen.tsx": "6351a51bcd3aa2cc1a5b2a8d13f626333dfc4ca8a9632ec4cf5745c53250cf2d",
+    "native/src/lib/inAppPurchase.ts": "b6ec30395a256428c2033d1797873c71c1724ccca33a7bcbbb2072da422b657c",
+    "scripts/native-monthly-offer-check.cjs": "5a1ac6435fe014963a6b8072aa35e2e50d9182e042274f86de71c1b955e38ecb",
+    "scripts/native-store-prices-check.cjs": "a174580157caf517c5050a67e1bf4317c26a274fec8ffa4519461450b52507fb",
+    "scripts/page-locks.json": "36c425e58bcf5356f20ee209a8153770b9053c595edaefcccd5b6e6948a6dbc5"
+  },
+  "nativeTypecheck": "pass",
+  "nativeLocks": "pass - 80 files, only two approved hashes refreshed",
+  "monthlyOfferCases": 7,
+  "localizedPriceFixtures": [
+    "USD 4.99",
+    "AUD 7.99",
+    "Google recurring monthly base price",
+    "no made-up price when unavailable"
+  ],
+  "screenHandlerPlatformSourceCases": 18,
+  "managementHelperCases": 4,
+  "concurrentIapConnectionOrdering": "pass - lookup then purchase then focus lookup, no overlapping connection or early disconnect",
+  "actualUiProof": {
+    "serial": "emulator-5580",
+    "binary": "Existing debug APK plus Metro current source (not final signed release)",
+    "screenshots": [
+      "android-billing-real-price-fallback-plans.png",
+      "android-billing-real-price-fallback-topups.png"
+    ],
+    "storeProducts": "Google mapping absent, real fallback displayed with credits and checkout price wording",
+    "purchasesMade": false
+  },
+  "finalSignedRuntime": "Pending final clean committed source SHA; final listing and billing proofs will use matching signed APK."
+}

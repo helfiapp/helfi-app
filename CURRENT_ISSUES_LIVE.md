@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS105, c5bf8940fc24eace9582bb3885cd7057498fc697
+- Date/time: 10 October 2026, verified by root after all BUILD/DEPLOY/VERIFY steps succeeded.
+- What changed: Native store source preparation: Android readable screens and monthly-offer requests, Apple activity-only signing and upload guards, and verified release evidence. No final signed upload/submission claimed.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; both HTTP200 through CloudFront, matching new ETag 17hiedyvys1z15.
+- What to quickly test: Final signed native packages must use the committed source and preserve saved login, all six nutrient cards and actual store offers.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS Amplify job104 / e68293322caf694fe40613d185be15ea684f5c25
 - Date/time: 10 October 2026, verified 04:50 UTC.
 - What changed: Meal photo analysis now finishes through short authenticated requests with one completed-result charge; whole-serving nutrients do not multiply again by pieces. Measured150g eggs stay3eggs; plain rice cannot borrow rice-noodle records.

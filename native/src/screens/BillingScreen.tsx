@@ -1,9 +1,9 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { ActivityIndicator, Alert, Linking, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
-import { openNativeSubscriptionManagement, restoreNativePurchases, runNativePurchase, type NativeBillingCatalogProduct, type NativePurchaseCode } from '../lib/inAppPurchase'
+import { openNativeSubscriptionManagement, readNativeStorePrices, restoreNativePurchases, runNativePurchase, type NativeBillingCatalogProduct, type NativePurchaseCode, type NativeStorePrices } from '../lib/inAppPurchase'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -66,17 +66,26 @@ const creditCostDisplayList = [
 ]
 
 const planCards = [
-  { plan: 'plan_10_monthly', title: '$10 / month', wallet: 'Monthly wallet: 700 credits', buttonLabel: 'Choose $10 Plan', popular: false, dark: false },
-  { plan: 'plan_20_monthly', title: '$20 / month', wallet: 'Monthly wallet: 1,400 credits', buttonLabel: 'Choose $20 Plan', popular: false, dark: false },
-  { plan: 'plan_30_monthly', title: '$30 / month', wallet: 'Monthly wallet: 2,100 credits', buttonLabel: 'Choose $30 Plan', popular: true, dark: false },
-  { plan: 'plan_50_monthly', title: '$50 / month', wallet: 'Monthly wallet: 3,500 credits', buttonLabel: 'Choose $50 Plan', popular: false, dark: true },
+  { plan: 'plan_10_monthly', credits: 700, priceCents: 1000, wallet: 'Monthly wallet: 700 credits', popular: false, dark: false },
+  { plan: 'plan_20_monthly', credits: 1400, priceCents: 2000, wallet: 'Monthly wallet: 1,400 credits', popular: false, dark: false },
+  { plan: 'plan_30_monthly', credits: 2100, priceCents: 3000, wallet: 'Monthly wallet: 2,100 credits', popular: true, dark: false },
+  { plan: 'plan_50_monthly', credits: 3500, priceCents: 5000, wallet: 'Monthly wallet: 3,500 credits', popular: false, dark: true },
 ] as const
 
 const topUpCards = [
-  { plan: 'credits_250', title: 'Try with $5 (250 credits)', desc: 'One-time top-up. Credits valid for 12 months.', buttonLabel: 'Buy $5 Credits' },
-  { plan: 'credits_500', title: '$10 (500 credits)', desc: 'One-time top-up. Credits valid for 12 months.', buttonLabel: 'Buy $10 Credits' },
-  { plan: 'credits_1000', title: '$20 (1,000 credits)', desc: 'One-time top-up. Credits valid for 12 months.', buttonLabel: 'Buy $20 Credits' },
+  { plan: 'credits_250', credits: 250, desc: 'One-time top-up. Credits valid for 12 months.' },
+  { plan: 'credits_500', credits: 500, desc: 'One-time top-up. Credits valid for 12 months.' },
+  { plan: 'credits_1000', credits: 1000, desc: 'One-time top-up. Credits valid for 12 months.' },
 ] as const
+
+export function nativeBillingPriceLabels(credits: number, kind: 'subscription' | 'topup', price?: string) {
+  const amount = `${credits.toLocaleString()} credits`
+  const monthly = kind === 'subscription'
+  return {
+    title: price ? monthly ? `${price} / month` : `${amount} — ${price}` : monthly ? `${amount} / month` : amount,
+    buttonLabel: price ? monthly ? `Choose ${price} monthly plan` : `Buy ${amount} for ${price}` : monthly ? `Choose plan with ${amount}` : `Buy ${amount}`,
+  }
+}
 
 const TERMS_URL = 'https://helfi.ai/terms'
 const PRIVACY_URL = 'https://helfi.ai/privacy'
@@ -237,6 +246,9 @@ export function BillingScreen() {
   const [isCreatingCheckout, setIsCreatingCheckout] = useState<string | null>(null)
   const [isRestoringPurchases, setIsRestoringPurchases] = useState(false)
   const [nativeProducts, setNativeProducts] = useState<NativeBillingCatalogProduct[]>([])
+  const [storePrices, setStorePrices] = useState<NativeStorePrices>({})
+  const storePriceLookup = useRef<Promise<NativeStorePrices> | null>(null)
+  const storePriceGeneration = useRef(0)
 
   const [usageRange, setUsageRange] = useState<RangeKey>('7d')
   const [usageStart, setUsageStart] = useState('')
@@ -315,8 +327,11 @@ export function BillingScreen() {
   }, [authHeaders, mode])
 
   const fetchNativeCatalog = useCallback(async () => {
+    const priceGeneration = ++storePriceGeneration.current
+    setStorePrices({})
     if (mode !== 'signedIn' || !authHeaders) {
       setNativeProducts([])
+      setStorePrices({})
       return []
     }
 
@@ -328,6 +343,11 @@ export function BillingScreen() {
 
     const products = Array.isArray(data?.products) ? (data.products as NativeBillingCatalogProduct[]) : []
     setNativeProducts(products)
+    await storePriceLookup.current
+    const priceLookup = readNativeStorePrices(products).catch(() => ({}))
+    storePriceLookup.current = priceLookup
+    const prices = await priceLookup
+    if (storePriceGeneration.current === priceGeneration) setStorePrices(prices)
     return products
   }, [authHeaders, mode])
 
@@ -422,6 +442,7 @@ export function BillingScreen() {
         return
       }
       setIsCreatingCheckout(plan)
+      await storePriceLookup.current
       const kind = plan.startsWith('credits_') ? 'topup' : 'subscription'
       const result = await runNativePurchase({
         code: plan,
@@ -445,11 +466,13 @@ export function BillingScreen() {
         return
       }
       setIsCreatingPortalSession(true)
-      if (Platform.OS === 'ios') {
+      if (subscription?.source === 'apple_iap' || subscription?.source === 'google_iap') {
         try {
-          await openNativeSubscriptionManagement()
+          const storePlatform = subscription.source === 'google_iap' ? 'android' : 'ios'
+          await storePriceLookup.current
+          await openNativeSubscriptionManagement(storePlatform)
           const products = nativeProducts.length > 0 ? nativeProducts : await fetchNativeCatalog()
-          if (session?.token) {
+          if (session?.token && Platform.OS === storePlatform) {
             await restoreNativePurchases({
               token: session.token,
               products,
@@ -458,9 +481,9 @@ export function BillingScreen() {
           await loadBillingData()
         } catch (error: any) {
           Alert.alert(
-            'Apple subscription settings',
+            subscription?.source === 'google_iap' ? 'Google subscription settings' : 'Apple subscription settings',
             error?.message ||
-              'Open iPhone Settings, go to Developer, then Sandbox Apple Account to manage TestFlight sandbox subscriptions.',
+              'Open your store subscription settings to manage this plan.',
           )
         }
         return
@@ -487,7 +510,15 @@ export function BillingScreen() {
         Alert.alert('Not signed in', 'Please log in again and try.')
         return
       }
-      if (Platform.OS === 'ios') {
+      if (subscription?.source === 'google_iap') {
+        await handleManagePortal()
+        return
+      }
+      if (subscription?.source === 'apple_iap') {
+        if (Platform.OS !== 'ios') {
+          await handleManagePortal()
+          return
+        }
         await startCheckout(newPlan as NativePurchaseCode)
         return
       }
@@ -549,13 +580,14 @@ export function BillingScreen() {
   }
 
   const handleCancelSubscription = () => {
-    if (Platform.OS === 'ios') {
+    if (subscription?.source === 'apple_iap' || subscription?.source === 'google_iap') {
+      const google = subscription.source === 'google_iap'
       Alert.alert(
-        'Cancel in App Store',
-        'Use Apple subscription settings to cancel this plan.',
+        google ? 'Cancel in Google Play' : 'Cancel in App Store',
+        google ? 'Use Google Play subscription settings to cancel this plan.' : 'Use Apple subscription settings to cancel this plan.',
         [
           { text: 'Not now', style: 'cancel' },
-          { text: 'Open App Store', onPress: () => void handleManagePortal() },
+          { text: google ? 'Open Google Play' : 'Open App Store', onPress: () => void handleManagePortal() },
         ],
       )
       return
@@ -578,6 +610,7 @@ export function BillingScreen() {
         return
       }
       setIsRestoringPurchases(true)
+      await storePriceLookup.current
       const products = nativeProducts.length > 0 ? nativeProducts : await fetchNativeCatalog()
       const result = await restoreNativePurchases({
         token: session.token,
@@ -682,8 +715,7 @@ export function BillingScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>Current Subscription</Text>
                 <Text style={{ marginTop: 6, color: theme.colors.muted }}>
-                  {subscription.tier}
-                  {subscription.credits > 0 ? ` - ${subscription.credits.toLocaleString()} credits/month` : ''}
+                  {subscription.credits > 0 ? `${subscription.credits.toLocaleString()} credits/month` : 'Monthly subscription'}
                 </Text>
                 {subscription.source ? (
                   <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 12 }}>
@@ -725,7 +757,7 @@ export function BillingScreen() {
 
             <View style={{ marginTop: 12, gap: 10 }}>
               <ActionButton
-                label={isCreatingPortalSession ? 'Opening...' : Platform.OS === 'ios' ? 'Manage in App Store' : 'Manage subscription'}
+                label={isCreatingPortalSession ? 'Opening...' : subscription.source === 'apple_iap' ? 'Manage in App Store' : subscription.source === 'google_iap' ? 'Manage in Google Play' : 'Manage subscription'}
                 onPress={handleManagePortal}
                 disabled={isCreatingPortalSession}
                 kind="primary"
@@ -747,38 +779,15 @@ export function BillingScreen() {
                 />
               ) : null}
 
-              {currentPrice !== 1000 ? (
+              {planCards.filter((item) => currentPrice !== item.priceCents).map((item) => (
                 <ActionButton
-                  label={currentPrice > 1000 ? 'Downgrade to $10/month' : 'Switch to $10/month'}
-                  onPress={() => void handleChangePlan('plan_10_monthly', currentPrice > 1000 ? 'downgrade' : 'upgrade')}
+                  key={item.plan}
+                  label={`${currentPrice > item.priceCents ? 'Downgrade' : 'Switch'} to ${storePrices[item.plan] ? `${storePrices[item.plan]} / month` : `${item.credits.toLocaleString()} credits / month`}`}
+                  onPress={() => void handleChangePlan(item.plan, currentPrice > item.priceCents ? 'downgrade' : 'upgrade')}
                   disabled={isManagingSubscription}
                   kind="secondary"
                 />
-              ) : null}
-              {currentPrice !== 2000 ? (
-                <ActionButton
-                  label={currentPrice > 2000 ? 'Downgrade to $20/month' : 'Switch to $20/month'}
-                  onPress={() => void handleChangePlan('plan_20_monthly', currentPrice > 2000 ? 'downgrade' : 'upgrade')}
-                  disabled={isManagingSubscription}
-                  kind="secondary"
-                />
-              ) : null}
-              {currentPrice !== 3000 ? (
-                <ActionButton
-                  label={currentPrice > 3000 ? 'Downgrade to $30/month' : 'Switch to $30/month'}
-                  onPress={() => void handleChangePlan('plan_30_monthly', currentPrice > 3000 ? 'downgrade' : 'upgrade')}
-                  disabled={isManagingSubscription}
-                  kind="secondary"
-                />
-              ) : null}
-              {currentPrice !== 5000 ? (
-                <ActionButton
-                  label={currentPrice > 5000 ? 'Downgrade to $50/month' : 'Switch to $50/month'}
-                  onPress={() => void handleChangePlan('plan_50_monthly', currentPrice > 5000 ? 'downgrade' : 'upgrade')}
-                  disabled={isManagingSubscription}
-                  kind="secondary"
-                />
-              ) : null}
+              ))}
             </View>
           </View>
         ) : null}
@@ -801,7 +810,7 @@ export function BillingScreen() {
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
           <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>Plans</Text>
           <Text style={{ marginTop: 6, color: theme.colors.muted }}>
-            Choose a monthly subscription plan. Subscriptions renew monthly until cancelled.
+            Choose a monthly subscription plan. Subscriptions renew monthly until cancelled. The store shows the price and currency before you confirm payment.
           </Text>
           <View style={{ marginTop: 8, flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
             <Pressable accessibilityRole="link" accessibilityLabel="Terms of Use" onPress={() => openExternalUrl(TERMS_URL)}>
@@ -816,9 +825,9 @@ export function BillingScreen() {
             {planCards.map((item) => (
               <PlanCard
                 key={item.plan}
-                title={item.title}
+                title={nativeBillingPriceLabels(item.credits, 'subscription', storePrices[item.plan]).title}
                 wallet={item.wallet}
-                buttonLabel={item.buttonLabel}
+                buttonLabel={nativeBillingPriceLabels(item.credits, 'subscription', storePrices[item.plan]).buttonLabel}
                 loading={isCreatingCheckout === item.plan}
                 popular={item.popular}
                 dark={item.dark}
@@ -835,9 +844,9 @@ export function BillingScreen() {
             {topUpCards.map((item) => (
               <TopUpCard
                 key={item.plan}
-                title={item.title}
-                desc={item.desc}
-                buttonLabel={item.buttonLabel}
+                title={nativeBillingPriceLabels(item.credits, 'topup', storePrices[item.plan]).title}
+                desc={`${item.desc}${storePrices[item.plan] ? '' : ' Price and currency shown at checkout.'}`}
+                buttonLabel={nativeBillingPriceLabels(item.credits, 'topup', storePrices[item.plan]).buttonLabel}
                 loading={isCreatingCheckout === item.plan}
                 onPress={() => void startCheckout(item.plan)}
               />

@@ -1,0 +1,51 @@
+{
+  "date": "2026-10-10",
+  "scope": "Owner-authorised native verified purchase and release repair",
+  "source": {
+    "routeSha256": "8b019cff64aebf300a304026d15c583754b534941a37a0006a2ce62a71583301",
+    "checkSha256": "67fc0d79fa6cea127849fa2ef6b0c9655c07f341e9291c812f067f48fae1e575"
+  },
+  "offlineActualRouteChecks": {
+    "verifiedTransactionOnly": true,
+    "crossAccountClaimsRejected": true,
+    "retainedClaimAfterAccountRemovalRejected": true,
+    "repeatedAndConcurrentTopUpsGrantedOnce": true,
+    "failedGrantRollsBackClaim": true,
+    "subscriptionOwnershipExpiryRevocationAndLinkedTokens": true,
+    "subscriptionHistoryDoesNotHideConsumables": true,
+    "authoritativeTwoPackQuantityGrantsBothOnce": true,
+    "clientQuantityIgnored": true,
+    "invalidAndOverflowQuantitiesRejected": true
+  },
+  "database": {
+    "migration": "20261010060000_native_purchase_claims",
+    "sha256": "e83b3f4ad80ed26a5aafa31502c0e94ddf69f00ad86d1348336f31d3510c5148",
+    "applied": true,
+    "reviewedAdditiveStatements": 4,
+    "columns": 5,
+    "accountDeletionRetainsClaimWithNullOwner": true,
+    "existingFoodAndUserRowsChanged": false,
+    "otherPendingMigrationsApplied": false
+  },
+  "productionBuild": {
+    "exitCode": 0,
+    "privateLog": "/tmp/helfi-native-store-final-build-2026-10-10.log",
+    "includesMonthlyOfferLocalizedPricesAndRoutingChecks": true
+  },
+  "limits": [
+    "Offline synthetic store replies are not a real Apple or Google sandbox purchase.",
+    "Final store credential/product setup, signed packages and actual store submission are recorded separately."
+  ],
+  "productionAppleCatalog": {
+    "existingSevenProductIdsRestored": true,
+    "otherProductionBranchSettingsPreserved": true,
+    "appLevelOpenAISettingAccessedOrChanged": false,
+    "requiresNextDeployment": true,
+    "privateVerificationCredentialsCreated": false
+  },
+  "locks": {
+    "webAndShared": 279,
+    "native": 80,
+    "passed": true
+  }
+}

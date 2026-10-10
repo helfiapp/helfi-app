@@ -26,14 +26,19 @@ type AppleReceiptEntry = {
   original_transaction_id?: string
   purchase_date_ms?: string
   expires_date_ms?: string
+  cancellation_date_ms?: string
+  quantity?: string | number
 }
 
 type AppleTransactionInfo = {
+  bundleId?: string
   productId?: string
   transactionId?: string
   originalTransactionId?: string
   purchaseDate?: number | string
   expiresDate?: number | string
+  revocationDate?: number | string
+  quantity?: number
 }
 
 type AppleApiCredentials = {
@@ -47,6 +52,7 @@ type GoogleProductPurchase = {
   orderId?: string
   purchaseState?: number
   purchaseTimeMillis?: string
+  quantity?: number
 }
 
 type GoogleSubscriptionPurchase = {
@@ -54,6 +60,61 @@ type GoogleSubscriptionPurchase = {
   expiryTimeMillis?: string
   startTimeMillis?: string
   paymentState?: number
+  linkedPurchaseToken?: string
+  cancelReason?: number
+}
+
+class NativePurchaseError extends Error {
+  constructor(message: string, public status: number) { super(message) }
+}
+
+function verifiedCreditQuantity(value: unknown, creditsPerPack: number, pricePerPack: number): number {
+  // Older store replies omit quantity; only the verified store response may
+  // increase a pack count. Legacy Apple receipts encode this as a string.
+  const quantity = value === undefined ? 1 : typeof value === 'number' ? value
+    : typeof value === 'string' && /^\d+$/.test(value) ? Number(value) : NaN
+  if (!Number.isSafeInteger(quantity) || quantity < 1 ||
+      !Number.isSafeInteger(quantity * creditsPerPack) || quantity * creditsPerPack > 2147483647 ||
+      !Number.isSafeInteger(quantity * pricePerPack)) {
+    throw new NativePurchaseError('The store returned an invalid purchase quantity.', 400)
+  }
+  return quantity
+}
+
+async function claimNativePurchase(tx: any, platform: 'ios' | 'android', purchaseId: string, userId: string): Promise<boolean> {
+  const claim = await tx.nativePurchaseClaim.findUnique({ where: { platform_purchaseId: { platform, purchaseId } } })
+  if (claim && claim.userId !== userId) {
+    throw new NativePurchaseError('This purchase is already linked to another Helfi account.', 409)
+  }
+  if (claim) return false
+  await tx.nativePurchaseClaim.create({ data: { platform, purchaseId, userId } })
+  return true
+}
+
+async function lockNativePurchaseIds(tx: any, platform: 'ios' | 'android', purchaseIds: string[]): Promise<void> {
+  await tx.$executeRaw`SET LOCAL lock_timeout = '2000ms'`
+  for (const id of [...new Set(purchaseIds)].sort()) {
+    if (!id) throw new NativePurchaseError('The store did not identify this purchase.', 400)
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${`native-purchase:${platform}:${id}`}))`
+  }
+}
+
+// All native grants use the verified store identity as the lock/ownership key.
+// The existing records remain intact; retries never create another credit row.
+async function grantNativeTopUpOnce(data: {
+  userId: string; amountCents: number; purchasedAt: Date; expiresAt: Date; source: string
+}, platform: 'ios' | 'android', purchaseId: string, sourceAliases: string[] = []): Promise<boolean> {
+  return prisma.$transaction(async (tx) => {
+    await lockNativePurchaseIds(tx, platform, [purchaseId])
+    const existing = await tx.creditTopUp.findMany({ where: { source: { in: [...new Set([data.source, ...sourceAliases])] } }, select: { userId: true } })
+    if (existing.some(row => row.userId !== data.userId)) {
+      throw new NativePurchaseError('This purchase is already linked to another Helfi account.', 409)
+    }
+    const newClaim = await claimNativePurchase(tx, platform, purchaseId, data.userId)
+    if (existing.length || !newClaim) return false
+    await tx.creditTopUp.create({ data: { ...data, usedCents: 0 } })
+    return true
+  }, { maxWait: 1000, timeout: 10000 })
 }
 
 function addDays(date: Date, days: number): Date {
@@ -148,40 +209,69 @@ async function upsertSubscriptionPreservingStartDate(opts: {
   storeProductId: string
   storeTransactionId?: string | null
   storeOriginalTransactionId?: string | null
+  storeOwnershipIds?: string[]
 }) {
   await ensureSubscriptionStoreColumns()
 
-  const existing = await prisma.subscription.findUnique({
-    where: { userId: opts.userId },
-    select: { startDate: true },
-  })
-
-  const startDate = existing?.startDate || opts.startDateHint || new Date()
-
-  await prisma.subscription.upsert({
-    where: { userId: opts.userId },
-    update: {
-      plan: 'PREMIUM',
-      monthlyPriceCents: opts.monthlyPriceCents,
-      startDate,
-      endDate: opts.endDate || null,
+  const canonicalId = opts.storeOriginalTransactionId || opts.storeTransactionId
+  if (!canonicalId) throw new NativePurchaseError('The store did not identify this subscription.', 400)
+  // Google renewal orders append ..N; the token is stable for the purchase.
+  // Recognise old stored order IDs as well as the new canonical token, without
+  // rewriting another account's historic subscription records.
+  const googleOrderBase = opts.source === 'google_iap' && opts.storeTransactionId?.startsWith('GPA.')
+    ? opts.storeTransactionId.split('..')[0] : null
+  const identities = [...new Set([canonicalId, opts.storeTransactionId, googleOrderBase].filter(Boolean))] as string[]
+  const platform = opts.source === 'apple_iap' ? 'ios' : 'android'
+  const ownershipIds = [...new Set([canonicalId, ...(opts.storeOwnershipIds || [])].filter(Boolean))]
+  await prisma.$transaction(async (tx) => {
+    await lockNativePurchaseIds(tx, platform, ownershipIds)
+    const owners = await tx.subscription.findMany({ where: {
       source: opts.source,
-      storeProductId: opts.storeProductId || null,
-      storeTransactionId: opts.storeTransactionId || null,
-      storeOriginalTransactionId: opts.storeOriginalTransactionId || null,
-    },
-    create: {
-      userId: opts.userId,
-      plan: 'PREMIUM',
-      monthlyPriceCents: opts.monthlyPriceCents,
-      startDate,
-      endDate: opts.endDate || null,
-      source: opts.source,
-      storeProductId: opts.storeProductId || null,
-      storeTransactionId: opts.storeTransactionId || null,
-      storeOriginalTransactionId: opts.storeOriginalTransactionId || null,
-    },
-  })
+      OR: [
+        { storeOriginalTransactionId: { in: identities } },
+        { storeTransactionId: { in: identities } },
+        ...(googleOrderBase ? [
+          { storeOriginalTransactionId: { startsWith: googleOrderBase + '..' } },
+          { storeTransactionId: { startsWith: googleOrderBase + '..' } },
+        ] : []),
+      ],
+    }, select: { userId: true } })
+    if (owners.some(row => row.userId !== opts.userId)) {
+      throw new NativePurchaseError('This subscription is already linked to another Helfi account.', 409)
+    }
+    for (const purchaseId of ownershipIds) await claimNativePurchase(tx, platform, purchaseId, opts.userId)
+    const existing = await tx.subscription.findUnique({
+      where: { userId: opts.userId },
+      select: { startDate: true },
+    })
+
+    const startDate = existing?.startDate || opts.startDateHint || new Date()
+
+    await tx.subscription.upsert({
+      where: { userId: opts.userId },
+      update: {
+        plan: 'PREMIUM',
+        monthlyPriceCents: opts.monthlyPriceCents,
+        startDate,
+        endDate: opts.endDate || null,
+        source: opts.source,
+        storeProductId: opts.storeProductId || null,
+        storeTransactionId: opts.storeTransactionId || null,
+        storeOriginalTransactionId: opts.storeOriginalTransactionId || null,
+      },
+      create: {
+        userId: opts.userId,
+        plan: 'PREMIUM',
+        monthlyPriceCents: opts.monthlyPriceCents,
+        startDate,
+        endDate: opts.endDate || null,
+        source: opts.source,
+        storeProductId: opts.storeProductId || null,
+        storeTransactionId: opts.storeTransactionId || null,
+        storeOriginalTransactionId: opts.storeOriginalTransactionId || null,
+      },
+    })
+  }, { maxWait: 1000, timeout: 10000 })
 }
 
 async function getBillingUser(request: NextRequest): Promise<BillingUser | null> {
@@ -243,9 +333,16 @@ async function verifyAppleReceipt(receiptData: string) {
     return { ok: false as const, error: `Apple receipt verification failed (status ${String(data?.status ?? 'unknown')}).` }
   }
 
+  const expectedBundle = String(process.env.APPLE_IAP_BUNDLE_ID || '').trim()
+  if (!expectedBundle || String(data?.receipt?.bundle_id || '').trim() !== expectedBundle) {
+    return { ok: false as const, error: 'Apple receipt does not belong to Helfi.' }
+  }
+
   const latest = Array.isArray(data?.latest_receipt_info) ? (data.latest_receipt_info as AppleReceiptEntry[]) : []
   const fallback = Array.isArray(data?.receipt?.in_app) ? (data.receipt.in_app as AppleReceiptEntry[]) : []
-  const items = latest.length > 0 ? latest : fallback
+  // latest_receipt_info covers subscription history; receipt.in_app can hold
+  // the consumable a subscribed user just bought. Keep both verified lists.
+  const items = [...latest, ...fallback]
 
   return { ok: true as const, items }
 }
@@ -297,6 +394,10 @@ async function verifyAppleTransactionById(transactionId: string) {
 
     try {
       const info = parseAppleSignedTransactionInfo(signedInfo)
+      if (String(info.bundleId || '').trim() !== creds.bundleId) {
+        lastError = 'Apple transaction does not belong to Helfi.'
+        continue
+      }
       return { ok: true as const, info }
     } catch (error: any) {
       lastError = String(error?.message || 'Apple signed transaction payload could not be parsed.')
@@ -502,34 +603,26 @@ export async function POST(request: NextRequest) {
 
       if (product.kind === 'topup') {
         const purchase = await verifyGoogleProductPurchase(expectedProductId, purchaseToken)
-        if (Number(purchase.purchaseState) !== 0) {
+        if (purchase.purchaseState !== 0) {
           return NextResponse.json({ error: 'Google purchase is not completed yet.' }, { status: 400 })
         }
+        const quantity = verifiedCreditQuantity(purchase.quantity, product.credits, product.priceCents)
+        const creditsAdded = product.credits * quantity
 
         const source = `google_iap:${String(purchase.orderId || purchaseToken)}`
-        const existingTopUp = await prisma.creditTopUp.findFirst({
-          where: { userId: user.id, source },
-          select: { id: true },
-        })
-        if (existingTopUp) {
-          return NextResponse.json({ ok: true, message: 'Purchase already processed.' })
-        }
-
         const purchasedAtMs = Number(purchase.purchaseTimeMillis || Date.now())
         const purchasedAt = new Date(Number.isFinite(purchasedAtMs) ? purchasedAtMs : Date.now())
         const expiresAt = new Date(purchasedAt)
         expiresAt.setFullYear(expiresAt.getFullYear() + 1)
 
-        await prisma.creditTopUp.create({
-          data: {
-            userId: user.id,
-            amountCents: product.credits,
-            usedCents: 0,
-            purchasedAt,
-            expiresAt,
-            source,
-          },
-        })
+        const added = await grantNativeTopUpOnce({
+          userId: user.id,
+          amountCents: creditsAdded,
+          purchasedAt,
+          expiresAt,
+          source,
+        }, 'android', purchaseToken, [`google_iap:${purchaseToken}`])
+        if (!added) return NextResponse.json({ ok: true, message: 'Purchase already processed.' })
 
         await createNativeAffiliateCommission({
           user,
@@ -537,7 +630,7 @@ export async function POST(request: NextRequest) {
           type: 'TOPUP',
           platform,
           transactionId: String(purchase.orderId || purchaseToken),
-          amountCents: product.priceCents,
+          amountCents: product.priceCents * quantity,
           occurredAt: purchasedAt,
         })
 
@@ -545,13 +638,21 @@ export async function POST(request: NextRequest) {
           ok: true,
           type: 'topup',
           message: 'Credits added successfully.',
-          creditsAdded: product.credits,
+          creditsAdded,
         })
       }
 
       const sub = await verifyGoogleSubscriptionPurchase(expectedProductId, purchaseToken)
       const endDateMs = Number(sub.expiryTimeMillis || 0)
-      const endDate = endDateMs > 0 ? new Date(endDateMs) : null
+      // A missing expiry must never turn a store subscription into permanent
+      // premium. User cancellation keeps access until the paid expiry; pending
+      // payments, replacement and developer/system revocation do not.
+      if (!Number.isFinite(endDateMs) || endDateMs <= Date.now() || endDateMs > 8640000000000000 ||
+          sub.paymentState === 0 || sub.paymentState === 3 ||
+          (sub.cancelReason != null && sub.cancelReason !== 0)) {
+        return NextResponse.json({ error: 'Google subscription is not currently active.' }, { status: 400 })
+      }
+      const endDate = new Date(endDateMs)
       const startDateMs = Number(sub.startTimeMillis || 0)
       const startDateHint = startDateMs > 0 ? new Date(startDateMs) : null
 
@@ -563,7 +664,8 @@ export async function POST(request: NextRequest) {
         source: 'google_iap',
         storeProductId: expectedProductId,
         storeTransactionId: String(sub.orderId || purchaseToken),
-        storeOriginalTransactionId: String(sub.orderId || purchaseToken),
+        storeOriginalTransactionId: purchaseToken,
+        storeOwnershipIds: sub.linkedPurchaseToken ? [purchaseToken, sub.linkedPurchaseToken] : [purchaseToken],
       })
 
       await createNativeAffiliateCommission({
@@ -594,12 +696,16 @@ export async function POST(request: NextRequest) {
     let finalOriginalTransactionId = ''
     let purchaseDateMs = 0
     let expiresDateMs = 0
+    let verifiedQuantity: unknown
 
     // Preferred path: App Store transaction lookup by transaction ID (works without shared secret).
     if (transactionId) {
       const lookup = await verifyAppleTransactionById(transactionId)
       if (lookup.ok) {
         const info = lookup.info
+        if (info.revocationDate != null) {
+          return NextResponse.json({ error: 'Apple revoked this purchase.' }, { status: 400 })
+        }
         const actualProductId = normalizeStoreProductId(info?.productId)
         if (actualProductId !== expectedProductId) {
           return NextResponse.json(
@@ -607,10 +713,14 @@ export async function POST(request: NextRequest) {
             { status: 400 },
           )
         }
-        finalTransactionId = String(info?.transactionId || info?.originalTransactionId || transactionId).trim()
+        finalTransactionId = String(info?.transactionId || '').trim()
+        if (!finalTransactionId || finalTransactionId !== transactionId) {
+          return NextResponse.json({ error: 'Apple did not verify the requested transaction.' }, { status: 400 })
+        }
         finalOriginalTransactionId = String(info?.originalTransactionId || finalTransactionId || '').trim()
         purchaseDateMs = Number(info?.purchaseDate || 0)
         expiresDateMs = Number(info?.expiresDate || 0)
+        verifiedQuantity = info.quantity
       } else if (!receiptData) {
         return NextResponse.json(
           {
@@ -636,7 +746,11 @@ export async function POST(request: NextRequest) {
       const matching = apple.items
         .filter((item) => normalizeStoreProductId(item?.product_id) === expectedProductId)
         .sort((a, b) => Number(b?.purchase_date_ms || 0) - Number(a?.purchase_date_ms || 0))
-      const purchase = matching[0]
+      // A supplied transaction ID must identify a transaction Apple actually
+      // verified, never become a caller-selected key for granting credits.
+      const purchase = transactionId
+        ? matching.find(item => String(item.transaction_id || '').trim() === transactionId)
+        : matching[0]
 
       if (!purchase) {
         return NextResponse.json(
@@ -646,13 +760,15 @@ export async function POST(request: NextRequest) {
           { status: 400 },
         )
       }
+      if (purchase.cancellation_date_ms != null && String(purchase.cancellation_date_ms).trim()) {
+        return NextResponse.json({ error: 'Apple revoked this purchase.' }, { status: 400 })
+      }
 
-      finalTransactionId = String(
-        transactionId || purchase.transaction_id || purchase.original_transaction_id || '',
-      ).trim()
+      finalTransactionId = String(purchase.transaction_id || '').trim()
       finalOriginalTransactionId = String(purchase.original_transaction_id || finalTransactionId || '').trim()
       purchaseDateMs = Number(purchase.purchase_date_ms || 0)
       expiresDateMs = Number(purchase.expires_date_ms || 0)
+      verifiedQuantity = purchase.quantity
     }
 
     if (!finalTransactionId) {
@@ -660,30 +776,22 @@ export async function POST(request: NextRequest) {
     }
 
     if (product.kind === 'topup') {
+      const quantity = verifiedCreditQuantity(verifiedQuantity, product.credits, product.priceCents)
+      const creditsAdded = product.credits * quantity
       const source = `apple_iap:${finalTransactionId}`
-      const existingTopUp = await prisma.creditTopUp.findFirst({
-        where: { userId: user.id, source },
-        select: { id: true },
-      })
-      if (existingTopUp) {
-        return NextResponse.json({ ok: true, message: 'Purchase already processed.' })
-      }
-
       const purchasedAtMs = purchaseDateMs > 0 ? purchaseDateMs : Date.now()
       const purchasedAt = new Date(Number.isFinite(purchasedAtMs) ? purchasedAtMs : Date.now())
       const expiresAt = new Date(purchasedAt)
       expiresAt.setFullYear(expiresAt.getFullYear() + 1)
 
-      await prisma.creditTopUp.create({
-        data: {
-          userId: user.id,
-          amountCents: product.credits,
-          usedCents: 0,
-          purchasedAt,
-          expiresAt,
-          source,
-        },
-      })
+      const added = await grantNativeTopUpOnce({
+        userId: user.id,
+        amountCents: creditsAdded,
+        purchasedAt,
+        expiresAt,
+        source,
+      }, 'ios', finalTransactionId)
+      if (!added) return NextResponse.json({ ok: true, message: 'Purchase already processed.' })
 
       await createNativeAffiliateCommission({
         user,
@@ -691,7 +799,7 @@ export async function POST(request: NextRequest) {
         type: 'TOPUP',
         platform,
         transactionId: finalTransactionId,
-        amountCents: product.priceCents,
+        amountCents: product.priceCents * quantity,
         occurredAt: purchasedAt,
       })
 
@@ -699,12 +807,15 @@ export async function POST(request: NextRequest) {
         ok: true,
         type: 'topup',
         message: 'Credits added successfully.',
-        creditsAdded: product.credits,
+        creditsAdded,
       })
     }
 
     const endDateMs = Number(expiresDateMs || 0)
-    const endDate = endDateMs > 0 ? new Date(endDateMs) : null
+    if (!Number.isFinite(endDateMs) || endDateMs <= Date.now() || endDateMs > 8640000000000000) {
+      return NextResponse.json({ error: 'Apple subscription is not currently active.' }, { status: 400 })
+    }
+    const endDate = new Date(endDateMs)
     const startDateMs = Number(purchaseDateMs || 0)
     const startDateHint = startDateMs > 0 ? new Date(startDateMs) : null
 
@@ -742,7 +853,7 @@ export async function POST(request: NextRequest) {
         error: 'Failed to verify purchase',
         message: error?.message || 'Unknown error',
       },
-      { status: 500 },
+      { status: error instanceof NativePurchaseError ? error.status : 500 },
     )
   }
 }

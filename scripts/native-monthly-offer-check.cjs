@@ -1,7 +1,7 @@
 const assert = require('node:assert/strict')
 const fs = require('node:fs')
 const vm = require('node:vm')
-const ts = require('../native/node_modules/typescript')
+const ts = require('typescript')
 const src = fs.readFileSync('native/src/lib/inAppPurchase.ts', 'utf8')
 const compiled = ts.transpileModule(src, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 } }).outputText
 const phase = (period = 'P1M') => ({ billingPeriod: period, recurrenceMode: 1 })

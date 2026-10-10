@@ -1,4 +1,4 @@
-import { Platform } from 'react-native'
+import { Linking, Platform } from 'react-native'
 import * as IAP from 'react-native-iap'
 
 import { API_BASE_URL } from '../config'
@@ -174,7 +174,7 @@ function buildAuthHeaders(token: string) {
   }
 }
 
-function getAndroidMonthlyOfferToken(product: any): string {
+function getAndroidMonthlyOffer(product: any): { token: string; displayPrice: string } {
   // Prefer the ordinary base plan so a discount cannot change the selected price.
   const legacyOffers = Array.isArray(product?.subscriptionOfferDetailsAndroid)
     ? product.subscriptionOfferDetailsAndroid.map((offer: any) => ({
@@ -190,19 +190,66 @@ function getAndroidMonthlyOfferToken(product: any): string {
         phases: offer?.pricingPhasesAndroid?.pricingPhaseList,
       }))
     : []
-  const monthlyOffers = [...legacyOffers, ...standardOffers].filter((offer) => {
+  const monthlyOffers = [...legacyOffers, ...standardOffers].map((offer) => {
     const phases = Array.isArray(offer.phases) ? offer.phases : []
-    const recurringPhase = phases[phases.length - 1]
+    return { ...offer, recurringPhase: phases[phases.length - 1] }
+  }).filter((offer) => {
     return (
       typeof offer.token === 'string' && offer.token.trim() &&
-      recurringPhase?.billingPeriod === 'P1M' && recurringPhase?.recurrenceMode === 1
+      offer.recurringPhase?.billingPeriod === 'P1M' && offer.recurringPhase?.recurrenceMode === 1
     )
   })
   const selected = monthlyOffers.find((offer) => offer.basePlan) || monthlyOffers[0]
   if (!selected) {
     throw new Error('This monthly plan is not available from Google Play yet. Please try again later.')
   }
-  return selected.token
+  return { token: selected.token, displayPrice: String(selected.recurringPhase?.formattedPrice || '').trim() }
+}
+
+// Product lookup, checkout, restore and management share the native connection.
+// A focus refresh must not close it while another operation is using it.
+let nativeStoreOperation: Promise<void> = Promise.resolve()
+function withNativeStoreConnection<T>(operation: () => Promise<T>): Promise<T> {
+  const pending = nativeStoreOperation.then(async () => {
+    await IAP.initConnection()
+    try {
+      return await operation()
+    } finally {
+      await IAP.endConnection().catch(() => {})
+    }
+  })
+  nativeStoreOperation = pending.then(() => {}, () => {})
+  return pending
+}
+
+export type NativeStorePrices = Partial<Record<NativePurchaseCode, string>>
+
+export async function readNativeStorePrices(products: NativeBillingCatalogProduct[]): Promise<NativeStorePrices> {
+  if (Platform.OS !== 'ios' && Platform.OS !== 'android') return {}
+  const platform = getPlatform()
+  const mapped = products.map((product) => ({
+    ...product,
+    storeId: String(platform === 'ios' ? product.iosProductId || '' : product.androidProductId || ''),
+  })).filter((product) => product.storeId)
+  if (mapped.length === 0) return {}
+  return withNativeStoreConnection(async () => {
+    const prices: NativeStorePrices = {}
+    for (const kind of ['subscription', 'topup'] as const) {
+      const group = mapped.filter((product) => product.kind === kind)
+      if (!group.length) continue
+      const fetched = await IAP.fetchProducts({ skus: group.map((product) => product.storeId), type: kind === 'subscription' ? 'subs' : 'in-app' }).catch(() => [])
+      for (const product of group) {
+        const actual = Array.isArray(fetched) ? fetched.find((entry) => entry.id === product.storeId) : null
+        if (!actual) continue
+        // Match the recurring monthly offer used at purchase, rather than a trial price.
+        const price = platform === 'android' && kind === 'subscription'
+          ? (() => { try { return getAndroidMonthlyOffer(actual).displayPrice } catch { return '' } })()
+          : String(actual.displayPrice || '').trim()
+        if (price) prices[product.code] = price
+      }
+    }
+    return prices
+  })
 }
 
 export async function runNativePurchase(opts: {
@@ -233,8 +280,7 @@ export async function runNativePurchase(opts: {
 
   const storeProductId = String(prepareData.storeProductId)
 
-  await IAP.initConnection()
-  try {
+  return withNativeStoreConnection(async () => {
     const fetchedProducts = await IAP
       .fetchProducts({
         skus: [storeProductId],
@@ -261,7 +307,7 @@ export async function runNativePurchase(opts: {
               android: {
                 skus: [storeProductId],
                 ...(opts.kind === 'subscription'
-                  ? { subscriptionOffers: [{ sku: storeProductId, offerToken: getAndroidMonthlyOfferToken(storeProduct) }] }
+                  ? { subscriptionOffers: [{ sku: storeProductId, offerToken: getAndroidMonthlyOffer(storeProduct).token }] }
                   : {}),
               },
             },
@@ -362,9 +408,7 @@ export async function runNativePurchase(opts: {
     return {
       message: String(verifyData?.message || 'Purchase completed.'),
     }
-  } finally {
-    await IAP.endConnection().catch(() => {})
-  }
+  })
 }
 
 export async function restoreNativePurchases(opts: {
@@ -378,8 +422,7 @@ export async function restoreNativePurchases(opts: {
   const platform = getPlatform()
   const headers = buildAuthHeaders(opts.token)
 
-  await IAP.initConnection()
-  try {
+  return withNativeStoreConnection(async () => {
     const purchases = (await IAP.getAvailablePurchases().catch(() => [])) as any[]
     if (!Array.isArray(purchases) || purchases.length === 0) {
       return { message: 'No previous purchases were found on this device/account.' }
@@ -452,18 +495,23 @@ export async function restoreNativePurchases(opts: {
     return {
       message: restoredCount === 1 ? '1 purchase restored successfully.' : `${restoredCount} purchases restored successfully.`,
     }
-  } finally {
-    await IAP.endConnection().catch(() => {})
-  }
+  })
 }
 
-export async function openNativeSubscriptionManagement(): Promise<PurchaseResult> {
+export async function openNativeSubscriptionManagement(storePlatform = getPlatform()): Promise<PurchaseResult> {
   if (Platform.OS !== 'ios' && Platform.OS !== 'android') {
     throw new Error('Subscription management is only available on iPhone and Android.')
   }
 
-  await IAP.initConnection()
-  try {
+  // A synced account may be opened on a phone using the other store.
+  if (storePlatform !== getPlatform()) {
+    await Linking.openURL(storePlatform === 'android'
+      ? 'https://play.google.com/store/account/subscriptions'
+      : 'https://apps.apple.com/account/subscriptions')
+    return { message: 'Subscription management opened.' }
+  }
+
+  return withNativeStoreConnection(async () => {
     if (Platform.OS === 'ios') {
       if (typeof (IAP as any).showManageSubscriptionsIOS === 'function') {
         await (IAP as any).showManageSubscriptionsIOS()
@@ -481,7 +529,5 @@ export async function openNativeSubscriptionManagement(): Promise<PurchaseResult
     }
 
     throw new Error('Subscription management is not available on this device.')
-  } finally {
-    await IAP.endConnection().catch(() => {})
-  }
+  })
 }
