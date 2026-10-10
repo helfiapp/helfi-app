@@ -6,6 +6,7 @@ export const NUTRITION_FIELDS = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'f
 const text = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
 export const foodNutritionLookupName = (value: unknown) => text(value).replace(/\bwhole\s+(?!wheat\b|grain\b|grains\b|milk\b)/g, '')
 const tokens = (value: unknown) => foodNutritionLookupName(value).split(' ').filter((word) => word && !/^\d+$/.test(word) && !['a', 'an', 'the', 'of', 'estimated', 'serving'].includes(word))
+const sameFoodWord = (requested: string, actual: string) => requested === actual || actual === `${requested}s` || requested === `${actual}s`
 // A matching food word alone does not make preserved or processed food equivalent.
 // Plain photo ingredients must not inherit dried/canned/juice nutrition silently.
 const foodForms = [
@@ -18,6 +19,8 @@ const foodForms = [
   /\b(candied|sweetened|in syrup)\b/,
   /\b(jam|jelly|preserve|preserves)\b/,
   /\b(pickled)\b/,
+  /\b(frozen)\b/,
+  /\b(mixture|mix)\b/,
   /\b(babyfood|baby food|infant food)\b/,
   /\b(cereal|cereals)\b/,
   /\b(bread|breads)\b/,
@@ -28,13 +31,26 @@ const foodForms = [
   /\b(smoothie|smoothies)\b/,
 ]
 
+// Raab/rabe and Chinese broccoli are different vegetables, despite sharing
+// the word broccoli. Preparation and a common first word do not identify them.
+const broccoliSubtypes = [
+  /\b(broccoli (raab|rabe)|rapini)\b/,
+  /\b(chinese broccoli|broccoli chinese|gai lan)\b/,
+]
+const sameFoodSubtype = (requested: unknown, actual: unknown) => {
+  const requestedName = text(requested)
+  const actualName = text(actual)
+  return broccoliSubtypes.every(subtype => subtype.test(requestedName) === subtype.test(actualName))
+}
+
 // A word buried in another food's name is not its primary identity. USDA
 // category prefixes (e.g. Nuts, almonds) and preparation labels are metadata.
 export function isFoodPhotoCandidateIdentity(item: any, candidate: any): boolean {
+  if (!sameFoodSubtype(item.name, candidate.name)) return false
   const metadata = new Set(['raw', 'uncooked', 'cooked', 'grilled', 'roasted', 'roast', 'boiled', 'baked', 'fried', 'steamed', 'fresh', 'nuts', 'nut', 'seeds', 'seed', 'fish', 'fruits', 'fruit', 'vegetables', 'vegetable'])
   const requested = tokens(item.name).filter(word => !metadata.has(word))
   const first = tokens(candidate.name).find(word => !metadata.has(word))
-  return !!first && requested.some(word => first === word || first === `${word}s` || word === `${first}s`)
+  return !!first && requested.some(word => sameFoodWord(word, first))
 }
 
 export function nutritionCandidateScale(item: any, candidate: any): number | null {
@@ -42,9 +58,10 @@ export function nutritionCandidateScale(item: any, candidate: any): number | nul
   const requestedName = text(item.name)
   const actualName = text(candidate.name)
   if (foodForms.some(form => form.test(requestedName) !== form.test(actualName))) return null
+  if (!sameFoodSubtype(item.name, candidate.name)) return null
   const requested = tokens(item.name)
   const actual = tokens(candidate.name)
-  if (!requested.length || !requested.every((word) => actual.includes(word) || actual.includes(`${word}s`))) return null
+  if (!requested.length || !requested.every((word) => actual.some(actualWord => sameFoodWord(word, actualWord)))) return null
   const brand = text(item.brand)
   const candidateBrand = text(candidate.brand)
   if (brand ? candidateBrand !== brand : !!candidateBrand) return null

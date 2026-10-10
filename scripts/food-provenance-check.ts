@@ -8,6 +8,7 @@ import { foodNumberOrNull, hasCoreFoodNutrition } from '../lib/food/openfoodfact
 import { convertFoodAmount, parseFoodServing } from '../native/src/lib/foodUnits'
 import { Prisma } from '@prisma/client'
 import { usdaLibraryServingSize } from '../lib/food/usda-library'
+import { checkFoodPhotoIdentity } from './food-photo-identity-check'
 const item = { name: 'Chicken breast cooked', serving_size: '200 g', calories: null, protein_g: null, carbs_g: 0, fat_g: 0 }
 const candidate = { source: 'usda', id: '123', name: 'Chicken breast cooked', serving_size: '100 g', calories: 165, protein_g: 31, carbs_g: 1, fat_g: 3 }
 const filled = fillMissingNutrition(item, candidate)
@@ -49,6 +50,7 @@ const context: any = { mapFoodNutritionChecks, foodNumberOrNull, parseFoodServin
 vm.createContext(context)
 vm.runInContext(ts.transpileModule(declarations.join('\n') + '\nthis.calibrate = enrichItemsWithDatabaseIfOutlier; this.fill = enrichItemsWithFatSecretIfMissing; this.sanitize = sanitizeStructuredItems; this.total = computeTotalsFromItems;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, context)
 const run = async () => {
+  await checkFoodPhotoIdentity()
   const foodDataAst = ts.createSourceFile('food-data.ts', fs.readFileSync('lib/food-data.ts', 'utf8'), ts.ScriptTarget.Latest, true)
   const genericDeclaration = foodDataAst.statements.find(node => ts.isFunctionDeclaration(node) && node.name?.text === 'searchPhotoGenericLibrary')!
   assert.ok(genericDeclaration)

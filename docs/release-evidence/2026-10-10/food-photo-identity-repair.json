@@ -1,0 +1,212 @@
+{
+  "date": "2026-10-10",
+  "issue": "HEL-344",
+  "scope": "Food-photo record identity only; no database mutation, external provider or OpenAI call, browser test, deployment or store submission.",
+  "before": {
+    "actualHelperFailures": 5,
+    "failures": [
+      "Frozen egg mixture accepted for scrambled eggs",
+      "Correct singular whole egg record rejected for plural eggs",
+      "Broccoli raab accepted by portion/source gate",
+      "Broccoli raab accepted by primary identity gate",
+      "Chinese broccoli accepted for conventional broccoli"
+    ]
+  },
+  "sourceRecords": [
+    {
+      "fdcId": 170382,
+      "source": "usda_sr_legacy",
+      "name": "Broccoli raab, cooked",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 25,
+      "proteinG": 3.83,
+      "carbsG": 3.12,
+      "fatG": 0.52,
+      "fiberG": 2.8,
+      "sugarG": 0.62
+    },
+    {
+      "fdcId": 169392,
+      "source": "usda_sr_legacy",
+      "name": "Broccoli, chinese, cooked",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 22,
+      "proteinG": 1.14,
+      "carbsG": 3.81,
+      "fatG": 0.72,
+      "fiberG": 2.5,
+      "sugarG": 0.84
+    },
+    {
+      "fdcId": 169967,
+      "source": "usda_sr_legacy",
+      "name": "Broccoli, cooked, boiled, drained, without salt",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 35,
+      "proteinG": 2.38,
+      "carbsG": 7.18,
+      "fatG": 0.41,
+      "fiberG": 3.3,
+      "sugarG": 1.39
+    },
+    {
+      "fdcId": 172187,
+      "source": "usda_sr_legacy",
+      "name": "Egg, whole, cooked, scrambled",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 149,
+      "proteinG": 9.99,
+      "carbsG": 1.61,
+      "fatG": 10.98,
+      "fiberG": 0,
+      "sugarG": 1.39
+    },
+    {
+      "fdcId": 169904,
+      "source": "usda_sr_legacy",
+      "name": "Eggs, scrambled, frozen mixture",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 131,
+      "proteinG": 13.1,
+      "carbsG": 7.5,
+      "fatG": 5.6,
+      "fiberG": 0,
+      "sugarG": 7.5
+    }
+  ],
+  "after": {
+    "actualHelperFailures": 0,
+    "productionHelperQueryReadOnly": {
+      "readOnly": true,
+      "actualProductionQuery": true,
+      "maxResults": 20,
+      "checks": [
+        {
+          "item": {
+            "name": "Scrambled eggs",
+            "serving_size": "Approximately 120g; egg count not discernible"
+          },
+          "elapsedMs": 289.687,
+          "candidateCount": 3,
+          "accepted": [
+            {
+              "source": "usda",
+              "id": "172187",
+              "name": "Egg, whole, cooked, scrambled",
+              "brand": null,
+              "serving_size": "100 g",
+              "calories": 149,
+              "protein_g": 9.99,
+              "carbs_g": 1.61,
+              "fat_g": 10.98,
+              "fiber_g": 0,
+              "sugar_g": 1.39
+            }
+          ]
+        },
+        {
+          "item": {
+            "name": "Cooked broccoli",
+            "serving_size": "Approximately 85g, about 1/2 cup"
+          },
+          "elapsedMs": 101.506,
+          "candidateCount": 14,
+          "accepted": [
+            {
+              "source": "usda",
+              "id": "168510",
+              "name": "Broccoli, cooked, boiled, drained, with salt",
+              "brand": null,
+              "serving_size": "100 g",
+              "calories": 35,
+              "protein_g": 2.38,
+              "carbs_g": 7.18,
+              "fat_g": 0.41,
+              "fiber_g": 3.3,
+              "sugar_g": 1.39
+            },
+            {
+              "source": "usda",
+              "id": "169967",
+              "name": "Broccoli, cooked, boiled, drained, without salt",
+              "brand": null,
+              "serving_size": "100 g",
+              "calories": 35,
+              "protein_g": 2.38,
+              "carbs_g": 7.18,
+              "fat_g": 0.41,
+              "fiber_g": 3.3,
+              "sugar_g": 1.39
+            }
+          ]
+        }
+      ]
+    },
+    "actualRouteFixture": {
+      "inputPortions": [
+        "Approximately 120g; egg count not discernible",
+        "Approximately 85g, about 1/2 cup"
+      ],
+      "sourceRecordIds": [
+        "172187",
+        "169967"
+      ],
+      "scaledCalories": [
+        179,
+        30
+      ],
+      "externalCalls": 0,
+      "estimatedPortionsRetained": true,
+      "unknownVersusZeroRetained": true,
+      "incompatibleOnlyCandidateLeavesEstimateWithoutFalseAttribution": true,
+      "wrongLocalCandidateUsesCompatibleProviderFallback": true
+    }
+  },
+  "checks": [
+    {
+      "command": "npm run check:food-provenance",
+      "result": "PASS, includes new recorded-identity regression in required existing prebuild check"
+    },
+    {
+      "command": "npm run check:food-photo-model",
+      "result": "PASS"
+    },
+    {
+      "command": "TS_NODE_COMPILER_OPTIONS commonjs/node ts-node scripts/food-photo-identity-check.ts",
+      "result": "PASS with typechecking enabled"
+    },
+    {
+      "command": "npm run check:page-locks",
+      "result": "PASS 278"
+    },
+    {
+      "command": "npm --prefix native run check:page-locks",
+      "result": "PASS 79"
+    },
+    {
+      "command": "git diff --check scoped files",
+      "result": "PASS"
+    }
+  ],
+  "limits": [
+    "Correcting source identity does not certify estimated photo portions or whole-meal calorie accuracy.",
+    "Only offline route/source regression and read-only real saved-library query were performed; root owns production build and live verification.",
+    "Conventional salted/unsalted cooked broccoli records have identical tracked nutrients; sodium is not among the six nutrient fields."
+  ],
+  "changedFiles": [
+    "lib/food/nutrition-provenance.ts",
+    "scripts/food-provenance-check.ts",
+    "scripts/food-photo-identity-check.ts"
+  ],
+  "rootValidation": {
+    "productionBuild": "npm run build; session41124 exit0; all required prebuild checks included",
+    "webLocks": "278 PASS",
+    "nativeLocks": "79 PASS",
+    "scope": "Food source identity only; no route/model/billing/database mutation or native signing changes included"
+  }
+}
