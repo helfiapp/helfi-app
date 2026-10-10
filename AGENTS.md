@@ -16,12 +16,12 @@ Do not use or recreate `AGENT_START_HERE.md` or `AGENT_HANDOVER_MESSAGE.md`.
 
 ## Local Secret Backup (macOS Keychain)
 
-Production secrets must never be stored in repo files. Some values are backed up in macOS Keychain so future agents can restore Vercel env vars without recreating keys.
+Production secrets must never be stored in repo files. Some values are backed up in macOS Keychain so future agents can restore production settings in the current AWS account without recreating keys. Historical Keychain item names remain unchanged.
 
 Rules:
 - Never paste secret values into chat, Linear, docs, screenshots, logs, or commits.
 - Never print secret values in terminal output.
-- Use Keychain Access or the macOS `security` command only when restoring a value into the real account or Vercel UI.
+- Use Keychain Access or the macOS `security` command only when restoring a value into the real production account UI. Do not recreate the removed Vercel project.
 - For OpenAI, keep following the warning above. Do not use the saved key for direct OpenAI scripts or one-off tests.
 
 Known Keychain items:
@@ -29,11 +29,35 @@ Known Keychain items:
 - `HELFI_ENV_APPLE_IAP_BUNDLE_ID` account `helfi-production`
 - `HELFI_ENV_GOOGLE_PLAY_PACKAGE_NAME` account `helfi-production`
 - `HELFI_ENV_STRIPE_PRICE_PRACTITIONER_LISTING` account `helfi-production`
+- `HELFI_AWS_AGENT_ACCESS_KEY_ID` account `helfi-production`
+- `HELFI_AWS_AGENT_SECRET_ACCESS_KEY` account `helfi-production`
+
+## AWS Agent Access
+
+- Future agents do not need the owner to sign in to AWS for normal Helfi hosting work.
+- AWS CLI profile: `helfi-agent`
+- Default AWS region: `ap-southeast-2` (Sydney)
+- Use commands such as: `aws --profile helfi-agent amplify list-apps`
+- The profile reads its credentials from macOS Keychain through `/Users/louieveleski/.local/bin/helfi-aws-credentials`.
+- Never run that credential helper directly, print its output, or copy its values into repo files, chat, logs, screenshots, Linear, or documentation.
+- The IAM identity is `helfi-codex-deployer` with broad deployment access but no AWS console password and no permission to manage IAM users or the AWS account.
 
 ## Communication Rules
 
 1. The owner is not a developer or coder. Always respond in simple, easy-to-understand English and avoid technical language.
 2. Never assume technical knowledge. Explain things as if the reader is computer illiterate.
+
+### Completion and Release Work (Owner instruction, 10 October 2026)
+
+- Carry authorised Helfi work through repair, meaningful testing, verified deployment and the requested Apple/Google submission. A status report or plan is not a replacement for doing the work.
+- Do not use the words "unfinished" or "blocked" in messages to the owner. Report concrete results, the specific remaining action and what you are doing to resolve it. Internal tool/status names may retain their required spelling.
+- Do not hide failures, invent test results or claim submission/approval without evidence. State exactly what has been verified.
+- Reuse prior authorisation. Do not repeatedly ask for routine sign-in, repairs, builds, uploads or submissions already requested in this conversation. Use the saved account-access procedure below.
+- When a method fails, diagnose it and try a supported alternative within the authorised scope. Continue independent work while an exact personal action is pending; do not treat one unavailable step as a reason to stop all release work.
+- The owner explicitly authorises additional agents for this Helfi audit/release. Delegate separate tasks when it improves completion. The primary agent owns integration and all deployments; agree file ownership before edits and do not let delegated agents deploy or overwrite shared files independently.
+- Ask only when an observed step genuinely needs a human, or an applicable tool policy requires action-time confirmation. Present the concrete prepared result, exact action and reason; avoid generic permission requests. Do not bypass authentication, legal confirmations or browser security protections.
+- Apply the actual confirmation mode documented by the current browser tool. The owner’s specific request to repair and submit Helfi authorises accurate routine listing changes, review notes, build uploads and submissions where pre-approval is permitted. Do not invent a fresh approval requirement for every form. Binding terms, new sensitive account access and permanent deletion still require the exact confirmation specified by tool policy.
+- Avoid speculative completion dates. Give an estimate only when supported by the actual remaining work or store-provided review information.
 
 ## Quick Handover File
 
@@ -50,6 +74,21 @@ Browser rules:
 - If the already-open browser cannot be controlled, stop and tell the owner instead of opening another browser.
 - It is OK to open a new tab in that same browser when needed.
 - Agents may use logged-in browser sessions for Helfi, Linear, App Store Connect, Gmail, and related project checks.
+
+### Agent Account Access (Owner instruction, 10 October 2026)
+
+Handle routine Helfi account access yourself. Before asking the owner to sign in, read `/Users/louieveleski/.codex/skills/helfi-account-access/SKILL.md` and verify the actual existing browser session.
+
+- Check already-open Chrome tabs first. Use `browser.user.openTabs()` and claim the exact returned object; `browser.tabs.list()` alone misses owner tabs.
+- Helfi user, Helfi admin, Apple and Google Play are separate sessions. A blocked API URL or automation error does not prove the owner is logged out. Recover the supported controls or observe actual responses from normal UI activity; do not bypass browser restrictions.
+- For an actually expired Helfi web/native test login, use the private `NATIVE_TEST_EMAIL` / `NATIVE_TEST_PASSWORD` settings through the normal login UI. Do not print environment files or credentials.
+- Reuse the admin's remembered session. An initial QR/login view can appear briefly during renewal; wait for renewal before declaring a logout. Keep password/authenticator and account-revocation checks intact.
+- Apple: read `/Users/louieveleski/.codex/skills/log-in-helfi-app-store-connect/SKILL.md`. The password for `helfiweb@gmail.com` is saved in **Google Password Manager**. Use normal saved-entry autofill; never reveal/copy/export the password. The in-field LastPass icon is a separate manager.
+- Google Play: reuse Global 22 / Helfi and the saved Google login if recovery is genuinely needed. AWS: use `helfi-agent`; Linear: use the existing Helfi Dev connection. Do not ask for invitations or unrelated logins.
+- Collect required account diagnostics yourself where supported. Ask only for a specific unavoidable personal step, such as Touch ID or a new device approval, explaining the observed prompt and attempted recovery.
+- Preserve sessions and unfinished forms. Never clear cookies, log accounts out, reset credentials/authenticators or weaken authentication to make access easier.
+
+Future agents on this Mac must follow this procedure and re-check live account state instead of repeating old login requests.
 
 Email rules:
 - Agents may read/search Apple Mail for project-related emails and status checks.
@@ -127,7 +166,7 @@ If Linear shows the default columns instead (this is OK):
 - Move your ticket to `Ready to deploy`.
 - If ANY other ticket is already in `Ready to deploy`, you MUST NOT deploy yet. Wait and comment that you are waiting.
 
-3. After your deploy is confirmed READY in Vercel:
+3. After the exact deployment succeeds in AWS Amplify and both live domains are verified:
 - Move your ticket to `Deployed`.
 - Add the required `DEPLOYED:` note at the TOP of `CURRENT_ISSUES_LIVE.md` (template is below in this file).
 
@@ -193,20 +232,11 @@ Important:
 
 ## Mandatory Pre-Deployment Checklist
 
-0. Use Vercel access: You have full Vercel access via token. Inspect deployments/logs in Vercel, and do not report "done" until the deployment is READY. If you see ERROR, open the Vercel deployment logs, fix the issue, redeploy, and re-check until green.
+0. Use AWS access: production is Amplify app `d2n4u4zm85ooe`, branch `master`, region `ap-southeast-2`, CLI profile `helfi-agent`. Vercel was removed on 8 September 2026; do not recreate/relink it, request Vercel login, or use old Vercel verification scripts. Inspect only appropriately filtered, secret-safe build diagnostics. Resolve failed deployments before reporting success.
 
 Before pushing ANY code changes to GitHub, you MUST:
 
-1. Verify Deployment Status: After pushing code, ALWAYS check deployment status before claiming changes are live
-   - Run: ./scripts/check-deployment-status.sh
-   - Or check manually: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
-   - The script now also verifies `helfi.ai` and `www.helfi.ai` both point to the newest READY deployment
-   - If it reports live-domain mismatch, run:
-     - `vercel alias set <latest-deployment-url> helfi.ai`
-     - `vercel alias set <latest-deployment-url> www.helfi.ai`
-     - Then rerun `./scripts/check-deployment-status.sh`
-   - NEVER tell the user "changes are live" without verifying deployment succeeded
-   - Only report success when deployment state is READY
+1. Verify Deployment Status: after pushing code, identify the AWS Amplify job for the exact pushed commit. Wait for its BUILD, DEPLOY and VERIFY steps to succeed, then confirm `helfi.ai` and `www.helfi.ai` serve the new deployment through CloudFront. Never claim changes are live from Git push alone. Follow DEPLOYMENT_PROTOCOL.md for the current commands.
 
 2. Read Deployment Protocol: Review DEPLOYMENT_PROTOCOL.md for full deployment procedures
 
@@ -243,13 +273,13 @@ Before pushing ANY code changes to GitHub, you MUST:
 
 ## Quick Reference
 
-- Deployment Status Script: ./scripts/check-deployment-status.sh
-- Deployment Protocol: DEPLOYMENT_PROTOCOL.md
+- Deployment verification: AWS Amplify exact-commit job and both live domains
+- Deployment Protocol: DEPLOYMENT_PROTOCOL.md (AWS; old Vercel scripts are obsolete)
 - Protected Code Areas:
   - WAITLIST_EMAIL_PROTECTION.md (read before modifying email code)
   - HEALTH_SETUP_PROTECTION.md (read before modifying health setup / onboarding / insights code)
   - GUARD_RAILS.md (read before touching Food Analyzer, food diary loading, or credit/billing system)
-- Vercel Dashboard: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
+- AWS Amplify app: `d2n4u4zm85ooe`, `master`, Sydney; use profile `helfi-agent`
 - Project Name: helfi-app
 - Team ID: team_DLxtczVMOZUXhiInxhTSDrCs
 - Food Analyzer Canary: run CANARY_AUTH_COOKIE="next-auth.session-token=..." node scripts/canary-food-analyzer.js (optionally set CANARY_BASE_URL) to verify multi-item breakdown still works.
@@ -261,15 +291,11 @@ Before pushing ANY code changes to GitHub, you MUST:
 # 1. Push your changes
 git push origin master
 
-# 2. Wait a few seconds for deployment to start
+# 2. Find the job for the exact pushed commit
+aws --profile helfi-agent --region ap-southeast-2 amplify list-jobs --app-id d2n4u4zm85ooe --branch-name master --max-results 5 --query 'jobSummaries[].{id:jobId,commit:commitId,status:status}'
 
-# 3. Check deployment status (script waits until completion)
-./scripts/check-deployment-status.sh
+# 3. Inspect that job until all steps succeed (replace JOB_ID)
+aws --profile helfi-agent --region ap-southeast-2 amplify get-job --app-id d2n4u4zm85ooe --branch-name master --job-id JOB_ID --query 'job.{summary:summary.{id:jobId,commit:commitId,status:status},steps:steps[].{name:stepName,status:status}}'
 
-# Optional troubleshooting only (run only if owner asks for rename diagnostics):
-RUN_RENAME_GUARD=1 CANARY_AUTH_COOKIE="next-auth.session-token=..." ./scripts/check-deployment-status.sh
-
-# 4. Script will only exit when deployment is READY or ERROR
-#    It also verifies helfi.ai/www.helfi.ai alias mapping.
-#    DO NOT report "deployment in progress" - wait for script to complete
+# 4. Verify both live domains as described in DEPLOYMENT_PROTOCOL.md.
 ```

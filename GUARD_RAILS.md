@@ -2101,12 +2101,13 @@ Agents **must NOT**:
 - Disable billing by flipping booleans such as `BILLING_ENFORCED` to `false`
   without explicit written approval from the user.
 - Change how remaining credits are calculated or displayed (wallet vs. legacy
-  credits) without:
-  - First asking the user for permission, and
-  - Gathering live JSON from:
-    - `https://helfi.ai/api/credit/status`
-    - `https://helfi.ai/api/credit/feature-usage`
-    - `https://helfi.ai/api/credit/usage-breakdown`
+  credits) without the owner's authorisation and verified account evidence.
+  Reuse explicit authorisation already given; do not ask again solely because
+  this section historically said to ask first. Collect actual status and
+  feature-usage responses and, where accessible, usage-breakdown. If an unused
+  diagnostic endpoint is unavailable through supported browser controls,
+  record that limitation and corroborate with read-only wallet/counter/usage
+  records. Do not bypass browser restrictions or change billing from guesses.
 - Edit the main Food Analyzer logic in `app/food/page.tsx` (analysis flow,
   ingredient cards, serving controls, nutrition totals, or diary history)
   unless the user has clearly requested a change to that specific behaviour.
@@ -2115,11 +2116,22 @@ Agents **must NOT**:
 
 If credits or usage counters ever look wrong, agents must:
 
-1. **Do not touch the Food Analyzer or credit code first.**
-2. Ask the user (in simple language) to open the three credit APIs in their
-   browser while logged in and paste the JSON (status, feature-usage,
-   usage-breakdown).
-3. Use those responses to diagnose the issue before proposing any code changes.
+1. Diagnose the real failure before changing the Food Analyzer or credit code.
+2. Collect actual live status and feature-usage responses yourself through the
+   owner's existing authenticated browser, following AGENTS.md's Agent Account
+   Access instructions. Also collect usage-breakdown where supported. If direct
+   navigation fails, use supported observation of actual responses from normal
+   UI activity where available. Never inspect/export cookies or tokens, inject
+   fetches or bypass browser restrictions. An unavailable diagnostic page is
+   not proof of an expired login and does not require the owner to repeat login.
+3. If a diagnostic response cannot be obtained, record exactly which one and
+   why. Corroborate the available responses with read-only authoritative account
+   wallet/counter/usage records before any charging or display change. Continue
+   other authorised work; do not treat that missing diagnostic alone as a reason
+   to abandon a supported repair. Never change the credit price or disable
+   enforcement as a runtime workaround.
+4. Explain the diagnosed repair in plain English and verify successful result
+   delivery, failures, retries and exactly-once charging as applicable.
 
 Only after following the above and explaining the exact plan in plain English
 may an agent change any of the protected files in this section.

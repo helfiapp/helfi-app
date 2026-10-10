@@ -1,188 +1,63 @@
 # Helfi Deployment Protocol
 
-This checklist must be followed before running any production deployment for the
-Helfi app. The goal is to guarantee we deploy with the correct Vercel account
-and project every time and eliminate any chance of publishing to the EPG CRM
-environment.
+Production is AWS Amplify app `d2n4u4zm85ooe`, branch `master`, in Sydney (`ap-southeast-2`). The Vercel project was removed on 8 September 2026. Do not recreate it, request Vercel credentials or use the old Vercel deployment/status scripts.
 
----
+## Complete one authorised task at a time
 
-> **Zero tolerance warning**
->
-> Helfi and EPG-CRM must remain completely isolated. Under no circumstances may
-> anyone create, link, or deploy an `epg-crm` project from this machine or this
-> repository. If the Vercel CLI ever prompts you to create a new project or
-> links to anything other than the Helfi IDs listed below, stop immediately,
-> log out, and fix the link. Document any incident in CURRENT_ISSUES_LIVE.md.
+Use only `/Volumes/U34 Bolt/HELFI APP/helfi-app`. Follow AGENTS.md, GUARD_RAILS.md and the notes for the changed area. Claim one Helfi Dev Linear issue and describe the exact scope. The primary agent coordinates deployments when agents work in parallel. Do not deploy another agent's pending work or use blanket `git add -A`.
 
-## Fast Path: GitHub Push Auto‑Deploy (Preferred)
-- Production deploys are triggered automatically by pushing to the `master` branch on GitHub.
-- Do NOT ask the user for Vercel auth or tokens to deploy. Use Git instead.
-- Steps:
-  1. Commit your changes locally.
-  2. Push to `origin master`.
-  3. **MANDATORY**: Check deployment status using Vercel API before claiming changes are live.
-  4. **NEVER** tell the user "changes are live" or "deployment complete" without verifying the deployment succeeded.
-  5. If deployment fails, fix the issue and redeploy before reporting success.
+The owner has authorised the current audit repairs, app checks and Apple/Google submissions. Use that authorisation for routine work; do not ask again for normal account access, builds or already-requested submissions. Report concrete verified results. Preserve data, credentials, authentication and applicable personal/action-time confirmation requirements.
 
-### If you are a GPT-5 Codex agent (required quick path)
-- **Always** use the Git push flow above (`git add -A && git commit ... && git push origin master`). This is the only supported production trigger.
-- Do **not** attempt to deploy with `npx vercel` unless the Git pipeline is broken and you have explicit approval.
-- Do **not** request or regenerate Vercel tokens; they are not needed for the Git-based deploy.
-- The Vercel dashboard should show the new deployment immediately after the push; wait for `READY` before reporting success.
-- If CLI auth prompts appear, stop and fall back to Git push (no CLI deploy).
+## Before pushing
 
-### ⚠️ CRITICAL: Deployment Status Verification
+1. Review the exact diff and exclude unrelated changes. Preserve other agents' work.
+2. Run meaningful checks for the change and the required production build.
+3. Run `npm run check:page-locks` and `npm --prefix native run check:page-locks`. Only refresh the exact owner-approved file snapshots after verification.
+4. Retain protected food rename behaviour, credit enforcement, AI consent and account isolation. Never wipe or reset live data. Read the relevant protection notes first.
+5. Move the scoped Linear issue to Ready to deploy (or Todo with the matching label). If another issue is already there, coordinate with its owner rather than deploying concurrently.
+6. Stage only reviewed files, commit that one task and push `origin master`. A successful push is not evidence that the site changed.
 
-**ALL AGENTS MUST VERIFY DEPLOYMENT STATUS BEFORE CLAIMING SUCCESS**
+## Verify the exact AWS job
 
-After pushing to GitHub, you MUST check the deployment status using the Vercel API:
+AWS access is already configured through profile `helfi-agent`. Its Keychain credential helper must never be run directly or printed. Do not request console login for ordinary hosting work.
 
-1. **Get the latest deployment**:
-   ```bash
-   # Using Vercel API (requires VERCEL_TOKEN from STRIPE_PRODUCTS_DOCUMENTATION.md)
-   curl -H "Authorization: Bearer $VERCEL_TOKEN" \
-     "https://api.vercel.com/v6/deployments?projectId=prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7&limit=1"
-   ```
-
-2. **Check deployment state**:
-   - `state: "READY"` = ✅ Success - deployment is live
-   - `state: "BUILDING"` = ⏳ Still building - wait and check again
-   - `state: "ERROR"` = ❌ Failed - check build logs and fix issues
-   - `state: "QUEUED"` = ⏳ Waiting - check again shortly
-
-3. **If deployment failed**:
-   - Check the build logs in the API response or Vercel dashboard
-   - Fix any errors (missing files, syntax errors, etc.)
-   - Commit fixes and push again
-   - Verify the new deployment succeeds before reporting to user
-
-4. **Only report success when**:
-   - Deployment state is `"READY"`
-   - Build completed without errors
-   - You have verified the deployment URL is accessible
-
-**Verification Methods**:
-
-1. **Using the helper script** (recommended - WAITS until deployment completes):
-   ```bash
-   ./scripts/check-deployment-status.sh
-   ```
-   **IMPORTANT**: This script will wait until deployment is READY or ERROR, and it now also verifies `helfi.ai` + `www.helfi.ai` point to that newest READY deployment. Do NOT report "deployment in progress" - wait for completion.
-   If it reports a live-domain mismatch, run:
-   ```bash
-   vercel alias set <latest-deployment-url> helfi.ai
-   vercel alias set <latest-deployment-url> www.helfi.ai
-   ./scripts/check-deployment-status.sh
-   ```
-   - Optional only (run only if owner asks for rename diagnostics):
-   ```bash
-   RUN_RENAME_GUARD=1 CANARY_AUTH_COOKIE="next-auth.session-token=..." ./scripts/check-deployment-status.sh
-   ```
-   - You can use `CANARY_STORAGE_STATE=playwright/.auth/<file>.json` instead of `CANARY_AUTH_COOKIE`.
-
-2. **Using Vercel API** (if script doesn't work, try API directly):
-   ```bash
-   VERCEL_TOKEN="2MLfXoXXv8hIaHIE7lQcdQ39"
-   curl -s -H "Authorization: Bearer $VERCEL_TOKEN" \
-     "https://api.vercel.com/v6/deployments?project=helfi-app&teamId=team_DLxtczVMOZUXhiInxhTSDrCs&limit=1"
-   ```
-
-3. **Manual check** (fallback if API doesn't work):
-   - Visit: https://vercel.com/louie-veleskis-projects/helfi-app/deployments
-   - Check the latest deployment status
-   - Only report success if status shows "Ready" (green checkmark)
-   - If status shows "Error" (red X), check build logs, fix issues, and redeploy
-
-Example commands:
-```bash
-git add -A
-git commit -m "Deploy: <short summary>"
-git push origin master
-```
-
-If you only changed documentation or configuration, this same flow applies.
-
-## 1. Confirm CLI Identity
-- Run `npx vercel whoami`.
-- Expected output: `helfiweb@gmail.com`.
-- If the output is anything else, stop immediately: run `npx vercel logout` and
-  then `npx vercel login` using the Helfi email.
-
-## 2. Verify Project Link (No EPG-CRM Allowed)
-- Ensure `.vercel/project.json` exists in the repo.
-- Run `cat .vercel/project.json`.
-- Confirm both values:
-  - `projectId`: `prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7` (current Helfi project ID).
-  - `orgId`: `team_pPRY3znvYPSvqemdfOEf3vAT` (Louie Veleski's projects team).
-- If the file is missing or IDs differ, re-link with `npx vercel link` and
-  choose **Louie Veleski’s projects → helfi-app**.
-- If the CLI shows a different project/org ID, or offers to create a new
-  project (especially anything labelled `epg-crm`), choose **Cancel**, run
-  `npx vercel logout`, and re-authenticate with the Helfi account.
-- Never run `vercel --prod` while the CLI is prompting to create a new project.
-
-## CLI Deploy (Fallback Only)
-- Use the Vercel CLI only if you specifically need to test a build from this machine and GitHub push is not an option.
-- If the CLI shows `Error: Could not retrieve Project Settings`:
-  - Prefer the GitHub push auto‑deploy path above.
-  - If you must use CLI, re‑link safely: `npx vercel link` → choose Louie Veleski’s projects → helfi-app. Verify IDs match below before running `npx vercel --prod`.
-  - Never create a new project or link anything labelled `epg-crm`.
-
-## 3. (Optional) Quick Link Sanity Check
-- `npx vercel link --confirm`
-- This command restates the existing link. If it errors, resolve the link
-  before deploying.
-
-## 4. Deployment Command
-- After passing the checks above, run `npx vercel --prod` from the repo root.
-- Watch the CLI output. The deployment URL must follow the pattern
-  `helfi-*.vercel.app` under `louie-veleskis-projects`.
-
-## 5. Post-Deploy Verification
-- Visit the live Helfi domain and smoke-test the area you changed.
-- Update CURRENT_ISSUES_LIVE.md, AGENT_TRACKING_SYSTEM.md, and the
-  EXIT_VERIFICATION_CHECKLIST.md as required by the broader protocol.
-
-## 5.1 Food Rename Area Is Locked (No Routine Canary)
-- Food Diary / Favorites / Custom rename paths are treated as locked and stable.
-- Agents must not change rename code unless the owner gives explicit written approval first.
-- Do not run rename canary on every deploy.
-- Rename canary is optional troubleshooting only, and should run only when owner asks to diagnose rename behavior:
-  - `CANARY_AUTH_COOKIE=\"next-auth.session-token=...\" ./scripts/check-rename-guard.sh`
-  - or `CANARY_STORAGE_STATE=\"playwright/.auth/<file>.json\" ./scripts/check-rename-guard.sh`
-
----
-
-### Keep Environments Isolated
-- Do not log into the EPG CRM Vercel account from this OS user profile. Use a
-  separate OS account, VM, or container if you must work on both projects.
-- Never delete `.vercel/project.json` from this repository.
-- If you clone the repo onto a new machine, run through steps 1–2 before the
-  first deployment.
-- If you ever discover an `epg-crm` project in this account or repo, delete the
-  link immediately, notify the team, and append a note to the deployment log so
-  future agents understand the remediation steps.
-
----
-
-### Quick Shell Script (optional)
-You can add the following helper script locally (not checked in) to automate
-the pre-flight check:
+Find the job for the exact pushed commit:
 
 ```bash
-#!/usr/bin/env bash
-npx vercel whoami | grep -q 'helfiweb@gmail.com' || {
-  echo '✖ Wrong Vercel account. Run `npx vercel logout` and log in again.'
-  exit 1
-}
-
-grep -q 'prj_0QdxIeqz4oIUEx7aAdLrsjGsqst7' .vercel/project.json || {
-  echo '✖ .vercel/project.json does not point to the Helfi project.'
-  exit 1
-}
-
-echo '✅ Ready to deploy'
+aws --profile helfi-agent --region ap-southeast-2 amplify list-jobs --app-id d2n4u4zm85ooe --branch-name master --max-results 5 --query 'jobSummaries[].{id:jobId,commit:commitId,status:status}'
 ```
 
-Run it before `npx vercel --prod` to enforce the checks automatically.
+Inspect the matching job, replacing `JOB_ID` with its actual identifier:
+
+```bash
+aws --profile helfi-agent --region ap-southeast-2 amplify get-job --app-id d2n4u4zm85ooe --branch-name master --job-id JOB_ID --query 'job.{summary:summary.{id:jobId,commit:commitId,status:status},steps:steps[].{name:stepName,status:status}}'
+```
+
+Wait for BUILD, DEPLOY and VERIFY to succeed. If a step fails, inspect secret-safe diagnostics, fix the cause, redeploy the same task and verify again. Do not print raw secret-bearing environment values, signed log URLs, provider URLs containing keys, or unfiltered server logs. Keep progress updates useful while checks run.
+
+## Verify production behaviour
+
+- Confirm both `https://helfi.ai` and `https://www.helfi.ai` load successfully through CloudFront after the exact job succeeds. Compare deployment identity/cache evidence with the previous version where relevant.
+- Test the changed behaviour through the existing authorised browser/native account. Use the saved account-access skill rather than requesting fresh logins.
+- Check cross-device goals/targets if those paths changed. Validate save/reopen and unknown-versus-zero nutrients for food changes where relevant.
+- Move the scoped issue to Deployed/Done only for work actually verified. Keep the overall store objective distinct from individual deployed fixes.
+- Add this note at the top of CURRENT_ISSUES_LIVE.md:
+
+```text
+DEPLOYED:
+- LIVE or STAGING:
+- Date/time:
+- What changed:
+- Where to see it (page/link):
+- What to quickly test:
+```
+
+## Store submissions
+
+Apple and Google uploads are separate from the website deployment. Verify the exact source, signed binary, package/bundle identity, release checks, account/team, listing assets and metadata before submission. Record the actual upload/processing/submission status. Do not describe a simulator build as a signed store upload or a submission as store approval.
+
+Use the existing Global 22 store sessions and saved logins. Delegate separate preparation tasks when useful, with one integration owner. Ask the owner only for a specific observed personal step or required action-time confirmation, after preparing a concrete reviewable action.
+
+## Protected rename checks
+
+Food Diary/Favorites/Custom rename paths remain protected. Do not change them without the owner's explicit request for that behaviour. Rename diagnostics are optional and run only when the owner requests them; do not perform them routinely or export browser authentication values.
