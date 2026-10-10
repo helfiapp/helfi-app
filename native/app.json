@@ -42,7 +42,7 @@
       "permissions": [
         "RECORD_AUDIO"
       ],
-      "versionCode": 39
+      "versionCode": 40
     },
     "web": {
       "favicon": "./assets/favicon.png"

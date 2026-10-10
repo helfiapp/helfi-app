@@ -962,7 +962,9 @@ const extractComponentsFromDelimitedText = (raw: string | null | undefined): str
 
 const extractComponentsFromAnalysis = (analysis: string | null | undefined): string[] => {
   if (!analysis) return [];
-  const cleaned = analysis.replace(/\s+/g, ' ').trim();
+  // Components is a line, not the following nutrition summary. Collapsing
+  // its newline makes the last ingredient look like nutrition metadata.
+  const cleaned = analysis.replace(/\r\n?/g, '\n').replace(/[^\S\n]+/g, ' ').trim();
   if (!cleaned) return [];
 
   const extractExtraComponentsFromText = (text: string): string[] => {
@@ -4707,7 +4709,7 @@ CRITICAL REQUIREMENTS:
       wantStructured &&
       !packagedMode &&
       !labelScan &&
-      !itemsCanCreateCards(resp.items)
+      (!itemsCanCreateCards(resp.items) || !itemsCoverComponentList(resp.items, listedComponents))
     ) {
       try {
         console.warn('⚠️ Analyzer: running final card-ready image repair.');
@@ -4759,7 +4761,7 @@ CRITICAL REQUIREMENTS:
           parsed && !Array.isArray(parsed) && typeof (parsed as any).total === 'object'
             ? (parsed as any).total
             : null;
-        if (itemsCanCreateCards(items)) {
+        if (itemsCanCreateCards(items) && itemsCoverComponentList(items, listedComponents)) {
           resp.items = items;
           resp.total = total || computeTotalsFromItems(resp.items) || resp.total || null;
           itemsSource = itemsSource === 'none' ? 'card_ready_image_repair' : `${itemsSource}+card_ready_image_repair`;
@@ -4812,6 +4814,16 @@ CRITICAL REQUIREMENTS:
         },
         { status: 502 },
       );
+    }
+
+    // A partial ingredient list must not become a successful, charged result.
+    // Repair only from the model's visible-food evidence, never guessed extras.
+    if (isImageAnalysis && wantStructured && !packagedMode && !labelScan &&
+        !itemsCoverComponentList(resp.items, listedComponents)) {
+      return NextResponse.json({
+        error: 'The photo result missed a visible ingredient. Please try the photo again. No credits were used.',
+        code: 'FOOD_COMPONENTS_MISSING',
+      }, { status: 502 });
     }
 
     // Packaged mode: skip secondary OpenAI per-serving extraction to keep one API call per analysis.

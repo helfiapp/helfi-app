@@ -4539,6 +4539,7 @@ export function TrackCaloriesScreen() {
         return
       }
 
+      void loadAll({ silent: true })
       const foundItems = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
       if (foundItems.length > 0) {
         appendItemsToFavoriteEditor(foundItems.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)))
@@ -4956,6 +4957,7 @@ export function TrackCaloriesScreen() {
         return
       }
 
+      void loadAll({ silent: true })
       const items = Array.isArray(data?.items) ? data.items.filter(isUsableAnalyzedFood) : []
       const summary = data?.food || data || {}
       const reviewItems = items.length ? items : isUsableAnalyzedFood(summary) ? [{
@@ -7900,19 +7902,8 @@ export function TrackCaloriesScreen() {
                     ? 'These update live when you change ingredient amounts.'
                     : 'This meal is 100% of the full amount.'}
                 </Text>
-                <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
-                  {[
-                    `${Math.round(favoriteEditTotals.calories)} kcal`,
-                    `${formatNutrientGrams(favoriteEditTotals.protein)} g protein`,
-                    `${formatNutrientGrams(favoriteEditTotals.carbs)} g carbs`,
-                    `${formatNutrientGrams(favoriteEditTotals.fat)} g fat`,
-                    `${formatNutrientGrams(favoriteEditTotals.fiber)} g fibre`,
-                    `${formatNutrientGrams(favoriteEditTotals.sugar)} g sugar`,
-                  ].map((value) => (
-                    <View key={value} style={{ borderRadius: 999, borderWidth: 1, borderColor: '#A7F3D0', backgroundColor: theme.colors.card, paddingHorizontal: 10, paddingVertical: 6 }}>
-                      <Text style={{ color: theme.colors.muted, fontSize: 11, fontWeight: '700' }}>{value}</Text>
-                    </View>
-                  ))}
+                <View style={{ marginTop: 10 }}>
+                  <NutrientCards energyUnit={energyUnit} values={favoriteEditTotals} />
                 </View>
                 <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 10 }}>
                   {mealBuilderOpen && !favoriteEditItem

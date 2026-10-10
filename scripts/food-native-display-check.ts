@@ -5,7 +5,7 @@ import ts from 'typescript'
 import { execFileSync } from 'node:child_process'
 import * as nutrients from '../native/src/lib/nutrientValues'
 
-// Run the actual saved meal sum, summary labels and responsive six-card
+// Run the actual saved meal sum, top summary and responsive six-card
 // component. Synthetic render width only; no network, credentials or writes.
 const baseline = process.argv.includes('--baseline')
 function source(path: string) {
@@ -19,13 +19,13 @@ const context = vm.createContext({ ...nutrients, Text: 'Text', View: 'View', use
 function evaluate(text: string) {
   return vm.runInContext(ts.transpile(text, { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), context)
 }
-let summaryLabels: ts.ArrayLiteralExpression | undefined
+let summaryCards: ts.JsxSelfClosingElement | undefined
 let inputValue: ts.Expression | undefined
 function bind(name: string) {
   let found: ts.FunctionDeclaration | undefined
   function visit(node: ts.Node) {
     if (ts.isFunctionDeclaration(node) && node.name?.text === name) found = node
-    if (ts.isArrayLiteralExpression(node) && node.getText(screen).includes('formatNutrientGrams(favoriteEditTotals.fat)')) summaryLabels = node
+    if (!summaryCards && ts.isJsxSelfClosingElement(node) && node.tagName.getText(screen) === 'NutrientCards' && node.getText(screen).includes('values={favoriteEditTotals}')) summaryCards = node
     if (ts.isJsxAttribute(node) && node.name.getText(screen) === 'value' && node.initializer && ts.isJsxExpression(node.initializer) && node.initializer.expression?.getText(screen).includes("total == null ? '' : key === 'calories'")) inputValue = node.initializer.expression
     ts.forEachChild(node, visit)
   }
@@ -35,15 +35,18 @@ function bind(name: string) {
 }
 bind('formatNutrientGrams')
 bind('calculateFavoriteAdjustTotals')
-assert.ok(summaryLabels, 'Actual meal summary labels exist')
+assert.ok(summaryCards, 'Actual meal summary cards exist')
+assert.ok(summaryCards.getStart(screen) > screen.text.indexOf('>Portion control<') && summaryCards.getStart(screen) < screen.text.indexOf('{favoriteEditSearchError ?'), 'All six cards must be in the visible top portion summary')
 assert.ok(inputValue, 'Actual ingredient nutrient field value exists')
 evaluate(cardsSource.statements.filter(node => !ts.isImportDeclaration(node)).map(node => node.getText(cardsSource).replace(/^export /, '')).join('\n'))
 const item = { id: '2317111', name: 'Sanitarium Crunchy Peanut Butter 500g', servingLabel: 'Serving — 20g', servings: 1.5, calories: 127.2, protein: 5.4, carbs: 2, fat: 10.7, fiber: 1.2, sugar: .8 }
 const original = JSON.stringify(item)
 context.favoriteEditTotals = context.calculateFavoriteAdjustTotals([item])
-const labels = evaluate(`(${summaryLabels.getText(screen)})`)
-assert.equal(labels.length, 6)
-assert.equal(labels[3], '16.1 g fat', 'Actual reopened summary must agree with the30g preview and precise saved16.05')
+context.energyUnit = 'kcal'
+const summary = evaluate(`(${summaryCards.getText(screen)})`)
+const displayedCards = summary.type(summary.props).children[0]
+assert.equal(displayedCards.length, 6)
+assert.equal(displayedCards[3].props.accessibilityLabel, 'Fat: 16.1 g', 'Actual reopened summary must agree with the30g preview and precise saved16.05')
 if (baseline) throw new Error('Baseline did not reproduce the native rounding mismatch')
 assert.equal(context.favoriteEditTotals.fat, item.fat * item.servings, 'Keep precise original source multiplication')
 context.total = context.favoriteEditTotals.fat

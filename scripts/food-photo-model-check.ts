@@ -36,6 +36,44 @@ async function main() {
   // Execute the actual route adapter, rather than a copy of its routing logic.
   const routeText = fs.readFileSync('app/api/analyze-food/route.ts', 'utf8')
   const ast = ts.createSourceFile('route.ts', routeText, ts.ScriptTarget.Latest, true)
+  const coverageHelpers = new Set(['normalizeComponentName', 'cleanComponentLabel', 'normalizeComponentList', 'extractComponentsFromDelimitedText', 'extractComponentsFromAnalysis', 'itemsCoverComponentList'])
+  const coverageDeclarations: string[] = []
+  let finalCoverageGuard: ts.IfStatement | undefined
+  function collectCoverage(node: ts.Node) {
+    if (ts.isVariableDeclaration(node) && coverageHelpers.has(node.name.getText(ast))) coverageDeclarations.push('const ' + node.getText(ast) + ';')
+    if (ts.isIfStatement(node) && node.thenStatement.getText(ast).includes("code: 'FOOD_COMPONENTS_MISSING'")) finalCoverageGuard = node
+    ts.forEachChild(node, collectCoverage)
+  }
+  collectCoverage(ast)
+  assert.equal(coverageDeclarations.length, coverageHelpers.size)
+  const coverageContext: any = { NextResponse: { json: (body: any, options: any) => ({ ...body, status: options.status }) } }
+  vm.createContext(coverageContext)
+  vm.runInContext(ts.transpileModule(coverageDeclarations.join('\n') + '\nthis.extract = extractComponentsFromAnalysis; this.normalize = normalizeComponentList; this.covers = itemsCoverComponentList;', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, coverageContext)
+  // Exact preserved description from the signed Android failure. The model
+  // saw almonds but newline collapse removed them from the coverage check.
+  const capturedAnalysis = 'The plate contains a whole red apple, raw spinach leaves, and almonds, with no visible sauce or drink. Portions and nutrition are photo-based estimates.\n\nComponents: Red apple, Raw spinach, Almonds\nCalories: 101, Protein: 1.4g, Carbs: 26.1g, Fat: 0.4g, Fibre: 5g, Sugar: 18.8g'
+  for (const analysis of [capturedAnalysis, capturedAnalysis.replace(/\n/g, '\r\n'), capturedAnalysis.replace('Components:', 'Ingredients list:')]) {
+    assert.deepEqual(Array.from(coverageContext.normalize(coverageContext.extract(analysis))), ['Red apple', 'Raw spinach', 'Almonds'], 'the final visible ingredient must survive the following nutrient summary')
+  }
+  const reportedItems = [{ name: 'Red apple', serving_size: '1 medium apple (180 g)', calories: 94 }, { name: 'Raw spinach', serving_size: '1 handful (30 g)', calories: 7 }]
+  const components = coverageContext.normalize(coverageContext.extract(capturedAnalysis))
+  assert.equal(coverageContext.covers(reportedItems, components), false, 'card-ready partial nutrition is not complete ingredient coverage')
+  const completeItems = [...reportedItems, { name: 'Almonds', serving_size: 'Estimated portion', calories: 170 }]
+  assert.equal(coverageContext.covers(completeItems, components), true)
+  assert.ok(finalCoverageGuard, 'final photo coverage must be checked before charging or preparing a result')
+  const chargePosition = routeText.indexOf('// Fixed per-use price. Charge only after a successful analysis is ready.')
+  assert.ok(finalCoverageGuard.getStart(ast) < chargePosition)
+  vm.runInContext(ts.transpileModule('this.guard = () => {' + finalCoverageGuard.getText(ast) + '; return null; };', { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, coverageContext)
+  Object.assign(coverageContext, { isImageAnalysis: true, wantStructured: true, packagedMode: false, labelScan: false, listedComponents: components, resp: { items: reportedItems } })
+  assert.equal(coverageContext.guard().code, 'FOOD_COMPONENTS_MISSING')
+  assert.equal(coverageContext.guard().status, 502)
+  coverageContext.resp = { items: completeItems }
+  assert.equal(coverageContext.guard(), null)
+  for (const flags of [{ packagedMode: true }, { labelScan: true }, { isImageAnalysis: false }]) {
+    Object.assign(coverageContext, { isImageAnalysis: true, packagedMode: false, labelScan: false, resp: { items: reportedItems } }, flags)
+    assert.equal(coverageContext.guard(), null, 'existing text and label modes keep their behavior')
+  }
+  console.log('PASS: actual server extraction retains the recorded almond component, detects partial results and rejects missing-component photos before payment.')
   let declaration: ts.VariableDeclaration | undefined
   function visit(node: ts.Node) {
     if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'runOpenAICompletion') declaration = node
