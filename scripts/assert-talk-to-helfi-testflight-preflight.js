@@ -37,6 +37,7 @@ assert(infoPlist.includes(`<key>CFBundleVersion</key>\n\t<string>${buildNumber}<
 assert(nativeAppJson.expo.plugins.includes('react-native-health'), 'The native configuration must preserve the HealthKit permission plugin.')
 assert(/<key>com.apple.developer.healthkit<\/key>\s*<true\s*\/>/.test(entitlements), 'The iOS app must include the HealthKit entitlement before Apple Health can work.')
 assert(!entitlements.includes('health-records') && !entitlements.includes('healthkit.background-delivery'), 'Helfi activity reading must not request clinical records or background Health access.')
+assert(!entitlements.includes('com.apple.developer.healthkit.access'), 'Activity-only Helfi signing must omit the HealthKit clinical access entitlement, including an empty array.')
 assert(exportOptions.includes('<string>app-store-connect</string>') && exportOptions.includes('<string>upload</string>'), 'ExportOptions.plist must still target App Store Connect upload for the approved TestFlight path.')
 assert(exportOptions.includes('<key>manageAppVersionAndBuildNumber</key>') && exportOptions.includes('<false/>'), 'Apple must not silently rewrite the app version/build number during export.')
 assert(packageJson.scripts?.['check:talk-to-helfi-testflight-upload-ready'] === 'node scripts/assert-talk-to-helfi-testflight-upload-ready.js', 'Package scripts must keep the Talk to Helfi TestFlight upload readiness check.')

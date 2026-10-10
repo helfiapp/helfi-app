@@ -1,0 +1,279 @@
+{
+  "checkedAt": "2026-10-10T03:58:57.602530+00:00",
+  "linear": "HEL-408",
+  "account": {
+    "team": "Global 22 Pty Ltd",
+    "teamId": "Z54KD5Q94J",
+    "app": "Helfi AI",
+    "appId": "6758901806",
+    "signedIn": true
+  },
+  "distribution": {
+    "state": "Prepare for Submission",
+    "selectedBuild": "22",
+    "reviewedBuild": "17",
+    "latestUploadedBuild": "28",
+    "latestBuildExpiresInDays": 9,
+    "latestReviewMessage": "2026-06-20",
+    "objections": [
+      "AI personal-data disclosure and prior consent",
+      "crowded iPad interface",
+      "Apple Health and talking/recording errors",
+      "medical/regulatory claims"
+    ]
+  },
+  "signing": {
+    "distributionCertificateAvailable": true,
+    "localDevelopmentProfileHealthKit": false,
+    "localDistributionProfileHealthKit": false,
+    "localProfilesPush": false,
+    "portalHealthKitEnabled": false,
+    "portalPushEnabled": false,
+    "developerAgreementAccepted": "2026-09-07",
+    "xcodeAccountPreferencesPresent": true,
+    "actualXcodeProvisioningAuthenticationTested": true,
+    "xcodeActiveAccountAvailable": false,
+    "firstArchiveErrors": [
+      "Unneeded empty clinical access entitlement requests Verifiable Health Records",
+      "Existing provisioning profiles omit HealthKit and Push"
+    ],
+    "narrowSourceRepairs": [
+      "Remove unused clinical access entitlement",
+      "Allow automatic profile updates during archive",
+      "Preflight prohibits empty clinical access entitlement",
+      "Activity-only Expo plugin executes after underlying entitlement mods and removes regenerated empty clinical access",
+      "native/app.json preserves react-native-health then activity-only cleanup"
+    ],
+    "secondArchiveErrors": [
+      "Xcode No Accounts",
+      "Existing profiles omit activity HealthKit and Push"
+    ],
+    "supportedRecovery": "Refresh/download existing signing profiles through signed-in Developer Portal after capability confirmation; existing signing certificates available",
+    "sourceVerification": {
+      "expoActualIntrospection": "PASS: HealthKit retained, clinical/background omitted, Apple sign-in/Push retained",
+      "actualPluginFixtures": "PASS: absent/empty clinical access cleaned; nonempty/malformed/Background Health rejected",
+      "testflightPreflight": "PASS",
+      "rootPageLocks": 278,
+      "nativePageLocks": 79,
+      "shellSyntax": "PASS",
+      "diffWhitespace": "PASS"
+    },
+    "filesForRootIntegration": [
+      "native/app.json",
+      "native/ios/Helfi/Helfi.entitlements",
+      "native/plugins/with-activity-only-healthkit.js",
+      "scripts/build-talk-to-helfi-testflight-ipa.sh",
+      "scripts/assert-talk-to-helfi-testflight-preflight.js"
+    ]
+  },
+  "screenshots": {
+    "ipadSlot": "13 inch",
+    "beforeCount": 8,
+    "uploaded": [
+      "01-food-diary.png",
+      "02-nutrient-cards.png"
+    ],
+    "dimensions": [
+      2064,
+      2752
+    ],
+    "afterCount": 10,
+    "reloadPersistenceVerified": true,
+    "existingOldAssetsRemoved": false,
+    "thirdCorrectScreenshotReady": "03-devices.png"
+  },
+  "subscriptions": {
+    "group": "21943171",
+    "products": [
+      "helfi.plan_10_monthly",
+      "helfi.plan_20_monthly",
+      "helfi.plan_30_monthly",
+      "helfi.plan_50_monthly"
+    ],
+    "status": "Prepare for Submission",
+    "smallestPlanReviewScreenshotPresent": true,
+    "sandboxPurchaseTested": false
+  },
+  "physicalDevice": {
+    "model": "iPhone 14 Pro Max",
+    "pairedAvailable": true,
+    "filteredInventorySucceeded": true,
+    "helfiInstalled": false
+  },
+  "sourcePreflight": "check:talk-to-helfi-testflight PASS",
+  "actionsRequired": [
+    "Save existing HealthKit and Push portal capabilities with required action-time confirmation",
+    "Refresh signing profiles and verify entitlements",
+    "Freeze final source with root before final archive",
+    "Install and test current signed build; include sandbox purchases",
+    "Replace old iPad mockups with actual screenshots",
+    "Update review notes and select new processed build; submit"
+  ],
+  "uploadedBuild": null,
+  "submittedForReview": false,
+  "listingReviewNotes": {
+    "saved": true,
+    "verifiedByFullReload": true,
+    "changed": "Removed obsolete build22 claim and iPhone-only Health fallback; described activity-only Health, AI consent/OpenAI, food estimates and nonmedical purpose without asserting new build submission."
+  },
+  "business": {
+    "freeAppsAgreement": "Active",
+    "paidAppsAgreement": "Active",
+    "agreementsExpiry": "2027-02-05",
+    "bankAccount": "Active",
+    "sharingEconomyReporting": "Missing Info (observed; no legal declaration entered)"
+  },
+  "appleProducts": {
+    "subscriptions": [
+      "helfi.plan_10_monthly",
+      "helfi.plan_20_monthly",
+      "helfi.plan_30_monthly",
+      "helfi.plan_50_monthly"
+    ],
+    "consumables": [
+      "helfi.credits_250",
+      "helfi.credits_500",
+      "helfi.credits_1000"
+    ],
+    "status": "Prepare for Submission",
+    "consumableRequiredReviewScreenshots": true,
+    "consumableLocalizedDescriptions": true,
+    "consumableAvailabilityCountriesCount": 2,
+    "credits250Countries": [
+      "Australia",
+      "United States"
+    ],
+    "consumablePrices": {
+      "250": {
+        "USD": 4.99,
+        "AUD": 7.99
+      },
+      "500": {
+        "USD": 9.99,
+        "AUD": 14.99
+      },
+      "1000": {
+        "USD": 19.99,
+        "AUD": 29.99
+      }
+    }
+  },
+  "applePurchaseKeys": {
+    "dedicatedActiveKeys": 0,
+    "newKeyGenerated": false,
+    "teamKeyExists": "Helfi TestFlight",
+    "privateRedownloadVisible": false,
+    "usualLocalP8SearchMatch": false,
+    "issuerId": "780996d3-de47-4841-90a4-dcd92baf771b",
+    "helfiTestFlightKeyId": "FGNU226Q65"
+  },
+  "googlePurchaseSetup": {
+    "subscriptions": 0,
+    "oneTimeProducts": 0,
+    "firstBillingEnabledUploadRequiredBeforeCreation": true,
+    "existingHelfiServiceAccount": false,
+    "existingOtherServiceAccountsScope": "Two LeaseAlarm-only accounts; no account-wide permissions checked",
+    "permissionsChanged": false,
+    "realTimeNotificationsConfigured": false,
+    "cloudProject": "helfi-maps-484312",
+    "cloudOwnerAccessVerified": true,
+    "cloudServiceAccountCount": 0,
+    "androidPublisherApiEnabled": false,
+    "apiEnableTermsDisplayed": true,
+    "requiredPlayPermissions": [
+      "View financial data, orders, and cancellation survey responses",
+      "Manage orders and subscriptions"
+    ],
+    "permissionSource": "https://developers.google.com/android-publisher/getting_started",
+    "apiActionSaved": false
+  },
+  "appleRegulatedMedicalDeviceDeclaration": {
+    "currentSelection": null,
+    "dialogPrepared": true,
+    "declarationSaved": false,
+    "question": "Is your app a regulated medical device in any country or region?"
+  },
+  "applePrivacy": {
+    "published": true,
+    "declaredDataTypes": 15,
+    "includes": [
+      "Health",
+      "Fitness",
+      "Photos or Videos",
+      "Audio Data",
+      "Sensitive Info",
+      "Purchase History"
+    ],
+    "modified": false
+  },
+  "appleProductEnvironmentMapping": {
+    "IOS_IAP_PLAN_10": "helfi.plan_10_monthly",
+    "IOS_IAP_PLAN_20": "helfi.plan_20_monthly",
+    "IOS_IAP_PLAN_30": "helfi.plan_30_monthly",
+    "IOS_IAP_PLAN_50": "helfi.plan_50_monthly",
+    "IOS_IAP_CREDITS_250": "helfi.credits_250",
+    "IOS_IAP_CREDITS_500": "helfi.credits_500",
+    "IOS_IAP_CREDITS_1000": "helfi.credits_1000"
+  },
+  "nativeSourceMetadata": {
+    "CFBundleShortVersionString": "1.0.0",
+    "CFBundleVersion": "39",
+    "NSCameraUsageDescription": "Allow Helfi to use your camera so you can take a photo for food logging, journal notes, or profile photos when you choose.",
+    "NSMicrophoneUsageDescription": "Allow Helfi to use your microphone only when you tap the voice button, so it can turn spoken requests such as \"add breakfast\" or \"log a 20 minute walk\" into text.",
+    "NSPhotoLibraryUsageDescription": "Allow Helfi to access your photos so you can log food from meal and nutrition label images.",
+    "NSHealthShareUsageDescription": "Allow Helfi to read selected Apple Health data, such as steps, distance, and active calories, so it can show your daily activity in your health dashboard.",
+    "NSHealthUpdateUsageDescription": "Helfi does not write data to Apple Health. This permission wording is included because Apple requires it when Health access is available.",
+    "ITSAppUsesNonExemptEncryption": false,
+    "xcode": "26.3 / 17C529"
+  },
+  "finalSignedArtifactChecksToRun": [
+    "Immutable committed native source; expected HEAD matches built manifest",
+    "Exported IPA SHA256 recorded",
+    "Packaged bundle ai.helfi.app/version1.0.0/build39 matches candidate",
+    "Exported distribution signature valid; get-task-allow=false",
+    "Activity Health entitlement true; no clinical/background entitlement",
+    "Exported aps-environment=production; refreshed profile authorises HealthKit+Push",
+    "Exact root source deployment succeeds in AWS and both domains",
+    "Actual signed iPhone login and activity permission/read flow",
+    "Actual signed iPad layout and six nutrient cards",
+    "Actual store sandbox products/purchase verification",
+    "Final processed build selected in Apple version;7 first purchase products attached",
+    "Store screenshots match actual device interface"
+  ],
+  "routineStoreActionsAuthorised": true,
+  "browserActionPolicyClarification": "Root read current runtime confirmations documentation; routine listing/review preparation uses existing owner submission authorisation, while new sensitive access and binding declarations use exact prepared action confirmation.",
+  "artifactProvenanceRepair": {
+    "files": [
+      "scripts/build-talk-to-helfi-testflight-ipa.sh",
+      "scripts/assert-talk-to-helfi-testflight-upload-ready.js"
+    ],
+    "nativeInputsMustBeCommitted": true,
+    "guardPhases": [
+      "before archive",
+      "after archive",
+      "after export"
+    ],
+    "commitDriftRejected": true,
+    "generatedOutputsExcluded": [
+      "native/ios/Pods",
+      "native/ios/build",
+      "native/ios/.xcode.env.local"
+    ],
+    "unrelatedDocsOrEvidenceChecked": false,
+    "ipaSha256RecordedByStreamingActualFile": true,
+    "uploadHashCheckedBeforeAwsOrAppleCalls": true,
+    "verification": {
+      "bashSyntax": "PASS",
+      "nodeSyntax": "PASS",
+      "existingTestflightPreflight": "PASS",
+      "whitespace": "PASS",
+      "realDirtySourceRejectBeforeArchive": "PASS",
+      "guardCleanChangedUntrackedCommitDriftFixtures": "PASS",
+      "actualExportManifestFileFingerprintFixtures": "PASS",
+      "actualConsumerMatchingMissingMalformedUppercaseWrongChangedBytesFixtures": "PASS"
+    },
+    "realArchiveCreatedByThisRepair": false,
+    "actualNewIpaHash": null,
+    "uploaded": false
+  }
+}

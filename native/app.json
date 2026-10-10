@@ -53,6 +53,7 @@
       "expo-notifications",
       "expo-apple-authentication",
       "react-native-health",
+      "./plugins/with-activity-only-healthkit",
       "react-native-iap",
       "expo-web-browser",
       "./plugins/with-transparent-ios-app-icon",

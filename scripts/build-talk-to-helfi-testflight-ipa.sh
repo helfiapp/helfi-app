@@ -19,6 +19,34 @@ BUILD_NUMBER="$(node -e "const app=require('./native/app.json'); process.stdout.
 APP_VERSION="$(node -e "const app=require('./native/app.json'); process.stdout.write(String(app.expo.version || ''))")"
 BUNDLE_IDENTIFIER="$(node -e "const app=require('./native/app.json'); process.stdout.write(String(app.expo.ios.bundleIdentifier || ''))")"
 COMMIT_SHA="$(git rev-parse HEAD)"
+# Check app/build inputs only. Generated output and unrelated release evidence
+# must not prevent an archive from an otherwise committed native app.
+NATIVE_RUNTIME_PATHS=(
+  native/App.tsx native/index.ts native/app.json
+  native/package.json native/package-lock.json native/tsconfig.json
+  native/babel.config.js native/metro.config.js native/eas.json
+  native/src native/assets native/plugins native/ios
+  ':(exclude)native/ios/Pods/**'
+  ':(exclude)native/ios/build/**'
+  ':(exclude)native/ios/.xcode.env.local'
+  scripts/build-talk-to-helfi-testflight-ipa.sh
+)
+
+assert_native_source_clean() {
+  local native_changes
+  native_changes="$(git status --porcelain=v1 --untracked-files=all -- "${NATIVE_RUNTIME_PATHS[@]}")"
+  if [[ -n "$native_changes" ]]; then
+    echo "Commit native app/build-input changes before creating a release IPA." >&2
+    echo "$native_changes" >&2
+    return 1
+  fi
+  if [[ "$(git rev-parse HEAD)" != "$COMMIT_SHA" ]]; then
+    echo "The source commit changed during this build. Rebuild the release IPA." >&2
+    return 1
+  fi
+}
+
+assert_native_source_clean
 if [[ -z "$BUILD_NUMBER" || -z "$APP_VERSION" ]]; then
   echo "Could not read native app version/build number." >&2
   exit 1
@@ -52,8 +80,10 @@ xcodebuild \
   -configuration Release \
   -destination 'generic/platform=iOS' \
   -archivePath "$ARCHIVE_PATH" \
+  -allowProvisioningUpdates \
   archive
 
+assert_native_source_clean
 cp native/ios/ExportOptions.plist "$EXPORT_OPTIONS"
 plutil -replace destination -string export "$EXPORT_OPTIONS"
 
@@ -64,6 +94,7 @@ xcodebuild \
   -exportOptionsPlist "$EXPORT_OPTIONS" \
   -allowProvisioningUpdates
 
+assert_native_source_clean
 TESTFLIGHT_MODE="$MODE" \
 TESTFLIGHT_LIVE_FLAG="$LIVE_FLAG" \
 TESTFLIGHT_APP_VERSION="$APP_VERSION" \
@@ -74,21 +105,33 @@ TESTFLIGHT_EXPORT_PATH="$EXPORT_PATH" \
 node <<'NODE'
 const fs = require('fs')
 const path = require('path')
+const { createHash } = require('crypto')
 
 const exportPath = process.env.TESTFLIGHT_EXPORT_PATH
-const manifest = {
-  mode: process.env.TESTFLIGHT_MODE,
-  liveVoiceEnabled: process.env.TESTFLIGHT_LIVE_FLAG === 'true',
-  apiBaseUrl: 'https://helfi.ai',
-  appVersion: process.env.TESTFLIGHT_APP_VERSION,
-  buildNumber: process.env.TESTFLIGHT_BUILD_NUMBER,
-  bundleIdentifier: process.env.TESTFLIGHT_BUNDLE_IDENTIFIER,
-  commitSha: process.env.TESTFLIGHT_COMMIT_SHA,
-  ipa: 'Helfi.ipa',
-  createdAt: new Date().toISOString(),
-}
+async function writeManifest() {
+  const ipaHash = createHash('sha256')
+  for await (const chunk of fs.createReadStream(path.join(exportPath, 'Helfi.ipa'))) {
+    ipaHash.update(chunk)
+  }
+  const manifest = {
+    mode: process.env.TESTFLIGHT_MODE,
+    liveVoiceEnabled: process.env.TESTFLIGHT_LIVE_FLAG === 'true',
+    apiBaseUrl: 'https://helfi.ai',
+    appVersion: process.env.TESTFLIGHT_APP_VERSION,
+    buildNumber: process.env.TESTFLIGHT_BUILD_NUMBER,
+    bundleIdentifier: process.env.TESTFLIGHT_BUNDLE_IDENTIFIER,
+    commitSha: process.env.TESTFLIGHT_COMMIT_SHA,
+    ipa: 'Helfi.ipa',
+    ipaSha256: ipaHash.digest('hex'),
+    createdAt: new Date().toISOString(),
+  }
 
-fs.writeFileSync(path.join(exportPath, 'Helfi-testflight-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+  fs.writeFileSync(path.join(exportPath, 'Helfi-testflight-manifest.json'), `${JSON.stringify(manifest, null, 2)}\n`)
+}
+writeManifest().catch((error) => {
+  console.error('Could not fingerprint the exported IPA:', error.message)
+  process.exitCode = 1
+})
 NODE
 
 echo "Local IPA created:"

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 const { execFileSync } = require('child_process')
+const { createHash } = require('crypto')
 const fs = require('fs')
 const path = require('path')
 
@@ -21,6 +22,14 @@ function fail(message) {
 function readAmplifyJob() {
   const args = ['--profile', 'helfi-agent', '--region', 'ap-southeast-2', 'amplify', 'list-jobs', '--app-id', 'd2n4u4zm85ooe', '--branch-name', 'master', '--max-results', '1', '--query', 'jobSummaries[0]', '--output', 'json']
   return JSON.parse(run('aws', args))
+}
+
+async function sha256File(filePath) {
+  const hash = createHash('sha256')
+  for await (const chunk of fs.createReadStream(filePath)) {
+    hash.update(chunk)
+  }
+  return hash.digest('hex')
 }
 
 async function readJson(url) {
@@ -74,6 +83,12 @@ async function main() {
   if (manifest.buildNumber !== buildNumber) fail(`Live TestFlight IPA build number does not match native/app.json ${buildNumber}.`)
   if (manifest.bundleIdentifier !== bundleIdentifier) fail(`Live TestFlight IPA bundle ID does not match native/app.json ${bundleIdentifier}.`)
   if (manifest.commitSha !== commitSha) fail(`Live TestFlight IPA was built from ${String(manifest.commitSha || '').slice(0, 8)}, not current commit ${commitSha.slice(0, 8)}. Rebuild it before upload.`)
+  if (!/^[a-f0-9]{64}$/.test(String(manifest.ipaSha256 || ''))) {
+    fail('Live TestFlight IPA manifest has no valid file fingerprint. Rebuild it before upload.')
+  }
+  if (await sha256File(ipaPath) !== manifest.ipaSha256) {
+    fail('Live TestFlight IPA differs from the file recorded at export. Rebuild it before upload.')
+  }
 
   let deployment
   try { deployment = readAmplifyJob() } catch {
