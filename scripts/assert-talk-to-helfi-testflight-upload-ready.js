@@ -99,7 +99,9 @@ async function main() {
   }
   const job = JSON.parse(run('aws', ['--profile', 'helfi-agent', '--region', 'ap-southeast-2', 'amplify', 'get-job', '--app-id', 'd2n4u4zm85ooe', '--branch-name', 'master', '--job-id', deployment.jobId, '--query', 'job.steps[].{step:stepName,status:status}', '--output', 'json']))
   if (!job.length || job.some(step => step.status !== 'SUCCEED')) fail('AWS build, deploy and verification must all succeed before upload.')
-  const domain = JSON.parse(run('aws', ['--profile', 'helfi-agent', '--region', 'ap-southeast-2', 'amplify', 'get-domain-association', '--app-id', 'd2n4u4zm85ooe', '--domain-name', 'helfi.ai', '--query', 'domainAssociation.{status:domainStatus,subDomains:subDomains[].subDomainSetting}', '--output', 'json']))
+  // Amplify omits the empty apex prefix in its response; retain the same
+  // AVAILABLE/master checks after normalizing that serialized empty value.
+  const domain = JSON.parse(run('aws', ['--profile', 'helfi-agent', '--region', 'ap-southeast-2', 'amplify', 'get-domain-association', '--app-id', 'd2n4u4zm85ooe', '--domain-name', 'helfi.ai', '--query', 'domainAssociation.{status:domainStatus,subDomains:subDomains[].{prefix:not_null(subDomainSetting.prefix, `""`),branchName:subDomainSetting.branchName}}', '--output', 'json']))
   if (domain.status !== 'AVAILABLE' || !domain.subDomains.some(item => item.prefix === '' && item.branchName === 'master')) fail('helfi.ai must be assigned to the verified master deployment.')
 
   let readiness = null
