@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS111 / c6d89ad49b9ea7e605980bd0bf7b01cd99370ce8
+- Date/time: 12 October 2026, verified 10:36 Melbourne.
+- What changed: Removed the duplicate DMARC policy that invalidated email authentication and added a plain-text partner to the password-reset email. AWS SES remains the live provider; Resend remains available as rollback.
+- Where to see it (page/link): https://helfi.ai/auth/signin and the password-reset email. Both live domains returned HTTP 200 through CloudFront with matching ETag zatvd79i041z15.
+- What to quickly test: Request a password reset. The exact deployed route returned success and the unread email arrived in the external test account's Inbox without the earlier spam prefix. AWS BUILD, DEPLOY and VERIFY all succeeded; no SES rejects, bounces, complaints or rendering failures were recorded.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS105, c5bf8940fc24eace9582bb3885cd7057498fc697
 - Date/time: 10 October 2026, verified by root after all BUILD/DEPLOY/VERIFY steps succeeded.
 - What changed: Native store source preparation: Android readable screens and monthly-offer requests, Apple activity-only signing and upload guards, and verified release evidence. No final signed upload/submission claimed.
