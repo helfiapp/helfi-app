@@ -49,6 +49,19 @@ export async function POST(request: NextRequest) {
       from: 'Helfi Team <support@helfi.ai>',
       to: email,
       subject: 'Reset your Helfi password',
+      text: [
+        'Helfi password reset',
+        '',
+        'We received a request to reset your password.',
+        `Reset your password: ${resetUrl}`,
+        '',
+        `This link expires in ${RESET_TOKEN_TTL_HOURS} hours.`,
+        'If you did not request this, you can ignore this email.',
+        '',
+        'Helfi Team',
+        'https://helfi.ai',
+        'support@helfi.ai',
+      ].join('\n'),
       html: `
         <div style="font-family: 'Segoe UI', Arial, sans-serif; max-width: 600px; margin: 0 auto; color: #333; background: #f8fafc;">
           <div style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; padding: 40px 30px; text-align: center; border-radius: 12px 12px 0 0;">
