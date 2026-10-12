@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Image, ImageSourcePropType, Linking, Platform, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
+import { Alert, Image, ImageSourcePropType, Linking, Platform, Pressable, ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native'
 
 import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
@@ -9,16 +9,10 @@ import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { appleHealthConnectAndReadToday, isAppleHealthSupportedDevice } from '../health/appleHealth'
+import { useAppleHealthSync } from '../health/AppleHealthSyncProvider'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
-
-function localDateYYYYMMDD(d: Date) {
-  const yyyy = d.getFullYear()
-  const mm = String(d.getMonth() + 1).padStart(2, '0')
-  const dd = String(d.getDate()).padStart(2, '0')
-  return `${yyyy}-${mm}-${dd}`
-}
 
 const APPLE_HEALTH_CONNECTED_KEY = 'helfi_apple_health_connected_v1'
 const APPLE_HEALTH_MODE_KEY = 'helfi_apple_health_mode_v1' // Ignore legacy sample connections.
@@ -56,6 +50,7 @@ export function DashboardScreen() {
     return { horizontalPadding, gap, cardWidth, isTablet }
   }, [width])
   const appleHealthAvailable = isAppleHealthSupportedDevice()
+  const healthSync = useAppleHealthSync()
 
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null)
   const [creditsFillPct, setCreditsFillPct] = useState(0)
@@ -538,7 +533,7 @@ export function DashboardScreen() {
         await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '1')
         await AsyncStorage.setItem(APPLE_HEALTH_MODE_KEY, 'real')
       } catch {}
-      Alert.alert('Apple Health connected', 'Great. You can now import today’s steps and calories.')
+      Alert.alert('Apple Health connected', 'Available activity was read. Import today refreshes it manually; you can also turn on automatic updates below.')
     } catch (e: any) {
       Alert.alert(
         'Apple Health could not connect',
@@ -561,37 +556,16 @@ export function DashboardScreen() {
 
     try {
       setAppleHealthBusy(true)
-      const summary = await appleHealthConnectAndReadToday()
-      if (!(summary.steps > 0 || (summary.distanceKm ?? 0) > 0 || (summary.activeEnergyKcal ?? 0) > 0)) {
-        setAppleHealthConnected(false)
-        try { await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '0') } catch {}
+      const result = await healthSync.refresh(true)
+      if (!result) return
+      const { summary, imported } = result
+      if (imported) {
+        Alert.alert('Imported', 'Today’s activity was updated in your exercise log.')
+      } else if (summary.steps > 0 || (summary.distanceKm ?? 0) > 0) {
+        Alert.alert('Activity read', 'Your steps and distance are available. Apple Health has no active calories available today, so Helfi has not added any exercise calories.')
+      } else {
         Alert.alert('No activity available today', 'There may be no saved activity for today, or Helfi may not have permission to read it. Check Health, Sharing, Apps, Helfi, then try again.')
-        return
       }
-      const date = localDateYYYYMMDD(new Date())
-
-      const res = await fetch(`${API_BASE_URL}/api/native-exercise-import`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({
-          source: 'APPLE_HEALTH',
-          date,
-          steps: summary.steps,
-          distanceKm: summary.distanceKm,
-          caloriesKcal: summary.activeEnergyKcal,
-        }),
-      })
-
-      const data = await res.json().catch(() => ({} as any))
-      if (!res.ok) {
-        Alert.alert('Import failed', data?.error ? String(data.error) : 'Please try again.')
-        return
-      }
-
-      Alert.alert('Imported', 'Today’s activity was added to your exercise log.')
     } catch (e: any) {
       Alert.alert('Import failed', e?.message || 'Please try again.')
     } finally {
@@ -985,12 +959,33 @@ export function DashboardScreen() {
                 <DeviceRow
                   name="Apple Health (HealthKit)"
                   icon={<AppleHealthLogo />}
-                  detail={appleHealthAvailable ? "Continue to Apple's HealthKit permission screen for steps, distance, and active energy." : 'Requires iPadOS 17 or later.'}
+                  detail={appleHealthAvailable ? (appleHealthConnected ? 'Import today refreshes available activity without asking for permission again.' : "Continue to Apple's HealthKit permission screen for steps, distance, and active energy.") : 'Requires iPadOS 17 or later.'}
                   rightLabel={!appleHealthAvailable ? 'Unavailable' : appleHealthConnected ? 'Import today' : 'Continue'}
                   rightKind="connect"
-                  disabled={appleHealthBusy || !appleHealthAvailable}
+                  disabled={appleHealthBusy || healthSync.busy || !appleHealthAvailable}
                   onPress={appleHealthConnected ? onAppleHealthImportToday : onAppleHealthConnect}
                 />
+                {appleHealthAvailable && (appleHealthConnected || healthSync.enabled) ? (
+                  <View style={{ gap: 8 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <Text style={{ color: theme.colors.text, fontWeight: '700', flex: 1 }}>Update automatically when Helfi opens</Text>
+                      <Switch accessibilityLabel="Automatic Apple Health updates" value={healthSync.enabled} onValueChange={value => {
+                        if (!value) { void healthSync.setEnabled(false).catch(() => Alert.alert('Could not save setting', 'Automatic updates are stopped for this session. Please try again to save the setting.')); return }
+                        Alert.alert('Automatic Apple Health updates', 'Allow Helfi to read your steps, walking/running distance and active calories whenever you open or return to the app, and store daily activity totals in your Helfi account? You can turn this off here or revoke access in Apple Health.', [
+                          { text: 'Cancel', style: 'cancel' },
+                          { text: 'Allow automatic updates', onPress: () => { void healthSync.setEnabled(true).catch(() => Alert.alert('Could not save setting', 'Please try again.')) } },
+                        ])
+                      }} />
+                    </View>
+                    <Text style={{ color: theme.colors.muted }}>Refreshes when you open or return to Helfi. Import today remains available for a manual refresh.</Text>
+                    {healthSync.result ? <Text style={{ color: theme.colors.text }}>
+                      {healthSync.result.summary.localDate}: {healthSync.result.summary.steps} steps
+                      {healthSync.result.summary.distanceKm !== null ? ` · ${healthSync.result.summary.distanceKm.toFixed(2)} km` : ''}
+                      {healthSync.result.summary.activeEnergyKcal !== null ? ` · ${Number(healthSync.result.summary.activeEnergyKcal.toFixed(2))} active kcal` : ' · No active calories available'}
+                    </Text> : null}
+                    {healthSync.error ? <Text style={{ color: theme.colors.muted }}>{healthSync.error}</Text> : null}
+                  </View>
+                ) : null}
               </>
             ) : null}
             <DeviceRow

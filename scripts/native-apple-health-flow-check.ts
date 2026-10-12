@@ -20,7 +20,8 @@ async function run(handler: string, overrides: Record<string, any> = {}) {
     APPLE_HEALTH_CONNECTED_KEY: 'connected', APPLE_HEALTH_MODE_KEY: 'mode',
     setAppleHealthBusy: () => {}, setAppleHealthConnected: (value: boolean) => calls.push({ connected: value }),
     AsyncStorage: { setItem: async () => {} }, Alert: { alert: (...args: any[]) => calls.push({ alert: args }) },
-    appleHealthConnectAndReadToday: async () => ({ steps: 1200, distanceKm: 0.82, activeEnergyKcal: 64 }),
+    appleHealthConnectAndReadToday: async () => ({ localDate: '2026-10-04', steps: 1200, distanceKm: 0.82, activeEnergyKcal: 64 }),
+    healthSync: { refresh: async () => ({ imported: true, summary: { localDate: '2026-10-04', steps: 1200, distanceKm: 0.82, activeEnergyKcal: 64 } }) },
     localDateYYYYMMDD: () => '2026-10-04', Date,
     fetch: async (url: string, options: any) => { calls.push({ url, payload: JSON.parse(options.body) }); return { ok: true, json: async () => ({}) } },
     ...overrides,
@@ -33,21 +34,24 @@ async function run(handler: string, overrides: Record<string, any> = {}) {
 async function main() {
   const readFailure = async () => { throw new Error('permission unavailable') }
   for (const handler of ['onAppleHealthConnect', 'onAppleHealthImportToday']) {
-    const failed = await run(handler, { appleHealthConnectAndReadToday: readFailure })
+    const failed = await run(handler, { appleHealthConnectAndReadToday: readFailure, healthSync: { refresh: readFailure } })
     assert.ok(failed.some(call => call.alert))
     assert.ok(!failed.some(call => call.url || call.connected), 'failed Health access never imports or claims connection')
     const ipad = await run(handler, { appleHealthAvailable: false })
     assert.ok(ipad.some(call => call.alert[0] === 'Apple Health unavailable'))
     assert.ok(!ipad.some(call => call.url || call.connected))
     for (const summary of [{ steps: 0, distanceKm: null, activeEnergyKcal: null }, { steps: 0, distanceKm: 0, activeEnergyKcal: 0 }]) {
-      const empty = await run(handler, { appleHealthConnectAndReadToday: async () => summary })
+      const empty = await run(handler, { appleHealthConnectAndReadToday: async () => summary, healthSync: { refresh: async () => ({summary, imported: false}) } })
       assert.ok(empty.some(call => call.alert?.[0] === 'No activity available today'))
       assert.ok(!empty.some(call => call.url || call.connected === true), 'empty/denied Health reads never import or claim a connected permission')
     }
   }
   const success = await run('onAppleHealthImportToday')
-  assert.deepEqual(success.find(call => call.url).payload, { source: 'APPLE_HEALTH', date: '2026-10-04', steps: 1200, distanceKm: 0.82, caloriesKcal: 64 })
-  const rejected = await run('onAppleHealthImportToday', { fetch: async () => ({ ok: false, json: async () => ({ error: 'Import unavailable' }) }) })
+  assert.ok(success.some(call => call.alert?.[0] === 'Imported'))
+  const stepsOnly = await run('onAppleHealthImportToday', { healthSync: { refresh: async () => ({ imported: false, summary: { steps: 123, distanceKm: 0.1, activeEnergyKcal: null } }) } })
+  assert.ok(stepsOnly.some(call => call.alert?.[0] === 'Activity read'))
+  assert.ok(!stepsOnly.some(call => call.alert?.[0] === 'Imported' || call.url))
+  const rejected = await run('onAppleHealthImportToday', { healthSync: { refresh: async () => { throw new Error('Import unavailable') } } })
   assert.ok(rejected.some(call => call.alert[0] === 'Import failed'))
   assert.ok(!rejected.some(call => call.alert[0] === 'Imported'))
   console.log('PASS: real Health activity only; unavailable/denied/empty access does not import sample calories or claim success.')

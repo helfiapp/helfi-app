@@ -63,6 +63,8 @@ echo "Live voice build flag: ${LIVE_FLAG}"
 
 npm --prefix native run check:voice-assistant
 npm --prefix native run typecheck
+npm run check:native-health
+npm run check:native-health-bridge -- --check-installed-library
 npm run check:talk-to-helfi-testflight
 npm --prefix native run check:talk-to-helfi-testflight
 node scripts/check-ios-distribution-signing.js

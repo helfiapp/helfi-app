@@ -3488,3 +3488,14 @@ for guidance first.
 - AWS Amplify can omit `subDomainSetting.prefix` for the empty apex mapping. Normalize only that null/missing value to the empty string in the release check's AWS query. Continue requiring domain status `AVAILABLE` and an actual apex mapping to `master`; a `www` mapping alone, another branch or an unavailable domain must still fail.
 - Keep exact IPA fingerprint/manifest/source checks, successful AWS build/deploy/verify steps and live voice readiness intact. Never change a signed build's manifest to claim a later commit or weaken the domain check because an HTTP page loads.
 - Actual same-source AWS109/d6ce31be, both live domains and the normalised readiness check passed before Apple accepted build39. Signed39 remains the immutable d6ce31be artifact; later checker/documentation commits must not rewrite its source identity. Evidence: `docs/release-evidence/2026-10-12/apple39-signed-package-verification.json`.
+
+### Apple Health foreground updates (12 October 2026)
+
+- Owner approved only steps, walking/running distance and active energy reads, with daily totals saved to their Helfi account. Automatic updates require the account-specific in-app switch and run only when opening/returning to Helfi; retain manual Import today and normal Health revocation.
+- Capture the local calendar date once for the entire read. The installed Health library's daily steps/distance queries use `date`; distance requests metres before converting to kilometres. Read-only refresh must not request Health authorization again.
+- Missing/denied/empty active energy must never become sample data or an estimate from steps/MET. Apple imports preserve positive reported calories (including fractions) and distance. Steps alone do not create invented exercise calories.
+- Replace the same account/date Apple exercise row, never add its daily total again. Handle simultaneous first imports using the existing compound unique key without duplicate rows or database migrations.
+- Foreground requests are bounded and serialized, with an automatic cooldown. Re-check the current account, session and preference before posting; late responses must not update another account or override turning automatic updates off.
+- Food reacts to a successful matching account/date Health import by refreshing exercise only. Preserve meals, nutrients, food targets, water, credits and rename behavior. Remaining calories retain `max(0, daily_target + exercise_burned - food_consumed)`.
+- Mandatory offline checks: `npm run check:native-health`. Native archives also require `npm run check:native-health-bridge -- --check-installed-library`. Offline proofs do not replace physical Health-versus-Helfi and phone/Watch source comparisons.
+- Previous verified server: 5ac3e353/AWS113 on 12 October 2026. Automatic updates require a new native build after39; do not describe build39 as having this feature.

@@ -12,6 +12,7 @@ export type IngestExerciseEntryInput = {
   startTime?: Date | null
   durationMinutes: number
   calories?: number | null
+  distanceKm?: number | null
   met?: number | null
   label: string
   rawPayload?: any
@@ -25,7 +26,7 @@ export async function ingestExerciseEntry(input: IngestExerciseEntryInput) {
   let calories =
     Number.isFinite(deviceCalories) && deviceCalories > 0 ? deviceCalories : null
 
-  if (calories === null && met !== null && Number.isFinite(met) && met > 0) {
+  if (calories === null && input.source !== 'APPLE_HEALTH' && met !== null && Number.isFinite(met) && met > 0) {
     const health = await getHealthProfileForUser(input.userId)
     if (health.weightKg) {
       calories = calculateExerciseCalories({
@@ -55,6 +56,10 @@ export async function ingestExerciseEntry(input: IngestExerciseEntryInput) {
     met: met !== null && Number.isFinite(met) && met > 0 ? met : 0,
     calories,
     rawPayload: input.rawPayload ?? null,
+    ...(input.source === 'APPLE_HEALTH' ? {
+      distanceKm: typeof input.distanceKm === 'number' && Number.isFinite(input.distanceKm) && input.distanceKm >= 0
+        ? input.distanceKm : null,
+    } : {}),
   } as const
 
   if (existing) {
@@ -65,6 +70,23 @@ export async function ingestExerciseEntry(input: IngestExerciseEntryInput) {
     return { created: false, entry }
   }
 
-  const entry = await prisma.exerciseEntry.create({ data })
-  return { created: true, entry }
+  try {
+    const entry = await prisma.exerciseEntry.create({ data })
+    return { created: true, entry }
+  } catch (error: any) {
+    // Two foreground/manual imports can both observe no row. The existing
+    // compound unique key prevents duplicates; refresh that same account's
+    // daily Apple row if another import created it first.
+    if (input.source !== 'APPLE_HEALTH' || error?.code !== 'P2002') throw error
+    const concurrent = await prisma.exerciseEntry.findUnique({
+      where: {
+        userId_source_deviceId: {
+          userId: input.userId, source: input.source, deviceId: input.deviceId,
+        },
+      },
+    })
+    if (!concurrent) throw error
+    const entry = await prisma.exerciseEntry.update({ where: { id: concurrent.id }, data })
+    return { created: false, entry }
+  }
 }

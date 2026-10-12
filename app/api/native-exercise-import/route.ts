@@ -17,8 +17,17 @@ async function getRequestUserId(request: NextRequest) {
 }
 
 function toFiniteNumber(value: unknown) {
+  if (value === null || value === undefined || typeof value === 'boolean') return null
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  if (typeof value === 'string' && !value.trim()) return null
   const next = Number(value)
   return Number.isFinite(next) ? next : null
+}
+
+function isCalendarDate(value: string) {
+  if (!DATE_RE.test(value)) return false
+  const date = new Date(`${value}T00:00:00.000Z`)
+  return Number.isFinite(date.getTime()) && date.toISOString().slice(0, 10) === value
 }
 
 export async function POST(request: NextRequest) {
@@ -38,11 +47,14 @@ export async function POST(request: NextRequest) {
   if (source !== 'APPLE_HEALTH') {
     return NextResponse.json({ error: 'Unsupported source' }, { status: 400 })
   }
-  if (!DATE_RE.test(date)) {
+  if (!isCalendarDate(date)) {
     return NextResponse.json({ error: 'Missing or invalid date (YYYY-MM-DD)' }, { status: 400 })
   }
   if (caloriesKcal === null || caloriesKcal <= 0 || caloriesKcal > 50_000) {
     return NextResponse.json({ error: 'No Apple Health activity calories found for this date' }, { status: 400 })
+  }
+  if ((steps !== null && steps < 0) || (distanceKm !== null && distanceKm < 0)) {
+    return NextResponse.json({ error: 'Activity readings must not be negative' }, { status: 400 })
   }
 
   const result = await ingestExerciseEntry({
@@ -51,7 +63,8 @@ export async function POST(request: NextRequest) {
     deviceId: `apple-health:${date}`,
     localDate: date,
     durationMinutes,
-    calories: Math.round(caloriesKcal),
+    calories: caloriesKcal,
+    distanceKm,
     label: 'Apple Health activity',
     rawPayload: {
       source: 'APPLE_HEALTH',

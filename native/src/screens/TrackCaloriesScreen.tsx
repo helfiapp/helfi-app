@@ -1813,6 +1813,7 @@ export function TrackCaloriesScreen() {
   const entrySwipeMetaRef = useRef<Record<string, { startX: number; startY: number; swiping: boolean; hasMoved: boolean }>>({})
   const entrySwipeBlockPressRef = useRef<Record<string, boolean>>({})
   const loadRequestIdRef = useRef(0)
+  const healthExerciseRevisionRef = useRef(0)
   const ingredientSearchRequestIdRef = useRef(0)
 
   const [loading, setLoading] = useState(true)
@@ -2739,6 +2740,7 @@ export function TrackCaloriesScreen() {
 
     const silent = options?.silent === true
     const requestId = ++loadRequestIdRef.current
+    const exerciseRevision = healthExerciseRevisionRef.current
     const isCurrentRequest = () => requestId === loadRequestIdRef.current
 
     if (!silent) setLoading(true)
@@ -2787,7 +2789,7 @@ export function TrackCaloriesScreen() {
 
       const exerciseData: any = await exerciseRes.json().catch(() => ({}))
       if (!isCurrentRequest()) return
-      if (exerciseRes.ok) {
+      if (exerciseRes.ok && exerciseRevision === healthExerciseRevisionRef.current) {
         setExerciseEntries(Array.isArray(exerciseData?.entries) ? exerciseData.entries : [])
         setExerciseCalories(Math.round(numberOrZero(exerciseData?.exerciseCalories)))
       }
@@ -2880,6 +2882,26 @@ export function TrackCaloriesScreen() {
     })
     return () => subscription.remove()
   }, [loadAll, mode, selectedDate, session?.token])
+
+  useEffect(() => {
+    if (mode !== 'signedIn' || !session?.token) return
+    let cancelled = false
+    const subscription = DeviceEventEmitter.addListener('helfi:apple-health-imported', (payload?: any) => {
+      if (payload?.userId !== session.user.id || payload?.localDate !== selectedDate) return
+      const revision = ++healthExerciseRevisionRef.current
+      // Health refresh must not reload meals, water, credits or targets.
+      void fetch(`${API_BASE_URL}/api/exercise-entries?date=${selectedDate}`, {
+        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
+      }).then(async response => {
+        if (!response.ok) return
+        const data = await response.json()
+        if (cancelled || revision !== healthExerciseRevisionRef.current) return
+        setExerciseEntries(Array.isArray(data?.entries) ? data.entries : [])
+        setExerciseCalories(Math.round(numberOrZero(data?.exerciseCalories)))
+      }).catch(() => {})
+    })
+    return () => { cancelled = true; subscription.remove() }
+  }, [mode, selectedDate, session?.token, session?.user.id])
 
   useEffect(() => {
     if (!favoritesOpen) return

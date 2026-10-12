@@ -1,7 +1,8 @@
 import { NativeModules, Platform } from 'react-native'
 import AppleHealthKit, { HealthKitPermissions, HealthValue } from 'react-native-health'
 
-type AppleHealthTodaySummary = {
+export type AppleHealthTodaySummary = {
+  localDate: string
   steps: number
   distanceKm: number | null
   activeEnergyKcal: number | null
@@ -13,14 +14,10 @@ function asNumber(val: any): number | null {
   return n
 }
 
-function startOfTodayLocalISO() {
-  const d = new Date()
+function startOfTodayLocalISO(now: Date) {
+  const d = new Date(now)
   d.setHours(0, 0, 0, 0)
   return d.toISOString()
-}
-
-function nowISO() {
-  return new Date().toISOString()
 }
 
 function healthKitBridge(): typeof AppleHealthKit {
@@ -67,10 +64,10 @@ async function initHealthKit(): Promise<void> {
   })
 }
 
-function getStepCount(): Promise<number> {
+function getStepCount(now: Date): Promise<number> {
   return new Promise((resolve, reject) => {
     healthKitBridge().getStepCount(
-      { startDate: startOfTodayLocalISO(), endDate: nowISO() } as any,
+      { date: now.toISOString() } as any,
       (err: string, results: HealthValue) => {
         if (err) return reject(new Error(String(err)))
         resolve(Math.max(0, Math.floor(asNumber((results as any)?.value) || 0)))
@@ -79,10 +76,10 @@ function getStepCount(): Promise<number> {
   })
 }
 
-function getDistanceWalkingRunningKm(): Promise<number | null> {
+function getDistanceWalkingRunningKm(now: Date): Promise<number | null> {
   return new Promise((resolve, reject) => {
     healthKitBridge().getDistanceWalkingRunning(
-      { startDate: startOfTodayLocalISO(), endDate: nowISO() } as any,
+      { date: now.toISOString(), unit: 'meter' } as any,
       (err: string, results: HealthValue) => {
         if (err) return reject(new Error(String(err)))
         const meters = asNumber((results as any)?.value)
@@ -93,10 +90,10 @@ function getDistanceWalkingRunningKm(): Promise<number | null> {
   })
 }
 
-function getActiveEnergyKcal(): Promise<number | null> {
+function getActiveEnergyKcal(now: Date): Promise<number | null> {
   return new Promise((resolve, reject) => {
     healthKitBridge().getActiveEnergyBurned(
-      { startDate: startOfTodayLocalISO(), endDate: nowISO() } as any,
+      { startDate: startOfTodayLocalISO(now), endDate: now.toISOString() } as any,
       (err: string, results: Array<HealthValue>) => {
         if (err) return reject(new Error(String(err)))
         const sum = (Array.isArray(results) ? results : [])
@@ -111,11 +108,18 @@ function getActiveEnergyKcal(): Promise<number | null> {
 
 export async function appleHealthConnectAndReadToday(): Promise<AppleHealthTodaySummary> {
   await initHealthKit()
+  return appleHealthReadToday()
+}
+
+// Reading already-authorised data must never open Apple's permission sheet.
+export async function appleHealthReadToday(now = new Date()): Promise<AppleHealthTodaySummary> {
+  if (!isAppleHealthSupportedDevice()) throw new Error('Apple Health requires an iPhone or an iPad with iPadOS 17 or later.')
+  const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
   const [steps, distanceKm, activeEnergyKcal] = await Promise.all([
-    getStepCount(),
-    getDistanceWalkingRunningKm(),
-    getActiveEnergyKcal(),
+    getStepCount(now),
+    getDistanceWalkingRunningKm(now),
+    getActiveEnergyKcal(now),
   ])
 
-  return { steps, distanceKm, activeEnergyKcal }
+  return { localDate, steps, distanceKm, activeEnergyKcal }
 }
