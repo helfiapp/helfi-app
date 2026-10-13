@@ -103,6 +103,7 @@ type ExerciseEntry = {
   label: string
   durationMinutes: number
   distanceKm: number | null
+  rawPayload?: { steps?: number | null; selectedSource?: { sourceId: string; sourceName: string } | null } | null
   calories: number
   startTime?: string | null
   exerciseType?: ExerciseType | null
@@ -5696,9 +5697,9 @@ export function TrackCaloriesScreen() {
       const result = await healthSync.refresh(true, date)
       if (!result) return
       if (result.imported) {
-        Alert.alert('Apple Health imported', `Daily activity for ${result.summary.localDate} was updated. This is the full day’s active calories, not just one walk.`)
+        Alert.alert('Activity imported', `${result.summary.selectedSource?.sourceName || 'Apple Health'} activity for ${result.summary.localDate} was updated. This is the daily active energy, not total calories or just one walk.`)
       } else {
-        Alert.alert('No active calories available', `Apple Health has no active calories available for ${date}. No exercise calories were added. Connect Apple Health on the Dashboard and check its access in the Health app if needed.`)
+        Alert.alert('No active calories available', `${result.summary.selectedSource?.sourceName || 'Apple Health'} has no active calories available for ${date}. Existing exercise entries were left as they were. Check the selected source and Health access, then try again.`)
       }
     } catch (error: any) {
       Alert.alert('Apple Health import failed', error?.message || 'Please try again.')
@@ -6382,10 +6383,10 @@ export function TrackCaloriesScreen() {
                 <Pressable
                   onPress={onAppleHealthImportSelectedDate}
                   disabled={healthSync.busy}
-                  accessibilityLabel={`Import Apple Health for ${selectedDate}`}
+                  accessibilityLabel={`Import ${healthSync.source?.sourceName || 'Apple Health'} for ${selectedDate}`}
                   style={{ marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0', opacity: healthSync.busy ? 0.5 : 1 }}
                 >
-                  <Text style={{ color: '#059669', fontWeight: '700', textAlign: 'center' }}>{healthSync.busy ? 'Importing Apple Health…' : 'Import Apple Health'}</Text>
+                  <Text style={{ color: '#059669', fontWeight: '700', textAlign: 'center' }}>{healthSync.busy ? 'Importing activity…' : `Import ${healthSync.source?.sourceName || 'Apple Health'}`}</Text>
                 </Pressable>
               ) : null}
 
@@ -6428,8 +6429,11 @@ export function TrackCaloriesScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
-                            {entry.source === 'APPLE_HEALTH' ? 'Apple Health activity' : entry.exerciseType?.name || 'Exercise'}
+                            {entry.source === 'APPLE_HEALTH' ? entry.label || 'Apple Health activity' : entry.exerciseType?.name || 'Exercise'}
                           </Text>
+                          {entry.source === 'APPLE_HEALTH' ? <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 12 }}>
+                            Steps: {typeof entry.rawPayload?.steps === 'number' && Number.isFinite(entry.rawPayload.steps) ? Math.round(entry.rawPayload.steps) : '—'} • Distance: {typeof entry.distanceKm === 'number' && Number.isFinite(entry.distanceKm) ? `${entry.distanceKm.toFixed(2)} km` : '—'}
+                          </Text> : null}
                           <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 12 }}>
                             {entry.source === 'APPLE_HEALTH'
                               ? `Daily total • ${formatCalories(numberOrZero(entry.calories), energyUnit)}`
@@ -6437,7 +6441,7 @@ export function TrackCaloriesScreen() {
                           </Text>
                         </View>
                         <EntryActionsButton
-                          label={`Actions for ${entry.source === 'APPLE_HEALTH' ? 'Apple Health activity' : entry.exerciseType?.name || 'exercise'}`}
+                          label={`Actions for ${entry.source === 'APPLE_HEALTH' ? entry.label || 'Apple Health activity' : entry.exerciseType?.name || 'exercise'}`}
                           onPress={() => setExerciseEntryMenu(entry)}
                         />
                       </View>

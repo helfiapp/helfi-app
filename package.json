@@ -76,7 +76,9 @@
     "check:native-health-flow": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/native-apple-health-flow-check.ts",
     "check:native-health-auto": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/native-apple-health-auto-check.ts",
     "check:native-health-server": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/native-health-import-server-check.ts",
-    "check:native-health": "npm run check:native-health-bridge && npm run check:native-health-flow && npm run check:native-health-auto && npm run check:native-health-server"
+    "check:native-health": "npm run check:native-health-bridge && npm run check:native-health-flow && npm run check:native-health-auto && npm run check:native-health-source && npm run check:native-health-server && npm run check:native-huawei-ui",
+    "check:native-health-source": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/native-apple-health-source-check.ts",
+    "check:native-huawei-ui": "TS_NODE_TRANSPILE_ONLY=1 TS_NODE_COMPILER_OPTIONS='{\"module\":\"commonjs\",\"moduleResolution\":\"node\"}' ts-node scripts/native-huawei-ui-check.ts"
   },
   "dependencies": {
     "@aws-sdk/client-kms": "^3.927.0",

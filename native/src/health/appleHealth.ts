@@ -1,11 +1,14 @@
 import { NativeModules, Platform } from 'react-native'
 import AppleHealthKit, { HealthKitPermissions, HealthValue } from 'react-native-health'
+import { AppleHealthSource, discoverAppleHealthSources, sumAppleHealthSourceQuantity, validateAppleHealthSource } from './appleHealthSources'
+export type { AppleHealthSource } from './appleHealthSources'
 
 export type AppleHealthTodaySummary = {
   localDate: string
-  steps: number
+  steps: number | null
   distanceKm: number | null
   activeEnergyKcal: number | null
+  selectedSource: AppleHealthSource | null
 }
 
 function asNumber(val: any): number | null {
@@ -31,12 +34,13 @@ export function appleHealthDateWindow(localDate: string | undefined, now = new D
   return { localDate: date, reference: date === localDateString(now) ? new Date(now) : reference, start, end }
 }
 
-function healthKitBridge(): typeof AppleHealthKit {
+function healthKitBridge(sourceMethods = false): typeof AppleHealthKit {
   // The library copies NativeModules with Object.assign. Bridgeless host
   // methods may be callable without being enumerable, so that copy can lose
   // the methods. Keep the original native object in that case.
   const candidates = [AppleHealthKit, NativeModules.AppleHealthKit]
   const methods = ['isAvailable', 'initHealthKit', 'getStepCount', 'getDistanceWalkingRunning', 'getActiveEnergyBurned']
+  if (sourceMethods) methods.push('getDailyStepCountSamples', 'getDailyDistanceWalkingRunningSamples')
   const bridge = candidates.find(candidate => candidate && methods.every(method => typeof candidate[method] === 'function'))
   if (!bridge) throw new Error('Apple Health is unavailable in this installation. Please update Helfi and try again.')
   return bridge
@@ -127,7 +131,38 @@ export async function appleHealthReadToday(now = new Date()): Promise<AppleHealt
   return appleHealthReadDate(undefined, now)
 }
 
-export async function appleHealthReadDate(localDate?: string, now = new Date()): Promise<AppleHealthTodaySummary> {
+async function readSourceBuckets(localDate?: string, now = new Date()) {
+  if (!isAppleHealthSupportedDevice()) throw new Error('Apple Health requires an iPhone or an iPad with iPadOS 17 or later.')
+  const window = appleHealthDateWindow(localDate, now)
+  const bridge = healthKitBridge(true)
+  const options = { startDate: window.start.toISOString(), endDate: window.end.toISOString(), period: 60, ascending: true }
+  const query = (method: 'getDailyStepCountSamples' | 'getDailyDistanceWalkingRunningSamples' | 'getActiveEnergyBurned', unit?: 'count' | 'meter') => new Promise<HealthValue[]>((resolve, reject) => {
+    bridge[method]({ ...options, ...(unit ? { unit } : {}) } as any, (error: string, results: HealthValue[]) => error ? reject(new Error(String(error))) : resolve(Array.isArray(results) ? results : []))
+  })
+  const [steps, distance, energy] = await Promise.all([query('getDailyStepCountSamples', 'count'), query('getDailyDistanceWalkingRunningSamples', 'meter'), query('getActiveEnergyBurned')])
+  return { window, steps, distance, energy }
+}
+
+export async function appleHealthDiscoverSources(localDate?: string): Promise<AppleHealthSource[]> {
+  const buckets = await readSourceBuckets(localDate)
+  return discoverAppleHealthSources([buckets.steps, buckets.distance, buckets.energy])
+}
+
+export async function appleHealthReadDate(localDate?: string, now = new Date(), selection: AppleHealthSource | null = null): Promise<AppleHealthTodaySummary> {
+  const selectedSource = validateAppleHealthSource(selection)
+  if (selectedSource) {
+    const buckets = await readSourceBuckets(localDate, now)
+    const observed = discoverAppleHealthSources([buckets.steps, buckets.distance, buckets.energy]).find(source => source.sourceId === selectedSource.sourceId)
+    if (!observed) return { localDate: buckets.window.localDate, selectedSource, steps: null, distanceKm: null, activeEnergyKcal: null }
+    const steps = sumAppleHealthSourceQuantity(buckets.steps, selectedSource.sourceId)
+    const distanceMeters = sumAppleHealthSourceQuantity(buckets.distance, selectedSource.sourceId)
+    return {
+      localDate: buckets.window.localDate, selectedSource: observed ?? selectedSource,
+      steps: steps === null ? null : Math.floor(steps),
+      distanceKm: distanceMeters === null ? null : distanceMeters / 1000,
+      activeEnergyKcal: sumAppleHealthSourceQuantity(buckets.energy, selectedSource.sourceId),
+    }
+  }
   if (!isAppleHealthSupportedDevice()) throw new Error('Apple Health requires an iPhone or an iPad with iPadOS 17 or later.')
   const window = appleHealthDateWindow(localDate, now)
   const [steps, distanceKm, activeEnergyKcal] = await Promise.all([
@@ -136,5 +171,5 @@ export async function appleHealthReadDate(localDate?: string, now = new Date()):
     getActiveEnergyKcal(window.start, window.end),
   ])
 
-  return { localDate: window.localDate, steps, distanceKm, activeEnergyKcal }
+  return { localDate: window.localDate, steps, distanceKm, activeEnergyKcal, selectedSource: null }
 }

@@ -522,7 +522,7 @@ export function DashboardScreen() {
       const summary = await appleHealthConnectAndReadToday()
       // Apple intentionally makes denied read access look like an empty store.
       // Completing the permission dialog is not proof that access was granted.
-      if (!(summary.steps > 0 || (summary.distanceKm ?? 0) > 0 || (summary.activeEnergyKcal ?? 0) > 0)) {
+      if (!((summary.steps ?? 0) > 0 || (summary.distanceKm ?? 0) > 0 || (summary.activeEnergyKcal ?? 0) > 0)) {
         setAppleHealthConnected(false)
         try { await AsyncStorage.setItem(APPLE_HEALTH_CONNECTED_KEY, '0') } catch {}
         Alert.alert('No activity available today', 'There may be no saved activity for today, or Helfi may not have permission to read it. Check Health, Sharing, Apps, Helfi, then try again.')
@@ -561,7 +561,7 @@ export function DashboardScreen() {
       const { summary, imported } = result
       if (imported) {
         Alert.alert('Imported', 'Today’s activity was updated in your exercise log.')
-      } else if (summary.steps > 0 || (summary.distanceKm ?? 0) > 0) {
+      } else if ((summary.steps ?? 0) > 0 || (summary.distanceKm ?? 0) > 0) {
         Alert.alert('Activity read', 'Your steps and distance are available. Apple Health has no active calories available today, so Helfi has not added any exercise calories.')
       } else {
         Alert.alert('No activity available today', 'There may be no saved activity for today, or Helfi may not have permission to read it. Check Health, Sharing, Apps, Helfi, then try again.')
@@ -978,8 +978,9 @@ export function DashboardScreen() {
                       }} />
                     </View>
                     <Text style={{ color: theme.colors.muted }}>Refreshes when you open or return to Helfi. Import today remains available for a manual refresh.</Text>
+                    <Text style={{ color: theme.colors.muted }}>Activity source: {healthSync.source?.sourceName || 'Apple Health totals'}. Choose a source in Devices.</Text>
                     {healthSync.result ? <Text style={{ color: theme.colors.text }}>
-                      {healthSync.result.summary.localDate}: {healthSync.result.summary.steps} steps
+                      {healthSync.result.summary.localDate}: {healthSync.result.summary.steps === null ? 'Steps unavailable' : `${healthSync.result.summary.steps} steps`}
                       {healthSync.result.summary.distanceKm !== null ? ` · ${healthSync.result.summary.distanceKm.toFixed(2)} km` : ''}
                       {healthSync.result.summary.activeEnergyKcal !== null ? ` · ${Number(healthSync.result.summary.activeEnergyKcal.toFixed(2))} active kcal` : ' · No active calories available'}
                     </Text> : null}

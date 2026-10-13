@@ -2,13 +2,14 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react'
 import { ActivityIndicator, Alert, Image, ImageSourcePropType, Linking, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
-import { useFocusEffect } from '@react-navigation/native'
+import { useFocusEffect, useNavigation } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { HuaweiHealthSetupCard } from '../ui/HuaweiHealthSetupCard'
 
 type WearableProvider = 'fitbit' | 'garmin'
 type InterestKey = 'googleFit' | 'oura' | 'polar' | 'huawei'
@@ -147,6 +148,7 @@ function InterestCard({
 
 export function DevicesScreen() {
   const { mode, session } = useAppMode()
+  const navigation = useNavigation<any>()
   const { width } = useWindowDimensions()
   const [loading, setLoading] = useState(true)
   const [fitbitConnected, setFitbitConnected] = useState(false)
@@ -355,6 +357,10 @@ export function DevicesScreen() {
             onDisconnect={() => disconnectProvider('garmin')}
           />
 
+          <HuaweiHealthSetupCard onAppleHealthSetup={() => {
+            navigation.navigate('Tabs', { screen: 'Dashboard' })
+          }} />
+
           <View style={{ backgroundColor: theme.colors.card, borderRadius: theme.radius.md, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
             <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700', marginBottom: 14 }}>Other devices under review</Text>
             <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
@@ -381,14 +387,6 @@ export function DevicesScreen() {
                 selected={interest.polar === true}
                 busy={savingInterest}
                 onPress={() => toggleInterest('polar')}
-              />
-              <InterestCard
-                title="Huawei Health"
-                detail="Activity & wellness"
-                icon={<MaterialCommunityIcons name="heart-pulse" size={30} color={theme.colors.muted} />}
-                selected={interest.huawei === true}
-                busy={savingInterest}
-                onPress={() => toggleInterest('huawei')}
               />
             </View>
           </View>

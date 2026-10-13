@@ -62,6 +62,12 @@ async function checkIngest() {
   assert.equal(later.created, false)
   assert.equal(later.entry.calories, 180, 'daily energy replaces rather than adds to the previous total')
   assert.equal(rows.size, 1)
+  const selectedSource = { sourceId: 'org.fixture.wearable', sourceName: 'Fixture wearable app' }
+  const selected = await ingestExerciseEntry({ ...input, calories: 64.25, label: 'Fixture wearable app via Apple Health', rawPayload: { ...input.rawPayload, selectedSource } })
+  assert.equal(selected.entry.id, later.entry.id, 'changing source must replace the same daily row')
+  assert.equal(selected.entry.calories, 64.25, 'selected source is not added to aggregate energy')
+  assert.equal(selected.entry.rawPayload.selectedSource.sourceId, selectedSource.sourceId)
+  assert.equal(rows.size, 1)
   await ingestExerciseEntry({ ...input, userId: 'fixture-b' })
   await ingestExerciseEntry({ ...input, deviceId: 'apple-health:2026-10-13', localDate: '2026-10-13' })
   assert.equal(rows.size, 3, 'accounts and dates stay isolated')
@@ -108,6 +114,20 @@ async function checkRoute() {
   assert.equal(calls[1].rawPayload.distanceKm, null, 'unreported distance remains unreported')
   assert.equal((await run({ ...body, caloriesKcal: 0.25 })).status, 200)
   assert.equal(calls[2].calories, 0.25, 'small reported energy must not round into zero before ingestion')
+  const selectedSource = { sourceId: 'org.fixture.wearable', sourceName: 'Fixture wearable app' }
+  const selected = await run({ ...body, selectedSource, steps: null, distanceKm: null })
+  assert.equal(selected.status, 200)
+  assert.equal(calls[3].deviceId, calls[0].deviceId, 'source choice must retain the same daily key')
+  assert.equal(calls[3].source, 'APPLE_HEALTH')
+  assert.equal(calls[3].label, 'Fixture wearable app via Apple Health')
+  assert.equal(calls[3].rawPayload.selectedSource.sourceId, selectedSource.sourceId)
+  assert.equal(calls[3].rawPayload.steps, null, 'unavailable source steps must remain missing')
+  assert.equal(calls[3].distanceKm, null)
+  const beforeInvalid = calls.length
+  for (const selectedSource of [[], true, {}, { sourceId: '', sourceName: 'App' }, { sourceId: 'org.fixture', sourceName: '' }, { sourceId: 'bad/id', sourceName: 'App' }, { sourceId: 'org.fixture', sourceName: 'App\nName' }]) {
+    assert.equal((await run({ ...body, selectedSource })).status, 400)
+  }
+  assert.equal(calls.length, beforeInvalid, 'invalid provenance must not reach ingestion')
 }
 
 async function main() {

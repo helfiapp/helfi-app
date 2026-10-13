@@ -3,23 +3,30 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 
+const sourceContext: any = {exports: {}, Map, Number, Error}
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('native/src/health/appleHealthSources.ts', 'utf8'), {compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText, sourceContext)
+
 const code = ts.transpileModule(fs.readFileSync('native/src/health/appleHealth.ts', 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, esModuleInterop: true },
 }).outputText
 
-function loadBridge(mode: 'bridgeless' | 'legacy' | 'missing' | 'denied' | 'unavailable' | 'availability-error', isPad = false, version: string | number = '26.2', os = 'ios') {
+function loadBridge(mode: 'bridgeless' | 'legacy' | 'missing' | 'denied' | 'unavailable' | 'availability-error' | 'missing-daily', isPad = false, version: string | number = '26.2', os = 'ios', perSource = false) {
   const calls: any[] = []
   const native: any = {}
   const queryOptions: any = {}
+  const metadata = (quantity: number) => [{sourceId:'fixture.tracker',sourceName:'Test Tracker',quantity},{sourceId:'fixture.phone',sourceName:'Test Phone',quantity:900}]
   const methods = {
     isAvailable(callback: any) { calls.push('availability'); callback(mode === 'availability-error' ? 'Health unavailable' : null, mode !== 'unavailable') },
     initHealthKit(options: any, callback: any) { calls.push({ permission: options }); callback(mode === 'denied' ? 'Health permission unavailable' : null) },
     getStepCount(options: any, callback: any) { queryOptions.steps = options; calls.push('steps'); callback(null, { value: 1234 }) },
     getDistanceWalkingRunning(options: any, callback: any) { queryOptions.distance = options; calls.push('distance'); callback(null, { value: 820 }) },
-    getActiveEnergyBurned(options: any, callback: any) { queryOptions.energy = options; calls.push('energy'); callback(null, [{ value: 32 }, { value: 16 }]) },
+    getActiveEnergyBurned(options: any, callback: any) { queryOptions.energy = options; calls.push('energy'); callback(null, perSource ? [{ value: 910, metadata: metadata(10) }, { value: 905, metadata: metadata(5) }] : [{ value: 32 }, { value: 16 }]) },
+    getDailyStepCountSamples(options: any, callback: any) { queryOptions.sourceSteps = options; calls.push('sourceSteps'); callback(null, [{value:2100,metadata:metadata(1200)},{value:1400,metadata:metadata(500)}]) },
+    getDailyDistanceWalkingRunningSamples(options: any, callback: any) { queryOptions.sourceDistance = options; calls.push('sourceDistance'); callback(null, [{value:1300,metadata:metadata(400)},{value:1100,metadata:metadata(200)}]) },
   }
   // Actual library behavior: Object.assign drops non-enumerable host methods.
   if (mode !== 'missing') for (const [name, method] of Object.entries(methods)) {
+    if (mode === 'missing-daily' && name.startsWith('getDaily')) continue
     Object.defineProperty(native, name, { value: method, enumerable: mode === 'legacy' })
   }
   const library = Object.assign({}, native, { Constants: { Permissions: { Steps: 'Steps', DistanceWalkingRunning: 'DistanceWalkingRunning', ActiveEnergyBurned: 'ActiveEnergyBurned' } } })
@@ -27,6 +34,7 @@ function loadBridge(mode: 'bridgeless' | 'legacy' | 'missing' | 'denied' | 'unav
   const context: any = { exports: {}, Date, Promise, require(name: string) {
     if (name === 'react-native') return { Platform: { OS: os, isPad, Version: version }, NativeModules: { AppleHealthKit: mode === 'legacy' ? undefined : native } }
     if (name === 'react-native-health') return library
+    if (name === './appleHealthSources') return sourceContext.exports
     throw new Error('Unexpected test dependency')
   } }
   vm.runInNewContext(code, context)
@@ -36,7 +44,7 @@ function loadBridge(mode: 'bridgeless' | 'legacy' | 'missing' | 'denied' | 'unav
 async function main() {
   for (const mode of ['bridgeless', 'legacy'] as const) {
     const test = loadBridge(mode)
-    assert.deepEqual(JSON.parse(JSON.stringify(await test.api.appleHealthConnectAndReadToday())), { localDate: new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0'), steps: 1234, distanceKm: 0.82, activeEnergyKcal: 48 })
+    assert.deepEqual(JSON.parse(JSON.stringify(await test.api.appleHealthConnectAndReadToday())), { localDate: new Date().getFullYear() + '-' + String(new Date().getMonth() + 1).padStart(2, '0') + '-' + String(new Date().getDate()).padStart(2, '0'), steps: 1234, distanceKm: 0.82, activeEnergyKcal: 48, selectedSource: null })
     assert.deepEqual(JSON.parse(JSON.stringify(test.calls[1])), { permission: { permissions: { read: ['Steps', 'DistanceWalkingRunning', 'ActiveEnergyBurned'], write: [] } } })
     assert.equal(test.calls.length, 5)
   }
@@ -66,6 +74,22 @@ async function main() {
     await assert.rejects(invalid.api.appleHealthReadDate(date, today))
     assert.equal(invalid.calls.length, 0, 'invalid/future dates never read Health')
   }
+  const selected = {sourceId:'fixture.tracker',sourceName:'Test Tracker'}
+  const sourceRead = loadBridge('bridgeless', false, '26.2', 'ios', true)
+  assert.deepEqual(JSON.parse(JSON.stringify(await sourceRead.api.appleHealthReadDate('2026-10-12', today, selected))), {localDate:'2026-10-12',steps:1700,distanceKm:0.6,activeEnergyKcal:15,selectedSource:selected}, 'exact source quantities exclude combined phone totals')
+  assert.equal(sourceRead.queryOptions.sourceSteps.unit, 'count'); assert.equal(sourceRead.queryOptions.sourceDistance.unit, 'meter')
+  for (const options of [sourceRead.queryOptions.sourceSteps,sourceRead.queryOptions.sourceDistance,sourceRead.queryOptions.energy]) {
+    assert.equal(options.startDate,new Date(2026,9,12).toISOString()); assert.equal(options.endDate,new Date(2026,9,12,23,59,59,999).toISOString()); assert.equal(options.period,60)
+  }
+  assert.ok(!sourceRead.calls.some(call=>typeof call==='object' && call.permission))
+  const missingSource = await sourceRead.api.appleHealthReadDate('2026-10-12',today,{sourceId:'fixture.absent',sourceName:'Absent Source'})
+  assert.equal(missingSource.steps,null); assert.equal(missingSource.distanceKm,null); assert.equal(missingSource.activeEnergyKcal,null)
+  const discovered = await sourceRead.api.appleHealthDiscoverSources('2026-10-12')
+  assert.deepEqual(JSON.parse(JSON.stringify(discovered)).map((x:any)=>x.sourceId).sort(),['fixture.phone','fixture.tracker'])
+  assert.ok(!sourceRead.calls.some(call=>typeof call==='object' && call.permission), 'discovery never requests permissions')
+  const noDaily = loadBridge('missing-daily')
+  await assert.rejects(noDaily.api.appleHealthReadDate('2026-10-12',today,selected), /unavailable/)
+  assert.equal(noDaily.calls.length,0, 'missing native daily methods never fall back to aggregate')
   const originalTimezone = process.env.TZ
   try {
     process.env.TZ = 'Australia/Melbourne'
@@ -84,6 +108,10 @@ async function main() {
     const fitnessLibrary = fs.readFileSync('native/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Methods_Fitness.m', 'utf8')
     assert.ok(/fitness_getStepCountOnDay[\s\S]*?key:@"date"/.test(fitnessLibrary), 'installed library step method uses date')
     assert.ok(/fitness_getDistanceWalkingRunningOnDay[\s\S]*?key:@"date"/.test(fitnessLibrary), 'installed library distance method uses date')
+    const exports = fs.readFileSync('native/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit.m', 'utf8')
+    for (const method of ['getDailyStepCountSamples','getDailyDistanceWalkingRunningSamples','getActiveEnergyBurned']) assert.ok(exports.includes(`RCT_EXPORT_METHOD(${method}:`), 'installed host exposes source range methods')
+    const queries = fs.readFileSync('native/node_modules/react-native-health/RCTAppleHealthKit/RCTAppleHealthKit+Queries.m','utf8')
+    assert.ok(queries.includes('HKStatisticsOptionSeparateBySource') && queries.includes('[result sumQuantityForSource:source]') && queries.includes('@"quantity" : @(quantity)') && queries.includes('@"metadata" : metadata'), 'source range output includes exact per-source quantities')
     console.log('PASS: installed native Health library uses the verified daily date arguments.')
   }
   for (const mode of ['missing', 'denied', 'unavailable', 'availability-error'] as const) {

@@ -2,7 +2,9 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
-const engineContext: any = { exports: {}, Date, Promise, Map, setTimeout, clearTimeout }
+const sourceContext: any = {exports:{}, Map, Number, Error}
+vm.runInNewContext(ts.transpileModule(fs.readFileSync('native/src/health/appleHealthSources.ts','utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2022}}).outputText,sourceContext)
+const engineContext: any = { exports: {}, Date, Promise, Map, setTimeout, clearTimeout, require: (name:string) => { assert.equal(name, './appleHealthSources'); return sourceContext.exports } }
 vm.runInNewContext(ts.transpileModule(fs.readFileSync('native/src/health/appleHealthSync.ts', 'utf8'), {
   compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022 },
 }).outputText, engineContext)
@@ -118,10 +120,11 @@ async function main() {
       if (name === '@react-native-async-storage/async-storage' || name === '../state/AppModeContext') return {}
       if (name === '../config') return { API_BASE_URL: 'https://fixture.invalid' }
       if (name === './appleHealthSync') return { createAppleHealthSync, appleHealthAutoKey }
-      if (name === './appleHealth') return { isAppleHealthSupportedDevice: () => true, appleHealthReadDate: async (date: string) => {
+      if (name === './appleHealthSources') return sourceContext.exports
+      if (name === './appleHealth') return { isAppleHealthSupportedDevice: () => true, appleHealthReadDate: async (date: string, _now: Date, selectedSource: any = null) => {
         requestedDates.push(date)
         if (delayRead) await new Promise<void>(resolve => { finishRead = resolve })
-        return { ...nativeRead, localDate: date }
+        return { ...nativeRead, localDate: date, selectedSource }
       } }
       throw new Error(`Unexpected provider test dependency ${name}`)
     },
@@ -130,7 +133,7 @@ async function main() {
   vm.runInContext(ts.transpileModule(provider + '\nexports.__sync = runSync', { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText, context)
   await context.exports.__sync({ localDate: '2026-10-12', userId: 'A', token: 'fixture', manual: true, allowed: () => true })
   assert.equal(posted.length, 1)
-  assert.deepEqual(posted[0].payload, { source: 'APPLE_HEALTH', date: '2026-10-12', steps: 321, distanceKm: 0.24, caloriesKcal: 0.25 }, 'actual provider sends exact snapshot/date/precision')
+  assert.deepEqual(posted[0].payload, { source: 'APPLE_HEALTH', date: '2026-10-12', steps: 321, distanceKm: 0.24, caloriesKcal: 0.25, selectedSource: null }, 'actual provider sends exact snapshot/date/precision')
   assert.equal(posted[0].options.headers.authorization, 'Bearer fixture')
   assert.equal(requestedDates[0], '2026-10-12', 'actual provider passes selected day to Health reader')
   nativeRead.activeEnergyKcal = null
@@ -151,7 +154,7 @@ async function main() {
   const values: boolean[] = []
   const writes: { value: string; finish: () => void }[] = []
   const callbackContext: any = {
-    exports: {}, userId: 'A', token: 'fixture',
+    exports: {}, ready: true, source: null, userId: 'A', token: 'fixture',
     current: { current: { userId: 'A', token: 'fixture', enabled: false, revision: 0 } },
     preferenceWrites: { current: Promise.resolve() },
     useCallback: (fn: any) => fn, updateEnabled: (value: boolean) => values.push(value), setReady: () => {}, setError: () => {}, setBusy: () => {}, setResult: () => {},
@@ -177,6 +180,11 @@ async function main() {
   assert.ok(finishRead); (finishRead as unknown as () => void)()
   assert.equal(await switching, null)
   assert.equal(posted.length, 1, 'actual callback stops account-switched reads before server storage')
+  delayRead = false
+  const exactSource = {sourceId:'fixture.tracker',sourceName:'Test Tracker'}
+  await context.exports.__sync({localDate:'2026-10-12',userId:'fixture-source-account',token:'fixture',source:exactSource,manual:true,allowed:()=>true})
+  assert.deepEqual(posted[posted.length-1].payload.selectedSource,exactSource,'actual provider POST retains selected app provenance')
+
   assert.ok(provider.includes('appleHealthReadDate') && !provider.includes('appleHealthConnectAndReadToday'), 'foreground code never requests authorization')
   assert.ok(provider.includes('appleHealthAutoKey(userId)') && !provider.includes('helfi_apple_health_connected_v1'), 'legacy global connection cannot grant automatic consent')
   assert.ok(provider.includes("state === 'active'") && provider.includes("AppState.currentState === 'active'"))
@@ -193,7 +201,7 @@ async function main() {
     if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && ['usedKcal', 'dailyAllowanceKcal', 'remainingKcal'].includes(node.name.text) && node.initializer && ts.isCallExpression(node.initializer)) budgetCallbacks[node.name.text] = node.initializer.arguments[0].getText(trackAst)
     if (ts.isJsxExpression(node) && node.expression) {
       const text = node.expression.getText(trackAst)
-      if (text.startsWith("entry.source === 'APPLE_HEALTH' ? 'Apple Health activity'")) healthRowTitle = text
+      if (text.startsWith("entry.source === 'APPLE_HEALTH'") && text.includes("'Apple Health activity'")) healthRowTitle = text
       if (text.includes('Daily total •')) healthRowDetail = text
       if (text.startsWith("Math.round(energyUnit === 'kj' ? dailyTargets.calories")) baseAllowanceExpression = text
       if (ts.isConditionalExpression(node.expression) && text.includes('onAppleHealthImportSelectedDate')) buttonCondition = node.expression.condition.getText(trackAst)
@@ -228,7 +236,7 @@ async function main() {
   vm.runInContext(ts.transpileModule(`const ${importHandler}; exports.importDay=onAppleHealthImportSelectedDate`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, importContext)
   await importContext.exports.importDay()
   assert.deepEqual(selectedRequests, [[true, '2026-10-12']], 'actual Food handler imports its selected date')
-  assert.ok(alerts[0][1].includes('2026-10-12') && alerts[0][1].includes('full day'))
+  assert.ok(alerts[0][1].includes('2026-10-12') && alerts[0][1].includes('daily active energy'))
   importContext.selectedDate = '2026-10-14'; await importContext.exports.importDay()
   assert.equal(selectedRequests.length, 1, 'future Food day never invokes Health')
   importContext.selectedDate = '2026-10-12'; importContext.healthSync.refresh = async () => ({ imported: false, summary: { activeEnergyKcal: null } })
