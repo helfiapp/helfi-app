@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react'
 import { Alert, Platform, Pressable, Text, View } from 'react-native'
-import { HUAWEI_HEALTH_GUIDE as guide } from '../../../lib/huawei-health-guide'
+import { HUAWEI_HEALTH_GUIDE as guide } from '../content/huawei-health-guide'
 import type { AppleHealthSource } from '../health/appleHealth'
 import { useAppleHealthSync } from '../health/AppleHealthSyncProvider'
 import { useAppMode } from '../state/AppModeContext'

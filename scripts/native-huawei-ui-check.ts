@@ -18,7 +18,7 @@ function compile(file: string) {
 
 async function checkCard() {
   const guide = { exports: {} as any }
-  vm.runInNewContext(compile('lib/huawei-health-guide.ts'), guide)
+  vm.runInNewContext(compile('native/src/content/huawei-health-guide.ts'), guide)
   const watch = { sourceId: 'org.fixture.wearable', sourceName: 'Fixture wearable app' }
   const phone = { sourceId: 'org.fixture.phone', sourceName: 'Fixture phone' }
   for (const platform of [{ OS: 'ios', isPad: false }, { OS: 'ios', isPad: true }, { OS: 'android', isPad: false }]) {
