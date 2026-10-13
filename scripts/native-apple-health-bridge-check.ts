@@ -50,6 +50,34 @@ async function main() {
   assert.equal(quiet.queryOptions.energy.startDate, midnight.toISOString())
   assert.equal(quiet.queryOptions.energy.endDate, fixed.toISOString())
   assert.ok(!quiet.calls.some(call => typeof call === 'object' && call.permission), 'read-only refresh never asks for authorization')
+  const historical = loadBridge('bridgeless')
+  const today = new Date(2026, 9, 13, 9, 15, 10, 321)
+  const yesterday = await historical.api.appleHealthReadDate('2026-10-12', today)
+  assert.equal(yesterday.localDate, '2026-10-12')
+  assert.equal(historical.queryOptions.steps.date, new Date(2026, 9, 12, 12).toISOString())
+  assert.equal(historical.queryOptions.distance.date, historical.queryOptions.steps.date)
+  assert.equal(historical.queryOptions.energy.startDate, new Date(2026, 9, 12).toISOString())
+  assert.equal(historical.queryOptions.energy.endDate, new Date(2026, 9, 12, 23, 59, 59, 999).toISOString())
+  assert.ok(!historical.calls.some(call => typeof call === 'object' && call.permission), 'dated reads never request permission')
+  const todayWindow = historical.api.appleHealthDateWindow('2026-10-13', today)
+  assert.equal(todayWindow.end.toISOString(), today.toISOString(), 'today stops at the captured current moment')
+  for (const date of ['2026-02-30', '2026-02-29', '2026-13-01', '2026-10-14', 'bad-date']) {
+    const invalid = loadBridge('bridgeless')
+    await assert.rejects(invalid.api.appleHealthReadDate(date, today))
+    assert.equal(invalid.calls.length, 0, 'invalid/future dates never read Health')
+  }
+  const originalTimezone = process.env.TZ
+  try {
+    process.env.TZ = 'Australia/Melbourne'
+    for (const [date, hours] of [['2026-10-04', 23], ['2026-04-05', 25]] as const) {
+      const window = historical.api.appleHealthDateWindow(date, new Date(2026, 9, 13))
+      assert.equal(window.end.getTime() - window.start.getTime(), hours * 60 * 60 * 1000 - 1, 'past day follows local DST boundaries')
+      assert.equal(window.end.getHours(), 23); assert.equal(window.end.getMilliseconds(), 999)
+    }
+  } finally {
+    if (originalTimezone === undefined) delete process.env.TZ
+    else process.env.TZ = originalTimezone
+  }
   // AWS builds install only web dependencies. Native archives additionally
   // require this installed-library contract check; never silently skip it there.
   if (process.argv.includes('--check-installed-library')) {

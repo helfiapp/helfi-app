@@ -3,11 +3,11 @@ import { AppState, DeviceEventEmitter } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_BASE_URL } from '../config'
 import { useAppMode } from '../state/AppModeContext'
-import { appleHealthReadToday, isAppleHealthSupportedDevice } from './appleHealth'
+import { appleHealthReadDate, isAppleHealthSupportedDevice } from './appleHealth'
 import { appleHealthAutoKey, createAppleHealthSync, AppleHealthSyncResult } from './appleHealthSync'
 
 const runSync = createAppleHealthSync({
-  read: appleHealthReadToday,
+  read: appleHealthReadDate,
   importSummary: async (summary, token) => {
     const controller = new AbortController()
     const timer = setTimeout(() => controller.abort(), 30_000)
@@ -30,7 +30,7 @@ type SyncContext = {
   result: AppleHealthSyncResult | null
   error: string | null
   setEnabled: (enabled: boolean) => Promise<void>
-  refresh: (manual?: boolean) => Promise<AppleHealthSyncResult | null>
+  refresh: (manual?: boolean, localDate?: string) => Promise<AppleHealthSyncResult | null>
 }
 const Context = createContext<SyncContext | null>(null)
 
@@ -78,14 +78,14 @@ export function AppleHealthSyncProvider({ children }: { children: React.ReactNod
     updateEnabled(value); setReady(true); setError(null)
   }, [userId])
 
-  const refresh = useCallback(async (manual = false) => {
+  const refresh = useCallback(async (manual = false, localDate?: string) => {
     if (!userId || !token || !isAppleHealthSupportedDevice()) return null
     const revision = current.current.revision
     const allowed = () => current.current.userId === userId && current.current.token === token && current.current.revision === revision && (manual || current.current.enabled)
     if (!allowed()) return null
     setBusy(true)
     try {
-      const next = await runSync({ userId, token, manual, allowed })
+      const next = await runSync({ userId, token, localDate, manual, allowed })
       if (next && allowed()) {
         setResult(next); setError(null)
         if (next.imported) DeviceEventEmitter.emit('helfi:apple-health-imported', { userId, localDate: next.summary.localDate })

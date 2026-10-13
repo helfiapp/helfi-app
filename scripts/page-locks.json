@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-12T07:49:04.101Z",
+  "generatedAt": "2026-10-13T09:06:23.889Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -207,9 +207,9 @@
     "native/src/config/nativePageRoutes.ts": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f",
     "native/src/content/legal.ts": "338d30c5ace5fb8f1a3df72c824acb4dc886997002c6a265220e53d675a52bd9",
     "native/src/data/produceMeasurements.ts": "1c0985f90c573a5e84084497aa08e59354a67f6392c5c7127acf3bbac0470a13",
-    "native/src/health/appleHealth.ts": "347df394bb600ee4662b4cd2a25f479123b9616257b504310e5ea6a39a75cfa0",
-    "native/src/health/appleHealthSync.ts": "2533ad0896703a821e254a14b0c042c1639111f2f916823fc1e3addbb455e174",
-    "native/src/health/AppleHealthSyncProvider.tsx": "5672d9f7715e03a66e0cfd42cd92f231bbd2d416d5ec6b235ff167ef4b1aaa09",
+    "native/src/health/appleHealth.ts": "b76db67947a637a375d5b3345fd9faf45f8568232e1dd87a7162fdb2c925c203",
+    "native/src/health/appleHealthSync.ts": "21cd0727ded50e67fa776c0bd92bc3248aa8ea6e0833cbfe1e95df35d2890cce",
+    "native/src/health/AppleHealthSyncProvider.tsx": "301a4bed99c956382bbde22def1f8101d8f93b3558f03b60982a6c6d2b757588",
     "native/src/lib/affiliateAttribution.ts": "a8f111e48edc67bbde16505278f9b76547b22ba6aa414204f45f55916381a1c3",
     "native/src/lib/aiConsent.ts": "cad69ccb3ee5eca072761d138b51344cfcd588e46f99f7d42b35e8ecc36835f6",
     "native/src/lib/dailyTargets.ts": "8ada3e9e7f09218f025bb4041ebfeeadb2c249c512ea3edcfff85bc800da7776",
@@ -272,7 +272,7 @@
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "b0456e82e3cae345d3722cb0a0ea1d791d5c26ff773840ee37a7b997d1334800",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "af92a223edbb1d4cd7b0335b0db447fdcdd5fd9b1a82c81f07e75141efac7b9b",
+    "native/src/screens/TrackCaloriesScreen.tsx": "adfeb8cf794a35e1ee7f8c629cdc2b9fe5dcef09dd04ef8406411634bb692fc6",
     "native/src/screens/WaterIntakeScreen.tsx": "1b3aae043fcb347c0198b6aa25e6b4caad76d6105911d632b55fdd61fbd0c2f9",
     "native/src/state/AppModeContext.tsx": "ce70c2670e359ca8fba27a78a2bd817b551490a422b30dabe3b87b3837739321",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",

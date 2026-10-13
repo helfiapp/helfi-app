@@ -14,10 +14,21 @@ function asNumber(val: any): number | null {
   return n
 }
 
-function startOfTodayLocalISO(now: Date) {
-  const d = new Date(now)
-  d.setHours(0, 0, 0, 0)
-  return d.toISOString()
+function localDateString(date: Date) {
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+}
+
+export function appleHealthDateWindow(localDate: string | undefined, now = new Date()) {
+  const date = localDate ?? localDateString(now)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(date)) throw new Error('Choose a valid date for Apple Health.')
+  const [year, month, day] = date.split('-').map(Number)
+  const reference = new Date(year, month - 1, day, 12)
+  if (localDateString(reference) !== date) throw new Error('Choose a valid date for Apple Health.')
+  if (date > localDateString(now)) throw new Error('Apple Health cannot import a future date.')
+  const start = new Date(year, month - 1, day)
+  const end = date === localDateString(now) ? new Date(now) : new Date(year, month - 1, day + 1)
+  if (date !== localDateString(now)) end.setMilliseconds(-1)
+  return { localDate: date, reference: date === localDateString(now) ? new Date(now) : reference, start, end }
 }
 
 function healthKitBridge(): typeof AppleHealthKit {
@@ -90,10 +101,10 @@ function getDistanceWalkingRunningKm(now: Date): Promise<number | null> {
   })
 }
 
-function getActiveEnergyKcal(now: Date): Promise<number | null> {
+function getActiveEnergyKcal(start: Date, end: Date): Promise<number | null> {
   return new Promise((resolve, reject) => {
     healthKitBridge().getActiveEnergyBurned(
-      { startDate: startOfTodayLocalISO(now), endDate: now.toISOString() } as any,
+      { startDate: start.toISOString(), endDate: end.toISOString() } as any,
       (err: string, results: Array<HealthValue>) => {
         if (err) return reject(new Error(String(err)))
         const sum = (Array.isArray(results) ? results : [])
@@ -113,13 +124,17 @@ export async function appleHealthConnectAndReadToday(): Promise<AppleHealthToday
 
 // Reading already-authorised data must never open Apple's permission sheet.
 export async function appleHealthReadToday(now = new Date()): Promise<AppleHealthTodaySummary> {
+  return appleHealthReadDate(undefined, now)
+}
+
+export async function appleHealthReadDate(localDate?: string, now = new Date()): Promise<AppleHealthTodaySummary> {
   if (!isAppleHealthSupportedDevice()) throw new Error('Apple Health requires an iPhone or an iPad with iPadOS 17 or later.')
-  const localDate = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+  const window = appleHealthDateWindow(localDate, now)
   const [steps, distanceKm, activeEnergyKcal] = await Promise.all([
-    getStepCount(now),
-    getDistanceWalkingRunningKm(now),
-    getActiveEnergyKcal(now),
+    getStepCount(window.reference),
+    getDistanceWalkingRunningKm(window.reference),
+    getActiveEnergyKcal(window.start, window.end),
   ])
 
-  return { localDate, steps, distanceKm, activeEnergyKcal }
+  return { localDate: window.localDate, steps, distanceKm, activeEnergyKcal }
 }

@@ -17,7 +17,7 @@ async function main() {
     read: async () => { reads++; if (pause) await new Promise<void>(resolve => { release = resolve }); return summary },
     importSummary: async (value: any, token: string) => { assert.equal(token, 'fixture'); assert.equal(value.localDate, summary.localDate); posts++ },
   })
-  const opts = { userId: 'A', token: 'fixture', allowed: () => allow }
+  const opts = { localDate: '2026-10-12', userId: 'A', token: 'fixture', allowed: () => allow }
   allow = false
   assert.equal(await run(opts), null); assert.equal(reads, 0)
   allow = true; pause = true
@@ -39,7 +39,7 @@ async function main() {
   assert.equal(await revoked, null); assert.equal(posts, 2, 'sign-out/revocation during read prevents storage')
   allow = true; pause = false
   summary = { ...summary, localDate: '2026-10-13' }
-  assert.equal((await run({ ...opts, userId: 'B' }))?.summary.localDate, '2026-10-13', 'account and date identity stay separate')
+  assert.equal((await run({ ...opts, userId: 'B', localDate: '2026-10-13' }))?.summary.localDate, '2026-10-13', 'account and date identity stay separate')
   assert.notEqual(appleHealthAutoKey('A'), appleHealthAutoKey('B'))
   for (const cancelWaiting of [false, true]) {
     const pendingReads: (() => void)[] = []
@@ -49,9 +49,9 @@ async function main() {
       read: async () => { await new Promise<void>(resolve => pendingReads.push(resolve)); return { localDate: '2026-10-12', steps: 100, distanceKm: 0.1, activeEnergyKcal: 20 } },
       importSummary: async (_summary: any, token: string) => { savedAccounts.push(token) },
     })
-    const old = switchRun({ userId: 'A', token: 'A', allowed: () => activeAccount === 'A' })
+    const old = switchRun({ localDate: '2026-10-12', userId: 'A', token: 'A', allowed: () => activeAccount === 'A' })
     activeAccount = 'B'
-    const next = switchRun({ userId: 'B', token: 'B', allowed: () => activeAccount === 'B' && bConsent })
+    const next = switchRun({ localDate: '2026-10-12', userId: 'B', token: 'B', allowed: () => activeAccount === 'B' && bConsent })
     assert.equal(pendingReads.length, 1, 'new account waits without overlapping Health reads')
     if (cancelWaiting) bConsent = false
     pendingReads[0](); assert.equal(await old, null)
@@ -68,20 +68,46 @@ async function main() {
   let account = 'A', finishOld: (() => void) | null = null
   let queuedReads = 0
   const replacedRun = createAppleHealthSync({ read: async () => { queuedReads++; await new Promise<void>(resolve => { finishOld = resolve }); return { localDate: '2026-10-12', steps: 1, distanceKm: null, activeEnergyKcal: 1 } }, importSummary: async () => { throw new Error('Replaced account cannot post') } })
-  const oldAccount = replacedRun({ userId: 'A', token: 'A', allowed: () => account === 'A' })
+  const oldAccount = replacedRun({ localDate: '2026-10-12', userId: 'A', token: 'A', allowed: () => account === 'A' })
   account = 'B'
-  const replacedAccount = replacedRun({ userId: 'B', token: 'B', allowed: () => account === 'B' })
+  const replacedAccount = replacedRun({ localDate: '2026-10-12', userId: 'B', token: 'B', allowed: () => account === 'B' })
   account = 'C'; (finishOld as unknown as () => void)()
   assert.equal(await oldAccount, null); assert.equal(await replacedAccount, null); assert.equal(queuedReads, 1)
+  summary.localDate = '2026-10-12'
   for (const value of [0, NaN, Infinity]) {
     summary.activeEnergyKcal = value
     const before: number = posts
     await run({ ...opts, manual: true })
     assert.equal(posts, before, 'invalid/empty energy cannot alter calories')
   }
+  const dayReads: string[] = [], dayPosts: string[] = []
+  const datesRun = createAppleHealthSync({ now: () => 0,
+    read: async (date: string) => { dayReads.push(date); return { localDate: date, steps: 10, distanceKm: 0.01, activeEnergyKcal: 2 } },
+    importSummary: async (value: any) => { dayPosts.push(value.localDate) },
+  })
+  const dayOpts = { userId: 'fixture-date-account', token: 'fixture', allowed: () => true }
+  await datesRun({ ...dayOpts, localDate: '2026-10-12' })
+  await datesRun({ ...dayOpts, localDate: '2026-10-13' })
+  assert.equal(await datesRun({ ...dayOpts, localDate: '2026-10-13' }), null)
+  await datesRun({ ...dayOpts, localDate: '2026-10-12', manual: true })
+  assert.deepEqual(dayReads, ['2026-10-12', '2026-10-13', '2026-10-12'], 'cooldown is account/day-specific; manual selected date can retry')
+  assert.deepEqual(dayPosts, dayReads, 'posted snapshots retain exactly the requested day')
+  const dateReleases: (() => void)[] = [], queuedDates: string[] = []
+  const queuedDateRun = createAppleHealthSync({
+    read: async (date: string) => { queuedDates.push(date); await new Promise<void>(resolve => dateReleases.push(resolve)); return { localDate: date, steps: 1, distanceKm: null, activeEnergyKcal: 1 } },
+    importSummary: async () => {},
+  })
+  const previousDay = queuedDateRun({ ...dayOpts, localDate: '2026-10-12', manual: true })
+  const currentDay = queuedDateRun({ ...dayOpts, localDate: '2026-10-13', manual: true })
+  assert.deepEqual(queuedDates, ['2026-10-12'], 'different selected dates share one in-flight read')
+  dateReleases[0](); await previousDay; await new Promise(resolve => setImmediate(resolve))
+  assert.deepEqual(queuedDates, ['2026-10-12', '2026-10-13']); dateReleases[1](); await currentDay
+  const mismatchRun = createAppleHealthSync({ read: async () => ({ localDate: '2026-10-13', steps: 10, distanceKm: 1, activeEnergyKcal: 20 }), importSummary: async () => { throw new Error('Wrong day cannot post') } })
+  await assert.rejects(mismatchRun({ ...dayOpts, localDate: '2026-10-12' }), /different date/)
   const provider = fs.readFileSync('native/src/health/AppleHealthSyncProvider.tsx', 'utf8')
   const nativeRead = { localDate: '2026-10-12', steps: 321, distanceKm: 0.24, activeEnergyKcal: 0.25 as number | null }
   const posted: any[] = []
+  const requestedDates: string[] = []
   let finishRead: (() => void) | null = null
   let delayRead = false
   const context: any = { exports: {}, AbortController, setTimeout, clearTimeout, Promise,
@@ -92,22 +118,27 @@ async function main() {
       if (name === '@react-native-async-storage/async-storage' || name === '../state/AppModeContext') return {}
       if (name === '../config') return { API_BASE_URL: 'https://fixture.invalid' }
       if (name === './appleHealthSync') return { createAppleHealthSync, appleHealthAutoKey }
-      if (name === './appleHealth') return { isAppleHealthSupportedDevice: () => true, appleHealthReadToday: async () => {
+      if (name === './appleHealth') return { isAppleHealthSupportedDevice: () => true, appleHealthReadDate: async (date: string) => {
+        requestedDates.push(date)
         if (delayRead) await new Promise<void>(resolve => { finishRead = resolve })
-        return nativeRead
+        return { ...nativeRead, localDate: date }
       } }
       throw new Error(`Unexpected provider test dependency ${name}`)
     },
   }
   vm.createContext(context)
   vm.runInContext(ts.transpileModule(provider + '\nexports.__sync = runSync', { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2022, jsx: ts.JsxEmit.React } }).outputText, context)
-  await context.exports.__sync({ userId: 'A', token: 'fixture', manual: true, allowed: () => true })
+  await context.exports.__sync({ localDate: '2026-10-12', userId: 'A', token: 'fixture', manual: true, allowed: () => true })
   assert.equal(posted.length, 1)
   assert.deepEqual(posted[0].payload, { source: 'APPLE_HEALTH', date: '2026-10-12', steps: 321, distanceKm: 0.24, caloriesKcal: 0.25 }, 'actual provider sends exact snapshot/date/precision')
   assert.equal(posted[0].options.headers.authorization, 'Bearer fixture')
+  assert.equal(requestedDates[0], '2026-10-12', 'actual provider passes selected day to Health reader')
   nativeRead.activeEnergyKcal = null
-  await context.exports.__sync({ userId: 'A', token: 'fixture', manual: true, allowed: () => true })
+  await context.exports.__sync({ localDate: '2026-10-12', userId: 'A', token: 'fixture', manual: true, allowed: () => true })
   assert.equal(posted.length, 1, 'actual provider never posts a substitute for absent active energy')
+  await context.exports.__sync({ userId: 'foreground-fixture', token: 'fixture', allowed: () => true })
+  const clock = new Date()
+  assert.equal(requestedDates[requestedDates.length - 1], `${clock.getFullYear()}-${String(clock.getMonth() + 1).padStart(2, '0')}-${String(clock.getDate()).padStart(2, '0')}`, 'foreground default reads today only')
 
   // Execute actual provider callbacks, including asynchronous preference races.
   const ast = ts.createSourceFile('provider.tsx', provider, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
@@ -146,7 +177,7 @@ async function main() {
   assert.ok(finishRead); (finishRead as unknown as () => void)()
   assert.equal(await switching, null)
   assert.equal(posted.length, 1, 'actual callback stops account-switched reads before server storage')
-  assert.ok(provider.includes('appleHealthReadToday') && !provider.includes('appleHealthConnectAndReadToday'), 'foreground code never requests authorization')
+  assert.ok(provider.includes('appleHealthReadDate') && !provider.includes('appleHealthConnectAndReadToday'), 'foreground code never requests authorization')
   assert.ok(provider.includes('appleHealthAutoKey(userId)') && !provider.includes('helfi_apple_health_connected_v1'), 'legacy global connection cannot grant automatic consent')
   assert.ok(provider.includes("state === 'active'") && provider.includes("AppState.currentState === 'active'"))
   const track = fs.readFileSync('native/src/screens/TrackCaloriesScreen.tsx', 'utf8')
@@ -154,8 +185,19 @@ async function main() {
   assert.ok(listener.includes('/api/exercise-entries?date=') && !listener.includes('loadAll') && !listener.includes('/api/food-log') && !listener.includes('/api/water-log'), 'Health event refreshes exercise only')
   let eventCode = ''
   const trackAst = ts.createSourceFile('track.tsx', track, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  let importHandler = '', healthRowTitle = '', healthRowDetail = '', baseAllowanceExpression = '', buttonCondition = ''
+  const budgetCallbacks: Record<string, string> = {}
   function collectEvent(node: ts.Node) {
     if (ts.isCallExpression(node) && node.arguments[0] && ts.isStringLiteral(node.arguments[0]) && node.arguments[0].text === 'helfi:apple-health-imported') eventCode = node.arguments[1].getText(trackAst)
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && node.name.text === 'onAppleHealthImportSelectedDate') importHandler = node.getText(trackAst)
+    if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name) && ['usedKcal', 'dailyAllowanceKcal', 'remainingKcal'].includes(node.name.text) && node.initializer && ts.isCallExpression(node.initializer)) budgetCallbacks[node.name.text] = node.initializer.arguments[0].getText(trackAst)
+    if (ts.isJsxExpression(node) && node.expression) {
+      const text = node.expression.getText(trackAst)
+      if (text.startsWith("entry.source === 'APPLE_HEALTH' ? 'Apple Health activity'")) healthRowTitle = text
+      if (text.includes('Daily total •')) healthRowDetail = text
+      if (text.startsWith("Math.round(energyUnit === 'kj' ? dailyTargets.calories")) baseAllowanceExpression = text
+      if (ts.isConditionalExpression(node.expression) && text.includes('onAppleHealthImportSelectedDate')) buttonCondition = node.expression.condition.getText(trackAst)
+    }
     ts.forEachChild(node, collectEvent)
   }
   collectEvent(trackAst)
@@ -178,6 +220,43 @@ async function main() {
   resolves[0]({ ok: true, json: async () => ({ exerciseCalories: 10, entries: [] }) })
   await new Promise(resolve => setImmediate(resolve))
   assert.deepEqual(displayedCalories, [20], 'late older exercise response cannot replace fresh totals')
-  console.log('PASS: actual Health sync coordinator preserves explicit account consent, cooldown, single request, manual retry, fixed date, revocation and no invented calories; foreground/exercise wiring stays narrow.')
+  const selectedRequests: any[] = [], alerts: any[] = []
+  const importContext: any = { exports: {}, selectedDate: '2026-10-12', formatLocalDate: () => '2026-10-13', Alert: { alert: (...args: any[]) => alerts.push(args) },
+    healthSync: { refresh: async (...args: any[]) => { selectedRequests.push(args); return { imported: true, summary: { localDate: args[1] } } } },
+  }
+  vm.createContext(importContext)
+  vm.runInContext(ts.transpileModule(`const ${importHandler}; exports.importDay=onAppleHealthImportSelectedDate`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, importContext)
+  await importContext.exports.importDay()
+  assert.deepEqual(selectedRequests, [[true, '2026-10-12']], 'actual Food handler imports its selected date')
+  assert.ok(alerts[0][1].includes('2026-10-12') && alerts[0][1].includes('full day'))
+  importContext.selectedDate = '2026-10-14'; await importContext.exports.importDay()
+  assert.equal(selectedRequests.length, 1, 'future Food day never invokes Health')
+  importContext.selectedDate = '2026-10-12'; importContext.healthSync.refresh = async () => ({ imported: false, summary: { activeEnergyKcal: null } })
+  await importContext.exports.importDay(); assert.equal(alerts[alerts.length - 1][0], 'No active calories available')
+
+  assert.ok(healthRowTitle && healthRowDetail && baseAllowanceExpression && buttonCondition, 'verify actual Health exercise JSX expressions')
+  const displayContext: any = { exports: {}, entry: { source: 'APPLE_HEALTH', label: 'Apple Health activity', calories: 180, durationMinutes: 1, startTime: null }, energyUnit: 'kcal', dailyTargets: { calories: 2200 }, exerciseCalories: 180,
+    numberOrZero: (value: number) => Number(value) || 0, formatCalories: (value: number, unit: string) => `${Math.round(unit === 'kj' ? value * 4.184 : value)} ${unit === 'kj' ? 'kJ' : 'kcal'}`, formatClockTime: () => '18:00', Math,
+    selectedDate: '2026-10-12', formatLocalDate: () => '2026-10-13', isAppleHealthSupportedDevice: () => true,
+  }
+  vm.createContext(displayContext)
+  vm.runInContext(ts.transpileModule(`exports.title=()=>(${healthRowTitle}); exports.detail=()=>(${healthRowDetail}); exports.base=()=>(${baseAllowanceExpression}); exports.button=()=>(${buttonCondition});`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, displayContext)
+  assert.equal(displayContext.exports.title(), 'Apple Health activity')
+  assert.equal(displayContext.exports.detail(), 'Daily total • 180 kcal'); assert.equal(displayContext.exports.base(), 2200)
+  for (const source of ['MANUAL', 'FITBIT', 'GARMIN']) {
+    displayContext.entry = { source, exerciseType: { name: 'Walking' }, durationMinutes: 30, calories: 200, startTime: 'fixture' }
+    assert.equal(displayContext.exports.title(), 'Walking'); assert.equal(displayContext.exports.detail(), '18:00 • 30 min • 200 kcal')
+  }
+  displayContext.energyUnit = 'kj'; assert.equal(displayContext.exports.base(), Math.round(2200 * 4.184), 'base target kJ line excludes exercise')
+  assert.equal(displayContext.exports.button(), true)
+  displayContext.selectedDate = '2026-10-14'; assert.equal(displayContext.exports.button(), false)
+  displayContext.selectedDate = '2026-10-12'; displayContext.isAppleHealthSupportedDevice = () => false; assert.equal(displayContext.exports.button(), false, 'Android has no Apple import action')
+  const budgetContext: any = { exports: {}, dailyTargets: { calories: 2200 }, exerciseCalories: 180, totals: { calories: 1400, protein: 0, carbs: 0, fat: 0 }, Math }
+  vm.createContext(budgetContext)
+  vm.runInContext(ts.transpileModule(`exports.budget=()=>{const usedKcal=(${budgetCallbacks.usedKcal})(); const dailyAllowanceKcal=(${budgetCallbacks.dailyAllowanceKcal})(); const remainingKcal=(${budgetCallbacks.remainingKcal})(); return {usedKcal,dailyAllowanceKcal,remainingKcal}}`, { compilerOptions: { target: ts.ScriptTarget.ES2022 } }).outputText, budgetContext)
+  assert.deepEqual(JSON.parse(JSON.stringify(budgetContext.exports.budget())), { usedKcal: 1400, dailyAllowanceKcal: 2380, remainingKcal: 980 })
+  assert.equal(budgetContext.exports.budget().remainingKcal, 980, 'repeated daily total does not add calories again')
+  budgetContext.exerciseCalories = 0; assert.equal(budgetContext.exports.budget().remainingKcal, 800)
+  console.log('PASS: actual dated Health reader/provider/Food handlers preserve account/day consent, serialized refresh, per-day cooldown, exact selected-date requests, daily labels/base target, late-response safety and no invented calories.')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

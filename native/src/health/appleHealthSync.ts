@@ -17,30 +17,34 @@ async function boundedRead(read: () => Promise<AppleHealthTodaySummary>) {
 
 // Shared by automatic and manual refresh; never run overlapping daily reads/posts.
 export function createAppleHealthSync(deps: {
-  read: () => Promise<AppleHealthTodaySummary>
+  read: (localDate: string) => Promise<AppleHealthTodaySummary>
   importSummary: (summary: AppleHealthTodaySummary, token: string) => Promise<void>
   now?: () => number
 }) {
-  let inFlight: { userId: string; done: Promise<void> } | null = null
+  let inFlight: { key: string; done: Promise<void> } | null = null
   const lastAttempt = new Map<string, number>()
-  return async (opts: { userId: string; token: string; manual?: boolean; allowed: () => boolean }): Promise<AppleHealthSyncResult | null> => {
+  return async (opts: { userId: string; token: string; localDate?: string; manual?: boolean; allowed: () => boolean }): Promise<AppleHealthSyncResult | null> => {
     if (!opts.userId || !opts.token || !opts.allowed()) return null
+    const captured = new Date(deps.now?.() ?? Date.now())
+    const localDate = opts.localDate ?? `${captured.getFullYear()}-${String(captured.getMonth() + 1).padStart(2, '0')}-${String(captured.getDate()).padStart(2, '0')}`
+    const key = JSON.stringify([opts.userId, localDate])
     while (inFlight) {
       // A repeated event for this account already has a refresh in progress.
-      if (inFlight.userId === opts.userId) return null
-      // A newly signed-in account must not lose its initial foreground event.
+      if (inFlight.key === key) return null
+      // A different account or selected day must not lose its refresh request.
       await inFlight.done
       if (!opts.allowed()) return null
     }
     const now = deps.now?.() ?? Date.now()
-    if (!opts.manual && now - (lastAttempt.get(opts.userId) ?? -Infinity) < 60_000) return null
+    if (!opts.manual && now - (lastAttempt.get(key) ?? -Infinity) < 60_000) return null
     let release: () => void = () => {}
-    const job = { userId: opts.userId, done: new Promise<void>(resolve => { release = resolve }) }
+    const job = { key, done: new Promise<void>(resolve => { release = resolve }) }
     inFlight = job
-    lastAttempt.set(opts.userId, now)
+    lastAttempt.set(key, now)
     try {
-      const summary = await boundedRead(deps.read)
+      const summary = await boundedRead(() => deps.read(localDate))
       if (!opts.allowed()) return null
+      if (summary.localDate !== localDate) throw new Error('Apple Health returned a different date. Please try again.')
       // A phone can have steps but no active-energy samples. Never invent calories.
       let imported = false
       if (summary.activeEnergyKcal !== null && Number.isFinite(summary.activeEnergyKcal) && summary.activeEnergyKcal > 0) {

@@ -3499,3 +3499,10 @@ for guidance first.
 - Food reacts to a successful matching account/date Health import by refreshing exercise only. Preserve meals, nutrients, food targets, water, credits and rename behavior. Remaining calories retain `max(0, daily_target + exercise_burned - food_consumed)`.
 - Mandatory offline checks: `npm run check:native-health`. Native archives also require `npm run check:native-health-bridge -- --check-installed-library`. Offline proofs do not replace physical Health-versus-Helfi and phone/Watch source comparisons.
 - Previous verified server: 5ac3e353/AWS113 on 12 October 2026. Automatic updates require a new native build after39; do not describe build39 as having this feature.
+
+### Dated Apple Health activity and Food labels (13 October 2026)
+
+- Automatic foreground imports remain today-only. An explicit Food import reads the selected valid, nonfuture local date; a past day uses its complete local midnight-to-23:59:59.999 window, including daylight-saving boundaries. Read-only imports retain the existing three permissions without reopening authorization.
+- Serialize reads across accounts and days, key automatic cooldowns by account/date, verify the returned date and refresh only matching Food exercise rows. Preserve the compound daily key, account/off checks, missing energy behavior and existing credit, food, water and rename paths.
+- Apple Health rows represent daily active energy, not a single workout. Show Apple Health activity and Daily total without the synthetic one-minute duration. Food's daily allowance label shows the base target and separately reports exercise added; remaining-energy math stays unchanged.
+- Offline date/DST/provider/handler/JSX fixtures and native TypeScript passed. Previous verified server source4ddb4e8e/AWS114; physical build40 automatic import was verified before this repair. Exact build41 and dated physical checks are recorded separately; do not claim they passed from source tests alone.

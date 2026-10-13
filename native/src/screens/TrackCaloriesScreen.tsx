@@ -36,6 +36,8 @@ import { materializeMealPortion } from '../lib/mealPortions'
 import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '../lib/nutrientValues'
 import { convertFoodAmount, parseFoodServing, liquidDensity, type FoodBaseUnit } from '../lib/foodUnits'
 import { useAppMode } from '../state/AppModeContext'
+import { useAppleHealthSync } from '../health/AppleHealthSyncProvider'
+import { isAppleHealthSupportedDevice } from '../health/appleHealth'
 import { Screen } from '../ui/Screen'
 import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { getThemeColors, theme as sharedTheme } from '../ui/theme'
@@ -97,6 +99,7 @@ type ExerciseType = {
 
 type ExerciseEntry = {
   id: string
+  source?: string
   label: string
   durationMinutes: number
   distanceKm: number | null
@@ -1790,6 +1793,7 @@ function buildFavoriteShareText(item: FavoritesListItem, adjustItems?: FavoriteA
 }
 
 export function TrackCaloriesScreen() {
+  const healthSync = useAppleHealthSync()
   const navigation = useNavigation<any>()
   const route = useRoute<any>()
   const { mode, session, signOut } = useAppMode()
@@ -5682,6 +5686,25 @@ export function TrackCaloriesScreen() {
     Alert.alert('Synced', 'Device exercise data was synced.')
   }
 
+  const onAppleHealthImportSelectedDate = async () => {
+    const date = selectedDate
+    if (date > formatLocalDate()) {
+      Alert.alert('Choose today or an earlier date', 'Apple Health cannot import a future date.')
+      return
+    }
+    try {
+      const result = await healthSync.refresh(true, date)
+      if (!result) return
+      if (result.imported) {
+        Alert.alert('Apple Health imported', `Daily activity for ${result.summary.localDate} was updated. This is the full day’s active calories, not just one walk.`)
+      } else {
+        Alert.alert('No active calories available', `Apple Health has no active calories available for ${date}. No exercise calories were added. Connect Apple Health on the Dashboard and check its access in the Health app if needed.`)
+      }
+    } catch (error: any) {
+      Alert.alert('Apple Health import failed', error?.message || 'Please try again.')
+    }
+  }
+
   const closeAllAddMenus = () => {
     setSectionMenuMeal(null)
     setTopAddCategoryOpen(false)
@@ -6212,8 +6235,9 @@ export function TrackCaloriesScreen() {
                 </View>
 
                 <Text style={{ marginTop: 10, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>
-                  Daily allowance: <Text style={{ fontWeight: '700', color: theme.colors.muted }}>{Math.round(energyUnit === 'kj' ? dailyAllowanceKcal * 4.184 : dailyAllowanceKcal)} {energyUnit}</Text>
+                  Daily allowance: <Text style={{ fontWeight: '700', color: theme.colors.muted }}>{Math.round(energyUnit === 'kj' ? dailyTargets.calories * 4.184 : dailyTargets.calories)} {energyUnit}</Text>
                 </Text>
+                {exerciseCalories > 0 ? <Text style={{ marginTop: 4, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>Exercise added: +{formatCalories(exerciseCalories, energyUnit)}</Text> : null}
               </>
             ) : null}
 
@@ -6354,6 +6378,17 @@ export function TrackCaloriesScreen() {
                 </Pressable>
               </View>
 
+              {isAppleHealthSupportedDevice() && selectedDate <= formatLocalDate() ? (
+                <Pressable
+                  onPress={onAppleHealthImportSelectedDate}
+                  disabled={healthSync.busy}
+                  accessibilityLabel={`Import Apple Health for ${selectedDate}`}
+                  style={{ marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0', opacity: healthSync.busy ? 0.5 : 1 }}
+                >
+                  <Text style={{ color: '#059669', fontWeight: '700', textAlign: 'center' }}>{healthSync.busy ? 'Importing Apple Health…' : 'Import Apple Health'}</Text>
+                </Pressable>
+              ) : null}
+
               <View style={{ marginTop: 12, borderTopWidth: 1, borderTopColor: '#EEF2F7', paddingTop: 12, flexDirection: 'row', alignItems: 'center' }}>
                 <Text style={{ color: '#6B7280', flex: 1 }}>
                   {exerciseEntries.length === 0
@@ -6393,14 +6428,16 @@ export function TrackCaloriesScreen() {
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ flex: 1 }}>
                           <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
-                            {entry.exerciseType?.name || 'Exercise'}
+                            {entry.source === 'APPLE_HEALTH' ? 'Apple Health activity' : entry.exerciseType?.name || 'Exercise'}
                           </Text>
                           <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 12 }}>
-                            {formatClockTime(entry.startTime)} • {Math.round(numberOrZero(entry.durationMinutes))} min • {formatCalories(numberOrZero(entry.calories), energyUnit)}
+                            {entry.source === 'APPLE_HEALTH'
+                              ? `Daily total • ${formatCalories(numberOrZero(entry.calories), energyUnit)}`
+                              : `${formatClockTime(entry.startTime)} • ${Math.round(numberOrZero(entry.durationMinutes))} min • ${formatCalories(numberOrZero(entry.calories), energyUnit)}`}
                           </Text>
                         </View>
                         <EntryActionsButton
-                          label={`Actions for ${entry.exerciseType?.name || 'exercise'}`}
+                          label={`Actions for ${entry.source === 'APPLE_HEALTH' ? 'Apple Health activity' : entry.exerciseType?.name || 'exercise'}`}
                           onPress={() => setExerciseEntryMenu(entry)}
                         />
                       </View>
