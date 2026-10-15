@@ -66,20 +66,24 @@ assert.equal(bundle.diaryNutrition.__portionScale, 2)
 assert.equal(bundle.diaryNutrition.calories, 449)
 const saveDisabledExpressions: string[] = []
 let previewExpression = ''
-let bottomCardExpression = ''
+const mealSummaryNodes: ts.JsxSelfClosingElement[] = []
 const findSaveControls = (node: ts.Node) => {
   if (ts.isJsxOpeningElement(node) && node.tagName.getText(source) === 'button' && node.attributes.properties.some(attr => ts.isJsxAttribute(attr) && attr.name.getText(source) === 'onClick' && attr.initializer?.getText(source) === '{createMeal}')) {
     const disabled = node.attributes.properties.find(attr => ts.isJsxAttribute(attr) && attr.name.getText(source) === 'disabled') as ts.JsxAttribute
     assert.ok(disabled?.initializer && ts.isJsxExpression(disabled.initializer))
     saveDisabledExpressions.push((disabled.initializer as ts.JsxExpression).expression!.getText(source))
   }
-  if (ts.isJsxAttribute(node) && node.name.getText(source) === 'values' && node.initializer?.getText(source).includes('portionAmountError')) previewExpression = (node.initializer as ts.JsxExpression).expression!.getText(source)
-  if (ts.isVariableDeclaration(node) && node.name.getText(source) === 'value' && node.initializer?.getText(source).includes('portionAmountError')) bottomCardExpression = node.initializer.getText(source)
+  if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(source) === 'NutrientCards' && node.getText(source).includes('mealTotals')) {
+    mealSummaryNodes.push(node)
+    const values = node.attributes.properties.find(attr => ts.isJsxAttribute(attr) && attr.name.getText(source) === 'values') as ts.JsxAttribute
+    previewExpression = (values.initializer as ts.JsxExpression).expression!.getText(source)
+  }
   ts.forEachChild(node, findSaveControls)
 }
 findSaveControls(source)
-assert.equal(saveDisabledExpressions.length, 2, 'both actual save controls are checked')
-assert.ok(previewExpression && bottomCardExpression)
+assert.equal(saveDisabledExpressions.length, 1, 'one main save action follows meal review')
+assert.equal(mealSummaryNodes.length, 1, 'one main nutrient summary describes the selected portion')
+assert.ok(previewExpression)
 const automaticPortionEffects: string[] = []
 const collectPortionEffects = (node: ts.Node) => {
  if (ts.isCallExpression(node) && node.expression.getText(source) === 'useEffect' && node.arguments[1]?.getText(source).includes('portionAmountInput') && node.arguments[0]?.getText(source).includes('setPortionAmountInput')) automaticPortionEffects.push(node.arguments[0].getText(source))
@@ -102,13 +106,12 @@ for (const amount of ['', '0', '-1', 'Infinity', 'no']) {
  assert.equal(ctx.portionAmountError, 'Enter an amount greater than zero.')
  for (const expression of saveDisabledExpressions) assert.equal(evaluate(expression), true, `actual save button disabled for ${amount}`)
  assert.equal(Object.keys(evaluate(previewExpression)).length, 0, 'invalid preview is unknown, never full meal')
- assert.equal(evaluate(bottomCardExpression), '—', 'bottom totals also unavailable')
 }
 ctx.portionUnit = 'g'
 ctx.portionAmountInput = '60.7'
 ctx.saveValidationError = actual('saveValidationError')
 ctx.portionAmountError = actual('portionAmountError')
-for (const expression of saveDisabledExpressions) assert.equal(evaluate(expression), false, 'valid custom amount enables both saves')
+for (const expression of saveDisabledExpressions) assert.equal(evaluate(expression), false, 'valid custom amount enables saving')
 ctx.portionAmountInput = '60.7'; ctx.portionScaleOverriddenByUser = false
 assert.equal(actual('buildDiaryAutosaveBundle')().diaryNutrition.__portionScale, .333, 'saved exact historical scale remains until an explicit control edit')
 const normalize = evaluate('normalizeServingOptionsForItem')
@@ -188,6 +191,140 @@ function effect(marker: string) {
   visit(source); assert.ok(expression, marker)
   return vm.runInContext(ts.transpile(`(${expression})`, { target: ts.ScriptTarget.ES2020 }), ctx)
 }
+function checkVisibleFoodReview() {
+  let nameInput: ts.JsxSelfClosingElement | undefined
+  let editFoodHeader: ts.JsxElement | undefined
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(source) === 'input' && node.attributes.properties.some(attr => ts.isJsxAttribute(attr) && attr.name.getText(source) === 'value' && attr.initializer?.getText(source) === '{mealName}')) nameInput = node
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'button' && node.openingElement.getText(source).includes('setExpandedId(expanded ? null : it.id)')) editFoodHeader = node
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  assert.ok(nameInput && editFoodHeader, 'actual meal title input and food editor action exist')
+  assert.ok(editFoodHeader.getText(source).includes('Edit food'), 'food editing action is visible before opening details')
+  assert.ok(text.includes('>Amount in whole meal</'), 'ingredient input explains its full-meal basis')
+  const context: any = vm.createContext({
+    React: { createElement: (type: any, props: any, ...children: any[]) => ({ type, props, children: children.flat(Infinity) }) },
+    mealName: 'My chosen dinner', items: [meal], buildDefaultMealName: evaluate('buildDefaultMealName'),
+    mealNameBackupRef: { current: '' }, mealNameEditedRef: { current: false }, mealNameWasClearedOnFocusRef: { current: false },
+    setMealName: (value: string) => { context.mealName = value },
+    it: { id: 'review-food' }, expanded: false, setExpandedId: (value: string | null) => { context.expandedId = value },
+  })
+  const renderTitle = () => vm.runInContext(ts.transpile(`(${nameInput!.getText(source)})`, { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), context)
+  const title = renderTitle()
+  assert.equal(title.props.value, 'My chosen dinner', 'the actual field contains the chosen title, not only a placeholder')
+  assert.ok(!title.props.readOnly && !title.props.disabled, 'meal title remains editable')
+  assert.equal(title.props.id, 'builder-meal-name')
+  assert.ok(text.includes('htmlFor="builder-meal-name"'), 'meal name label is attached to its editable field')
+  title.props.onChange({ target: { value: 'My corrected dinner' } })
+  assert.equal(renderTitle().props.value, 'My corrected dinner', 'normal typing changes the displayed title')
+  const handler = editFoodHeader.openingElement.attributes.properties.find(attr => ts.isJsxAttribute(attr) && attr.name.getText(source) === 'onClick') as ts.JsxAttribute
+  const onEdit = vm.runInContext(ts.transpile(`(${(handler.initializer as ts.JsxExpression).expression!.getText(source)})`, { target: ts.ScriptTarget.ES2020 }), context)
+  onEdit()
+  assert.equal(context.expandedId, 'review-food', 'visible edit action opens the intended food')
+  context.expanded = true
+  onEdit()
+  assert.equal(context.expandedId, null, 'food details can be closed without saving')
+  const foodPosition = text.indexOf('>Your foods</')
+  const portionPosition = text.indexOf('>How much did you eat?</')
+  assert.ok(foodPosition >= 0 && portionPosition > foodPosition, 'reviewed foods appear before portion controls')
+  assert.ok(mealSummaryNodes[0].getStart(source) > portionPosition, 'one main summary follows foods and portion choice')
+
+  // Execute both real photo-review entry actions. A visible label must reach
+  // the intended item editor, including when its parent row is collapsible.
+  const diaryText = fs.readFileSync('app/food/page.tsx', 'utf8')
+  const diary = ts.createSourceFile('app/food/page.tsx', diaryText, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+  const editButtons: ts.JsxElement[] = []
+  const collect = (node: ts.Node) => {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(diary) === 'button' && node.openingElement.getText(diary).includes('setEditingItemIndex(index)') && node.children.some(child => ts.isJsxText(child) && child.text.trim() === 'Edit food')) editButtons.push(node)
+    ts.forEachChild(node, collect)
+  }
+  collect(diary)
+  assert.equal(editButtons.length, 2, 'collapsed and expanded photo foods both offer Edit food')
+  for (const button of editButtons) {
+    let selected: number | null = null, opened = false, propagationStopped = false
+    const state = vm.createContext({ React: context.React, index: 7, setEditingItemIndex: (value: number) => { selected = value }, setShowItemEditModal: (value: boolean) => { opened = value } })
+    const rendered = vm.runInContext(ts.transpile(`(${button.getText(diary)})`, { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), state)
+    rendered.props.onClick({ stopPropagation: () => { propagationStopped = true } })
+    assert.equal(selected, 7)
+    assert.equal(opened, true)
+    if (button.openingElement.getText(diary).includes('event.stopPropagation')) assert.equal(propagationStopped, true, 'edit click cannot also collapse the parent food card')
+  }
+}
+async function checkAtomicFoodReplacement() {
+  const previous = { ...meal, id: 'stable-food-row', name: 'Cooked chicken', calories: 403, protein_g: 12.26, carbs_g: 1, fat_g: 38.94, __baseAmount: 100, __amount: 100, __amountInput: '100', __source: 'usda', __sourceId: 'old-provider-record' }
+  const other = { ...meal, id: 'other-food-row', name: 'Rice cooked' }
+  const originalItems = [previous, other]
+  const original = JSON.stringify(originalItems)
+  Object.assign(ctx, {
+    items: originalItems, itemsRef: { current: originalItems }, mealName: 'My chosen dinner', replacementItemId: null, replacementItemIdRef: { current: null },
+    isDiaryEdit: true, sourceLogId: 'existing-diary-row', selectedDate: '2026-10-15', sourceCreatedAtRef: { current: '2026-10-15T01:00:00.125Z' },
+    entryTime: evaluate("extractTimeFromTimestamp('2026-10-15T01:00:00.125Z')"), linkedFavoriteId: '',
+    portionControlEnabled: true, portionUnit: 'serving', portionAmountInput: '0.5', portionInputRef: { current: null }, recipeServingsForPortion: 1, portionScaleOverriddenByUser: true,
+    it: previous, displayName: previous.name, queryInputRef: { current: { focus: () => {} } },
+    document: { getElementById: () => ({ scrollIntoView: () => {} }) }, runSearch: (query: string) => { ctx.lastSearch = query },
+    triggerHaptic: () => {}, window: undefined,
+    setItems: (update: any) => { ctx.items = typeof update === 'function' ? update(ctx.items) : update; ctx.itemsRef.current = ctx.items },
+    setReplacementItemId: setter('replacementItemId'), setIngredientsListExpanded: setter('ingredientsListExpanded'), setExpandedId: setter('expandedId'),
+    setKind: setter('kind'), setQuery: setter('query'), setResults: setter('results'), setError: setter('error'),
+  })
+  ctx.addBuilderItem = actual('addBuilderItem')
+  ctx.addItemDirect = actual('addItemDirect')
+  ctx.hasMacroData = actual('hasMacroData')
+  const choose = actual('addItemWithMacros')
+  jsxHandler('replacementItemIdRef.current = it.id', 'onClick')()
+  assert.equal(ctx.replacementItemIdRef.current, previous.id)
+  assert.equal(ctx.replacementItemId, previous.id)
+  assert.equal(ctx.lastSearch, previous.name)
+  assert.equal(JSON.stringify(ctx.items), original, 'opening a replacement search cannot delete the old food')
+  const replacement = { id: 'correct-provider-record', source: 'usda', name: 'Chicken meat and skin, cooked, roasted', serving_size: '100 g', calories: 239, protein_g: 27.3, carbs_g: 0, fat_g: 13.6, fiber_g: null, sugar_g: 0 }
+  await choose({ ...replacement, fat_g: null })
+  assert.equal(JSON.stringify(ctx.items), original, 'a result without complete core nutrients cannot replace the old food')
+  assert.equal(ctx.replacementItemIdRef.current, previous.id)
+  await choose(replacement)
+  assert.equal(ctx.items.length, 2)
+  const selected = ctx.items[0]
+  assert.equal(selected.id, previous.id, 'replacement keeps the UI food row identity')
+  assert.equal(selected.__source, 'usda')
+  assert.equal(selected.__sourceId, replacement.id, 'the selected provider record is preserved separately')
+  assert.equal(selected.name, replacement.name)
+  assert.equal(selected.__amount, 100)
+  assert.equal(selected.__unit, 'g')
+  assert.equal(selected.servings, 1)
+  assert.equal(selected.calories, 239)
+  assert.equal(selected.fiber_g, null)
+  assert.equal(selected.sugar_g, 0)
+  assert.equal(JSON.stringify(ctx.items[1]), JSON.stringify(other), 'replacement preserves all other foods')
+  assert.equal(ctx.mealName, 'My chosen dinner')
+  assert.equal(ctx.replacementItemIdRef.current, null)
+  assert.equal(ctx.replacementItemId, null)
+  const saved = actual('buildDiaryAutosaveBundle')()
+  assert.equal(saved.title, 'My chosen dinner')
+  assert.equal(saved.createdAtIso, '2026-10-15T01:00:00.125Z', 'replacing food preserves the exact saved time')
+  assert.equal(saved.diaryNutrition.__portionScale, 0.5, 'replacing food preserves the chosen meal share')
+  assert.equal(saved.cleanedItems[0].id, previous.id)
+  assert.equal(saved.cleanedItems[0].__sourceId, replacement.id)
+  assert.equal(saved.cleanedItems[0].__amount, 100, 'save retains the whole-food measured basis')
+  assert.equal(saved.diaryNutrition.fiber, null)
+  assert.equal(saved.diaryNutrition.sugar, 0)
+
+  Object.assign(ctx, { items: originalItems, itemsRef: { current: originalItems }, replacementItemId: previous.id, replacementItemIdRef: { current: previous.id } })
+  click('Cancel replacement')
+  assert.equal(ctx.replacementItemIdRef.current, null)
+  assert.equal(ctx.replacementItemId, null)
+  assert.equal(JSON.stringify(ctx.items), original, 'Cancel replacement keeps every original food')
+  assert.equal(ctx.mealName, 'My chosen dinner')
+
+  Object.assign(ctx, { items: [other], itemsRef: { current: [other] }, replacementItemId: previous.id, replacementItemIdRef: { current: previous.id } })
+  await choose(replacement)
+  assert.equal(JSON.stringify(ctx.items), JSON.stringify([other]), 'stale replacement cannot silently append a new food')
+  assert.equal(ctx.replacementItemIdRef.current, null)
+  assert.equal(ctx.error, 'That food was removed. Search again to add a food.')
+  const countFood = evaluate('buildFoodReplacement')({ ...previous, __unit: 'serving', __amount: 3 }, selected)
+  assert.equal(countFood.__amount, selected.__amount, 'a serving count cannot become an invented equal weight in a different food')
+  assert.equal(JSON.stringify(originalItems), original)
+  console.log('PASS: actual web visible editing/title controls and atomic source replacement, measured amount, custom name, unknown/zero, cancel and stale-selection protection.')
+}
 async function checkMealAndTime() {
   const original = '2026-10-15T01:00:00.125Z'
   const timers: Array<() => any> = []
@@ -222,8 +359,8 @@ async function checkMealAndTime() {
   }
   ctx.portionAmountInput = '60.7'
   assert.ok(text.includes('grid grid-cols-4 gap-1 sm:gap-2'))
-  assert.ok(text.indexOf('aria-label="Meal category"') < text.indexOf('>Search ingredients</div>'))
-  assert.ok(text.indexOf('aria-label="Meal time"') < text.indexOf('>Search ingredients</div>'))
+  assert.ok(text.indexOf('aria-label="Meal category"') < text.indexOf('>Food search</div>'))
+  assert.ok(text.indexOf('aria-label="Meal time"') < text.indexOf('>Food search</div>'))
   console.log('PASS: actual web whole/half/custom controls, exact half/full/double saving, unknown/zero, invalid-input guard, saved scale, source identity, photo naming/transport, food-scoped design, category/time controls, stable draft and exact timestamp preservation. Browser visual proof remains separate.')
 }
 async function checkSavedNativeNameHydration() {
@@ -257,4 +394,5 @@ async function checkSavedNativeNameHydration() {
   }
   console.log('PASS: actual saved-native-log hydration preserves chosen title over ingredient description, suggests detected names for generic photo title, keeps meaningful description fallback and exact original time/half portion.')
 }
-checkMealAndTime().then(checkSavedNativeNameHydration).catch((error) => { console.error(error); process.exitCode = 1 })
+checkVisibleFoodReview()
+checkMealAndTime().then(checkSavedNativeNameHydration).then(checkAtomicFoodReplacement).catch((error) => { console.error(error); process.exitCode = 1 })

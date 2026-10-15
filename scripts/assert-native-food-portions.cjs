@@ -14,7 +14,7 @@ function load(file) {
   const module = { exports: {} }
   cache.set(file, module.exports)
   let text = fs.readFileSync(file, 'utf8')
-  if (file === screenPath) text += '\nexport const __test = { normalizeFoodApiEntry, normalizeFavoriteMeal, favoriteStorageRecord, buildFavoriteAdjustItems, buildFavoritesListItemFromEntry, buildFavoritesListItemFromFavorite, calculateFavoriteAdjustTotals, favoriteAdjustPersistenceFields, normalizeFavoriteServingOptions, favoriteBaseForItem, cloneFavoriteItems, nullableNumber, portionMealItems, recipePortionRatio, suggestMealName, servingLookupForFavoriteAdjustItem, searchQueryForFavoriteAdjustItem };'
+  if (file === screenPath) text += '\nexport const __test = { normalizeFoodApiEntry, normalizeFavoriteMeal, favoriteStorageRecord, buildFavoriteAdjustItems, buildFavoritesListItemFromEntry, buildFavoritesListItemFromFavorite, calculateFavoriteAdjustTotals, favoriteAdjustPersistenceFields, normalizeFavoriteServingOptions, favoriteBaseForItem, cloneFavoriteItems, nullableNumber, portionMealItems, recipePortionRatio, suggestMealName, servingLookupForFavoriteAdjustItem, searchQueryForFavoriteAdjustItem, hasServingOptionMacroData, buildFavoriteAdjustItemFromSearchFood, favoriteAmountUnitOptions, updateFavoriteAdjustItemUnit, updateFavoriteAdjustItemAmount };'
   const js = ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020 } }).outputText
   const localRequire = (name) => {
     if (name.includes('/lib/')) {
@@ -42,6 +42,49 @@ function handlerCode(name) {
   walk(ast)
   assert.ok(code, name)
   return ts.transpileModule('module.exports = ' + code, { compilerOptions: { target: ts.ScriptTarget.ES2020 } }).outputText
+}
+function checkVisibleFoodReview() {
+  let nameInput, editAction
+  const mealSummaries = []
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'TextInput' && node.attributes.properties.some(attr => ts.isJsxAttribute(attr) && attr.name.getText(ast) === 'value' && attr.initializer?.getText(ast) === '{favoriteEditName}')) nameInput = node
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'NutrientCards' && node.getText(ast).includes('values={favoriteEditTotals}')) mealSummaries.push(node)
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(ast) === 'Pressable' && node.openingElement.getText(ast).includes('setFavoriteEditExpandedItemId(expanded ? null : editItem.id)')) editAction = node
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.ok(nameInput && editAction, 'actual editable meal name and food editing action exist')
+  assert.equal(mealSummaries.length, 1, 'meal review has one main nutrient summary')
+  assert.ok(source.indexOf('>Your foods</Text>') < source.indexOf('>How much did you eat?</Text>'), 'foods appear before portion controls')
+  assert.ok(source.indexOf('>How much did you eat?</Text>') < mealSummaries[0].getStart(ast), 'summary follows the foods and selected portion')
+  const context = {
+    React: { createElement: (type, props, ...children) => ({ type, props, children: children.flat(Infinity) }) },
+    Text: 'Text', View: 'View', TextInput: 'TextInput', Pressable: 'Pressable',
+    theme: { colors: { text: '#111', muted: '#666' } },
+    favoriteEditName: 'My chosen dinner', setFavoriteEditName: value => { context.favoriteEditName = value },
+    editItem: { id: 'review-food', name: 'Cooked chicken', servingLabel: '100 g', amountInput: '100', raw: {} },
+    expanded: false, amountUnitLabel: 'g', ingredientSourceLabel: () => 'USDA',
+    setFavoriteEditExpandedItemId: value => { context.openedFood = value },
+  }
+  vm.createContext(context)
+  const render = node => vm.runInContext(ts.transpile('(' + node.getText(ast) + ')', { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), context)
+  const texts = node => typeof node === 'string' || typeof node === 'number' ? [String(node)] : (node?.children || []).flatMap(texts)
+  const title = render(nameInput)
+  assert.equal(title.props.value, 'My chosen dinner', 'chosen title is the real input value, not a placeholder')
+  assert.notEqual(title.props.editable, false, 'meal title remains editable')
+  title.props.onChangeText('My corrected dinner')
+  assert.equal(render(nameInput).props.value, 'My corrected dinner', 'normal text entry changes the displayed meal name')
+  const collapsed = render(editAction)
+  assert.ok(texts(collapsed).includes('Edit food'), 'food correction is visible before opening details')
+  assert.ok(texts(collapsed).join(' ').includes('Full-meal amount:'), 'row explains the amount before portion scaling')
+  collapsed.props.onPress()
+  assert.equal(context.openedFood, 'review-food', 'visible action opens the intended food')
+  context.expanded = true
+  const expanded = render(editAction)
+  assert.ok(texts(expanded).includes('Close edit'))
+  expanded.props.onPress()
+  assert.equal(context.openedFood, null, 'editing details can be closed without saving')
+  assert.ok(source.includes('>Amount in whole meal</Text>'), 'amount editor states its whole-meal basis')
 }
 const clone = (value) => JSON.parse(JSON.stringify(value))
 const fixture = {
@@ -75,6 +118,70 @@ assert.equal(mealPortionScale('2', 'serving', null), 2)
 assert.equal(JSON.stringify(fixture), unchanged)
 assert.equal(h.normalizeFoodApiEntry(materializeMealPortion(fixture)).nutrients.calories, 250)
 
+function checkFoodReplacement() {
+  const previous = h.buildFavoriteAdjustItemFromSearchFood({ id: 'old-provider-food', source: 'usda', name: 'Cooked chicken', serving_size: '100 g', calories: 403, protein_g: 12.26, carbs_g: 1, fat_g: 38.94, fiber_g: null, sugar_g: 0 })
+  const originalItems = [previous, editorItems[1]]
+  const original = JSON.stringify(originalItems)
+  const context = {
+    ...h, favoriteEditItems: originalItems, favoriteEditReplaceItemId: null, favoriteEditName: 'My chosen dinner',
+    favoriteEditScrollRef: { current: { scrollTo: value => { context.scrollTarget = value } } }, favoriteEditSearchTopRef: { current: 120 },
+    runFavoriteEditSearch: (kind, query) => { context.searchRequest = { kind, query } },
+    appendItemsToFavoriteEditor: () => { throw new Error('Replacing a food cannot append another item') },
+    Alert: { alert: title => { context.notice = title } }, module: { exports: {} }, Number, String, Math,
+  }
+  for (const field of ['FavoriteEditItems', 'FavoriteEditReplaceItemId', 'FavoriteEditSearchKind', 'FavoriteEditSearchQuery', 'FavoriteEditSearchError', 'FavoriteEditSearchResults', 'FavoriteEditIngredientsExpanded', 'FavoriteEditExpandedItemId', 'FavoriteEditServingPickerItemId']) {
+    const key = field[0].toLowerCase() + field.slice(1)
+    context['set' + field] = value => { context[key] = typeof value === 'function' ? value(context[key]) : value }
+  }
+  vm.createContext(context)
+  vm.runInContext(handlerCode('beginFavoriteEditReplacement'), context)
+  context.module.exports(previous)
+  assert.equal(context.favoriteEditReplaceItemId, previous.id)
+  assert.deepEqual(context.searchRequest, { kind: 'single', query: previous.name })
+  assert.equal(context.scrollTarget.y, 112)
+  assert.equal(JSON.stringify(context.favoriteEditItems), original, 'starting replacement preserves the old food until a valid choice')
+  vm.runInContext(handlerCode('addSearchResultToFavoriteEditor'), context)
+  const choose = context.module.exports
+  const replacement = { id: 'correct-provider-record', source: 'usda', name: 'Chicken meat and skin, cooked, roasted', serving_size: '100 g', calories: 239, protein_g: 27.3, carbs_g: 0, fat_g: 13.6, fiber_g: null, sugar_g: 0 }
+  choose({ ...replacement, fat_g: null })
+  assert.equal(context.notice, 'Food details unavailable')
+  assert.equal(context.favoriteEditReplaceItemId, previous.id)
+  assert.equal(JSON.stringify(context.favoriteEditItems), original, 'incomplete source never destroys the original')
+  choose(replacement)
+  assert.equal(context.favoriteEditItems.length, 2)
+  const selected = context.favoriteEditItems[0]
+  assert.equal(selected.id, previous.id, 'food row identity remains stable')
+  assert.equal(selected.raw.id, replacement.id, 'new provider identity is kept separately')
+  assert.equal(selected.raw.source, 'usda')
+  assert.equal(selected.name, replacement.name)
+  assert.equal(selected.amountUnit, 'g')
+  assert.equal(Number(selected.amountInput), 100, 'compatible measured amount survives the replacement')
+  assert.equal(selected.servings, 1)
+  assert.equal(selected.calories, 239)
+  assert.equal(selected.fiber, null)
+  assert.equal(selected.sugar, 0)
+  assert.equal(JSON.stringify(context.favoriteEditItems[1]), JSON.stringify(originalItems[1]), 'other foods are untouched')
+  assert.equal(context.favoriteEditReplaceItemId, null)
+  assert.equal(context.favoriteEditName, 'My chosen dinner', 'replacement does not replace the chosen meal title')
+
+  let cancel
+  function visit(node) {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(ast) === 'Pressable' && node.openingElement.getText(ast).includes('accessibilityLabel="Cancel food replacement"')) {
+      const attr = node.openingElement.attributes.properties.find(attr => ts.isJsxAttribute(attr) && attr.name.getText(ast) === 'onPress')
+      cancel = attr.initializer.expression.getText(ast)
+    }
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.ok(cancel, 'actual replacement banner offers cancellation')
+  context.favoriteEditItems = originalItems
+  context.favoriteEditReplaceItemId = previous.id
+  vm.runInContext(ts.transpile('(' + cancel + ')()', { target: ts.ScriptTarget.ES2020 }), context)
+  assert.equal(context.favoriteEditReplaceItemId, null)
+  assert.equal(JSON.stringify(context.favoriteEditItems), original, 'cancelling replacement is read-only')
+  assert.equal(context.favoriteEditName, 'My chosen dinner')
+}
+
 async function save(scale, kind = 'builder', editItems = editorItems, recipe = null, eaten = '') {
   let payload, favoritePayload, failure
   const favorite = h.normalizeFavoriteMeal({ ...fixture, id: 'favorite', label: fixture.name })
@@ -104,6 +211,8 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
   return { payload: payload || favoritePayload, failure }
 }
 ;(async () => {
+  checkVisibleFoodReview()
+  checkFoodReplacement()
   for (const kind of ['builder', 'entry', 'favorite']) {
     for (const scale of [0.5, 1, 2]) {
       const result = await save(scale, kind)
@@ -247,6 +356,8 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
     for (const setter of handlerCode('openFavoriteEditor').matchAll(/\b(set[A-Z]\w*)\(/g)) context[setter[1]] = (value) => { state[setter[1]] = value }
     vm.runInNewContext(handlerCode('openFavoriteEditor'), context)
     context.module.exports(h.buildFavoritesListItemFromEntry(h.normalizeFoodApiEntry({ ...fixture, name: title })))
+    assert.equal(state.setFavoriteEditIngredientsExpanded, true, 'existing foods are visible on opening the editor')
+    assert.equal(state.setFavoriteEditExpandedItemId, null, 'individual detail panels start collapsed')
     if (title === 'My special meal') assert.equal(state.setFavoriteEditName, title)
     else { assert.notEqual(state.setFavoriteEditName, title); assert.match(state.setFavoriteEditName, /chicken/i) }
   }
@@ -286,5 +397,5 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
   assert.equal(options[0].calories, 203.15)
   assert.equal(options[0].foodName, 'Chicken meat and skin, cooked, roasted')
   assert.equal(JSON.stringify(fixture), unchanged)
-  console.log('PASS: actual native preview/save/reopen/full/half/double/favorites/null-zero/grams-oz/invalid controls and recorded85g serving')
+  console.log('PASS: actual native visible food editing/editable titles/single summary/atomic replacement-cancel and preview/save/reopen/full/half/double/favorites/null-zero/grams-oz/invalid controls and recorded85g serving')
 })().catch((error) => { console.error(error); process.exitCode = 1 })

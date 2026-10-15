@@ -36,7 +36,7 @@ function bind(name: string) {
 bind('formatNutrientGrams')
 bind('calculateFavoriteAdjustTotals')
 assert.ok(summaryCards, 'Actual meal summary cards exist')
-assert.ok(summaryCards.getStart(screen) > screen.text.indexOf('>Portion control<') && summaryCards.getStart(screen) < screen.text.indexOf('{favoriteEditSearchError ?'), 'All six cards must be in the visible top portion summary')
+assert.ok(summaryCards.getStart(screen) > screen.text.indexOf('>How much did you eat?</Text>'), 'All six cards follow the portion controls whose values they describe')
 assert.ok(inputValue, 'Actual ingredient nutrient field value exists')
 evaluate(cardsSource.statements.filter(node => !ts.isImportDeclaration(node)).map(node => node.getText(cardsSource).replace(/^export /, '')).join('\n'))
 const item = { id: '2317111', name: 'Sanitarium Crunchy Peanut Butter 500g', servingLabel: 'Serving — 20g', servings: 1.5, calories: 127.2, protein: 5.4, carbs: 2, fat: 10.7, fiber: 1.2, sugar: .8 }

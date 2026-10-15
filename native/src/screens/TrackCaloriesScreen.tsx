@@ -1935,6 +1935,9 @@ export function TrackCaloriesScreen() {
   const [favoriteEditServingLoadingId, setFavoriteEditServingLoadingId] = useState<string | null>(null)
   const [favoriteEditSearchKind, setFavoriteEditSearchKind] = useState<'single' | 'packaged'>('packaged')
   const [favoriteEditSearchQuery, setFavoriteEditSearchQuery] = useState('')
+  const [favoriteEditReplaceItemId, setFavoriteEditReplaceItemId] = useState<string | null>(null)
+  const favoriteEditScrollRef = useRef<ScrollView | null>(null)
+  const favoriteEditSearchTopRef = useRef(0)
   const [favoriteEditSearchResults, setFavoriteEditSearchResults] = useState<SearchFoodItem[]>([])
   const [favoriteEditSearchLoading, setFavoriteEditSearchLoading] = useState(false)
   const [favoriteEditSearchError, setFavoriteEditSearchError] = useState('')
@@ -3795,12 +3798,13 @@ export function TrackCaloriesScreen() {
     setFavoriteEditName(suggestMealName(editorItems, item.label))
     setFavoriteEditTime(formatEditorTime(item.entry?.createdAt || item.entry?.raw?.createdAt || null))
     setFavoriteEditTimePickerOpen(false)
-    setFavoriteEditIngredientsExpanded(false)
+    setFavoriteEditIngredientsExpanded(true)
     setFavoriteEditExpandedItemId(null)
     setFavoriteEditServingPickerItemId(null)
     setFavoriteEditServingLoadingId(null)
     setFavoriteEditSearchKind('packaged')
     setFavoriteEditSearchQuery('')
+    setFavoriteEditReplaceItemId(null)
     setFavoriteEditSearchResults([])
     setFavoriteEditSearchError('')
     const portion = savedMealPortion(item.favorite?.raw || item.entry?.raw)
@@ -3896,11 +3900,12 @@ export function TrackCaloriesScreen() {
     setFavoriteEditTime(formatEditorTime(new Date().toISOString()))
     setFavoriteEditTimePickerOpen(false)
     setFavoriteEditIngredientsExpanded(prefillItems.length > 0)
-    setFavoriteEditExpandedItemId(prefillItems[0]?.id || null)
+    setFavoriteEditExpandedItemId(null)
     setFavoriteEditServingPickerItemId(null)
     setFavoriteEditServingLoadingId(null)
     setFavoriteEditSearchKind('packaged')
     setFavoriteEditSearchQuery('')
+    setFavoriteEditReplaceItemId(null)
     setFavoriteEditSearchResults([])
     setFavoriteEditSearchError('')
     setFavoriteEditPortionControlEnabled(false)
@@ -4389,10 +4394,52 @@ export function TrackCaloriesScreen() {
   }, [])
 
   const addSearchResultToFavoriteEditor = (item: SearchFoodItem) => {
-    appendItemsToFavoriteEditor([buildFavoriteAdjustItemFromSearchFood(item)])
+    if (favoriteEditReplaceItemId) {
+      if (!hasServingOptionMacroData({ ...item, calories: item.calories ?? item.calories_kcal })) {
+        Alert.alert('Food details unavailable', 'Choose a food with calories, protein, carbs and fat before replacing it.')
+        return
+      }
+      const previous = favoriteEditItems.find((entry) => entry.id === favoriteEditReplaceItemId)
+      if (!previous) {
+        setFavoriteEditReplaceItemId(null)
+        Alert.alert('Choose the food again', 'Open Change food on the food you want to replace.')
+        return
+      }
+      let replacement = buildFavoriteAdjustItemFromSearchFood(item)
+      // Carry a real measured amount only when this source supports the same unit.
+      // A count of servings does not establish equivalent mass across two foods.
+      const keepMeasuredAmount = previous.amountUnit !== 'serving'
+        && favoriteAmountUnitOptions(replacement).includes(previous.amountUnit)
+        && Number(previous.amountInput) > 0
+      if (keepMeasuredAmount) {
+        replacement = updateFavoriteAdjustItemAmount(
+          updateFavoriteAdjustItemUnit(replacement, previous.amountUnit), previous.amountInput,
+        )
+      }
+      const updated = { ...replacement, id: previous.id }
+      setFavoriteEditItems((items) => items.map((entry) => entry.id === previous.id ? updated : entry))
+      setFavoriteEditIngredientsExpanded(true)
+      setFavoriteEditExpandedItemId(previous.id)
+      setFavoriteEditServingPickerItemId(null)
+      setFavoriteEditReplaceItemId(null)
+      if (!keepMeasuredAmount) Alert.alert('Check amount', 'The replacement uses its own serving size. Check its amount before saving.')
+    } else {
+      appendItemsToFavoriteEditor([buildFavoriteAdjustItemFromSearchFood(item)])
+    }
     setFavoriteEditSearchQuery('')
     setFavoriteEditSearchResults([])
     setFavoriteEditSearchError('')
+  }
+
+  const beginFavoriteEditReplacement = (item: FavoriteAdjustItem) => {
+    const source = String(item.raw?.__source || item.raw?.source || '')
+    const kind = source === 'openfoodfacts' || source === 'fatsecret' && !!item.raw?.brand ? 'packaged' : 'single'
+    setFavoriteEditReplaceItemId(item.id)
+    setFavoriteEditSearchKind(kind)
+    setFavoriteEditSearchQuery(item.name)
+    setFavoriteEditSearchError('')
+    void runFavoriteEditSearch(kind, item.name)
+    favoriteEditScrollRef.current?.scrollTo({ y: Math.max(0, favoriteEditSearchTopRef.current - 8), animated: true })
   }
 
   const addFavoriteListItemToFavoriteEditor = (item: FavoritesListItem) => {
@@ -7861,7 +7908,7 @@ export function TrackCaloriesScreen() {
               <View style={{ flex: 1 }}>
                 <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
                   {mealBuilderOpen && !favoriteEditItem
-                    ? 'Build a meal'
+                    ? favoriteEditItems.length ? 'Review meal' : 'Build a meal'
                     : favoriteEditItem?.entry && favoriteEditItems.length === 1
                       ? 'Edit food entry'
                       : 'Edit meal'}
@@ -7878,9 +7925,10 @@ export function TrackCaloriesScreen() {
             </View>
           </View>
 
-          <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
+          <ScrollView ref={favoriteEditScrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
             <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
               <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Meal name</Text>
+              <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 4 }}>We suggest a name from your foods. You can change it below.</Text>
               <TextInput
                 value={favoriteEditName}
                 onChangeText={setFavoriteEditName}
@@ -7976,8 +8024,17 @@ export function TrackCaloriesScreen() {
               ) : null}
             </View>
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
-              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Search ingredients</Text>
+            <View onLayout={(event) => { favoriteEditSearchTopRef.current = event.nativeEvent.layout.y }} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
+              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Food search</Text>
+              {favoriteEditReplaceItemId ? (
+                <View accessibilityRole="alert" style={{ marginTop: 10, padding: 12, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 2 }}>
+                  <Text style={{ color: '#065F46', fontSize: 13, fontWeight: '700' }}>Replacing {favoriteEditItems.find((item) => item.id === favoriteEditReplaceItemId)?.name || 'food'}</Text>
+                  <Text style={{ color: '#047857', fontSize: 12, lineHeight: 18, marginTop: 4 }}>Choose a matching food from the search results. Your original food stays until you choose a replacement.</Text>
+                  <Pressable onPress={() => setFavoriteEditReplaceItemId(null)} accessibilityRole="button" accessibilityLabel="Cancel food replacement" style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' }}>
+                    <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>Cancel replacement</Text>
+                  </Pressable>
+                </View>
+              ) : null}
               <View style={{ marginTop: 12, position: 'relative' }}>
                 <TextInput
                   value={favoriteEditSearchQuery}
@@ -7991,20 +8048,23 @@ export function TrackCaloriesScreen() {
                   autoCorrect={false}
                   autoCapitalize="none"
                   placeholderTextColor="#9CA3AF"
-                  style={[inputStyle, { paddingRight: 48 }]}
+                  style={[inputStyle, { paddingRight: 80 }]}
                 />
                 <Pressable
                   onPress={() => void runFavoriteEditSearch()}
+                  accessibilityRole="button"
+                  accessibilityLabel="Search foods"
+                  hitSlop={{ top: 6, bottom: 6 }}
                   disabled={favoriteEditSearchLoading || !favoriteEditSearchQuery.trim()}
                   style={{
                     position: 'absolute',
                     right: 8,
                     top: '50%',
                     marginTop: -16,
-                    width: 32,
+                    width: 64,
                     height: 32,
                     borderRadius: 2,
-                    backgroundColor: '#6B7280',
+                    backgroundColor: '#047857',
                     alignItems: 'center',
                     justifyContent: 'center',
                     opacity: favoriteEditSearchLoading || !favoriteEditSearchQuery.trim() ? 0.6 : 1,
@@ -8013,7 +8073,7 @@ export function TrackCaloriesScreen() {
                   {favoriteEditSearchLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <MaterialCommunityIcons name="magnify" size={18} color="#FFFFFF" />
+                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Search</Text>
                   )}
                 </Pressable>
               </View>
@@ -8028,21 +8088,26 @@ export function TrackCaloriesScreen() {
                     setFavoriteEditSearchKind('packaged')
                     if (favoriteEditSearchQuery.trim()) void runFavoriteEditSearch('packaged', favoriteEditSearchQuery)
                   }}
-                  style={[foodChoiceButton, favoriteEditSearchKind === 'packaged' && chipActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: favoriteEditSearchKind === 'packaged' }}
+                  style={[foodChoiceButton, favoriteEditSearchKind === 'packaged' && foodChoiceActive]}
                 >
-                  <Text style={[foodChoiceText, favoriteEditSearchKind === 'packaged' && chipTextActive]}>Packaged & fast food</Text>
+                  <Text style={[foodChoiceText, favoriteEditSearchKind === 'packaged' && foodChoiceTextActive]}>Packaged & fast food</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
                     setFavoriteEditSearchKind('single')
                     if (favoriteEditSearchQuery.trim()) void runFavoriteEditSearch('single', favoriteEditSearchQuery)
                   }}
-                  style={[foodChoiceButton, favoriteEditSearchKind === 'single' && chipActive]}
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: favoriteEditSearchKind === 'single' }}
+                  style={[foodChoiceButton, favoriteEditSearchKind === 'single' && foodChoiceActive]}
                 >
-                  <Text style={[foodChoiceText, favoriteEditSearchKind === 'single' && chipTextActive]}>Single foods</Text>
+                  <Text style={[foodChoiceText, favoriteEditSearchKind === 'single' && foodChoiceTextActive]}>Single foods</Text>
                 </Pressable>
               </View>
 
+              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600', marginTop: 16 }}>Add food</Text>
               <View style={{ marginTop: 8, flexDirection: 'row', gap: 6 }}>
                 <Pressable
                   onPress={() =>
@@ -8088,58 +8153,6 @@ export function TrackCaloriesScreen() {
                 </View>
               </View>
 
-              {mealRecipe ? (
-                <View style={{ marginTop: 14, padding: 14, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 2 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Recipe servings</Text>
-                  <Text style={{ color: theme.colors.muted, marginTop: 6 }}>{mealRecipe.servings ? `Full recipe makes ${mealRecipe.servings} servings.` : 'Full recipe is one batch. Enter a fraction of the batch you ate.'}</Text>
-                  <Text style={{ color: theme.colors.muted, marginTop: 8 }}>{mealRecipe.servings ? 'Servings eaten' : 'Batches eaten'}</Text>
-                  <TextInput accessibilityLabel="Recipe servings eaten" value={recipeServingsEaten} onChangeText={updateRecipeServingsEaten} keyboardType="decimal-pad" style={[inputStyle, { marginTop: 6 }]} />
-                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 8 }}>Totals show this amount. Check the matched food varieties and include any measured oil or toppings.</Text>
-                </View>
-              ) : null}
-
-              {!mealRecipe ? (
-                <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 16 }}>
-                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>How much did you eat?</Text>
-                  <View style={{ marginTop: 10, flexDirection: 'row', gap: 6 }}>
-                    {([['whole', 'Whole meal'], ['half', 'Half meal'], ['custom', 'Custom']] as const).map(([choice, label]) => (
-                      <Pressable key={choice} onPress={() => chooseFavoriteEditPortion(choice)}
-                        accessibilityRole="button" accessibilityState={{ selected: favoriteEditPortionChoice === choice }}
-                        style={[foodChoiceButton, favoriteEditPortionChoice === choice && chipActive]}>
-                        <Text style={[foodChoiceText, favoriteEditPortionChoice === choice && chipTextActive]}>{label}</Text>
-                      </Pressable>
-                    ))}
-                  </View>
-                  {favoriteEditPortionChoice === 'custom' ? (
-                    <View style={{ marginTop: 12, gap: 8 }}>
-                      <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Amount eaten</Text>
-                      <TextInput accessibilityLabel="Amount eaten" value={favoriteEditPortionAmount}
-                        onChangeText={(value) => { setFavoriteEditSavedScale(null); setFavoriteEditPortionAmount(value) }} keyboardType="decimal-pad" style={inputStyle} />
-                      <View style={{ flexDirection: 'row', gap: 6 }}>
-                        {(['serving', ...(favoriteEditWholeGrams != null ? ['g', 'oz'] : [])] as MealPortionUnit[]).map((unit) => (
-                          <Pressable key={unit} onPress={() => changeFavoriteEditPortionUnit(unit)} accessibilityRole="button"
-                            accessibilityLabel={unit === 'serving' ? 'Meal servings' : unit === 'g' ? 'Grams' : 'Ounces'}
-                            accessibilityState={{ selected: favoriteEditPortionUnit === unit }}
-                            style={[foodChoiceButton, favoriteEditPortionUnit === unit && chipActive]}>
-                            <Text style={[foodChoiceText, favoriteEditPortionUnit === unit && chipTextActive]}>{unit === 'serving' ? 'Servings' : unit}</Text>
-                          </Pressable>
-                        ))}
-                      </View>
-                    </View>
-                  ) : null}
-                  <Text style={{ color: favoriteEditPortionScale == null ? '#B91C1C' : '#6B7280', fontSize: 12, marginTop: 10 }}>
-                    {favoriteEditPortionScale == null ? 'Enter a positive amount to calculate your portion.'
-                      : `Totals show ${Math.round(favoriteEditPortionScale * 1000) / 10}% of the ingredient amounts below.`}
-                  </Text>
-                  {favoriteEditWholeGrams != null ? (
-                    <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>Whole meal: {Math.round(favoriteEditWholeGrams * 10) / 10} g{favoriteEditRecipeServings !== 1 ? ` · ${favoriteEditRecipeServings} servings` : ''}</Text>
-                  ) : <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>Use servings, or add measured ingredient weights to use grams and ounces.</Text>}
-                  <View style={{ marginTop: 12 }}>
-                    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={favoriteEditTotals} />
-                  </View>
-                </View>
-              ) : null}
-
               {favoriteEditSearchError ? <Text style={{ color: '#DC2626', marginTop: 10 }}>{favoriteEditSearchError}</Text> : null}
 
               {(favoriteEditSearchLoading || favoriteEditSearchResults.length > 0) ? (
@@ -8153,7 +8166,7 @@ export function TrackCaloriesScreen() {
                       </Text>
                       <Text style={{ color: '#9CA3AF', fontSize: 11, marginTop: 3 }}>Source: {ingredientSourceLabel(item)}</Text>
                       <Pressable onPress={() => addSearchResultToFavoriteEditor(item)} style={[miniPrimaryButton, { marginTop: 8 }]}>
-                        <Text style={miniPrimaryText}>Add</Text>
+                        <Text style={miniPrimaryText}>{favoriteEditReplaceItemId ? 'Use this food' : 'Add food'}</Text>
                       </Pressable>
                     </View>
                   ))}
@@ -8169,11 +8182,11 @@ export function TrackCaloriesScreen() {
                     setFavoriteEditIngredientsExpanded((prev) => !prev)
                   }}
                   accessibilityRole="button"
-                  accessibilityLabel="Toggle meal ingredients"
+                  accessibilityLabel="Show or hide your foods"
                   accessibilityState={{ expanded: favoriteEditIngredientsExpanded, disabled: favoriteEditItems.length === 0 }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
                 >
-                  <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Your ingredients</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Your foods</Text>
                   {favoriteEditItems.length > 0 ? (
                     <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{favoriteEditIngredientsExpanded ? '▾' : '▸'}</Text>
                   ) : null}
@@ -8183,16 +8196,17 @@ export function TrackCaloriesScreen() {
                 </Text>
               </View>
 
+              <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 8 }}>Check each food and its full-meal amount. Choose Edit food to correct the amount or serving size.</Text>
               {favoriteEditItems.length === 0 ? (
-                <Text style={{ color: '#6B7280', marginTop: 12 }}>Add ingredients using the search above.</Text>
+                <Text style={{ color: '#6B7280', marginTop: 12 }}>Find a food above, or add one by photo, barcode or favorites.</Text>
               ) : !favoriteEditIngredientsExpanded ? (
                 <Pressable
                   onPress={() => setFavoriteEditIngredientsExpanded(true)}
                   accessibilityRole="button"
-                  accessibilityLabel="Show meal ingredients"
+                  accessibilityLabel="Show foods and amounts"
                   style={{ marginTop: 12, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.bg, paddingHorizontal: 12, paddingVertical: 10 }}
                 >
-                  <Text style={{ color: '#6B7280', fontSize: 12 }}>Ingredients are hidden. Tap to expand.</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 12 }}>Show foods and amounts</Text>
                 </Pressable>
               ) : (
                 <View style={{ marginTop: 12, gap: 10 }}>
@@ -8214,29 +8228,36 @@ export function TrackCaloriesScreen() {
                           <View style={{ flex: 1 }}>
                             <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>{editItem.name}</Text>
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>
-                              Serving: {editItem.servingLabel} • Amount: {editItem.amountInput || formatFavoriteAmount(favoriteAmountFromServings(editItem.servings, editItem.amountUnit, favoriteBaseForItem(editItem)))} {amountUnitLabel}
+                              Serving: {editItem.servingLabel} • Full-meal amount: {editItem.amountInput || formatFavoriteAmount(favoriteAmountFromServings(editItem.servings, editItem.amountUnit, favoriteBaseForItem(editItem)))} {amountUnitLabel}
                             </Text>
                             {editItem.raw?.selectedServingFoodName ? <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 11 }}>Matched food: {editItem.raw.selectedServingFoodName}</Text> : null}
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 11 }}>Source: {editItem.raw?.matchSourceLabel || editItem.raw?.sourceLabel || ingredientSourceLabel(editItem.raw || {})}</Text>
                           </View>
-                          <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{expanded ? '▾' : '▸'}</Text>
+                          <View style={{ alignItems: 'flex-end', gap: 4 }}>
+                            <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>{expanded ? 'Close edit' : 'Edit food'}</Text>
+                            <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{expanded ? '▾' : '▸'}</Text>
+                          </View>
                         </Pressable>
 
                         {expanded ? (
                           <View style={{ paddingHorizontal: 14, paddingBottom: 14, gap: 12 }}>
+                            <Pressable onPress={() => beginFavoriteEditReplacement(editItem)} accessibilityRole="button" accessibilityLabel={`Change food: ${editItem.name}`} style={[miniSecondaryButton, { alignItems: 'center', minHeight: 44, justifyContent: 'center' }]}>
+                              <Text style={miniSecondaryText}>Change food</Text>
+                            </Pressable>
+                            <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18 }}>Choose Change food if this is a different food. Edit the amount below if only the quantity is wrong.</Text>
                             <View>
-                              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Ingredient name</Text>
+                              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Food name</Text>
                               <TextInput
                                 value={editItem.name}
                                 onChangeText={(value) => updateFavoriteEditIngredientName(editItem.id, value)}
-                                placeholder="Ingredient name"
+                                placeholder="Food name"
                                 placeholderTextColor="#9CA3AF"
                                 style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
                               />
                             </View>
                             <View style={{ gap: 10 }}>
                               <View>
-                                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Amount</Text>
+                                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Amount in whole meal</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                   <TextInput
                                     value={editItem.amountInput}
@@ -8402,7 +8423,7 @@ export function TrackCaloriesScreen() {
                               onPress={() => removeFavoriteEditIngredient(editItem.id)}
                               style={{ borderWidth: 1, borderColor: '#FECACA', borderRadius: 2, backgroundColor: '#FEF2F2', alignItems: 'center', paddingVertical: 11 }}
                             >
-                              <Text style={{ color: '#DC2626', fontWeight: '600' }}>Remove ingredient</Text>
+                              <Text style={{ color: '#DC2626', fontWeight: '600' }}>Remove food</Text>
                             </Pressable>
                           </View>
                         ) : null}
@@ -8412,6 +8433,57 @@ export function TrackCaloriesScreen() {
                 </View>
               )}
             </View>
+
+              {mealRecipe ? (
+                <View style={{ padding: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '700' }}>How much did you eat?</Text>
+                  <Text style={{ color: theme.colors.muted, marginTop: 6 }}>{mealRecipe.servings ? `Full recipe makes ${mealRecipe.servings} servings.` : 'Full recipe is one batch. Enter a fraction of the batch you ate.'}</Text>
+                  <Text style={{ color: theme.colors.muted, marginTop: 8 }}>{mealRecipe.servings ? 'Servings eaten' : 'Batches eaten'}</Text>
+                  <TextInput accessibilityLabel="Recipe servings eaten" value={recipeServingsEaten} onChangeText={updateRecipeServingsEaten} keyboardType="decimal-pad" style={[inputStyle, { marginTop: 6 }]} />
+                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 8 }}>Totals show this amount. Check the matched food varieties and include any measured oil or toppings.</Text>
+                </View>
+              ) : null}
+
+              {!mealRecipe ? (
+                <View style={{ padding: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2 }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>How much did you eat?</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 6 }}>Whole meal uses all the food amounts above. Half meal uses half of every food. Custom lets you enter your share. Calories and every nutrient total change together.</Text>
+                  <View style={{ marginTop: 10, flexDirection: 'row', gap: 6 }}>
+                    {([['whole', 'Whole meal'], ['half', 'Half meal'], ['custom', 'Custom']] as const).map(([choice, label]) => (
+                      <Pressable key={choice} onPress={() => chooseFavoriteEditPortion(choice)}
+                        accessibilityRole="button" accessibilityState={{ selected: favoriteEditPortionChoice === choice }}
+                        style={[foodChoiceButton, favoriteEditPortionChoice === choice && foodChoiceActive]}>
+                        <Text style={[foodChoiceText, favoriteEditPortionChoice === choice && foodChoiceTextActive]}>{label}</Text>
+                      </Pressable>
+                    ))}
+                  </View>
+                  {favoriteEditPortionChoice === 'custom' ? (
+                    <View style={{ marginTop: 12, gap: 8 }}>
+                      <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Amount eaten</Text>
+                      <TextInput accessibilityLabel="Amount eaten" value={favoriteEditPortionAmount}
+                        onChangeText={(value) => { setFavoriteEditSavedScale(null); setFavoriteEditPortionAmount(value) }} keyboardType="decimal-pad" style={inputStyle} />
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {(['serving', ...(favoriteEditWholeGrams != null ? ['g', 'oz'] : [])] as MealPortionUnit[]).map((unit) => (
+                          <Pressable key={unit} onPress={() => changeFavoriteEditPortionUnit(unit)} accessibilityRole="button"
+                            accessibilityLabel={unit === 'serving' ? 'Meal servings' : unit === 'g' ? 'Grams' : 'Ounces'}
+                            accessibilityState={{ selected: favoriteEditPortionUnit === unit }}
+                            style={[foodChoiceButton, favoriteEditPortionUnit === unit && foodChoiceActive]}>
+                            <Text style={[foodChoiceText, favoriteEditPortionUnit === unit && foodChoiceTextActive]}>{unit === 'serving' ? 'Servings' : unit}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+                  <Text style={{ color: favoriteEditPortionScale == null ? '#B91C1C' : '#6B7280', fontSize: 12, marginTop: 10 }}>
+                    {favoriteEditPortionScale == null ? 'Enter a positive amount to calculate your portion.'
+                      : `Totals show ${Math.round(favoriteEditPortionScale * 1000) / 10}% of the food amounts above.`}
+                  </Text>
+                  {favoriteEditWholeGrams != null ? (
+                    <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>Whole meal: {Math.round(favoriteEditWholeGrams * 10) / 10} g{favoriteEditRecipeServings !== 1 ? ` · ${favoriteEditRecipeServings} servings` : ''}</Text>
+                  ) : <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>Use servings, or add measured food weights to use grams and ounces.</Text>}
+                </View>
+              ) : null}
+
 
             <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
@@ -8745,7 +8817,7 @@ export function TrackCaloriesScreen() {
                 returnKeyType="search"
                 placeholder="e.g. pizza"
                 placeholderTextColor="#8AA39D"
-                style={[inputStyle, { paddingRight: 48 }]}
+                style={[inputStyle, { paddingRight: 80 }]}
               />
               <Pressable
                 onPress={() => void runIngredientSearch()}
@@ -10275,3 +10347,6 @@ const foodChoiceText = {
   fontWeight: '600' as const,
   textAlign: 'center' as const,
 }
+
+const foodChoiceActive = { borderColor: '#059669', backgroundColor: '#059669' }
+const foodChoiceTextActive = { color: '#FFFFFF' }

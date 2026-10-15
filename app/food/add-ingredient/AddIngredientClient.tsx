@@ -1992,19 +1992,19 @@ export default function AddIngredientClient() {
           <button
             type="button"
             onClick={() => router.push('/food')}
-            className="p-2 rounded-full hover:bg-gray-100"
+            className="min-h-11 min-w-11 rounded-sm p-2 hover:bg-gray-100"
             aria-label="Back"
           >
             <span aria-hidden>←</span>
           </button>
           <div className="flex-1 text-center">
-            <div className="text-lg font-semibold text-gray-900">Add ingredient</div>
+            <div className="text-lg font-semibold text-gray-900">Add food</div>
             <div className="text-xs text-gray-500">{headerSubtitle}</div>
           </div>
           <button
             type="button"
             onClick={() => router.push('/food')}
-            className="p-2 rounded-full hover:bg-gray-100"
+            className="min-h-11 min-w-11 rounded-sm p-2 hover:bg-gray-100"
             aria-label="Close"
           >
             <span aria-hidden>✕</span>
@@ -2016,40 +2016,8 @@ export default function AddIngredientClient() {
         <div className="w-full max-w-3xl mx-auto space-y-4">
           {/* PROTECTED: ADD_INGREDIENT_SEARCH START */}
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
-            <div className="text-sm font-semibold text-gray-900">
-              Search ingredients
-            </div>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setKind('packaged')
-                  // Changing category already starts a search through the query effect.
-                  if (kind === 'packaged' && query.trim().length >= 1) runSearch(query, 'packaged', 'auto')
-                }}
-                className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
-                  kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
-                } disabled:opacity-60`}
-              >
-                Packaged &amp; fast food
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setKind('single')
-                  // Tapping the current category still refreshes its results.
-                  if (kind === 'single' && query.trim().length >= 1) runSearch(query, 'single', 'auto')
-                }}
-                className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
-                  kind === 'single' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
-                } disabled:opacity-60`}
-              >
-                Single foods
-              </button>
-            </div>
+            <div className="text-sm font-semibold text-gray-900">Food search</div>
+            <p className="text-sm text-gray-600">Find the food you ate, then choose Set amount to check how much you ate before adding it.</p>
 
             <form
               className="relative"
@@ -2066,13 +2034,14 @@ export default function AddIngredientClient() {
                     setQuery(e.target.value)
                     setError(null)
                   }}
+                aria-label="Search foods"
                 placeholder="e.g. pizza"
                 autoComplete="off"
                 autoCorrect="off"
                 autoCapitalize="none"
                 spellCheck={false}
                 enterKeyHint="search"
-                className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                className="min-h-11 w-full px-3 py-2 pr-14 border border-gray-300 rounded-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
               />
               <button
                 type="button"
@@ -2087,7 +2056,7 @@ export default function AddIngredientClient() {
                   triggerSearchFromButton()
                 }}
                 onClick={triggerSearchFromButton}
-                className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
+                className="absolute right-0 top-1/2 -translate-y-1/2 h-11 w-11 rounded-sm bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
               >
                 {loading ? (
                   <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -2100,11 +2069,93 @@ export default function AddIngredientClient() {
               </button>
             </form>
 
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setKind('packaged')
+                  // Changing category already starts a search through the query effect.
+                  if (kind === 'packaged' && query.trim().length >= 1) runSearch(query, 'packaged', 'auto')
+                }}
+                className={`min-h-11 px-3 py-2 rounded-sm border text-sm font-semibold ${
+                  kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
+                } disabled:opacity-60`}
+              >
+                Packaged &amp; fast food
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setKind('single')
+                  // Tapping the current category still refreshes its results.
+                  if (kind === 'single' && query.trim().length >= 1) runSearch(query, 'single', 'auto')
+                }}
+                className={`min-h-11 px-3 py-2 rounded-sm border text-sm font-semibold ${
+                  kind === 'single' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
+                } disabled:opacity-60`}
+              >
+                Single foods
+              </button>
+            </div>
+
+
+
+          <div className="border-t border-gray-200 pt-4 space-y-3">
+            <div className="text-sm font-semibold text-gray-900">Add food</div>
+            <div className="text-sm text-gray-600">Take a clear photo of your food. Check the detected foods and amounts before saving.</div>
+
+            <div>
+              <UsageMeter inline={true} feature="foodAnalysis" />
+            </div>
+
+            {photoPreviewUrl && (
+              <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={photoPreviewUrl} alt="Selected food photo" className="w-full max-h-64 object-cover" />
+              </div>
+            )}
+
+            <div>
+              <button
+                type="button"
+                disabled={photoLoading}
+                onClick={() => photoInputRef.current?.click()}
+                className="min-h-11 w-full min-w-0 rounded-sm border border-gray-300 bg-white px-2 py-2 text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
+              >
+                {photoLoading ? 'Analyzing…' : 'Add by photo'}
+              </button>
+            </div>
+
+              <button
+                type="button"
+                onClick={() => {
+                  setQuery('')
+                  setResults([])
+                  setError(null)
+                }}
+                className="min-h-11 px-2 py-2 text-sm font-semibold text-emerald-700 hover:bg-gray-50"
+              >
+                Clear search
+              </button>
+            <input
+              ref={photoInputRef}
+              type="file"
+              accept={FOOD_IMAGE_ACCEPT}
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0]
+                if (f) addByPhoto(f)
+              }}
+            />
+          </div>
+
             {error && <div className="text-sm text-red-600">{error}</div>}
 
             {!loading && !error && results.length === 0 && query.trim() && (
               <div className="text-sm text-gray-500">
-                No results yet. Try a different search.
+                No matching foods found. Try a shorter name or another food category.
               </div>
             )}
 
@@ -2117,8 +2168,8 @@ export default function AddIngredientClient() {
                   const display = buildSearchDisplay(r, query)
                   return (
                     <div key={id} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
-                      <div className="min-w-0">
-                        <div className="text-sm font-semibold text-gray-900 truncate">
+                      <div className="min-w-0 flex-1">
+                        <div className="text-sm font-semibold text-gray-900 break-words">
                           {display.title}
                           {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                         </div>
@@ -2162,9 +2213,9 @@ export default function AddIngredientClient() {
                           }
                           addFromSearchResult(r)
                         }}
-                        className="ml-3 px-3 py-2 rounded-lg bg-emerald-600 text-white text-xs font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                        className="ml-3 min-h-11 shrink-0 rounded-sm bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700 disabled:opacity-60"
                       >
-                        {isBrandSuggestion ? 'Show' : busy ? 'Adding…' : 'Add'}
+                        {isBrandSuggestion ? 'Show foods' : busy ? 'Opening…' : 'Set amount'}
                       </button>
                     </div>
                   )
@@ -2182,69 +2233,22 @@ export default function AddIngredientClient() {
             />
           </div>
 
-          <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-2">
-            <div className="text-sm font-semibold text-gray-900">Or use AI food photo notes</div>
-            <div className="text-sm text-gray-600">Take a clear photo of the food or package.</div>
 
-            <div>
-              <UsageMeter inline={true} feature="foodAnalysis" />
-            </div>
-
-            {photoPreviewUrl && (
-              <div className="rounded-xl border border-gray-200 bg-white overflow-hidden">
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img src={photoPreviewUrl} alt="Selected food photo" className="w-full max-h-64 object-cover" />
-              </div>
-            )}
-
-            <div className="flex gap-2">
-              <button
-                type="button"
-                disabled={photoLoading}
-                onClick={() => photoInputRef.current?.click()}
-                className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
-              >
-                {photoLoading ? 'Analyzing…' : 'Add by photo'}
-              </button>
-              <button
-                type="button"
-                onClick={() => {
-                  setQuery('')
-                  setResults([])
-                  setError(null)
-                }}
-                className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50"
-              >
-                Reset
-              </button>
-            </div>
-
-            <input
-              ref={photoInputRef}
-              type="file"
-              accept={FOOD_IMAGE_ACCEPT}
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0]
-                if (f) addByPhoto(f)
-              }}
-            />
-          </div>
         </div>
       </div>
 
       {adjustItem && (
         <div className="fixed inset-0 z-50 bg-black/30 flex items-end justify-center p-0 sm:items-center sm:p-4">
-          <div className="w-full h-[100dvh] sm:h-auto sm:max-w-lg rounded-none sm:rounded-2xl bg-white shadow-2xl overflow-hidden flex flex-col">
+          <div role="dialog" aria-modal="true" aria-labelledby="add-food-amount-title" className="w-full h-[100dvh] sm:h-auto sm:max-w-lg rounded-none sm:rounded-sm bg-white shadow-2xl overflow-hidden flex flex-col">
             <div className="flex items-center justify-between border-b border-gray-200 px-4 py-3">
-              <div className="text-base font-semibold text-gray-900">Adjust ingredient</div>
+              <div id="add-food-amount-title" className="text-base font-semibold text-gray-900">Set amount</div>
               <button
                 type="button"
                 onClick={() => {
                   if (adjustSaving) return
                   setAdjustItem(null)
                 }}
-                className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+                className="min-h-11 min-w-11 p-2 rounded-sm hover:bg-gray-100 text-gray-500"
                 aria-label="Close"
               >
                 <span aria-hidden>✕</span>
@@ -2252,7 +2256,8 @@ export default function AddIngredientClient() {
             </div>
             <div className="flex-1 overflow-y-auto px-4 py-4 space-y-4">
               <div>
-                <div className="text-sm font-semibold text-gray-900">{adjustItem.name}</div>
+                <div className="text-sm font-semibold text-gray-900 break-words">{adjustItem.name}</div>
+                <p className="mt-1 text-sm text-gray-600">Enter the amount you ate. The nutrients below update as you change it.</p>
                 {adjustItem.brand && <div className="text-xs text-gray-500">{adjustItem.brand}</div>}
               </div>
 
@@ -2296,7 +2301,7 @@ export default function AddIngredientClient() {
                   <>
                     {servingOptions.length > 0 && (
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Serving size</label>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Serving choice</label>
                         <select
                           value={adjustServingId || servingOptions[0]?.id || ''}
                           onChange={(e) => {
@@ -2345,7 +2350,7 @@ export default function AddIngredientClient() {
                       </div>
                     )}
                     <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount</label>
+                      <label className="block text-sm font-medium text-gray-700 mb-1">Amount eaten</label>
                       <div className="flex gap-2 min-w-0">
                         <input
                           type="number"
@@ -2374,11 +2379,13 @@ export default function AddIngredientClient() {
                               return 1
                             return 1
                           })()}
+                          aria-label="Amount eaten"
                           value={adjustAmountInput}
                           onChange={(e) => setAdjustAmountInput(e.target.value)}
                           className="w-20 sm:w-24 flex-none px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                         />
                         <select
+                          aria-label="Amount measurement"
                           value={safeUnit}
                           onChange={(e) => {
                             const nextUnit = e.target.value as MeasurementUnit
@@ -2428,7 +2435,7 @@ export default function AddIngredientClient() {
                 type="button"
                 disabled={adjustSaving}
                 onClick={confirmAdjustAdd}
-                className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
+                className="min-h-11 flex-1 px-3 py-2 rounded-sm bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
               >
                 {adjustSaving ? 'Adding…' : 'Add to diary'}
               </button>
@@ -2436,7 +2443,7 @@ export default function AddIngredientClient() {
                 type="button"
                 disabled={adjustSaving}
                 onClick={() => setAdjustItem(null)}
-                className="px-3 py-2 rounded-lg border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
+                className="min-h-11 px-3 py-2 rounded-sm border border-gray-200 text-sm font-semibold text-gray-700 hover:bg-gray-50 disabled:opacity-60"
               >
                 Cancel
               </button>

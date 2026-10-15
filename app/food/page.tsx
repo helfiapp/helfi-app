@@ -21554,7 +21554,7 @@ Please add nutritional information manually if needed.`);
                   {/* PROTECTED: ADD_INGREDIENT_MODAL_SEARCH START */}
 	                <div className="space-y-2">
 	                  <label className="block text-sm font-medium text-gray-900">
-	                    Search foods (Helfi database first, then FatSecret if needed)
+	                    Search ingredients
 	                  </label>
                   <div className="flex flex-col gap-2">
                     <div className="grid grid-cols-2 gap-2">
@@ -21695,8 +21695,7 @@ Please add nutritional information manually if needed.`);
                     </div>
                   </div>
 	                  <p className="text-xs text-gray-500">
-	                    Search always shows Helfi database results first. If we don’t have enough matches, we try FatSecret.
-	                    Results only show when calories + protein + carbs + fat are available.
+	                    Choose the food that matches what you ate. You can adjust its amount next.
 	                  </p>
 	                </div>
                 {officialError && <div className="mt-3 text-xs text-red-600">{officialError}</div>}
@@ -21711,8 +21710,8 @@ Please add nutritional information manually if needed.`);
                         key={`${r.source}-${r.id}-${idx}`}
                         className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
                       >
-                        <div className="min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 truncate">
+                        <div className="min-w-0 flex-1">
+                          <div className="text-sm font-semibold text-gray-900 break-words">
                             {display.title}
                             {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                           </div>
@@ -21766,7 +21765,7 @@ Please add nutritional information manually if needed.`);
                             }
                             addIngredientFromOfficial(r)
                           }}
-                          className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                          className="ml-3 min-h-11 shrink-0 rounded-sm bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                         >
                           {isBrandSuggestion ? 'Show' : 'Add'}
                         </button>
@@ -23120,7 +23119,7 @@ Please add nutritional information manually if needed.`);
                       <div className="font-semibold">Label numbers look wrong</div>
                       <div className="text-xs text-red-800 mt-1">{labelValidation.message}</div>
                       <div className="text-xs text-red-800 mt-1">
-                        Fix the macros with the pencil icon or retake the label photo to continue.
+                        Choose Edit label numbers below or take a clearer label photo to continue.
                       </div>
                       <button
                         type="button"
@@ -23135,11 +23134,13 @@ Please add nutritional information manually if needed.`);
                   {/* Food title + optional notes (editable while viewing an entry or an analysis result) */}
                   {(editingEntry || showAiResult) ? (
                     <div className="mb-4 space-y-3">
-                      <div className="block text-lg font-medium text-gray-900">Food Details</div>
+                      <div className="block text-lg font-semibold text-gray-900">Review your meal</div>
+                      <p className="text-sm text-gray-600">Check the name, foods and amounts before saving. Use Edit food to correct an ingredient.</p>
                       <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Food name</label>
+                        <label htmlFor="review-meal-name" className="block text-sm font-medium text-gray-700 mb-1">Meal name</label>
                         <input
                           type="text"
+                          id="review-meal-name"
                           value={editedFoodTitle}
                           onChange={(e) => {
                             const v = e.target.value
@@ -23855,29 +23856,42 @@ Please add nutritional information manually if needed.`);
                                 : undefined
                             }
                           >
-                            {item?.nutritionProvenance?.foodName ? (
-                              <p className="mb-2 text-xs text-slate-600 break-words">Nutrition source: {item.nutritionProvenance.foodName}</p>
-                            ) : null}
                             {/* Header row with actions, title, and description */}
                             {isCollapsed ? (
-                              <div className="flex items-center justify-between gap-2">
-                                <div className="font-semibold text-slate-900 text-base leading-tight break-words">
-                                  {displayName}
+                              <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
+                                <div className="min-w-0 flex-1">
+                                  <div className="font-semibold text-slate-900 text-base leading-tight break-words">{displayName}</div>
+                                  {item?.nutritionProvenance?.foodName ? (
+                                    <p className="mt-1 text-xs text-slate-500 break-words">Nutrition based on: {item.nutritionProvenance.foodName}</p>
+                                  ) : null}
                                 </div>
-                                <button
-                                  onClick={() => {
-                                    toggleExpand()
-                                  }}
-                                  className="p-2 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition-colors"
-                                  title="Expand"
-                                >
-                                  <span className="material-symbols-outlined text-[20px]">expand_more</span>
-                                </button>
+                                <div className="flex flex-wrap gap-2">
+                                  <button
+                                    type="button"
+                                    onClick={(event) => {
+                                      event.stopPropagation()
+                                      setEditingItemIndex(index)
+                                      setShowItemEditModal(true)
+                                    }}
+                                    onKeyDown={(event) => event.stopPropagation()}
+                                    className="min-h-11 rounded-sm border border-emerald-600 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                                  >Edit food</button>
+                                  <button
+                                    type="button"
+                                    onClick={(event) => { event.stopPropagation(); toggleExpand() }}
+                                    onKeyDown={(event) => event.stopPropagation()}
+                                    className="min-h-11 rounded-sm border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-700 hover:bg-gray-50"
+                                  >Show details</button>
+                                </div>
                               </div>
                             ) : (
-                              <div className="flex flex-col mb-3">
-                                <div className="flex items-center justify-end">
-                                  <div className="flex items-center gap-1 bg-white border border-slate-200 px-3 py-1.5 rounded-full shadow-sm">
+                              <div className="flex flex-col mb-3 gap-2">
+                                <div className="font-semibold text-slate-900 text-lg break-words">{displayName}</div>
+                                {item?.nutritionProvenance?.foodName ? (
+                                  <p className="text-xs text-slate-500 break-words">Nutrition based on: {item.nutritionProvenance.foodName}</p>
+                                ) : null}
+                                <div className="flex items-center justify-start">
+                                  <div className="flex flex-wrap items-center gap-2 bg-white">
                                     <button
                                       type="button"
                                       onClick={() => handleItemThumb(index, 'up')}
@@ -23886,7 +23900,8 @@ Please add nutritional information manually if needed.`);
                                           ? 'bg-emerald-600 text-white'
                                           : 'text-slate-400 hover:text-emerald-600 hover:bg-emerald-50'
                                       }`}
-                                      title="Thumbs up"
+                                      aria-label="This food looks right"
+                                      title="This food looks right"
                                     >
                                       <span className="material-symbols-outlined text-[20px]">thumb_up</span>
                                     </button>
@@ -23898,7 +23913,8 @@ Please add nutritional information manually if needed.`);
                                           ? 'bg-red-600 text-white'
                                           : 'text-slate-400 hover:text-red-600 hover:bg-red-50'
                                       }`}
-                                      title="Thumbs down"
+                                      aria-label="Report a problem with this food"
+                                      title="Report a problem with this food"
                                     >
                                       <span className="material-symbols-outlined text-[20px]">thumb_down</span>
                                     </button>
@@ -23908,17 +23924,19 @@ Please add nutritional information manually if needed.`);
                                         setEditingItemIndex(index);
                                         setShowItemEditModal(true);
                                       }}
-                                      className="p-1.5 text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-full transition-colors"
-                                      title="Adjust details"
+                                      className="min-h-11 inline-flex items-center gap-1 rounded-sm border border-emerald-600 px-3 py-2 text-sm font-semibold text-emerald-700 hover:bg-emerald-50"
+                                      title="Edit food or amount"
                                     >
-                                      <span className="material-symbols-outlined text-[20px]">edit</span>
+                                      <span aria-hidden="true" className="material-symbols-outlined text-[20px]">edit</span>
+                                      Edit food
                                     </button>
                                     <button
                                       onClick={() => handleDeleteItem(index)}
-                                      className="p-1.5 text-slate-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-colors"
+                                      className="min-h-11 inline-flex items-center gap-1 rounded-sm border border-gray-300 px-3 py-2 text-sm font-semibold text-gray-600 hover:text-red-600 hover:bg-red-50"
                                       title="Delete ingredient"
                                     >
-                                      <span className="material-symbols-outlined text-[20px]">delete</span>
+                                      <span aria-hidden="true" className="material-symbols-outlined text-[20px]">delete</span>
+                                      Remove
                                     </button>
                                     <div className="w-px h-4 bg-slate-200 mx-1" />
                                     {isMultiIngredient && (
@@ -23933,9 +23951,6 @@ Please add nutritional information manually if needed.`);
                                       </button>
                                     )}
                                   </div>
-                                </div>
-                                <div className="font-semibold text-slate-900 text-lg mt-2 break-words">
-                                  {displayName}
                                 </div>
                                 {item.brand && (
                                   <div className="text-xs font-semibold text-slate-400 uppercase tracking-widest mt-1">
@@ -24661,16 +24676,21 @@ Please add nutritional information manually if needed.`);
             {/* Item Edit Modal */}
             {showItemEditModal && editingItemIndex !== null && analyzedItems[editingItemIndex] && (
               <div className="fixed inset-0 z-50 bg-white sm:bg-black/30 sm:flex sm:items-center sm:justify-center sm:p-6">
-                <div className="h-[100dvh] w-full sm:h-auto sm:max-h-[90dvh] sm:max-w-3xl bg-white sm:rounded-2xl sm:shadow-2xl flex flex-col overflow-hidden">
+                <div role="dialog" aria-modal="true" aria-labelledby="edit-food-dialog-title" className="h-[100dvh] w-full sm:h-auto sm:max-h-[90dvh] sm:max-w-3xl bg-white sm:rounded-sm sm:shadow-2xl flex flex-col overflow-hidden">
                   <div className="sticky top-0 z-10 bg-white border-b border-gray-200 px-5 py-4 flex items-center justify-between">
-                    <h3 className="text-lg font-semibold text-gray-900">Adjust Food Details</h3>
+                    <div>
+                      <h3 id="edit-food-dialog-title" className="text-lg font-semibold text-gray-900">Edit food</h3>
+                      <p className="mt-1 text-sm text-gray-600">Correct the food or the amount you ate.</p>
+                    </div>
                     <button
+                      type="button"
+                      aria-label="Close food editor"
                       onClick={() => {
                         setShowItemEditModal(false);
                         setEditingItemIndex(null);
                         setMissingFixMode(false);
                       }}
-                      className="p-2 rounded-full hover:bg-gray-100 text-gray-500"
+                      className="min-h-11 min-w-11 rounded-sm p-2 hover:bg-gray-100 text-gray-500"
                     >
                       <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
@@ -24679,10 +24699,11 @@ Please add nutritional information manually if needed.`);
                   </div>
 
                   <div className="flex-1 min-h-0 overflow-y-auto px-5 py-4 pb-10">
-                    <div className="space-y-4">
+                    <div className="space-y-5">
+                      <h4 className="text-sm font-semibold text-gray-900">Food</h4>
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">
-                          Food Name
+                          Food name
                         </label>
                         <input
                           type="text"
@@ -24711,8 +24732,13 @@ Please add nutritional information manually if needed.`);
                             }
                           }}
                           className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                          placeholder="e.g., Bread, Sausage, etc."
+                          aria-label="Food name"
+                          placeholder="e.g., Chicken with skin"
                         />
+                        <p className="mt-1 text-xs text-gray-500">Changing this name only changes the label. To correct the nutrition, choose a different food below.</p>
+                        {analyzedItems[editingItemIndex]?.nutritionProvenance?.foodName ? (
+                          <p className="mt-2 text-xs text-gray-500 break-words">Nutrition based on: {analyzedItems[editingItemIndex].nutritionProvenance.foodName}</p>
+                        ) : null}
                       </div>
                       
                       <div>
@@ -24728,6 +24754,10 @@ Please add nutritional information manually if needed.`);
                         />
                       </div>
                       
+                      <div className="border-t border-gray-200 pt-4">
+                        <h4 className="text-sm font-semibold text-gray-900">Amount eaten</h4>
+                        <p className="mt-1 text-xs text-gray-500">Enter the weight or number of servings you ate. Changing either updates the nutrients.</p>
+                      </div>
                       {(() => {
                         const item = analyzedItems[editingItemIndex]
                         const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
@@ -24786,9 +24816,11 @@ Please add nutritional information manually if needed.`);
                                       )
                                     : 'e.g., 250'
                                 }
-                                className="flex-1 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                                aria-label="Weight eaten"
+                                className="min-w-0 flex-1 px-3 py-2 border border-gray-300 rounded-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                               />
                               <select
+                                aria-label="Weight measurement"
                                 value={unit}
                                 onChange={(e) => updateItemField(editingItemIndex, 'weightUnit', e.target.value)}
                                 className="w-24 px-2 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
@@ -24802,7 +24834,7 @@ Please add nutritional information manually if needed.`);
                             </div>
                             {baseWeightPerServing && (
                               <p className="text-xs text-gray-500 mt-1">
-                                Total amount ≈{' '}
+                                Amount eaten ≈{' '}
                                 {(() => {
                                   const raw = baseWeightPerServing * servingsCount
                                   const amount = roundWeightValue(raw, unit)
@@ -24812,7 +24844,7 @@ Please add nutritional information manually if needed.`);
                             )}
                             {!baseWeightPerServing && (
                               <p className="text-xs text-gray-500 mt-1">
-                                This is the weight shown on the package or your estimate
+                                Use a measured weight when you have it; photo weights are estimates.
                               </p>
                             )}
                           </div>
@@ -24821,7 +24853,7 @@ Please add nutritional information manually if needed.`);
 
                       <div>
                         <label className="block text-sm font-medium text-gray-700 mb-2">
-                          Servings
+                          Or enter servings
                         </label>
                         <input
                           type="number"
@@ -24864,16 +24896,16 @@ Please add nutritional information manually if needed.`);
                           placeholder="e.g., 1"
                         />
                         <p className="text-xs text-gray-500 mt-1">
-                          Adjust servings to multiply nutrients accordingly
+                          1 serving is {analyzedItems[editingItemIndex]?.serving_size || 'the amount listed for this food'}. For half, enter 0.5; for double, enter 2.
                         </p>
                       </div>
 
                       <div className="pt-2 border-t border-gray-200">
                         <div className="text-sm font-medium text-gray-900">
-                          Find a better match (Helfi database first, then FatSecret if needed)
+                          Change food
                         </div>
                         <p className="text-xs text-gray-500 mt-1">
-                          Selecting a result replaces the item name, serving size, and macros.
+                          Search for the correct food and cooking method. Selecting a food updates its name and nutrition.
                         </p>
                         <div className="mt-3 flex flex-col gap-2">
                           <div className="grid grid-cols-2 gap-2">
@@ -24937,7 +24969,8 @@ Please add nutritional information manually if needed.`);
                                   handleOfficialSearch(officialSource, officialSearchQuery)
                                 }
                               }}
-                              placeholder="e.g., Christmas pudding"
+                              aria-label="Search for a replacement food"
+                              placeholder="e.g., chicken cooked"
                               autoComplete="off"
                               autoCorrect="off"
                               autoCapitalize="none"
@@ -25030,8 +25063,8 @@ Please add nutritional information manually if needed.`);
                                   key={`${r.source}-${r.id}-${idx}`}
                                   className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
                                 >
-                                  <div className="min-w-0">
-                                    <div className="text-sm font-semibold text-gray-900 truncate">
+                                  <div className="min-w-0 flex-1">
+                                    <div className="text-sm font-semibold text-gray-900 break-words">
                                       {display.title}
                                       {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                                     </div>
@@ -25096,9 +25129,9 @@ Please add nutritional information manually if needed.`);
                                         }
                                       })()
                                     }}
-                                    className="ml-3 px-3 py-1.5 rounded-md bg-emerald-600 text-white text-xs hover:bg-emerald-700"
+                                    className="ml-3 min-h-11 shrink-0 rounded-sm bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-700"
                                   >
-                                    {isBrandSuggestion ? 'Show' : 'Use match'}
+                                    {isBrandSuggestion ? 'Show foods' : 'Use this food'}
                                   </button>
                                 </div>
                               )
@@ -25106,29 +25139,13 @@ Please add nutritional information manually if needed.`);
                           </div>
                         )}
                         {!officialLoading && !officialError && officialResults.length === 0 && officialSearchQuery.trim() && (
-                          <div className="mt-4 text-xs text-gray-500">
-                            {(() => {
-                              const last = officialLastRequest
-                              const hasLast =
-                                last &&
-                                last.query?.trim().toLowerCase() === officialSearchQuery.trim().toLowerCase() &&
-                                last.mode === officialSource
-                              const hint = hasLast
-                                ? `Last search: ${last.status ?? '—'} • ${last.itemCount ?? 0} results • ${last.source || '—'}`
-                                : null
-                              const err = hasLast && last?.errorText ? ` (${String(last.errorText).slice(0, 140)})` : ''
-                              return (
-                                <div className="space-y-1">
-                                  <div>No results yet.</div>
-                                  {hint && <div className="text-[11px] text-gray-400">{hint}{err}</div>}
-                                  <div>Try a shorter name or switch between Packaged and Single food.</div>
-                                </div>
-                              )
-                            })()}
-                          </div>
+                          <p className="mt-4 text-sm text-gray-500">No matching foods found. Try a shorter name or switch between Packaged &amp; fast food and Single foods.</p>
                         )}
                       </div>
 
+                      <details className="border-t border-gray-200 pt-4">
+                        <summary className="min-h-11 cursor-pointer py-2 text-sm font-semibold text-gray-900">Enter nutrition from a label (optional)</summary>
+                        <p className="mb-3 text-xs text-gray-500">Use this only when you have the package or another reliable nutrition value.</p>
                       {(() => {
                         const item = analyzedItems[editingItemIndex]
                         const servingsCount = Number.isFinite(item?.servings) ? Number(item.servings) : 1
@@ -25410,8 +25427,11 @@ Please add nutritional information manually if needed.`);
                           </div>
                         )
                       })()}
-                      
-                      <div className="pt-4 border-t border-gray-200">
+                      </details>
+                    </div>
+                  </div>
+                      <div className="shrink-0 border-t border-gray-200 bg-white px-5 py-4">
+                        <p className="mb-2 text-xs text-gray-500">Apply these changes, then save the meal in your diary.</p>
                         <button
                           onClick={() => {
                             // Recalculate nutrition after edits
@@ -25422,11 +25442,9 @@ Please add nutritional information manually if needed.`);
                           }}
                           className="w-full py-3 px-4 bg-emerald-500 hover:bg-emerald-600 text-white font-medium rounded-xl transition-colors duration-200"
                         >
-                          Save Changes
+                          Apply changes
                         </button>
                       </div>
-                    </div>
-                  </div>
                 </div>
               </div>
             )}

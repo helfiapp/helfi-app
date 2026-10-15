@@ -1673,12 +1673,12 @@ export function AddIngredientScreen() {
             <Text style={{ fontSize: 18, color: theme.colors.text }}>←</Text>
           </Pressable>
           <View style={{ flex: 1, alignItems: 'center' }}>
-            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Add ingredient</Text>
+            <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Add food</Text>
             <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>Add to {categoryLabel}</Text>
           </View>
           <Pressable
             accessibilityRole="button"
-            accessibilityLabel="Close Add ingredient"
+            accessibilityLabel="Close Add food"
             onPress={() => navigation.goBack()}
             style={({ pressed }) => ({ opacity: pressed ? 0.7 : 1, width: 36, alignItems: 'flex-end' })}
           >
@@ -1699,7 +1699,7 @@ export function AddIngredientScreen() {
           }}
         >
           <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>
-            Search foods
+            Food search
           </Text>
 
           <View style={{ position: 'relative' }}>
@@ -1721,20 +1721,21 @@ export function AddIngredientScreen() {
                 borderRadius: 2,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
-                paddingRight: 48,
+                paddingRight: 80,
                 color: theme.colors.text,
               }}
             />
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Search foods"
+              hitSlop={{ top: 6, bottom: 6 }}
               onPress={() => void runSearch()}
               disabled={loading || query.trim().length === 0}
               style={({ pressed }) => ({
                 position: 'absolute',
                 right: 8,
                 top: 6,
-                width: 32,
+                width: 64,
                 height: 32,
                 borderRadius: 2,
                 backgroundColor: '#0F172A',
@@ -1743,7 +1744,7 @@ export function AddIngredientScreen() {
                 opacity: loading || query.trim().length === 0 ? 0.6 : pressed ? 0.85 : 1,
               })}
             >
-              {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>⌕</Text>}
+              {loading ? <ActivityIndicator size="small" color="#FFFFFF" /> : <Text style={{ color: '#FFFFFF', fontWeight: '700', fontSize: 12 }}>Search</Text>}
             </Pressable>
           </View>
 
@@ -1806,6 +1807,43 @@ export function AddIngredientScreen() {
             </Pressable>
           </View>
 
+          <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 14, gap: 10 }}>
+            <Text style={{ fontSize: 14, fontWeight: '700', color: theme.colors.text }}>Add food</Text>
+            <View style={{ flexDirection: 'row', gap: 6 }}>
+              <Pressable accessibilityRole="button" accessibilityLabel={photoLoading ? 'Analyzing image' : 'Add by photo'}
+                accessibilityState={{ disabled: photoLoading }} disabled={photoLoading} onPress={() => void addByPhoto()}
+                style={[foodActionButton, photoLoading && { opacity: 0.6 }]}>
+                <Text style={foodActionText}>{photoLoading ? 'Analyzing…' : 'Add by photo'}</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Scan barcode"
+                onPress={() => navigation.navigate('TrackCalories', { voiceAction: 'openBarcode', voiceMeal: targetMeal, voiceActionNonce: Date.now() })}
+                style={foodActionButton}>
+                <Text style={foodActionText}>Scan barcode</Text>
+              </Pressable>
+              <Pressable accessibilityRole="button" accessibilityLabel="Favorites"
+                onPress={() => navigation.navigate('TrackCalories', { voiceAction: 'openFavorites', voiceMeal: targetMeal, voiceActionNonce: Date.now() })}
+                style={foodActionButton}>
+                <Text style={foodActionText}>Favorites</Text>
+              </Pressable>
+            </View>
+            <Text style={{ fontSize: 12, lineHeight: 18, color: '#6B7280' }}>For a photo, check the detected foods and amounts before saving.</Text>
+            <View>
+              <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Credits remaining</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+                <View style={{ flex: 1, height: 8, borderRadius: 2, backgroundColor: '#E5E7EB', overflow: 'hidden', marginRight: 10 }}>
+                  <View style={{ width: `${Math.max(0, 100 - creditsPercentUsed)}%`, height: '100%', backgroundColor: '#4CAF50' }} />
+                </View>
+                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted }}>{creditsRemaining !== null ? creditsRemaining.toLocaleString() : '—'}</Text>
+              </View>
+            </View>
+            {photoPreviewUri ? <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, overflow: 'hidden' }}>
+              <Image source={{ uri: photoPreviewUri }} style={{ width: '100%', height: 220 }} resizeMode="cover" />
+            </View> : null}
+            {query || photoPreviewUri ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={resetSearchSection} style={{ alignSelf: 'flex-start', paddingVertical: 8 }}>
+              <Text style={{ fontSize: 12, fontWeight: '600', color: '#047857' }}>Clear search</Text>
+            </Pressable> : null}
+          </View>
+
           {error ? <Text style={{ color: '#DC2626', fontSize: 13 }}>{error}</Text> : null}
 
           {loading && (
@@ -1856,13 +1894,15 @@ export function AddIngredientScreen() {
                         </View>
                         <Pressable
                           accessibilityRole="button"
-                          accessibilityLabel={`Add ${display.title}`}
+                          accessibilityLabel={`Choose ${display.title} and set amount`}
                           disabled={isOpeningAdjust}
                           onPress={() => {
                             void openAdjust(item)
                           }}
                           style={({ pressed }) => ({
                             borderRadius: 2,
+                            minHeight: 44,
+                            justifyContent: 'center',
                             backgroundColor: '#059669',
                             paddingHorizontal: 12,
                             paddingVertical: 9,
@@ -1872,7 +1912,7 @@ export function AddIngredientScreen() {
                           {isOpeningAdjust ? (
                             <ActivityIndicator size="small" color="#FFFFFF" />
                           ) : (
-                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Add</Text>
+                            <Text style={{ fontSize: 12, fontWeight: '700', color: '#FFFFFF' }}>Set amount</Text>
                           )}
                         </Pressable>
                       </View>
@@ -1905,85 +1945,6 @@ export function AddIngredientScreen() {
           </Pressable>
         </View>
 
-        <View
-          style={{
-            marginTop: 14,
-            borderWidth: 1,
-            borderColor: '#E5E7EB',
-            borderRadius: 2,
-            backgroundColor: theme.colors.card,
-            padding: 12,
-            gap: 10,
-          }}
-        >
-          <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Add by photo</Text>
-          <Text style={{ fontSize: 14, color: '#4B5563' }}>Take a clear photo of the food or package.</Text>
-
-          <View>
-            <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Credits remaining</Text>
-            <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 6 }}>
-              <View style={{ flex: 1, height: 8, borderRadius: 2, backgroundColor: '#E5E7EB', overflow: 'hidden', marginRight: 10 }}>
-                <View
-                  style={{
-                    width: `${Math.max(0, 100 - creditsPercentUsed)}%`,
-                    height: '100%',
-                    backgroundColor: '#4CAF50',
-                  }}
-                />
-              </View>
-              <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted }}>
-                {creditsRemaining !== null ? creditsRemaining.toLocaleString() : '—'}
-              </Text>
-            </View>
-          </View>
-
-          {photoPreviewUri ? (
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, overflow: 'hidden' }}>
-              <Image source={{ uri: photoPreviewUri }} style={{ width: '100%', height: 220 }} resizeMode="cover" />
-            </View>
-          ) : null}
-
-          <View style={{ flexDirection: 'row', gap: 8 }}>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel={photoLoading ? 'Analyzing image' : 'Add by photo'}
-              accessibilityState={{ disabled: photoLoading }}
-              disabled={photoLoading}
-              onPress={() => void addByPhoto()}
-              style={({ pressed }) => ({
-                flex: 1,
-                borderRadius: 2,
-                backgroundColor: '#059669',
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingVertical: 12,
-                opacity: photoLoading ? 0.6 : pressed ? 0.9 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '700', color: '#FFFFFF' }}>
-                {photoLoading ? 'Analyzing…' : 'Add by photo'}
-              </Text>
-            </Pressable>
-            <Pressable
-              accessibilityRole="button"
-              accessibilityLabel="Reset"
-              onPress={resetSearchSection}
-              style={({ pressed }) => ({
-                borderRadius: 2,
-                borderWidth: 1,
-                borderColor: '#E5E7EB',
-                backgroundColor: theme.colors.card,
-                alignItems: 'center',
-                justifyContent: 'center',
-                paddingHorizontal: 14,
-                paddingVertical: 12,
-                opacity: pressed ? 0.9 : 1,
-              })}
-            >
-              <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.muted }}>Reset</Text>
-            </Pressable>
-          </View>
-        </View>
       </ScrollView>
 
       <Modal
@@ -2147,10 +2108,10 @@ export function AddIngredientScreen() {
             }}
           >
             <Text style={{ fontSize: 22, color: theme.colors.text }}> </Text>
-            <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text }}>Adjust ingredient</Text>
+            <Text style={{ fontSize: 17, fontWeight: '700', color: theme.colors.text }}>Food and amount</Text>
             <Pressable
               accessibilityRole="button"
-              accessibilityLabel="Close adjust ingredient"
+              accessibilityLabel="Close food and amount"
               onPress={() => {
                 if (adjustSaving) return
                 resetAdjustState()
@@ -2167,12 +2128,13 @@ export function AddIngredientScreen() {
           >
             <View>
               <Text style={{ fontSize: 15, fontWeight: '700', color: theme.colors.text }}>{adjustItem?.name || 'Food'}</Text>
+              <Text style={{ marginTop: 6, fontSize: 12, lineHeight: 18, color: '#6B7280' }}>Check the food, then enter the amount you want to add. The nutrition totals update as you change it.</Text>
               {adjustItem?.brand ? <Text style={{ marginTop: 2, fontSize: 12, color: '#6B7280' }}>{adjustItem.brand}</Text> : null}
             </View>
 
             {adjustServingOptions.length > 0 ? (
               <View>
-                <Text style={{ fontSize: 14, color: theme.colors.muted, marginBottom: 6 }}>Base serving size</Text>
+                <Text style={{ fontSize: 14, color: theme.colors.muted, marginBottom: 6 }}>Serving size</Text>
                 <View ref={adjustServingTriggerRef}>
                   <Pressable
                     accessibilityRole="button"
@@ -2202,7 +2164,7 @@ export function AddIngredientScreen() {
             ) : null}
 
             <View>
-              <Text style={{ fontSize: 14, color: theme.colors.muted, marginBottom: 6 }}>Amount</Text>
+              <Text style={{ fontSize: 14, color: theme.colors.muted, marginBottom: 6 }}>Amount to add</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                 <TextInput
                   value={adjustAmountInput}
@@ -2394,4 +2356,24 @@ export function AddIngredientScreen() {
       </Modal>
     </Screen>
   )
+}
+
+const foodActionButton = {
+  flex: 1,
+  minWidth: 0,
+  minHeight: 44,
+  borderRadius: 2,
+  borderWidth: 1,
+  borderColor: '#D1D5DB',
+  backgroundColor: '#FFFFFF',
+  paddingHorizontal: 6,
+  paddingVertical: 10,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+}
+const foodActionText = {
+  color: '#374151',
+  fontSize: 12,
+  fontWeight: '600' as const,
+  textAlign: 'center' as const,
 }

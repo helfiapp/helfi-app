@@ -1999,6 +1999,21 @@ const sanitizeMealTitle = (v: string) => v.replace(/\s+/g, ' ').trim()
 
 const buildDefaultMealName = (items: BuilderItem[]) => suggestMealName(items) || 'Meal'
 
+const buildFoodReplacement = (previous: BuilderItem, selected: BuilderItem): BuilderItem => {
+  const next = { ...selected, id: previous.id }
+  const unit = previous.__unit || previous.__baseUnit
+  const amount = Number(previous.__amount)
+  // Keep a measured amount only when the new food supports the same physical unit.
+  // A portion such as "one piece" belongs to its own food and must be checked again.
+  if (unit && ['g', 'ml', 'oz'].includes(unit) && allowedUnitsForItem(next).includes(unit) &&
+      Number.isFinite(amount) && amount > 0 && next.__baseAmount && next.__baseUnit) {
+    const measured = { ...next, __unit: unit, __amount: amount, __amountInput: String(amount) }
+    const servings = computeServingsFromAmount(measured)
+    if (Number.isFinite(servings) && servings > 0) return { ...measured, servings }
+  }
+  return next
+}
+
 export default function MealBuilderClient() {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -2079,6 +2094,8 @@ export default function MealBuilderClient() {
   const editFavoriteSourceItemsRef = useRef<any[] | null>(null)
   const editFavoriteIsCustomRef = useRef(false)
   const [expandedId, setExpandedId] = useState<string | null>(null)
+  const [replacementItemId, setReplacementItemId] = useState<string | null>(null)
+  const replacementItemIdRef = useRef<string | null>(null)
   // RECIPE LOCK (owner request): reopened saved recipes must support one top-level ingredients expander.
   // Default collapsed in edit/reopen mode; keep enabled in first-time build flow.
   // Do not remove/change without explicit written owner approval.
@@ -2824,8 +2841,8 @@ export default function MealBuilderClient() {
   }, [editScopeKey, editFavoriteId, sourceLogId, loadedFavoriteId])
 
   useEffect(() => {
-    // UX rule: when reopening an already-saved meal, the whole "Your ingredients" section starts collapsed.
-    // RECIPE LOCK (owner request): do not alter this default without explicit written approval.
+    // Owner's food usability request: show the foods on reopen so corrections are discoverable.
+    // Individual food details remain collapsed until Edit food is selected.
     if (!editScopeKey) {
       editListCollapseAppliedScopeRef.current = null
       setIngredientsListExpanded(true)
@@ -2835,7 +2852,7 @@ export default function MealBuilderClient() {
     if (!expectedLoadedId) return
     if (loadedFavoriteId !== expectedLoadedId) return
     if (editListCollapseAppliedScopeRef.current === editScopeKey) return
-    setIngredientsListExpanded(false)
+    setIngredientsListExpanded(true)
     editListCollapseAppliedScopeRef.current = editScopeKey
   }, [editScopeKey, editFavoriteId, sourceLogId, loadedFavoriteId])
 
@@ -3209,11 +3226,25 @@ export default function MealBuilderClient() {
   })()
 
   const addBuilderItem = (next: BuilderItem) => {
-    setItems((prev) => [...prev, next])
-    setExpandedId(next.id)
+    const replacementId = replacementItemIdRef.current
+    const previous = replacementId ? itemsRef.current.find((item) => item.id === replacementId) : null
+    if (replacementId && !previous) {
+      replacementItemIdRef.current = null
+      setReplacementItemId(null)
+      setError('That food was removed. Search again to add a food.')
+      return
+    }
+    const nextItem = previous ? buildFoodReplacement(previous, next) : next
+    setItems((prev) => replacementId
+      ? prev.map((item) => item.id === replacementId ? nextItem : item)
+      : [...prev, nextItem])
+    replacementItemIdRef.current = null
+    setReplacementItemId(null)
+    setIngredientsListExpanded(true)
+    setExpandedId(nextItem.id)
     try {
       if (typeof window !== 'undefined') {
-        const id = String(next.id || '')
+        const id = String(nextItem.id || '')
         const start = Date.now()
         const escape = (v: string) => {
           try {
@@ -6513,7 +6544,7 @@ export default function MealBuilderClient() {
             </button>
             <div className="min-w-0">
               <div className="text-lg font-semibold text-gray-900 truncate">
-                {editFavoriteId ? 'Edit meal' : 'Build a meal'}
+                {editFavoriteId || sourceLogId ? 'Edit meal' : items.length ? 'Review meal' : 'Build a meal'}
               </div>
               <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-gray-500">
                 <span className="inline-flex items-center rounded-full bg-emerald-50 px-2 py-0.5 text-sm font-medium text-emerald-700">
@@ -7020,8 +7051,10 @@ export default function MealBuilderClient() {
           )}
 
 	        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
-	          <div className="text-sm font-semibold text-gray-900">Meal name</div>
+	          <label htmlFor="builder-meal-name" className="block text-sm font-semibold text-gray-900">Meal name</label>
           <input
+            id="builder-meal-name"
+            aria-describedby="builder-meal-name-help"
             value={mealName}
             onFocus={() => {
               mealNameBackupRef.current = mealName
@@ -7043,6 +7076,7 @@ export default function MealBuilderClient() {
             placeholder={buildDefaultMealName(items)}
             className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
+          <p id="builder-meal-name-help" className="text-xs text-gray-600">Suggested from your foods. You can change this name.</p>
           <fieldset className="min-w-0 space-y-2">
             <legend className="text-sm font-semibold text-gray-900">Meal</legend>
             <div className="grid grid-cols-4 gap-1 sm:gap-2" role="group" aria-label="Meal category">
@@ -7122,7 +7156,14 @@ export default function MealBuilderClient() {
         </div>
 
         <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
-          <div className="text-sm font-semibold text-gray-900">Search ingredients</div>
+          <div id="builder-food-search" className="scroll-mt-24 text-sm font-semibold text-gray-900">Food search</div>
+          <p className="text-xs text-gray-600">Search for a packaged product, restaurant item or single food.</p>
+          {replacementItemId ? (
+            <div role="status" className="border-l-2 border-emerald-600 bg-emerald-50 p-3 text-sm text-gray-800">
+              <p>Choose a replacement food below. Check its amount before saving.</p>
+              <button type="button" className="mt-2 min-h-11 border border-gray-300 bg-white px-3 py-2 font-semibold" onClick={() => { replacementItemIdRef.current = null; setReplacementItemId(null); setQuery(''); setResults([]) }}>Cancel replacement</button>
+            </div>
+          ) : null}
           <div className="grid grid-cols-2 gap-2">
             <button
               type="button"
@@ -7177,13 +7218,14 @@ export default function MealBuilderClient() {
                 queryWasClearedOnFocusRef.current = false
                 queryEditedAfterClearRef.current = false
               }}
+              aria-label="Search foods"
               placeholder="e.g. chicken breast"
               autoComplete="off"
               autoCorrect="off"
               autoCapitalize="none"
               spellCheck={false}
               enterKeyHint="search"
-              className="w-full px-3 py-2 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+              className="w-full px-3 py-2 pr-24 min-h-11 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
             />
             <button
               type="button"
@@ -7198,16 +7240,9 @@ export default function MealBuilderClient() {
                 triggerSearchFromButton()
               }}
               onClick={triggerSearchFromButton}
-              className="absolute right-2 top-1/2 -translate-y-1/2 h-8 w-8 rounded-full bg-slate-900 text-white flex items-center justify-center disabled:opacity-60"
+              className="absolute right-1 top-1/2 -translate-y-1/2 min-h-9 px-3 bg-slate-900 text-white text-sm font-semibold flex items-center justify-center disabled:opacity-60"
             >
-              {busy ? (
-                <span className="h-4 w-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <svg className="h-4 w-4" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-                  <circle cx="11" cy="11" r="7" />
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M20 20l-3.5-3.5" />
-                </svg>
-              )}
+              {busy ? 'Searching…' : 'Search'}
             </button>
           </form>
           {(results.length > 0 || searchLoading || error) && (
@@ -7225,7 +7260,7 @@ export default function MealBuilderClient() {
                     return (
                       <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 truncate">
+                          <div className="text-sm font-semibold text-gray-900 break-words">
                             {display.title}
                             {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                           </div>
@@ -7249,9 +7284,9 @@ export default function MealBuilderClient() {
                             }
                             addItemWithMacros(r)
                           }}
-                          className="ml-3 px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold"
+                          className="ml-3 min-h-11 shrink-0 px-3 py-2 border border-emerald-600 bg-emerald-600 text-white text-sm font-semibold"
                         >
-                          {isBrandSuggestion ? 'Show' : 'Add'}
+                          {isBrandSuggestion ? 'Show foods' : replacementItemId ? 'Use this food' : 'Add'}
                         </button>
                       </div>
                     )
@@ -7268,11 +7303,13 @@ export default function MealBuilderClient() {
               source="build-meal"
             />
           </div>
-          <div className="flex flex-col gap-2 pt-1">
+          <div className="flex flex-col gap-2 border-t border-gray-200 pt-3">
+            <div className="text-sm font-semibold text-gray-900">Add food</div>
+            <p className="text-xs text-gray-600">Use a photo, scan a label or choose a saved favorite.</p>
             <div className="grid grid-cols-3 gap-2">
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || Boolean(replacementItemId)}
                 onClick={() => {
                   triggerHaptic(10)
                   photoInputRef.current?.click()
@@ -7283,7 +7320,7 @@ export default function MealBuilderClient() {
               </button>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || Boolean(replacementItemId)}
                 onClick={() => setShowBarcodeScanner(true)}
                 className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-sm font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
               >
@@ -7291,7 +7328,7 @@ export default function MealBuilderClient() {
               </button>
               <button
                 type="button"
-                disabled={busy}
+                disabled={busy || Boolean(replacementItemId)}
                 onClick={() => {
                   setFavoritesActiveTab('all')
                   setFavoritesSearch('')
@@ -7316,9 +7353,305 @@ export default function MealBuilderClient() {
 
           <UsageMeter inline className="mt-1" feature="foodAnalysis" />
 
-          <div className="border-t border-gray-200 pt-4">
+
+
+          {photoPreviewUrl && (
+            <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
+              <div className="relative w-full max-w-sm mx-auto">
+                {photoLoading && (
+                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
+                    <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin" />
+                  </div>
+                )}
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={photoPreviewUrl}
+                  alt="Analyzed food"
+                  className="w-full aspect-square object-cover"
+                />
+              </div>
+              <div className="px-3 py-2 text-xs text-gray-600 flex items-center justify-between gap-2">
+                <span>{photoLoading ? 'Analyzing photo…' : 'Photo added'}</span>
+                <button
+                  type="button"
+                  onClick={() => {
+                    try {
+                      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
+                    } catch {}
+                    setPhotoPreviewUrl(null)
+                    try {
+                      if (photoInputRef.current) photoInputRef.current.value = ''
+                    } catch {}
+                  }}
+                  className="text-xs font-semibold text-gray-700 hover:text-gray-900"
+                >
+                  Remove
+                </button>
+              </div>
+            </div>
+          )}
+
+          {(savingMeal || photoLoading || barcodeLoading) && (
+            <div className="text-xs text-gray-500">
+              {savingMeal
+                ? 'Saving…'
+                : photoLoading
+                ? 'Analyzing photo…'
+                : barcodeLoading
+                ? 'Looking up barcode…'
+                : 'Working…'}
+            </div>
+          )}
+        </div>
+
+        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            {/* One optional section toggle; the owner's usability update keeps food rows visible on reopen. */}
+            <button
+              type="button"
+              onClick={() => {
+                if (items.length === 0) return
+                setIngredientsListExpanded((prev) => !prev)
+              }}
+              className={`flex items-center gap-2 text-sm font-semibold ${
+                items.length === 0 ? 'text-gray-900 cursor-default' : 'text-gray-900 hover:text-gray-700'
+              }`}
+            >
+              <span>Your foods</span>
+              {items.length > 0 ? <span className="text-gray-400">{ingredientsListExpanded ? '▾' : '▸'}</span> : null}
+            </button>
+            <div className="text-xs text-gray-500">{items.length} item{items.length === 1 ? '' : 's'}</div>
+          </div>
+
+          {items.length === 0 ? (
+            <div className="text-sm text-gray-500">Add a food using search, photo, barcode or Favorites above.</div>
+          ) : !ingredientsListExpanded ? (
+            <button
+              type="button"
+              onClick={() => setIngredientsListExpanded(true)}
+              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-xs text-gray-600 hover:bg-gray-100"
+            >
+              Show foods to review or change them.
+            </button>
+          ) : (
+            <div className="space-y-2">
+              {items.map((it) => {
+                const expanded = expandedId === it.id
+                const compactCollapsedHeader = false
+                const baseUnits = allowedUnitsForItem(it)
+                const hasCustomUnits = !isMeasuredLiquidItem(it) && Boolean(getFoodUnitGrams(it.name))
+                const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
+                const isImportedRecipeView = Boolean(activeRecipePanel || recipeImportDraft || recipeImportFlag)
+                const totals = computeItemTotals(it)
+                const displayTotals = applyPortionScaleToTotals(totals, effectivePortionScale)
+                const macroTotals = isImportedRecipeView ? totals : displayTotals
+                const amountUnit = it.__unit || it.__baseUnit
+                const fullAmount = Number.isFinite(Number(it.__amount)) ? round3(Number(it.__amount)) : null
+                const hasPortionScale = Number.isFinite(Number(effectivePortionScale)) && Number(effectivePortionScale) > 0
+                const showPortionAmount = Boolean(
+                  portionControlEnabled &&
+                  amountUnit &&
+                    fullAmount !== null &&
+                    hasPortionScale &&
+                    Math.abs(Number(effectivePortionScale) - 1) > 0.0001,
+                )
+                const portionAmount = showPortionAmount
+                  ? round3(Math.max(0, Number(fullAmount) * Number(effectivePortionScale)))
+                  : null
+                return (
+                  <div
+                    key={it.id}
+                    data-builder-item-id={it.id}
+                    className="rounded-2xl border border-gray-200 overflow-hidden"
+                  >
+                    <button
+                      type="button"
+                      onClick={() => setExpandedId(expanded ? null : it.id)}
+                      aria-expanded={expanded}
+                      className="w-full flex items-center justify-between gap-3 px-3 py-3 bg-white hover:bg-gray-50"
+                    >
+                      <div className="min-w-0 flex-1 text-left">
+                        <div className="text-sm font-semibold text-gray-900 break-words">
+                          {displayName}
+                          {it.brand ? ` – ${it.brand}` : ''}
+                        </div>
+                        {it.nutritionProvenance?.foodName ? (
+                          <div className="mt-1 text-xs text-gray-600 break-words">Nutrition source: {it.nutritionProvenance.foodName}</div>
+                        ) : null}
+                        {it.nutritionProvenance?.portionEstimated ? (
+                          <div className="mt-1 text-xs text-amber-800">Photo estimate — check the food and amount.</div>
+                        ) : null}
+                        {!compactCollapsedHeader && (
+                          <>
+                            {isImportedRecipeView ? (
+                              <div className="text-[11px] text-gray-500 break-words">
+                                {it.__baseUnit && amountUnit && fullAmount !== null
+                                  ? `Full recipe amount: ${fullAmount} ${amountUnit}`
+                                  : `Full recipe servings: ${it.servings}`}
+                              </div>
+                            ) : (
+                              <div className="text-[11px] text-gray-500 break-words">
+                                {it.__baseUnit && amountUnit && fullAmount !== null
+                                  ? `Amount in whole meal: ${fullAmount} ${amountUnit}`
+                                  : `Servings in whole meal: ${it.servings}`}
+                              </div>
+                            )}
+                            {showPortionAmount && amountUnit && portionAmount !== null ? (
+                              <div className="text-[11px] text-gray-500 break-words">
+                                Portion amount: {portionAmount} {amountUnit}
+                              </div>
+                            ) : null}
+                            {it.__matchedName &&
+                            normalizeSearchToken(it.__matchedName) !== normalizeSearchToken(it.name) ? (
+                              <div className="text-[11px] text-gray-400 break-words">
+                                Matched nutrition: {it.__matchedName}
+                              </div>
+                            ) : null}
+                          </>
+                        )}
+                      </div>
+                      <div className="flex shrink-0 items-center gap-2">
+                        <span className="min-h-11 shrink-0 whitespace-nowrap border border-gray-300 px-3 py-2 text-sm font-semibold text-emerald-700">{expanded ? 'Close edit' : 'Edit food'}</span>
+                      </div>
+                    </button>
+
+                    {expanded && (
+                      <div className="px-3 pb-3 bg-white space-y-3">
+                        {!isImportedRecipeView &&
+                          Array.isArray(it.__servingOptions) &&
+                          it.__servingOptions.length > 0 &&
+                          !hasCustomUnits && (
+                          <div className="space-y-1">
+                            <div className="text-xs font-semibold text-gray-700">Serving size options</div>
+                            <select
+                              value={it.__selectedServingId || ''}
+                              onChange={(e) => setServingOption(it.id, e.target.value)}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            >
+                              <option value="">Choose a size</option>
+                              {it.__servingOptions.map((opt) => (
+                                <option key={opt.id} value={opt.id}>
+                                  {opt.label || opt.serving_size}{opt.foodName ? ` — ${opt.foodName}` : ''}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          )}
+                        <div className="grid grid-cols-2 gap-2">
+                          <div className="space-y-1">
+                            <label htmlFor={`food-amount-${it.id}`} className="block text-xs font-semibold text-gray-700">Amount in whole meal</label>
+                            <input
+                              id={`food-amount-${it.id}`}
+                              type="number"
+                              inputMode="decimal"
+                              min={0}
+                              step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
+                              value={it.__amountInput}
+                              onFocus={(e) => {
+                                // Mobile UX: tap-to-clear, but restore if user doesn't type anything.
+                                const current = String((e.target as HTMLInputElement).value || '')
+                                amountBackupRef.current.set(it.id, current)
+                                amountEditedAfterClearRef.current.delete(it.id)
+                                if (!current.trim()) {
+                                  amountWasClearedOnFocusRef.current.delete(it.id)
+                                  return
+                                }
+                                amountWasClearedOnFocusRef.current.add(it.id)
+                                setAmount(it.id, '')
+                              }}
+                              onChange={(e) => {
+                                if (amountWasClearedOnFocusRef.current.has(it.id)) amountEditedAfterClearRef.current.add(it.id)
+                                setAmount(it.id, e.target.value)
+                              }}
+                              onBlur={(e) => {
+                                const cleared = amountWasClearedOnFocusRef.current.has(it.id)
+                                const edited = amountEditedAfterClearRef.current.has(it.id)
+                                const current = String((e.target as HTMLInputElement).value || '')
+                                if (cleared && !edited && current.trim().length === 0) {
+                                  const backup = amountBackupRef.current.get(it.id)
+                                  if (typeof backup === 'string') setAmount(it.id, backup)
+                                }
+                                amountWasClearedOnFocusRef.current.delete(it.id)
+                                amountEditedAfterClearRef.current.delete(it.id)
+                              }}
+                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                            />
+                          </div>
+                          <div className="space-y-1">
+                            <label htmlFor={`food-unit-${it.id}`} className="block text-xs font-semibold text-gray-700">Unit</label>
+                            {baseUnits.length > 0 ? (
+                              <select
+                                id={`food-unit-${it.id}`}
+                                value={it.__unit || it.__baseUnit || baseUnits[0]}
+                                onChange={(e) => setUnit(it.id, e.target.value as BuilderUnit)}
+                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                              >
+                                {baseUnits.map((u) => (
+                                  <option key={u} value={u}>
+                                    {formatUnitLabel(u, it)}
+                                  </option>
+                                ))}
+                              </select>
+                            ) : (
+                              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600">
+                                servings
+                              </div>
+                            )}
+                          </div>
+                        </div>
+
+                        <p className="text-xs text-gray-600">Nutrition for this food in your portion</p>
+                        <NutrientCards energyUnit={energyUnit} values={{
+                          calories: it.calories == null ? null : macroTotals.calories,
+                          protein: it.protein_g == null ? null : macroTotals.protein,
+                          carbs: it.carbs_g == null ? null : macroTotals.carbs,
+                          fat: it.fat_g == null ? null : macroTotals.fat,
+                          fiber: it.fiber_g == null ? null : macroTotals.fiber,
+                          sugar: it.sugar_g == null ? null : macroTotals.sugar,
+                        }} />
+
+                        <button
+                          type="button"
+                          disabled={busy}
+                          onClick={() => {
+                            replacementItemIdRef.current = it.id
+                            setReplacementItemId(it.id)
+                            setKind('single')
+                            setResults([])
+                            setError(null)
+                            document.getElementById('builder-food-search')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+                            queryInputRef.current?.focus({ preventScroll: true })
+                            setQuery(displayName)
+                            void runSearch(displayName)
+                          }}
+                          className="w-full min-h-11 border border-emerald-600 bg-white px-3 py-2 text-sm font-semibold text-emerald-700 disabled:opacity-60"
+                        >Change food</button>
+                        <p className="text-xs text-gray-600">Amounts above describe the whole meal. Choose your share below; all nutrient totals update together.</p>
+
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            removeItem(it.id)
+                          }}
+                          className="w-full mt-2 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-sm font-semibold text-red-700 hover:bg-red-100"
+                        >
+                          Remove ingredient
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
+        </div>
+
+
+          <div className="border border-gray-200 bg-white p-3 sm:p-4">
             <div className="text-sm font-semibold text-gray-900">How much did you eat?</div>
-            <p className="mt-1 text-xs text-gray-600">Choose your share. The nutrients below and your diary use this amount.</p>
+            <p className="mt-1 text-xs text-gray-600">Whole meal uses all the foods above. Half meal halves every nutrient total. Custom lets you enter the amount you ate.</p>
             <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Meal portion">
               <button
                 type="button"
@@ -7417,6 +7750,13 @@ export default function MealBuilderClient() {
             ) : (
               <div className="mt-2 text-[11px] text-emerald-700">This meal is 100% of the full amount.</div>
             )}
+            <div className="mt-4 flex items-center justify-between gap-2">
+              <div className="text-sm font-semibold text-gray-900">Nutrition for your portion</div>
+              <div className="flex gap-1" role="group" aria-label="Energy unit">
+                <button type="button" aria-pressed={energyUnit === 'kcal'} onClick={() => setEnergyUnit('kcal')} className={`min-h-11 border px-3 py-2 text-sm ${energyUnit === 'kcal' ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-300 text-gray-600'}`}>kcal</button>
+                <button type="button" aria-pressed={energyUnit === 'kJ'} onClick={() => setEnergyUnit('kJ')} className={`min-h-11 border px-3 py-2 text-sm ${energyUnit === 'kJ' ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-300 text-gray-600'}`}>kJ</button>
+              </div>
+            </div>
             <div className="mt-3" aria-live="polite" aria-atomic="true">
               <NutrientCards energyUnit={energyUnit} values={portionAmountError ? {} : mealTotals} />
             </div>
@@ -7470,362 +7810,8 @@ export default function MealBuilderClient() {
                 </div>
               </div>
             ) : null}
-            {showPortionSaveCta && (
-              <div className="mt-3 flex items-center justify-between gap-2 rounded-lg border border-emerald-200 bg-white px-3 py-2">
-                <div className="text-[11px] text-gray-600">{saveValidationError || 'Ready to save this portion.'}</div>
-                <button
-                  type="button"
-                  onClick={createMeal}
-                  disabled={busy || favoriteSaving || Boolean(saveValidationError)}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-600 text-white text-xs font-semibold disabled:opacity-60"
-                >
-                  {isFavoriteAdjustBuild ? 'Add' : 'Save meal'}
-                </button>
-              </div>
-            )}
+
           </div>
-
-          {photoPreviewUrl && (
-            <div className="rounded-xl border border-gray-200 bg-gray-50 overflow-hidden">
-              <div className="relative w-full max-w-sm mx-auto">
-                {photoLoading && (
-                  <div className="absolute inset-0 bg-white/70 flex items-center justify-center">
-                    <div className="w-10 h-10 border-4 border-emerald-100 border-t-emerald-500 rounded-full animate-spin" />
-                  </div>
-                )}
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
-                  src={photoPreviewUrl}
-                  alt="Analyzed food"
-                  className="w-full aspect-square object-cover"
-                />
-              </div>
-              <div className="px-3 py-2 text-xs text-gray-600 flex items-center justify-between gap-2">
-                <span>{photoLoading ? 'Analyzing photo…' : 'Photo added'}</span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    try {
-                      if (photoPreviewUrl) URL.revokeObjectURL(photoPreviewUrl)
-                    } catch {}
-                    setPhotoPreviewUrl(null)
-                    try {
-                      if (photoInputRef.current) photoInputRef.current.value = ''
-                    } catch {}
-                  }}
-                  className="text-xs font-semibold text-gray-700 hover:text-gray-900"
-                >
-                  Remove
-                </button>
-              </div>
-            </div>
-          )}
-
-          {(savingMeal || photoLoading || barcodeLoading) && (
-            <div className="text-xs text-gray-500">
-              {savingMeal
-                ? 'Saving…'
-                : photoLoading
-                ? 'Analyzing photo…'
-                : barcodeLoading
-                ? 'Looking up barcode…'
-                : 'Working…'}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            {/* RECIPE LOCK (owner request): this is the single top-level ingredients expander.
-                Keep as one section toggle on reopen/edit flows unless owner approves change. */}
-            <button
-              type="button"
-              onClick={() => {
-                if (items.length === 0) return
-                setIngredientsListExpanded((prev) => !prev)
-              }}
-              className={`flex items-center gap-2 text-sm font-semibold ${
-                items.length === 0 ? 'text-gray-900 cursor-default' : 'text-gray-900 hover:text-gray-700'
-              }`}
-            >
-              <span>Your ingredients</span>
-              {items.length > 0 ? <span className="text-gray-400">{ingredientsListExpanded ? '▾' : '▸'}</span> : null}
-            </button>
-            <div className="text-xs text-gray-500">{items.length} item{items.length === 1 ? '' : 's'}</div>
-          </div>
-
-          {items.length === 0 ? (
-            <div className="text-sm text-gray-500">Add ingredients using the search above.</div>
-          ) : !ingredientsListExpanded ? (
-            <button
-              type="button"
-              onClick={() => setIngredientsListExpanded(true)}
-              className="w-full rounded-xl border border-gray-200 bg-gray-50 px-3 py-2 text-left text-xs text-gray-600 hover:bg-gray-100"
-            >
-              Ingredients are hidden. Tap to expand.
-            </button>
-          ) : (
-            <div className="space-y-2">
-              {items.map((it) => {
-                const expanded = expandedId === it.id
-                const compactCollapsedHeader = Boolean((editFavoriteId || sourceLogId) && !expanded)
-                const baseUnits = allowedUnitsForItem(it)
-                const hasCustomUnits = !isMeasuredLiquidItem(it) && Boolean(getFoodUnitGrams(it.name))
-                const displayName = applyFoodNameOverride(it.name, { items: [it] }, foodNameOverrideIndex) || it.name
-                const isImportedRecipeView = Boolean(activeRecipePanel || recipeImportDraft || recipeImportFlag)
-                const totals = computeItemTotals(it)
-                const displayTotals = applyPortionScaleToTotals(totals, effectivePortionScale)
-                const macroTotals = isImportedRecipeView ? totals : displayTotals
-                const amountUnit = it.__unit || it.__baseUnit
-                const fullAmount = Number.isFinite(Number(it.__amount)) ? round3(Number(it.__amount)) : null
-                const hasPortionScale = Number.isFinite(Number(effectivePortionScale)) && Number(effectivePortionScale) > 0
-                const showPortionAmount = Boolean(
-                  portionControlEnabled &&
-                  amountUnit &&
-                    fullAmount !== null &&
-                    hasPortionScale &&
-                    Math.abs(Number(effectivePortionScale) - 1) > 0.0001,
-                )
-                const portionAmount = showPortionAmount
-                  ? round3(Math.max(0, Number(fullAmount) * Number(effectivePortionScale)))
-                  : null
-                return (
-                  <div
-                    key={it.id}
-                    data-builder-item-id={it.id}
-                    className="rounded-2xl border border-gray-200 overflow-hidden"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => setExpandedId(expanded ? null : it.id)}
-                      className="w-full flex items-center justify-between px-3 py-3 bg-white hover:bg-gray-50"
-                    >
-                      <div className="min-w-0 text-left">
-                        <div className="text-sm font-semibold text-gray-900 break-words">
-                          {displayName}
-                          {it.brand ? ` – ${it.brand}` : ''}
-                        </div>
-                        {it.nutritionProvenance?.foodName ? (
-                          <div className="mt-1 text-xs text-gray-600 break-words">Nutrition source: {it.nutritionProvenance.foodName}</div>
-                        ) : null}
-                        {it.nutritionProvenance?.portionEstimated ? (
-                          <div className="mt-1 text-xs text-amber-800">Photo estimate — check the food and amount.</div>
-                        ) : null}
-                        {!compactCollapsedHeader && (
-                          <>
-                            {isImportedRecipeView ? (
-                              <div className="text-[11px] text-gray-500 truncate">
-                                {it.__baseUnit && amountUnit && fullAmount !== null
-                                  ? `Full recipe amount: ${fullAmount} ${amountUnit}`
-                                  : `Full recipe servings: ${it.servings}`}
-                              </div>
-                            ) : (
-                              <div className="text-[11px] text-gray-500 truncate">
-                                {it.serving_size ? `Serving: ${it.serving_size}` : 'Serving: (unknown)'} •{' '}
-                                {it.__baseUnit && amountUnit && fullAmount !== null
-                                  ? `Amount (full recipe): ${fullAmount} ${amountUnit}`
-                                  : `Servings: ${it.servings}`}
-                              </div>
-                            )}
-                            {showPortionAmount && amountUnit && portionAmount !== null ? (
-                              <div className="text-[11px] text-gray-500 truncate">
-                                Portion amount: {portionAmount} {amountUnit}
-                              </div>
-                            ) : null}
-                            {it.__matchedName &&
-                            normalizeSearchToken(it.__matchedName) !== normalizeSearchToken(it.name) ? (
-                              <div className="text-[11px] text-gray-400 truncate">
-                                Matched nutrition: {it.__matchedName}
-                              </div>
-                            ) : null}
-                          </>
-                        )}
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-gray-400">{expanded ? '▾' : '▸'}</span>
-                      </div>
-                    </button>
-
-                    {expanded && (
-                      <div className="px-3 pb-3 bg-white space-y-3">
-                        {!isImportedRecipeView &&
-                          Array.isArray(it.__servingOptions) &&
-                          it.__servingOptions.length > 0 &&
-                          !hasCustomUnits && (
-                          <div className="space-y-1">
-                            <div className="text-xs font-semibold text-gray-700">Serving size options</div>
-                            <select
-                              value={it.__selectedServingId || ''}
-                              onChange={(e) => setServingOption(it.id, e.target.value)}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            >
-                              <option value="">Choose a size</option>
-                              {it.__servingOptions.map((opt) => (
-                                <option key={opt.id} value={opt.id}>
-                                  {opt.label || opt.serving_size}{opt.foodName ? ` — ${opt.foodName}` : ''}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          )}
-                        <div className="grid grid-cols-2 gap-2">
-                          <div className="space-y-1">
-                            <div className="text-xs font-semibold text-gray-700">Amount</div>
-                            <input
-                              type="number"
-                              inputMode="decimal"
-                              min={0}
-                              step={getAmountInputStepForUnit(it.__unit || it.__baseUnit)}
-                              value={it.__amountInput}
-                              onFocus={(e) => {
-                                // Mobile UX: tap-to-clear, but restore if user doesn't type anything.
-                                const current = String((e.target as HTMLInputElement).value || '')
-                                amountBackupRef.current.set(it.id, current)
-                                amountEditedAfterClearRef.current.delete(it.id)
-                                if (!current.trim()) {
-                                  amountWasClearedOnFocusRef.current.delete(it.id)
-                                  return
-                                }
-                                amountWasClearedOnFocusRef.current.add(it.id)
-                                setAmount(it.id, '')
-                              }}
-                              onChange={(e) => {
-                                if (amountWasClearedOnFocusRef.current.has(it.id)) amountEditedAfterClearRef.current.add(it.id)
-                                setAmount(it.id, e.target.value)
-                              }}
-                              onBlur={(e) => {
-                                const cleared = amountWasClearedOnFocusRef.current.has(it.id)
-                                const edited = amountEditedAfterClearRef.current.has(it.id)
-                                const current = String((e.target as HTMLInputElement).value || '')
-                                if (cleared && !edited && current.trim().length === 0) {
-                                  const backup = amountBackupRef.current.get(it.id)
-                                  if (typeof backup === 'string') setAmount(it.id, backup)
-                                }
-                                amountWasClearedOnFocusRef.current.delete(it.id)
-                                amountEditedAfterClearRef.current.delete(it.id)
-                              }}
-                              className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                            />
-                          </div>
-                          <div className="space-y-1">
-                            <div className="text-xs font-semibold text-gray-700">Serving size</div>
-                            {baseUnits.length > 0 ? (
-                              <select
-                                value={it.__unit || it.__baseUnit || baseUnits[0]}
-                                onChange={(e) => setUnit(it.id, e.target.value as BuilderUnit)}
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
-                              >
-                                {baseUnits.map((u) => (
-                                  <option key={u} value={u}>
-                                    {formatUnitLabel(u, it)}
-                                  </option>
-                                ))}
-                              </select>
-                            ) : (
-                              <div className="w-full px-3 py-2 border border-gray-200 rounded-lg bg-gray-50 text-sm text-gray-600">
-                                servings
-                              </div>
-                            )}
-                          </div>
-                        </div>
-
-                        <NutrientCards energyUnit={energyUnit} values={{
-                          calories: it.calories == null ? null : macroTotals.calories,
-                          protein: it.protein_g == null ? null : macroTotals.protein,
-                          carbs: it.carbs_g == null ? null : macroTotals.carbs,
-                          fat: it.fat_g == null ? null : macroTotals.fat,
-                          fiber: it.fiber_g == null ? null : macroTotals.fiber,
-                          sugar: it.sugar_g == null ? null : macroTotals.sugar,
-                        }} />
-
-                        <button
-                          type="button"
-                          onClick={(e) => {
-                            e.preventDefault()
-                            e.stopPropagation()
-                            removeItem(it.id)
-                          }}
-                          className="w-full mt-2 px-3 py-2 rounded-lg border border-red-200 bg-red-50 text-sm font-semibold text-red-700 hover:bg-red-100"
-                        >
-                          Remove ingredient
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                )
-              })}
-            </div>
-          )}
-        </div>
-
-        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4">
-          <div className="flex items-center justify-between mb-2">
-            <div className="text-sm font-semibold text-gray-900">
-              {portionControlEnabled ? 'Your portion totals' : 'Meal totals'}
-            </div>
-            <div className="inline-flex items-center text-[11px] bg-gray-100 rounded-full p-0.5 border border-gray-200">
-              <button
-                type="button"
-                onClick={() => setEnergyUnit('kcal')}
-                className={`px-2 py-0.5 rounded-full ${
-                  energyUnit === 'kcal' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                }`}
-              >
-                kcal
-              </button>
-              <button
-                type="button"
-                onClick={() => setEnergyUnit('kJ')}
-                className={`px-2 py-0.5 rounded-full ${
-                  energyUnit === 'kJ' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500'
-                }`}
-              >
-                kJ
-              </button>
-            </div>
-          </div>
-          {!portionAmountError && portionControlEnabled && effectivePortionScale !== 1 && (
-            <div className="mb-2 text-[11px] text-gray-600">
-              Your portion is about {Math.round(effectivePortionScale * 100)}% of the recipe.
-              <span className="mx-1">•</span>
-              Whole recipe: {formatEnergyValue(baseMealTotals.calories, energyUnit)} {energyUnit} • {round3(baseMealTotals.carbs)} g
-              carbs • {(roundOptionalNutrient(baseMealTotals.sugar, 3) ?? '—')} g sugar
-            </div>
-          )}
-          {!portionControlEnabled && (
-            <div className="mb-2 text-[11px] text-gray-600">This meal is 100% of the full amount.</div>
-          )}
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-            {MEAL_TOTAL_CARDS.map((card) => {
-              const value =
-                portionAmountError ? '—' : card.key === 'calories'
-                  ? formatEnergyValue(mealTotals.calories, energyUnit)
-                  : card.key === 'protein'
-                  ? round3(mealTotals.protein)
-                  : card.key === 'carbs'
-                  ? round3(mealTotals.carbs)
-                  : card.key === 'fat'
-                  ? round3(mealTotals.fat)
-                  : card.key === 'fiber'
-                  ? (roundOptionalNutrient(mealTotals.fiber, 3) ?? '—')
-                  : (roundOptionalNutrient(mealTotals.sugar, 3) ?? '—')
-              const label = card.key === 'calories' ? (energyUnit === 'kJ' ? 'Kilojoules' : 'Calories') : card.label
-              const unit = card.key === 'calories' ? energyUnit : card.unit || ''
-              return (
-                <div
-                  key={card.key}
-                  className={`rounded-xl p-3 bg-gradient-to-br ${card.gradient} border border-gray-100`}
-                >
-                  <div className={`text-lg font-bold ${card.accent}`}>
-                    {value}
-                    {unit ? ` ${unit}` : ''}
-                  </div>
-                  <div className="text-[10px] font-bold uppercase tracking-widest text-gray-500">{label}</div>
-                </div>
-              )
-            })}
-          </div>
-        </div>
 
         {(autosaveHint || isDiaryEdit) && (
           <div className="text-xs text-gray-500 px-1">

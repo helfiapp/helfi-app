@@ -3524,3 +3524,12 @@ for guidance first.
 - Portion controls change the displayed and saved nutrition. Keep the complete ingredient basis plus the chosen portion metadata; save the consumed nutrition summary, apply its scale once, and restore the same portion when reopening on any platform. Recipe fractions, gram/ounce portions and shares greater than one must retain their meaning. Zero/invalid amounts cannot save or autosave.
 - Suggest a meal name from detected foods only for an empty or generic name; preserve names written by the user. Photos remain estimates, with ingredient weights editable before saving.
 - Required regression checks: check:food-design-parity, check:food-provenance, check:food-native-serving-override, existing saved-state/measurement/recipe checks and both page-lock checks. Runtime proof must include save/reopen across platforms, half/double and invalid zero, source-correct chicken and a weighed photo reference. Signed native releases must use the exact committed source and retain the test account login.
+
+- Food design/source/portion baseline:5c9bfbfdfec39ebb875e0d3fc7f446e5fcb73d90,15October2026,AWS120(allstepsSUCCEED),bothdomains200CloudFront/newmatchingETagirrdwy0xas1z15. Real web/iOS/Android halfsave/reopen, positive/zero guards and source/weight evidence:docs/release-evidence/2026-10-15/food-repair-verification.json. Native store processing and physical installation remain independently recorded.
+
+### Food correction usability (15 October 2026 owner clarification)
+
+- Food review starts with an editable suggested meal name. Keep user-written names, food source identity, measured amounts, saved share and time intact.
+- Show food rows on reopen with explicit Edit food and Change food actions. Retain the original food until a valid replacement is chosen; cancellation or missing source data cannot remove it. Retain supported physical measurements using existing conversion helpers; otherwise make the new serving amount clear.
+- Use consistent rectangular Food search / Add food / Your foods / How much did you eat sections. Explain whole, half and custom beside their controls; show one main nutrient summary after the share selector. Individual food detail cards must clearly say their nutrition uses the chosen share.
+- Do not turn this design/usability task into questioning the owner about their old dinner. Historical entries and Google reviewer credentials stay unchanged.
