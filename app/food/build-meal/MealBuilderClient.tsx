@@ -2,7 +2,7 @@
 
 import foodDesign from '../food-design.module.css'
 import { requestFoodAnalysis } from '@/native/src/lib/foodAnalysisRequest'
-import { isFoodIdentityCompatible, suggestMealName } from '@/native/src/lib/foodIdentity'
+import { isFoodIdentityCompatible, isGenericMealName, suggestMealName } from '@/native/src/lib/foodIdentity'
 
 import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '@/lib/food/nutrient-values'
 
@@ -2748,12 +2748,18 @@ export default function MealBuilderClient() {
           return
         }
 
-        const label = normalizeMealLabel(log?.description || log?.name || '').trim()
+        const rawItems = Array.isArray(log?.items) ? log.items : null
+        const storedName = normalizeMealLabel(log?.name).trim()
+        const storedDescription = normalizeMealLabel(log?.description).trim()
+        // Native saves the chosen title in name and its ingredient list in
+        // description. Keep that title; an ingredient list is not a chosen name.
+        const ingredientDescription = normalizeMealLabel((rawItems || []).map((item: any) => item?.name || '').join(', ')).trim()
+        const fallbackDescription = storedDescription === ingredientDescription ? '' : storedDescription
+        const label = !isGenericMealName(storedName) ? storedName : fallbackDescription || storedName
         const logTotals = (log as any)?.nutrients || null
         if (!cancelled) applySavedPortion(logTotals)
         initialPortionTotalWeightRef.current = getSavedPortionTotalWeightG(logTotals)
 
-        const rawItems = Array.isArray(log?.items) ? log.items : null
         if (!cancelled) setMealName(suggestMealName(rawItems || [], label))
         const logRecipeRaw = {
           ...(((log as any)?.recipe && typeof (log as any).recipe === 'object'

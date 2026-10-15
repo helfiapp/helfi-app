@@ -3,7 +3,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import * as nutrients from '../lib/food/nutrient-values'
-import { isFoodIdentityCompatible, suggestMealName } from '../native/src/lib/foodIdentity'
+import { isFoodIdentityCompatible, isGenericMealName, suggestMealName } from '../native/src/lib/foodIdentity'
 import { convertFoodAmount, liquidDensity, liquidHouseholdMl, parseFoodServing } from '../native/src/lib/foodUnits'
 import { DRY_FOOD_MEASUREMENTS } from '../lib/food/dry-food-measurements'
 import { PRODUCE_MEASUREMENTS } from '../lib/food/produce-measurements'
@@ -14,7 +14,7 @@ import { DAIRY_SEMI_SOLID_MEASUREMENTS } from '../lib/food/dairy-semi-solid-meas
 const path = 'app/food/build-meal/MealBuilderClient.tsx'
 const text = fs.readFileSync(path, 'utf8')
 const source = ts.createSourceFile(path, text, ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-const ctx: any = vm.createContext({ ...nutrients, isFoodIdentityCompatible, suggestMealName, convertFoodAmount, liquidDensity, liquidHouseholdMl, parseFoodServing, DRY_FOOD_MEASUREMENTS, PRODUCE_MEASUREMENTS, DAIRY_SEMI_SOLID_MEASUREMENTS, useCallback: (fn: any) => fn, useMemo: (fn: any) => fn(), measurementCountry: 'AU', console })
+const ctx: any = vm.createContext({ ...nutrients, isFoodIdentityCompatible, isGenericMealName, suggestMealName, convertFoodAmount, liquidDensity, liquidHouseholdMl, parseFoodServing, DRY_FOOD_MEASUREMENTS, PRODUCE_MEASUREMENTS, DAIRY_SEMI_SOLID_MEASUREMENTS, useCallback: (fn: any) => fn, useMemo: (fn: any) => fn(), measurementCountry: 'AU', console })
 const top = source.statements.filter(node => !ts.isImportDeclaration(node) && !(ts.isFunctionDeclaration(node) && node.name?.text === 'MealBuilderClient')).map(node => node.getText(source)).join('\n')
 vm.runInContext(ts.transpile(top, { target: ts.ScriptTarget.ES2020 }), ctx)
 const evaluate = (expression: string) => vm.runInContext(expression, ctx)
@@ -226,4 +226,35 @@ async function checkMealAndTime() {
   assert.ok(text.indexOf('aria-label="Meal time"') < text.indexOf('>Search ingredients</div>'))
   console.log('PASS: actual web whole/half/custom controls, exact half/full/double saving, unknown/zero, invalid-input guard, saved scale, source identity, photo naming/transport, food-scoped design, category/time controls, stable draft and exact timestamp preservation. Browser visual proof remains separate.')
 }
-checkMealAndTime().catch((error) => { console.error(error); process.exitCode = 1 })
+async function checkSavedNativeNameHydration() {
+  const rawItems = [{ ...meal, name: 'Chicken with skin', id: 'native-generated-row', __source: 'usda', __sourceId: '239-original-record' }]
+  const sourceDescription = rawItems.map((item) => item.name).join(', ')
+  for (const [savedName, description, expected] of [
+    ['Food portion check15Oct', sourceDescription, 'Food portion check15Oct'],
+    ['Photo analyzed meal', sourceDescription, suggestMealName(rawItems, 'Photo analyzed meal')],
+    ['', 'My custom dinner name', 'My custom dinner name'],
+  ]) {
+    const originalTime = '2026-10-15T00:34:00.125Z'
+    const savedLog = { id: 'fixture-native-log', name: savedName, description, meal: 'lunch', createdAt: originalTime, items: rawItems, nutrients: { calories: 120, __portionScale: .5, __portionControlEnabled: true, __portionAmount: .5, __portionUnit: 'serving', __portionTotalWeightG: 121.4, __portionRecipeServings: 1 } }
+    const before = JSON.stringify(savedLog)
+    let complete: () => void = () => {}
+    const loaded = new Promise<void>((resolve) => { complete = resolve })
+    Object.assign(ctx, { sourceLogId: savedLog.id, editFavoriteId: '', loadedFavoriteId: null, isFavoriteAdjustBuild: false, draftAppliedRef: { current: false }, initialPortionTotalWeightRef: { current: null }, initialItemsSignatureRef: { current: '' }, sourceCreatedAtRef: { current: null }, entryTime: '', mealName: '',
+      setLinkedFavoriteId: setter('linkedFavoriteId'), setSavedPortionScale: setter('savedPortionScale'), setMealName: setter('mealName'), setItems: setter('items'), setExpandedId: () => {}, setPersistedRecipePanel: setter('persistedRecipePanel'), setLoadedFavoriteId: (value: string) => { ctx.loadedFavoriteId = value; complete() },
+      fetch: async (url: string) => { assert.ok(url.startsWith('/api/food-log?id=')); return { ok: true, json: async () => ({ log: savedLog }) } }, normalizeMealLabel: actual('normalizeMealLabel'), applySavedPortion: actual('applySavedPortion'), getSavedPortionTotalWeightG: actual('getSavedPortionTotalWeightG'), convertToBuilderItems: actual('convertToBuilderItems') })
+    const cleanup = effect('const loadedTime = extractTimeFromTimestamp(log?.createdAt)')()
+    let timeout: ReturnType<typeof setTimeout> | undefined
+    try {
+      await Promise.race([loaded, new Promise<void>((_, reject) => { timeout = setTimeout(() => reject(new Error('Actual saved native meal hydration did not finish')), 1000) })])
+    } finally { if (timeout) clearTimeout(timeout); cleanup?.() }
+    assert.equal(ctx.mealName, expected, 'saved native chosen title survives ingredient description')
+    assert.equal(ctx.savedPortionScale, .5)
+    assert.equal(ctx.portionAmountInput, '0.5')
+    assert.equal(ctx.sourceCreatedAtRef.current, originalTime)
+    assert.equal(ctx.entryTime, evaluate(`extractTimeFromTimestamp('${originalTime}')`))
+    assert.equal(ctx.category, 'lunch')
+    assert.equal(JSON.stringify(savedLog), before, 'reading native meal cannot modify saved data')
+  }
+  console.log('PASS: actual saved-native-log hydration preserves chosen title over ingredient description, suggests detected names for generic photo title, keeps meaningful description fallback and exact original time/half portion.')
+}
+checkMealAndTime().then(checkSavedNativeNameHydration).catch((error) => { console.error(error); process.exitCode = 1 })
