@@ -21711,7 +21711,7 @@ Please add nutritional information manually if needed.`);
                         className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
                       >
                         <div className="min-w-0 flex-1">
-                          <div className="text-sm font-semibold text-gray-900 break-words">
+                          <div className="text-sm font-medium text-gray-800 break-words">
                             {display.title}
                             {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                           </div>
@@ -23173,7 +23173,7 @@ Please add nutritional information manually if needed.`);
                               }
                             } catch {}
                           }}
-                          className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+                          className="w-full font-medium text-gray-800 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
                           placeholder="e.g., Granola cookies"
                         />
                       </div>
@@ -23860,7 +23860,7 @@ Please add nutritional information manually if needed.`);
                             {isCollapsed ? (
                               <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                                 <div className="min-w-0 flex-1">
-                                  <div className="font-semibold text-slate-900 text-base leading-tight break-words">{displayName}</div>
+                                  <div className="font-medium text-slate-800 text-base leading-tight break-words">{displayName}</div>
                                   {item?.nutritionProvenance?.foodName ? (
                                     <p className="mt-1 text-xs text-slate-500 break-words">Nutrition based on: {item.nutritionProvenance.foodName}</p>
                                   ) : null}
@@ -23886,7 +23886,7 @@ Please add nutritional information manually if needed.`);
                               </div>
                             ) : (
                               <div className="flex flex-col mb-3 gap-2">
-                                <div className="font-semibold text-slate-900 text-lg break-words">{displayName}</div>
+                                <div className="font-medium text-slate-800 text-lg break-words">{displayName}</div>
                                 {item?.nutritionProvenance?.foodName ? (
                                   <p className="text-xs text-slate-500 break-words">Nutrition based on: {item.nutritionProvenance.foodName}</p>
                                 ) : null}
@@ -25064,7 +25064,7 @@ Please add nutritional information manually if needed.`);
                                   className="flex items-start justify-between rounded-lg border border-gray-200 px-3 py-2"
                                 >
                                   <div className="min-w-0 flex-1">
-                                    <div className="text-sm font-semibold text-gray-900 break-words">
+                                    <div className="text-sm font-medium text-gray-800 break-words">
                                       {display.title}
                                       {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                                     </div>
@@ -29595,7 +29595,7 @@ Please add nutritional information manually if needed.`);
 	                            >
                               <div className="flex items-center justify-between gap-3 min-w-0">
                                 <div className="min-w-0">
-                                  <div className="text-sm font-semibold text-gray-900 truncate">{item.label}</div>
+                                  <div className="text-sm font-medium text-gray-800 truncate">{item.label}</div>
                                   <div className="text-xs text-gray-600 truncate">{serving}</div>
                                   {recentUsedText && <div className="text-[11px] text-gray-500 truncate">{recentUsedText}</div>}
                                 </div>

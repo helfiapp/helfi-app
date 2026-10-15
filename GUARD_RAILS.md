@@ -3538,3 +3538,8 @@ for guidance first.
 
 - Keep the explicitly requested Portion control toggle on web, iPhone and Android. OFF hides portion presets/amount controls and uses full-meal nutrition; ON reveals those controls. Selecting Whole while ON must not turn the toggle off.
 - Turning OFF resets the visible choice and amount to the full meal/recipe yield. Saved half/custom/recipe fractions restore ON with their original full ingredient basis, consumed totals, name and time. Do not remove this opt-in control in future presentation cleanups.
+
+### Food typography and subtle corners (15 October 2026 owner correction)
+
+- The owner explicitly rejected heavy ingredient typography and uniformly square food surfaces. Use medium-weight food titles, calm section headings and regular supporting text. Keep gentle 8px corners on nutrient cards/chart panels and food surfaces; action/category controls remain subtly rectangular. Preserve circular nutrient rings, profile shapes, nutrient colours and values.
+- This correction supersedes the earlier all-2px presentation treatment. Keep Portion control as an opt-in toggle with hidden options while OFF; appearance changes must not alter food identity, portions, names/times or saved data.

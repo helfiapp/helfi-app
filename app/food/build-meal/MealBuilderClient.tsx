@@ -7051,7 +7051,7 @@ export default function MealBuilderClient() {
           )}
 
 	        <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
-	          <label htmlFor="builder-meal-name" className="block text-sm font-semibold text-gray-900">Meal name</label>
+	          <label htmlFor="builder-meal-name" className="block text-sm font-medium text-gray-900">Meal name</label>
           <input
             id="builder-meal-name"
             aria-describedby="builder-meal-name-help"
@@ -7074,7 +7074,7 @@ export default function MealBuilderClient() {
               mealNameEditedRef.current = false
             }}
             placeholder={buildDefaultMealName(items)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
+            className="w-full font-medium text-gray-800 px-3 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500"
           />
           <p id="builder-meal-name-help" className="text-xs text-gray-600">Suggested from your foods. You can change this name.</p>
           <fieldset className="min-w-0 space-y-2">
@@ -7095,7 +7095,7 @@ export default function MealBuilderClient() {
             ) : null}
           </fieldset>
           <div className="space-y-2">
-            <label htmlFor="meal-entry-time" className="block text-sm font-semibold text-gray-900">Time</label>
+            <label htmlFor="meal-entry-time" className="block text-sm font-medium text-gray-900">Time</label>
             <input
               id="meal-entry-time"
               aria-label="Meal time"
@@ -7260,7 +7260,7 @@ export default function MealBuilderClient() {
                     return (
                       <div key={`${r.source}:${r.id}`} className="flex items-start justify-between rounded-xl border border-gray-200 px-3 py-2">
                         <div className="min-w-0">
-                          <div className="text-sm font-semibold text-gray-900 break-words">
+                          <div className="text-sm font-medium text-gray-800 break-words">
                             {display.title}
                             {display.showBrandSuffix && r.brand ? ` – ${r.brand}` : ''}
                           </div>
@@ -7471,7 +7471,7 @@ export default function MealBuilderClient() {
                       className="w-full flex items-center justify-between gap-3 px-3 py-3 bg-white hover:bg-gray-50"
                     >
                       <div className="min-w-0 flex-1 text-left">
-                        <div className="text-sm font-semibold text-gray-900 break-words">
+                        <div className="text-sm font-medium text-gray-800 break-words">
                           {displayName}
                           {it.brand ? ` – ${it.brand}` : ''}
                         </div>
@@ -7539,7 +7539,7 @@ export default function MealBuilderClient() {
                           )}
                         <div className="grid grid-cols-2 gap-2">
                           <div className="space-y-1">
-                            <label htmlFor={`food-amount-${it.id}`} className="block text-xs font-semibold text-gray-700">Amount in whole meal</label>
+                            <label htmlFor={`food-amount-${it.id}`} className="block text-xs font-medium text-gray-700">Amount in whole meal</label>
                             <input
                               id={`food-amount-${it.id}`}
                               type="number"
@@ -7578,7 +7578,7 @@ export default function MealBuilderClient() {
                             />
                           </div>
                           <div className="space-y-1">
-                            <label htmlFor={`food-unit-${it.id}`} className="block text-xs font-semibold text-gray-700">Unit</label>
+                            <label htmlFor={`food-unit-${it.id}`} className="block text-xs font-medium text-gray-700">Unit</label>
                             {baseUnits.length > 0 ? (
                               <select
                                 id={`food-unit-${it.id}`}
@@ -7649,7 +7649,7 @@ export default function MealBuilderClient() {
         </div>
 
 
-          <div className="border border-gray-200 bg-white p-3 sm:p-4">
+          <div className="rounded-lg border border-gray-200 bg-white p-3 sm:p-4">
             <div className="flex items-center justify-between gap-3">
               <div>
                 <div id="portion-control-label" className="text-sm font-semibold text-gray-900">Portion control</div>

@@ -53,7 +53,7 @@ for (const [base, count, expected] of [[10.7, 1.5, '16.1g'], [4.9, 1.5, '7.4g'],
   cards = render(base, count)
   assert.equal(cards.length, 6)
   for (const card of cards.slice(1)) assert.ok(textOf(card).includes(expected), `Actual card ${base} x${count}: ${expected}`)
-  assert.ok(cards.every((card: any) => card.props.className.includes('rounded-2xl') && card.props.className.includes('border')), 'Keep actual colorful card layout')
+  assert.ok(cards.every((card: any) => card.props.className.includes('border')), 'Keep actual colorful card layout')
 }
 cards = render(null, 1)
 assert.ok(cards.slice(1).every((card: any) => textOf(card).includes('Missing')), 'Missing stays unavailable in all five macro cards')

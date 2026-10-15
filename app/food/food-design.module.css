@@ -1,12 +1,15 @@
-/* Food controls share the same straight-edged treatment on web and native. */
+/* Food panels stay softly rounded; actions use restrained rectangular controls. */
 .surface {
   min-width: 0;
   max-width: 100%;
 }
 
-.surface :where(button, input, select, textarea):not([id="profile-dropdown"] *),
-.surface :where(div, details, span)[class*="rounded"]:not([class*="animate-spin"]):not([class*="animate-pulse"]):not([id="profile-dropdown"] *) {
-  border-radius: 2px !important;
+.surface :where(button, input, select, textarea):not([class*="rounded-full"]):not([id="profile-dropdown"]):not([id="profile-dropdown"] *) {
+  border-radius: 4px !important;
+}
+
+.surface :where(div, details)[class*="rounded"]:not([class*="rounded-full"]):not([class*="rounded-none"]):not([class*="animate-spin"]):not([class*="animate-pulse"]):not([id="profile-dropdown"]):not([id="profile-dropdown"] *) {
+  border-radius: 8px !important;
 }
 
 .surface :where(button, input, select, textarea) {

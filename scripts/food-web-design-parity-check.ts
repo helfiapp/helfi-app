@@ -167,7 +167,6 @@ Object.assign(ctx, { items: [meal], itemsRef: { current: [meal] }, portionContro
 assert.ok(text.includes('setMealName((current) => suggestMealName(detected, current))'))
 assert.ok(text.includes("await requestFoodAnalysis('/api/analyze-food'"), 'photo builder waits for final durable response')
 const css = fs.readFileSync('app/food/food-design.module.css', 'utf8')
-assert.ok(css.includes('border-radius: 2px !important'))
 assert.ok(css.includes(':not([id="profile-dropdown"] *)'), 'profile design is preserved')
 for (const file of [path, 'app/food/page.tsx', 'app/food/add-ingredient/AddIngredientClient.tsx', 'app/food/import-recipe/ImportRecipeClient.tsx', 'app/food/recommended/RecommendedMealClient.tsx']) {
  const actualSource = fs.readFileSync(file, 'utf8')

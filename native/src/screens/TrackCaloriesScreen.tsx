@@ -311,7 +311,7 @@ const recipeImportModeChipActive = {
 const recipeImportModeChipText = {
   color: theme.colors.muted,
   fontSize: 14,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const recipeImportModeChipTextActive = {
@@ -332,7 +332,7 @@ const recipeImportPrimaryButton = {
 const recipeImportPrimaryButtonText = {
   color: '#FFFFFF',
   fontSize: 14,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const recipeImportSecondaryButton = {
@@ -351,7 +351,7 @@ const recipeImportSecondaryButton = {
 const recipeImportSecondaryButtonText = {
   color: theme.colors.text,
   fontSize: 14,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const MEALS = [
@@ -6098,7 +6098,7 @@ export function TrackCaloriesScreen() {
   }
 
   const renderFavoriteNutrientCards = (entryTotals: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }) => (
-    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={entryTotals} />
+    <NutrientCards cornerRadius={8} energyUnit={energyUnit} values={entryTotals} />
   )
 
   const renderFavoriteDailyTotals = (entryTotals: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }) => {
@@ -6179,17 +6179,17 @@ export function TrackCaloriesScreen() {
               style={{
                 borderWidth: 1,
                 borderColor: row.border,
-                borderRadius: 2,
+                borderRadius: 8,
                 padding: 12,
                 backgroundColor: row.bg,
               }}
             >
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-                <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>{row.label}</Text>
-                <Text style={{ color: theme.colors.text, fontWeight: '700', textAlign: 'right', flex: 1 }}>{row.value}</Text>
+                <Text style={{ color: theme.colors.muted, fontWeight: '500' }}>{row.label}</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', textAlign: 'right', flex: 1 }}>{row.value}</Text>
               </View>
-              <View style={{ marginTop: 10, height: 8, borderRadius: 2, backgroundColor: theme.colors.card, overflow: 'hidden' }}>
-                <View style={{ width: `${progress}%`, height: '100%', borderRadius: 2, backgroundColor: row.color }} />
+              <View style={{ marginTop: 10, height: 8, borderRadius: 4, backgroundColor: theme.colors.card, overflow: 'hidden' }}>
+                <View style={{ width: `${progress}%`, height: '100%', borderRadius: 8, backgroundColor: row.color }} />
               </View>
             </View>
           )
@@ -6201,7 +6201,7 @@ export function TrackCaloriesScreen() {
   if (mode !== 'signedIn' || !session?.token) {
     return (
       <Screen style={{ alignItems: 'center', justifyContent: 'center', padding: 20 }}>
-        <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 18 }}>Please sign in</Text>
+        <Text style={{ color: theme.colors.text, fontWeight: '500', fontSize: 18 }}>Please sign in</Text>
         <Text style={{ color: theme.colors.muted, marginTop: 6, textAlign: 'center' }}>
           Food Diary is available after sign-in.
         </Text>
@@ -6239,7 +6239,7 @@ export function TrackCaloriesScreen() {
             >
               <MaterialCommunityIcons name="microphone" size={21} color="#FFFFFF" />
             </Pressable>
-            <Text style={{ flex: 1, textAlign: 'center', color: theme.colors.text, fontSize: 21, fontWeight: '700' }}>Food Diary</Text>
+            <Text style={{ flex: 1, textAlign: 'center', color: theme.colors.text, fontSize: 21, fontWeight: '600' }}>Food Diary</Text>
             <Pressable
               onPress={() => setProfileMenuOpen((v) => !v)}
               style={{
@@ -6257,7 +6257,7 @@ export function TrackCaloriesScreen() {
               {accountImage ? (
                 <Image source={{ uri: accountImage }} style={{ width: '100%', height: '100%' }} />
               ) : (
-                <Text style={{ color: '#6B7280', fontWeight: '700' }}>{profileInitial}</Text>
+                <Text style={{ color: '#6B7280', fontWeight: '600' }}>{profileInitial}</Text>
               )}
             </Pressable>
           </View>
@@ -6266,15 +6266,15 @@ export function TrackCaloriesScreen() {
         <View style={{ paddingHorizontal: 16, paddingTop: 12, paddingBottom: 14, borderBottomWidth: 1, borderBottomColor: '#DFE3EA', backgroundColor: '#F2F4F6' }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
             <Pressable onPress={() => setSelectedDate((prev) => shiftDate(prev, -1))} style={dateArrowCircle}>
-              <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700' }}>‹</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '600' }}>‹</Text>
             </Pressable>
             <Pressable onPress={() => setShowDatePicker(true)} style={dateCenterPill}>
-              <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>
+              <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>
                 {formatDateLabel(selectedDate)}
               </Text>
             </Pressable>
             <Pressable onPress={() => setSelectedDate((prev) => shiftDate(prev, 1))} style={dateArrowCircle}>
-              <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '700' }}>›</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 24, fontWeight: '600' }}>›</Text>
             </Pressable>
           </View>
         </View>
@@ -6302,17 +6302,17 @@ export function TrackCaloriesScreen() {
               style={{
                 width: 46,
                 height: 46,
-                borderRadius: 2,
+                borderRadius: 8,
                 backgroundColor: 'rgba(255,255,255,0.2)',
                 alignItems: 'center',
                 justifyContent: 'center',
                 marginRight: 12,
               }}
             >
-              <Text style={{ color: '#fff', fontSize: 35/1.6, fontWeight: '500' }}>＋</Text>
+              <Text style={{ color: '#fff', fontSize: 35/1.6, fontWeight: '400' }}>＋</Text>
             </View>
-            <Text style={{ color: '#fff', fontSize: 41/2, fontWeight: '700', flex: 1 }}>Add Food Entry</Text>
-            <Text style={{ color: '#fff', fontSize: 29/2, fontWeight: '700' }}>
+            <Text style={{ color: '#fff', fontSize: 41/2, fontWeight: '600', flex: 1 }}>Add Food Entry</Text>
+            <Text style={{ color: '#fff', fontSize: 29/2, fontWeight: '600' }}>
               {topAddCategoryOpen || topAddOptionsOpen ? '⌃' : '⌄'}
             </Text>
           </Pressable>
@@ -6321,7 +6321,7 @@ export function TrackCaloriesScreen() {
             <View
               style={{
                 marginTop: 8,
-                borderRadius: 2,
+                borderRadius: 8,
                 backgroundColor: theme.colors.card,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
@@ -6343,7 +6343,7 @@ export function TrackCaloriesScreen() {
                     borderTopColor: '#F3F4F6',
                   }}
                 >
-                  <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>{meal.label}</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '500', fontSize: 16 }}>{meal.label}</Text>
                 </Pressable>
               ))}
             </View>
@@ -6353,7 +6353,7 @@ export function TrackCaloriesScreen() {
             <View
               style={{
                 marginTop: 8,
-                borderRadius: 2,
+                borderRadius: 8,
                 backgroundColor: theme.colors.card,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
@@ -6361,7 +6361,7 @@ export function TrackCaloriesScreen() {
               }}
             >
               <View style={{ paddingHorizontal: 14, paddingTop: 12, paddingBottom: 8 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 18 }}>{mealLabel(topAddMeal)}</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 18 }}>{mealLabel(topAddMeal)}</Text>
               </View>
               {topAddMenuActions.map((item, idx) => (
                 <Pressable
@@ -6381,20 +6381,20 @@ export function TrackCaloriesScreen() {
                     style={{
                       width: 42,
                       height: 42,
-                      borderRadius: 2,
+                      borderRadius: 8,
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: item.iconBg,
                       marginRight: 10,
                     }}
                   >
-                    <Text style={{ color: item.iconColor, fontSize: 20, fontWeight: '700' }}>{item.icon}</Text>
+                    <Text style={{ color: item.iconColor, fontSize: 20, fontWeight: '600' }}>{item.icon}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>{item.title}</Text>
+                    <Text style={{ color: theme.colors.text, fontWeight: '500', fontSize: 16 }}>{item.title}</Text>
                     <Text style={{ color: '#6B7280', fontSize: 13 }}>{item.subtitle}</Text>
                   </View>
-                  <Text style={{ color: '#9CA3AF', fontSize: 18, fontWeight: '600' }}>›</Text>
+                  <Text style={{ color: '#9CA3AF', fontSize: 18, fontWeight: '500' }}>›</Text>
                 </Pressable>
               ))}
             </View>
@@ -6403,16 +6403,16 @@ export function TrackCaloriesScreen() {
           <View style={{ marginTop: 12 }}>
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={{ color: '#6B7280', fontSize: 16 }}>Credits remaining</Text>
-              <Text style={{ marginLeft: 'auto', color: theme.colors.muted, fontSize: 18, fontWeight: '700' }}>
+              <Text style={{ marginLeft: 'auto', color: theme.colors.muted, fontSize: 18, fontWeight: '600' }}>
                 {creditsRemaining == null ? '—' : creditsRemaining.toLocaleString()}
               </Text>
             </View>
-            <View style={{ marginTop: 8, height: 12, borderRadius: 2, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
+            <View style={{ marginTop: 8, height: 12, borderRadius: 4, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
               <View style={{ width: `${creditsBarPercent}%`, height: '100%', backgroundColor: '#41AD49' }} />
             </View>
             <Text style={{ marginTop: 10, color: '#4B5563', fontSize: 14 }}>
               This {foodAnalysisUsageLabel === 'monthly' ? 'month' : 'total'}:{' '}
-              <Text style={{ fontWeight: '600' }}>This AI feature has been used {foodAnalysisUsageCount} times.</Text>
+              <Text style={{ fontWeight: '500' }}>This AI feature has been used {foodAnalysisUsageCount} times.</Text>
             </Text>
             <Text style={{ marginTop: 2, color: '#4B5563', fontSize: 14 }}>
               Cost: {foodAnalysisCostPerUse} credits per food photo notes request.
@@ -6424,13 +6424,13 @@ export function TrackCaloriesScreen() {
           <View
             onTouchStart={onSummaryTouchStart}
             onTouchEnd={onSummaryTouchEnd}
-            style={{ borderRadius: 2, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', padding: 14 }}
+            style={{ borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', padding: 14 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              <Text style={{ color: theme.colors.text, fontSize: 20/1.4, fontWeight: '700' }}>
+              <Text style={{ color: theme.colors.text, fontSize: 20/1.4, fontWeight: '600' }}>
                 {isToday(selectedDate) ? "Today's energy summary" : 'Energy summary'}
               </Text>
-              <View style={{ marginLeft: 'auto', flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 2, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
+              <View style={{ marginLeft: 'auto', flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
                 <Pressable onPress={() => setEnergyUnit('kcal')} style={[energyTogglePill, energyUnit === 'kcal' && energyTogglePillActive]}>
                   <Text style={[energyToggleText, energyUnit === 'kcal' && energyToggleTextActive]}>kcal</Text>
                 </Pressable>
@@ -6448,7 +6448,7 @@ export function TrackCaloriesScreen() {
                 </View>
 
                 <Text style={{ marginTop: 10, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>
-                  Daily allowance: <Text style={{ fontWeight: '700', color: theme.colors.muted }}>{Math.round(energyUnit === 'kj' ? dailyTargets.calories * 4.184 : dailyTargets.calories)} {energyUnit}</Text>
+                  Daily allowance: <Text style={{ fontWeight: '600', color: theme.colors.muted }}>{Math.round(energyUnit === 'kj' ? dailyTargets.calories * 4.184 : dailyTargets.calories)} {energyUnit}</Text>
                 </Text>
                 {exerciseCalories > 0 ? <Text style={{ marginTop: 4, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>Exercise added: +{formatCalories(exerciseCalories, energyUnit)}</Text> : null}
               </>
@@ -6473,22 +6473,22 @@ export function TrackCaloriesScreen() {
                   return (
                     <View key={row.key} style={{ marginTop: row.key === 'protein' ? 0 : 8 }}>
                       <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <Text style={{ color: theme.colors.text, fontSize: 25/2, fontWeight: '600', flex: 1 }}>
+                        <Text style={{ color: theme.colors.text, fontSize: 25/2, fontWeight: '500', flex: 1 }}>
                           {row.label}{' '}
-                          <Text style={{ color: '#4B5563', fontWeight: '500' }}>
+                          <Text style={{ color: '#4B5563', fontWeight: '400' }}>
                             {formatMacroAmount(row.consumed)} / {formatMacroAmount(safeTarget)} {row.unit}
                             {row.key === 'sugar' ? ' cap' : ''}
                           </Text>{' '}
-                          <Text style={{ color: over ? '#EF4444' : row.color, fontWeight: '600' }}>
+                          <Text style={{ color: over ? '#EF4444' : row.color, fontWeight: '500' }}>
                             {unknown ? 'Incomplete data' : `${formatMacroAmount(remaining)} ${row.unit} left`}
                           </Text>
                         </Text>
-                        <Text style={{ color: over ? '#EF4444' : '#111827', fontSize: 12, fontWeight: '700' }}>
+                        <Text style={{ color: over ? '#EF4444' : '#111827', fontSize: 12, fontWeight: '600' }}>
                           {percentLabel}
                         </Text>
                       </View>
 
-                      <View style={{ marginTop: 5, height: 9, borderRadius: 2, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
+                      <View style={{ marginTop: 5, height: 9, borderRadius: 4, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
                         {row.key === 'fat' && fatTotal > 0 ? (
                           <View style={{ width: `${usedWidth}%`, height: '100%', flexDirection: 'row' }}>
                             {fatGoodPct > 0 ? <View style={{ width: `${fatGoodPct}%`, height: '100%', backgroundColor: '#22C55E' }} /> : null}
@@ -6511,7 +6511,7 @@ export function TrackCaloriesScreen() {
 
             {summarySlideIndex === 2 ? (
               <View style={{ marginTop: 10 }}>
-                <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '600', marginBottom: 8 }}>Fat quality</Text>
+                <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '500', marginBottom: 8 }}>Fat quality</Text>
                 <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
                   <CircleMetric value={fatSplit.good} label="GOOD FAT" color="#22C55E" unit="g" size="compact" />
                   <CircleMetric value={fatSplit.bad} label="BAD FAT" color="#EF4444" unit="g" size="compact" />
@@ -6523,7 +6523,7 @@ export function TrackCaloriesScreen() {
             <View style={{ marginTop: 10, flexDirection: 'row', justifyContent: 'center', gap: 10 }}>
               {[0, 1, 2].map((idx) => (
                 <Pressable key={idx} onPress={() => setSummarySlideIndex(idx)}>
-                  <View style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: summarySlideIndex === idx ? '#10B981' : '#D1D5DB' }} />
+                  <View style={{ width: 12, height: 12, borderRadius: 4, backgroundColor: summarySlideIndex === idx ? '#10B981' : '#D1D5DB' }} />
                 </Pressable>
               ))}
             </View>
@@ -6531,11 +6531,11 @@ export function TrackCaloriesScreen() {
         </View>
 
         <View style={{ marginTop: 18, paddingHorizontal: 16, gap: 10 }}>
-          <Text style={{ color: theme.colors.text, fontSize: 44 / 2, fontWeight: '700' }}>
+          <Text style={{ color: theme.colors.text, fontSize: 44 / 2, fontWeight: '600' }}>
             {isToday(selectedDate) ? "Today's Meals" : 'Meals'}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <View style={{ flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 2, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
+            <View style={{ flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 8, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
               <Pressable onPress={() => setEnergyUnit('kcal')} style={[energyTogglePill, energyUnit === 'kcal' && energyTogglePillActive]}>
                 <Text style={[energyToggleText, energyUnit === 'kcal' && energyToggleTextActive]}>kcal</Text>
               </Pressable>
@@ -6544,7 +6544,7 @@ export function TrackCaloriesScreen() {
               </Pressable>
             </View>
             <Pressable onPress={openAskHelfiMealAdvice} style={{ backgroundColor: '#10B981', borderRadius: 2, paddingHorizontal: 14, paddingVertical: 8, flexShrink: 0 }}>
-              <Text style={{ color: '#fff', fontWeight: '700' }}>Ask Helfi</Text>
+              <Text style={{ color: '#fff', fontWeight: '600' }}>Ask Helfi</Text>
             </Pressable>
           </View>
         </View>
@@ -6556,24 +6556,24 @@ export function TrackCaloriesScreen() {
           </View>
         ) : (
           <>
-            <View style={[cardStyle, { marginTop: 12, marginHorizontal: 16, borderRadius: 2, padding: 12 }]}>
+            <View style={[cardStyle, { marginTop: 12, marginHorizontal: 16, borderRadius: 8, padding: 12 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View
                   style={{
                     width: 54,
                     height: 54,
-                    borderRadius: 2,
+                    borderRadius: 8,
                     alignItems: 'center',
                     justifyContent: 'center',
                     backgroundColor: '#DCFCE7',
                   }}
                 >
-                  <Text style={{ color: '#059669', fontSize: 26, fontWeight: '700' }}>⚡</Text>
+                  <Text style={{ color: '#059669', fontSize: 26, fontWeight: '600' }}>⚡</Text>
                 </View>
                 <View style={{ marginLeft: 10, flex: 1 }}>
-                  <Text style={{ color: theme.colors.text, fontSize: 32 / 2, fontWeight: '700' }}>Exercise</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 32 / 2, fontWeight: '600' }}>Exercise</Text>
                   <Text style={{ color: '#6B7280', fontSize: 14 }}>
-                    Burned: <Text style={{ color: '#10B981', fontWeight: '600' }}>{formatCalories(exerciseCalories, energyUnit)}</Text>
+                    Burned: <Text style={{ color: '#10B981', fontWeight: '500' }}>{formatCalories(exerciseCalories, energyUnit)}</Text>
                   </Text>
                 </View>
                 <Pressable
@@ -6587,7 +6587,7 @@ export function TrackCaloriesScreen() {
                     backgroundColor: theme.colors.card,
                   }}
                 >
-                  <Text style={{ color: '#6B7280', fontSize: 14, fontWeight: '700' }}>Connect device</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 14, fontWeight: '600' }}>Connect device</Text>
                 </Pressable>
               </View>
 
@@ -6598,7 +6598,7 @@ export function TrackCaloriesScreen() {
                   accessibilityLabel={`Import ${healthSync.source?.sourceName || 'Apple Health'} for ${selectedDate}`}
                   style={{ marginTop: 12, padding: 12, borderRadius: 2, borderWidth: 1, borderColor: '#A7F3D0', opacity: healthSync.busy ? 0.5 : 1 }}
                 >
-                  <Text style={{ color: '#059669', fontWeight: '700', textAlign: 'center' }}>{healthSync.busy ? 'Importing activity…' : `Import ${healthSync.source?.sourceName || 'Apple Health'}`}</Text>
+                  <Text style={{ color: '#059669', fontWeight: '600', textAlign: 'center' }}>{healthSync.busy ? 'Importing activity…' : `Import ${healthSync.source?.sourceName || 'Apple Health'}`}</Text>
                 </Pressable>
               ) : null}
 
@@ -6621,7 +6621,7 @@ export function TrackCaloriesScreen() {
                     justifyContent: 'center',
                   }}
                 >
-                  <Text style={{ color: '#059669', fontSize: 24, fontWeight: '700' }}>＋</Text>
+                  <Text style={{ color: '#059669', fontSize: 24, fontWeight: '600' }}>＋</Text>
                 </Pressable>
               </View>
 
@@ -6633,14 +6633,14 @@ export function TrackCaloriesScreen() {
                       style={{
                         borderWidth: 1,
                         borderColor: '#E5E7EB',
-                        borderRadius: 2,
+                        borderRadius: 8,
                         backgroundColor: '#FBFDFC',
                         padding: 10,
                       }}
                     >
                       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                         <View style={{ flex: 1 }}>
-                          <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
+                          <Text style={{ color: theme.colors.text, fontWeight: '500' }}>
                             {entry.source === 'APPLE_HEALTH' ? entry.label || 'Apple Health activity' : entry.exerciseType?.name || 'Exercise'}
                           </Text>
                           {entry.source === 'APPLE_HEALTH' ? <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 12 }}>
@@ -6695,7 +6695,7 @@ export function TrackCaloriesScreen() {
                     backgroundColor: theme.colors.card,
                     borderWidth: 1,
                     borderColor: '#E5E7EB',
-                    borderRadius: 2,
+                    borderRadius: 8,
                     overflow: 'hidden',
                   }}
                 >
@@ -6715,13 +6715,13 @@ export function TrackCaloriesScreen() {
                         justifyContent: 'center',
                       }}
                     >
-                      <Text style={{ color: '#059669', fontSize: 23, fontWeight: '700' }}>＋</Text>
+                      <Text style={{ color: '#059669', fontSize: 23, fontWeight: '600' }}>＋</Text>
                     </Pressable>
                     <Pressable
                       onPress={() => setExpandedMeals((prev) => ({ ...prev, [meal.key]: !prev[meal.key] }))}
                       style={{ flex: 1, marginLeft: 10 }}
                     >
-                      <Text style={{ color: theme.colors.text, fontSize: 34 / 2, fontWeight: '700' }}>{meal.label}</Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 34 / 2, fontWeight: '600' }}>{meal.label}</Text>
                       <Text style={{ color: '#6B7280', fontSize: 14 }} numberOfLines={1}>
                         {sectionSummary}
                       </Text>
@@ -6730,7 +6730,7 @@ export function TrackCaloriesScreen() {
                       onPress={() => setExpandedMeals((prev) => ({ ...prev, [meal.key]: !prev[meal.key] }))}
                       style={{ paddingHorizontal: 8, paddingVertical: 6 }}
                     >
-                      <Text style={{ color: '#6B7280', fontSize: 20, fontWeight: '700' }}>{isExpanded ? '⌃' : '⌄'}</Text>
+                      <Text style={{ color: '#6B7280', fontSize: 20, fontWeight: '600' }}>{isExpanded ? '⌃' : '⌄'}</Text>
                     </Pressable>
                   </View>
 
@@ -6749,7 +6749,7 @@ export function TrackCaloriesScreen() {
                                   style={{
                                     width: 34,
                                     height: 34,
-                                    borderRadius: 2,
+                                    borderRadius: 8,
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     backgroundColor: '#EFF6FF',
@@ -6763,7 +6763,7 @@ export function TrackCaloriesScreen() {
                                   />
                                 </View>
                                 <View style={{ flex: 1, minWidth: 0 }}>
-                                  <Text style={{ color: theme.colors.text, fontSize: 18 / 1.2, fontWeight: '700' }} numberOfLines={1}>
+                                  <Text style={{ color: theme.colors.text, fontSize: 18 / 1.2, fontWeight: '600' }} numberOfLines={1}>
                                     {entry.label || 'Water'}
                                   </Text>
                                   <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 13 }}>
@@ -6926,7 +6926,7 @@ export function TrackCaloriesScreen() {
                                     style={{
                                       width: 34,
                                       height: 34,
-                                      borderRadius: 2,
+                                      borderRadius: 8,
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       backgroundColor: theme.colors.card,
@@ -6940,12 +6940,12 @@ export function TrackCaloriesScreen() {
                                     />
                                   </View>
                                   <View style={{ flex: 1, minWidth: 0 }}>
-                                    <Text style={{ color: theme.colors.text, fontSize: 18 / 1.2, fontWeight: '700' }} numberOfLines={1}>
+                                    <Text style={{ color: theme.colors.text, fontSize: 18 / 1.2, fontWeight: '500', lineHeight: 22 }} numberOfLines={1}>
                                       {entry.name || 'Meal entry'}
                                     </Text>
                                   </View>
                                   <View style={{ marginLeft: 10, alignItems: 'flex-end' }}>
-                                    <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
+                                    <Text style={{ color: theme.colors.text, fontWeight: '500' }}>
                                       {formatCalories(readNutrient(nutrients, ['calories', 'calories_kcal']), energyUnit)}
                                     </Text>
                                     <Text style={{ color: '#6B7280', marginTop: 2, fontSize: 13 }}>
@@ -6953,7 +6953,7 @@ export function TrackCaloriesScreen() {
                                     </Text>
                                   </View>
                                   {copyMode ? (
-                                    <Text style={{ marginLeft: 8, color: selected ? '#059669' : '#9CA3AF', fontWeight: '700' }}>
+                                    <Text style={{ marginLeft: 8, color: selected ? '#059669' : '#9CA3AF', fontWeight: '600' }}>
                                       {selected ? '✓' : '○'}
                                     </Text>
                                   ) : (
@@ -6997,16 +6997,16 @@ export function TrackCaloriesScreen() {
 
         {copyMode ? (
           <View style={[cardStyle, { marginTop: 12, marginHorizontal: 16, borderColor: '#95D5A7' }]}>
-            <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Copy mode</Text>
+            <Text style={{ color: theme.colors.text, fontWeight: '500' }}>Copy mode</Text>
             <Text style={{ color: theme.colors.muted, marginTop: 4 }}>
               Select items, then copy them for paste into another section.
             </Text>
             <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
               <Pressable onPress={copySelected} style={{ backgroundColor: theme.colors.primary, borderRadius: 2, paddingHorizontal: 12, paddingVertical: 8 }}>
-                <Text style={{ color: theme.colors.primaryText, fontWeight: '600' }}>Copy selected ({selectedIds.length})</Text>
+                <Text style={{ color: theme.colors.primaryText, fontWeight: '500' }}>Copy selected ({selectedIds.length})</Text>
               </Pressable>
               <Pressable onPress={() => { setCopyMode(false); setSelectedIds([]) }} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 2, paddingHorizontal: 12, paddingVertical: 8 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Cancel</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '500' }}>Cancel</Text>
               </Pressable>
             </View>
           </View>
@@ -7033,14 +7033,14 @@ export function TrackCaloriesScreen() {
               style={{
                 width: 242,
                 backgroundColor: '#fff',
-                borderRadius: 2,
+                borderRadius: 8,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
                 overflow: 'hidden',
               }}
             >
               <View style={{ paddingHorizontal: 12, paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: '#E5E7EB' }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '600' }} numberOfLines={1}>
+                <Text style={{ color: theme.colors.text, fontWeight: '500' }} numberOfLines={1}>
                   {accountName}
                 </Text>
                 {!!accountEmail ? (
@@ -7066,7 +7066,7 @@ export function TrackCaloriesScreen() {
 
       <Modal transparent visible={sectionMenuMeal != null} animationType="fade" onRequestClose={() => setSectionMenuMeal(null)}>
         <View style={modalBackdrop}>
-          <View style={[modalCardLarge, { borderRadius: 2, padding: 0, overflow: 'hidden' }]}>
+          <View style={[modalCardLarge, { borderRadius: 8, padding: 0, overflow: 'hidden' }]}>
             <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
               <Text style={modalTitle}>{mealLabel(sectionMenuMeal || 'uncategorized')}</Text>
             </View>
@@ -7092,20 +7092,20 @@ export function TrackCaloriesScreen() {
                     style={{
                       width: 42,
                       height: 42,
-                      borderRadius: 2,
+                      borderRadius: 8,
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: item.iconBg,
                       marginRight: 10,
                     }}
                   >
-                    <Text style={{ color: item.iconColor, fontSize: 20, fontWeight: '700' }}>{item.icon}</Text>
+                    <Text style={{ color: item.iconColor, fontSize: 20, fontWeight: '600' }}>{item.icon}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>{item.title}</Text>
+                    <Text style={{ color: theme.colors.text, fontWeight: '500', fontSize: 16 }}>{item.title}</Text>
                     <Text style={{ color: '#6B7280', fontSize: 13 }}>{item.subtitle}</Text>
                   </View>
-                  <Text style={{ color: '#9CA3AF', fontSize: 18, fontWeight: '600' }}>›</Text>
+                  <Text style={{ color: '#9CA3AF', fontSize: 18, fontWeight: '500' }}>›</Text>
                 </Pressable>
               ))}
             </ScrollView>
@@ -7321,7 +7321,7 @@ export function TrackCaloriesScreen() {
               <LabeledNumberInput label="Sugar (g)" value={editSugar} onChange={setEditSugar} />
             </View>
             <View style={{ marginTop: 12 }}>
-              <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{ calories: nullableNumber(editCalories), protein: nullableNumber(editProtein), carbs: nullableNumber(editCarbs), fat: nullableNumber(editFat), fiber: nullableNumber(editFiber), sugar: nullableNumber(editSugar) }} />
+              <NutrientCards cornerRadius={8} energyUnit={energyUnit} values={{ calories: nullableNumber(editCalories), protein: nullableNumber(editProtein), carbs: nullableNumber(editCarbs), fat: nullableNumber(editFat), fiber: nullableNumber(editFiber), sugar: nullableNumber(editSugar) }} />
             </View>
             </ScrollView>
             <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
@@ -7388,7 +7388,7 @@ export function TrackCaloriesScreen() {
                   onChangeText={setFavoritesSearch}
                   placeholder="Search all foods..."
                   placeholderTextColor="#8AA39D"
-                  style={{ flex: 1, marginLeft: 8, color: theme.colors.text, fontSize: 16, fontWeight: '700' }}
+                  style={{ flex: 1, marginLeft: 8, color: theme.colors.text, fontSize: 16, fontWeight: '500' }}
                 />
                 {favoritesSearch ? (
                   <Pressable
@@ -7424,7 +7424,7 @@ export function TrackCaloriesScreen() {
                       justifyContent: 'center',
                     }}
                   >
-                    <Text style={{ color: theme.colors.text, fontWeight: '600' }}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '500' }}>
                       {tab === 'all' ? 'All' : tab === 'favorites' ? 'Favorites' : 'Custom'}
                     </Text>
                   </Pressable>
@@ -7439,7 +7439,7 @@ export function TrackCaloriesScreen() {
                   <Text style={{ color: '#6B7280', marginTop: 8 }}>Loading favorites...</Text>
                 </View>
               ) : favoritesForList.length === 0 ? (
-                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, paddingHorizontal: 18, paddingVertical: 28 }}>
+                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, paddingHorizontal: 18, paddingVertical: 28 }}>
                   <Text style={{ color: '#6B7280', textAlign: 'center' }}>
                     {favoritesTab === 'all'
                       ? 'No meals yet. Add some entries to see them here.'
@@ -7449,7 +7449,7 @@ export function TrackCaloriesScreen() {
                   </Text>
                 </View>
               ) : (
-                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, overflow: 'hidden', backgroundColor: theme.colors.card }}>
+                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden', backgroundColor: theme.colors.card }}>
                   {favoritesForList.map((item, index) => {
                     const lastUsedText =
                       item.lastUsedAtMs > 0
@@ -7489,7 +7489,7 @@ export function TrackCaloriesScreen() {
                         >
                           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                             <View style={{ flex: 1 }}>
-                              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }} numberOfLines={1}>
+                              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500', lineHeight: 20 }} numberOfLines={1}>
                                 {item.label}
                               </Text>
                               <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 2 }} numberOfLines={1}>
@@ -7502,7 +7502,7 @@ export function TrackCaloriesScreen() {
                               ) : null}
                             </View>
                             <View style={{ alignItems: 'flex-end' }}>
-                              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>
+                              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500' }}>
                                 {Math.round(item.calories)} kcal
                               </Text>
                               <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 3 }}>{displayedSourceTag}</Text>
@@ -7517,7 +7517,7 @@ export function TrackCaloriesScreen() {
                             onPress={() => void addFavoriteToDiary(item)}
                             style={{ width: 52, alignItems: 'center', justifyContent: 'center' }}
                           >
-                            <Text style={{ color: '#3E9B44', fontSize: 14, fontWeight: '600' }}>Add</Text>
+                            <Text style={{ color: '#3E9B44', fontSize: 14, fontWeight: '500' }}>Add</Text>
                           </Pressable>
                         ) : null}
 
@@ -7570,8 +7570,8 @@ export function TrackCaloriesScreen() {
 
       <Modal transparent visible={favoriteActionItem != null} animationType="fade" onRequestClose={() => setFavoriteActionItem(null)}>
         <View style={modalBackdrop}>
-          <View style={[modalCard, { borderRadius: 2, padding: 18 }]}>
-            <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>{favoriteActionItem?.label}</Text>
+          <View style={[modalCard, { borderRadius: 8, padding: 18 }]}>
+            <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '500' }}>{favoriteActionItem?.label}</Text>
             <Text style={{ color: '#6B7280', marginTop: 4 }}>What would you like to do?</Text>
 
             <View style={{ marginTop: 14, gap: 10 }}>
@@ -7611,14 +7611,14 @@ export function TrackCaloriesScreen() {
             }}
           >
             <Pressable onPress={() => { if (favoritePreviewItem) { setFavoritePreviewItem(null); setFavoriteActionItem(favoritePreviewItem) } }}>
-              <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Back</Text>
+              <Text style={{ color: theme.colors.muted, fontWeight: '500' }}>Back</Text>
             </Pressable>
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Preview</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '500' }}>Preview</Text>
               <Text style={{ color: '#6B7280', fontSize: 12 }}>{favoritePreviewItem?.serving || '1 serving'}</Text>
             </View>
             <Pressable onPress={() => setFavoritePreviewItem(null)} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
-              <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Cancel</Text>
+              <Text style={{ color: theme.colors.muted, fontWeight: '500' }}>Cancel</Text>
             </Pressable>
           </View>
 
@@ -7637,7 +7637,7 @@ export function TrackCaloriesScreen() {
               </Pressable>
             </View>
 
-            <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '700', marginTop: 18 }}>
+            <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '600', marginTop: 18 }}>
               {favoritePreviewItem?.label}
             </Text>
             <Text style={{ color: '#6B7280', marginTop: 4 }}>This is a preview. It does not add the meal yet.</Text>
@@ -7645,7 +7645,7 @@ export function TrackCaloriesScreen() {
             {renderFavoriteNutrientCards(favoritePreviewTotals)}
 
             <View style={{ marginTop: 24 }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Daily totals after adding</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '500' }}>Daily totals after adding</Text>
               <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>This shows what your full day would look like if you added this.</Text>
               {renderFavoriteDailyTotals(favoritePreviewTotals)}
             </View>
@@ -7679,7 +7679,7 @@ export function TrackCaloriesScreen() {
               >
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
               </Pressable>
-              <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700', flex: 1 }}>Import recipe</Text>
+              <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '600', flex: 1 }}>Import recipe</Text>
             </View>
           </View>
 
@@ -7716,10 +7716,10 @@ export function TrackCaloriesScreen() {
             </View>
 
             {!importRecipe ? (
-              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
+              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, backgroundColor: theme.colors.card }}>
                 {importRecipeMode === 'url' ? (
                   <>
-                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Recipe link</Text>
+                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500' }}>Recipe link</Text>
                     <TextInput
                       value={importRecipeUrl}
                       onChangeText={(text) => {
@@ -7751,7 +7751,7 @@ export function TrackCaloriesScreen() {
                   </>
                 ) : (
                   <>
-                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Recipe photos</Text>
+                    <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500' }}>Recipe photos</Text>
                     <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 8 }}>
                       Cost: {RECIPE_IMPORT_PHOTO_CREDITS} credits per photo import.
                     </Text>
@@ -7783,7 +7783,7 @@ export function TrackCaloriesScreen() {
                             {importRecipePhotoAssets.length} photo{importRecipePhotoAssets.length === 1 ? '' : 's'} selected
                           </Text>
                           <Pressable onPress={() => setImportRecipePhotoAssets([])} accessibilityRole="button" accessibilityLabel="Clear recipe photos">
-                            <Text style={{ color: '#6B7280', fontSize: 12, fontWeight: '600', textDecorationLine: 'underline' }}>Clear</Text>
+                            <Text style={{ color: '#6B7280', fontSize: 12, fontWeight: '500', textDecorationLine: 'underline' }}>Clear</Text>
                           </Pressable>
                         </View>
                         <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 8 }}>
@@ -7810,16 +7810,16 @@ export function TrackCaloriesScreen() {
                 )}
 
                 {importRecipeError ? (
-                  <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: '700', marginTop: 12 }}>{importRecipeError}</Text>
+                  <Text style={{ color: '#DC2626', fontSize: 13, fontWeight: '600', marginTop: 12 }}>{importRecipeError}</Text>
                 ) : null}
               </View>
             ) : (
               <>
-                <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
-                  <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Review (you can edit)</Text>
+                <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, backgroundColor: theme.colors.card }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500' }}>Review (you can edit)</Text>
                   <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 8 }}>Use measured grams or ml. Remove optional extras you are not using and choose one food where the recipe offers alternatives.</Text>
                   {importRecipeError ? <Text style={{ color: '#DC2626', fontSize: 13, marginTop: 10 }}>{importRecipeError}</Text> : null}
-                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700', marginTop: 12 }}>Title</Text>
+                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '600', marginTop: 12 }}>Title</Text>
                   <TextInput
                     value={importRecipeTitle}
                     onChangeText={setImportRecipeTitle}
@@ -7827,7 +7827,7 @@ export function TrackCaloriesScreen() {
                     placeholderTextColor="#9CA3AF"
                     style={[inputStyle, { marginTop: 6 }]}
                   />
-                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700', marginTop: 12 }}>Servings (optional)</Text>
+                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '600', marginTop: 12 }}>Servings (optional)</Text>
                   <TextInput
                     value={importRecipeServings}
                     onChangeText={setImportRecipeServings}
@@ -7836,7 +7836,7 @@ export function TrackCaloriesScreen() {
                     keyboardType="numeric"
                     style={[inputStyle, { marginTop: 6 }]}
                   />
-                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700', marginTop: 12 }}>
+                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '600', marginTop: 12 }}>
                     Ingredients (one per line)
                   </Text>
                   <TextInput
@@ -7846,7 +7846,7 @@ export function TrackCaloriesScreen() {
                     textAlignVertical="top"
                     style={[inputStyle, { marginTop: 6, minHeight: 150 }]}
                   />
-                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '700', marginTop: 12 }}>
+                  <Text style={{ color: theme.colors.muted, fontSize: 13, fontWeight: '600', marginTop: 12 }}>
                     Instructions (one step per line)
                   </Text>
                   <TextInput
@@ -7923,7 +7923,7 @@ export function TrackCaloriesScreen() {
                 <MaterialCommunityIcons name="arrow-left" size={24} color="#4B5563" />
               </Pressable>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
+                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '600' }}>
                   {mealBuilderOpen && !favoriteEditItem
                     ? favoriteEditItems.length ? 'Review meal' : 'Build a meal'
                     : favoriteEditItem?.entry && favoriteEditItems.length === 1
@@ -7931,8 +7931,8 @@ export function TrackCaloriesScreen() {
                       : 'Edit meal'}
                 </Text>
                 <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{ borderRadius: 2, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4 }}>
-                    <Text style={{ color: '#047857', fontSize: 13, fontWeight: '700' }}>{mealLabel(favoritesTargetMeal)}</Text>
+                  <View style={{ borderRadius: 8, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4 }}>
+                    <Text style={{ color: '#047857', fontSize: 13, fontWeight: '600' }}>{mealLabel(favoritesTargetMeal)}</Text>
                   </View>
                   <Text style={{ color: '#9CA3AF', fontSize: 12 }}>•</Text>
                   <Text style={{ color: '#6B7280', fontSize: 13 }}>{selectedDate}</Text>
@@ -7943,7 +7943,7 @@ export function TrackCaloriesScreen() {
           </View>
 
           <ScrollView ref={favoriteEditScrollRef} keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, backgroundColor: theme.colors.card }}>
               <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Meal name</Text>
               <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 4 }}>We suggest a name from your foods. You can change it below.</Text>
               <TextInput
@@ -7955,15 +7955,15 @@ export function TrackCaloriesScreen() {
                   marginTop: 10,
                   borderWidth: 1,
                   borderColor: '#D1D5DB',
-                  borderRadius: 2,
+                  borderRadius: 4,
                   paddingHorizontal: 14,
                   paddingVertical: 12,
                   color: theme.colors.text,
                   fontSize: 16,
-                  fontWeight: '700',
+                  fontWeight: '500',
                 }}
               />
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginTop: 14, marginBottom: 8 }}>
+              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '500', marginTop: 14, marginBottom: 8 }}>
                 Meal
               </Text>
               <View style={{ flexDirection: 'row', gap: 4 }}>
@@ -7990,7 +7990,7 @@ export function TrackCaloriesScreen() {
                         paddingVertical: 9,
                       }}
                     >
-                      <Text style={{ color: selected ? '#047857' : '#374151', fontWeight: '600', fontSize: 12, textAlign: 'center' }}>
+                      <Text style={{ color: selected ? '#047857' : '#374151', fontWeight: '500', fontSize: 12, textAlign: 'center' }}>
                         {meal.label}
                       </Text>
                     </Pressable>
@@ -7998,10 +7998,10 @@ export function TrackCaloriesScreen() {
                 })}
               </View>
               <Pressable onPress={() => setFavoritesTargetMeal('uncategorized')} accessibilityRole="button" accessibilityState={{ selected: favoritesTargetMeal === 'uncategorized' }} style={{ marginTop: 8, minHeight: 36, alignSelf: 'flex-start', justifyContent: 'center' }}>
-                <Text style={{ color: favoritesTargetMeal === 'uncategorized' ? '#047857' : '#6B7280', fontSize: 12, fontWeight: '600' }}>Other meal</Text>
+                <Text style={{ color: favoritesTargetMeal === 'uncategorized' ? '#047857' : '#6B7280', fontSize: 12, fontWeight: '500' }}>Other meal</Text>
               </Pressable>
               <View style={{ marginTop: 14 }}>
-                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 7 }}>Time</Text>
+                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '500', marginBottom: 7 }}>Time</Text>
                 <Pressable
                   onPress={() => setFavoriteEditTimePickerOpen((current) => !current)}
                   accessibilityRole="button"
@@ -8016,7 +8016,7 @@ export function TrackCaloriesScreen() {
                     backgroundColor: theme.colors.card,
                   }}
                 >
-                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>{favoriteEditTime}</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '500' }}>{favoriteEditTime}</Text>
                 </Pressable>
                 {favoriteEditTimePickerOpen ? (
                   <DateTimePicker
@@ -8041,14 +8041,14 @@ export function TrackCaloriesScreen() {
               ) : null}
             </View>
 
-            <View onLayout={(event) => { favoriteEditSearchTopRef.current = event.nativeEvent.layout.y }} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
+            <View onLayout={(event) => { favoriteEditSearchTopRef.current = event.nativeEvent.layout.y }} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, backgroundColor: theme.colors.card }}>
               <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Food search</Text>
               {favoriteEditReplaceItemId ? (
-                <View accessibilityRole="alert" style={{ marginTop: 10, padding: 12, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 2 }}>
-                  <Text style={{ color: '#065F46', fontSize: 13, fontWeight: '700' }}>Replacing {favoriteEditItems.find((item) => item.id === favoriteEditReplaceItemId)?.name || 'food'}</Text>
+                <View accessibilityRole="alert" style={{ marginTop: 10, padding: 12, backgroundColor: '#ECFDF5', borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 8 }}>
+                  <Text style={{ color: '#065F46', fontSize: 13, fontWeight: '600' }}>Replacing {favoriteEditItems.find((item) => item.id === favoriteEditReplaceItemId)?.name || 'food'}</Text>
                   <Text style={{ color: '#047857', fontSize: 12, lineHeight: 18, marginTop: 4 }}>Choose a matching food from the search results. Your original food stays until you choose a replacement.</Text>
                   <Pressable onPress={() => setFavoriteEditReplaceItemId(null)} accessibilityRole="button" accessibilityLabel="Cancel food replacement" style={{ alignSelf: 'flex-start', minHeight: 44, justifyContent: 'center' }}>
-                    <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>Cancel replacement</Text>
+                    <Text style={{ color: '#047857', fontSize: 12, fontWeight: '600' }}>Cancel replacement</Text>
                   </Pressable>
                 </View>
               ) : null}
@@ -8090,13 +8090,13 @@ export function TrackCaloriesScreen() {
                   {favoriteEditSearchLoading ? (
                     <ActivityIndicator size="small" color="#FFFFFF" />
                   ) : (
-                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '700' }}>Search</Text>
+                    <Text style={{ color: '#FFFFFF', fontSize: 12, fontWeight: '600' }}>Search</Text>
                   )}
                 </Pressable>
               </View>
 
               <Pressable onPress={openFavoriteEditMissingReport} style={{ marginTop: 12, alignSelf: 'flex-start' }}>
-                <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>Missing item? Tell us</Text>
+                <Text style={{ color: '#047857', fontSize: 12, fontWeight: '600' }}>Missing item? Tell us</Text>
               </Pressable>
 
               <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
@@ -8155,7 +8155,7 @@ export function TrackCaloriesScreen() {
               <View style={{ marginTop: 14 }}>
                 <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Credits remaining</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <View style={{ flex: 1, height: 8, borderRadius: 2, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                  <View style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
                     <View
                       style={{
                         width: `${Math.max(0, 100 - creditsPercentUsed)}%`,
@@ -8164,7 +8164,7 @@ export function TrackCaloriesScreen() {
                       }}
                     />
                   </View>
-                  <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>
+                  <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '500' }}>
                     {creditsRemaining !== null ? creditsRemaining.toLocaleString() : '—'}
                   </Text>
                 </View>
@@ -8175,8 +8175,8 @@ export function TrackCaloriesScreen() {
               {(favoriteEditSearchLoading || favoriteEditSearchResults.length > 0) ? (
                 <ScrollView style={{ marginTop: 12, maxHeight: 280 }}>
                   {favoriteEditSearchResults.map((item) => (
-                    <View key={`${String(item.source || 'auto')}:${String(item.id)}`} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 12, marginBottom: 8 }}>
-                      <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>{searchFoodDisplayName(item)}</Text>
+                    <View key={`${String(item.source || 'auto')}:${String(item.id)}`} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 12, marginBottom: 8 }}>
+                      <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '500', lineHeight: 20 }}>{searchFoodDisplayName(item)}</Text>
                       <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 3 }}>
                         {item.serving_size ? `Serving: ${item.serving_size} • ` : ''}
                         {Math.round(numberOrZero(item.calories ?? item.calories_kcal))} kcal
@@ -8191,7 +8191,7 @@ export function TrackCaloriesScreen() {
               ) : null}
             </View>
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Pressable
                   onPress={() => {
@@ -8203,7 +8203,7 @@ export function TrackCaloriesScreen() {
                   accessibilityState={{ expanded: favoriteEditIngredientsExpanded, disabled: favoriteEditItems.length === 0 }}
                   style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}
                 >
-                  <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Your foods</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '600' }}>Your foods</Text>
                   {favoriteEditItems.length > 0 ? (
                     <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{favoriteEditIngredientsExpanded ? '▾' : '▸'}</Text>
                   ) : null}
@@ -8234,7 +8234,7 @@ export function TrackCaloriesScreen() {
                     const amountUnitOptions = favoriteAmountUnitOptions(editItem)
                     const amountUnitLabel = favoriteAmountUnitLabel(editItem.amountUnit, editItem)
                     return (
-                      <View key={editItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, overflow: 'hidden', backgroundColor: theme.colors.card }}>
+                      <View key={editItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden', backgroundColor: theme.colors.card }}>
                         <Pressable
                           onPress={() => setFavoriteEditExpandedItemId(expanded ? null : editItem.id)}
                           accessibilityRole="button"
@@ -8243,7 +8243,7 @@ export function TrackCaloriesScreen() {
                           style={{ paddingHorizontal: 14, paddingVertical: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
                         >
                           <View style={{ flex: 1 }}>
-                            <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>{editItem.name}</Text>
+                            <Text style={{ color: theme.colors.text, fontWeight: '500', fontSize: 16, lineHeight: 22 }}>{editItem.name}</Text>
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>
                               Serving: {editItem.servingLabel} • Full-meal amount: {editItem.amountInput || formatFavoriteAmount(favoriteAmountFromServings(editItem.servings, editItem.amountUnit, favoriteBaseForItem(editItem)))} {amountUnitLabel}
                             </Text>
@@ -8251,7 +8251,7 @@ export function TrackCaloriesScreen() {
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 11 }}>Source: {editItem.raw?.matchSourceLabel || editItem.raw?.sourceLabel || ingredientSourceLabel(editItem.raw || {})}</Text>
                           </View>
                           <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                            <Text style={{ color: '#047857', fontSize: 12, fontWeight: '700' }}>{expanded ? 'Close edit' : 'Edit food'}</Text>
+                            <Text style={{ color: '#047857', fontSize: 12, fontWeight: '600' }}>{expanded ? 'Close edit' : 'Edit food'}</Text>
                             <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{expanded ? '▾' : '▸'}</Text>
                           </View>
                         </Pressable>
@@ -8263,18 +8263,18 @@ export function TrackCaloriesScreen() {
                             </Pressable>
                             <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18 }}>Choose Change food if this is a different food. Edit the amount below if only the quantity is wrong.</Text>
                             <View>
-                              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Food name</Text>
+                              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '500', marginBottom: 6 }}>Food name</Text>
                               <TextInput
                                 value={editItem.name}
                                 onChangeText={(value) => updateFavoriteEditIngredientName(editItem.id, value)}
                                 placeholder="Food name"
                                 placeholderTextColor="#9CA3AF"
-                                style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
+                                style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
                               />
                             </View>
                             <View style={{ gap: 10 }}>
                               <View>
-                                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Amount in whole meal</Text>
+                                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Amount in whole meal</Text>
                                 <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
                                   <TextInput
                                     value={editItem.amountInput}
@@ -8286,7 +8286,7 @@ export function TrackCaloriesScreen() {
                                       )
                                     }
                                     keyboardType="decimal-pad"
-                                    style={{ width: 104, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}
+                                    style={{ width: 104, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '500', textAlign: 'center' }}
                                   />
                                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
                                     {amountUnitOptions.map((unit) => {
@@ -8310,7 +8310,7 @@ export function TrackCaloriesScreen() {
                                             paddingVertical: 9,
                                           }}
                                         >
-                                          <Text style={{ color: active ? '#047857' : '#374151', fontWeight: '600', fontSize: 12 }} numberOfLines={1}>
+                                          <Text style={{ color: active ? '#047857' : '#374151', fontWeight: '500', fontSize: 12 }} numberOfLines={1}>
                                             {favoriteAmountUnitLabel(unit, editItem)}
                                           </Text>
                                         </Pressable>
@@ -8320,7 +8320,7 @@ export function TrackCaloriesScreen() {
                                 </View>
                               </View>
                               <View>
-                                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700', marginBottom: 6 }}>Serving size</Text>
+                                <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 6 }}>Serving size</Text>
                                 <Pressable
                                   onPress={() => {
                                     if (servingPickerOpen) {
@@ -8344,7 +8344,7 @@ export function TrackCaloriesScreen() {
                                     opacity: favoriteEditServingLoadingId === editItem.id ? 0.7 : 1,
                                   }}
                                 >
-                                  <Text style={{ color: theme.colors.muted, fontWeight: '700', flex: 1 }} numberOfLines={1}>
+                                  <Text style={{ color: theme.colors.muted, fontWeight: '600', flex: 1 }} numberOfLines={1}>
                                     {editItem.servingLabel}
                                   </Text>
                                   {favoriteEditServingLoadingId === editItem.id ? (
@@ -8357,7 +8357,7 @@ export function TrackCaloriesScreen() {
                             </View>
 
                             {servingPickerOpen ? (
-                              <View style={{ borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 2, backgroundColor: '#F0FDF4', padding: 10, gap: 8 }}>
+                              <View style={{ borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 8, backgroundColor: '#F0FDF4', padding: 10, gap: 8 }}>
                                 {servingOptions.length === 0 ? (
                                   <Text style={{ color: '#6B7280', fontSize: 12 }}>No serving choices found yet.</Text>
                                 ) : (
@@ -8379,7 +8379,7 @@ export function TrackCaloriesScreen() {
                                         }}
                                       >
                                         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-                                          <Text style={{ color: theme.colors.text, fontWeight: '600', flex: 1 }} numberOfLines={2}>
+                                          <Text style={{ color: theme.colors.text, fontWeight: '500', flex: 1 }} numberOfLines={2}>
                                             {servingOptionDisplayLabel(option)}
                                           </Text>
                                           {selected ? <MaterialCommunityIcons name="check" size={17} color="#059669" /> : null}
@@ -8396,7 +8396,7 @@ export function TrackCaloriesScreen() {
                             ) : null}
 
                             <View>
-                              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 8 }}>
+                              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '500', marginBottom: 8 }}>
                                 Nutrients for this amount
                               </Text>
                               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
@@ -8412,14 +8412,14 @@ export function TrackCaloriesScreen() {
                                   const total = scaleOptionalNutrient(editItem[key], servings)
                                   return (
                                     <View key={key} style={{ width: '48%' }}>
-                                      <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginBottom: 5 }}>{label} ({unit})</Text>
+                                      <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '500', marginBottom: 5 }}>{label} ({unit})</Text>
                                       <TextInput
                                         value={total == null ? '' : key === 'calories' ? String(Math.round(total)) : formatNutrientGrams(total)}
                                         placeholder="Not provided"
                                         onChangeText={(value) => updateFavoriteEditIngredientNutrient(editItem.id, key, value)}
                                         keyboardType="decimal-pad"
                                         selectTextOnFocus
-                                        style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
+                                        style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
                                       />
                                     </View>
                                   )
@@ -8427,7 +8427,7 @@ export function TrackCaloriesScreen() {
                               </View>
                             </View>
 
-                            <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{
+                            <NutrientCards cornerRadius={8} energyUnit={energyUnit} values={{
                               calories: editItem.calories * editItem.servings,
                               protein: editItem.protein * editItem.servings,
                               carbs: editItem.carbs * editItem.servings,
@@ -8440,7 +8440,7 @@ export function TrackCaloriesScreen() {
                               onPress={() => removeFavoriteEditIngredient(editItem.id)}
                               style={{ borderWidth: 1, borderColor: '#FECACA', borderRadius: 2, backgroundColor: '#FEF2F2', alignItems: 'center', paddingVertical: 11 }}
                             >
-                              <Text style={{ color: '#DC2626', fontWeight: '600' }}>Remove food</Text>
+                              <Text style={{ color: '#DC2626', fontWeight: '500' }}>Remove food</Text>
                             </Pressable>
                           </View>
                         ) : null}
@@ -8451,10 +8451,10 @@ export function TrackCaloriesScreen() {
               )}
             </View>
 
-            <View style={{ padding: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card }}>
+            <View style={{ padding: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>Portion control</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>Portion control</Text>
                   <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 4 }}>
                     {favoriteEditPortionControlEnabled ? 'Choose how much of the meal you ate.' : 'Off: totals use the whole meal. Turn on to choose a smaller or larger amount.'}
                   </Text>
@@ -8465,7 +8465,7 @@ export function TrackCaloriesScreen() {
               </View>
               {favoriteEditPortionControlEnabled && mealRecipe ? (
                 <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '700' }}>How much did you eat?</Text>
+                  <Text style={{ color: theme.colors.text, fontWeight: '600' }}>How much did you eat?</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 6 }}>{mealRecipe.servings ? `Full recipe makes ${mealRecipe.servings} servings.` : 'Full recipe is one batch. Enter a fraction of the batch you ate.'}</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 8 }}>{mealRecipe.servings ? 'Servings eaten' : 'Batches eaten'}</Text>
                   <TextInput accessibilityLabel="Recipe servings eaten" value={recipeServingsEaten} onChangeText={updateRecipeServingsEaten} keyboardType="decimal-pad" style={[inputStyle, { marginTop: 6 }]} />
@@ -8475,7 +8475,7 @@ export function TrackCaloriesScreen() {
 
               {favoriteEditPortionControlEnabled && !mealRecipe ? (
                 <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
-                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>How much did you eat?</Text>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>How much did you eat?</Text>
                   <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 6 }}>Whole meal uses all the food amounts above. Half meal uses half of every food. Custom lets you enter your share. Calories and every nutrient total change together.</Text>
                   <View style={{ marginTop: 10, flexDirection: 'row', gap: 6 }}>
                     {([['whole', 'Whole meal'], ['half', 'Half meal'], ['custom', 'Custom']] as const).map(([choice, label]) => (
@@ -8516,17 +8516,17 @@ export function TrackCaloriesScreen() {
 
             </View>
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 16, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
-                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
+                <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '600' }}>
                   {favoriteEditPortionControlEnabled ? mealRecipe ? 'Recipe portion totals' : 'Your portion totals' : 'Meal totals'}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.bg, padding: 2 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.bg, padding: 2 }}>
                   <Pressable onPress={() => setEnergyUnit('kcal')} style={{ borderRadius: 2, backgroundColor: energyUnit === 'kcal' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
-                    <Text style={{ color: energyUnit === 'kcal' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '700' }}>kcal</Text>
+                    <Text style={{ color: energyUnit === 'kcal' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '600' }}>kcal</Text>
                   </Pressable>
                   <Pressable onPress={() => setEnergyUnit('kj')} style={{ borderRadius: 2, backgroundColor: energyUnit === 'kj' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
-                    <Text style={{ color: energyUnit === 'kj' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '700' }}>kJ</Text>
+                    <Text style={{ color: energyUnit === 'kj' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '600' }}>kJ</Text>
                   </Pressable>
                 </View>
               </View>
@@ -8535,7 +8535,7 @@ export function TrackCaloriesScreen() {
                   ? `${recipeServingsEaten || '—'} of ${mealRecipe.servings || 1} recipe servings.`
                   : 'These totals are for the amount you selected.'}
               </Text>
-              <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={favoriteEditTotals} />
+              <NutrientCards cornerRadius={8} energyUnit={energyUnit} values={favoriteEditTotals} />
             </View>
 
             <Pressable onPress={() => void updateFavoriteFromEditor()}
@@ -8564,7 +8564,7 @@ export function TrackCaloriesScreen() {
         <View style={modalBackdrop}>
           <View style={[modalCardLarge, { maxHeight: 620 }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-              <Text style={{ fontSize: 16, fontWeight: '700', color: theme.colors.text }}>Report missing item</Text>
+              <Text style={{ fontSize: 16, fontWeight: '600', color: theme.colors.text }}>Report missing item</Text>
               <Pressable onPress={() => setFavoriteEditMissingReportOpen(false)}>
                 <Text style={{ fontSize: 18, color: '#6B7280' }}>✕</Text>
               </Pressable>
@@ -8572,7 +8572,7 @@ export function TrackCaloriesScreen() {
 
             <View style={{ marginTop: 12, gap: 10 }}>
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Item name *</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.muted, marginBottom: 4 }}>Item name *</Text>
                 <TextInput
                   value={favoriteEditMissingReportName}
                   onChangeText={setFavoriteEditMissingReportName}
@@ -8583,7 +8583,7 @@ export function TrackCaloriesScreen() {
               </View>
 
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Brand or chain</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.muted, marginBottom: 4 }}>Brand or chain</Text>
                 <TextInput
                   value={favoriteEditMissingReportBrand}
                   onChangeText={setFavoriteEditMissingReportBrand}
@@ -8594,7 +8594,7 @@ export function TrackCaloriesScreen() {
               </View>
 
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Size (optional)</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.muted, marginBottom: 4 }}>Size (optional)</Text>
                 <TextInput
                   value={favoriteEditMissingReportSize}
                   onChangeText={setFavoriteEditMissingReportSize}
@@ -8605,7 +8605,7 @@ export function TrackCaloriesScreen() {
               </View>
 
               <View>
-                <Text style={{ fontSize: 12, fontWeight: '700', color: theme.colors.muted, marginBottom: 4 }}>Extra notes</Text>
+                <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.muted, marginBottom: 4 }}>Extra notes</Text>
                 <TextInput
                   value={favoriteEditMissingReportNotes}
                   onChangeText={setFavoriteEditMissingReportNotes}
@@ -8622,7 +8622,7 @@ export function TrackCaloriesScreen() {
 
               <View style={{ flexDirection: 'row', justifyContent: 'flex-end', alignItems: 'center', gap: 10, marginTop: 4 }}>
                 <Pressable onPress={() => setFavoriteEditMissingReportOpen(false)}>
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#6B7280' }}>Close</Text>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#6B7280' }}>Close</Text>
                 </Pressable>
                 <Pressable
                   disabled={favoriteEditMissingReportBusy}
@@ -8635,7 +8635,7 @@ export function TrackCaloriesScreen() {
                     opacity: favoriteEditMissingReportBusy ? 0.6 : pressed ? 0.9 : 1,
                   })}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: '700', color: '#FFFFFF' }}>
+                  <Text style={{ fontSize: 13, fontWeight: '600', color: '#FFFFFF' }}>
                     {favoriteEditMissingReportBusy ? 'Sending…' : 'Send'}
                   </Text>
                 </Pressable>
@@ -8666,16 +8666,16 @@ export function TrackCaloriesScreen() {
                 setFavoritePreviewItem(favoriteAdjustItem)
               }}
             >
-              <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Back</Text>
+              <Text style={{ color: theme.colors.muted, fontWeight: '500' }}>Back</Text>
             </Pressable>
             <View style={{ flex: 1, alignItems: 'center' }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Change portion</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '500' }}>Change portion</Text>
               <Text style={{ color: '#6B7280', fontSize: 12 }} numberOfLines={1}>
                 {favoriteAdjustItem?.label}
               </Text>
             </View>
             <Pressable onPress={() => { setFavoriteAdjustItem(null); setFavoriteAdjustItems([]) }} style={{ paddingHorizontal: 10, paddingVertical: 8 }}>
-              <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>Cancel</Text>
+              <Text style={{ color: theme.colors.muted, fontWeight: '500' }}>Cancel</Text>
             </Pressable>
           </View>
 
@@ -8684,8 +8684,8 @@ export function TrackCaloriesScreen() {
 
             <View style={{ gap: 12 }}>
               {favoriteAdjustItems.map((adjustItem) => (
-                <View key={adjustItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 14 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{adjustItem.name}</Text>
+                <View key={adjustItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, padding: 14 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '500' }}>{adjustItem.name}</Text>
                   <Text style={{ color: '#6B7280', marginTop: 4 }}>{adjustItem.servingLabel}</Text>
 
                   <View style={{ marginTop: 12, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
@@ -8699,7 +8699,7 @@ export function TrackCaloriesScreen() {
                       }
                       style={{ width: 38, height: 38, borderRadius: 2, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
                     >
-                      <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '600' }}>-</Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '500' }}>-</Text>
                     </Pressable>
                     <TextInput
                       value={String(adjustItem.servings)}
@@ -8713,7 +8713,7 @@ export function TrackCaloriesScreen() {
                         )
                       }
                       keyboardType="decimal-pad"
-                      style={{ width: 84, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}
+                      style={{ width: 84, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 4, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '500', textAlign: 'center' }}
                     />
                     <Pressable
                       onPress={() =>
@@ -8725,12 +8725,12 @@ export function TrackCaloriesScreen() {
                       }
                       style={{ width: 38, height: 38, borderRadius: 2, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
                     >
-                      <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '600' }}>+</Text>
+                      <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '500' }}>+</Text>
                     </Pressable>
                   </View>
 
                   <View style={{ marginTop: 12 }}>
-                    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{
+                    <NutrientCards cornerRadius={8} energyUnit={energyUnit} values={{
                       calories: adjustItem.calories * adjustItem.servings,
                       protein: adjustItem.protein * adjustItem.servings,
                       carbs: adjustItem.carbs * adjustItem.servings,
@@ -8753,15 +8753,15 @@ export function TrackCaloriesScreen() {
                       width: '47%',
                       borderWidth: 1,
                       borderColor: card.border,
-                      borderRadius: 2,
+                      borderRadius: 8,
                       padding: 14,
                       backgroundColor: card.bg,
                     }}
                   >
-                    <Text style={{ color: card.color, fontSize: 18, fontWeight: '700' }}>
+                    <Text style={{ color: card.color, fontSize: 18, fontWeight: '600' }}>
                       {formatFavoriteNutrientValue(card.key, favoriteAdjustTotals[card.key], energyUnit)}
                     </Text>
-                    <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginTop: 6, textTransform: 'uppercase' }}>
+                    <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '500', marginTop: 6, textTransform: 'uppercase' }}>
                       {label}
                     </Text>
                   </View>
@@ -8770,7 +8770,7 @@ export function TrackCaloriesScreen() {
             </View>
 
             <View style={{ marginTop: 24 }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Daily totals after adding</Text>
+              <Text style={{ color: theme.colors.text, fontWeight: '500' }}>Daily totals after adding</Text>
               <Text style={{ color: '#6B7280', fontSize: 12 }}>This updates live as you change amounts.</Text>
               {renderFavoriteDailyTotals(favoriteAdjustTotals)}
             </View>
@@ -8870,7 +8870,7 @@ export function TrackCaloriesScreen() {
                 {ingredientLoading ? (
                   <ActivityIndicator size="small" color="#FFFFFF" />
                 ) : (
-                  <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>⌕</Text>
+                  <Text style={{ color: '#FFFFFF', fontWeight: '600' }}>⌕</Text>
                 )}
               </Pressable>
             </View>
@@ -8915,8 +8915,8 @@ export function TrackCaloriesScreen() {
                 <Text style={{ color: theme.colors.muted }}>Search to see results.</Text>
               ) : (
                 ingredientResults.map((item) => (
-                  <View key={String(item.id)} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 2, padding: 10, marginBottom: 8, backgroundColor: '#FBFDFC' }}>
-                    <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{searchFoodDisplayName(item)}</Text>
+                  <View key={String(item.id)} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, padding: 10, marginBottom: 8, backgroundColor: '#FBFDFC' }}>
+                    <Text style={{ color: theme.colors.text, fontWeight: '500', lineHeight: 22 }}>{searchFoodDisplayName(item)}</Text>
                     <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
                       {item.serving_size ? `Serving: ${item.serving_size} • ` : ''}
                       {Math.round(numberOrZero(item.calories ?? item.calories_kcal))} kcal
@@ -9100,7 +9100,7 @@ export function TrackCaloriesScreen() {
                 <View style={barcodeProductPanel}>
                   <Text style={barcodeProductTitle}>{barcodeFood.name}</Text>
                   <ScrollView style={{ maxHeight: 320, marginTop: 10 }}>
-                    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{
+                    <NutrientCards cornerRadius={8} energyUnit={energyUnit} values={{
                       calories: nullableNumber(barcodeFood.calories ?? barcodeFood.calories_kcal),
                       protein: nullableNumber(barcodeFood.protein_g),
                       carbs: nullableNumber(barcodeFood.carbs_g),
@@ -9170,7 +9170,7 @@ export function TrackCaloriesScreen() {
               <MaterialCommunityIcons name="arrow-left" size={24} color="#111827" />
             </Pressable>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '700' }}>
+              <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '600' }}>
                 AI Recommended {mealLabel(recommendedTargetMeal)}
               </Text>
               <Text style={{ color: '#6B7280', marginTop: 3, fontSize: 13 }}>{selectedDate}</Text>
@@ -9193,9 +9193,9 @@ export function TrackCaloriesScreen() {
               </Pressable>
             ) : null}
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.card, padding: 14 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>Credit usage</Text>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Credit usage</Text>
                 {recommendedMeal ? (
                   <Pressable
                     onPress={() => setRecommendedExplainOpen(true)}
@@ -9203,20 +9203,20 @@ export function TrackCaloriesScreen() {
                     accessibilityRole="button"
                     accessibilityLabel="About recommended meals"
                   >
-                    <Text style={{ color: theme.colors.text, fontWeight: '600' }}>About</Text>
+                    <Text style={{ color: theme.colors.text, fontWeight: '500' }}>About</Text>
                   </Pressable>
                 ) : null}
               </View>
-              <Text style={{ color: theme.colors.muted, marginTop: 8, fontWeight: '600' }}>
+              <Text style={{ color: theme.colors.muted, marginTop: 8, fontWeight: '500' }}>
                 {recommendedCostCredits} credit{recommendedCostCredits === 1 ? '' : 's'} per recommendation
               </Text>
               <Text style={{ color: '#6B7280', marginTop: 6 }}>Credits are only spent when a recommendation is generated.</Text>
             </View>
 
             {!recommendedMeal ? (
-              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
-                <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>About</Text>
-                <Text style={{ color: theme.colors.muted, marginTop: 8, fontWeight: '600' }}>Get a recommendation</Text>
+              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.card, padding: 14 }}>
+                <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>About</Text>
+                <Text style={{ color: theme.colors.muted, marginTop: 8, fontWeight: '500' }}>Get a recommendation</Text>
                 <Text style={{ color: '#6B7280', marginTop: 6 }}>
                   Generate an AI meal suggestion for {mealLabel(recommendedTargetMeal).toLowerCase()}.
                 </Text>
@@ -9232,11 +9232,11 @@ export function TrackCaloriesScreen() {
                   </Text>
                 </Pressable>
                 {recommendedError ? (
-                  <Text style={{ color: '#DC2626', fontWeight: '700', marginTop: 10 }}>{recommendedError}</Text>
+                  <Text style={{ color: '#DC2626', fontWeight: '600', marginTop: 10 }}>{recommendedError}</Text>
                 ) : null}
               </View>
             ) : recommendedError ? (
-              <Text style={{ color: '#DC2626', fontWeight: '700' }}>{recommendedError}</Text>
+              <Text style={{ color: '#DC2626', fontWeight: '600' }}>{recommendedError}</Text>
             ) : null}
 
             {recommendedMeal
@@ -9245,12 +9245,12 @@ export function TrackCaloriesScreen() {
                   const macroRows = recommendedMacroRows(recommendedMeal)
                   return (
                     <>
-                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
-                        <Text style={{ color: '#6B7280', fontWeight: '600', fontSize: 12 }}>Meal</Text>
-                        <Text style={{ color: theme.colors.text, fontSize: 20, lineHeight: 25, fontWeight: '700', marginTop: 4 }}>
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.card, padding: 14 }}>
+                        <Text style={{ color: '#6B7280', fontWeight: '500', fontSize: 12 }}>Meal</Text>
+                        <Text style={{ color: theme.colors.text, fontSize: 20, lineHeight: 25, fontWeight: '500', marginTop: 4 }}>
                           {recommendedMeal.mealName}
                         </Text>
-                        <Text style={{ color: theme.colors.muted, marginTop: 7, fontWeight: '600' }}>{recommendedMacroLine(recommendedMeal)}</Text>
+                        <Text style={{ color: theme.colors.muted, marginTop: 7, fontWeight: '500' }}>{recommendedMacroLine(recommendedMeal)}</Text>
                         <Text style={{ color: '#6B7280', marginTop: 3 }}>{recommendedSecondaryMacroLine(recommendedMeal)}</Text>
 
                         <View style={{ gap: 8, marginTop: 14 }}>
@@ -9286,33 +9286,33 @@ export function TrackCaloriesScreen() {
                         {tags.length > 0 ? (
                           <View style={{ marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                             {tags.map((tag) => (
-                              <View key={tag} style={{ borderRadius: 2, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 6 }}>
-                                <Text style={{ color: '#047857', fontSize: 12, fontWeight: '600' }}>{tag}</Text>
+                              <View key={tag} style={{ borderRadius: 8, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 6 }}>
+                                <Text style={{ color: '#047857', fontSize: 12, fontWeight: '500' }}>{tag}</Text>
                               </View>
                             ))}
                           </View>
                         ) : null}
                       </View>
 
-                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
-                        <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>Meal macro summary</Text>
-                        <View style={{ marginTop: 12 }}><NutrientCards cornerRadius={2} energyUnit={energyUnit} values={recommendedMealTotals(recommendedMeal)} /></View>
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.card, padding: 14 }}>
+                        <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>Meal macro summary</Text>
+                        <View style={{ marginTop: 12 }}><NutrientCards cornerRadius={8} energyUnit={energyUnit} values={recommendedMealTotals(recommendedMeal)} /></View>
                         <View style={{ marginTop: 12, gap: 12 }}>
                           {macroRows.map((row) => (
                             <View key={row.label}>
                               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10 }}>
-                                <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>{row.label}</Text>
-                                <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{row.display}</Text>
+                                <Text style={{ color: theme.colors.muted, fontWeight: '500' }}>{row.label}</Text>
+                                <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{row.display}</Text>
                               </View>
-                              <View style={{ height: 8, borderRadius: 2, backgroundColor: '#E5E7EB', overflow: 'hidden', marginTop: 6 }}>
-                                <View style={{ height: 8, width: `${row.percent}%`, borderRadius: 2, backgroundColor: row.color }} />
+                              <View style={{ height: 8, borderRadius: 4, backgroundColor: '#E5E7EB', overflow: 'hidden', marginTop: 6 }}>
+                                <View style={{ height: 8, width: `${row.percent}%`, borderRadius: 4, backgroundColor: row.color }} />
                               </View>
                             </View>
                           ))}
                         </View>
                       </View>
 
-                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.card, padding: 14 }}>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <Pressable
                             onPress={() => setRecommendedTab('ingredients')}
@@ -9347,7 +9347,7 @@ export function TrackCaloriesScreen() {
                               return (
                                 <View
                                   key={`${item.name}-${idx}`}
-                                  style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 2, backgroundColor: '#FBFDFC', overflow: 'hidden' }}
+                                  style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 8, backgroundColor: '#FBFDFC', overflow: 'hidden' }}
                                 >
                                   <Pressable
                                     onPress={() => setRecommendedExpandedIngredientIndex(expanded ? null : idx)}
@@ -9356,9 +9356,9 @@ export function TrackCaloriesScreen() {
                                     accessibilityLabel={`${expanded ? 'Collapse' : 'Expand'} ${item.name}`}
                                   >
                                     <View style={{ flex: 1 }}>
-                                      <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{item.name}</Text>
+                                      <Text style={{ color: theme.colors.text, fontWeight: '500', lineHeight: 22 }}>{item.name}</Text>
                                       <Text style={{ color: theme.colors.muted, marginTop: 3, fontSize: 12 }}>{recommendedIngredientMeta(item)}</Text>
-                                      <Text style={{ color: theme.colors.text, marginTop: 4, fontWeight: '600', fontSize: 12 }}>
+                                      <Text style={{ color: theme.colors.text, marginTop: 4, fontWeight: '500', fontSize: 12 }}>
                                         {formatCalories(numberOrZero(item.calories), energyUnit)} each serving
                                       </Text>
                                     </View>
@@ -9416,8 +9416,8 @@ export function TrackCaloriesScreen() {
                 })()
               : null}
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
-              <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>History</Text>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, backgroundColor: theme.colors.card, padding: 14 }}>
+              <Text style={{ color: theme.colors.text, fontWeight: '600', fontSize: 16 }}>History</Text>
               <Text style={{ color: '#6B7280', marginTop: 4 }}>Previously generated AI meals</Text>
               <View style={{ marginTop: 12, gap: 8 }}>
                 {recommendedHistory.length === 0 ? (
@@ -9435,9 +9435,9 @@ export function TrackCaloriesScreen() {
                       accessibilityRole="button"
                       accessibilityLabel={`Open ${item.mealName}`}
                     >
-                      <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{item.mealName}</Text>
+                      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{item.mealName}</Text>
                       <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>{recommendedMealMeta(item)}</Text>
-                      <Text style={{ color: theme.colors.text, marginTop: 6, fontWeight: '600' }}>{recommendedMealCalories(item)} kcal</Text>
+                      <Text style={{ color: theme.colors.text, marginTop: 6, fontWeight: '500' }}>{recommendedMealCalories(item)} kcal</Text>
                     </Pressable>
                   ))
                 )}
@@ -9459,8 +9459,8 @@ export function TrackCaloriesScreen() {
             <Text style={{ color: theme.colors.muted, marginTop: 8 }}>
               You will get a suggested meal based on your targets and what you have already eaten today.
             </Text>
-            <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 2, backgroundColor: '#ECFDF5', padding: 10 }}>
-              <Text style={{ color: '#065F46', fontWeight: '600' }}>
+            <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 8, backgroundColor: '#ECFDF5', padding: 10 }}>
+              <Text style={{ color: '#065F46', fontWeight: '500' }}>
                 Cost: {recommendedCostCredits} credit{recommendedCostCredits === 1 ? '' : 's'} per recommendation
               </Text>
             </View>
@@ -9530,7 +9530,7 @@ export function TrackCaloriesScreen() {
                         backgroundColor: selected ? '#E8F5EB' : '#FBFDFC',
                       }}
                     >
-                      <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{entry.name}</Text>
+                      <Text style={{ color: theme.colors.text, fontWeight: '500' }}>{entry.name}</Text>
                       <Text style={{ color: theme.colors.muted, marginTop: 2 }}>{mealLabel(String(entry.meal || 'uncategorized'))}</Text>
                     </Pressable>
                   )
@@ -9634,7 +9634,7 @@ export function TrackCaloriesScreen() {
                       backgroundColor: selected ? '#E8F5EB' : '#FBFDFC',
                     }}
                   >
-                    <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{item.name}</Text>
+                    <Text style={{ color: theme.colors.text, fontWeight: '500', lineHeight: 22 }}>{item.name}</Text>
                     <Text style={{ color: theme.colors.muted }}>{item.category}</Text>
                   </Pressable>
                 )
@@ -9698,8 +9698,8 @@ export function TrackCaloriesScreen() {
             justifyContent: 'center',
           }}
         >
-          <View style={{ backgroundColor: '#fff', borderRadius: 2, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: theme.colors.border }}>
-            <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Saving...</Text>
+          <View style={{ backgroundColor: '#fff', borderRadius: 8, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: theme.colors.border }}>
+            <Text style={{ color: theme.colors.text, fontWeight: '500' }}>Saving...</Text>
           </View>
         </View>
       ) : null}
@@ -9741,10 +9741,10 @@ function CircleMetric({
           backgroundColor: '#fff',
         }}
       >
-        <Text style={{ color: theme.colors.text, fontSize: valueFontSize, fontWeight: '700' }}>{display}</Text>
+        <Text style={{ color: theme.colors.text, fontSize: valueFontSize, fontWeight: '600' }}>{display}</Text>
         <Text style={{ color: '#6B7280', marginTop: 1, fontSize: 14 / 1.4 }}>{unit}</Text>
       </View>
-      <Text style={{ marginTop: compact ? 6 : 8, color: theme.colors.muted, fontWeight: '700', fontSize: labelFontSize, textTransform: 'uppercase' }}>
+      <Text style={{ marginTop: compact ? 6 : 8, color: theme.colors.muted, fontWeight: '600', fontSize: labelFontSize, textTransform: 'uppercase' }}>
         {label}
       </Text>
     </View>
@@ -9769,12 +9769,12 @@ function ProgressRow({
   return (
     <View>
       <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-        <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{label}</Text>
-        <Text style={{ color: theme.colors.muted, fontWeight: '700' }}>
+        <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{label}</Text>
+        <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>
           {displayValue}/{displayTarget} {unit}
         </Text>
       </View>
-      <View style={{ marginTop: 5, height: 7, borderRadius: 2, backgroundColor: '#E6EFEC', overflow: 'hidden' }}>
+      <View style={{ marginTop: 5, height: 7, borderRadius: 4, backgroundColor: '#E6EFEC', overflow: 'hidden' }}>
         <View style={{ width: `${Math.round(ratio * 100)}%`, height: '100%', backgroundColor: theme.colors.primary }} />
       </View>
     </View>
@@ -9792,7 +9792,7 @@ function LabeledNumberInput({
 }) {
   return (
     <View>
-      <Text style={{ color: theme.colors.text, fontWeight: '700', marginBottom: 4 }}>{label}</Text>
+      <Text style={{ color: theme.colors.text, fontWeight: '600', marginBottom: 4 }}>{label}</Text>
       <TextInput
         value={value}
         onChangeText={onChange}
@@ -9816,7 +9816,7 @@ function ProfileMenuAction({
 }) {
   return (
     <Pressable onPress={onPress} style={{ paddingHorizontal: 12, paddingVertical: 10 }}>
-      <Text style={{ color: danger ? '#DC2626' : '#111827', fontWeight: '700' }}>{label}</Text>
+      <Text style={{ color: danger ? '#DC2626' : '#111827', fontWeight: '600' }}>{label}</Text>
     </Pressable>
   )
 }
@@ -9825,14 +9825,14 @@ const cardStyle = {
   backgroundColor: theme.colors.card,
   borderWidth: 1,
   borderColor: theme.colors.border,
-  borderRadius: 2,
+  borderRadius: 8,
   padding: 14,
 }
 
 const dateArrowCircle = {
   width: 64,
   height: 64,
-  borderRadius: 2,
+  borderRadius: 4,
   backgroundColor: '#E5E7EB',
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
@@ -9841,7 +9841,7 @@ const dateArrowCircle = {
 const dateCenterPill = {
   flex: 1,
   marginHorizontal: 10,
-  borderRadius: 2,
+  borderRadius: 4,
   borderWidth: 1,
   borderColor: '#D1D5DB',
   backgroundColor: theme.colors.card,
@@ -9862,7 +9862,7 @@ const energyTogglePillActive = {
 
 const energyToggleText = {
   color: '#6B7280',
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const energyToggleTextActive = {
@@ -9885,7 +9885,7 @@ const chipActive = {
 
 const chipText = {
   color: theme.colors.text,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const chipTextActive = {
@@ -9895,12 +9895,12 @@ const chipTextActive = {
 const inputStyle = {
   borderWidth: 1,
   borderColor: theme.colors.border,
-  borderRadius: 2,
+  borderRadius: 4,
   backgroundColor: theme.colors.card,
   color: theme.colors.text,
   paddingHorizontal: 12,
   paddingVertical: 10,
-  fontWeight: '700' as const,
+  fontWeight: '500' as const,
 }
 
 const pillButton = {
@@ -9916,7 +9916,7 @@ const pillButton = {
 
 const pillButtonText = {
   color: theme.colors.text,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const modalBackdrop = {
@@ -9930,7 +9930,7 @@ const modalBackdrop = {
 const modalCard = {
   width: '100%' as const,
   backgroundColor: theme.colors.card,
-  borderRadius: 2,
+  borderRadius: 8,
   borderWidth: 1,
   borderColor: theme.colors.border,
   padding: 14,
@@ -9939,7 +9939,7 @@ const modalCard = {
 const modalCardLarge = {
   width: '100%' as const,
   backgroundColor: theme.colors.card,
-  borderRadius: 2,
+  borderRadius: 8,
   borderWidth: 1,
   borderColor: theme.colors.border,
   padding: 14,
@@ -9949,7 +9949,7 @@ const modalCardLarge = {
 const modalTitle = {
   color: theme.colors.text,
   fontSize: 20,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const entryActionsSheetCard = {
@@ -9976,7 +9976,7 @@ const entryActionRowDivider = {
 const entryActionText = {
   color: theme.colors.text,
   fontSize: 18,
-  fontWeight: '500' as const,
+  fontWeight: '400' as const,
   flex: 1,
 }
 
@@ -9989,7 +9989,7 @@ const modalCancelButton = {
 
 const modalCancelText = {
   color: theme.colors.muted,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const primaryButton = {
@@ -10003,7 +10003,7 @@ const primaryButton = {
 
 const primaryButtonText = {
   color: theme.colors.primaryText,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const barcodeModalActionButton = {
@@ -10043,7 +10043,7 @@ const barcodeScannerHeaderButton = {
 const barcodeScannerHeaderTitle = {
   color: theme.colors.text,
   fontSize: 18,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const barcodeCameraArea = {
@@ -10080,14 +10080,14 @@ const barcodeFrameTextBlock = {
 const barcodeOverlayTitle = {
   color: '#FFFFFF',
   fontSize: 22,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
   textAlign: 'center' as const,
 }
 
 const barcodeOverlaySubtitle = {
   color: 'rgba(255,255,255,0.82)',
   fontSize: 14,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
   textAlign: 'center' as const,
   marginTop: 4,
 }
@@ -10096,7 +10096,7 @@ const barcodeScanFrame = {
   width: 288,
   maxWidth: '88%' as const,
   height: 220,
-  borderRadius: 2,
+  borderRadius: 8,
   borderWidth: 4,
   borderColor: 'rgba(255,255,255,0.96)',
   backgroundColor: 'rgba(0,0,0,0.12)',
@@ -10118,7 +10118,7 @@ const barcodeStatusText = {
   paddingHorizontal: 12,
   paddingVertical: 5,
   fontSize: 12,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const barcodePermissionPanel = {
@@ -10143,7 +10143,7 @@ const barcodePermissionButton = {
 
 const barcodePermissionButtonText = {
   color: theme.colors.text,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const barcodeManualPanel = {
@@ -10151,7 +10151,7 @@ const barcodeManualPanel = {
   left: 16,
   right: 16,
   bottom: 110,
-  borderRadius: 2,
+  borderRadius: 8,
   borderWidth: 1,
   borderColor: '#E5E7EB',
   backgroundColor: 'rgba(255,255,255,0.96)',
@@ -10162,7 +10162,7 @@ const barcodeManualPanel = {
 const barcodeManualTitle = {
   color: theme.colors.text,
   fontSize: 15,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const barcodeManualRow = {
@@ -10174,14 +10174,14 @@ const barcodeManualRow = {
 const barcodeManualInput = {
   flex: 1,
   minHeight: 42,
-  borderRadius: 2,
+  borderRadius: 4,
   borderWidth: 1,
   borderColor: '#D1D5DB',
   backgroundColor: theme.colors.card,
   color: theme.colors.text,
   paddingHorizontal: 12,
   fontSize: 16,
-  fontWeight: '700' as const,
+  fontWeight: '500' as const,
 }
 
 const barcodeManualSearchButton = {
@@ -10195,13 +10195,13 @@ const barcodeManualSearchButton = {
 
 const barcodeManualSearchText = {
   color: theme.colors.primaryText,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const barcodeManualCancelText = {
   color: '#6B7280',
   fontSize: 12,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
   textDecorationLine: 'underline' as const,
 }
 
@@ -10210,7 +10210,7 @@ const barcodeProductPanel = {
   left: 16,
   right: 16,
   bottom: 110,
-  borderRadius: 2,
+  borderRadius: 8,
   borderWidth: 1,
   borderColor: '#E5E7EB',
   backgroundColor: 'rgba(255,255,255,0.96)',
@@ -10220,13 +10220,13 @@ const barcodeProductPanel = {
 const barcodeProductTitle = {
   color: theme.colors.text,
   fontSize: 16,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const barcodeProductMeta = {
   color: '#6B7280',
   marginTop: 4,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const barcodeProductButton = {
@@ -10240,7 +10240,7 @@ const barcodeProductButton = {
 
 const barcodeProductButtonText = {
   color: theme.colors.primaryText,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const barcodeBottomBar = {
@@ -10266,7 +10266,7 @@ const barcodeBottomAction = {
 const barcodeBottomActionText = {
   color: theme.colors.text,
   fontSize: 13,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
   textTransform: 'uppercase' as const,
 }
 
@@ -10283,7 +10283,7 @@ const secondaryButton = {
 
 const secondaryButtonText = {
   color: theme.colors.text,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const favoriteActionPrimaryButton = {
@@ -10298,7 +10298,7 @@ const favoriteActionPrimaryButton = {
 
 const favoriteActionPrimaryText = {
   color: theme.colors.primaryText,
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
   fontSize: 15,
 }
 
@@ -10316,7 +10316,7 @@ const favoriteActionSecondaryButton = {
 
 const favoriteActionSecondaryText = {
   color: theme.colors.text,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
   fontSize: 15,
 }
 
@@ -10329,7 +10329,7 @@ const miniPrimaryButton = {
 
 const miniPrimaryText = {
   color: theme.colors.primaryText,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
 }
 
 const miniSecondaryButton = {
@@ -10342,7 +10342,7 @@ const miniSecondaryButton = {
 
 const miniSecondaryText = {
   get color() { return theme.colors.text },
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const miniDangerButton = {
@@ -10356,7 +10356,7 @@ const miniDangerButton = {
 
 const miniDangerText = {
   color: '#B91C1C',
-  fontWeight: '700' as const,
+  fontWeight: '600' as const,
 }
 
 const foodChoiceButton = {
@@ -10375,7 +10375,7 @@ const foodChoiceButton = {
 const foodChoiceText = {
   color: '#374151',
   fontSize: 12,
-  fontWeight: '600' as const,
+  fontWeight: '500' as const,
   textAlign: 'center' as const,
 }
 

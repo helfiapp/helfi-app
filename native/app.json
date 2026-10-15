@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.helfi.app",
-      "buildNumber": "45",
+      "buildNumber": "46",
       "associatedDomains": [
         "applinks:helfi.ai",
         "applinks:www.helfi.ai"
@@ -42,7 +42,7 @@
       "permissions": [
         "RECORD_AUDIO"
       ],
-      "versionCode": 43
+      "versionCode": 44
     },
     "web": {
       "favicon": "./assets/favicon.png"
