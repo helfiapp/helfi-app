@@ -182,14 +182,104 @@ function checkFoodReplacement() {
   assert.equal(context.favoriteEditName, 'My chosen dinner')
 }
 
-async function save(scale, kind = 'builder', editItems = editorItems, recipe = null, eaten = '') {
+async function checkPortionToggle() {
+  let toggle, ordinaryGate, recipeGate
+  function visit(node) {
+    if (ts.isJsxSelfClosingElement(node) && node.tagName.getText(ast) === 'Switch' && node.getText(ast).includes('accessibilityLabel="Portion control"')) toggle = node
+    if (ts.isConditionalExpression(node) && node.condition.getText(ast) === 'favoriteEditPortionControlEnabled && !mealRecipe') ordinaryGate = node
+    if (ts.isConditionalExpression(node) && node.condition.getText(ast) === 'favoriteEditPortionControlEnabled && mealRecipe') recipeGate = node
+    ts.forEachChild(node, visit)
+  }
+  visit(ast)
+  assert.ok(toggle && ordinaryGate && recipeGate, 'actual native switch gates ordinary and recipe portion controls')
+  const context = {
+    ...h, mealPortionScale, module: { exports: {} }, Number, String, Math,
+    React: { createElement: (type, props, ...children) => ({ type, props, children: children.flat(Infinity) }) },
+    Switch: 'Switch', View: 'View', Text: 'Text', TextInput: 'TextInput', Pressable: 'Pressable',
+    theme: { colors: { text: '#111', muted: '#666' } }, inputStyle: {}, foodChoiceButton: {}, foodChoiceActive: {}, foodChoiceText: {}, foodChoiceTextActive: {},
+    favoriteEditPortionControlEnabled: false, favoriteEditSavedScale: .5, favoriteEditPortionChoice: 'half', favoriteEditPortionUnit: 'serving', favoriteEditPortionAmount: '0.5', favoriteEditRecipeServings: 1, favoriteEditWholeGrams: 300,
+    favoriteEditPortionScale: 1, mealRecipe: null, recipeServingsEaten: '', changeFavoriteEditPortionUnit: () => {}, updateRecipeServingsEaten: () => {},
+  }
+  for (const field of ['FavoriteEditPortionControlEnabled', 'FavoriteEditSavedScale', 'FavoriteEditPortionChoice', 'FavoriteEditPortionUnit', 'FavoriteEditPortionAmount', 'RecipeServingsEaten']) {
+    const key = field[0].toLowerCase() + field.slice(1)
+    context['set' + field] = value => { context[key] = typeof value === 'function' ? value(context[key]) : value }
+  }
+  vm.createContext(context)
+  for (const name of ['toggleFavoriteEditPortionControl', 'chooseFavoriteEditPortion']) {
+    vm.runInContext(handlerCode(name), context)
+    context[name] = context.module.exports
+  }
+  const scale = () => { vm.runInContext(handlerCode('favoriteEditPortionScale'), context); return context.favoriteEditPortionScale = context.module.exports }
+  const render = node => vm.runInContext(ts.transpile('(' + node.getText(ast) + ')', { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), context)
+  const labels = node => typeof node === 'string' ? [node] : (node?.children || []).flatMap(labels)
+  assert.equal(render(toggle).props.value, false)
+  assert.equal(render(ordinaryGate), null, 'OFF removes ordinary inputs and presets')
+  assert.equal(render(recipeGate), null)
+  assert.equal(scale(), 1, 'OFF ignores historical fractional scale')
+  render(toggle).props.onValueChange(true)
+  assert.equal(render(toggle).props.value, true)
+  assert.ok(labels(render(ordinaryGate)).includes('Half meal'), 'ON reveals real preset actions')
+  context.chooseFavoriteEditPortion('half')
+  assert.equal(scale(), .5)
+  context.chooseFavoriteEditPortion('whole')
+  assert.equal(context.favoriteEditPortionControlEnabled, true, 'Whole keeps switch ON')
+  assert.equal(scale(), 1)
+  context.chooseFavoriteEditPortion('custom')
+  context.setFavoriteEditPortionAmount('2')
+  assert.equal(scale(), 2)
+  assert.ok(labels(render(ordinaryGate)).includes('Amount eaten'))
+  context.setFavoriteEditPortionAmount('0')
+  assert.equal(scale(), null, 'ON zero custom amount remains invalid')
+  render(toggle).props.onValueChange(false)
+  assert.equal(scale(), 1, 'turning OFF clears invalid amount and uses whole meal')
+  assert.equal(context.favoriteEditPortionAmount, '1')
+  assert.equal(render(ordinaryGate), null)
+  const off = await save(scale(), 'builder', editorItems, null, '', false)
+  assert.equal(off.payload.nutrition.calories, 499)
+  assert.equal(off.payload.nutrition.__portionControlEnabled, false)
+  const wholeOn = await save(1, 'builder', editorItems, null, '', true)
+  assert.equal(wholeOn.payload.nutrition.__portionControlEnabled, true, 'whole ON is retained in saved metadata')
+  assert.equal(wholeOn.payload.nutrition.__portionScale, 1)
+  context.mealRecipe = { title: 'Four-serving recipe', servings: 4 }
+  context.recipeServingsEaten = '1'
+  assert.equal(render(recipeGate), null, 'OFF also hides recipe portion input')
+  assert.equal(scale(), 1, 'OFF uses full recipe despite old eaten serving')
+  render(toggle).props.onValueChange(true)
+  assert.ok(render(recipeGate), 'ON reveals recipe servings input')
+  assert.equal(scale(), .25)
+  render(toggle).props.onValueChange(false)
+  assert.equal(context.recipeServingsEaten, '4')
+  assert.equal(context.favoriteEditPortionAmount, '4')
+  assert.equal(scale(), 1)
+  const recipeOff = await save(scale(), 'builder', editorItems, context.mealRecipe, context.recipeServingsEaten, false)
+  assert.equal(recipeOff.payload.nutrition.calories, 499)
+  assert.equal(recipeOff.payload.nutrition.__portionControlEnabled, false)
+  assert.equal(recipeOff.payload.nutrition.__portionAmount, 4)
+  assert.equal(recipeOff.payload.nutrition.__nativeRecipeServingsEaten, 4)
+  assert.equal(recipeOff.payload.items[0].__amount, 100, 'OFF preserves immutable whole food quantities')
+  for (const [saved, expectedEnabled, expectedCalories] of [[off, false, 499], [wholeOn, true, 499], [recipeOff, false, 499], [await save(.5), true, 250], [await save(2), true, 998]]) {
+    const opened = {}
+    const reopenContext = { ...h, savedMealPortion: load(path.join(root, 'native/src/lib/mealPortions.ts')).savedMealPortion, recipeServingsAppliedRef: { current: 1 }, formatEditorTime: () => '12:23', module: { exports: {} }, Number, String }
+    for (const setter of handlerCode('openFavoriteEditor').matchAll(/\b(set[A-Z]\w*)\(/g)) reopenContext[setter[1]] = value => { opened[setter[1]] = value }
+    vm.runInNewContext(handlerCode('openFavoriteEditor'), reopenContext)
+    const normalized = h.normalizeFoodApiEntry(saved.payload)
+    reopenContext.module.exports(h.buildFavoritesListItemFromEntry(normalized))
+    assert.equal(opened.setFavoriteEditPortionControlEnabled, expectedEnabled, 'actual saved metadata reopens the intended switch state')
+    assert.equal(normalized.nutrients.calories, expectedCalories)
+    assert.equal(opened.setFavoriteEditItems[0].servings, 1, 'reopening keeps full food quantities')
+    const again = await save(saved.payload.nutrition.__portionScale, 'builder', opened.setFavoriteEditItems, opened.setMealRecipe, opened.setRecipeServingsEaten, expectedEnabled)
+    assert.equal(again.payload.nutrition.calories, expectedCalories, 'second save never applies a portion twice')
+    assert.equal(again.payload.nutrition.__portionControlEnabled, expectedEnabled)
+  }
+}
+async function save(scale, kind = 'builder', editItems = editorItems, recipe = null, eaten = '', enabled = scale !== 1) {
   let payload, favoritePayload, failure
   const favorite = h.normalizeFavoriteMeal({ ...fixture, id: 'favorite', label: fixture.name })
   const listItem = kind === 'favorite' ? h.buildFavoritesListItemFromFavorite(favorite) : kind === 'entry' ? h.buildFavoritesListItemFromEntry(native) : null
   const noop = () => {}
   const context = {
     ...h, mealBuilderOpen: kind === 'builder', favoriteEditItem: listItem, favoriteEditItems: editItems,
-    favoriteEditPortionScale: scale, favoriteEditPortionControlEnabled: scale !== 1, favoriteEditPortionUnit: 'serving', favoriteEditPortionAmount: String(scale), favoriteEditWholeGrams: 300, favoriteEditRecipeServings: 1,
+    favoriteEditPortionScale: scale, favoriteEditPortionControlEnabled: enabled, favoriteEditPortionUnit: 'serving', favoriteEditPortionAmount: String(scale), favoriteEditWholeGrams: 300, favoriteEditRecipeServings: 1,
     favoriteEditPortionItems: portionMealItems(editItems, scale ?? 1), favoriteEditName: fixture.name,
     mealRecipe: recipe, recipeServingsEaten: eaten, recipePortionRatio: h.recipePortionRatio, favoritesTargetMeal: 'lunch', selectedDate: '2026-10-15', favoriteEditTime: '12:23', favorites: [favorite],
     authHeaders: {}, session: { token: 'offline-fixture' }, API_BASE_URL: 'offline',
@@ -213,6 +303,7 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
 ;(async () => {
   checkVisibleFoodReview()
   checkFoodReplacement()
+  await checkPortionToggle()
   for (const kind of ['builder', 'entry', 'favorite']) {
     for (const scale of [0.5, 1, 2]) {
       const result = await save(scale, kind)
@@ -267,13 +358,14 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
     assert.equal(created.items[0].source, 'usda')
   }
   // Reopening retains the saved preset/units and authoritative original scale.
-  for (const meta of [fixture.nutrition, { ...fixture.nutrition, __portionAmount: 150, __portionUnit: 'g' }, { ...fixture.nutrition, __portionAmount: 1, __portionRecipeServings: 4, __portionScale: 0.25 }]) {
+  for (const meta of [{ ...fixture.nutrition, __portionScale: 1, __portionAmount: 1 }, { ...fixture.nutrition, __portionScale: 1, __portionAmount: 1, __portionControlEnabled: false }, { ...fixture.nutrition, __portionScale: 2, __portionAmount: 2 }, { ...fixture.nutrition, __portionControlEnabled: undefined }, fixture.nutrition, { ...fixture.nutrition, __portionAmount: 150, __portionUnit: 'g' }, { ...fixture.nutrition, __portionAmount: 1, __portionRecipeServings: 4, __portionScale: 0.25 }]) {
     const state = {}
     const context = { ...h, savedMealPortion: load(path.join(root, 'native/src/lib/mealPortions.ts')).savedMealPortion, recipeServingsAppliedRef: { current: 1 }, formatEditorTime: () => '12:23', module: { exports: {} }, Number, String }
     for (const setter of handlerCode('openFavoriteEditor').matchAll(/\b(set[A-Z]\w*)\(/g)) context[setter[1]] = (value) => { state[setter[1]] = value }
     vm.runInNewContext(handlerCode('openFavoriteEditor'), context)
     context.module.exports(h.buildFavoritesListItemFromEntry(h.normalizeFoodApiEntry({ ...fixture, nutrition: meta })))
     assert.equal(state.setFavoriteEditSavedScale, meta.__portionScale)
+    assert.equal(state.setFavoriteEditPortionControlEnabled, meta.__portionScale !== 1 || meta.__portionControlEnabled === true, 'saved whole ON, OFF, half/custom and legacy half restore their switch state')
     assert.equal(state.setFavoriteEditPortionUnit, meta.__portionUnit)
     assert.equal(Number(state.setFavoriteEditPortionAmount), meta.__portionAmount)
     assert.equal(state.setFavoriteEditRecipeServings, meta.__portionRecipeServings)
@@ -296,7 +388,7 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
     const opened = openRecipeRow(row)
     assert.equal(opened.setRecipeServingsEaten, String(scale * 4), 'web portion restores eaten recipe servings without native metadata')
     assert.equal(opened.setFavoriteEditItems[0].servings, 1, 'web full recipe basis retained')
-    const ratioContext = { mealRecipe: opened.setMealRecipe, recipeServingsEaten: opened.setRecipeServingsEaten, recipePortionRatio: h.recipePortionRatio, Number, module: { exports: {} } }
+    const ratioContext = { favoriteEditPortionControlEnabled: opened.setFavoriteEditPortionControlEnabled, mealRecipe: opened.setMealRecipe, recipeServingsEaten: opened.setRecipeServingsEaten, recipePortionRatio: h.recipePortionRatio, Number, module: { exports: {} } }
     vm.runInNewContext(handlerCode('favoriteEditPortionScale'), ratioContext)
     const restoredScale = ratioContext.module.exports
     assert.equal(restoredScale, scale)
@@ -379,7 +471,7 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
     { scale: 0.5, items: editorItems, disabled: false },
   ]) {
     const context = {
-      favoriteEditPortionScale: values.scale, favoriteEditItems: values.items, mealRecipe: null, recipeServingsEaten: '1',
+      favoriteEditPortionControlEnabled: true, favoriteEditPortionScale: values.scale, favoriteEditItems: values.items, mealRecipe: null, recipeServingsEaten: '1',
       React: { createElement: (type, props, ...children) => ({ type, props, children }) },
       Pressable: 'Pressable', Text: 'Text', primaryButton: {}, primaryButtonText: {},
       mealBuilderOpen: true, favoriteEditItem: null, updateFavoriteFromEditor: () => {}, Number,
@@ -397,5 +489,5 @@ async function save(scale, kind = 'builder', editItems = editorItems, recipe = n
   assert.equal(options[0].calories, 203.15)
   assert.equal(options[0].foodName, 'Chicken meat and skin, cooked, roasted')
   assert.equal(JSON.stringify(fixture), unchanged)
-  console.log('PASS: actual native visible food editing/editable titles/single summary/atomic replacement-cancel and preview/save/reopen/full/half/double/favorites/null-zero/grams-oz/invalid controls and recorded85g serving')
+  console.log('PASS: actual native portion toggle gating/whole ON/full OFF/save-reopen/recipe yield and visible food editing/editable titles/single summary/atomic replacement-cancel and preview/save/reopen/full/half/double/favorites/null-zero/grams-oz/invalid controls and recorded85g serving')
 })().catch((error) => { console.error(error); process.exitCode = 1 })

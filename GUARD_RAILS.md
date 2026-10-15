@@ -3533,3 +3533,8 @@ for guidance first.
 - Show food rows on reopen with explicit Edit food and Change food actions. Retain the original food until a valid replacement is chosen; cancellation or missing source data cannot remove it. Retain supported physical measurements using existing conversion helpers; otherwise make the new serving amount clear.
 - Use consistent rectangular Food search / Add food / Your foods / How much did you eat sections. Explain whole, half and custom beside their controls; show one main nutrient summary after the share selector. Individual food detail cards must clearly say their nutrition uses the chosen share.
 - Do not turn this design/usability task into questioning the owner about their old dinner. Historical entries and Google reviewer credentials stay unchanged.
+
+### Food portion toggle restoration (15 October 2026 owner instruction)
+
+- Keep the explicitly requested Portion control toggle on web, iPhone and Android. OFF hides portion presets/amount controls and uses full-meal nutrition; ON reveals those controls. Selecting Whole while ON must not turn the toggle off.
+- Turning OFF resets the visible choice and amount to the full meal/recipe yield. Saved half/custom/recipe fractions restore ON with their original full ingredient basis, consumed totals, name and time. Do not remove this opt-in control in future presentation cleanups.

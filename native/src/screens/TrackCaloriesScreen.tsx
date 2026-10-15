@@ -11,6 +11,7 @@ import {
   Pressable,
   Share,
   ScrollView,
+  Switch,
   Text,
   TextInput,
   useWindowDimensions,
@@ -2435,11 +2436,11 @@ export function TrackCaloriesScreen() {
     return total
   }, [favoriteEditItems])
 
-  const favoriteEditPortionScale = mealRecipe
-    ? recipePortionRatio(recipeServingsEaten, Number(mealRecipe.servings) > 0 ? Number(mealRecipe.servings) : 1)
-    : favoriteEditPortionControlEnabled
-      ? favoriteEditSavedScale ?? mealPortionScale(favoriteEditPortionAmount, favoriteEditPortionUnit, favoriteEditWholeGrams, favoriteEditRecipeServings)
-      : 1
+  const favoriteEditPortionScale = !favoriteEditPortionControlEnabled
+    ? 1
+    : mealRecipe
+      ? recipePortionRatio(recipeServingsEaten, Number(mealRecipe.servings) > 0 ? Number(mealRecipe.servings) : 1)
+      : favoriteEditSavedScale ?? mealPortionScale(favoriteEditPortionAmount, favoriteEditPortionUnit, favoriteEditWholeGrams, favoriteEditRecipeServings)
   const favoriteEditPortionItems = useMemo(
     () => portionMealItems(favoriteEditItems, favoriteEditPortionScale ?? 1),
     [favoriteEditItems, favoriteEditPortionScale],
@@ -2453,12 +2454,25 @@ export function TrackCaloriesScreen() {
   const favoriteEditSaveDisabled = favoriteEditPortionScale == null
     || favoriteEditItems.length === 0
     || favoriteEditItems.some((item) => !Number.isFinite(item.servings) || item.servings <= 0)
-    || !!(mealRecipe && recipePortionRatio(recipeServingsEaten, 1) == null)
+    || !!(favoriteEditPortionControlEnabled && mealRecipe && recipePortionRatio(recipeServingsEaten, 1) == null)
+
+  const toggleFavoriteEditPortionControl = (enabled: boolean) => {
+    setFavoriteEditPortionControlEnabled(enabled)
+    if (enabled) return
+    const wholeServings = mealRecipe
+      ? Number(mealRecipe.servings) > 0 ? Number(mealRecipe.servings) : 1
+      : favoriteEditRecipeServings
+    setFavoriteEditSavedScale(null)
+    setFavoriteEditPortionChoice('whole')
+    setFavoriteEditPortionUnit('serving')
+    setFavoriteEditPortionAmount(String(wholeServings))
+    if (mealRecipe) setRecipeServingsEaten(String(wholeServings))
+  }
 
   const chooseFavoriteEditPortion = (choice: 'whole' | 'half' | 'custom') => {
     setFavoriteEditSavedScale(null)
     setFavoriteEditPortionChoice(choice)
-    setFavoriteEditPortionControlEnabled(choice !== 'whole')
+    setFavoriteEditPortionControlEnabled(true)
     if (choice !== 'custom') {
       setFavoriteEditPortionUnit('serving')
       setFavoriteEditPortionAmount(String(favoriteEditRecipeServings * (choice === 'half' ? 0.5 : 1)))
@@ -3822,7 +3836,7 @@ export function TrackCaloriesScreen() {
     if (restoredAmount == null) restoredAmount = scale * wholeServings
     // A saved scale is authoritative, even when old displayed ounce amounts were rounded.
     setFavoriteEditSavedScale(scale)
-    setFavoriteEditPortionControlEnabled(scale !== 1 || portion?.__portionControlEnabled === true)
+    setFavoriteEditPortionControlEnabled(scale !== 1 || portion?.__portionControlEnabled === true || !!(legacyConsumedRecipe && eaten !== recipeYield))
     setFavoriteEditPortionAmount(String(restoredAmount))
     setFavoriteEditPortionUnit(portionUnit)
     setFavoriteEditPortionChoice(scale === 1 ? 'whole' : scale === 0.5 && portionUnit === 'serving' ? 'half' : 'custom')
@@ -4118,7 +4132,7 @@ export function TrackCaloriesScreen() {
 
   const updateFavoriteFromEditor = async () => {
     const isMealBuilder = mealBuilderOpen && !favoriteEditItem
-    if (mealRecipe && recipePortionRatio(recipeServingsEaten, 1) == null) {
+    if (favoriteEditPortionControlEnabled && mealRecipe && recipePortionRatio(recipeServingsEaten, 1) == null) {
       Alert.alert('Check servings', 'Enter the number of recipe servings you ate before saving.')
       return
     }
@@ -4126,14 +4140,17 @@ export function TrackCaloriesScreen() {
       Alert.alert('Check portion amount', 'Enter a positive amount before saving.')
       return
     }
+    const recipeWholeServings = mealRecipe && Number(mealRecipe.servings) > 0 ? Number(mealRecipe.servings) : 1
     const recipeMetadata = {
       __portionScale: favoriteEditPortionScale,
-      __portionControlEnabled: !!mealRecipe || favoriteEditPortionControlEnabled,
-      __portionUnit: mealRecipe ? 'serving' : favoriteEditPortionUnit,
-      __portionAmount: mealRecipe ? Number(recipeServingsEaten) : Number(favoriteEditPortionAmount),
+      __portionControlEnabled: favoriteEditPortionControlEnabled,
+      __portionUnit: !favoriteEditPortionControlEnabled || mealRecipe ? 'serving' : favoriteEditPortionUnit,
+      __portionAmount: mealRecipe
+        ? favoriteEditPortionControlEnabled ? Number(recipeServingsEaten) : recipeWholeServings
+        : favoriteEditPortionControlEnabled ? Number(favoriteEditPortionAmount) : favoriteEditRecipeServings,
       __portionTotalWeightG: favoriteEditWholeGrams,
-      __portionRecipeServings: mealRecipe ? Number(mealRecipe.servings) > 0 ? Number(mealRecipe.servings) : 1 : favoriteEditRecipeServings,
-      ...(mealRecipe ? { __importRecipe: mealRecipe, __nativeRecipeServingsEaten: Number(recipeServingsEaten) } : {}),
+      __portionRecipeServings: mealRecipe ? recipeWholeServings : favoriteEditRecipeServings,
+      ...(mealRecipe ? { __importRecipe: mealRecipe, __nativeRecipeServingsEaten: favoriteEditPortionControlEnabled ? Number(recipeServingsEaten) : recipeWholeServings } : {}),
     }
     if (!favoriteEditItem && !isMealBuilder) return
     if (favoriteEditItems.length === 0) {
@@ -8434,8 +8451,20 @@ export function TrackCaloriesScreen() {
               )}
             </View>
 
-              {mealRecipe ? (
-                <View style={{ padding: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2 }}>
+            <View style={{ padding: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+                <View style={{ flex: 1 }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>Portion control</Text>
+                  <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 4 }}>
+                    {favoriteEditPortionControlEnabled ? 'Choose how much of the meal you ate.' : 'Off: totals use the whole meal. Turn on to choose a smaller or larger amount.'}
+                  </Text>
+                </View>
+                <Switch accessibilityLabel="Portion control" value={favoriteEditPortionControlEnabled}
+                  onValueChange={toggleFavoriteEditPortionControl}
+                  trackColor={{ false: '#D1D5DB', true: '#10B981' }} thumbColor="#FFFFFF" />
+              </View>
+              {favoriteEditPortionControlEnabled && mealRecipe ? (
+                <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
                   <Text style={{ color: theme.colors.text, fontWeight: '700' }}>How much did you eat?</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 6 }}>{mealRecipe.servings ? `Full recipe makes ${mealRecipe.servings} servings.` : 'Full recipe is one batch. Enter a fraction of the batch you ate.'}</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 8 }}>{mealRecipe.servings ? 'Servings eaten' : 'Batches eaten'}</Text>
@@ -8444,8 +8473,8 @@ export function TrackCaloriesScreen() {
                 </View>
               ) : null}
 
-              {!mealRecipe ? (
-                <View style={{ padding: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2 }}>
+              {favoriteEditPortionControlEnabled && !mealRecipe ? (
+                <View style={{ marginTop: 14, paddingTop: 14, borderTopWidth: 1, borderTopColor: '#E5E7EB' }}>
                   <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>How much did you eat?</Text>
                   <Text style={{ color: '#6B7280', fontSize: 12, lineHeight: 18, marginTop: 6 }}>Whole meal uses all the food amounts above. Half meal uses half of every food. Custom lets you enter your share. Calories and every nutrient total change together.</Text>
                   <View style={{ marginTop: 10, flexDirection: 'row', gap: 6 }}>
@@ -8485,10 +8514,12 @@ export function TrackCaloriesScreen() {
               ) : null}
 
 
+            </View>
+
             <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
-                  {mealRecipe ? 'Recipe portion totals' : favoriteEditPortionControlEnabled ? 'Your portion totals' : 'Meal totals'}
+                  {favoriteEditPortionControlEnabled ? mealRecipe ? 'Recipe portion totals' : 'Your portion totals' : 'Meal totals'}
                 </Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.bg, padding: 2 }}>
                   <Pressable onPress={() => setEnergyUnit('kcal')} style={{ borderRadius: 2, backgroundColor: energyUnit === 'kcal' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
@@ -8500,9 +8531,9 @@ export function TrackCaloriesScreen() {
                 </View>
               </View>
               <Text style={{ color: '#6B7280', fontSize: 12, marginBottom: 12 }}>
-                {mealRecipe ? `${recipeServingsEaten || '—'} of ${mealRecipe.servings || 1} recipe servings.` : favoriteEditPortionControlEnabled
-                  ? 'These totals are for the amount you selected.'
-                  : 'This meal is 100% of the full amount.'}
+                {!favoriteEditPortionControlEnabled ? 'This meal is 100% of the full amount.' : mealRecipe
+                  ? `${recipeServingsEaten || '—'} of ${mealRecipe.servings || 1} recipe servings.`
+                  : 'These totals are for the amount you selected.'}
               </Text>
               <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={favoriteEditTotals} />
             </View>

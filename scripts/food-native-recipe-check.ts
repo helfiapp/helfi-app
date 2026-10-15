@@ -84,13 +84,29 @@ async function main() {
   ctx.mealBuilderOpen = true; ctx.favoriteEditItem = null; ctx.favoriteEditName = 'Pancakes'; ctx.favoritesTargetMeal = 'other'; ctx.favoriteEditTime = '05:00'; ctx.selectedDate = '2026-10-05'; ctx.editorTimeToDate = () => '2026-10-04T18:00:00Z'
   ctx.favoriteEditPortionScale = recipeValues.recipePortionRatio(ctx.recipeServingsEaten, ctx.mealRecipe.servings)
   ctx.favoriteEditPortionItems = portionMealItems(ctx.favoriteEditItems, ctx.favoriteEditPortionScale)
-  ctx.favoriteEditPortionControlEnabled = false; ctx.favoriteEditPortionUnit = 'serving'; ctx.favoriteEditPortionAmount = '1'; ctx.favoriteEditWholeGrams = null; ctx.favoriteEditRecipeServings = 12
+  ctx.favoriteEditPortionControlEnabled = true; ctx.favoriteEditPortionUnit = 'serving'; ctx.favoriteEditPortionAmount = '1'; ctx.favoriteEditWholeGrams = null; ctx.favoriteEditRecipeServings = 12
   let saved: any
   ctx.createFoodEntry = async (value: any) => { saved = value; return true }
   for (const name of ['setMealBuilderOpen', 'setFavoriteEditName', 'setFavoriteEditIngredientsExpanded', 'setFavoriteEditExpandedItemId', 'setFavoriteEditServingPickerItemId', 'setFavoriteEditServingLoadingId']) ctx[name] = () => {}
   await vm.runInContext(actual('updateFavoriteFromEditor'), ctx)()
   assert.equal(saved.calories, 67); assert.equal(saved.fiber, null); assert.equal(saved.nutrition.__importRecipe.servings, 12); assert.equal(saved.nutrition.__nativeRecipeServingsEaten, 1)
   assert.equal(saved.nutrition.__importRecipe.sourceUrl, 'https://example.invalid/recipe'); assert.equal(saved.items[1].id, 'egg'); assert.equal(saved.items[1].servings, 1); assert.equal(saved.nutrition.__portionScale, 1 / 12); assert.equal(saved.nutrition.__portionAmount, 1); assert.equal(saved.nutrition.__portionRecipeServings, 12)
+  assert.equal(saved.nutrition.__portionControlEnabled, true)
+  // With portion control OFF, a recipe uses its whole yield, not the previous fraction.
+  ctx.favoriteEditItems = (opened as any).items
+  ctx.favoriteEditPortionControlEnabled = false
+  ctx.favoriteEditPortionScale = vm.runInContext(actual('favoriteEditPortionScale'), ctx)
+  assert.equal(ctx.favoriteEditPortionScale, 1)
+  ctx.favoriteEditPortionItems = portionMealItems(ctx.favoriteEditItems, ctx.favoriteEditPortionScale)
+  await vm.runInContext(actual('updateFavoriteFromEditor'), ctx)()
+  assert.equal(saved.calories, 809)
+  assert.equal(saved.fiber, null)
+  assert.equal(saved.nutrition.__portionScale, 1)
+  assert.equal(saved.nutrition.__portionControlEnabled, false)
+  assert.equal(saved.nutrition.__portionAmount, 12)
+  assert.equal(saved.nutrition.__nativeRecipeServingsEaten, 12)
+  assert.equal(saved.items[0].servings, 1)
+  assert.equal(saved.items[0].calories, 364)
   console.log('PASS: actual native recipe matching, missing-item review, ingredient quantities, yield, one/two/full-batch scaling and saved recipe provenance; no network or AI calls.')
 }
 main().catch((error) => { console.error(error); process.exitCode = 1 })

@@ -7650,21 +7650,55 @@ export default function MealBuilderClient() {
 
 
           <div className="border border-gray-200 bg-white p-3 sm:p-4">
+            <div className="flex items-center justify-between gap-3">
+              <div>
+                <div id="portion-control-label" className="text-sm font-semibold text-gray-900">Portion control</div>
+                <p className="mt-1 text-xs text-gray-600">Turn on to choose how much of this meal you ate.</p>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-label="Portion control"
+                aria-checked={portionControlEnabled}
+                aria-controls="portion-control-options"
+                onClick={() => {
+                  const nextEnabled = !portionControlEnabled
+                  const fullServings = recipeServingsForPortion && recipeServingsForPortion > 0 ? recipeServingsForPortion : 1
+                  setPortionControlEnabled(nextEnabled)
+                  setPortionScaleOverriddenByUser(true)
+                  setRecipeServingsForPortion(fullServings)
+                  setPortionUnit('serving')
+                  setPortionAmountInput(String(fullServings))
+                }}
+                className="min-h-11 min-w-20 inline-flex shrink-0 items-center justify-end gap-2 text-sm font-semibold text-gray-700"
+              >
+                <span>{portionControlEnabled ? 'On' : 'Off'}</span>
+                <span aria-hidden="true" className={`inline-flex h-6 w-11 items-center rounded-sm p-0.5 ${portionControlEnabled ? 'bg-emerald-600' : 'bg-gray-300'}`}>
+                  <span className={`h-5 w-5 rounded-sm bg-white shadow-sm transition-transform ${portionControlEnabled ? 'translate-x-5' : 'translate-x-0'}`} />
+                </span>
+              </button>
+            </div>
+            {portionControlEnabled && (
+              <div id="portion-control-options" className="mt-4">
             <div className="text-sm font-semibold text-gray-900">How much did you eat?</div>
             <p className="mt-1 text-xs text-gray-600">Whole meal uses all the foods above. Half meal halves every nutrient total. Custom lets you enter the amount you ate.</p>
             <div className="mt-3 grid grid-cols-3 gap-2" role="group" aria-label="Meal portion">
               <button
                 type="button"
-                aria-pressed={!portionControlEnabled}
+                aria-pressed={portionControlEnabled && portionUnit === 'serving' && Math.abs(effectivePortionScale - 1) < 0.0001}
                 onClick={() => {
-                  setPortionControlEnabled(false)
+                  setPortionControlEnabled(true)
                   setPortionScaleOverriddenByUser(true)
+                  const fullServings = recipeServingsForPortion && recipeServingsForPortion > 0 ? recipeServingsForPortion : 1
+                  setRecipeServingsForPortion(fullServings)
+                  setPortionUnit('serving')
+                  setPortionAmountInput(String(fullServings))
                 }}
-                className={`min-h-11 border px-2 py-2 text-sm font-semibold ${!portionControlEnabled ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300'}`}
+                className={`min-h-11 border px-2 py-2 text-sm font-semibold ${portionControlEnabled && portionUnit === 'serving' && Math.abs(effectivePortionScale - 1) < 0.0001 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300'}`}
               >Whole meal</button>
               <button
                 type="button"
-                aria-pressed={portionControlEnabled && Math.abs(effectivePortionScale - 0.5) < 0.0001}
+                aria-pressed={portionControlEnabled && portionUnit === 'serving' && Math.abs(effectivePortionScale - 0.5) < 0.0001}
                 onClick={() => {
                   setPortionScaleOverriddenByUser(true)
                   setPortionControlEnabled(true)
@@ -7672,11 +7706,11 @@ export default function MealBuilderClient() {
                   setPortionUnit('serving')
                   setPortionAmountInput(String((recipeServingsForPortion && recipeServingsForPortion > 0 ? recipeServingsForPortion : 1) * 0.5))
                 }}
-                className={`min-h-11 border px-2 py-2 text-sm font-semibold ${portionControlEnabled && Math.abs(effectivePortionScale - 0.5) < 0.0001 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300'}`}
+                className={`min-h-11 border px-2 py-2 text-sm font-semibold ${portionControlEnabled && portionUnit === 'serving' && Math.abs(effectivePortionScale - 0.5) < 0.0001 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300'}`}
               >Half meal</button>
               <button
                 type="button"
-                aria-pressed={portionControlEnabled && Math.abs(effectivePortionScale - 0.5) >= 0.0001}
+                aria-pressed={portionControlEnabled && (portionUnit !== 'serving' || (Math.abs(effectivePortionScale - 0.5) >= 0.0001 && Math.abs(effectivePortionScale - 1) >= 0.0001))}
                 onClick={() => {
                   setPortionScaleOverriddenByUser(true)
                   setPortionControlEnabled(true)
@@ -7689,10 +7723,9 @@ export default function MealBuilderClient() {
                     setPortionAmountInput(String(recipeServingsForPortion && recipeServingsForPortion > 0 ? recipeServingsForPortion : 1))
                   }
                 }}
-                className={`min-h-11 border px-2 py-2 text-sm font-semibold ${portionControlEnabled && Math.abs(effectivePortionScale - 0.5) >= 0.0001 ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300'}`}
+                className={`min-h-11 border px-2 py-2 text-sm font-semibold ${portionControlEnabled && (portionUnit !== 'serving' || (Math.abs(effectivePortionScale - 0.5) >= 0.0001 && Math.abs(effectivePortionScale - 1) >= 0.0001)) ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-300'}`}
               >Custom</button>
             </div>
-            {portionControlEnabled ? (
               <>
                 <div className="mt-2 flex items-center gap-2">
                   <input
@@ -7747,11 +7780,13 @@ export default function MealBuilderClient() {
                   </div>
                 ) : null}
               </>
-            ) : (
-              <div className="mt-2 text-[11px] text-emerald-700">This meal is 100% of the full amount.</div>
+              </div>
+            )}
+            {!portionControlEnabled && (
+              <p className="mt-3 text-xs text-gray-600">Portion control is off. Totals show the whole meal.</p>
             )}
             <div className="mt-4 flex items-center justify-between gap-2">
-              <div className="text-sm font-semibold text-gray-900">Nutrition for your portion</div>
+              <div className="text-sm font-semibold text-gray-900">{portionControlEnabled ? 'Nutrition for your portion' : 'Meal totals'}</div>
               <div className="flex gap-1" role="group" aria-label="Energy unit">
                 <button type="button" aria-pressed={energyUnit === 'kcal'} onClick={() => setEnergyUnit('kcal')} className={`min-h-11 border px-3 py-2 text-sm ${energyUnit === 'kcal' ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-300 text-gray-600'}`}>kcal</button>
                 <button type="button" aria-pressed={energyUnit === 'kJ'} onClick={() => setEnergyUnit('kJ')} className={`min-h-11 border px-3 py-2 text-sm ${energyUnit === 'kJ' ? 'border-emerald-600 text-emerald-700 bg-emerald-50' : 'border-gray-300 text-gray-600'}`}>kJ</button>
@@ -7771,7 +7806,7 @@ export default function MealBuilderClient() {
                 Full meal is {Number(recipeServingsForPortion)} {Number(recipeServingsForPortion) === 1 ? 'serving' : 'servings'}.
               </div>
             ) : null}
-            {totalRecipeWeightG > 0 ? (
+            {portionControlEnabled && (totalRecipeWeightG > 0 ? (
               <div className="mt-2 text-[11px] text-gray-600">
                 Full recipe ≈ {Math.round(totalRecipeWeightG)} g
               </div>
@@ -7779,7 +7814,7 @@ export default function MealBuilderClient() {
               <div className="mt-2 text-[11px] text-gray-600">
                 Use servings when the full meal weight is unknown.
               </div>
-            )}
+            ))}
             {recipeImportDraft && !editFavoriteId ? (
               <div className="mt-3 rounded-lg border border-emerald-200 bg-white px-3 py-2">
                 <div className="flex items-center justify-between gap-3">

@@ -41,6 +41,7 @@ Object.assign(ctx, { portionControlEnabled: false, portionScaleOverriddenByUser:
   setPortionControlEnabled: setter('portionControlEnabled'), setPortionScaleOverriddenByUser: setter('portionScaleOverriddenByUser'), setPortionUnit: setter('portionUnit'), setPortionAmountInput: setter('portionAmountInput'), setRecipeServingsForPortion: setter('recipeServingsForPortion') })
 const meal = { id: 'fixture', name: 'Cooked chicken breast', serving_size: '121.4 g', calories: 224.4, protein_g: 40, carbs_g: 0, fat_g: 8, fiber_g: null, sugar_g: 0, servings: 1, __baseAmount: 121.4, __baseUnit: 'g', __unit: 'g', __amount: 121.4, __amountInput: '121.4', __measurementCountry: 'AU' }
 Object.assign(ctx, { category: 'lunch', draftCategory: 'lunch', items: [meal], itemsRef: { current: [meal] }, isDiaryEdit: true, sourceLogId: 'fixture', sourceCreatedAtRef: { current: '2026-10-15T01:00:00.000Z' }, mealName: 'Chicken lunch', linkedFavoriteId: '', selectedDate: '2026-10-15', entryTime: '12:00', savedPortionScale: .333, portionInputRef: { current: null }, editFavoriteId: '' })
+checkPortionToggle()
 click('Half meal')
 assert.equal(ctx.portionControlEnabled, true)
 assert.equal(ctx.portionUnit, 'serving')
@@ -57,6 +58,7 @@ click('Half meal')
 assert.equal(ctx.portionAmountInput, '2', 'half of four recipe servings')
 assert.equal(actual('buildDiaryAutosaveBundle')().diaryNutrition.__portionScale, .5)
 click('Whole meal')
+assert.equal(ctx.portionControlEnabled, true, 'Whole meal keeps the portion switch on')
 assert.equal(actual('buildDiaryAutosaveBundle')().diaryNutrition.calories, 224)
 click('Custom')
 assert.equal(ctx.portionAmountInput, '121.4', 'custom initializes with exact full mass')
@@ -190,6 +192,60 @@ function effect(marker: string) {
   }
   visit(source); assert.ok(expression, marker)
   return vm.runInContext(ts.transpile(`(${expression})`, { target: ts.ScriptTarget.ES2020 }), ctx)
+}
+function checkPortionToggle() {
+  let switchNode: ts.JsxElement | undefined
+  let optionsGate: ts.BinaryExpression | undefined
+  const visit = (node: ts.Node) => {
+    if (ts.isJsxElement(node) && node.openingElement.tagName.getText(source) === 'button' && node.openingElement.getText(source).includes('aria-label="Portion control"')) switchNode = node
+    if (ts.isBinaryExpression(node) && node.operatorToken.kind === ts.SyntaxKind.AmpersandAmpersandToken && node.left.getText(source) === 'portionControlEnabled' && node.right.getText(source).includes('id="portion-control-options"')) optionsGate = node
+    ts.forEachChild(node, visit)
+  }
+  visit(source)
+  assert.ok(switchNode && optionsGate, 'actual accessible toggle gates the portion options')
+  ctx.React = { createElement: (type: any, props: any, ...children: any[]) => ({ type, props, children: children.flat(Infinity) }), Fragment: 'Fragment' }
+  Object.assign(ctx, { portionAmountError: null, effectivePortionScale: 1 })
+  const render = (node: ts.Node) => vm.runInContext(ts.transpile(`(${node.getText(source)})`, { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), ctx)
+  const switchView = () => render(switchNode!)
+  assert.equal(switchView().props.role, 'switch')
+  assert.equal(switchView().props['aria-checked'], false)
+  assert.equal(render(optionsGate!), false, 'OFF removes portion inputs and presets from rendered UI')
+  switchView().props.onClick()
+  assert.equal(switchView().props['aria-checked'], true)
+  assert.equal(render(optionsGate!).props.id, 'portion-control-options', 'ON reveals actual portion controls')
+  assert.equal(ctx.portionAmountInput, '1')
+  click('Half meal')
+  assert.equal(actual('buildDiaryAutosaveBundle')().diaryNutrition.calories, 112)
+  switchView().props.onClick()
+  assert.equal(ctx.portionControlEnabled, false)
+  assert.equal(render(optionsGate!), false)
+  assert.equal(ctx.portionAmountInput, '1')
+  const off = actual('buildDiaryAutosaveBundle')()
+  assert.equal(off.diaryNutrition.calories, 224, 'OFF restores every food to full meal')
+  assert.equal(off.diaryNutrition.__portionScale ?? 1, 1, 'OFF omits optional scale metadata and retains full basis')
+  assert.equal(off.diaryNutrition.__portionControlEnabled, false)
+  assert.equal(off.cleanedItems[0].__amount, 121.4)
+  const restore = actual('applySavedPortion')
+  for (const [scale, enabled] of [[1, true], [.5, true], [2, true], [1, false], [.5, undefined]] as const) {
+    restore({ __portionScale: scale, ...(enabled === undefined ? {} : { __portionControlEnabled: enabled }), __portionAmount: scale, __portionUnit: 'serving', __portionRecipeServings: 1 })
+    assert.equal(ctx.portionControlEnabled, enabled ?? true, 'saved whole ON, half/custom ON, OFF and legacy half restore correctly')
+    assert.equal(switchView().props['aria-checked'], enabled ?? true)
+    ctx.portionScaleOverriddenByUser = true
+    const saved = actual('buildDiaryAutosaveBundle')()
+    assert.equal(saved.diaryNutrition.__portionScale ?? 1, (enabled ?? true) ? scale : 1)
+    assert.equal(saved.diaryNutrition.calories, Math.round(224.4 * ((enabled ?? true) ? scale : 1)))
+  }
+  ctx.portionControlEnabled = false
+  ctx.recipeServingsForPortion = 4
+  switchView().props.onClick()
+  assert.equal(ctx.portionAmountInput, '4', 'ON starts with full recipe yield')
+  click('Half meal')
+  switchView().props.onClick()
+  assert.equal(ctx.portionAmountInput, '4', 'OFF resets a fractional recipe to its whole yield')
+  assert.equal(actual('buildDiaryAutosaveBundle')().diaryNutrition.__portionScale ?? 1, 1)
+  ctx.recipeServingsForPortion = null
+  switchView().props.onClick()
+  console.log('PASS: actual web portion switch gates rendered controls, OFF saves whole meal, Whole stays ON, saved ON/OFF/legacy portions restore, and four-serving recipe resets to full yield.')
 }
 function checkVisibleFoodReview() {
   let nameInput: ts.JsxSelfClosingElement | undefined
@@ -386,6 +442,7 @@ async function checkSavedNativeNameHydration() {
     } finally { if (timeout) clearTimeout(timeout); cleanup?.() }
     assert.equal(ctx.mealName, expected, 'saved native chosen title survives ingredient description')
     assert.equal(ctx.savedPortionScale, .5)
+    assert.equal(ctx.portionControlEnabled, true, 'saved half meal reopens with portion controls on')
     assert.equal(ctx.portionAmountInput, '0.5')
     assert.equal(ctx.sourceCreatedAtRef.current, originalTime)
     assert.equal(ctx.entryTime, evaluate(`extractTimeFromTimestamp('${originalTime}')`))
