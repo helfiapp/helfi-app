@@ -1,5 +1,8 @@
 'use client'
 
+import foodDesign from '../food-design.module.css'
+import { isFoodIdentityCompatible } from '@/native/src/lib/foodIdentity'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useUserData } from '@/components/providers/UserDataProvider'
@@ -54,6 +57,7 @@ type DrinkOverrideItem = Omit<NormalizedFoodItem, 'source' | 'id'> & {
 }
 
 type ServingOption = {
+  foodName?: string | null
   id: string
   serving_size: string
   label?: string
@@ -1338,6 +1342,7 @@ export default function AddIngredientClient() {
         return {
           id,
           serving_size,
+          foodName: typeof opt?.foodName === 'string' ? opt.foodName : null,
           label: label || undefined,
           grams: safeNumber(opt?.grams),
           ml: safeNumber(opt?.ml),
@@ -1367,7 +1372,7 @@ export default function AddIngredientClient() {
     if (hasSizedCountUnits(getFoodUnitGrams(r.name))) return null
     const key = `${r.source}:${r.id}`
     const cached = servingCacheRef.current.get(key)
-    if (cached) return { ...applyServingOptionToResult(r, cached.option), servingOptions: cached.options }
+    if (cached && (!cached.option.foodName || isFoodIdentityCompatible(r.name, cached.option.foodName))) return { ...applyServingOptionToResult(r, cached.option), servingOptions: cached.options }
     if (servingPendingRef.current.has(key)) return null
     servingPendingRef.current.add(key)
     try {
@@ -1375,7 +1380,7 @@ export default function AddIngredientClient() {
       const res = await fetch(`/api/food-data/servings?${params.toString()}`, { method: 'GET' })
       if (!res.ok) return null
       const data = await res.json().catch(() => ({}))
-      const options = normalizeServingOptionsForAdjust(data?.options)
+      const options = normalizeServingOptionsForAdjust(data?.options).filter((option) => !option.foodName || isFoodIdentityCompatible(r.name, option.foodName))
       const best = pickBestServingOption(options)
       if (!best) return null
       // Keep all measured choices with the selected basis, including unchanged
@@ -1708,7 +1713,7 @@ export default function AddIngredientClient() {
       const upgraded = await loadServingOverride(target)
       const resolvedTarget = upgraded || target
 
-      const servingOptions = normalizeServingOptionsForAdjust((resolvedTarget as any)?.servingOptions)
+      const servingOptions = normalizeServingOptionsForAdjust((resolvedTarget as any)?.servingOptions).filter((option) => !option.foodName || isFoodIdentityCompatible(resolvedTarget.name, option.foodName))
       const defaultServingOption =
         servingOptions.find((option) => option.id === resolvedTarget.selectedServingId) ||
         pickDefaultServingOptionForAdjust(servingOptions)
@@ -1981,7 +1986,7 @@ export default function AddIngredientClient() {
   const headerSubtitle = useMemo(() => `Add to ${categoryLabel}`, [categoryLabel])
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className={`${foodDesign.surface} min-h-screen bg-white`}>
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="w-full max-w-3xl mx-auto px-4 py-3 flex items-center justify-between gap-3">
           <button
@@ -2012,7 +2017,38 @@ export default function AddIngredientClient() {
           {/* PROTECTED: ADD_INGREDIENT_SEARCH START */}
           <div className="rounded-2xl border border-gray-200 bg-white p-3 sm:p-4 space-y-3">
             <div className="text-sm font-semibold text-gray-900">
-              Search foods (use the source buttons below if results look off)
+              Search ingredients
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setKind('packaged')
+                  // Changing category already starts a search through the query effect.
+                  if (kind === 'packaged' && query.trim().length >= 1) runSearch(query, 'packaged', 'auto')
+                }}
+                className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
+                  kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
+                } disabled:opacity-60`}
+              >
+                Packaged &amp; fast food
+              </button>
+              <button
+                type="button"
+                disabled={loading}
+                onClick={() => {
+                  setKind('single')
+                  // Tapping the current category still refreshes its results.
+                  if (kind === 'single' && query.trim().length >= 1) runSearch(query, 'single', 'auto')
+                }}
+                className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
+                  kind === 'single' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
+                } disabled:opacity-60`}
+              >
+                Single foods
+              </button>
             </div>
 
             <form
@@ -2063,37 +2099,6 @@ export default function AddIngredientClient() {
                 )}
               </button>
             </form>
-
-            <div className="grid grid-cols-2 gap-2">
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setKind('packaged')
-                  // Changing category already starts a search through the query effect.
-                  if (kind === 'packaged' && query.trim().length >= 1) runSearch(query, 'packaged', 'auto')
-                }}
-                className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
-                  kind === 'packaged' ? 'bg-emerald-600 text-white border-emerald-600' : 'bg-white text-gray-700 border-gray-200'
-                } disabled:opacity-60`}
-              >
-                Packaged/Fast-foods
-              </button>
-              <button
-                type="button"
-                disabled={loading}
-                onClick={() => {
-                  setKind('single')
-                  // Tapping the current category still refreshes its results.
-                  if (kind === 'single' && query.trim().length >= 1) runSearch(query, 'single', 'auto')
-                }}
-                className={`px-3 py-2 rounded-lg border text-sm font-semibold ${
-                  kind === 'single' ? 'bg-slate-800 text-white border-slate-800' : 'bg-white text-gray-700 border-gray-200'
-                } disabled:opacity-60`}
-              >
-                Single food
-              </button>
-            </div>
 
             {error && <div className="text-sm text-red-600">{error}</div>}
 
@@ -2199,7 +2204,7 @@ export default function AddIngredientClient() {
                 onClick={() => photoInputRef.current?.click()}
                 className="flex-1 px-3 py-2 rounded-lg bg-emerald-600 text-white text-sm font-semibold hover:bg-emerald-700 disabled:opacity-60"
               >
-                {photoLoading ? 'Analyzing…' : 'Add image'}
+                {photoLoading ? 'Analyzing…' : 'Add by photo'}
               </button>
               <button
                 type="button"
@@ -2253,7 +2258,7 @@ export default function AddIngredientClient() {
 
               {(() => {
                 const pieceGrams = adjustPieceGrams
-                const servingOptions = normalizeServingOptionsForAdjust((adjustItem as any)?.servingOptions)
+                const servingOptions = normalizeServingOptionsForAdjust((adjustItem as any)?.servingOptions).filter((option) => !option.foodName || isFoodIdentityCompatible(adjustItem.name, option.foodName))
                 const selectedServing =
                   servingOptions.length > 0 && adjustServingId
                     ? servingOptions.find((opt) => opt.id === adjustServingId) || null
@@ -2333,7 +2338,7 @@ export default function AddIngredientClient() {
                         >
                           {servingOptions.map((opt) => (
                             <option key={opt.id} value={opt.id}>
-                              {opt.label || opt.serving_size}
+                              {opt.label || opt.serving_size}{opt.foodName ? ` — ${opt.foodName}` : ''}
                             </option>
                           ))}
                         </select>

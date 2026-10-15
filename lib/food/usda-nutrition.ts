@@ -67,8 +67,20 @@ export function usdaStandardServingOptions(food: any, fdcId: string) {
   if (basis === 'g') portions.forEach((portion: any, index: number) => {
     const grams = foodNumberOrNull(portion?.gramWeight)
     if (grams == null || grams <= 0) return
-    const label = portion.portionDescription || portion.modifier || portion.measureUnit?.name || 'Serving'
-    options.push(option(String(index), `${label} — ${grams}g`, grams))
+    const description = [portion.portionDescription, portion.modifier]
+      .find(value => typeof value === 'string' && value.trim())?.trim() || ''
+    const rawMeasure = portion.measureUnit?.name
+    const measure = typeof rawMeasure === 'string' && !/^(undetermined|unknown|not specified)$/i.test(rawMeasure.trim()) ? rawMeasure.trim() : ''
+    const label = description || measure
+    const count = foodNumberOrNull(portion.amount)
+    // gramWeight covers the complete provider portion, which can be 3 oz or
+    // several pieces. A bare unit must not imply one unit at that full weight.
+    const hasQuantity = /^(?:\d|\.\d|[¼½¾⅓⅔⅛⅜⅝⅞]|(?:a|an|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter)\b)/i.test(label)
+    const barePhysicalUnit = /^(?:oz|ounces?|g|grams?|kg|kilograms?|lb|lbs|pounds?|ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)$/i.test(label)
+    const servingLabel = hasQuantity ? label
+      : count != null && count > 0 && label ? `${count} ${label}`
+        : barePhysicalUnit || !description ? '' : label
+    options.push(option(String(index), servingLabel ? `${servingLabel} — ${grams}g` : `${grams} g`, grams))
   })
   return options
 }

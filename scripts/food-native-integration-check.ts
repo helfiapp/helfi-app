@@ -2,7 +2,7 @@ import assert from 'node:assert/strict'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
-import { materializeMealPortion } from '../native/src/lib/mealPortions'
+import { materializeMealPortion, savedMealPortion } from '../native/src/lib/mealPortions'
 import { convertFoodAmount, parseFoodServing, liquidDensity } from '../native/src/lib/foodUnits'
 import * as nutrientValues from '../native/src/lib/nutrientValues'
 
@@ -10,7 +10,7 @@ import * as nutrientValues from '../native/src/lib/nutrientValues'
 const source = ts.createSourceFile('screen.tsx', fs.readFileSync('native/src/screens/TrackCaloriesScreen.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 assert.equal((source as any).parseDiagnostics.length, 0, 'native screen JSX parses before exercising result fragments')
 const code = source.statements.filter((node) => ts.isFunctionDeclaration(node) && node.name && !/^[A-Z]/.test(node.name.text)).map(node => node.getText(source)).join('\n')
-const context: any = { ...nutrientValues, materializeMealPortion, convertFoodAmount, parseFoodServing, liquidDensity }
+const context: any = { ...nutrientValues, materializeMealPortion, savedMealPortion, convertFoodAmount, parseFoodServing, liquidDensity }
 vm.createContext(context)
 vm.runInContext(ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.None } }).outputText, context)
 

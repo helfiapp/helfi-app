@@ -1,6 +1,7 @@
 import { foodNumberOrNull } from './openfoodfacts'
 import { isFoodPreparationCompatible } from '../../native/src/lib/foodPreparation'
 import { convertFoodAmount, parseFoodServing } from '../../native/src/lib/foodUnits'
+import { isFoodIdentityCompatible } from '../../native/src/lib/foodIdentity'
 
 export const NUTRITION_FIELDS = ['calories', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g'] as const
 const text = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -47,6 +48,7 @@ const sameFoodSubtype = (requested: unknown, actual: unknown) => {
 // A word buried in another food's name is not its primary identity. USDA
 // category prefixes (e.g. Nuts, almonds) and preparation labels are metadata.
 export function isFoodPhotoCandidateIdentity(item: any, candidate: any): boolean {
+  if (!isFoodIdentityCompatible(item?.name, candidate?.name)) return false
   if (!sameFoodSubtype(item.name, candidate.name)) return false
   const metadata = new Set(['raw', 'uncooked', 'cooked', 'grilled', 'roasted', 'roast', 'boiled', 'baked', 'fried', 'steamed', 'fresh', 'nuts', 'nut', 'seeds', 'seed', 'fish', 'fruits', 'fruit', 'vegetables', 'vegetable'])
   const requested = tokens(item.name).filter(word => !metadata.has(word))
@@ -56,11 +58,12 @@ export function isFoodPhotoCandidateIdentity(item: any, candidate: any): boolean
 
 export function nutritionCandidateScale(item: any, candidate: any): number | null {
   if (!candidate?.id || !candidate?.source || !isFoodPreparationCompatible(candidate.name, item.name)) return null
+  if (!isFoodIdentityCompatible(item?.name, candidate?.name)) return null
   const requestedName = text(item.name)
   const actualName = text(candidate.name)
   if (foodForms.some(form => form.test(requestedName) !== form.test(actualName))) return null
   if (!sameFoodSubtype(item.name, candidate.name)) return null
-  const requested = tokens(item.name)
+  const requested = tokens(item.name).filter(word => !['with', 'and', 'cooked'].includes(word))
   const actual = tokens(candidate.name)
   if (!requested.length || !requested.every((word) => actual.some(actualWord => sameFoodWord(word, actualWord)))) return null
   const brand = text(item.brand)

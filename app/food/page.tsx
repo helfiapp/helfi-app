@@ -1,4 +1,6 @@
 'use client'
+import foodDesign from './food-design.module.css'
+import { isFoodIdentityCompatible } from '@/native/src/lib/foodIdentity'
 import { requestFoodAnalysis } from '@/native/src/lib/foodAnalysisRequest'
 import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '@/lib/food/nutrient-values'
 import { Cog6ToothIcon, HandThumbDownIcon, HandThumbUpIcon, UserIcon } from '@heroicons/react/24/outline'
@@ -5179,7 +5181,7 @@ export default function FoodDiary() {
   }
 
   const normalizeServingOptionsForItem = (options: any[], itemName: string) =>
-    options.map((opt) => ({
+    options.filter((opt) => !opt.foodName || isFoodIdentityCompatible(itemName, opt.foodName)).map((opt) => ({
       ...opt,
       label: normalizeServingOptionLabel(opt, itemName),
     }))
@@ -16226,7 +16228,7 @@ Please add nutritional information manually if needed.`);
     setEditingItemIndex(index)
     setShowItemEditModal(true)
     setOfficialSearchQuery(query)
-    // "Packaged/Fast-foods" is usually best for real meals (broader database + FatSecret fallback if needed).
+    // "Packaged &amp; fast food" is usually best for real meals (broader database + FatSecret fallback if needed).
     handleOfficialSearch('packaged', query)
   }
 
@@ -20804,7 +20806,7 @@ Please add nutritional information manually if needed.`);
       {clientReady ? (
       <div
         ref={pageTopRef}
-        className="flex-1 flex flex-col overflow-hidden bg-gray-50"
+        className={`${foodDesign.surface} flex-1 flex flex-col overflow-hidden bg-gray-50`}
         onTouchStart={handlePullStart}
         onTouchMove={handlePullMove}
         onTouchEnd={handlePullEnd}
@@ -21555,6 +21557,38 @@ Please add nutritional information manually if needed.`);
 	                    Search foods (Helfi database first, then FatSecret if needed)
 	                  </label>
                   <div className="flex flex-col gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <button
+                        type="button"
+                        disabled={officialLoading}
+                        onClick={() => {
+                          setOfficialSource('packaged')
+                          if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('packaged', officialSearchQuery)
+                        }}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
+                          officialSource === 'packaged'
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-gray-700 border-gray-300'
+                        } disabled:opacity-60`}
+                      >
+                        Packaged &amp; fast food
+                      </button>
+                      <button
+                        type="button"
+                        disabled={officialLoading}
+                        onClick={() => {
+                          setOfficialSource('single')
+                          if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('single', officialSearchQuery)
+                        }}
+                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
+                          officialSource === 'single'
+                            ? 'bg-emerald-600 text-white border-emerald-600'
+                            : 'bg-white text-gray-700 border-gray-300'
+                        } disabled:opacity-60`}
+                      >
+                        Single foods
+                      </button>
+                    </div>
                     <div className="relative">
                       <input
                         type="text"
@@ -21618,39 +21652,20 @@ Please add nutritional information manually if needed.`);
                       </button>
                     </div>
 
-                    <div className="flex gap-2">
+
+                    <div className="grid grid-cols-3 gap-2">
                       <button
                         type="button"
-                        disabled={officialLoading}
                         onClick={() => {
-                          setOfficialSource('packaged')
-                          if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('packaged', officialSearchQuery)
+                          setShowAddIngredientModal(false)
+                          try {
+                            selectPhotoInputRef.current?.click()
+                          } catch {}
                         }}
-                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
-                          officialSource === 'packaged'
-                            ? 'bg-emerald-600 text-white border-emerald-600'
-                            : 'bg-white text-gray-700 border-gray-300'
-                        } disabled:opacity-60`}
+                        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
                       >
-                        Packaged/Fast-foods
+                        Add by photo
                       </button>
-                      <button
-                        type="button"
-                        disabled={officialLoading}
-                        onClick={() => {
-                          setOfficialSource('single')
-                          if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('single', officialSearchQuery)
-                        }}
-                        className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
-                          officialSource === 'single'
-                            ? 'bg-slate-800 text-white border-slate-800'
-                            : 'bg-white text-gray-700 border-gray-300'
-                        } disabled:opacity-60`}
-                      >
-                        Single food
-                      </button>
-                    </div>
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                       <button
                         type="button"
                         onClick={() => {
@@ -21675,19 +21690,7 @@ Please add nutritional information manually if needed.`);
                         }}
                         className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
                       >
-                        Add from favorites
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setShowAddIngredientModal(false)
-                          try {
-                            selectPhotoInputRef.current?.click()
-                          } catch {}
-                        }}
-                        className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50"
-                      >
-                        Add by photo
+                        Favorites
                       </button>
                     </div>
                   </div>
@@ -23388,6 +23391,11 @@ Please add nutritional information manually if needed.`);
                     </div>
                   )}
 
+                  {analyzedItems.some((item) => item?.nutritionProvenance?.portionEstimated) && (
+                    <p className="mx-4 sm:mx-6 mt-3 border-l-2 border-amber-500 bg-amber-50 px-3 py-2 text-sm text-amber-900">
+                      Photo estimates can vary. Check each food and its weight before saving; use a label or weighed amount when available.
+                    </p>
+                  )}
                   {(analyzedNutrition || analyzedItems.length > 0) && (
                     <section aria-label="Nutrient results" data-testid="food-result-nutrient-cards" className="mb-6 mt-3 px-4 sm:px-6">
                       <NutrientCards values={analyzedNutrition || {}} energyUnit={energyUnit} />
@@ -23847,6 +23855,9 @@ Please add nutritional information manually if needed.`);
                                 : undefined
                             }
                           >
+                            {item?.nutritionProvenance?.foodName ? (
+                              <p className="mb-2 text-xs text-slate-600 break-words">Nutrition source: {item.nutritionProvenance.foodName}</p>
+                            ) : null}
                             {/* Header row with actions, title, and description */}
                             {isCollapsed ? (
                               <div className="flex items-center justify-between gap-2">
@@ -24865,6 +24876,38 @@ Please add nutritional information manually if needed.`);
                           Selecting a result replaces the item name, serving size, and macros.
                         </p>
                         <div className="mt-3 flex flex-col gap-2">
+                          <div className="grid grid-cols-2 gap-2">
+                            <button
+                              type="button"
+                              disabled={officialLoading}
+                              onClick={() => {
+                                setOfficialSource('packaged')
+                                if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('packaged', officialSearchQuery)
+                              }}
+                              className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
+                                officialSource === 'packaged'
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-white text-gray-700 border-gray-300'
+                              } disabled:opacity-60`}
+                            >
+                              Packaged &amp; fast food
+                            </button>
+                            <button
+                              type="button"
+                              disabled={officialLoading}
+                              onClick={() => {
+                                setOfficialSource('single')
+                                if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('single', officialSearchQuery)
+                              }}
+                              className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
+                                officialSource === 'single'
+                                  ? 'bg-emerald-600 text-white border-emerald-600'
+                                  : 'bg-white text-gray-700 border-gray-300'
+                              } disabled:opacity-60`}
+                            >
+                              Single foods
+                            </button>
+                          </div>
                           <div className="relative">
                             <input
                               type="text"
@@ -24928,40 +24971,9 @@ Please add nutritional information manually if needed.`);
                             </button>
                           </div>
 
-                          <div className="flex gap-2">
-                            <button
-                              type="button"
-                              disabled={officialLoading}
-                              onClick={() => {
-                                setOfficialSource('packaged')
-                                if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('packaged', officialSearchQuery)
-                              }}
-                              className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
-                                officialSource === 'packaged'
-                                  ? 'bg-emerald-600 text-white border-emerald-600'
-                                  : 'bg-white text-gray-700 border-gray-300'
-                              } disabled:opacity-60`}
-                            >
-                              Packaged/Fast-foods
-                            </button>
-                            <button
-                              type="button"
-                              disabled={officialLoading}
-                              onClick={() => {
-                                setOfficialSource('single')
-                                if (officialSearchQuery.trim().length >= 1) handleOfficialSearch('single', officialSearchQuery)
-                              }}
-                              className={`flex-1 px-3 py-2 text-xs font-medium rounded-lg border ${
-                                officialSource === 'single'
-                                  ? 'bg-slate-800 text-white border-slate-800'
-                                  : 'bg-white text-gray-700 border-gray-300'
-                              } disabled:opacity-60`}
-                            >
-                              Single food
-                            </button>
-                          </div>
 
-                          <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+
+                          <div className="grid grid-cols-3 gap-2">
                             <button
                               type="button"
                               disabled={replacePhotoLoading || editingItemIndex === null || editingItemIndex === undefined}
@@ -25001,7 +25013,7 @@ Please add nutritional information manually if needed.`);
                               }}
                               className="px-3 py-2 rounded-lg border border-gray-200 bg-white text-xs font-semibold text-gray-800 hover:bg-gray-50 disabled:opacity-60"
                             >
-                              Add from favorites
+                              Favorites
                             </button>
                           </div>
                         </div>

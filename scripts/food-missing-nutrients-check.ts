@@ -4,7 +4,8 @@ import vm from 'node:vm'
 import ts from 'typescript'
 import * as nativeValues from '../native/src/lib/nutrientValues'
 import * as webValues from '../lib/food/nutrient-values'
-import { materializeMealPortion } from '../native/src/lib/mealPortions'
+import { materializeMealPortion, savedMealPortion } from '../native/src/lib/mealPortions'
+import { mealPortionScale, portionMealItems } from '../native/src/lib/mealPortionEditor'
 import { parseFoodServing, liquidDensity, convertFoodAmount } from '../native/src/lib/foodUnits'
 
 // Exercise the actual save/read/editor functions, without app dependencies,
@@ -31,7 +32,7 @@ function bind(context: vm.Context, source: ts.SourceFile, names: string[]) {
 }
 const plain = (value: any) => JSON.parse(JSON.stringify(value))
 const native = sourceFile('native/src/screens/TrackCaloriesScreen.tsx')
-const ctx = vm.createContext({ ...nativeValues, materializeMealPortion, parseFoodServing, liquidDensity, convertFoodAmount, console })
+const ctx = vm.createContext({ ...nativeValues, materializeMealPortion, savedMealPortion, mealPortionScale, portionMealItems, parseFoodServing, liquidDensity, convertFoodAmount, console })
 bind(ctx, native, ['roundTo', 'round1', 'nullableNumber', 'numberOrZero', 'normalizeFavoriteLabel', 'normalizeFavoriteAmountUnit', 'parseServingBaseForFavorite', 'favoriteAmountStateFromRaw', 'favoriteBaseForItem', 'convertFavoriteBaseAmount', 'favoriteAmountFromServings', 'formatFavoriteAmount', 'isOpenMeasurementServing', 'hasServingOptionMacroData', 'normalizeFavoriteServingOptions', 'findSelectedServingId', 'sanitizeEntryTotals', 'hasNonZeroEntryTotals', 'extractTotalsFromDescriptionText', 'recalculateTotalsFromItems', 'normalizeFoodApiEntry', 'buildFavoriteAdjustItems', 'buildFavoriteAdjustItemFromSearchFood', 'calculateFavoriteAdjustTotals', 'buildFallbackFavoriteServingOptions', 'formatMacroAmount', 'formatNutrientGrams', 'formatFavoriteNutrientValue'])
 
 const sauce = { id: '1106110', source: 'usda', name: 'TERIYAKI SAUCE', barcode: '072036761163', serving_size: '100 g', calories: 88, protein_g: 5.88, carbs_g: 11.76, fat_g: 0, fiber_g: null, sugar_g: 11.76, servings: 1 }
@@ -107,6 +108,13 @@ ctx.mealBuilderOpen = false
 ctx.mealRecipe = null
 ctx.recipeServingsEaten = ''
 ctx.favoriteEditItems = ctx.buildFavoriteAdjustItems({ id: 'entry:saved', ...ctx.favoriteEditItem })
+ctx.favoriteEditPortionScale = 1
+ctx.favoriteEditPortionControlEnabled = false
+ctx.favoriteEditPortionUnit = 'serving'
+ctx.favoriteEditPortionAmount = '1'
+ctx.favoriteEditWholeGrams = 100
+ctx.favoriteEditRecipeServings = 1
+ctx.favoriteEditPortionItems = portionMealItems(ctx.favoriteEditItems, 1)
 ctx.favoriteEditName = sauce.name
 ctx.favoritesTargetMeal = 'snacks'
 ctx.favoriteEditTime = '04:41'

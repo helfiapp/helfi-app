@@ -7,6 +7,7 @@ import { liquidDensity, convertFoodAmount, parseFoodServing, liquidHouseholdMl }
 import { getFoodUnitGrams, formatUnitLabel } from '../lib/food/measurement-units'
 import { PRODUCE_MEASUREMENTS } from '../native/src/data/produceMeasurements'
 import { hasCoreFoodNutrition } from '../lib/food/openfoodfacts'
+import { checkUsdaServingLabels } from './food-usda-serving-label-check'
 
 // Exercise real USDA detail -> serving options -> native override/cache ->
 // open adjustment -> saved payload, without environment values or network.
@@ -52,6 +53,7 @@ async function save(amount: number, unit: string) {
   await ctx.addAdjustedItem(); assert.ok(payload); return payload
 }
 async function run() {
+  checkUsdaServingLabels()
   // Actual native conversion and labels, with the saved account country.
   const auBase = { amount: 100, unit: 'ml', density: 1.03 }
   close(ctx.computeServings(1, 'tbsp', auBase, {}, 'AU'), .2)

@@ -1,4 +1,5 @@
 'use client'
+import foodDesign from '../food-design.module.css'
 
 import NutrientCards from '@/components/food/NutrientCards'
 import { optionalNutrient, roundOptionalNutrient } from '@/lib/food/nutrient-values'
@@ -845,7 +846,7 @@ export default function RecommendedMealClient() {
   // PROTECTED: RECOMMENDED_MEAL_BUILD_BUTTON_ROW END
 
   return (
-    <div className="min-h-screen bg-white overflow-x-hidden">
+    <div className={`${foodDesign.surface} min-h-screen bg-white overflow-x-hidden`}>
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="px-4 py-3">
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">

@@ -37,7 +37,7 @@ export async function GET(request: NextRequest) {
               fiberPer100g: item.fiberPer100g,
               sugarPer100g: item.sugarPer100g,
             })
-      return NextResponse.json({ success: true, source: 'custom', options: options.filter(hasCoreFoodNutrition) })
+      return NextResponse.json({ success: true, source: 'custom', options: options.filter(hasCoreFoodNutrition).map((option: any) => item?.name ? { ...option, foodName: item.name } : option) })
     }
 
     if (source === 'usda') {

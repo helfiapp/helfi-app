@@ -30,6 +30,7 @@ export interface NormalizedFoodItem {
 
 export interface ServingOption {
   id: string
+  foodName?: string
   label: string
   serving_size: string
   grams?: number | null
@@ -663,7 +664,7 @@ export async function fetchUsdaServingOptions(fdcId: string): Promise<ServingOpt
       const key = `${opt.serving_size}|${opt.grams || ''}`
       if (!deduped.has(key)) deduped.set(key, opt)
     })
-    return Array.from(deduped.values())
+    return Array.from(deduped.values()).map(option => ({ ...option, foodName }))
   } catch (err) {
     console.warn('USDA serving request failed')
     return []
@@ -990,6 +991,7 @@ export async function fetchFatSecretServingOptions(foodId: string): Promise<Serv
 
       options.push({
         id: `fatsecret:${foodId}:${serving?.serving_id ?? idx}`,
+        foodName: food.food_name,
         label,
         serving_size: label,
         grams,

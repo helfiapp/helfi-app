@@ -11,7 +11,6 @@ import {
   Pressable,
   Share,
   ScrollView,
-  Switch,
   Text,
   TextInput,
   useWindowDimensions,
@@ -32,7 +31,9 @@ import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { parseRecipeAmount, chooseRecipeFood, measuredRecipeFood, recipePortionRatio } from '../lib/recipeNutrition'
-import { materializeMealPortion } from '../lib/mealPortions'
+import { materializeMealPortion, savedMealPortion } from '../lib/mealPortions'
+import { mealPortionScale, portionMealItems, type MealPortionUnit } from '../lib/mealPortionEditor'
+import { isFoodIdentityCompatible, suggestMealName } from '../lib/foodIdentity'
 import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '../lib/nutrientValues'
 import { convertFoodAmount, parseFoodServing, liquidDensity, type FoodBaseUnit } from '../lib/foodUnits'
 import { useAppMode } from '../state/AppModeContext'
@@ -205,6 +206,7 @@ type SearchFoodServingOption = {
   id?: string | number
   label?: string | null
   serving_size?: string | null
+  foodName?: string | null
   calories?: number | null
   protein_g?: number | null
   carbs_g?: number | null
@@ -294,7 +296,7 @@ const RECIPE_IMPORT_PHOTO_CREDITS = 15
 const recipeImportModeChip = {
   borderWidth: 1,
   borderColor: '#D1D5DB',
-  borderRadius: 12,
+  borderRadius: 2,
   paddingHorizontal: 12,
   paddingVertical: 8,
   backgroundColor: theme.colors.card,
@@ -318,7 +320,7 @@ const recipeImportModeChipTextActive = {
 const recipeImportPrimaryButton = {
   flex: 0,
   minHeight: 42,
-  borderRadius: 12,
+  borderRadius: 2,
   backgroundColor: '#059669',
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
@@ -335,7 +337,7 @@ const recipeImportPrimaryButtonText = {
 const recipeImportSecondaryButton = {
   flex: 0,
   minHeight: 42,
-  borderRadius: 12,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: '#D1D5DB',
   backgroundColor: theme.colors.card,
@@ -626,12 +628,17 @@ function normalizeFavoriteServingOptions(raw: any): SearchFoodServingOption[] {
     .map((option, index) => {
       const label = typeof option?.label === 'string' ? option.label.trim() : ''
       const servingSize = typeof option?.serving_size === 'string' ? option.serving_size.trim() : ''
-      const resolvedLabel = (servingSize || label).trim()
+      const originalLabel = (servingSize || label).trim()
+      const grams = nullableNumber(option?.grams)
+      const resolvedLabel = /^(?:oz|ounce|ounces|g|grams?)$/i.test(originalLabel) && grams != null && grams > 0
+        ? `${grams} g` : originalLabel
+      const displayLabel = /^(?:oz|ounce|ounces|g|grams?)$/i.test(label) && grams != null && grams > 0 ? `${grams} g` : label
       const id = String(option?.id || resolvedLabel || `serving-${index}`).trim()
       if (!id || !resolvedLabel) return null
       return {
         id,
-        label: label || resolvedLabel,
+        foodName: typeof option?.foodName === 'string' ? option.foodName : null,
+        label: displayLabel || resolvedLabel,
         serving_size: resolvedLabel,
         calories: nullableNumber(option?.calories),
         protein_g: nullableNumber(option?.protein_g),
@@ -844,10 +851,20 @@ function favoriteAmountUnitLabel(unit: FavoriteAmountUnit, item: FavoriteAdjustI
 
 function favoriteAmountStateFromRaw(raw: any, servingLabel: string, servings: number) {
   const base = parseServingBaseForFavorite(servingLabel, String(raw?.name || ''))
-  const rawUnitValue = raw?.amountUnit ?? raw?.__unit ?? raw?.weightUnit
+  // Newer saved physical fields win over an older amount alias. Keep each
+  // amount paired with its unit so stale grams cannot override saved ounces.
+  const savedMeasurement = [
+    { amount: raw?.__amount, unit: raw?.__unit },
+    { amount: raw?.weightAmount, unit: raw?.weightUnit },
+    { amount: raw?.amount, unit: raw?.amountUnit },
+  ].find((measurement) => {
+    const amount = nullableNumber(measurement.amount)
+    return amount !== null && amount > 0 && String(measurement.unit || '').trim().length > 0
+  })
+  const rawUnitValue = savedMeasurement?.unit ?? raw?.__unit ?? raw?.weightUnit ?? raw?.amountUnit
   const hasRawUnit = rawUnitValue !== null && rawUnitValue !== undefined && String(rawUnitValue).trim().length > 0
   const rawUnit = hasRawUnit ? normalizeFavoriteAmountUnit(rawUnitValue, 'serving') : null
-  const rawAmount = nullableNumber(raw?.amount ?? raw?.__amount ?? raw?.weightAmount)
+  const rawAmount = nullableNumber(savedMeasurement?.amount ?? raw?.__amount ?? raw?.weightAmount ?? raw?.amount)
   const preferredUnit =
     rawAmount && rawAmount > 0 && rawUnit
       ? rawUnit
@@ -872,6 +889,10 @@ function favoriteAdjustPersistenceFields(entry: FavoriteAdjustItem) {
   const amount = nullableNumber(entry.amountInput)
   const safeAmount = amount && amount > 0 ? amount : favoriteAmountFromServings(entry.servings, entry.amountUnit, base)
   const fields: any = {
+    // The caller spreads the original row first; overwrite every amount alias
+    // together so a later reopen cannot recover its stale pre-edit amount.
+    amount: roundTo(safeAmount, 3),
+    amountUnit: entry.amountUnit,
     __amount: roundTo(safeAmount, 3),
     __unit: entry.amountUnit,
     weightAmount: roundTo(safeAmount, 3),
@@ -964,6 +985,7 @@ function applyServingOptionToFavoriteAdjustItem(
       ...raw,
       serving_size: servingLabel,
       selectedServingId: String(option.id),
+      selectedServingFoodName: option.foodName || null,
       servingOptions: options,
       ...favoriteAdjustPersistenceFields({
         ...item,
@@ -992,22 +1014,19 @@ function applyServingOptionToFavoriteAdjustItem(
 
 function servingLookupForFavoriteAdjustItem(item: FavoriteAdjustItem) {
   const raw = item.raw && typeof item.raw === 'object' ? item.raw : {}
-  let source = String(raw?.source || raw?.foodSource || raw?.dataSource || '').toLowerCase().trim()
-  let id = String(raw?.id || raw?.foodId || raw?.fdcId || raw?.sourceId || '').trim()
-
-  if (id.startsWith('custom:')) {
-    source = 'custom'
-    id = id.slice('custom:'.length)
-  } else if (raw?.__custom === true || source === 'custom') {
-    source = 'custom'
-  } else if (source === 'usda' || id.startsWith('usda:')) {
-    source = 'usda'
-    id = id.replace(/^usda:/i, '')
-  } else if (source === 'fatsecret' || id.startsWith('fatsecret:')) {
-    source = 'fatsecret'
-    id = id.replace(/^fatsecret:/i, '')
+  let source = String(raw?.__source || raw?.source || raw?.foodSource || raw?.dataSource || '').toLowerCase().trim()
+  const provenance = raw?.nutritionProvenance
+  const provenanceId = source && String(provenance?.provider || '').toLowerCase().trim() === source ? provenance?.recordId : null
+  let id = [raw?.__sourceId, provenanceId, raw?.foodId, raw?.fdcId, raw?.sourceId, raw?.id]
+    .map((value) => value == null ? '' : String(value).trim()).find(Boolean) || ''
+  const prefixed = id.match(/^(custom|usda|fatsecret):(.+)$/i)
+  if (prefixed) {
+    const provider = prefixed[1].toLowerCase()
+    if (source && source !== provider) return null
+    source = provider
+    id = prefixed[2]
   }
-
+  if (!source && raw?.__custom === true) source = 'custom'
   if (!source || !id) return null
   return { source, id }
 }
@@ -1157,6 +1176,7 @@ function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotal
 }
 
 function normalizeFoodApiEntry(raw: any): FoodEntry {
+  const originalRaw = raw
   raw = materializeMealPortion(raw)
   const itemsTotals = recalculateTotalsFromItems(raw?.items)
   const storedTotals = sanitizeEntryTotals(raw?.nutrients || raw?.nutrition || raw?.total)
@@ -1213,7 +1233,7 @@ function normalizeFoodApiEntry(raw: any): FoodEntry {
     },
     items: Array.isArray(raw?.items) ? raw.items : null,
     createdAt: String(raw?.createdAt || new Date().toISOString()),
-    raw,
+    raw: originalRaw,
   }
 }
 
@@ -1550,6 +1570,7 @@ function favoriteServingLabel(favorite: FavoriteMeal | null | undefined) {
 
 function normalizeFavoriteMeal(raw: any): FavoriteMeal | null {
   if (!raw || typeof raw !== 'object') return null
+  const originalRaw = raw
   raw = materializeMealPortion(raw)
   const items = cloneFavoriteItems(raw?.items) || cloneFavoriteItems(raw?.ingredients)
   const totals = favoriteTotalsFromRaw(raw)
@@ -1582,7 +1603,7 @@ function normalizeFavoriteMeal(raw: any): FavoriteMeal | null {
     lastUsedAt: raw?.lastUsedAt || raw?.lastUsed || raw?.recentlyUsedAt || null,
     sourceId: raw?.sourceId ? String(raw.sourceId) : null,
     method: raw?.method ? String(raw.method) : null,
-    raw,
+    raw: originalRaw,
   }
 }
 
@@ -1595,7 +1616,17 @@ function normalizeFavoriteList(raw: any): FavoriteMeal[] {
 
 function favoriteStorageRecord(favorite: FavoriteMeal) {
   const baseRaw = favorite?.raw && typeof favorite.raw === 'object' ? { ...favorite.raw } : {}
-  const totals = {
+  const portion = savedMealPortion(baseRaw)
+  const fullItems = portion ? cloneFavoriteItems(baseRaw.items) || cloneFavoriteItems(baseRaw.ingredients) : null
+  const originalTotals = portion && fullItems?.length ? {
+    calories: readNutrient(portion, ['calories', 'calories_kcal']),
+    protein: readNutrient(portion, ['protein', 'protein_g']),
+    carbs: readNutrient(portion, ['carbs', 'carbs_g']),
+    fat: readNutrient(portion, ['fat', 'fat_g']),
+    fiber: readOptionalNutrient(portion, ['fiber', 'fiber_g']),
+    sugar: readOptionalNutrient(portion, ['sugar', 'sugar_g']),
+  } : null
+  const totals = originalTotals || {
     calories: Math.max(0, Math.round(Number(favorite?.nutrients?.calories) || 0)),
     protein: Math.max(0, round1(Number(favorite?.nutrients?.protein) || 0)),
     carbs: Math.max(0, round1(Number(favorite?.nutrients?.carbs) || 0)),
@@ -1611,9 +1642,9 @@ function favoriteStorageRecord(favorite: FavoriteMeal) {
     description: favorite.description || favorite.name,
     meal: favorite.meal,
     category: favorite.meal,
-    nutrition: { ...(baseRaw?.nutrition || {}), ...totals },
-    total: { ...(baseRaw?.total || {}), ...totals },
-    items: Array.isArray(favorite.items) ? favorite.items : baseRaw?.items || null,
+    nutrition: { ...(savedMealPortion(baseRaw) || baseRaw?.nutrition || {}), ...totals },
+    total: { ...(savedMealPortion(baseRaw) || baseRaw?.total || {}), ...totals },
+    items: fullItems || (Array.isArray(favorite.items) ? favorite.items : baseRaw?.items || null),
     customMeal: favorite.custom === true,
     createdAt: favorite.createdAt || baseRaw?.createdAt || Date.now(),
     lastUsedAt: favorite.lastUsedAt || baseRaw?.lastUsedAt || null,
@@ -1630,9 +1661,10 @@ function linkedFavoriteIdFromEntry(entry: FoodEntry | null | undefined) {
   return typeof total?.__favoriteId === 'string' ? String(total.__favoriteId).trim() : ''
 }
 
-function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[] {
+function buildFavoriteAdjustItems(item: FavoritesListItem, wholeMeal = false): FavoriteAdjustItem[] {
   const source = item.favorite || item.entry
-  const rawItems = Array.isArray(source?.items) ? source.items : []
+  const fullItems = wholeMeal && savedMealPortion(source?.raw) ? cloneFavoriteItems(source?.raw?.items) || cloneFavoriteItems(source?.raw?.ingredients) : null
+  const rawItems = fullItems || (Array.isArray(source?.items) ? source.items : [])
   if (rawItems.length > 0) {
     return rawItems.map((raw: any, index: number) => {
       const servingOptions = normalizeFavoriteServingOptions(raw?.servingOptions)
@@ -1657,7 +1689,20 @@ function buildFavoriteAdjustItems(item: FavoritesListItem): FavoriteAdjustItem[]
       }
     })
   }
-  const sourceTotals = item.favorite?.nutrients || item.entry?.nutrients || {
+  const sourceTotals = wholeMeal && savedMealPortion(source?.raw)
+    ? (() => {
+        const stored = savedMealPortion(source?.raw)!
+        const scale = Number(stored.__portionScale) || 1
+        return {
+          calories: readNutrient(stored, ['calories', 'calories_kcal']) / scale,
+          protein: readNutrient(stored, ['protein', 'protein_g']) / scale,
+          carbs: readNutrient(stored, ['carbs', 'carbs_g']) / scale,
+          fat: readNutrient(stored, ['fat', 'fat_g']) / scale,
+          fiber: scaleOptionalNutrient(readOptionalNutrient(stored, ['fiber', 'fiber_g']), 1 / scale),
+          sugar: scaleOptionalNutrient(readOptionalNutrient(stored, ['sugar', 'sugar_g']), 1 / scale),
+        }
+      })()
+    : item.favorite?.nutrients || item.entry?.nutrients || {
     calories: item.calories,
     protein: 0,
     carbs: 0,
@@ -1894,6 +1939,11 @@ export function TrackCaloriesScreen() {
   const [favoriteEditSearchLoading, setFavoriteEditSearchLoading] = useState(false)
   const [favoriteEditSearchError, setFavoriteEditSearchError] = useState('')
   const [favoriteEditPortionControlEnabled, setFavoriteEditPortionControlEnabled] = useState(false)
+  const [favoriteEditPortionAmount, setFavoriteEditPortionAmount] = useState('1')
+  const [favoriteEditPortionUnit, setFavoriteEditPortionUnit] = useState<MealPortionUnit>('serving')
+  const [favoriteEditRecipeServings, setFavoriteEditRecipeServings] = useState(1)
+  const [favoriteEditSavedScale, setFavoriteEditSavedScale] = useState<number | null>(null)
+  const [favoriteEditPortionChoice, setFavoriteEditPortionChoice] = useState<'whole' | 'half' | 'custom'>('whole')
   const [favoriteEditPhotoLoading, setFavoriteEditPhotoLoading] = useState(false)
   const [favoriteEditMissingReportOpen, setFavoriteEditMissingReportOpen] = useState(false)
   const [favoriteEditMissingReportName, setFavoriteEditMissingReportName] = useState('')
@@ -2369,10 +2419,58 @@ export function TrackCaloriesScreen() {
     [favoritePreviewItems],
   )
 
-  const favoriteEditTotals = useMemo(
-    () => calculateFavoriteAdjustTotals(favoriteEditItems),
-    [favoriteEditItems],
+  const favoriteEditWholeGrams = useMemo(() => {
+    if (!favoriteEditItems.length) return null
+    let total = 0
+    for (const item of favoriteEditItems) {
+      const base = favoriteBaseForItem(item)
+      if (!base) return null
+      const grams = convertFoodAmount(base.amount * item.servings, base.unit, 'g', base.density)
+      if (!Number.isFinite(grams) || grams <= 0) return null
+      total += grams
+    }
+    return total
+  }, [favoriteEditItems])
+
+  const favoriteEditPortionScale = mealRecipe
+    ? recipePortionRatio(recipeServingsEaten, Number(mealRecipe.servings) > 0 ? Number(mealRecipe.servings) : 1)
+    : favoriteEditPortionControlEnabled
+      ? favoriteEditSavedScale ?? mealPortionScale(favoriteEditPortionAmount, favoriteEditPortionUnit, favoriteEditWholeGrams, favoriteEditRecipeServings)
+      : 1
+  const favoriteEditPortionItems = useMemo(
+    () => portionMealItems(favoriteEditItems, favoriteEditPortionScale ?? 1),
+    [favoriteEditItems, favoriteEditPortionScale],
   )
+  const favoriteEditTotals = useMemo(
+    () => favoriteEditPortionScale == null
+      ? { calories: null, protein: null, carbs: null, fat: null, fiber: null, sugar: null }
+      : calculateFavoriteAdjustTotals(favoriteEditPortionItems),
+    [favoriteEditPortionItems, favoriteEditPortionScale],
+  )
+  const favoriteEditSaveDisabled = favoriteEditPortionScale == null
+    || favoriteEditItems.length === 0
+    || favoriteEditItems.some((item) => !Number.isFinite(item.servings) || item.servings <= 0)
+    || !!(mealRecipe && recipePortionRatio(recipeServingsEaten, 1) == null)
+
+  const chooseFavoriteEditPortion = (choice: 'whole' | 'half' | 'custom') => {
+    setFavoriteEditSavedScale(null)
+    setFavoriteEditPortionChoice(choice)
+    setFavoriteEditPortionControlEnabled(choice !== 'whole')
+    if (choice !== 'custom') {
+      setFavoriteEditPortionUnit('serving')
+      setFavoriteEditPortionAmount(String(favoriteEditRecipeServings * (choice === 'half' ? 0.5 : 1)))
+    }
+  }
+  const changeFavoriteEditPortionUnit = (unit: MealPortionUnit) => {
+    const scale = favoriteEditPortionScale
+    setFavoriteEditSavedScale(null)
+    setFavoriteEditPortionUnit(unit)
+    if (scale != null) {
+      const amount = unit === 'serving' ? scale * favoriteEditRecipeServings : favoriteEditWholeGrams != null
+        ? favoriteEditWholeGrams * scale / (unit === 'oz' ? 28.349523125 : 1) : null
+      if (amount != null) setFavoriteEditPortionAmount(String(amount))
+    }
+  }
 
   const favoriteEditServingPickerItem = useMemo(
     () =>
@@ -2617,6 +2715,10 @@ export function TrackCaloriesScreen() {
     setFavoriteEditSearchLoading(false)
     setFavoriteEditSearchError('')
     setFavoriteEditPortionControlEnabled(false)
+    setFavoriteEditPortionAmount('1')
+    setFavoriteEditPortionUnit('serving')
+    setFavoriteEditPortionChoice('whole')
+    setFavoriteEditSavedScale(null)
     setFavoriteEditPhotoLoading(false)
     setFavoriteEditMissingReportOpen(false)
     setFavoriteEditMissingReportName('')
@@ -3457,6 +3559,8 @@ export function TrackCaloriesScreen() {
   const saveListItemToFavorites = async (item: FavoritesListItem) => {
     if (!item.entry) return
     const base = makeFavoriteFromEntry(item.entry)
+    const originalPortion = savedMealPortion(item.entry.raw)
+    const baseTotals = base.nutrients || { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: null, sugar: null }
     const candidate: FavoriteMeal = {
       ...base,
       name: item.label,
@@ -3475,22 +3579,24 @@ export function TrackCaloriesScreen() {
         description: item.label,
         meal: String(item.entry.meal || item.entry.category || favoritesTargetMeal || 'uncategorized'),
         category: String(item.entry.meal || item.entry.category || favoritesTargetMeal || 'uncategorized'),
-        items: Array.isArray(item.entry.items) ? JSON.parse(JSON.stringify(item.entry.items)) : null,
+        items: originalPortion ? cloneFavoriteItems(item.entry.raw?.items) || cloneFavoriteItems(item.entry.raw?.ingredients) : Array.isArray(item.entry.items) ? JSON.parse(JSON.stringify(item.entry.items)) : null,
         nutrition: {
-          calories: base.nutrients.calories,
-          protein: base.nutrients.protein,
-          carbs: base.nutrients.carbs,
-          fat: base.nutrients.fat,
-          fiber: base.nutrients.fiber,
-          sugar: base.nutrients.sugar,
+          ...(originalPortion || {}),
+          calories: baseTotals.calories,
+          protein: baseTotals.protein,
+          carbs: baseTotals.carbs,
+          fat: baseTotals.fat,
+          fiber: baseTotals.fiber,
+          sugar: baseTotals.sugar,
         },
         total: {
-          calories: base.nutrients.calories,
-          protein: base.nutrients.protein,
-          carbs: base.nutrients.carbs,
-          fat: base.nutrients.fat,
-          fiber: base.nutrients.fiber,
-          sugar: base.nutrients.sugar,
+          ...(originalPortion || {}),
+          calories: baseTotals.calories,
+          protein: baseTotals.protein,
+          carbs: baseTotals.carbs,
+          fat: baseTotals.fat,
+          fiber: baseTotals.fiber,
+          sugar: baseTotals.sugar,
         },
       },
     }
@@ -3557,6 +3663,8 @@ export function TrackCaloriesScreen() {
     const sourceFavorite = item.favorite
     const sourceEntry = item.entry
     const source = sourceFavorite || sourceEntry
+    const originalPortion = !adjustedItems?.length ? savedMealPortion(source?.raw) : null
+    const originalItems = originalPortion ? cloneFavoriteItems(source?.raw?.items) || cloneFavoriteItems(source?.raw?.ingredients) : null
     const totals =
       adjustedItems && adjustedItems.length > 0
         ? calculateFavoriteAdjustTotals(adjustedItems)
@@ -3587,11 +3695,12 @@ export function TrackCaloriesScreen() {
             fiber_g: entry.fiber,
             sugar_g: entry.sugar,
           }))
-        : Array.isArray(source?.items)
+        : originalItems || (Array.isArray(source?.items)
         ? JSON.parse(JSON.stringify(source.items))
-        : null
+        : null)
     const nutritionPayload = {
-      ...(sourceFavorite?.raw?.nutrition || sourceFavorite?.raw?.total || sourceEntry?.raw?.nutrition || sourceEntry?.raw?.total || {}),
+      ...(originalPortion || sourceFavorite?.raw?.nutrition || sourceFavorite?.raw?.total || sourceEntry?.raw?.nutrition || sourceEntry?.raw?.total || {}),
+      __portionScale: originalPortion ? Number(originalPortion.__portionScale) : 1,
       calories: Math.max(0, Math.round(Number(totals?.calories) || 0)),
       protein: Math.max(0, round1(Number(totals?.protein) || 0)),
       carbs: Math.max(0, round1(Number(totals?.carbs) || 0)),
@@ -3671,11 +3780,19 @@ export function TrackCaloriesScreen() {
     const recipeNutrition = item.entry?.raw?.nutrients || item.entry?.raw?.nutrition || item.favorite?.raw?.nutrients || item.favorite?.raw?.nutrition || {}
     const recipe = recipeNutrition.__importRecipe || null
     setMealRecipe(recipe)
-    const eaten = Number(recipeNutrition.__nativeRecipeServingsEaten || recipe?.servings || 1)
+    const storedPortion = savedMealPortion(item.favorite?.raw || item.entry?.raw)
+    const storedScale = Number(storedPortion?.__portionScale) > 0 ? Number(storedPortion?.__portionScale) : 1
+    const recipeYield = Number(recipe?.servings) > 0 ? Number(recipe.servings) : 1
+    const nativeEaten = Number(recipeNutrition.__nativeRecipeServingsEaten)
+    const legacyConsumedRecipe = !!recipe && nativeEaten > 0 && storedScale === 1
+      && recipeNutrition.__origin !== 'meal-builder' && recipeNutrition.__portionControlEnabled !== true
+    const eaten = legacyConsumedRecipe ? nativeEaten : storedScale * recipeYield
     setRecipeServingsEaten(recipe ? String(eaten) : '')
-    recipeServingsAppliedRef.current = eaten > 0 ? eaten : 1
-    setFavoriteEditItems(buildFavoriteAdjustItems(item))
-    setFavoriteEditName(item.label)
+    recipeServingsAppliedRef.current = recipe ? eaten : 1
+    const originalItems = buildFavoriteAdjustItems(item, true)
+    const editorItems = legacyConsumedRecipe ? portionMealItems(originalItems, recipeYield / nativeEaten) : originalItems
+    setFavoriteEditItems(editorItems)
+    setFavoriteEditName(suggestMealName(editorItems, item.label))
     setFavoriteEditTime(formatEditorTime(item.entry?.createdAt || item.entry?.raw?.createdAt || null))
     setFavoriteEditTimePickerOpen(false)
     setFavoriteEditIngredientsExpanded(false)
@@ -3686,7 +3803,25 @@ export function TrackCaloriesScreen() {
     setFavoriteEditSearchQuery('')
     setFavoriteEditSearchResults([])
     setFavoriteEditSearchError('')
-    setFavoriteEditPortionControlEnabled(false)
+    const portion = savedMealPortion(item.favorite?.raw || item.entry?.raw)
+    const scale = Number(portion?.__portionScale) || 1
+    const wholeServings = Number(portion?.__portionRecipeServings) > 0 ? Number(portion?.__portionRecipeServings) : 1
+    setFavoriteEditRecipeServings(wholeServings)
+    let portionUnit: MealPortionUnit = portion?.__portionUnit === 'g' || portion?.__portionUnit === 'oz' ? portion.__portionUnit : 'serving'
+    const savedAmount = nullableNumber(portion?.__portionAmount)
+    const wholeGrams = nullableNumber(portion?.__portionTotalWeightG)
+    let restoredAmount = savedAmount != null && savedAmount > 0 ? savedAmount : null
+    if (restoredAmount == null && portionUnit !== 'serving') {
+      if (wholeGrams != null && wholeGrams > 0) restoredAmount = wholeGrams * scale / (portionUnit === 'oz' ? 28.349523125 : 1)
+      else portionUnit = 'serving'
+    }
+    if (restoredAmount == null) restoredAmount = scale * wholeServings
+    // A saved scale is authoritative, even when old displayed ounce amounts were rounded.
+    setFavoriteEditSavedScale(scale)
+    setFavoriteEditPortionControlEnabled(scale !== 1 || portion?.__portionControlEnabled === true)
+    setFavoriteEditPortionAmount(String(restoredAmount))
+    setFavoriteEditPortionUnit(portionUnit)
+    setFavoriteEditPortionChoice(scale === 1 ? 'whole' : scale === 0.5 && portionUnit === 'serving' ? 'half' : 'custom')
   }
 
   const buildImportedRecipeItems = async (ingredients: string[]) => {
@@ -3769,6 +3904,11 @@ export function TrackCaloriesScreen() {
     setFavoriteEditSearchResults([])
     setFavoriteEditSearchError('')
     setFavoriteEditPortionControlEnabled(false)
+    setFavoriteEditPortionAmount('1')
+    setFavoriteEditPortionUnit('serving')
+    setFavoriteEditPortionChoice('whole')
+    setFavoriteEditSavedScale(null)
+    setFavoriteEditRecipeServings(1)
     setFavoriteEditMissingReportOpen(false)
     setMealBuilderOpen(true)
     setSectionMenuMeal(null)
@@ -3783,7 +3923,7 @@ export function TrackCaloriesScreen() {
       if (typeof payload?.localDate === 'string') setSelectedDate(payload.localDate)
       closeAllAddMenus()
       openNativeMealBuilder(meal, {
-        name: items.length === 1 ? String(items[0]?.name || 'Photo analyzed meal') : 'Photo analyzed meal',
+        name: suggestMealName(items),
         items: items.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)),
       })
       Alert.alert('Review before saving', String(payload?.nutritionNotice || 'Photo nutrition is an estimate. Check the food and portion amounts before saving.'))
@@ -3958,14 +4098,8 @@ export function TrackCaloriesScreen() {
   }
 
   const updateRecipeServingsEaten = (value: string) => {
+    // Keep the complete recipe immutable; preview/save derive the eaten share.
     setRecipeServingsEaten(value)
-    const ratio = recipePortionRatio(value, recipeServingsAppliedRef.current)
-    if (ratio == null) return
-    setFavoriteEditItems((items) => items.map((item) => {
-      const servings = item.servings * ratio
-      return { ...item, servings, amountInput: formatFavoriteAmount(favoriteAmountFromServings(servings, item.amountUnit, favoriteBaseForItem(item))) }
-    }))
-    recipeServingsAppliedRef.current = Number(value)
   }
 
   const openMealEntryEditor = (entry: FoodEntry) => {
@@ -3983,15 +4117,27 @@ export function TrackCaloriesScreen() {
       Alert.alert('Check servings', 'Enter the number of recipe servings you ate before saving.')
       return
     }
-    const recipeMetadata = mealRecipe ? { __importRecipe: mealRecipe, __nativeRecipeServingsEaten: Number(recipeServingsEaten) } : {}
+    if (favoriteEditPortionScale == null || favoriteEditItems.some((item) => !Number.isFinite(item.servings) || item.servings <= 0)) {
+      Alert.alert('Check portion amount', 'Enter a positive amount before saving.')
+      return
+    }
+    const recipeMetadata = {
+      __portionScale: favoriteEditPortionScale,
+      __portionControlEnabled: !!mealRecipe || favoriteEditPortionControlEnabled,
+      __portionUnit: mealRecipe ? 'serving' : favoriteEditPortionUnit,
+      __portionAmount: mealRecipe ? Number(recipeServingsEaten) : Number(favoriteEditPortionAmount),
+      __portionTotalWeightG: favoriteEditWholeGrams,
+      __portionRecipeServings: mealRecipe ? Number(mealRecipe.servings) > 0 ? Number(mealRecipe.servings) : 1 : favoriteEditRecipeServings,
+      ...(mealRecipe ? { __importRecipe: mealRecipe, __nativeRecipeServingsEaten: Number(recipeServingsEaten) } : {}),
+    }
     if (!favoriteEditItem && !isMealBuilder) return
-    if (isMealBuilder && favoriteEditItems.length === 0) {
+    if (favoriteEditItems.length === 0) {
       Alert.alert('Add ingredients', 'Add at least one ingredient first.')
       return
     }
     const fallbackName = favoriteEditItems.map((item) => item.name).filter(Boolean).slice(0, 3).join(', ')
     const nextName = normalizeFavoriteLabel(favoriteEditName) || favoriteEditItem?.label || fallbackName || 'Built meal'
-    const totals = calculateFavoriteAdjustTotals(favoriteEditItems)
+    const totals = calculateFavoriteAdjustTotals(favoriteEditPortionItems)
     const nextItems = favoriteEditItems.map((entry) => ({
       ...(entry.raw && typeof entry.raw === 'object' ? entry.raw : {}),
       id: entry.raw?.id || entry.id,
@@ -4015,16 +4161,16 @@ export function TrackCaloriesScreen() {
       const nutrition = {
         calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
         calories_kcal: Math.max(0, Math.round(Number(totals.calories) || 0)),
-        protein: Math.max(0, round1(Number(totals.protein) || 0)),
-        protein_g: Math.max(0, round1(Number(totals.protein) || 0)),
-        carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
-        carbs_g: Math.max(0, round1(Number(totals.carbs) || 0)),
-        fat: Math.max(0, round1(Number(totals.fat) || 0)),
-        fat_g: Math.max(0, round1(Number(totals.fat) || 0)),
-        fiber: roundOptionalNutrient(totals.fiber),
-        fiber_g: roundOptionalNutrient(totals.fiber),
-        sugar: roundOptionalNutrient(totals.sugar),
-        sugar_g: roundOptionalNutrient(totals.sugar),
+        protein: Math.max(0, roundTo(Number(totals.protein) || 0, 3)),
+        protein_g: Math.max(0, roundTo(Number(totals.protein) || 0, 3)),
+        carbs: Math.max(0, roundTo(Number(totals.carbs) || 0, 3)),
+        carbs_g: Math.max(0, roundTo(Number(totals.carbs) || 0, 3)),
+        fat: Math.max(0, roundTo(Number(totals.fat) || 0, 3)),
+        fat_g: Math.max(0, roundTo(Number(totals.fat) || 0, 3)),
+        fiber: roundOptionalNutrient(totals.fiber, 3),
+        fiber_g: roundOptionalNutrient(totals.fiber, 3),
+        sugar: roundOptionalNutrient(totals.sugar, 3),
+        sugar_g: roundOptionalNutrient(totals.sugar, 3),
         customMeal: true,
         method: 'meal-builder',
         ...recipeMetadata,
@@ -4077,16 +4223,16 @@ export function TrackCaloriesScreen() {
         ...(baseNutrition as any),
         calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
         calories_kcal: Math.max(0, Math.round(Number(totals.calories) || 0)),
-        protein: Math.max(0, round1(Number(totals.protein) || 0)),
-        protein_g: Math.max(0, round1(Number(totals.protein) || 0)),
-        carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
-        carbs_g: Math.max(0, round1(Number(totals.carbs) || 0)),
-        fat: Math.max(0, round1(Number(totals.fat) || 0)),
-        fat_g: Math.max(0, round1(Number(totals.fat) || 0)),
-        fiber: roundOptionalNutrient(totals.fiber),
-        fiber_g: roundOptionalNutrient(totals.fiber),
-        sugar: roundOptionalNutrient(totals.sugar),
-        sugar_g: roundOptionalNutrient(totals.sugar),
+        protein: Math.max(0, roundTo(Number(totals.protein) || 0, 3)),
+        protein_g: Math.max(0, roundTo(Number(totals.protein) || 0, 3)),
+        carbs: Math.max(0, roundTo(Number(totals.carbs) || 0, 3)),
+        carbs_g: Math.max(0, roundTo(Number(totals.carbs) || 0, 3)),
+        fat: Math.max(0, roundTo(Number(totals.fat) || 0, 3)),
+        fat_g: Math.max(0, roundTo(Number(totals.fat) || 0, 3)),
+        fiber: roundOptionalNutrient(totals.fiber, 3),
+        fiber_g: roundOptionalNutrient(totals.fiber, 3),
+        sugar: roundOptionalNutrient(totals.sugar, 3),
+        sugar_g: roundOptionalNutrient(totals.sugar, 3),
         customMeal: true,
         method: 'meal-builder',
         ...recipeMetadata,
@@ -4169,11 +4315,11 @@ export function TrackCaloriesScreen() {
       items: nextItems,
       nutrients: {
         calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
-        protein: Math.max(0, round1(Number(totals.protein) || 0)),
-        carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
-        fat: Math.max(0, round1(Number(totals.fat) || 0)),
-        fiber: roundOptionalNutrient(totals.fiber),
-        sugar: roundOptionalNutrient(totals.sugar),
+        protein: Math.max(0, roundTo(Number(totals.protein) || 0, 3)),
+        carbs: Math.max(0, roundTo(Number(totals.carbs) || 0, 3)),
+        fat: Math.max(0, roundTo(Number(totals.fat) || 0, 3)),
+        fiber: roundOptionalNutrient(totals.fiber, 3),
+        sugar: roundOptionalNutrient(totals.sugar, 3),
       },
       raw: {
         ...(sourceFavorite.raw || {}),
@@ -4182,25 +4328,26 @@ export function TrackCaloriesScreen() {
         meal,
         category: meal,
         items: nextItems,
+        nutrients: null,
         nutrition: {
           ...((sourceFavorite.raw?.nutrition || sourceFavorite.raw?.total || {}) as any),
           ...recipeMetadata,
           calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
-          protein: Math.max(0, round1(Number(totals.protein) || 0)),
-          carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
-          fat: Math.max(0, round1(Number(totals.fat) || 0)),
-          fiber: roundOptionalNutrient(totals.fiber),
-          sugar: roundOptionalNutrient(totals.sugar),
+          protein: Math.max(0, roundTo(Number(totals.protein) || 0, 3)),
+          carbs: Math.max(0, roundTo(Number(totals.carbs) || 0, 3)),
+          fat: Math.max(0, roundTo(Number(totals.fat) || 0, 3)),
+          fiber: roundOptionalNutrient(totals.fiber, 3),
+          sugar: roundOptionalNutrient(totals.sugar, 3),
         },
         total: {
           ...((sourceFavorite.raw?.total || sourceFavorite.raw?.nutrition || {}) as any),
           ...recipeMetadata,
           calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
-          protein: Math.max(0, round1(Number(totals.protein) || 0)),
-          carbs: Math.max(0, round1(Number(totals.carbs) || 0)),
-          fat: Math.max(0, round1(Number(totals.fat) || 0)),
-          fiber: roundOptionalNutrient(totals.fiber),
-          sugar: roundOptionalNutrient(totals.sugar),
+          protein: Math.max(0, roundTo(Number(totals.protein) || 0, 3)),
+          carbs: Math.max(0, roundTo(Number(totals.carbs) || 0, 3)),
+          fat: Math.max(0, roundTo(Number(totals.fat) || 0, 3)),
+          fiber: roundOptionalNutrient(totals.fiber, 3),
+          sugar: roundOptionalNutrient(totals.sugar, 3),
         },
         method: method || (custom ? 'meal-builder' : 'text'),
         ...(custom ? { customMeal: true } : {}),
@@ -4208,10 +4355,10 @@ export function TrackCaloriesScreen() {
     }
 
     const next = favorites.map((favorite) =>
-      favorite.id === sourceFavorite.id ? nextFavorite : favorite,
+      favorite.id === sourceFavorite.id ? normalizeFavoriteMeal(favoriteStorageRecord(nextFavorite)) || nextFavorite : favorite,
     )
     await saveFavorites(next)
-    const updatedListItem = buildFavoritesListItemFromFavorite(nextFavorite)
+    const updatedListItem = buildFavoritesListItemFromFavorite(normalizeFavoriteMeal(favoriteStorageRecord(nextFavorite)) || nextFavorite)
     setFavoriteEditItem(null)
     setFavoriteEditItems([])
     setFavoriteEditName('')
@@ -4237,6 +4384,7 @@ export function TrackCaloriesScreen() {
     if (!items.length) return
     setFavoriteEditIngredientsExpanded(true)
     setFavoriteEditItems((prev) => [...prev, ...items])
+    setFavoriteEditName((current) => suggestMealName(items, current))
     setFavoriteEditExpandedItemId(items[0]?.id || null)
   }, [])
 
@@ -4342,8 +4490,7 @@ export function TrackCaloriesScreen() {
           selectedServingId: findSelectedServingId(options, entry.servingLabel, entry.selectedServingId),
           raw: {
             ...raw,
-            ...(identifiers?.source ? { source: identifiers.source } : {}),
-            ...(identifiers?.id ? { id: identifiers.source === 'custom' ? `custom:${identifiers.id}` : identifiers.id } : {}),
+            ...(identifiers ? { servingOptionsSource: { ...identifiers } } : {}),
             servingOptions: options,
           },
         }
@@ -4362,7 +4509,7 @@ export function TrackCaloriesScreen() {
     )
     const data: any = await res.json().catch(() => ({}))
     if (!res.ok) return []
-    const options = normalizeFavoriteServingOptions(data?.options)
+    const options = normalizeFavoriteServingOptions(data?.options).filter((option) => !option.foodName || isFoodIdentityCompatible(item.name, option.foodName))
     if (options.length > 0) cacheFavoriteEditServingOptions(item.id, options, lookup)
     return options
   }
@@ -4379,10 +4526,11 @@ export function TrackCaloriesScreen() {
     const data: any = await res.json().catch(() => ({}))
     if (!res.ok) return []
     const results: SearchFoodItem[] = Array.isArray(data?.items) ? data.items : []
-    const best = results.find((entry) => entry?.__custom === true || entry?.source === 'custom') || results[0] || null
+    const compatible = results.filter((entry) => isFoodIdentityCompatible(item.name, String(entry.name || '')))
+    const best = compatible.find((entry) => entry?.__custom === true || entry?.source === 'custom') || compatible[0] || null
     if (!best) return []
 
-    const directOptions = normalizeFavoriteServingOptions(best.servingOptions)
+    const directOptions = normalizeFavoriteServingOptions(best.servingOptions).filter((option) => !option.foodName || isFoodIdentityCompatible(item.name, option.foodName))
     const lookup = servingLookupForFavoriteAdjustItem({
       ...item,
       raw: best,
@@ -4399,14 +4547,14 @@ export function TrackCaloriesScreen() {
     )
     const optionsData: any = await resOptions.json().catch(() => ({}))
     if (!resOptions.ok) return []
-    const fetchedOptions = normalizeFavoriteServingOptions(optionsData?.options)
+    const fetchedOptions = normalizeFavoriteServingOptions(optionsData?.options).filter((option) => !option.foodName || isFoodIdentityCompatible(item.name, option.foodName))
     if (fetchedOptions.length > 0) cacheFavoriteEditServingOptions(item.id, fetchedOptions, lookup)
     return fetchedOptions
   }
 
   const openFavoriteEditServingPicker = async (item: FavoriteAdjustItem) => {
-    const existing = normalizeFavoriteServingOptions(item.servingOptions || item.raw?.servingOptions)
-    if (existing.length > 0) {
+    const existing = normalizeFavoriteServingOptions(item.servingOptions || item.raw?.servingOptions).filter((option) => !option.foodName || isFoodIdentityCompatible(item.name, option.foodName))
+    if (existing.length > 0 && (existing.every((option) => !!option.foodName) || !servingLookupForFavoriteAdjustItem(item))) {
       setFavoriteEditServingPickerItemId(item.id)
       return
     }
@@ -5004,7 +5152,7 @@ export function TrackCaloriesScreen() {
         return
       }
       openNativeMealBuilder(meal, {
-        name: reviewItems.length === 1 ? String(reviewItems[0]?.name || 'Photo analyzed meal') : 'Photo analyzed meal',
+        name: suggestMealName(reviewItems),
         items: reviewItems.map((entry: any) => buildFavoriteAdjustItemFromSearchFood(entry)),
       })
       Alert.alert('Review before saving', String(data?.nutritionNotice || 'Photo nutrition is an estimate. Check the food and portion amounts before saving.'))
@@ -5886,7 +6034,7 @@ export function TrackCaloriesScreen() {
   }
 
   const renderFavoriteNutrientCards = (entryTotals: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }) => (
-    <NutrientCards energyUnit={energyUnit} values={entryTotals} />
+    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={entryTotals} />
   )
 
   const renderFavoriteDailyTotals = (entryTotals: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }) => {
@@ -5967,7 +6115,7 @@ export function TrackCaloriesScreen() {
               style={{
                 borderWidth: 1,
                 borderColor: row.border,
-                borderRadius: 14,
+                borderRadius: 2,
                 padding: 12,
                 backgroundColor: row.bg,
               }}
@@ -5976,8 +6124,8 @@ export function TrackCaloriesScreen() {
                 <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>{row.label}</Text>
                 <Text style={{ color: theme.colors.text, fontWeight: '700', textAlign: 'right', flex: 1 }}>{row.value}</Text>
               </View>
-              <View style={{ marginTop: 10, height: 8, borderRadius: 999, backgroundColor: theme.colors.card, overflow: 'hidden' }}>
-                <View style={{ width: `${progress}%`, height: '100%', borderRadius: 999, backgroundColor: row.color }} />
+              <View style={{ marginTop: 10, height: 8, borderRadius: 2, backgroundColor: theme.colors.card, overflow: 'hidden' }}>
+                <View style={{ width: `${progress}%`, height: '100%', borderRadius: 2, backgroundColor: row.color }} />
               </View>
             </View>
           )
@@ -6014,7 +6162,7 @@ export function TrackCaloriesScreen() {
               style={{
                 width: 42,
                 height: 42,
-                borderRadius: 21,
+                borderRadius: 2,
                 backgroundColor: '#41AD49',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -6033,7 +6181,7 @@ export function TrackCaloriesScreen() {
               style={{
                 width: 42,
                 height: 42,
-                borderRadius: 21,
+                borderRadius: 2,
                 overflow: 'hidden',
                 borderWidth: 3,
                 borderColor: '#50B848',
@@ -6078,7 +6226,7 @@ export function TrackCaloriesScreen() {
               setTopAddCategoryOpen(true)
             }}
             style={{
-              borderRadius: 16,
+              borderRadius: 2,
               backgroundColor: '#50B848',
               paddingVertical: 14,
               paddingHorizontal: 16,
@@ -6090,7 +6238,7 @@ export function TrackCaloriesScreen() {
               style={{
                 width: 46,
                 height: 46,
-                borderRadius: 23,
+                borderRadius: 2,
                 backgroundColor: 'rgba(255,255,255,0.2)',
                 alignItems: 'center',
                 justifyContent: 'center',
@@ -6109,7 +6257,7 @@ export function TrackCaloriesScreen() {
             <View
               style={{
                 marginTop: 8,
-                borderRadius: 16,
+                borderRadius: 2,
                 backgroundColor: theme.colors.card,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
@@ -6141,7 +6289,7 @@ export function TrackCaloriesScreen() {
             <View
               style={{
                 marginTop: 8,
-                borderRadius: 16,
+                borderRadius: 2,
                 backgroundColor: theme.colors.card,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
@@ -6169,7 +6317,7 @@ export function TrackCaloriesScreen() {
                     style={{
                       width: 42,
                       height: 42,
-                      borderRadius: 12,
+                      borderRadius: 2,
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: item.iconBg,
@@ -6195,7 +6343,7 @@ export function TrackCaloriesScreen() {
                 {creditsRemaining == null ? '—' : creditsRemaining.toLocaleString()}
               </Text>
             </View>
-            <View style={{ marginTop: 8, height: 12, borderRadius: 999, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
+            <View style={{ marginTop: 8, height: 12, borderRadius: 2, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
               <View style={{ width: `${creditsBarPercent}%`, height: '100%', backgroundColor: '#41AD49' }} />
             </View>
             <Text style={{ marginTop: 10, color: '#4B5563', fontSize: 14 }}>
@@ -6212,13 +6360,13 @@ export function TrackCaloriesScreen() {
           <View
             onTouchStart={onSummaryTouchStart}
             onTouchEnd={onSummaryTouchEnd}
-            style={{ borderRadius: 24, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', padding: 14 }}
+            style={{ borderRadius: 2, borderWidth: 1, borderColor: '#E5E7EB', backgroundColor: '#fff', padding: 14 }}
           >
             <View style={{ flexDirection: 'row', alignItems: 'center' }}>
               <Text style={{ color: theme.colors.text, fontSize: 20/1.4, fontWeight: '700' }}>
                 {isToday(selectedDate) ? "Today's energy summary" : 'Energy summary'}
               </Text>
-              <View style={{ marginLeft: 'auto', flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 999, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
+              <View style={{ marginLeft: 'auto', flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 2, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
                 <Pressable onPress={() => setEnergyUnit('kcal')} style={[energyTogglePill, energyUnit === 'kcal' && energyTogglePillActive]}>
                   <Text style={[energyToggleText, energyUnit === 'kcal' && energyToggleTextActive]}>kcal</Text>
                 </Pressable>
@@ -6276,7 +6424,7 @@ export function TrackCaloriesScreen() {
                         </Text>
                       </View>
 
-                      <View style={{ marginTop: 5, height: 9, borderRadius: 999, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
+                      <View style={{ marginTop: 5, height: 9, borderRadius: 2, backgroundColor: '#D1D5DB', overflow: 'hidden' }}>
                         {row.key === 'fat' && fatTotal > 0 ? (
                           <View style={{ width: `${usedWidth}%`, height: '100%', flexDirection: 'row' }}>
                             {fatGoodPct > 0 ? <View style={{ width: `${fatGoodPct}%`, height: '100%', backgroundColor: '#22C55E' }} /> : null}
@@ -6311,7 +6459,7 @@ export function TrackCaloriesScreen() {
             <View style={{ marginTop: 10, flexDirection: 'row', justifyContent: 'center', gap: 10 }}>
               {[0, 1, 2].map((idx) => (
                 <Pressable key={idx} onPress={() => setSummarySlideIndex(idx)}>
-                  <View style={{ width: 12, height: 12, borderRadius: 6, backgroundColor: summarySlideIndex === idx ? '#10B981' : '#D1D5DB' }} />
+                  <View style={{ width: 12, height: 12, borderRadius: 2, backgroundColor: summarySlideIndex === idx ? '#10B981' : '#D1D5DB' }} />
                 </Pressable>
               ))}
             </View>
@@ -6323,7 +6471,7 @@ export function TrackCaloriesScreen() {
             {isToday(selectedDate) ? "Today's Meals" : 'Meals'}
           </Text>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 8 }}>
-            <View style={{ flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 999, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
+            <View style={{ flexDirection: 'row', backgroundColor: theme.colors.bg, borderRadius: 2, borderWidth: 1, borderColor: '#E5E7EB', padding: 4 }}>
               <Pressable onPress={() => setEnergyUnit('kcal')} style={[energyTogglePill, energyUnit === 'kcal' && energyTogglePillActive]}>
                 <Text style={[energyToggleText, energyUnit === 'kcal' && energyToggleTextActive]}>kcal</Text>
               </Pressable>
@@ -6331,7 +6479,7 @@ export function TrackCaloriesScreen() {
                 <Text style={[energyToggleText, energyUnit === 'kj' && energyToggleTextActive]}>kJ</Text>
               </Pressable>
             </View>
-            <Pressable onPress={openAskHelfiMealAdvice} style={{ backgroundColor: '#10B981', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 8, flexShrink: 0 }}>
+            <Pressable onPress={openAskHelfiMealAdvice} style={{ backgroundColor: '#10B981', borderRadius: 2, paddingHorizontal: 14, paddingVertical: 8, flexShrink: 0 }}>
               <Text style={{ color: '#fff', fontWeight: '700' }}>Ask Helfi</Text>
             </Pressable>
           </View>
@@ -6344,13 +6492,13 @@ export function TrackCaloriesScreen() {
           </View>
         ) : (
           <>
-            <View style={[cardStyle, { marginTop: 12, marginHorizontal: 16, borderRadius: 20, padding: 12 }]}>
+            <View style={[cardStyle, { marginTop: 12, marginHorizontal: 16, borderRadius: 2, padding: 12 }]}>
               <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                 <View
                   style={{
                     width: 54,
                     height: 54,
-                    borderRadius: 18,
+                    borderRadius: 2,
                     alignItems: 'center',
                     justifyContent: 'center',
                     backgroundColor: '#DCFCE7',
@@ -6369,7 +6517,7 @@ export function TrackCaloriesScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: '#E5E7EB',
-                    borderRadius: 14,
+                    borderRadius: 2,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
                     backgroundColor: theme.colors.card,
@@ -6384,7 +6532,7 @@ export function TrackCaloriesScreen() {
                   onPress={onAppleHealthImportSelectedDate}
                   disabled={healthSync.busy}
                   accessibilityLabel={`Import ${healthSync.source?.sourceName || 'Apple Health'} for ${selectedDate}`}
-                  style={{ marginTop: 12, padding: 12, borderRadius: 12, borderWidth: 1, borderColor: '#A7F3D0', opacity: healthSync.busy ? 0.5 : 1 }}
+                  style={{ marginTop: 12, padding: 12, borderRadius: 2, borderWidth: 1, borderColor: '#A7F3D0', opacity: healthSync.busy ? 0.5 : 1 }}
                 >
                   <Text style={{ color: '#059669', fontWeight: '700', textAlign: 'center' }}>{healthSync.busy ? 'Importing activity…' : `Import ${healthSync.source?.sourceName || 'Apple Health'}`}</Text>
                 </Pressable>
@@ -6401,7 +6549,7 @@ export function TrackCaloriesScreen() {
                   style={{
                     width: 42,
                     height: 42,
-                    borderRadius: 21,
+                    borderRadius: 2,
                     borderWidth: 1,
                     borderColor: '#A7F3D0',
                     backgroundColor: '#DCFCE7',
@@ -6421,7 +6569,7 @@ export function TrackCaloriesScreen() {
                       style={{
                         borderWidth: 1,
                         borderColor: '#E5E7EB',
-                        borderRadius: 12,
+                        borderRadius: 2,
                         backgroundColor: '#FBFDFC',
                         padding: 10,
                       }}
@@ -6483,7 +6631,7 @@ export function TrackCaloriesScreen() {
                     backgroundColor: theme.colors.card,
                     borderWidth: 1,
                     borderColor: '#E5E7EB',
-                    borderRadius: 20,
+                    borderRadius: 2,
                     overflow: 'hidden',
                   }}
                 >
@@ -6495,7 +6643,7 @@ export function TrackCaloriesScreen() {
                       style={{
                         width: 42,
                         height: 42,
-                        borderRadius: 21,
+                        borderRadius: 2,
                         borderWidth: 1,
                         borderColor: '#A7F3D0',
                         backgroundColor: '#DCFCE7',
@@ -6537,7 +6685,7 @@ export function TrackCaloriesScreen() {
                                   style={{
                                     width: 34,
                                     height: 34,
-                                    borderRadius: 17,
+                                    borderRadius: 2,
                                     alignItems: 'center',
                                     justifyContent: 'center',
                                     backgroundColor: '#EFF6FF',
@@ -6563,7 +6711,7 @@ export function TrackCaloriesScreen() {
                                   accessibilityLabel={`Open actions for ${entry.label || 'water'} entry`}
                                   onPress={() => setWaterEntryMenu(entry)}
                                   disabled={waterEditId === entry.id}
-                                  style={{ width: 42, height: 42, borderRadius: 21, marginLeft: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.bg, opacity: waterEditId === entry.id ? 0.5 : 1 }}
+                                  style={{ width: 42, height: 42, borderRadius: 2, marginLeft: 8, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.colors.bg, opacity: waterEditId === entry.id ? 0.5 : 1 }}
                                 >
                                   <MaterialCommunityIcons name="dots-horizontal" size={26} color="#4B5563" />
                                 </Pressable>
@@ -6714,7 +6862,7 @@ export function TrackCaloriesScreen() {
                                     style={{
                                       width: 34,
                                       height: 34,
-                                      borderRadius: 17,
+                                      borderRadius: 2,
                                       alignItems: 'center',
                                       justifyContent: 'center',
                                       backgroundColor: theme.colors.card,
@@ -6759,7 +6907,7 @@ export function TrackCaloriesScreen() {
                                         marginLeft: 8,
                                         width: 34,
                                         height: 34,
-                                        borderRadius: 17,
+                                        borderRadius: 2,
                                         alignItems: 'center',
                                         justifyContent: 'center',
                                         backgroundColor: theme.colors.bg,
@@ -6790,10 +6938,10 @@ export function TrackCaloriesScreen() {
               Select items, then copy them for paste into another section.
             </Text>
             <View style={{ marginTop: 10, flexDirection: 'row', gap: 8 }}>
-              <Pressable onPress={copySelected} style={{ backgroundColor: theme.colors.primary, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <Pressable onPress={copySelected} style={{ backgroundColor: theme.colors.primary, borderRadius: 2, paddingHorizontal: 12, paddingVertical: 8 }}>
                 <Text style={{ color: theme.colors.primaryText, fontWeight: '600' }}>Copy selected ({selectedIds.length})</Text>
               </Pressable>
-              <Pressable onPress={() => { setCopyMode(false); setSelectedIds([]) }} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, paddingHorizontal: 12, paddingVertical: 8 }}>
+              <Pressable onPress={() => { setCopyMode(false); setSelectedIds([]) }} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 2, paddingHorizontal: 12, paddingVertical: 8 }}>
                 <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Cancel</Text>
               </Pressable>
             </View>
@@ -6821,7 +6969,7 @@ export function TrackCaloriesScreen() {
               style={{
                 width: 242,
                 backgroundColor: '#fff',
-                borderRadius: 12,
+                borderRadius: 2,
                 borderWidth: 1,
                 borderColor: '#E5E7EB',
                 overflow: 'hidden',
@@ -6854,7 +7002,7 @@ export function TrackCaloriesScreen() {
 
       <Modal transparent visible={sectionMenuMeal != null} animationType="fade" onRequestClose={() => setSectionMenuMeal(null)}>
         <View style={modalBackdrop}>
-          <View style={[modalCardLarge, { borderRadius: 20, padding: 0, overflow: 'hidden' }]}>
+          <View style={[modalCardLarge, { borderRadius: 2, padding: 0, overflow: 'hidden' }]}>
             <View style={{ paddingHorizontal: 14, paddingTop: 14, paddingBottom: 10 }}>
               <Text style={modalTitle}>{mealLabel(sectionMenuMeal || 'uncategorized')}</Text>
             </View>
@@ -6880,7 +7028,7 @@ export function TrackCaloriesScreen() {
                     style={{
                       width: 42,
                       height: 42,
-                      borderRadius: 12,
+                      borderRadius: 2,
                       alignItems: 'center',
                       justifyContent: 'center',
                       backgroundColor: item.iconBg,
@@ -7109,7 +7257,7 @@ export function TrackCaloriesScreen() {
               <LabeledNumberInput label="Sugar (g)" value={editSugar} onChange={setEditSugar} />
             </View>
             <View style={{ marginTop: 12 }}>
-              <NutrientCards energyUnit={energyUnit} values={{ calories: nullableNumber(editCalories), protein: nullableNumber(editProtein), carbs: nullableNumber(editCarbs), fat: nullableNumber(editFat), fiber: nullableNumber(editFiber), sugar: nullableNumber(editSugar) }} />
+              <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{ calories: nullableNumber(editCalories), protein: nullableNumber(editProtein), carbs: nullableNumber(editCarbs), fat: nullableNumber(editFat), fiber: nullableNumber(editFiber), sugar: nullableNumber(editSugar) }} />
             </View>
             </ScrollView>
             <View style={{ marginTop: 12, flexDirection: 'row', gap: 8 }}>
@@ -7152,7 +7300,7 @@ export function TrackCaloriesScreen() {
                 accessibilityRole="button"
                 accessibilityLabel="Close favorites"
                 onPress={closeFavoritesFlow}
-                style={{ width: 38, height: 38, borderRadius: 19, alignItems: 'center', justifyContent: 'center' }}
+                style={{ width: 38, height: 38, borderRadius: 2, alignItems: 'center', justifyContent: 'center' }}
               >
                 <MaterialCommunityIcons name="close" size={22} color="#4B5563" />
               </Pressable>
@@ -7227,7 +7375,7 @@ export function TrackCaloriesScreen() {
                   <Text style={{ color: '#6B7280', marginTop: 8 }}>Loading favorites...</Text>
                 </View>
               ) : favoritesForList.length === 0 ? (
-                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, paddingHorizontal: 18, paddingVertical: 28 }}>
+                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, paddingHorizontal: 18, paddingVertical: 28 }}>
                   <Text style={{ color: '#6B7280', textAlign: 'center' }}>
                     {favoritesTab === 'all'
                       ? 'No meals yet. Add some entries to see them here.'
@@ -7237,7 +7385,7 @@ export function TrackCaloriesScreen() {
                   </Text>
                 </View>
               ) : (
-                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, overflow: 'hidden', backgroundColor: theme.colors.card }}>
+                <View style={{ marginHorizontal: 16, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, overflow: 'hidden', backgroundColor: theme.colors.card }}>
                   {favoritesForList.map((item, index) => {
                     const lastUsedText =
                       item.lastUsedAtMs > 0
@@ -7358,7 +7506,7 @@ export function TrackCaloriesScreen() {
 
       <Modal transparent visible={favoriteActionItem != null} animationType="fade" onRequestClose={() => setFavoriteActionItem(null)}>
         <View style={modalBackdrop}>
-          <View style={[modalCard, { borderRadius: 20, padding: 18 }]}>
+          <View style={[modalCard, { borderRadius: 2, padding: 18 }]}>
             <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '600' }}>{favoriteActionItem?.label}</Text>
             <Text style={{ color: '#6B7280', marginTop: 4 }}>What would you like to do?</Text>
 
@@ -7504,7 +7652,7 @@ export function TrackCaloriesScreen() {
             </View>
 
             {!importRecipe ? (
-              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
+              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
                 {importRecipeMode === 'url' ? (
                   <>
                     <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Recipe link</Text>
@@ -7579,7 +7727,7 @@ export function TrackCaloriesScreen() {
                             <Image
                               key={asset.uri}
                               source={{ uri: asset.uri }}
-                              style={{ width: 76, height: 76, borderRadius: 10, backgroundColor: theme.colors.bg }}
+                              style={{ width: 76, height: 76, borderRadius: 2, backgroundColor: theme.colors.bg }}
                             />
                           ))}
                         </View>
@@ -7603,7 +7751,7 @@ export function TrackCaloriesScreen() {
               </View>
             ) : (
               <>
-                <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
+                <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
                   <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Review (you can edit)</Text>
                   <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 8 }}>Use measured grams or ml. Remove optional extras you are not using and choose one food where the recipe offers alternatives.</Text>
                   {importRecipeError ? <Text style={{ color: '#DC2626', fontSize: 13, marginTop: 10 }}>{importRecipeError}</Text> : null}
@@ -7719,7 +7867,7 @@ export function TrackCaloriesScreen() {
                       : 'Edit meal'}
                 </Text>
                 <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-                  <View style={{ borderRadius: 999, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <View style={{ borderRadius: 2, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 4 }}>
                     <Text style={{ color: '#047857', fontSize: 13, fontWeight: '700' }}>{mealLabel(favoritesTargetMeal)}</Text>
                   </View>
                   <Text style={{ color: '#9CA3AF', fontSize: 12 }}>•</Text>
@@ -7731,8 +7879,8 @@ export function TrackCaloriesScreen() {
           </View>
 
           <ScrollView keyboardShouldPersistTaps="handled" contentContainerStyle={{ padding: 16, paddingBottom: 40, gap: 16 }}>
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
-              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Meal name (optional)</Text>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
+              <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Meal name</Text>
               <TextInput
                 value={favoriteEditName}
                 onChangeText={setFavoriteEditName}
@@ -7742,7 +7890,7 @@ export function TrackCaloriesScreen() {
                   marginTop: 10,
                   borderWidth: 1,
                   borderColor: '#D1D5DB',
-                  borderRadius: 12,
+                  borderRadius: 2,
                   paddingHorizontal: 14,
                   paddingVertical: 12,
                   color: theme.colors.text,
@@ -7753,8 +7901,8 @@ export function TrackCaloriesScreen() {
               <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginTop: 14, marginBottom: 8 }}>
                 Meal
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 8 }}>
-                {MEALS.map((meal) => {
+              <View style={{ flexDirection: 'row', gap: 4 }}>
+                {MEALS.filter((meal) => meal.key !== 'uncategorized').map((meal) => {
                   const selected = favoritesTargetMeal === meal.key
                   return (
                     <Pressable
@@ -7767,18 +7915,26 @@ export function TrackCaloriesScreen() {
                         borderWidth: 1,
                         borderColor: selected ? '#10B981' : '#D1D5DB',
                         backgroundColor: selected ? '#ECFDF5' : '#FFFFFF',
-                        borderRadius: 999,
-                        paddingHorizontal: 12,
+                        borderRadius: 2,
+                        flex: 1,
+                        minWidth: 0,
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        minHeight: 44,
+                        paddingHorizontal: 2,
                         paddingVertical: 9,
                       }}
                     >
-                      <Text style={{ color: selected ? '#047857' : '#374151', fontWeight: '600', fontSize: 13 }}>
+                      <Text style={{ color: selected ? '#047857' : '#374151', fontWeight: '600', fontSize: 12, textAlign: 'center' }}>
                         {meal.label}
                       </Text>
                     </Pressable>
                   )
                 })}
-              </ScrollView>
+              </View>
+              <Pressable onPress={() => setFavoritesTargetMeal('uncategorized')} accessibilityRole="button" accessibilityState={{ selected: favoritesTargetMeal === 'uncategorized' }} style={{ marginTop: 8, minHeight: 36, alignSelf: 'flex-start', justifyContent: 'center' }}>
+                <Text style={{ color: favoritesTargetMeal === 'uncategorized' ? '#047857' : '#6B7280', fontSize: 12, fontWeight: '600' }}>Other meal</Text>
+              </Pressable>
               <View style={{ marginTop: 14 }}>
                 <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600', marginBottom: 7 }}>Time</Text>
                 <Pressable
@@ -7789,7 +7945,7 @@ export function TrackCaloriesScreen() {
                     minHeight: 44,
                     borderWidth: 1,
                     borderColor: '#D1D5DB',
-                    borderRadius: 12,
+                    borderRadius: 2,
                     paddingHorizontal: 14,
                     justifyContent: 'center',
                     backgroundColor: theme.colors.card,
@@ -7820,7 +7976,7 @@ export function TrackCaloriesScreen() {
               ) : null}
             </View>
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
               <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>Search ingredients</Text>
               <View style={{ marginTop: 12, position: 'relative' }}>
                 <TextInput
@@ -7847,7 +8003,7 @@ export function TrackCaloriesScreen() {
                     marginTop: -16,
                     width: 32,
                     height: 32,
-                    borderRadius: 16,
+                    borderRadius: 2,
                     backgroundColor: '#6B7280',
                     alignItems: 'center',
                     justifyContent: 'center',
@@ -7872,22 +8028,22 @@ export function TrackCaloriesScreen() {
                     setFavoriteEditSearchKind('packaged')
                     if (favoriteEditSearchQuery.trim()) void runFavoriteEditSearch('packaged', favoriteEditSearchQuery)
                   }}
-                  style={[chip, { flex: 1, alignItems: 'center', justifyContent: 'center' }, favoriteEditSearchKind === 'packaged' && chipActive]}
+                  style={[foodChoiceButton, favoriteEditSearchKind === 'packaged' && chipActive]}
                 >
-                  <Text style={[chipText, favoriteEditSearchKind === 'packaged' && chipTextActive]}>Packaged/Fast-foods</Text>
+                  <Text style={[foodChoiceText, favoriteEditSearchKind === 'packaged' && chipTextActive]}>Packaged & fast food</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => {
                     setFavoriteEditSearchKind('single')
                     if (favoriteEditSearchQuery.trim()) void runFavoriteEditSearch('single', favoriteEditSearchQuery)
                   }}
-                  style={[chip, { flex: 1, alignItems: 'center', justifyContent: 'center' }, favoriteEditSearchKind === 'single' && chipActive]}
+                  style={[foodChoiceButton, favoriteEditSearchKind === 'single' && chipActive]}
                 >
-                  <Text style={[chipText, favoriteEditSearchKind === 'single' && chipTextActive]}>Single food</Text>
+                  <Text style={[foodChoiceText, favoriteEditSearchKind === 'single' && chipTextActive]}>Single foods</Text>
                 </Pressable>
               </View>
 
-              <View style={{ marginTop: 10, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
+              <View style={{ marginTop: 8, flexDirection: 'row', gap: 6 }}>
                 <Pressable
                   onPress={() =>
                     Alert.alert('Add by photo', 'Choose where to get the image from.', [
@@ -7896,28 +8052,28 @@ export function TrackCaloriesScreen() {
                       { text: 'Cancel', style: 'cancel' },
                     ])
                   }
-                  style={[miniSecondaryButton, { width: '48%', alignItems: 'center', justifyContent: 'center' }]}
+                  style={foodChoiceButton}
                 >
-                  <Text style={miniSecondaryText}>{favoriteEditPhotoLoading ? 'Adding photo…' : 'Add by photo'}</Text>
+                  <Text style={foodChoiceText}>{favoriteEditPhotoLoading ? 'Adding photo…' : 'Add by photo'}</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => openBarcode(favoritesTargetMeal, 'editor')}
-                  style={[miniSecondaryButton, { width: '48%', alignItems: 'center', justifyContent: 'center' }]}
+                  style={foodChoiceButton}
                 >
-                  <Text style={miniSecondaryText}>Scan barcode</Text>
+                  <Text style={foodChoiceText}>Scan barcode</Text>
                 </Pressable>
                 <Pressable
                   onPress={() => openFavorites(favoritesTargetMeal, 'editor')}
-                  style={[miniSecondaryButton, { width: '100%', alignItems: 'center', justifyContent: 'center' }]}
+                  style={foodChoiceButton}
                 >
-                  <Text style={miniSecondaryText}>Add from favorites</Text>
+                  <Text style={foodChoiceText}>Favorites</Text>
                 </Pressable>
               </View>
 
               <View style={{ marginTop: 14 }}>
                 <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 6 }}>Credits remaining</Text>
                 <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 }}>
-                  <View style={{ flex: 1, height: 8, borderRadius: 999, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
+                  <View style={{ flex: 1, height: 8, borderRadius: 2, backgroundColor: '#E5E7EB', overflow: 'hidden' }}>
                     <View
                       style={{
                         width: `${Math.max(0, 100 - creditsPercentUsed)}%`,
@@ -7933,7 +8089,7 @@ export function TrackCaloriesScreen() {
               </View>
 
               {mealRecipe ? (
-                <View style={{ marginTop: 14, padding: 14, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 16 }}>
+                <View style={{ marginTop: 14, padding: 14, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 2 }}>
                   <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Recipe servings</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 6 }}>{mealRecipe.servings ? `Full recipe makes ${mealRecipe.servings} servings.` : 'Full recipe is one batch. Enter a fraction of the batch you ate.'}</Text>
                   <Text style={{ color: theme.colors.muted, marginTop: 8 }}>{mealRecipe.servings ? 'Servings eaten' : 'Batches eaten'}</Text>
@@ -7943,43 +8099,45 @@ export function TrackCaloriesScreen() {
               ) : null}
 
               {!mealRecipe ? (
-              <View style={{ marginTop: 14, borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 16, backgroundColor: '#ECFDF5', padding: 14 }}>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>Portion control</Text>
-                    <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4 }}>
-                      {favoriteEditPortionControlEnabled
-                        ? 'Toggle is on: you are editing a portion amount.'
-                        : 'Toggle is off: this meal uses 100% of ingredients.'}
-                    </Text>
+                <View style={{ marginTop: 16, borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingTop: 16 }}>
+                  <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>How much did you eat?</Text>
+                  <View style={{ marginTop: 10, flexDirection: 'row', gap: 6 }}>
+                    {([['whole', 'Whole meal'], ['half', 'Half meal'], ['custom', 'Custom']] as const).map(([choice, label]) => (
+                      <Pressable key={choice} onPress={() => chooseFavoriteEditPortion(choice)}
+                        accessibilityRole="button" accessibilityState={{ selected: favoriteEditPortionChoice === choice }}
+                        style={[foodChoiceButton, favoriteEditPortionChoice === choice && chipActive]}>
+                        <Text style={[foodChoiceText, favoriteEditPortionChoice === choice && chipTextActive]}>{label}</Text>
+                      </Pressable>
+                    ))}
                   </View>
-                  <Switch
-                    value={favoriteEditPortionControlEnabled}
-                    onValueChange={setFavoriteEditPortionControlEnabled}
-                    trackColor={{ false: '#D1D5DB', true: '#10B981' }}
-                    thumbColor="#FFFFFF"
-                  />
+                  {favoriteEditPortionChoice === 'custom' ? (
+                    <View style={{ marginTop: 12, gap: 8 }}>
+                      <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Amount eaten</Text>
+                      <TextInput accessibilityLabel="Amount eaten" value={favoriteEditPortionAmount}
+                        onChangeText={(value) => { setFavoriteEditSavedScale(null); setFavoriteEditPortionAmount(value) }} keyboardType="decimal-pad" style={inputStyle} />
+                      <View style={{ flexDirection: 'row', gap: 6 }}>
+                        {(['serving', ...(favoriteEditWholeGrams != null ? ['g', 'oz'] : [])] as MealPortionUnit[]).map((unit) => (
+                          <Pressable key={unit} onPress={() => changeFavoriteEditPortionUnit(unit)} accessibilityRole="button"
+                            accessibilityLabel={unit === 'serving' ? 'Meal servings' : unit === 'g' ? 'Grams' : 'Ounces'}
+                            accessibilityState={{ selected: favoriteEditPortionUnit === unit }}
+                            style={[foodChoiceButton, favoriteEditPortionUnit === unit && chipActive]}>
+                            <Text style={[foodChoiceText, favoriteEditPortionUnit === unit && chipTextActive]}>{unit === 'serving' ? 'Servings' : unit}</Text>
+                          </Pressable>
+                        ))}
+                      </View>
+                    </View>
+                  ) : null}
+                  <Text style={{ color: favoriteEditPortionScale == null ? '#B91C1C' : '#6B7280', fontSize: 12, marginTop: 10 }}>
+                    {favoriteEditPortionScale == null ? 'Enter a positive amount to calculate your portion.'
+                      : `Totals show ${Math.round(favoriteEditPortionScale * 1000) / 10}% of the ingredient amounts below.`}
+                  </Text>
+                  {favoriteEditWholeGrams != null ? (
+                    <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>Whole meal: {Math.round(favoriteEditWholeGrams * 10) / 10} g{favoriteEditRecipeServings !== 1 ? ` · ${favoriteEditRecipeServings} servings` : ''}</Text>
+                  ) : <Text style={{ color: '#6B7280', fontSize: 12, marginTop: 4 }}>Use servings, or add measured ingredient weights to use grams and ounces.</Text>}
+                  <View style={{ marginTop: 12 }}>
+                    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={favoriteEditTotals} />
+                  </View>
                 </View>
-                <Text style={{ color: '#047857', fontSize: 11, marginTop: 10 }}>
-                  {favoriteEditPortionControlEnabled
-                    ? 'These update live when you change ingredient amounts.'
-                    : 'This meal is 100% of the full amount.'}
-                </Text>
-                <View style={{ marginTop: 10 }}>
-                  <NutrientCards energyUnit={energyUnit} values={favoriteEditTotals} />
-                </View>
-                <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 10 }}>
-                  {mealBuilderOpen && !favoriteEditItem
-                    ? favoriteEditPortionControlEnabled
-                      ? 'These update live when you change portion size.'
-                      : 'Portion control is off. Totals show the full meal.'
-                    : `Full meal has ${favoriteEditItems.length} ingredient${favoriteEditItems.length === 1 ? '' : 's'}.`}
-                </Text>
-                {mealBuilderOpen && !favoriteEditItem ? (
-                  <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 6 }}>Add weights to ingredients to use portions.</Text>
-                ) : null}
-              </View>
-
               ) : null}
 
               {favoriteEditSearchError ? <Text style={{ color: '#DC2626', marginTop: 10 }}>{favoriteEditSearchError}</Text> : null}
@@ -7987,7 +8145,7 @@ export function TrackCaloriesScreen() {
               {(favoriteEditSearchLoading || favoriteEditSearchResults.length > 0) ? (
                 <ScrollView style={{ marginTop: 12, maxHeight: 280 }}>
                   {favoriteEditSearchResults.map((item) => (
-                    <View key={`${String(item.source || 'auto')}:${String(item.id)}`} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 12, marginBottom: 8 }}>
+                    <View key={`${String(item.source || 'auto')}:${String(item.id)}`} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 12, marginBottom: 8 }}>
                       <Text style={{ color: theme.colors.text, fontSize: 14, fontWeight: '600' }}>{searchFoodDisplayName(item)}</Text>
                       <Text style={{ color: '#4B5563', fontSize: 12, marginTop: 3 }}>
                         {item.serving_size ? `Serving: ${item.serving_size} • ` : ''}
@@ -8003,7 +8161,7 @@ export function TrackCaloriesScreen() {
               ) : null}
             </View>
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                 <Pressable
                   onPress={() => {
@@ -8032,7 +8190,7 @@ export function TrackCaloriesScreen() {
                   onPress={() => setFavoriteEditIngredientsExpanded(true)}
                   accessibilityRole="button"
                   accessibilityLabel="Show meal ingredients"
-                  style={{ marginTop: 12, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, backgroundColor: theme.colors.bg, paddingHorizontal: 12, paddingVertical: 10 }}
+                  style={{ marginTop: 12, borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.bg, paddingHorizontal: 12, paddingVertical: 10 }}
                 >
                   <Text style={{ color: '#6B7280', fontSize: 12 }}>Ingredients are hidden. Tap to expand.</Text>
                 </Pressable>
@@ -8045,7 +8203,7 @@ export function TrackCaloriesScreen() {
                     const amountUnitOptions = favoriteAmountUnitOptions(editItem)
                     const amountUnitLabel = favoriteAmountUnitLabel(editItem.amountUnit, editItem)
                     return (
-                      <View key={editItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, overflow: 'hidden', backgroundColor: theme.colors.card }}>
+                      <View key={editItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, overflow: 'hidden', backgroundColor: theme.colors.card }}>
                         <Pressable
                           onPress={() => setFavoriteEditExpandedItemId(expanded ? null : editItem.id)}
                           accessibilityRole="button"
@@ -8058,6 +8216,8 @@ export function TrackCaloriesScreen() {
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>
                               Serving: {editItem.servingLabel} • Amount: {editItem.amountInput || formatFavoriteAmount(favoriteAmountFromServings(editItem.servings, editItem.amountUnit, favoriteBaseForItem(editItem)))} {amountUnitLabel}
                             </Text>
+                            {editItem.raw?.selectedServingFoodName ? <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 11 }}>Matched food: {editItem.raw.selectedServingFoodName}</Text> : null}
+                            <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 11 }}>Source: {editItem.raw?.matchSourceLabel || editItem.raw?.sourceLabel || ingredientSourceLabel(editItem.raw || {})}</Text>
                           </View>
                           <Text style={{ color: '#9CA3AF', fontSize: 18 }}>{expanded ? '▾' : '▸'}</Text>
                         </Pressable>
@@ -8071,7 +8231,7 @@ export function TrackCaloriesScreen() {
                                 onChangeText={(value) => updateFavoriteEditIngredientName(editItem.id, value)}
                                 placeholder="Ingredient name"
                                 placeholderTextColor="#9CA3AF"
-                                style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
+                                style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
                               />
                             </View>
                             <View style={{ gap: 10 }}>
@@ -8088,7 +8248,7 @@ export function TrackCaloriesScreen() {
                                       )
                                     }
                                     keyboardType="decimal-pad"
-                                    style={{ width: 104, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}
+                                    style={{ width: 104, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}
                                   />
                                   <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8, paddingRight: 4 }}>
                                     {amountUnitOptions.map((unit) => {
@@ -8107,7 +8267,7 @@ export function TrackCaloriesScreen() {
                                             borderWidth: 1,
                                             borderColor: active ? '#10B981' : '#D1D5DB',
                                             backgroundColor: active ? '#ECFDF5' : '#FFFFFF',
-                                            borderRadius: 999,
+                                            borderRadius: 2,
                                             paddingHorizontal: 12,
                                             paddingVertical: 9,
                                           }}
@@ -8137,7 +8297,7 @@ export function TrackCaloriesScreen() {
                                   style={{
                                     borderWidth: 1,
                                     borderColor: '#D1D5DB',
-                                    borderRadius: 10,
+                                    borderRadius: 2,
                                     paddingHorizontal: 12,
                                     paddingVertical: 11,
                                     flexDirection: 'row',
@@ -8159,7 +8319,7 @@ export function TrackCaloriesScreen() {
                             </View>
 
                             {servingPickerOpen ? (
-                              <View style={{ borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 12, backgroundColor: '#F0FDF4', padding: 10, gap: 8 }}>
+                              <View style={{ borderWidth: 1, borderColor: '#D1FAE5', borderRadius: 2, backgroundColor: '#F0FDF4', padding: 10, gap: 8 }}>
                                 {servingOptions.length === 0 ? (
                                   <Text style={{ color: '#6B7280', fontSize: 12 }}>No serving choices found yet.</Text>
                                 ) : (
@@ -8175,7 +8335,7 @@ export function TrackCaloriesScreen() {
                                           borderWidth: 1,
                                           borderColor: selected ? '#10B981' : '#D1D5DB',
                                           backgroundColor: selected ? '#ECFDF5' : '#FFFFFF',
-                                          borderRadius: 10,
+                                          borderRadius: 2,
                                           paddingHorizontal: 10,
                                           paddingVertical: 9,
                                         }}
@@ -8186,6 +8346,7 @@ export function TrackCaloriesScreen() {
                                           </Text>
                                           {selected ? <MaterialCommunityIcons name="check" size={17} color="#059669" /> : null}
                                         </View>
+                                        {option.foodName ? <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4 }}>Matched food: {option.foodName}</Text> : null}
                                         <Text style={{ color: '#6B7280', fontSize: 11, marginTop: 4 }}>
                                           {Math.round(numberOrZero(option.calories))} kcal • P {formatNutrientGrams(numberOrZero(option.protein_g))}g • C {formatNutrientGrams(numberOrZero(option.carbs_g))}g • F {formatNutrientGrams(numberOrZero(option.fat_g))}g
                                         </Text>
@@ -8220,7 +8381,7 @@ export function TrackCaloriesScreen() {
                                         onChangeText={(value) => updateFavoriteEditIngredientNutrient(editItem.id, key, value)}
                                         keyboardType="decimal-pad"
                                         selectTextOnFocus
-                                        style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
+                                        style={{ borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontSize: 15 }}
                                       />
                                     </View>
                                   )
@@ -8228,7 +8389,7 @@ export function TrackCaloriesScreen() {
                               </View>
                             </View>
 
-                            <NutrientCards energyUnit={energyUnit} values={{
+                            <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{
                               calories: editItem.calories * editItem.servings,
                               protein: editItem.protein * editItem.servings,
                               carbs: editItem.carbs * editItem.servings,
@@ -8239,7 +8400,7 @@ export function TrackCaloriesScreen() {
 
                             <Pressable
                               onPress={() => removeFavoriteEditIngredient(editItem.id)}
-                              style={{ borderWidth: 1, borderColor: '#FECACA', borderRadius: 10, backgroundColor: '#FEF2F2', alignItems: 'center', paddingVertical: 11 }}
+                              style={{ borderWidth: 1, borderColor: '#FECACA', borderRadius: 2, backgroundColor: '#FEF2F2', alignItems: 'center', paddingVertical: 11 }}
                             >
                               <Text style={{ color: '#DC2626', fontWeight: '600' }}>Remove ingredient</Text>
                             </Pressable>
@@ -8252,29 +8413,33 @@ export function TrackCaloriesScreen() {
               )}
             </View>
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 18, padding: 16, backgroundColor: theme.colors.card }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 16, backgroundColor: theme.colors.card }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: 10 }}>
                 <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>
                   {mealRecipe ? 'Recipe portion totals' : favoriteEditPortionControlEnabled ? 'Your portion totals' : 'Meal totals'}
                 </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 999, backgroundColor: theme.colors.bg, padding: 2 }}>
-                  <Pressable onPress={() => setEnergyUnit('kcal')} style={{ borderRadius: 999, backgroundColor: energyUnit === 'kcal' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.bg, padding: 2 }}>
+                  <Pressable onPress={() => setEnergyUnit('kcal')} style={{ borderRadius: 2, backgroundColor: energyUnit === 'kcal' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
                     <Text style={{ color: energyUnit === 'kcal' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '700' }}>kcal</Text>
                   </Pressable>
-                  <Pressable onPress={() => setEnergyUnit('kj')} style={{ borderRadius: 999, backgroundColor: energyUnit === 'kj' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
+                  <Pressable onPress={() => setEnergyUnit('kj')} style={{ borderRadius: 2, backgroundColor: energyUnit === 'kj' ? '#FFFFFF' : 'transparent', paddingHorizontal: 10, paddingVertical: 4 }}>
                     <Text style={{ color: energyUnit === 'kj' ? '#111827' : '#6B7280', fontSize: 12, fontWeight: '700' }}>kJ</Text>
                   </Pressable>
                 </View>
               </View>
               <Text style={{ color: '#6B7280', fontSize: 12, marginBottom: 12 }}>
                 {mealRecipe ? `${recipeServingsEaten || '—'} of ${mealRecipe.servings || 1} recipe servings.` : favoriteEditPortionControlEnabled
-                  ? 'Your portion is based on the ingredient amounts shown above.'
+                  ? 'These totals are for the amount you selected.'
                   : 'This meal is 100% of the full amount.'}
               </Text>
-              <NutrientCards energyUnit={energyUnit} values={favoriteEditTotals} />
+              <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={favoriteEditTotals} />
             </View>
 
-            <Pressable onPress={() => void updateFavoriteFromEditor()} style={primaryButton}>
+            <Pressable onPress={() => void updateFavoriteFromEditor()}
+              disabled={favoriteEditSaveDisabled}
+              accessibilityRole="button"
+              accessibilityState={{ disabled: favoriteEditSaveDisabled }}
+              style={[primaryButton, favoriteEditSaveDisabled && { opacity: 0.45 }]}>
               <Text style={primaryButtonText}>
                 {mealBuilderOpen && !favoriteEditItem
                   ? 'Save meal'
@@ -8360,7 +8525,7 @@ export function TrackCaloriesScreen() {
                   disabled={favoriteEditMissingReportBusy}
                   onPress={() => void submitFavoriteEditMissingReport()}
                   style={({ pressed }) => ({
-                    borderRadius: 10,
+                    borderRadius: 2,
                     backgroundColor: '#059669',
                     paddingHorizontal: 14,
                     paddingVertical: 10,
@@ -8416,7 +8581,7 @@ export function TrackCaloriesScreen() {
 
             <View style={{ gap: 12 }}>
               {favoriteAdjustItems.map((adjustItem) => (
-                <View key={adjustItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, padding: 14 }}>
+                <View key={adjustItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, padding: 14 }}>
                   <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{adjustItem.name}</Text>
                   <Text style={{ color: '#6B7280', marginTop: 4 }}>{adjustItem.servingLabel}</Text>
 
@@ -8429,7 +8594,7 @@ export function TrackCaloriesScreen() {
                           ),
                         )
                       }
-                      style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ width: 38, height: 38, borderRadius: 2, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
                     >
                       <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '600' }}>-</Text>
                     </Pressable>
@@ -8445,7 +8610,7 @@ export function TrackCaloriesScreen() {
                         )
                       }
                       keyboardType="decimal-pad"
-                      style={{ width: 84, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 10, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}
+                      style={{ width: 84, borderWidth: 1, borderColor: '#D1D5DB', borderRadius: 2, paddingHorizontal: 12, paddingVertical: 10, color: theme.colors.text, fontWeight: '600', textAlign: 'center' }}
                     />
                     <Pressable
                       onPress={() =>
@@ -8455,14 +8620,14 @@ export function TrackCaloriesScreen() {
                           ),
                         )
                       }
-                      style={{ width: 38, height: 38, borderRadius: 10, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
+                      style={{ width: 38, height: 38, borderRadius: 2, borderWidth: 1, borderColor: '#D1D5DB', alignItems: 'center', justifyContent: 'center' }}
                     >
                       <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '600' }}>+</Text>
                     </Pressable>
                   </View>
 
                   <View style={{ marginTop: 12 }}>
-                    <NutrientCards energyUnit={energyUnit} values={{
+                    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{
                       calories: adjustItem.calories * adjustItem.servings,
                       protein: adjustItem.protein * adjustItem.servings,
                       carbs: adjustItem.carbs * adjustItem.servings,
@@ -8485,7 +8650,7 @@ export function TrackCaloriesScreen() {
                       width: '47%',
                       borderWidth: 1,
                       borderColor: card.border,
-                      borderRadius: 16,
+                      borderRadius: 2,
                       padding: 14,
                       backgroundColor: card.bg,
                     }}
@@ -8556,7 +8721,7 @@ export function TrackCaloriesScreen() {
                 }}
                 style={[chip, { flex: 1, alignItems: 'center', justifyContent: 'center' }, ingredientKind === 'packaged' && chipActive]}
               >
-                <Text style={[chipText, ingredientKind === 'packaged' && chipTextActive]}>Packaged/Fast-foods</Text>
+                <Text style={[chipText, ingredientKind === 'packaged' && chipTextActive]}>Packaged & fast food</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -8565,7 +8730,7 @@ export function TrackCaloriesScreen() {
                 }}
                 style={[chip, { flex: 1, alignItems: 'center', justifyContent: 'center' }, ingredientKind === 'single' && chipActive]}
               >
-                <Text style={[chipText, ingredientKind === 'single' && chipTextActive]}>Single food</Text>
+                <Text style={[chipText, ingredientKind === 'single' && chipTextActive]}>Single foods</Text>
               </Pressable>
             </View>
 
@@ -8592,7 +8757,7 @@ export function TrackCaloriesScreen() {
                   marginTop: -16,
                   width: 32,
                   height: 32,
-                  borderRadius: 16,
+                  borderRadius: 2,
                   backgroundColor: '#0F172A',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -8615,7 +8780,7 @@ export function TrackCaloriesScreen() {
                 }}
                 style={[miniSecondaryButton, { flexBasis: '31%', alignItems: 'center' }]}
               >
-                <Text style={miniSecondaryText}>Scan barcode</Text>
+                <Text style={foodChoiceText}>Scan barcode</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -8624,7 +8789,7 @@ export function TrackCaloriesScreen() {
                 }}
                 style={[miniSecondaryButton, { flexBasis: '31%', alignItems: 'center' }]}
               >
-                <Text style={miniSecondaryText}>Add from favorites</Text>
+                <Text style={foodChoiceText}>Favorites</Text>
               </Pressable>
               <Pressable
                 onPress={() => {
@@ -8647,7 +8812,7 @@ export function TrackCaloriesScreen() {
                 <Text style={{ color: theme.colors.muted }}>Search to see results.</Text>
               ) : (
                 ingredientResults.map((item) => (
-                  <View key={String(item.id)} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 10, padding: 10, marginBottom: 8, backgroundColor: '#FBFDFC' }}>
+                  <View key={String(item.id)} style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 2, padding: 10, marginBottom: 8, backgroundColor: '#FBFDFC' }}>
                     <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{searchFoodDisplayName(item)}</Text>
                     <Text style={{ color: theme.colors.muted, marginTop: 3 }}>
                       {item.serving_size ? `Serving: ${item.serving_size} • ` : ''}
@@ -8832,7 +8997,7 @@ export function TrackCaloriesScreen() {
                 <View style={barcodeProductPanel}>
                   <Text style={barcodeProductTitle}>{barcodeFood.name}</Text>
                   <ScrollView style={{ maxHeight: 320, marginTop: 10 }}>
-                    <NutrientCards energyUnit={energyUnit} values={{
+                    <NutrientCards cornerRadius={2} energyUnit={energyUnit} values={{
                       calories: nullableNumber(barcodeFood.calories ?? barcodeFood.calories_kcal),
                       protein: nullableNumber(barcodeFood.protein_g),
                       carbs: nullableNumber(barcodeFood.carbs_g),
@@ -8925,13 +9090,13 @@ export function TrackCaloriesScreen() {
               </Pressable>
             ) : null}
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14 }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
               <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 10, alignItems: 'center' }}>
                 <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>Credit usage</Text>
                 {recommendedMeal ? (
                   <Pressable
                     onPress={() => setRecommendedExplainOpen(true)}
-                    style={{ borderRadius: 10, backgroundColor: theme.colors.bg, paddingHorizontal: 12, paddingVertical: 8 }}
+                    style={{ borderRadius: 2, backgroundColor: theme.colors.bg, paddingHorizontal: 12, paddingVertical: 8 }}
                     accessibilityRole="button"
                     accessibilityLabel="About recommended meals"
                   >
@@ -8946,7 +9111,7 @@ export function TrackCaloriesScreen() {
             </View>
 
             {!recommendedMeal ? (
-              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14 }}>
+              <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
                 <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>About</Text>
                 <Text style={{ color: theme.colors.muted, marginTop: 8, fontWeight: '600' }}>Get a recommendation</Text>
                 <Text style={{ color: '#6B7280', marginTop: 6 }}>
@@ -8977,7 +9142,7 @@ export function TrackCaloriesScreen() {
                   const macroRows = recommendedMacroRows(recommendedMeal)
                   return (
                     <>
-                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14 }}>
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
                         <Text style={{ color: '#6B7280', fontWeight: '600', fontSize: 12 }}>Meal</Text>
                         <Text style={{ color: theme.colors.text, fontSize: 20, lineHeight: 25, fontWeight: '700', marginTop: 4 }}>
                           {recommendedMeal.mealName}
@@ -9018,7 +9183,7 @@ export function TrackCaloriesScreen() {
                         {tags.length > 0 ? (
                           <View style={{ marginTop: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 8 }}>
                             {tags.map((tag) => (
-                              <View key={tag} style={{ borderRadius: 999, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 6 }}>
+                              <View key={tag} style={{ borderRadius: 2, backgroundColor: '#ECFDF5', paddingHorizontal: 10, paddingVertical: 6 }}>
                                 <Text style={{ color: '#047857', fontSize: 12, fontWeight: '600' }}>{tag}</Text>
                               </View>
                             ))}
@@ -9026,9 +9191,9 @@ export function TrackCaloriesScreen() {
                         ) : null}
                       </View>
 
-                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14 }}>
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
                         <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>Meal macro summary</Text>
-                        <View style={{ marginTop: 12 }}><NutrientCards energyUnit={energyUnit} values={recommendedMealTotals(recommendedMeal)} /></View>
+                        <View style={{ marginTop: 12 }}><NutrientCards cornerRadius={2} energyUnit={energyUnit} values={recommendedMealTotals(recommendedMeal)} /></View>
                         <View style={{ marginTop: 12, gap: 12 }}>
                           {macroRows.map((row) => (
                             <View key={row.label}>
@@ -9036,15 +9201,15 @@ export function TrackCaloriesScreen() {
                                 <Text style={{ color: theme.colors.muted, fontWeight: '600' }}>{row.label}</Text>
                                 <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{row.display}</Text>
                               </View>
-                              <View style={{ height: 8, borderRadius: 999, backgroundColor: '#E5E7EB', overflow: 'hidden', marginTop: 6 }}>
-                                <View style={{ height: 8, width: `${row.percent}%`, borderRadius: 999, backgroundColor: row.color }} />
+                              <View style={{ height: 8, borderRadius: 2, backgroundColor: '#E5E7EB', overflow: 'hidden', marginTop: 6 }}>
+                                <View style={{ height: 8, width: `${row.percent}%`, borderRadius: 2, backgroundColor: row.color }} />
                               </View>
                             </View>
                           ))}
                         </View>
                       </View>
 
-                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14 }}>
+                      <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
                         <View style={{ flexDirection: 'row', gap: 8 }}>
                           <Pressable
                             onPress={() => setRecommendedTab('ingredients')}
@@ -9079,7 +9244,7 @@ export function TrackCaloriesScreen() {
                               return (
                                 <View
                                   key={`${item.name}-${idx}`}
-                                  style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 12, backgroundColor: '#FBFDFC', overflow: 'hidden' }}
+                                  style={{ borderWidth: 1, borderColor: theme.colors.border, borderRadius: 2, backgroundColor: '#FBFDFC', overflow: 'hidden' }}
                                 >
                                   <Pressable
                                     onPress={() => setRecommendedExpandedIngredientIndex(expanded ? null : idx)}
@@ -9148,7 +9313,7 @@ export function TrackCaloriesScreen() {
                 })()
               : null}
 
-            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 14, backgroundColor: theme.colors.card, padding: 14 }}>
+            <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: theme.colors.card, padding: 14 }}>
               <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 16 }}>History</Text>
               <Text style={{ color: '#6B7280', marginTop: 4 }}>Previously generated AI meals</Text>
               <View style={{ marginTop: 12, gap: 8 }}>
@@ -9163,7 +9328,7 @@ export function TrackCaloriesScreen() {
                         setRecommendedExpandedIngredientIndex(null)
                         setRecommendedTab('ingredients')
                       }}
-                      style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, backgroundColor: '#FBFDFC', padding: 12 }}
+                      style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 2, backgroundColor: '#FBFDFC', padding: 12 }}
                       accessibilityRole="button"
                       accessibilityLabel={`Open ${item.mealName}`}
                     >
@@ -9191,7 +9356,7 @@ export function TrackCaloriesScreen() {
             <Text style={{ color: theme.colors.muted, marginTop: 8 }}>
               You will get a suggested meal based on your targets and what you have already eaten today.
             </Text>
-            <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 10, backgroundColor: '#ECFDF5', padding: 10 }}>
+            <View style={{ marginTop: 10, borderWidth: 1, borderColor: '#A7F3D0', borderRadius: 2, backgroundColor: '#ECFDF5', padding: 10 }}>
               <Text style={{ color: '#065F46', fontWeight: '600' }}>
                 Cost: {recommendedCostCredits} credit{recommendedCostCredits === 1 ? '' : 's'} per recommendation
               </Text>
@@ -9256,7 +9421,7 @@ export function TrackCaloriesScreen() {
                       style={{
                         borderWidth: 1,
                         borderColor: selected ? theme.colors.primary : theme.colors.border,
-                        borderRadius: 10,
+                        borderRadius: 2,
                         padding: 10,
                         marginBottom: 8,
                         backgroundColor: selected ? '#E8F5EB' : '#FBFDFC',
@@ -9360,7 +9525,7 @@ export function TrackCaloriesScreen() {
                     style={{
                       borderWidth: 1,
                       borderColor: selected ? theme.colors.primary : theme.colors.border,
-                      borderRadius: 10,
+                      borderRadius: 2,
                       padding: 8,
                       marginBottom: 6,
                       backgroundColor: selected ? '#E8F5EB' : '#FBFDFC',
@@ -9430,7 +9595,7 @@ export function TrackCaloriesScreen() {
             justifyContent: 'center',
           }}
         >
-          <View style={{ backgroundColor: '#fff', borderRadius: 12, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: theme.colors.border }}>
+          <View style={{ backgroundColor: '#fff', borderRadius: 2, paddingHorizontal: 16, paddingVertical: 12, borderWidth: 1, borderColor: theme.colors.border }}>
             <Text style={{ color: theme.colors.text, fontWeight: '600' }}>Saving...</Text>
           </View>
         </View>
@@ -9506,7 +9671,7 @@ function ProgressRow({
           {displayValue}/{displayTarget} {unit}
         </Text>
       </View>
-      <View style={{ marginTop: 5, height: 7, borderRadius: 999, backgroundColor: '#E6EFEC', overflow: 'hidden' }}>
+      <View style={{ marginTop: 5, height: 7, borderRadius: 2, backgroundColor: '#E6EFEC', overflow: 'hidden' }}>
         <View style={{ width: `${Math.round(ratio * 100)}%`, height: '100%', backgroundColor: theme.colors.primary }} />
       </View>
     </View>
@@ -9557,14 +9722,14 @@ const cardStyle = {
   backgroundColor: theme.colors.card,
   borderWidth: 1,
   borderColor: theme.colors.border,
-  borderRadius: theme.radius.lg,
+  borderRadius: 2,
   padding: 14,
 }
 
 const dateArrowCircle = {
   width: 64,
   height: 64,
-  borderRadius: 32,
+  borderRadius: 2,
   backgroundColor: '#E5E7EB',
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
@@ -9573,7 +9738,7 @@ const dateArrowCircle = {
 const dateCenterPill = {
   flex: 1,
   marginHorizontal: 10,
-  borderRadius: 28,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: '#D1D5DB',
   backgroundColor: theme.colors.card,
@@ -9583,7 +9748,7 @@ const dateCenterPill = {
 }
 
 const energyTogglePill = {
-  borderRadius: 999,
+  borderRadius: 2,
   paddingHorizontal: 12,
   paddingVertical: 6,
 }
@@ -9604,7 +9769,7 @@ const energyToggleTextActive = {
 const chip = {
   borderWidth: 1,
   borderColor: theme.colors.border,
-  borderRadius: 999,
+  borderRadius: 2,
   paddingHorizontal: 12,
   paddingVertical: 7,
   backgroundColor: theme.colors.card,
@@ -9627,7 +9792,7 @@ const chipTextActive = {
 const inputStyle = {
   borderWidth: 1,
   borderColor: theme.colors.border,
-  borderRadius: theme.radius.md,
+  borderRadius: 2,
   backgroundColor: theme.colors.card,
   color: theme.colors.text,
   paddingHorizontal: 12,
@@ -9638,7 +9803,7 @@ const inputStyle = {
 const pillButton = {
   borderWidth: 1,
   borderColor: theme.colors.border,
-  borderRadius: 999,
+  borderRadius: 2,
   paddingHorizontal: 12,
   paddingVertical: 8,
   alignItems: 'center' as const,
@@ -9662,7 +9827,7 @@ const modalBackdrop = {
 const modalCard = {
   width: '100%' as const,
   backgroundColor: theme.colors.card,
-  borderRadius: 14,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: theme.colors.border,
   padding: 14,
@@ -9671,7 +9836,7 @@ const modalCard = {
 const modalCardLarge = {
   width: '100%' as const,
   backgroundColor: theme.colors.card,
-  borderRadius: 14,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: theme.colors.border,
   padding: 14,
@@ -9685,7 +9850,7 @@ const modalTitle = {
 }
 
 const entryActionsSheetCard = {
-  borderRadius: 26,
+  borderRadius: 2,
   overflow: 'hidden' as const,
   backgroundColor: '#F5F7F9',
   borderWidth: 1,
@@ -9726,7 +9891,7 @@ const modalCancelText = {
 
 const primaryButton = {
   flex: 1,
-  borderRadius: 10,
+  borderRadius: 2,
   backgroundColor: theme.colors.primary,
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
@@ -9828,7 +9993,7 @@ const barcodeScanFrame = {
   width: 288,
   maxWidth: '88%' as const,
   height: 220,
-  borderRadius: 22,
+  borderRadius: 2,
   borderWidth: 4,
   borderColor: 'rgba(255,255,255,0.96)',
   backgroundColor: 'rgba(0,0,0,0.12)',
@@ -9844,7 +10009,7 @@ const barcodeStatusPill = {
 
 const barcodeStatusText = {
   overflow: 'hidden' as const,
-  borderRadius: 999,
+  borderRadius: 2,
   backgroundColor: 'rgba(0,0,0,0.58)',
   color: '#FFFFFF',
   paddingHorizontal: 12,
@@ -9867,7 +10032,7 @@ const barcodePermissionPanel = {
 
 const barcodePermissionButton = {
   marginTop: 16,
-  borderRadius: 12,
+  borderRadius: 2,
   backgroundColor: theme.colors.card,
   paddingHorizontal: 18,
   paddingVertical: 11,
@@ -9883,7 +10048,7 @@ const barcodeManualPanel = {
   left: 16,
   right: 16,
   bottom: 110,
-  borderRadius: 18,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: '#E5E7EB',
   backgroundColor: 'rgba(255,255,255,0.96)',
@@ -9906,7 +10071,7 @@ const barcodeManualRow = {
 const barcodeManualInput = {
   flex: 1,
   minHeight: 42,
-  borderRadius: 10,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: '#D1D5DB',
   backgroundColor: theme.colors.card,
@@ -9918,7 +10083,7 @@ const barcodeManualInput = {
 
 const barcodeManualSearchButton = {
   minHeight: 42,
-  borderRadius: 10,
+  borderRadius: 2,
   backgroundColor: theme.colors.primary,
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
@@ -9942,7 +10107,7 @@ const barcodeProductPanel = {
   left: 16,
   right: 16,
   bottom: 110,
-  borderRadius: 18,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: '#E5E7EB',
   backgroundColor: 'rgba(255,255,255,0.96)',
@@ -9964,7 +10129,7 @@ const barcodeProductMeta = {
 const barcodeProductButton = {
   marginTop: 10,
   minHeight: 44,
-  borderRadius: 10,
+  borderRadius: 2,
   backgroundColor: theme.colors.primary,
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
@@ -10004,7 +10169,7 @@ const barcodeBottomActionText = {
 
 const secondaryButton = {
   flex: 1,
-  borderRadius: 10,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: theme.colors.border,
   alignItems: 'center' as const,
@@ -10020,7 +10185,7 @@ const secondaryButtonText = {
 
 const favoriteActionPrimaryButton = {
   minHeight: 46,
-  borderRadius: 10,
+  borderRadius: 2,
   backgroundColor: theme.colors.primary,
   alignItems: 'center' as const,
   justifyContent: 'center' as const,
@@ -10036,7 +10201,7 @@ const favoriteActionPrimaryText = {
 
 const favoriteActionSecondaryButton = {
   minHeight: 46,
-  borderRadius: 10,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: theme.colors.border,
   alignItems: 'center' as const,
@@ -10053,7 +10218,7 @@ const favoriteActionSecondaryText = {
 }
 
 const miniPrimaryButton = {
-  borderRadius: 10,
+  borderRadius: 2,
   backgroundColor: theme.colors.primary,
   paddingHorizontal: 10,
   paddingVertical: 8,
@@ -10065,7 +10230,7 @@ const miniPrimaryText = {
 }
 
 const miniSecondaryButton = {
-  borderRadius: 10,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: theme.colors.border,
   paddingHorizontal: 10,
@@ -10078,7 +10243,7 @@ const miniSecondaryText = {
 }
 
 const miniDangerButton = {
-  borderRadius: 10,
+  borderRadius: 2,
   borderWidth: 1,
   borderColor: '#FCA5A5',
   backgroundColor: '#FEF2F2',
@@ -10089,4 +10254,24 @@ const miniDangerButton = {
 const miniDangerText = {
   color: '#B91C1C',
   fontWeight: '700' as const,
+}
+
+const foodChoiceButton = {
+  flex: 1,
+  minWidth: 0,
+  minHeight: 44,
+  borderWidth: 1,
+  borderColor: '#D1D5DB',
+  borderRadius: 2,
+  backgroundColor: '#FFFFFF',
+  paddingHorizontal: 6,
+  paddingVertical: 10,
+  alignItems: 'center' as const,
+  justifyContent: 'center' as const,
+}
+const foodChoiceText = {
+  color: '#374151',
+  fontSize: 12,
+  fontWeight: '600' as const,
+  textAlign: 'center' as const,
 }

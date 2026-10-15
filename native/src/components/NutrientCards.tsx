@@ -13,7 +13,7 @@ const CARDS = [
   { key: 'sugar', label: 'Sugar', bg: '#FDF2F8', border: '#FBCFE8', color: '#EC4899' },
 ] as const
 
-export function NutrientCards({ values, energyUnit = 'kcal' }: { values: NutrientValues; energyUnit?: 'kcal' | 'kj' }) {
+export function NutrientCards({ values, energyUnit = 'kcal', cornerRadius = 16 }: { values: NutrientValues; energyUnit?: 'kcal' | 'kj'; cornerRadius?: number }) {
   const [width, setWidth] = useState(0)
   const columns = width >= 600 ? 3 : 2
   return (
@@ -30,7 +30,7 @@ export function NutrientCards({ values, energyUnit = 'kcal' }: { values: Nutrien
           : `${roundedGrams} g`
         return (
           <View key={card.key} accessible accessibilityLabel={`${label}: ${display}`}
-            style={{ width: width > 0 ? (width - (columns - 1) * 10) / columns : '47%', minHeight: 86, borderWidth: 1, borderColor: card.border, borderRadius: 16, padding: 14, backgroundColor: card.bg }}>
+            style={{ width: width > 0 ? (width - (columns - 1) * 10) / columns : '47%', minHeight: 86, borderWidth: 1, borderColor: card.border, borderRadius: cornerRadius, padding: 14, backgroundColor: card.bg }}>
             <Text style={{ color: card.color, fontSize: 20, fontWeight: '700' }}>{display}</Text>
             <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '600', marginTop: 6, textTransform: 'uppercase' }}>{label}</Text>
           </View>

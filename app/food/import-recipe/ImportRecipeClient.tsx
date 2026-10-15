@@ -1,5 +1,7 @@
 'use client'
 
+import foodDesign from '../food-design.module.css'
+
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Image from 'next/image'
@@ -230,7 +232,7 @@ export default function ImportRecipeClient() {
   }
 
   return (
-    <div className="min-h-screen bg-white overflow-x-clip">
+    <div className={`${foodDesign.surface} min-h-screen bg-white overflow-x-clip`}>
       <div className="sticky top-0 z-10 bg-white border-b border-gray-200">
         <div className="px-4 py-3 flex items-center gap-3">
           <button

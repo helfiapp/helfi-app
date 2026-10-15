@@ -1,0 +1,33 @@
+/* Food controls share the same straight-edged treatment on web and native. */
+.surface {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.surface :where(button, input, select, textarea):not([id="profile-dropdown"] *),
+.surface :where(div, details, span)[class*="rounded"]:not([class*="animate-spin"]):not([class*="animate-pulse"]):not([id="profile-dropdown"] *) {
+  border-radius: 2px !important;
+}
+
+.surface :where(button, input, select, textarea) {
+  min-width: 0;
+}
+
+.surface :where(button):not([id="profile-dropdown"] *) {
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+
+.surface :where(input, select, textarea) {
+  max-width: 100%;
+}
+
+.surface :where([role="group"] > button) {
+  min-height: 44px;
+}
+
+@media (max-width: 480px) {
+  .surface :where(input, select, textarea) {
+    font-size: 16px;
+  }
+}

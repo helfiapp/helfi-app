@@ -3,6 +3,7 @@ import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
 import * as recipeValues from '../native/src/lib/recipeNutrition'
+import { portionMealItems } from '../native/src/lib/mealPortionEditor'
 import * as nutrientValues from '../native/src/lib/nutrientValues'
 import { parseFoodServing, liquidDensity, convertFoodAmount } from '../native/src/lib/foodUnits'
 
@@ -62,10 +63,10 @@ async function main() {
   const portion = vm.runInContext(actual('updateRecipeServingsEaten'), ctx)
   for (const servings of [1, 2, 12, 1]) {
     portion(String(servings))
-    const totals = ctx.calculateFavoriteAdjustTotals(ctx.favoriteEditItems)
+    const totals = ctx.calculateFavoriteAdjustTotals(portionMealItems(ctx.favoriteEditItems, recipeValues.recipePortionRatio(ctx.recipeServingsEaten, 12)!))
     assert.ok(Math.abs(totals.calories - batch.calories * servings / 12) < 0.000001)
     assert.equal(totals.fiber, null)
-    if (servings === 12) assert.equal(ctx.favoriteEditItems[0].amountInput, '100', 'Returning to the full recipe must not accumulate display rounding')
+    assert.equal(ctx.favoriteEditItems[0].amountInput, '100', 'Portion edits retain the complete recipe without accumulating rounding')
   }
   let opened: any = null; let error = ''; let closed = false
   ctx.importRecipe = { title: 'Pancakes', servings: 12, ingredients: lines, steps: ['Mix and cook'], sourceUrl: 'https://example.invalid/recipe' }
@@ -81,12 +82,15 @@ async function main() {
   await continueRecipe(); assert.equal((opened as any).items.length, 4); assert.equal(ctx.mealRecipe.servings, 12); assert.equal(ctx.mealRecipe.steps[0], 'Mix and cook'); assert.equal(closed, true)
   ctx.favoriteEditItems = (opened as any).items; ctx.recipeServingsAppliedRef.current = 12; portion('1')
   ctx.mealBuilderOpen = true; ctx.favoriteEditItem = null; ctx.favoriteEditName = 'Pancakes'; ctx.favoritesTargetMeal = 'other'; ctx.favoriteEditTime = '05:00'; ctx.selectedDate = '2026-10-05'; ctx.editorTimeToDate = () => '2026-10-04T18:00:00Z'
+  ctx.favoriteEditPortionScale = recipeValues.recipePortionRatio(ctx.recipeServingsEaten, ctx.mealRecipe.servings)
+  ctx.favoriteEditPortionItems = portionMealItems(ctx.favoriteEditItems, ctx.favoriteEditPortionScale)
+  ctx.favoriteEditPortionControlEnabled = false; ctx.favoriteEditPortionUnit = 'serving'; ctx.favoriteEditPortionAmount = '1'; ctx.favoriteEditWholeGrams = null; ctx.favoriteEditRecipeServings = 12
   let saved: any
   ctx.createFoodEntry = async (value: any) => { saved = value; return true }
   for (const name of ['setMealBuilderOpen', 'setFavoriteEditName', 'setFavoriteEditIngredientsExpanded', 'setFavoriteEditExpandedItemId', 'setFavoriteEditServingPickerItemId', 'setFavoriteEditServingLoadingId']) ctx[name] = () => {}
   await vm.runInContext(actual('updateFavoriteFromEditor'), ctx)()
   assert.equal(saved.calories, 67); assert.equal(saved.fiber, null); assert.equal(saved.nutrition.__importRecipe.servings, 12); assert.equal(saved.nutrition.__nativeRecipeServingsEaten, 1)
-  assert.equal(saved.nutrition.__importRecipe.sourceUrl, 'https://example.invalid/recipe'); assert.equal(saved.items[1].id, 'egg'); assert.equal(saved.items[1].servings, 1 / 12)
+  assert.equal(saved.nutrition.__importRecipe.sourceUrl, 'https://example.invalid/recipe'); assert.equal(saved.items[1].id, 'egg'); assert.equal(saved.items[1].servings, 1); assert.equal(saved.nutrition.__portionScale, 1 / 12); assert.equal(saved.nutrition.__portionAmount, 1); assert.equal(saved.nutrition.__portionRecipeServings, 12)
   console.log('PASS: actual native recipe matching, missing-item review, ingredient quantities, yield, one/two/full-batch scaling and saved recipe provenance; no network or AI calls.')
 }
 main().catch((error) => { console.error(error); process.exitCode = 1 })

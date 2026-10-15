@@ -1,5 +1,14 @@
 // The web stores whole-recipe ingredients plus __portionScale. Native editors
 // operate on the eaten ingredient amounts, so materialize that scale exactly once.
+export function savedMealPortion(raw: any): Record<string, any> | null {
+  for (const key of ['nutrients', 'nutrition', 'total', 'nourishment']) {
+    const source = raw?.[key]
+    const scale = Number(source?.__portionScale)
+    if (source && typeof source === 'object' && Number.isFinite(scale) && scale > 0) return source
+  }
+  return null
+}
+
 export function materializeMealPortion(raw: any): any {
   if (!raw || typeof raw !== 'object') return raw
   const containers = ['nutrients', 'nutrition', 'total', 'nourishment']
