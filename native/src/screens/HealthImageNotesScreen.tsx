@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -15,6 +15,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import * as ImagePicker from 'expo-image-picker'
 
 import { API_BASE_URL } from '../config'
+import { createVoiceActionReadGuard, matchesVoiceActionReadRefresh } from '../voice/voiceActionReadRefresh'
 import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
@@ -110,6 +111,15 @@ export function HealthImageNotesScreen() {
     if (mode !== 'signedIn' || !session?.token) return null
     return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [mode, session?.token])
+  const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
+  const voiceReadAccount = mode === 'signedIn' && authHeaders && session?.token ? JSON.stringify([session.user?.id || '', session.token]) : null
+  voiceReadGuardRef.current.setAccount(voiceReadAccount)
+  useEffect(() => {
+    const guard = voiceReadGuardRef.current!
+    guard.mount()
+    return () => guard.unmount()
+  }, [])
 
   const [activeTab, setActiveTab] = useState<TabKey>('notes')
   const [image, setImage] = useState<ImageAsset | null>(null)
@@ -133,21 +143,39 @@ export function HealthImageNotesScreen() {
   const [historyActions, setHistoryActions] = useState<ImageHistoryItem | null>(null)
 
   const loadHistory = useCallback(async () => {
-    if (!authHeaders) return
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'health-image-history')
+    if (!authHeaders || !read) return
     setHistoryLoading(true)
     setHistoryError('')
     try {
-      const res = await fetch(`${API_BASE_URL}/api/medical-images/history`, { headers: authHeaders })
+      const res = await fetch(`${API_BASE_URL}/api/medical-images/history`, { headers: authHeaders, signal: read.signal })
       const data: any = await res.json().catch(() => ({}))
+      if (!read.isCurrent()) return
       if (!res.ok) throw new Error(String(data?.error || 'Failed to load history'))
       setHistoryItems(Array.isArray(data?.history) ? data.history : [])
     } catch (e: any) {
+      if (!read.isCurrent()) return
       setHistoryError(e?.message || 'Failed to load history')
       setHistoryItems([])
     } finally {
-      setHistoryLoading(false)
+      if (read.isCurrent()) setHistoryLoading(false)
+      read.finish()
     }
-  }, [authHeaders])
+  }, [authHeaders, voiceReadAccount])
+
+  useEffect(() => {
+    setHistoryItems([])
+    setHistoryLoading(false)
+    setHistoryError('')
+  }, [voiceReadAccount])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:voice-action-completed', payload => {
+      if (!authHeaders || !matchesVoiceActionReadRefresh(payload, session?.user?.id, 'health-images')) return
+      if (activeTab === 'history') void loadHistory()
+    })
+    return () => subscription.remove()
+  }, [activeTab, authHeaders, loadHistory, session?.user?.id])
 
   useFocusEffect(
     useCallback(() => {

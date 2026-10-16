@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16T20:29:31.949Z",
+  "generatedAt": "2026-10-16T20:51:50.568Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -239,12 +239,12 @@
     "native/src/screens/AddIngredientScreen.tsx": "5da16968c543fd87ac2fed7eae26983352214d05f00ea9c4e244db5b5028d08e",
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
     "native/src/screens/BillingScreen.tsx": "6351a51bcd3aa2cc1a5b2a8d13f626333dfc4ca8a9632ec4cf5745c53250cf2d",
-    "native/src/screens/DailyCheckInScreen.tsx": "b380235c0f06ecfceb92a3a54dcdaf75e0777a055276b43ce35fae567dec3ffd",
+    "native/src/screens/DailyCheckInScreen.tsx": "98e7d5ff8187ec506898f3e7366e49a04b0ba2ba5cf903cf90ee00b1943ea717",
     "native/src/screens/DashboardScreen.tsx": "c4ceba674f286ed4479066899f5ad29df7f343761f5f995b09b10d6f5cfafa00",
-    "native/src/screens/DevicesScreen.tsx": "70dd04c380c4e5edb437c83ad6036b077133f4f6ab8b634c14f0b0b2f8199bf3",
+    "native/src/screens/DevicesScreen.tsx": "6ef949877dea0ab66a7e94f8f513f7df546142f1a2e9afc0363942e913161299",
     "native/src/screens/FoodDiarySettingsScreen.tsx": "4be27f5bc3ee5651b3b8e66f5c2f4a9d4e27b60dda832cdd32f71286b16ef5f4",
     "native/src/screens/FoodScreen.tsx": "fcb1382fc17499842d50bfae07686f9a94a367d1151d8c857f87c131b431a92a",
-    "native/src/screens/HealthImageNotesScreen.tsx": "8001a4158179b23fed517dc81ebbfb149988f13a97a82c030cefcc623dcf719d",
+    "native/src/screens/HealthImageNotesScreen.tsx": "9ab2c75bf822d68774c757b39314653e26f666e36364e959cab8176da2fb1d1d",
     "native/src/screens/HealthJournalScreen.tsx": "b3b8053441409c692568d6062c1dd9a48985a37be2ea4733ec72f5773fe36b73",
     "native/src/screens/HealthSetupScreen.tsx": "69e9adaa420a14b38092c4f0329feeb269f03684586bd0cb4ef9ea6837a7b2db",
     "native/src/screens/HelpScreen.tsx": "d79343411824cc17dd9ade0779186125e348b2a5397d7e9d500d30da48477af4",
@@ -272,7 +272,7 @@
     "native/src/screens/SettingsScreen.tsx": "75faceb78f6cbaa9745b9560b43be1dffa66fb6bf45baac0769ef1d8c087764b",
     "native/src/screens/SignupScreen.tsx": "64ccf96092708afaf44bd43fba4fe6592b61e4f79c5df5edf0633bc447cf7099",
     "native/src/screens/SleepCoachScreen.tsx": "70b720195bca7aa08e0edc4e67fd93096d52931191adbeda2e58c83c9da80d98",
-    "native/src/screens/SmartHealthCoachScreen.tsx": "eb55954568139075c97f105bfbb56d52ce5be7753c17ab86e8ac8d8d331d4b14",
+    "native/src/screens/SmartHealthCoachScreen.tsx": "720644c0bc9d92a12542927f72a5e131f1f7959a129ea80aa8c795e810ba7be4",
     "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
     "native/src/screens/SymptomNotesScreen.tsx": "a2621b96f114dc76843ec5d9345b37dcee5b8be303bc4c2ba5ef07adebc80d78",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
@@ -291,7 +291,8 @@
     "native/src/voice/nativeDeviceActions.ts": "4ae6d7de1e6c4a2d1e9fe8e8d7af26f33592c9d0a399ca729c69391745b80e95",
     "native/src/voice/realtimeVoice.ts": "0e7e3d7474b8e4f560bb2c0c1614cc7393e6f0de32376c53ab73fd0410269e68",
     "native/src/voice/reportPdfActions.ts": "730d4abdc9ce666a4562fce1231c143b57c0a5c1e66ddea48a481a708ad9d5e6",
-    "native/src/voice/VoiceAssistant.tsx": "0cd1a18f7535dbe34b5aa816450fb539165ffb6efb1a45573506d1b5de19e1a9",
+    "native/src/voice/voiceActionReadRefresh.ts": "4109b5bb3bf669d96731746a728018f2dc284dcc8d19e3c6fe5d822fa85e1ead",
+    "native/src/voice/VoiceAssistant.tsx": "9a731c96ffbbf447336ef4cb7d6ebd27b3226e073c73d072b8adddf6e45e244a",
     "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e"
   }
 }

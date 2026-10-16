@@ -1,10 +1,11 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, Image, ImageSourcePropType, Linking, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, DeviceEventEmitter, Image, ImageSourcePropType, Linking, Pressable, ScrollView, Text, useWindowDimensions, View } from 'react-native'
 
 import { Feather, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { createVoiceActionReadGuard, matchesVoiceActionReadRefresh } from '../voice/voiceActionReadRefresh'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -162,48 +163,72 @@ export function DevicesScreen() {
     if (mode !== 'signedIn' || !session?.token) return null
     return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [mode, session?.token])
+  const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
+  const voiceReadAccount = mode === 'signedIn' && authHeaders && session?.token ? JSON.stringify([session.user?.id || '', session.token]) : null
+  voiceReadGuardRef.current.setAccount(voiceReadAccount)
+  useEffect(() => {
+    const guard = voiceReadGuardRef.current!
+    guard.mount()
+    return () => guard.unmount()
+  }, [])
 
   const contentPadding = width >= 700 ? 32 : 14
 
-  const loadDeviceStatus = useCallback(async () => {
-    if (!authHeaders) {
-      setFitbitConnected(false)
-      setGarminConnected(false)
-      setInterest({})
-      setLoading(false)
-      return
-    }
-
+  const loadDeviceStatus = useCallback(async (options?: { interestOnly?: boolean }) => {
+    if (!authHeaders) return
+    const interestRead = voiceReadGuardRef.current!.begin(voiceReadAccount, 'device-interest')
+    const statusRead = options?.interestOnly ? null : voiceReadGuardRef.current!.begin(voiceReadAccount, 'device-status')
+    if (!interestRead) return
     try {
-      setLoading(true)
+      if (!options?.interestOnly) setLoading(true)
       const [fitbitRes, garminRes, userDataRes] = await Promise.all([
-        fetch(`${API_BASE_URL}/api/fitbit/status`, { headers: authHeaders }),
-        fetch(`${API_BASE_URL}/api/garmin/status`, { headers: authHeaders }),
-        fetch(`${API_BASE_URL}/api/user-data`, { headers: authHeaders }),
+        options?.interestOnly ? null : fetch(`${API_BASE_URL}/api/fitbit/status`, { headers: authHeaders, signal: statusRead!.signal }),
+        options?.interestOnly ? null : fetch(`${API_BASE_URL}/api/garmin/status`, { headers: authHeaders, signal: statusRead!.signal }),
+        fetch(`${API_BASE_URL}/api/user-data`, { headers: authHeaders, signal: interestRead.signal }),
       ])
-
-      if (fitbitRes.ok) {
+      if (fitbitRes?.ok) {
         const data: any = await fitbitRes.json().catch(() => ({}))
-        setFitbitConnected(data?.connected === true)
+        if (statusRead?.isCurrent()) setFitbitConnected(data?.connected === true)
       }
-
-      if (garminRes.ok) {
+      if (garminRes?.ok) {
         const data: any = await garminRes.json().catch(() => ({}))
-        setGarminConnected(data?.connected === true)
+        if (statusRead?.isCurrent()) setGarminConnected(data?.connected === true)
       }
-
       if (userDataRes.ok) {
         const data: any = await userDataRes.json().catch(() => ({}))
-        if (data?.data?.deviceInterest && typeof data.data.deviceInterest === 'object') {
-          setInterest(data.data.deviceInterest)
+        if (interestRead.isCurrent()) {
+          const next = data?.data?.deviceInterest
+          if (next && typeof next === 'object' && !Array.isArray(next) && Object.values(next).every(value => typeof value === 'boolean')) setInterest(next)
+          else if (options?.interestOnly) throw new Error('The saved interest preference could not be reloaded.')
         }
+      } else if (options?.interestOnly && interestRead.isCurrent()) {
+        throw new Error('The saved interest preference could not be reloaded.')
       }
     } catch {
+      if (options?.interestOnly && interestRead.isCurrent()) Alert.alert('Could not refresh Devices', 'Your saved interest preference could not be reloaded. Please reopen Devices.')
       // Keep the last visible state if the network is unstable.
     } finally {
-      setLoading(false)
+      if (statusRead?.isCurrent()) setLoading(false)
+      statusRead?.finish()
+      interestRead.finish()
     }
-  }, [authHeaders])
+  }, [authHeaders, voiceReadAccount])
+
+  useEffect(() => {
+    setFitbitConnected(false)
+    setGarminConnected(false)
+    setInterest({})
+    setLoading(Boolean(voiceReadAccount))
+  }, [voiceReadAccount])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:voice-action-completed', payload => {
+      if (!authHeaders || !matchesVoiceActionReadRefresh(payload, session?.user?.id, 'devices')) return
+      void loadDeviceStatus({ interestOnly: true })
+    })
+    return () => subscription.remove()
+  }, [authHeaders, loadDeviceStatus, session?.user?.id])
 
   useFocusEffect(
     useCallback(() => {

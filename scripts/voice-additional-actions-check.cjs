@@ -28,11 +28,18 @@ const imageList=load('app/api/medical-images/history/route.ts',imageDeps),imageD
 // Execute only the existing normal interest storage/read blocks; other profile
 // fields and their app bootstrap are deliberately outside this isolated fixture.
 const userRaw=fs.readFileSync(path.join(root,'app/api/user-data/route.ts'),'utf8'),userAst=ts.createSourceFile('user-data.ts',userRaw,ts.ScriptTarget.Latest,true)
-let interestWrite
-function visit(n){if(ts.isIfStatement(n)&&n.expression.getText(userAst).includes('(data as any).deviceInterest'))interestWrite=n;ts.forEachChild(n,visit)}visit(userAst);assert(interestWrite)
+let interestWrite,interestReadField,interestGetReturn
+function visit(n){
+ if(ts.isIfStatement(n)&&n.expression.getText(userAst).includes('(data as any).deviceInterest'))interestWrite=n
+ if(ts.isPropertyAssignment(n)&&n.name.getText(userAst)==='deviceInterest'&&n.initializer.getText(userAst)==='deviceInterestData')interestReadField=n
+ if(ts.isReturnStatement(n)&&n.expression&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(userAst)==='NextResponse.json'&&n.expression.arguments[0]?.getText(userAst)==='{ data: onboardingData }')interestGetReturn=n
+ ts.forEachChild(n,visit)
+}visit(userAst);assert(interestWrite);assert(interestReadField);assert(interestGetReturn)
 const readStart=userRaw.indexOf('    let deviceInterestData: any = {}'),readEnd=userRaw.indexOf('\n    //',readStart+1);assert(readStart>0&&readEnd>readStart)
 const interestBox=vm.createContext({prisma,actor,NextResponse:server.NextResponse,console:{error(){},log(){}}})
-vm.runInContext(compile(`async function GET(request){const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});user.healthGoals=[{...await prisma.healthGoal.findFirst({where:{userId:user.id}}),name:'__DEVICE_INTEREST__'}];${userRaw.slice(readStart,readEnd)};return NextResponse.json({deviceInterest:deviceInterestData})} async function POST(request){const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});const data=await request.json();try{${interestWrite.getText(userAst)};return NextResponse.json({success:true})}catch{return NextResponse.json({error:'save_failed'},{status:500})}};globalThis.routes={GET,POST}`),interestBox)
+// Preserve the actual normal GET field assignment AND its response statement;
+// a handwritten top-level response here previously concealed an envelope bug.
+vm.runInContext(compile(`async function GET(request){const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});user.healthGoals=[{...await prisma.healthGoal.findFirst({where:{userId:user.id}}),name:'__DEVICE_INTEREST__'}];${userRaw.slice(readStart,readEnd)};const onboardingData={${interestReadField.getText(userAst)}};${interestGetReturn.getText(userAst)}} async function POST(request){const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});const data=await request.json();try{${interestWrite.getText(userAst)};return NextResponse.json({success:true})}catch{return NextResponse.json({error:'save_failed'},{status:500})}};globalThis.routes={GET,POST}`),interestBox)
 const review=load('lib/native-voice-review-token.ts',{crypto})
 const instrument=(route,method)=>(...args)=>{calls.push({method,url:args[0].url,headers:new Headers(args[0].headers)});return route[method](...args)}
 const userRoutes={GET:instrument(interestBox.routes,'GET'),POST:instrument(interestBox.routes,'POST')}
@@ -45,6 +52,18 @@ function reset(){sessionId=null;nativeId=owner;mode='normal';mutations=[];calls=
 let count=0
 async function check(name,run){reset();await run();count++;console.log('PASS '+name)}
 async function main(){
+ await check('actual normal GET response envelope is required; top-level and malformed interest responses cannot prepare or execute',async()=>{
+  const normal=await(await interestBox.routes.GET(request())).json()
+  assert.deepEqual(normal,{data:{deviceInterest:{googleFit:false,oura:true,polar:false,huawei:true}}});assert.equal(normal.deviceInterest,undefined)
+  const args=[request(),owner,{action:'devices.interest.update',values:{provider:'googleFit',interested:true}},'I am interested in Google Fit','2026-10-17']
+  const draft=await helper.prepareVoiceAdditionalAction(...args)
+  for(const invalid of [{deviceInterest:{googleFit:false}},null,{}, {data:null},{data:[]},{data:{}},{data:{deviceInterest:[]}},{data:{deviceInterest:{googleFit:'false'}}},{data:{deviceInterest:{googleFit:null}}}]){
+   const io={userId:async()=>owner,call:async()=>invalid}
+   await assert.rejects(()=>helper.prepareVoiceAdditionalAction(...args,io),/reopen Devices/)
+   await assert.rejects(()=>helper.executeVoiceAdditionalAction(request(),owner,draft,{receiptClaimed:true,actionId:'synthetic-action-id'},io),/reopen Devices/)
+  }
+  assert.equal(mutations.length,0)
+ })
  await check('fixed schema and both old-client capability gates refuse before any normal-handler access',async()=>{
   assert.equal(Object.keys(helper.VOICE_ADDITIONAL_ACTION_SCHEMAS).length,4)
   await assert.rejects(()=>prepare('devices.interest.update',{provider:'googleFit',interested:true},'I am interested in Google Fit',request(false)),/updated Helfi/)

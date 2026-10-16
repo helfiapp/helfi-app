@@ -49,7 +49,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 
 ## Required offline regression coverage
 
-`scripts/assert-native-voice-confirm-guard.js` currently registers **49 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
+`scripts/assert-native-voice-confirm-guard.js` currently registers **50 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
 
 | Required suite (`scripts/`) | Recorded offline count / scope |
 |---|---|
@@ -170,3 +170,12 @@ Native50/e7c74f72 was actually installed and signed in; server129 and recovery13
 The native51 candidate adds PDF opening, GoogleFit/Oura/Polar interest preferences, selected saved health-image-note deletion, saved Chat History rename/delete and captured coach/check-in history deletion. Required new suites: PDF server13 groups; PDF client12; additional server14; additional/history client13; history server18. The complete49-suite guard passed under UTC with native/node_modules resolution denied, alongside root/native types and design/region checks. Actual native opening/preferences are verified separately after release; no real history deletion was used to test these features.
 
 A report PDF review binds exact owner/READY report/period/content and the first native receipt binds SHA256(reviewToken). Only transient access links leave the confirmation response; none enter durable receipts or transcripts. The microphone is stopped before the normal OS opening. Saved-history wording cannot clear the current voice chat, even under a mislabeled model action. Bounded history snapshots and transactional exact-row comparison preserve later arrivals and reject stale/partial selections. Already-absent means no deletion was performed. These are finite coverage/tests, not a promise that every possible spoken request or every platform has been exercised.
+
+
+### Native52 response and screen-refresh correction
+
+The device-interest adapter now consumes the real normal GET envelope; its actual-wrapper suite has15 groups. Four mounted views (Devices, Health Image Notes, Health Coach history and Daily Check-in history) consume exact same-account completion events and perform guarded read-only refreshes. The additional27-group actual-source suite covers late/unmounted/wrong-account reads, superseded responses, inactive history and preservation of unsaved forms. Runtime display checks remain separate.
+
+Known protected-screen limitation: Insights refreshes on normal focus, but generating a report while Insights is already focused can leave the list/status stale until the page is reopened. The approved Insights/MainTabs hard locks have not been changed. PDF opening does not modify stored report data. This is not evidence that all manual app features are universally voice-complete.
+
+Final52 pre-release checks: complete50-suite guard PASS under UTC with native-only dependencies refused; root and native type checks PASS;292 full/93 native locks PASS; protected-region checks PASS. Signed52, deployment and device checks are recorded separately once actually performed.

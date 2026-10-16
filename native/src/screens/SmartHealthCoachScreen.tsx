@@ -1,9 +1,10 @@
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, Modal, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native'
+import { ActivityIndicator, Alert, DeviceEventEmitter, Modal, Pressable, ScrollView, Switch, Text, TextInput, View } from 'react-native'
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { createVoiceActionReadGuard, matchesVoiceActionReadRefresh } from '../voice/voiceActionReadRefresh'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -231,6 +232,15 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
     if (!session?.token) return null
     return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [session?.token])
+  const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
+  const voiceReadAccount = mode === 'signedIn' && authHeaders && session?.token ? JSON.stringify([session.user?.id || '', session.token]) : null
+  voiceReadGuardRef.current.setAccount(voiceReadAccount)
+  useEffect(() => {
+    const guard = voiceReadGuardRef.current!
+    guard.mount()
+    return () => guard.unmount()
+  }, [])
 
   const clearedTipIdsSet = useMemo(() => new Set(clearedTipIds), [clearedTipIds])
 
@@ -328,20 +338,37 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
   }, [authHeaders])
 
   const loadHistoryTips = useCallback(async () => {
-    if (!authHeaders) return
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'coach-history')
+    if (!authHeaders || !read) return
     try {
       setLoadingHistory(true)
-      const res = await fetch(`${API_BASE_URL}/api/health-tips/history`, { headers: authHeaders })
+      const res = await fetch(`${API_BASE_URL}/api/health-tips/history`, { headers: authHeaders, signal: read.signal })
       const data: any = await res.json().catch(() => ({}))
+      if (!read.isCurrent()) return
       if (!res.ok) throw new Error(data?.error || data?.detail || 'Could not load tip history')
       setTipsHistory(Array.isArray(data?.tips) ? data.tips : [])
     } catch (e: any) {
+      if (!read.isCurrent()) return
       Alert.alert('Could not load history', e?.message || 'Please try again.')
       setTipsHistory([])
     } finally {
-      setLoadingHistory(false)
+      if (read.isCurrent()) setLoadingHistory(false)
+      read.finish()
     }
-  }, [authHeaders])
+  }, [authHeaders, voiceReadAccount])
+
+  useEffect(() => {
+    setTipsHistory([])
+    setLoadingHistory(false)
+  }, [voiceReadAccount])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:voice-action-completed', payload => {
+      if (!authHeaders || !matchesVoiceActionReadRefresh(payload, session?.user?.id, 'coach-history')) return
+      if (activeTab === 'history') void loadHistoryTips()
+    })
+    return () => subscription.remove()
+  }, [activeTab, authHeaders, loadHistoryTips, session?.user?.id])
 
   const loadSettings = useCallback(async () => {
     if (!authHeaders) return

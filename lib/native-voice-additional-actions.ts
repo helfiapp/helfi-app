@@ -80,7 +80,7 @@ function intent(action:VoiceAdditionalActionName,values:Record<string,any>,trans
   }
 }
 const domain=(action:VoiceAdditionalActionName):Call['domain']=>action==='devices.interest.update'?'devices':action==='health_image_note.delete'?'health-images':'chat-history'
-function interests(data:any){const result=data?.deviceInterest;if(!result||typeof result!=='object'||Array.isArray(result)||Object.values(result).some(value=>typeof value!=='boolean'))throw new Error('Please reopen Devices to review the saved interest settings.');return{...result}}
+function interests(data:any){const envelope=data?.data,result=envelope?.deviceInterest;if(!envelope||typeof envelope!=='object'||Array.isArray(envelope)||!result||typeof result!=='object'||Array.isArray(result)||Object.values(result).some(value=>typeof value!=='boolean'))throw new Error('Please reopen Devices to review the saved interest settings.');return{...result}}
 async function records(request:NextRequest,userId:string,action:VoiceAdditionalActionName,values:Record<string,any>,io:VoiceAdditionalIo,targetId?:string){
   const data=await io.call(request,{domain:domain(action),method:'GET',context:values.context,targetId})
   if(action==='devices.interest.update')return{interest:interests(data)}

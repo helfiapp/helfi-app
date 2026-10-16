@@ -1114,6 +1114,7 @@ for (const regression of [
   'voice-additional-actions-check.cjs',
   'voice-additional-client-check.cjs',
   'voice-history-actions-check.cjs',
+  'voice-screen-read-refresh-check.cjs',
   'voice-preference-actions-check.cjs',
   'voice-recipe-metadata-check.cjs',
   'voice-recipe-integration-check.cjs',

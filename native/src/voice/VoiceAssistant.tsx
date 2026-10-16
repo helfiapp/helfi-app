@@ -2261,7 +2261,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           saveRequestOutstanding = false
           traceVoiceAction(voiceActionRunId, 'action_completed', targetDraft.action, receipt.status, accepted.idempotentReplay ? 'replayed_saved_item_receipt' : 'verified_saved_item_receipt', startedAt)
           appendConversationTurns([makeConversationTurn('assistant', receipt.message)])
-          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', kind: receipt.kind, action: receipt.action, changedAreas: receipt.changedAreas })
+          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', accountId: voiceMemoryUserId, kind: receipt.kind, action: receipt.action, changedAreas: receipt.changedAreas })
           const target = receipt.kind === 'history_action' ? receipt.action === 'coach_history.delete' ? { title: 'Health Coach', path: '/health-tips/history', nativeTarget: { type: 'stack', route: 'SmartHealthCoach', params: { tab: 'history' } } } : { title: 'Daily Check-in', path: '/check-in?tab=history', nativeTarget: { type: 'stack', route: 'DailyCheckIn', params: { tab: 'history' } } }
             : receipt.kind === 'device_interest' ? { title: 'Devices', path: '/devices', nativeTarget: { type: 'stack', route: 'Devices' } }
             : receipt.kind === 'health_image_note' ? { title: 'Health Image Notes', path: '/medical-images', nativeTarget: { type: 'stack', route: 'HealthImageNotes' } }

@@ -2,6 +2,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -14,6 +15,7 @@ import { useFocusEffect, useRoute, type RouteProp } from '@react-navigation/nati
 import Svg, { Circle, Line as SvgLine, Path, Text as SvgText } from 'react-native-svg'
 
 import { API_BASE_URL } from '../config'
+import { createVoiceActionReadGuard, matchesVoiceActionReadRefresh } from '../voice/voiceActionReadRefresh'
 import type { MainStackParamList } from '../navigation/MainNavigator'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
@@ -77,6 +79,15 @@ export function DailyCheckInScreen() {
       'cache-control': 'no-store',
     }
   }, [mode, session?.token])
+  const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
+  const voiceReadAccount = mode === 'signedIn' && authHeaders && session?.token ? JSON.stringify([session.user?.id || '', session.token]) : null
+  voiceReadGuardRef.current.setAccount(voiceReadAccount)
+  useEffect(() => {
+    const guard = voiceReadGuardRef.current!
+    guard.mount()
+    return () => guard.unmount()
+  }, [])
   const todayAccountRef = useRef<string | null>(null)
   const todayLoadRunRef = useRef(0)
   const todayLoadedRef = useRef<{ account: string; localDate: string } | null>(null)
@@ -96,6 +107,7 @@ export function DailyCheckInScreen() {
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyRows, setHistoryRows] = useState<CheckInHistoryRow[]>([])
   const [historyLoaded, setHistoryLoaded] = useState(false)
+  const voiceHistoryNeedsRefreshRef = useRef(false)
   const [historyPeriod, setHistoryPeriod] = useState<PeriodKey>('all')
   const [selectedIssues, setSelectedIssues] = useState<string[]>([])
   const [expandedGroupKey, setExpandedGroupKey] = useState<string | null>(null)
@@ -193,34 +205,53 @@ export function DailyCheckInScreen() {
   }, [authHeaders])
 
   const loadHistory = useCallback(async () => {
-    if (!authHeaders) {
-      setHistoryLoading(false)
-      return
-    }
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'checkin-history')
+    if (!authHeaders || !read) return
 
     try {
       setHistoryLoading(true)
       const res = await fetch(`${API_BASE_URL}/api/checkins/history`, {
         headers: authHeaders,
+        signal: read.signal,
       })
       const data: any = await res.json().catch(() => ({}))
+      if (!read.isCurrent()) return
       if (!res.ok) throw new Error(String(data?.error || 'Could not load history'))
 
       const rows: CheckInHistoryRow[] = Array.isArray(data?.history) ? data.history : []
       setHistoryRows(rows)
+      voiceHistoryNeedsRefreshRef.current = false
       setHistoryLoaded(true)
     } catch (e: any) {
+      if (!read.isCurrent()) return
       Alert.alert('Could not load history', e?.message || 'Please try again.')
     } finally {
-      setHistoryLoading(false)
+      if (read.isCurrent()) setHistoryLoading(false)
+      read.finish()
     }
-  }, [authHeaders])
+  }, [authHeaders, voiceReadAccount])
+
+  useEffect(() => {
+    voiceHistoryNeedsRefreshRef.current = false
+    setHistoryRows([])
+    setHistoryLoaded(false)
+    setHistoryLoading(false)
+  }, [voiceReadAccount])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:voice-action-completed', payload => {
+      if (!authHeaders || !matchesVoiceActionReadRefresh(payload, session?.user?.id, 'checkin-history')) return
+      voiceHistoryNeedsRefreshRef.current = true
+      if (activeTab === 'history') void loadHistory()
+    })
+    return () => subscription.remove()
+  }, [activeTab, authHeaders, loadHistory, session?.user?.id])
 
   useFocusEffect(
     useCallback(() => {
       if (activeTab === 'today') {
         void loadToday()
-      } else if (!historyLoaded) {
+      } else if (!historyLoaded || voiceHistoryNeedsRefreshRef.current) {
         void loadHistory()
       }
       return () => {}
