@@ -285,8 +285,8 @@
     "native/src/ui/HuaweiHealthSetupCard.tsx": "4b737730447bb845d1cb04fcd88c660b8940f31e23abcaf13b2aeec133b586d5",
     "native/src/ui/Screen.tsx": "7f3e8eab601f2dea38f605dc113bfb8395e2a3a99995bb72fe9aa30855514dd4",
     "native/src/ui/theme.ts": "60e389709fa224cbf99d06e4b29d10ea451988ed176cc5a1f038dcc4907a88a0",
-    "native/src/voice/realtimeVoice.ts": "3131752a61483fae4f0b683f219a8dbdc274a3b82859c233f510c1e7841a5c31",
-    "native/src/voice/VoiceAssistant.tsx": "13b9d37a1dc31d7ea6ed2c8888780251b5f97fdca4423710051cbb810b8a5af5",
+    "native/src/voice/realtimeVoice.ts": "62678d9e992df8431c8c5bb2afb309a7b81b5f2c9c57f5635fed0515a13dbf45",
+    "native/src/voice/VoiceAssistant.tsx": "eae986b12185c4bb81ae55f97e6a4e7caea75917e8c2ea019a7d766d9bca8e1d",
     "native/src/voice/VoiceAssistantIconButton.tsx": "9be7cd11cc7abffa4c8778de0740aeb1a4bad2b84f21073bc3db1ed7feaa2301"
   }
 }

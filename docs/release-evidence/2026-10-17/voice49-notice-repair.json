@@ -1,0 +1,29 @@
+{
+  "recordedAtUtc": "2026-10-16T15:09:12.159627+00:00",
+  "status": "Local notice/error-feedback correction; final signed iPhone49 pending",
+  "baseCommit": "632cc31421bf3825725fd5a3cfe1902fa36618fe",
+  "observation": "Normal Android46 app connected; after12s without speech a silence reminder was incorrectly shown as Voice service error and Thinking. Exact event log showed session.instructions.appended and ongoing usage; zero provider error events.",
+  "repairs": [
+    "Separate optional notice callback from genuine errors",
+    "Silence reminder leaves connected microphone ready",
+    "Unclear legacy transcription uses a notice",
+    "Actual service error retains its useful exact message",
+    "Ignore late notices after End"
+  ],
+  "scope": "Only native voice callbacks and iOS49 metadata; no design, action, billing, networking or model change.",
+  "checks": [
+    "Actual-source protocol suite PASS:12s silence notice/ready status/no error; unclear-audio notice; cleanup",
+    "Actual-source callback suite PASS:notice vs genuine failure; exact error message; late notice ignored"
+  ],
+  "sourceSha256": {
+    "native/src/voice/realtimeVoice.ts": "62678d9e992df8431c8c5bb2afb309a7b81b5f2c9c57f5635fed0515a13dbf45",
+    "native/src/voice/VoiceAssistant.tsx": "eae986b12185c4bb81ae55f97e6a4e7caea75917e8c2ea019a7d766d9bca8e1d",
+    "scripts/voice-live-protocol-check.cjs": "f9d2411246e084e0008934e6ac3fc54c2a3c99ca67623883ff46bfd326a20c0f",
+    "scripts/voice-client-integrity-check.cjs": "4d02c26260d5ba0935a26eddd7e2146b90468e8585255272a6d752d00b21fd27"
+  },
+  "actualVoiceHandshakeFromPreviousSameTransportVerified": true,
+  "realIPhoneMicrophoneConversationTested": false,
+  "unapprovedInsightsExcluded": true,
+  "uploaded": false,
+  "physicalInstallationVerified": false
+}

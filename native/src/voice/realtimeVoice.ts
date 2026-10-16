@@ -7,6 +7,7 @@ type RealtimeCallbacks = {
   onStatus?: (status: string) => void
   onConnectStage?: (stage: string) => void
   onError?: (message: string) => void
+  onNotice?: (message: string) => void
   onAudioRoute?: (route: string) => void
   onTranscript?: (text: string) => void
   onAssistantText?: (text: string) => void
@@ -438,8 +439,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
       if (stopped || silenceReminderSent || !dataChannelOpen) return
       silenceReminderSent = true
       const message = "I didn't hear anything. Please try speaking again."
-      callbacks.onError?.(message)
-      emitStatus('thinking')
+      callbacks.onNotice?.(message)
+      emitStatus('live')
       if (voiceProtocol === 'live-v1') {
         sendRealtimeEvent(dataChannel, { type: 'session.instructions.append', delegation_id: null, content: `Say briefly: ${message} Then listen again.` })
         return
@@ -797,7 +798,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     }
     if (payload.type === 'conversation.item.input_audio_transcription.failed') {
       const message = 'I could not understand that audio. Please try speaking again.'
-      callbacks.onError?.(message)
+      callbacks.onNotice?.(message)
       emitStatus('live')
       return
     }

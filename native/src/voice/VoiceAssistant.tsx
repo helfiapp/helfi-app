@@ -2580,8 +2580,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           },
           onError: (message) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
-            setRealtimeVoiceError(cleanFavoriteText(message, 260) || 'The live voice service reported an error. Please tap Try again.')
-            addVoiceActivity('Voice service error — ready to retry', 'error')
+            const detail = cleanFavoriteText(message, 260) || 'The live voice service reported an error. Please tap Try again.'
+            setRealtimeVoiceError(detail)
+            addVoiceActivity(detail, 'error')
+          },
+          onNotice: (message) => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+            setRealtimeVoiceError('')
+            addVoiceActivity(cleanFavoriteText(message, 260) || 'Ready — speak when you are ready', 'done')
           },
           onAudioRoute: (route) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return

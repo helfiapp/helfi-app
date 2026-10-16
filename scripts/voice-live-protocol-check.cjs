@@ -230,7 +230,7 @@ async function checkRoute() {
   assertClosed(finalAuthority)
 }
 function nativeHarness(options = {}) {
-  const statuses = [], errors = [], transcripts = [], assistant = [], actions = [], sent = [], requests = []
+  const statuses = [], errors = [], notices = [], transcripts = [], assistant = [], actions = [], sent = [], requests = []
   const timers = new Map()
   let sequence = 0, clock = 1000000, trackStops = 0, closes = 0, userSpeech = 0, pc
   let outputEnergy = 0, outputLevel = 0
@@ -280,7 +280,7 @@ function nativeHarness(options = {}) {
   const started = box.exports.startHelfiRealtimeVoiceSession({
     token: 'synthetic-token', billingSessionId: 'synthetic-conversation-123', signal: controller.signal,
     callbacks: {
-      onStatus: (status) => statuses.push(status), onError: (error) => errors.push(error),
+      onStatus: (status) => statuses.push(status), onError: (error) => errors.push(error), onNotice: (notice) => notices.push(notice),
       onTranscript: (text) => transcripts.push(text), onAssistantText: (text) => assistant.push(text), onUserSpeech: () => { userSpeech++; options.onUserSpeech?.() },
       onActionRequest: async (args) => { actions.push(args); return options.action ? options.action(args) : { ok: true, saved: false, safeToClaimSaved: false, needsReview: true, spokenReply: 'Synthetic review. Would you like me to save that for you?' } },
     },
@@ -296,7 +296,7 @@ function nativeHarness(options = {}) {
     }
     await tick()
   }
-  return { box, started, controller, statuses, errors, transcripts, assistant, actions, sent, requests, timers, emit, advance,
+  return { box, started, controller, statuses, errors, notices, transcripts, assistant, actions, sent, requests, timers, emit, advance,
     output: (energy, level = 0) => { outputEnergy = energy; outputLevel = level },
     peer: () => pc, stoppedTracks: () => trackStops, closes: () => closes, userSpeech: () => userSpeech }
 }
@@ -420,12 +420,24 @@ async function checkNative() {
   assert.equal(immediate.timers.size, 0)
   const legacy = nativeHarness({ legacy: true })
   const legacySession = (await legacy.started).session
+  legacy.emit({ type: 'conversation.item.input_audio_transcription.failed' })
+  assert.match(legacy.notices.at(-1), /could not understand/)
+  assert.equal(legacy.errors.length, 0, 'An unclear turn is a retry notice, not a failed voice service')
   legacy.emit({ type: 'response.function_call_arguments.done', name: 'request_helfi_action', call_id: 'legacy-call', arguments: JSON.stringify({ request: 'log water', action: 'water', needsReview: true }) })
   await tick()
   assert.ok(legacy.sent.some((item) => item.type === 'conversation.item.create' && item.item.call_id === 'legacy-call'))
   await legacySession.stop()
   assert.ok(legacy.sent.some((item) => item.type === 'response.cancel'))
   assert.equal(legacy.timers.size, 0)
+  const silent = nativeHarness()
+  const silentSession = (await silent.started).session
+  await silent.advance(12000)
+  assert.match(silent.notices.at(-1), /didn't hear anything/)
+  assert.equal(silent.errors.length, 0, 'Ordinary silence must never be shown as a service failure')
+  assert.equal(silent.statuses.at(-1), 'live', 'A silent connected microphone stays ready, not thinking about an unheard request')
+  assert.ok(silent.sent.some(event => event.type === 'session.instructions.append' && event.delegation_id === null))
+  await silentSession.stop()
+  assert.equal(silent.timers.size, 0)
 }
 async function checkMetering() {
   const source = sourceWithoutImports('lib/cost-meter.ts')

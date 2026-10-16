@@ -1,3 +1,9 @@
+## 17 October 2026 — Final iPhone49 truthful silence guidance
+
+Actual signed Android46 long connection showed session.started, complete media readiness, acknowledged silence guidance and continuing usage updates; zero provider error events. Its red service-error activity was a local12-second silence reminder misclassified through onError. Native49 separates notices from genuine errors, keeps a silent connected session ready, retains useful genuine failure messages and ignores notices after End. Transport/model/actions/credit behavior and the approved Dashboard are unchanged. Actual-source notice/error/state regressions, native types, full production build and286/87locks pass.
+
+Only iPhone49 is being prepared for installation;47/48 remain undistributed. Google46 remains valid for its independent corrected-login submission, now sent for review by GOOGLE PLAY FIX. Unapproved GREEN Insights preview is privately preserved and temporarily excluded; restore only after49 immutable archive/export checks. Real iPhone microphone conversation/save proof remains the owner's next test after installation. Evidence: docs/release-evidence/2026-10-17/voice49-notice-repair.json.
+
 ## 17 October 2026 — Voice48 connection repair; real app handshake verified
 
 First signed47 candidate was held before internal distribution because signed Android45 exposed a local media-gathering timeout before any provider/server request. Removed the unrelated Google STUN dependency, retained bounded complete candidate gathering with10seconds, and reset the server deadline after the local offer becomes ready. Actual private Android46 diagnostic normal app UI now reaches Ready—speak now, full session/media readiness and clean stop; no speech or diary save attempted. Connection evidence is distinct from real iPhone audio/save correctness.

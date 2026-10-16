@@ -192,6 +192,23 @@ async function verifySaveResult() {
 }
 async function main() {
   const box = evaluate(baseBox(), '')
+  const noticeState = baseBox(), activity = [], errors = []
+  Object.assign(noticeState, {
+    realtimeRunId: 0, voiceSessionActiveRef: { current: true },
+    setRealtimeVoiceError: message => errors.push(message),
+    addVoiceActivity: (message, kind) => activity.push({ message, kind }),
+  })
+  evaluate(noticeState, `globalThis.notice = ${properties.get('onNotice')}; globalThis.failure = ${properties.get('onError')}`)
+  noticeState.notice("I didn't hear anything. Please try speaking again.")
+  assert.equal(errors.at(-1), '')
+  assert.equal(activity.at(-1).kind, 'done')
+  assert.match(activity.at(-1).message, /didn't hear anything/)
+  noticeState.failure('Synthetic genuine service failure')
+  assert.equal(activity.at(-1).kind, 'error')
+  assert.equal(activity.at(-1).message, 'Synthetic genuine service failure', 'Real service errors retain the exact useful message')
+  noticeState.voiceSessionActiveRef.current = false
+  noticeState.notice('Late silence notice')
+  assert.equal(activity.length, 2, 'A stopped conversation ignores late notices')
   const draft = foodDraft()
   for (const text of ['make this dinner instead', 'make dinner', 'add 50 ml milk to lunch', 'add milk for lunch', 'log this for dinner', 'change the meal to breakfast', 'add one more egg']) {
     assert.equal(box.isExplicitNewVoiceCommand(text, draft), false, `Keep reviewed draft for: ${text}`)
