@@ -70,8 +70,9 @@ export type VoiceReportPdfIo = {
 function pdfPublicOrigin(){
   try{
     const url=new URL(getSiteUrl())
-    if(url.protocol!=='https:'||url.username||url.password||url.hash||url.search||url.pathname!=='/'||!['https://helfi.ai','https://www.helfi.ai','https://stg.helfi.ai'].includes(url.origin))throw new Error()
-    return url.origin==='https://www.helfi.ai'?'https://helfi.ai':url.origin
+    const productionDefaultOrigin='https://master.d2n4u4zm85ooe.amplifyapp.com'
+    if(url.protocol!=='https:'||url.username||url.password||url.hash||url.search||url.pathname!=='/'||!['https://helfi.ai','https://www.helfi.ai','https://stg.helfi.ai',productionDefaultOrigin].includes(url.origin))throw new Error()
+    return url.origin==='https://www.helfi.ai'||url.origin===productionDefaultOrigin?'https://helfi.ai':url.origin
   }catch{throw new Error('The app could not verify its secure public PDF address. Please use Save as PDF in Insights.')}
 }
 function pdfOriginClass(url:URL){

@@ -10,7 +10,7 @@ const fixture=new Function('require','__dirname',`${fixtureSource.slice(0,bounda
 class NextRequest extends Request {}
 const owner='synthetic-user',now=Date.parse('2026-10-15T01:00:00Z'),plain=v=>JSON.parse(JSON.stringify(v))
 const response=(body,options)=>new Response(JSON.stringify(body),{status:options?.status||200,headers:{'content-type':'application/json'}})
-function setup({requestOrigin='https://helfi.ai',siteUrl='https://helfi.ai',extraHeaders={}}={}){
+function setup({requestOrigin='https://helfi.ai',siteUrl='https://helfi.ai',siteEnvironment,extraHeaders={}}={}){
   fixture.AuditDate.setNow(now)
   let account={id:owner},posts=0,authSeen,mode='ok',postOriginSeen;const diagnostics=[]
   const reports=[{id:'older-ready',userId:owner,status:'READY',periodStart:'2026-10-01',periodEnd:'2026-10-07',report:{summary:'Older synthetic facts'}},
@@ -19,9 +19,10 @@ function setup({requestOrigin='https://helfi.ai',siteUrl='https://helfi.ai',extr
     {id:'foreign',userId:'another-owner',status:'READY',periodStart:'2026-10-09',periodEnd:'2026-10-15'}]
   const byId=async(user,id)=>reports.find(row=>row.userId===user&&row.id===id)||null
   const authenticate=async()=>account
+  const actualSiteUrl=siteEnvironment?fixture.load('lib/site-url.ts',{URL,process:{env:{...siteEnvironment}}}).getSiteUrl:null
   const pdf=fixture.load('app/api/reports/weekly/pdf/route.ts',{Headers,URL,createHmac:crypto.createHmac,timingSafeEqual:crypto.timingSafeEqual,getWeeklyReportRequestUser:authenticate,getWeeklyReportById:byId,NextResponse:{json:response},process:{env:{AUTH_SECRET:'synthetic-pdf-link-secret'}}})
   const helper=fixture.load('lib/native-voice-report-actions.ts',{Headers,URL,NextRequest,
-    getSiteUrl:()=>siteUrl,console:{log(){},warn(){},error(){},info:(...args)=>diagnostics.push(plain(args))},
+    getSiteUrl:actualSiteUrl||(()=>siteUrl),console:{log(){},warn(){},error(){},info:(...args)=>diagnostics.push(plain(args))},
     getWeeklyReportRequestUser:authenticate,getWeeklyReportById:byId,getWeeklyReportByPeriod:async(user,start,end)=>reports.find(row=>row.userId===user&&row.periodStart===start&&row.periodEnd===end)||null,listWeeklyReports:async(user,limit,status)=>{assert.equal(limit,50);assert.equal(status,'READY');return reports.filter(row=>row.userId===user&&row.status===status)},
     signNativeVoiceDraft:fixture.tokens.signNativeVoiceDraft,verifyNativeVoiceDraft:fixture.tokens.verifyNativeVoiceDraft,
     require:name=>{assert.equal(name,'@/app/api/reports/weekly/pdf/route');return{POST:async request=>{posts++;postOriginSeen=new URL(request.url).origin;authSeen=request.headers.get('authorization');assert.deepEqual(await request.json(),{reportId:'latest-ready'});if(mode==='error')return response({error:'PRIVATE synthetic underlying failure'},{status:500});return pdf.POST(new NextRequest(request.url,{method:'POST',headers:request.headers,body:JSON.stringify({reportId:'latest-ready'})}))}}},
@@ -94,8 +95,21 @@ async function run(){
       const f=setup({requestOrigin:'http://synthetic-internal.invalid:3000',siteUrl,extraHeaders:{host:'attacker.invalid','x-forwarded-host':'attacker.invalid','x-forwarded-proto':'http'}}),draft=await f.prepare(),result=await f.execute(draft)
       assert.equal(f.postOrigin(),expected);assert.equal(new URL(result.reportPdfAccess.url).origin,expected);assert.equal(f.diagnostics[0][1].requestProtocol,'http');assert.equal(f.diagnostics[0][1].sameRequestOrigin,false);assert.equal(f.auth(),'Bearer synthetic-original')
     }
-    for(const siteUrl of ['http://helfi.ai','https://attacker.invalid','https://helfi.ai.attacker.invalid','https://helfi.ai:8443','https://user:password@helfi.ai','https://helfi.ai/other','https://helfi.ai?redirect=bad','https://helfi.ai#bad','not a URL']){
+    for(const siteUrl of ['http://helfi.ai','https://attacker.invalid','https://helfi.ai.attacker.invalid','https://helfi.ai:8443','https://user:password@helfi.ai','https://helfi.ai/other','https://helfi.ai?redirect=bad','https://helfi.ai#bad','not a URL','https://master.other.amplifyapp.com','https://other.d2n4u4zm85ooe.amplifyapp.com','http://master.d2n4u4zm85ooe.amplifyapp.com','https://master.d2n4u4zm85ooe.amplifyapp.com:8443','https://user:password@master.d2n4u4zm85ooe.amplifyapp.com','https://master.d2n4u4zm85ooe.amplifyapp.com.attacker.invalid']){
       const f=setup({siteUrl}),draft=await f.prepare();await assert.rejects(()=>f.execute(draft),error=>/secure public PDF address/.test(error.message)&&!error.message.includes(siteUrl));assert.equal(f.posts(),0);assert.equal(f.diagnostics.length,0)
+    }
+  })
+  await check('actual public-site helper maps only the exact configured production AWS default to canonical native PDF access',async()=>{
+    const production='https://master.d2n4u4zm85ooe.amplifyapp.com',keys=['NEXT_PUBLIC_APP_URL','NEXT_PUBLIC_SITE_URL','NEXTAUTH_URL']
+    const environments=[Object.fromEntries(keys.map(key=>[key,production])),...keys.map(key=>({[key]:production}))]
+    for(const siteEnvironment of environments){
+      const f=setup({requestOrigin:production,siteEnvironment}),draft=await f.prepare(),actionId=crypto.createHash('sha256').update(draft.reviewToken).digest('base64url')
+      const exported=await f.helper.executeVoiceReportPdfAction(f.request(),owner,draft,{receiptClaimed:true,actionId});assert.equal(f.postOrigin(),'https://helfi.ai');assert.equal(new URL(exported.reportPdfAccess.url).origin,'https://helfi.ai');assert.equal(f.auth(),'Bearer synthetic-original')
+      const native=fixture.load('native/src/voice/reportPdfActions.ts',{URL,nativeVoiceReviewTokenDigest:token=>crypto.createHash('sha256').update(token).digest('base64url')});let opened=0
+      const result=await native.openReviewedNativeReportPdf({success:true,...exported},draft,{apiBaseUrl:'https://helfi.ai',accountId:owner,isCurrent:()=>true,now:()=>fixture.AuditDate.now(),openUrl:async()=>{opened++}});assert.equal(result.result.status,'pdf_open_requested');assert.equal(opened,1);assert.equal(f.diagnostics[0][1].linkOriginClass,'canonical_public');assert.equal(f.diagnostics[0][1].requestOriginClass,'aws_runtime')
+    }
+    for(const value of ['https://master.other.amplifyapp.com','https://other.d2n4u4zm85ooe.amplifyapp.com','http://master.d2n4u4zm85ooe.amplifyapp.com','https://master.d2n4u4zm85ooe.amplifyapp.com:8443','https://user:password@master.d2n4u4zm85ooe.amplifyapp.com']){
+      const f=setup({siteEnvironment:Object.fromEntries(keys.map(key=>[key,value]))}),draft=await f.prepare();await assert.rejects(()=>f.execute(draft),/secure public PDF address/);assert.equal(f.posts(),0)
     }
   })
   await check('untrusted returned runtime URL is rejected rather than rebased even when same as incoming runtime request',async()=>{

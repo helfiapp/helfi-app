@@ -1088,6 +1088,8 @@ function stripVoiceFoodCommandWords(value: string) {
     .replace(/\b(to|into|in)\s+(?:my\s+)?(?:food\s+)?(?:diary|log|breakfast|lunch|dinner|snacks?)\b/gi, ' ')
     .replace(/\b(breakfast|lunch|dinner|snacks?)\b/gi, ' ')
     .replace(/^[\s:;,]+/, '')
+    .replace(/^(?:with|using|including)\b\s*/i, '')
+    .replace(/\b(and|plus)\s+(?:include|including)\s+/gi, '$1 ')
     .replace(/\s+/g, ' ')
     .trim()
 }
@@ -2198,7 +2200,7 @@ function isExplicitNewVoiceCommand(value: unknown) {
   const text = cleanText(value, 1200).toLowerCase()
   if (!text) return false
   if (/\b(?:this|that|current|reviewed)\s+(?:meal|draft|entry|drink|coffee|tea|milk|water|exercise|workout|journal|mood)\b/.test(text) || /\b(?:make|set|use)\s+(?:it|this|that)\b/.test(text) || /\b(?:change|correct|update|adjust|instead|remove|without)\b/.test(text)) return false
-  const hasCommand = /\b(add|log|record|save|open|show|go to|take me to|create|build|make|track|write|drank|ate|consumed|walked|ran|jogged|cycled|swam)\b/.test(text) || /\bi\s+(?:had|did)\b/.test(text)
+  const hasCommand = /\b(add|log|record|save|open|show|go to|take me to|prepare|create|build|make|track|write|drank|ate|consumed|walked|ran|jogged|cycled|swam)\b/.test(text) || /\bi\s+(?:had|did)\b/.test(text)
   const hasTarget =
     /\b(food|meal|breakfast|lunch|dinner|snack|snacks|favourites?|favorites?|saved|diary|water|coffee|tea|milk|drinks?|hydration|yoga|pilates|exercise|workout|mood|journal|symptom|symptoms|medication|medicine|supplement|vitamin|health image|photo|camera|insights)\b/.test(text)
   return hasCommand && hasTarget
@@ -2392,6 +2394,11 @@ function extractReviewedFoodAddition(draft: any, answerRaw: string) {
   const raw = cleanText(answerRaw, 800)
   const currentMeal = cleanText(draft?.food?.meal, 40).toLowerCase() || 'snacks'
   const translated = cleanText(translateLocalizedFoodRequest(raw, { section: 'food', title: 'Food Diary', meal: currentMeal }), 1000)
+  // A product qualifier such as "with Cheese" is not an addition command when
+  // the user dictates a complete new meal. Otherwise a retained failed draft
+  // can override that fresh request and carry its unresolved food names along.
+  const standaloneMealCommand = /^(?:(?:please|can you|could you|i want to|i would like to)\s+)*(?:prepare|log|record|track|enter|create|build|make)\b/i.test(raw) && isExplicitNewVoiceCommand(raw)
+  if (standaloneMealCommand) return null
   const wantsAdd =
     /\b(add|include|also add|put|with)\b/i.test(translated) ||
     /(додај|додаj|внеси|дополни)/i.test(raw)

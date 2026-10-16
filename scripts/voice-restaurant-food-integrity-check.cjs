@@ -8,7 +8,7 @@ const path = require('node:path')
 const vm = require('node:vm')
 const ts = require('typescript')
 const root = path.resolve(__dirname, '..')
-const allowed = new Set(['lib/native-voice-spoken-quantities.ts', 'native/src/lib/foodUnits.ts', 'lib/food/serving-measurements.ts', 'lib/food/measurement-units.ts', 'lib/food/produce-measurements.ts', 'lib/food/dry-food-measurements.ts', 'lib/food/dairy-semi-solid-measurements.ts'])
+const allowed = new Set(['lib/native-voice-spoken-quantities.ts', 'native/src/lib/foodUnits.ts', 'lib/food/serving-measurements.ts', 'lib/food/measurement-units.ts', 'lib/food/produce-measurements.ts', 'lib/food/dry-food-measurements.ts', 'lib/food/dairy-semi-solid-measurements.ts', 'lib/food/custom-serving-options.ts', 'lib/food/openfoodfacts.ts'])
 const cache = new Map()
 function measurement(relative) {
   assert(allowed.has(relative), `Unexpected dependency ${relative}`)
@@ -59,6 +59,20 @@ function actualMenuRows(){
   }
   return load('lib/food/fast-food-menus.ts').loadFastFoodMenuItems().filter(row=>row.country==='AU'&&row.chain==="McDonald's").map((row,index)=>({...row,id:`source-catalog-${index}`,brand:row.chain,kind:'FAST_FOOD'}))
 }
+function mappedStoredCatalog(rows){
+  const module={exports:{}}
+  const code=ts.transpileModule(fs.readFileSync(path.join(root,'lib/food/custom-foods.ts'),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020}}).outputText
+  vm.runInNewContext(code,{module,exports:module.exports,Date,require:request=>{
+    if(request==='server-only')return{}
+    if(request==='@/lib/prisma')return{prisma:{customFoodItem:{findMany:async()=>rows}}}
+    if(request==='@/lib/food/custom-serving-options')return measurement('lib/food/custom-serving-options.ts')
+    throw Error('Unexpected catalog dependency '+request)
+  }},{filename:'lib/food/custom-foods.ts'})
+  return module.exports.getCustomPackagedItems
+}
+// Exact public CustomFoodItem rows captured read-only17Oct2026. Nutrients
+// reside in recorded servingOptions; per100g fields are intentionally null.
+function capturedStoredMenuRows(){return [{"id":"cmlc49uxq000a12sxppmnueee","key":"mcdonald s double quarter pounder|FAST_FOOD|au","name":"Double Quarter Pounder","brand":"McDonald's","country":"AU","kind":"FAST_FOOD","caloriesPer100g":null,"proteinPer100g":null,"carbsPer100g":null,"fatPer100g":null,"fiberPer100g":null,"sugarPer100g":null,"aliases":["Double Quarter Pounder (McDonald's)","McDonald's Double Quarter Pounder","Double Quarter Pounder (McDonald s)","McDonald s Double Quarter Pounder","Double Quarter Pounder (McDonalds)","McDonalds Double Quarter Pounder"],"servingOptions":[{"id":"serving-mcdonald s double quarter pounder 1 serving","ml":null,"fat_g":50.6,"grams":null,"label":"1 serving","carbs_g":34.2,"fiber_g":null,"sugar_g":8.3,"calories":804,"protein_g":52.3,"serving_size":"1 serving"}]},{"id":"cmvb631vg000bs76950mpd6g9","key":"mcdonald s chicken mcnuggets|FAST_FOOD|au","name":"Chicken McNuggets","brand":"McDonald's","country":"AU","kind":"FAST_FOOD","caloriesPer100g":null,"proteinPer100g":null,"carbsPer100g":null,"fatPer100g":null,"fiberPer100g":null,"sugarPer100g":null,"aliases":["Chicken McNuggets (McDonald's)","McDonald's Chicken McNuggets","Chicken McNuggets (McDonald s)","McDonald s Chicken McNuggets","Chicken McNuggets (McDonalds)","McDonalds Chicken McNuggets"],"servingOptions":[{"id":"serving-mcdonald s chicken mcnuggets 3 pieces","ml":null,"fat_g":6.5,"grams":null,"label":"3 pieces","carbs_g":6.2,"fiber_g":null,"sugar_g":0.2,"calories":108,"protein_g":6,"serving_size":"3 pieces"},{"id":"serving-mcdonald s chicken mcnuggets 6 pieces","ml":null,"fat_g":13,"grams":null,"label":"6 pieces","carbs_g":12.4,"fiber_g":null,"sugar_g":0.4,"calories":216,"protein_g":12.1,"serving_size":"6 pieces"},{"id":"serving-mcdonald s chicken mcnuggets 10 pieces","ml":null,"fat_g":21.7,"grams":null,"label":"10 pieces","carbs_g":20.6,"fiber_g":null,"sugar_g":0.7,"calories":360,"protein_g":20.1,"serving_size":"10 pieces"},{"id":"serving-mcdonald s chicken mcnuggets 20 pieces","ml":null,"fat_g":43.4,"grams":null,"label":"20 pieces","carbs_g":41.2,"fiber_g":null,"sugar_g":1.3,"calories":721,"protein_g":40.2,"serving_size":"20 pieces"},{"id":"serving-mcdonald s chicken mcnuggets 40 pieces","ml":null,"fat_g":86.8,"grams":null,"label":"40 pieces","carbs_g":82.5,"fiber_g":null,"sugar_g":2.7,"calories":1440,"protein_g":80.4,"serving_size":"40 pieces"}]}]}
 async function run(){
   await check('exact physical53 meal/date/colon preamble cannot become part of a restaurant product',async()=>{
     menuRows=actualMenuRows()
@@ -92,6 +106,35 @@ async function run(){
       const p=real.ctx.tryParseIngredientMealRequest(localized)||real.ctx.tryParseDirectFoodRequest(localized,{section:'food',title:'Food Diary'})
       assert(p);assert.equal(p.meal,'lunch');assert.match(p.ingredients[0].name,/banana/);assert.equal(real.ctx.resolveRequestedActionDate(localized,'2026-10-17'),'2026-10-17')
     }
+  })
+  await check('retained failed review cannot turn a complete all-curly new meal into a with-cheese addition or provider fallback',async()=>{
+    const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
+    const at=matrix.indexOf('async function run() {');assert(at>0)
+    const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.getCustomPackagedItems=mappedStoredCatalog(capturedStoredMenuRows())
+    real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
+    real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'})
+    real.ctx.getOpenAIClient=()=>null
+    let fallbacks=0,writes=0
+    real.ctx.searchDiaryFoods=async()=>{fallbacks++;throw Error('Unexpected provider/diary fallback')}
+    real.ctx.searchLocalFoods=async()=>{fallbacks++;throw Error('Unexpected fallback')}
+    real.ctx.prisma.foodLog.create=async()=>{writes++;throw Error('Unexpected save')}
+    const products='one McDonald’s Double Quarter Pounder with Cheese and a pack of six McNuggets'
+    const exact=`Prepare a meal for today: ${products}. Don’t save it yet.`
+    const fresh=await real.send(exact);assert.equal(fresh.status,200);assert.equal(fresh.body.draft.food.nutrition.calories,1020)
+    const prior={...fresh.body.draft,action:'food_draft',canConfirm:false,confirmationMessage:'I cannot finish this meal yet. Please clarify for : one McDonald’s Double Quarter Pounder with Cheese with a supported amount or choose a matching food. Nothing has been saved.',food:{...fresh.body.draft.food,draftText:'1 for : one McDonald’s Double Quarter Pounder with Cheese, 6 McNuggets',items:fresh.body.draft.food.items.filter(item=>item.name==='Chicken McNuggets')}}
+    for(const text of [exact,`Prepare a meal for today: ${products}.`,`Please prepare a meal for today: ${products}. Don’t save it yet.`,`Log a meal for today: ${products}. Don’t save it yet.`,...['include','add'].map(verb=>`Prepare a new meal with one McDonald’s Double Quarter Pounder with Cheese and ${verb} a pack of six McNuggets. Don’t save it yet.`)]){
+      assert.equal(real.ctx.extractReviewedFoodAddition(prior,text),null,text)
+      const response=await real.send(text,{followUpDraft:prior,launchContext:{section:'food',title:'Food Diary',meal:'breakfast',date:'2026-10-17'},conversationHistory:[{role:'user',text:exact},{role:'assistant',text:prior.confirmationMessage}]})
+      assert.equal(response.status,200,JSON.stringify(response));const d=response.body.draft
+      assert.equal(d.canConfirm,true,d.confirmationMessage);assert.equal(d.food.items.length,2);assert.equal(d.food.nutrition.calories,1020);assert.equal(d.localDate,'2026-10-17');assert.equal(d.autoSave,false)
+      assert.deepEqual(Array.from(d.food.items.map(item=>item.id)),['custom:cmlc49uxq000a12sxppmnueee','custom:cmvb631vg000bs76950mpd6g9'])
+    }
+    for(const correction of ['Add three McDonald’s nuggets','Include three McDonald’s nuggets','with three McDonald’s nuggets','Add three McDonald’s nuggets to this meal']){
+      const added=real.ctx.extractReviewedFoodAddition(fresh.body.draft,correction);assert(added,correction);assert.equal(added.correctedParts.length,3)
+    }
+    assert(real.ctx.extractReviewedFoodCountCorrection(fresh.body.draft,'Change the nuggets to three'))
+    assert.equal(fallbacks,0);assert.equal(writes,0)
   })
   await check('trailing no-save sentence does not become nugget product punctuation',async()=>{
     const parsed=parse("Prepare a double quarter pounder with cheese and a pack of six nuggets from McDonald's for lunch. Don't save it yet.")

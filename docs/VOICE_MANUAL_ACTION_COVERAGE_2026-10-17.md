@@ -58,7 +58,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-sign-save-integration-check.cjs` | Composed signed prepare/confirm scenario |
 | `voice-client-integrity-check.cjs` | Native callback integrity suite |
 | `voice-live-protocol-check.cjs` | Route/native/metering protocol surfaces |
-| `voice-restaurant-food-integrity-check.cjs` | 23 groups |
+| `voice-restaurant-food-integrity-check.cjs` | 24 groups |
 | `voice-action-matrix-check.cjs` | 78 cases |
 | `voice-action-outcome-check.cjs` | Actual outcome/receipt boundary suite |
 | `voice-record-actions-check.cjs` | 41 groups |
@@ -193,3 +193,9 @@ Final53 source verification: complete52-suite guard PASS under UTC/root-only dep
 Native53/eacb13c is actually installed, opened and signed in on the physical iPhone. Its actual Oura preference off/restore test passed with exact original row/other preferences preserved and mounted Devices immediately refreshed. Typed natural Yes was used. The latest READY PDF review selected29April–5May correctly, but native URL verification refused the result. The longer meal/date/colon request above also failed because `for :` entered the product name. Neither failure saved a meal or claimed to open a PDF.
 
 Server repairs now cover the exact failing natural request through actual POST composition (restaurant23 groups), plus trusted public PDF origin through actual normal PDF handler and unchanged native boundary (PDF16 groups). Internal runtime URL reproduces the exact native alert offline; malicious forwarded headers/returned links are rejected. These are offline results until the exact server release and installed53 retests are separately verified. No native source/design/baseline or normal PDF route changes are needed for these two repairs.
+
+### Retained-state and configured production-origin regressions
+
+AWS134/4faec663 was deployed and both domains verified. Actual installed53 retest exposed two further cases: a failed prior meal was misread as an ingredient-addition context because the complete new request contained “with Cheese”, leading to provider fallback and a28second failed response; and production's three public-site settings select the exact master Amplify default origin, so the new PDF origin helper refused it. Neither actual retest is recorded as successful.
+
+The next server repair recognizes complete new meal commands before pending additions and preserves true add/change corrections. Restaurant24 groups now exercise exact smart-apostrophe requests with the retained failed draft, actual public stored food rows through the actual mapper, exact1020/source IDs/no fallback/no save. The full8261public-row mapper was independently read-only checked; no malformed-row cause found. PDF17 groups exercise the actual site-url helper with synthetic copies of the known production public settings, mapping only that exact configured production alias to helfi.ai; other AWS/HTTP/credential-bearing destinations remain refused. Native53 source and all approved designs remain unchanged. Deployment and actual phone retests remain separate evidence.
