@@ -49,7 +49,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 
 ## Required offline regression coverage
 
-`scripts/assert-native-voice-confirm-guard.js` currently registers **52 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
+`scripts/assert-native-voice-confirm-guard.js` currently registers **53 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
 
 | Required suite (`scripts/`) | Recorded offline count / scope |
 |---|---|
@@ -58,7 +58,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-sign-save-integration-check.cjs` | Composed signed prepare/confirm scenario |
 | `voice-client-integrity-check.cjs` | Native callback integrity suite |
 | `voice-live-protocol-check.cjs` | Route/native/metering protocol surfaces |
-| `voice-restaurant-food-integrity-check.cjs` | 24 groups |
+| `voice-restaurant-food-integrity-check.cjs` | 29 groups including exact competing products and explicit named sizes |
 | `voice-action-matrix-check.cjs` | 78 cases |
 | `voice-action-outcome-check.cjs` | Actual outcome/receipt boundary suite |
 | `voice-record-actions-check.cjs` | 41 groups |
@@ -84,6 +84,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-recipe-import-confirm-check.cjs` | 7 groups |
 | `voice-support-actions-check.cjs` | 8 groups |
 | `voice-spoken-quantities-check.cjs` | 14 groups |
+| `voice-handsfree-review-check.cjs` | 8 actual-source groups, including final water correction amount and spoken confirmation/discard decisions |
 | `voice-report-actions-check.cjs` | 9 groups |
 | `voice-native-device-actions-check.cjs` | 19 synthetic-IO groups; dormant Sleep fixtures do not expose a feature |
 | `voice-result-receipt-storage-check.cjs` | 5 groups |
@@ -205,3 +206,19 @@ The next server repair recognizes complete new meal commands before pending addi
 Actual physical53/live134 mood5/7 review and rating correction2/7 worked, then natural typed “No, discard it” returned “No problem. I have not saved anything.” Read-only MoodEntries showed only the original disposable751ac608-b8fb-4ffa-a8af-65d8f5677666 at2/7/date17October. However bare `Note:` incorrectly copied the entire request into the note; no save was confirmed. A narrow server mood-note repair now preserves exactly “Voice review check only.”, removes only separate trailing save-control clauses, keeps quoted literal words and leaves clear rating-only notes empty. Mood13 groups cover actual preparation POST and exact normal-handler synthetic save/readback. Runtime retest remains separate evidence.
 
 Physical53 measured coffee review retained250ml coffee/50mlwholemilk/two teaspoons sugar/64kcal. Natural milk25ml correction retained250ml and8gsugar, producing49kcal. No save was requested in these review tests; cancellation/read-only checks are recorded separately. These remain typed app/server tests, not physical microphone/hearing proof.
+
+### Physical53 verified server135/136 follow-up
+
+Exact server135/0d74 and136/bbf5 each passed AWS BUILD/DEPLOY/VERIFY and both public domains through CloudFront. Physical53/eacb typed long restaurant request now prepares1020kcal, correction three nuggets912 and six1020; natural discard passed with no new saved entry. Coffee250ml/wholemilk50ml/two teaspoons sugar64kcal corrected to25mlmilk49kcal, natural discard passed. Physical136 bare Note mood request preserves exactly “Voice review check only.”,5→2 retains it, and natural discard passes. Separate6/7 rating-only request contains no invented note and was discarded with its normal button. Read-only saved records remain food3/water550ml/original mood2/7/original15Octmeal retained.
+
+PDF135 server link validation passes, but actual native receipt is pdf_open_not_verified and no viewer was observed. A primary in-app viewer with explicit signed inline presentation is being prepared for54; this is not a successful PDF runtime claim. Protected Insights same-focused read-refresh proposal remains unapplied pending exact owner approval.
+
+### Native54 candidate checks and broader restaurant findings
+
+The next candidate adds a primary in-app PDF viewer with signed explicit inline presentation, preserving older app/manual attachment behavior and all existing report access checks. Server PDF21 and actual-host client20 groups pass, including active voice shutdown and actual End/background cancellation. The complete53-suite UTC/root-only guard, root/native types,292full/93native/design/region locks and production build pass before final named fries-size additions; those additions require final checks again. No54upload/install claim is made here.
+
+Actual full8261public catalog preparation checks exposed plain Whopper selecting Outback, Zinger selecting CrunchStacker, and KFC promotional price suffix used as nugget count. The repaired exact-product selection chooses source-backed Whopper582/Zinger451/KFCsixnuggets316/HJsixpack261, preserves those sources through quantity changes and refuses equal-ranked conflicts. Actual McDonalds fries named-size options require the final portion adapter follow-up; no wrong-size save was observed. All these catalogue checks use synthetic storage/no providers/no writes.
+
+Final restaurant29 groups also exercise14actual size requests with10public source rows: McDonalds Small219/Medium316/Large389, HungryJacks small254/medium308/large440, KFC regular283/large567. Two large McDonalds portions778; five individual fries are refused as unsourced pieces. A physical100g KFC large chips request retains its actual recorded236.25kcal/100g precision. AUFAST_FOOD chips/fries wording is shared only for that restaurant category, while packaged crisps and other countries stay distinct. Unsized multi-size requests clarify without provider fallback. Root final53guard/types/production rebuild runs after this final source freeze; actual installed54 tests remain separate.
+
+Final54 source freeze verification: complete53-suite guard PASS under UTC/root-only resolution, root/native types PASS,292full/93native/dedicatedDashboard+Insights/protected checks PASS. Exact production build after the final restaurant named-size change exited0. Owner4web/lock/protection build isolation was restored byte-for-byte and checked again. Deployment, signed54binary and physical54runtime are recorded separately after completion.

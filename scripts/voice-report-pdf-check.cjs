@@ -2,7 +2,8 @@
 'use strict'
 // Actual reviewed report helper, normal PDF POST and confirm/receipt source.
 // Synthetic identities/clock/storage/HMAC only; no app import, provider, network,
-// credential, PDF generation, account write or actual database access.
+// credential, real report access, account write or actual database access.
+// PDF GET rendering below uses synthetic content and the installed pdf-lib.
 const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),crypto=require('node:crypto')
 const fixtureSource=fs.readFileSync(path.join(__dirname,'voice-save-integrity-check.cjs'),'utf8').replace(/^#!.*\n/,'')
 const boundary=fixtureSource.indexOf('async function run() {');assert(boundary>0)
@@ -10,7 +11,7 @@ const fixture=new Function('require','__dirname',`${fixtureSource.slice(0,bounda
 class NextRequest extends Request {}
 const owner='synthetic-user',now=Date.parse('2026-10-15T01:00:00Z'),plain=v=>JSON.parse(JSON.stringify(v))
 const response=(body,options)=>new Response(JSON.stringify(body),{status:options?.status||200,headers:{'content-type':'application/json'}})
-function setup({requestOrigin='https://helfi.ai',siteUrl='https://helfi.ai',siteEnvironment,extraHeaders={}}={}){
+function setup({requestOrigin='https://helfi.ai',siteUrl='https://helfi.ai',siteEnvironment,extraHeaders={},inline=false}={}){
   fixture.AuditDate.setNow(now)
   let account={id:owner},posts=0,authSeen,mode='ok',postOriginSeen;const diagnostics=[]
   const reports=[{id:'older-ready',userId:owner,status:'READY',periodStart:'2026-10-01',periodEnd:'2026-10-07',report:{summary:'Older synthetic facts'}},
@@ -20,21 +21,25 @@ function setup({requestOrigin='https://helfi.ai',siteUrl='https://helfi.ai',site
   const byId=async(user,id)=>reports.find(row=>row.userId===user&&row.id===id)||null
   const authenticate=async()=>account
   const actualSiteUrl=siteEnvironment?fixture.load('lib/site-url.ts',{URL,process:{env:{...siteEnvironment}}}).getSiteUrl:null
-  const pdf=fixture.load('app/api/reports/weekly/pdf/route.ts',{Headers,URL,createHmac:crypto.createHmac,timingSafeEqual:crypto.timingSafeEqual,getWeeklyReportRequestUser:authenticate,getWeeklyReportById:byId,NextResponse:{json:response},process:{env:{AUTH_SECRET:'synthetic-pdf-link-secret'}}})
+  const pdfLib=require('pdf-lib'),chatReads=[],renderErrors=[]
+  // pdf-lib checks page-size arrays with host-realm instanceof Array. Bridge
+  // that VM value only; all document/font/drawing/serialization work is real.
+  const documentApi={create:async()=>{const doc=await pdfLib.PDFDocument.create(),addPage=doc.addPage.bind(doc);doc.addPage=size=>addPage(Array.from(size));return doc}}
+  const pdf=fixture.load('app/api/reports/weekly/pdf/route.ts',{Headers,URL,Response,console:{log(){},warn(){},error:(...args)=>renderErrors.push(args.map(item=>String(item)))},createHmac:crypto.createHmac,timingSafeEqual:crypto.timingSafeEqual,getWeeklyReportRequestUser:authenticate,getWeeklyReportById:byId,getWeeklyReportChatActivity:async(...args)=>{chatReads.push(args);return{verified:true,userMessageCount:0,activeDays:0,sourceBreakdown:{general:{userMessageCount:0},food:{userMessageCount:0}}}},PDFDocument:documentApi,StandardFonts:pdfLib.StandardFonts,rgb:pdfLib.rgb,NextResponse:{json:response},process:{env:{AUTH_SECRET:'synthetic-pdf-link-secret'}}})
   const helper=fixture.load('lib/native-voice-report-actions.ts',{Headers,URL,NextRequest,
     getSiteUrl:actualSiteUrl||(()=>siteUrl),console:{log(){},warn(){},error(){},info:(...args)=>diagnostics.push(plain(args))},
     getWeeklyReportRequestUser:authenticate,getWeeklyReportById:byId,getWeeklyReportByPeriod:async(user,start,end)=>reports.find(row=>row.userId===user&&row.periodStart===start&&row.periodEnd===end)||null,listWeeklyReports:async(user,limit,status)=>{assert.equal(limit,50);assert.equal(status,'READY');return reports.filter(row=>row.userId===user&&row.status===status)},
     signNativeVoiceDraft:fixture.tokens.signNativeVoiceDraft,verifyNativeVoiceDraft:fixture.tokens.verifyNativeVoiceDraft,
-    require:name=>{assert.equal(name,'@/app/api/reports/weekly/pdf/route');return{POST:async request=>{posts++;postOriginSeen=new URL(request.url).origin;authSeen=request.headers.get('authorization');assert.deepEqual(await request.json(),{reportId:'latest-ready'});if(mode==='error')return response({error:'PRIVATE synthetic underlying failure'},{status:500});return pdf.POST(new NextRequest(request.url,{method:'POST',headers:request.headers,body:JSON.stringify({reportId:'latest-ready'})}))}}},
+    require:name=>{assert.equal(name,'@/app/api/reports/weekly/pdf/route');return{POST:async request=>{posts++;postOriginSeen=new URL(request.url).origin;authSeen=request.headers.get('authorization');const body=await request.json(),hasInline=String(request.headers.get('x-helfi-voice-capabilities')).split(',').includes('report-pdf-inline-v1');assert.deepEqual(body,{reportId:'latest-ready',...(hasInline?{view:'inline'}:{})});if(mode==='error')return response({error:'PRIVATE synthetic underlying failure'},{status:500});return pdf.POST(new NextRequest(request.url,{method:'POST',headers:request.headers,body:JSON.stringify(body)}))}}},
   })
-  const headers={authorization:'Bearer synthetic-original','content-type':'application/json','x-helfi-voice-capabilities':'report-pdf-v1,additional-actions-v1',...extraHeaders}
+  const headers={authorization:'Bearer synthetic-original','content-type':'application/json','x-helfi-voice-capabilities':'report-pdf-v1,additional-actions-v1'+(inline?',report-pdf-inline-v1':''),...extraHeaders}
   const request=(caps=true,signal)=>new NextRequest(requestOrigin+'/api/native/voice-assistant',{method:'POST',headers:{...headers,...(!caps?{'x-helfi-voice-capabilities':''}:{})},body:'{}',...(signal?{signal}:{})})
   const prepare=(values={},transcript='Open my latest weekly report as PDF',caps=true)=>helper.prepareVoiceReportPdfAction(request(caps),owner,{action:'reports.weekly.export_pdf',values},transcript,'2026-10-15')
   const execute=draft=>helper.executeVoiceReportPdfAction(request(),owner,draft,{receiptClaimed:true,actionId:'synthetic-pdf-action-id'})
   const h=fixture.harness()
   Object.assign(h.route,{Headers,URL,NextRequest,executeVoiceReportPdfAction:helper.executeVoiceReportPdfAction,refreshVoiceReportPdfAccess:helper.refreshVoiceReportPdfAccess})
   const confirm=(draft,caps=true)=>h.route.POST(new NextRequest(requestOrigin+'/api/native/voice-assistant/confirm',{method:'POST',headers:{...headers,...(!caps?{'x-helfi-voice-capabilities':''}:{})},body:JSON.stringify({draft})}))
-  return{helper,pdf,h,reports,request,prepare,execute,confirm,diagnostics,posts:()=>posts,auth:()=>authSeen,postOrigin:()=>postOriginSeen,setAccount:value=>{account=value},setMode:value=>{mode=value}}
+  return{helper,pdf,h,reports,request,prepare,execute,confirm,diagnostics,chatReads,renderErrors,posts:()=>posts,auth:()=>authSeen,postOrigin:()=>postOriginSeen,setAccount:value=>{account=value},setMode:value=>{mode=value}}
 }
 let count=0
 async function check(name,run){await run();count++;console.log('PASS '+name)}
@@ -84,7 +89,7 @@ async function run(){
     const exported=await f.helper.executeVoiceReportPdfAction(f.request(),owner,draft,{receiptClaimed:true,actionId})
     assert.equal(f.postOrigin(),'https://helfi.ai');assert.equal(new URL(exported.reportPdfAccess.url).origin,'https://helfi.ai');assert.equal(f.auth(),'Bearer synthetic-original')
     const native=fixture.load('native/src/voice/reportPdfActions.ts',{URL,nativeVoiceReviewTokenDigest:token=>crypto.createHash('sha256').update(token).digest('base64url')})
-    let opened=0;const io={apiBaseUrl:'https://helfi.ai',accountId:owner,isCurrent:()=>true,now:()=>fixture.AuditDate.now(),openUrl:async()=>{opened++}}
+    let opened=0;const io={apiBaseUrl:'https://helfi.ai',accountId:owner,isCurrent:()=>true,now:()=>fixture.AuditDate.now(),openUrl:async()=>{opened++;return{type:'opened'}}}
     await assert.rejects(()=>native.openReviewedNativeReportPdf({success:true,...exported,reportPdfAccess:{...exported.reportPdfAccess,url:legacy.url}},draft,io),/The report PDF link was not verified/);assert.equal(opened,0)
     const result=await native.openReviewedNativeReportPdf({success:true,...exported},draft,io);assert.equal(result.result.status,'pdf_open_requested');assert.equal(opened,1)
     assert.deepEqual(f.diagnostics,[['[native voice PDF]',{event:'report_pdf_link_validated',requestOriginClass:'aws_runtime',linkOriginClass:'canonical_public',trustedPublicOriginMatch:true,sameRequestOrigin:false,requestProtocol:'https',linkProtocol:'https',pathMatch:true,queryKeysValid:true,queryCount:2}]])
@@ -106,7 +111,7 @@ async function run(){
       const f=setup({requestOrigin:production,siteEnvironment}),draft=await f.prepare(),actionId=crypto.createHash('sha256').update(draft.reviewToken).digest('base64url')
       const exported=await f.helper.executeVoiceReportPdfAction(f.request(),owner,draft,{receiptClaimed:true,actionId});assert.equal(f.postOrigin(),'https://helfi.ai');assert.equal(new URL(exported.reportPdfAccess.url).origin,'https://helfi.ai');assert.equal(f.auth(),'Bearer synthetic-original')
       const native=fixture.load('native/src/voice/reportPdfActions.ts',{URL,nativeVoiceReviewTokenDigest:token=>crypto.createHash('sha256').update(token).digest('base64url')});let opened=0
-      const result=await native.openReviewedNativeReportPdf({success:true,...exported},draft,{apiBaseUrl:'https://helfi.ai',accountId:owner,isCurrent:()=>true,now:()=>fixture.AuditDate.now(),openUrl:async()=>{opened++}});assert.equal(result.result.status,'pdf_open_requested');assert.equal(opened,1);assert.equal(f.diagnostics[0][1].linkOriginClass,'canonical_public');assert.equal(f.diagnostics[0][1].requestOriginClass,'aws_runtime')
+      const result=await native.openReviewedNativeReportPdf({success:true,...exported},draft,{apiBaseUrl:'https://helfi.ai',accountId:owner,isCurrent:()=>true,now:()=>fixture.AuditDate.now(),openUrl:async()=>{opened++;return{type:'opened'}}});assert.equal(result.result.status,'pdf_open_requested');assert.equal(opened,1);assert.equal(f.diagnostics[0][1].linkOriginClass,'canonical_public');assert.equal(f.diagnostics[0][1].requestOriginClass,'aws_runtime')
     }
     for(const value of ['https://master.other.amplifyapp.com','https://other.d2n4u4zm85ooe.amplifyapp.com','http://master.d2n4u4zm85ooe.amplifyapp.com','https://master.d2n4u4zm85ooe.amplifyapp.com:8443','https://user:password@master.d2n4u4zm85ooe.amplifyapp.com']){
       const f=setup({siteEnvironment:Object.fromEntries(keys.map(key=>[key,value]))}),draft=await f.prepare();await assert.rejects(()=>f.execute(draft),/secure public PDF address/);assert.equal(f.posts(),0)
@@ -116,6 +121,35 @@ async function run(){
     const f=setup({requestOrigin:'https://synthetic-runtime.amplifyapp.com'}),draft=await f.prepare(),link=await(await f.pdf.POST(new NextRequest('https://synthetic-runtime.amplifyapp.com/api/reports/weekly/pdf',{method:'POST',headers:f.request().headers,body:JSON.stringify({reportId:'latest-ready'})}))).json()
     const io={authenticate:async()=>({id:owner}),byId:async()=>f.reports[1],byPeriod:async()=>null,list:async()=>[],link:async()=>link}
     await assert.rejects(()=>f.helper.executeVoiceReportPdfAction(f.request(),owner,draft,{receiptClaimed:true,actionId:'synthetic'},io),/verify.*link/);assert.equal(f.diagnostics.length,0)
+  })
+  await check('actual normal PDF GET renders real synthetic PDF bytes with legacy attachment and signed inline mode only',async()=>{
+    const pages=[]
+    for(const inline of [false,true]){
+      const f=setup({inline}),draft=await f.prepare(),exported=await f.execute(draft),url=new URL(exported.reportPdfAccess.url),payload=JSON.parse(Buffer.from(url.searchParams.get('accessToken').split('.')[0],'base64url').toString('utf8'))
+      assert.deepEqual([...url.searchParams.keys()].sort(),inline?['accessToken','reportId','view']:['accessToken','reportId']);assert.deepEqual(Object.keys(payload).sort(),inline?['expiresAt','reportId','userId','view']:['expiresAt','reportId','userId']);assert.equal(payload.view,inline?'inline':undefined)
+      f.setAccount(null);const rendered=await f.pdf.GET(new NextRequest(url));assert.equal(rendered.status,200,JSON.stringify(f.renderErrors));assert.equal(rendered.headers.get('content-type'),'application/pdf');assert.equal(rendered.headers.get('content-disposition'),`${inline?'inline':'attachment'}; filename="helfi-7-day-report-2026-10-08.pdf"`)
+      const bytes=new Uint8Array(await rendered.arrayBuffer());assert.equal(Buffer.from(bytes).subarray(0,5).toString(),'%PDF-');const parsed=await require('pdf-lib').PDFDocument.load(bytes);assert(parsed.getPageCount()>0);pages.push(parsed.getPageCount());assert.deepEqual(f.chatReads,[[owner,'2026-10-08','2026-10-14']]);assert.equal(f.diagnostics[0][1].queryCount,inline?3:2)
+    }
+    assert.equal(pages[0],pages[1])
+  })
+  await check('inline54 composed server result passes unchanged current native viewer contract and durable result stays URL-free',async()=>{
+    const f=setup({inline:true}),draft=await f.prepare(),actionId=crypto.createHash('sha256').update(draft.reviewToken).digest('base64url'),exported=await f.helper.executeVoiceReportPdfAction(f.request(),owner,draft,{receiptClaimed:true,actionId})
+    const native=fixture.load('native/src/voice/reportPdfActions.ts',{URL,nativeVoiceReviewTokenDigest:token=>crypto.createHash('sha256').update(token).digest('base64url')});let opens=0
+    const result=await native.openReviewedNativeReportPdf({success:true,...exported},draft,{apiBaseUrl:'https://helfi.ai',accountId:owner,isCurrent:()=>true,now:()=>fixture.AuditDate.now(),openUrl:async url=>{assert.equal(new URL(url).searchParams.get('view'),'inline');opens++;return{type:'viewer_closed'}}})
+    assert.equal(opens,1);assert.equal(result.result.status,'pdf_viewer_closed');assert.equal(result.result.downloaded,false);assert.equal(result.result.saved,false);assert.equal(result.result.opened,false);assert(!JSON.stringify(result).includes('accessToken'));assert(!JSON.stringify(exported.result).includes('view'))
+  })
+  await check('inline GET requires matching signed presentation and refuses mode/query/identity/signature/expiry changes before rendering',async()=>{
+    const legacy=setup(),legacyDraft=await legacy.prepare(),legacyUrl=new URL((await legacy.execute(legacyDraft)).reportPdfAccess.url);legacy.setAccount(null);legacyUrl.searchParams.set('view','inline');assert.equal((await legacy.pdf.GET(new NextRequest(legacyUrl))).status,401)
+    const f=setup({inline:true}),draft=await f.prepare(),base=new URL((await f.execute(draft)).reportPdfAccess.url);f.setAccount(null)
+    for(const [change,status]of [[url=>url.searchParams.delete('view'),401],[url=>url.searchParams.set('view','attachment'),400],[url=>url.searchParams.append('view','inline'),400],[url=>url.searchParams.set('extra','bad'),400],[url=>url.searchParams.set('reportId','foreign'),401],[url=>url.searchParams.delete('accessToken'),400],[url=>{const parts=url.searchParams.get('accessToken').split('.');parts[1]=(parts[1][0]==='A'?'B':'A')+parts[1].slice(1);url.searchParams.set('accessToken',parts.join('.'))},401],[url=>{const parts=url.searchParams.get('accessToken').split('.'),payload=JSON.parse(Buffer.from(parts[0],'base64url').toString('utf8'));delete payload.view;parts[0]=Buffer.from(JSON.stringify(payload)).toString('base64url');url.searchParams.set('accessToken',parts.join('.'))},401]]){const url=new URL(base);change(url);assert.equal((await f.pdf.GET(new NextRequest(url))).status,status)}
+    f.setAccount({id:'another-owner'});assert.equal((await f.pdf.GET(new NextRequest(base))).status,401);f.setAccount(null);f.reports[1].status='LOCKED';assert.equal((await f.pdf.GET(new NextRequest(base))).status,403);f.reports[1].status='READY';fixture.AuditDate.setNow(now+60001);assert.equal((await f.pdf.GET(new NextRequest(base))).status,401);assert.equal(f.chatReads.length,0)
+  })
+  await check('normal PDF POST rejects unsupported view values; helper requires capability-bound query and token view without fallback',async()=>{
+    const f=setup({inline:true}),draft=await f.prepare(),valid=await f.execute(draft)
+    for(const view of ['attachment','',true,null])assert.equal((await f.pdf.POST(new NextRequest('https://helfi.ai/api/reports/weekly/pdf',{method:'POST',headers:f.request().headers,body:JSON.stringify({reportId:'latest-ready',view})}))).status,400)
+    const io={authenticate:async()=>({id:owner}),byId:async()=>f.reports[1],byPeriod:async()=>null,list:async()=>[],link:async()=>({url:valid.reportPdfAccess.url})}
+    const legacy=setup(),legacyDraft=await legacy.prepare();await assert.rejects(()=>legacy.helper.executeVoiceReportPdfAction(legacy.request(),owner,legacyDraft,{receiptClaimed:true,actionId:'synthetic'},io),/verify.*link/)
+    const oldUrl=(await legacy.execute(legacyDraft)).reportPdfAccess.url;io.link=async()=>({url:oldUrl});await assert.rejects(()=>f.helper.executeVoiceReportPdfAction(f.request(),owner,draft,{receiptClaimed:true,actionId:'synthetic'},io),/verify.*link/)
   })
   await check('actual signed confirmation stores URL-free receipt and replay freshly regenerates after review expiry',async()=>{const f=setup(),draft=await f.prepare(),first=await f.confirm(draft);assert.equal(first.status,200);assert(first.body.reportPdfAccess.url);const receipt=await f.h.route.completedReviewResult(owner,draft);assert.equal(receipt.action,'reports.weekly.export_pdf');assert(!JSON.stringify(receipt).includes('url'));assert(!JSON.stringify(receipt).includes('accessToken'));fixture.AuditDate.setNow(now+31*60*1000);const replay=await f.confirm({...draft,reportAction:{reportId:'foreign'},summary:'tampered ignored on completed receipt'});assert.equal(replay.status,200);assert.equal(replay.body.idempotentReplay,true);assert.deepEqual(plain(replay.body.result),plain(first.body.result));assert.notEqual(replay.body.reportPdfAccess.url,first.body.reportPdfAccess.url);assert.equal(replay.body.reportPdfAccess.reportId,'latest-ready');assert.equal(f.posts(),2)})
   await check('replay rechecks READY/source/current account and capability instead of returning an expired URL',async()=>{const f=setup(),draft=await f.prepare();assert.equal((await f.confirm(draft)).status,200);assert.equal((await f.confirm(draft,false)).status,500);f.reports[1].status='LOCKED';assert.equal((await f.confirm(draft)).status,500);f.reports[1].status='READY';f.setAccount({id:'another-owner'});assert.equal((await f.confirm(draft)).status,500);assert.equal(f.posts(),1)})
@@ -135,6 +169,6 @@ async function run(){
     f.reports[1].report.summary='Exact saved synthetic facts';io.link=async()=>{controller.abort();return{url:valid.reportPdfAccess.url}}
     await assert.rejects(()=>f.helper.executeVoiceReportPdfAction(f.request(true,controller.signal),owner,draft,{receiptClaimed:true,actionId:'synthetic-cancel'},io),/stopped/)
   })
-  console.log(`Voice report PDF: ${count} actual-source offline groups passed. Normal PDF POST only; no file opened/saved or real account/provider/database access.`)
+  console.log(`Voice report PDF: ${count} actual-source offline groups passed. Normal PDF POST/GET with real offline rendering; no file opened/saved or real account/provider/database access.`)
 }
 run().catch(error=>{console.error(error);process.exitCode=1})

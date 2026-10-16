@@ -1403,13 +1403,13 @@ function voiceDrinkIngredients(raw: string, amountMl: number, drinkType: string,
 async function resolveVoiceDrinkDraft(draft: VoiceDraft): Promise<VoiceDraft> {
   if (draft.action === 'water' && hasMultipleVoiceSweeteners(draft.transcript)) return multipleSweetenerClarification(draft.transcript, draft.localDate)
   if (draft.action !== 'water' || !draft.water || !draft.water.amountMl || draft.timingNeedsClarification || /That (?:date|time) is not valid/.test(draft.confirmationMessage)) return draft
-  if (isPlainVoiceWaterRequest(draft.transcript, draft.water.drinkType || '')) return { ...draft, canConfirm: true, food: undefined }
+  if (isPlainVoiceWaterRequest(draft.transcript, draft.water.drinkType || '')) return { ...draft, canConfirm: true, food: undefined, confirmationMessage: `I can log ${draft.water.amount} ${draft.water.unit} ${draft.water.label}. Would you like me to save that?` }
   if (/Should I log|How much (?:sugar|honey|milk)/i.test(draft.confirmationMessage)) return draft
   const ingredients = draft.water.ingredients?.length ? draft.water.ingredients : voiceDrinkIngredients(draft.transcript, draft.water.amountMl, draft.water.drinkType || draft.water.label, draft.water.sweetener || null)
   const meal = draft.water.category || 'other'
   const built = await buildVoiceMealDraft({ meal, mealName: draft.water.label, ingredients }, draft.transcript, draft.localDate)
   if (!built || !built.canConfirm) return { ...draft, canConfirm: false, reasonCode: built?.reasonCode || 'food_source_unavailable', food: built?.food, confirmationMessage: built?.confirmationMessage || 'I could not resolve the drink nutrition. Please choose a matching drink and amount. Nothing has been saved.' }
-  return { ...draft, canConfirm: true, food: built.food, summary: `${draft.water.amount} ${draft.water.unit} ${draft.water.label}, ${built.food.nutrition!.calories} kcal`, confirmationMessage: `I can log ${draft.water.amount} ${draft.water.unit} ${draft.water.label} with ${Math.round(built.food.nutrition!.calories)} kcal. Review the ingredients and confirm to save. Nothing has been saved yet.` }
+  return { ...draft, canConfirm: true, food: built.food, summary: `${draft.water.amount} ${draft.water.unit} ${draft.water.label}, ${built.food.nutrition!.calories} kcal`, confirmationMessage: `I can log ${draft.water.amount} ${draft.water.unit} ${draft.water.label} with ${Math.round(built.food.nutrition!.calories)} kcal. Would you like me to save that? Nothing has been saved yet.` }
 }
 
 function tryParseWaterRequest(transcript: string, localDate: string, launchContext?: VoiceLaunchContext, country?: string): VoiceDraft | null {
@@ -1493,7 +1493,7 @@ function tryParseWaterRequest(transcript: string, localDate: string, launchConte
     transcript: raw,
     localDate,
     summary: `${amount.amount} ${amount.unit} ${label}`,
-    confirmationMessage: isPlainWater ? `I can log ${amount.amount} ${amount.unit} ${label}. Review it, then tap Confirm to save.` : 'Checking the drink ingredients and nutrition before saving.',
+    confirmationMessage: isPlainWater ? `I can log ${amount.amount} ${amount.unit} ${label}. Would you like me to save that?` : 'Checking the drink ingredients and nutrition before saving.',
     canConfirm: isPlainWater,
     autoSave: false,
     water: {
@@ -2649,7 +2649,7 @@ function buildReviewedExerciseCorrection(draft: any, answerRaw: string, localDat
     transcript: raw,
     localDate,
     summary,
-    confirmationMessage: `I can update this exercise draft to ${summary}. Review it, then tap Confirm to save.`,
+    confirmationMessage: `I can update this exercise draft to ${summary}. Would you like me to save that?`,
     canConfirm: true,
     autoSave: false,
     exercise,
@@ -2671,7 +2671,7 @@ function buildReviewedJournalCorrection(draft: any, answerRaw: string, localDate
     transcript: raw,
     localDate,
     summary: title,
-    confirmationMessage: `I can update this ${journalLabel} note: "${content.slice(0, 160)}${content.length > 160 ? '...' : ''}" Review it, then tap Confirm to save.`,
+    confirmationMessage: `I can update this ${journalLabel} note: "${content.slice(0, 160)}${content.length > 160 ? '...' : ''}" Would you like me to save that?`,
     canConfirm: true,
     autoSave: false,
     journal: { title, content, tags, journalType },
@@ -3298,7 +3298,7 @@ function buildQuickJournalDraft(parsed: any, transcript: string, localDate: stri
     transcript,
     localDate,
     summary: title,
-    confirmationMessage: `I can add this ${journalLabel} note: "${content.slice(0, 160)}${content.length > 160 ? '...' : ''}" Review it, then tap Confirm to save.`,
+    confirmationMessage: `I can add this ${journalLabel} note: "${content.slice(0, 160)}${content.length > 160 ? '...' : ''}" Would you like me to save that?`,
     canConfirm: true,
     autoSave: false,
     journal: { title, content, tags, journalType },
@@ -4167,10 +4167,14 @@ function requestedIngredientBasis(ingredient: any, found: any) {
 }
 
 function voicePreparedIdentityText(value: unknown) {
-  let text = compactFoodMatchText(value).replace(/\bmc\s*donalds?\b/g, 'mcdonalds').replace(/\bmcnuggets?\b/g, 'nuggets')
+  // Delivery/catering labels describe the sales channel, not another burger.
+  // Keep actual product qualifiers (Outback, Crunch, Stacker, box, etc.).
+  const label = String(value || '').replace(/^catering\s*[-:]\s*/i, '').replace(/\(\s*uber eats\s*\)/gi, ' ').replace(/\b\d+\s*pc\b/gi, ' ')
+  let text = compactFoodMatchText(label).replace(/\bmc\s*donalds?\b/g, 'mcdonalds').replace(/\bmcnuggets?\b/g, 'nuggets')
   const brand = voiceRestaurantBrand(value)
   if (brand) text = text.replace(compactFoodMatchText(brand), ' ')
-  return singularFoodText(text.replace(/\b(?:with|from|small|medium|large|regular|piece|pieces|pack|box|serving)\b/g, ' ').replace(/\b\d+\b/g, ' '))
+  text = singularFoodText(text.replace(/\b(?:with|from|of|small|medium|large|regular|piece|pieces|pc|pack|serving)\b/g, ' ').replace(/\b\d+\b/g, ' '))
+  return /\bnugget\b/.test(text) ? text.replace(/\bchicken\b/g, ' ').replace(/\s+/g, ' ').trim() : text
 }
 
 function voicePreparedIdentityMatches(ingredient: any, item: any) {
@@ -4179,14 +4183,29 @@ function voicePreparedIdentityMatches(ingredient: any, item: any) {
   const candidateBrand = voiceRestaurantBrand(item.brand) || item.brand || voiceRestaurantBrand(item.name)
   if (brand && compactFoodMatchText(brand).replace(/\s/g, '') !== compactFoodMatchText(candidateBrand).replace(/\s/g, '')) return false
   const wantedName = brand ? String(ingredient.name).replace(new RegExp(escapeRegex(brand), 'ig'), ' ') : ingredient.name
-  const wanted = voicePreparedIdentityText(wantedName).split(' ').filter(Boolean)
+  const identity = (label: unknown) => {
+    const normalized = voicePreparedIdentityText(label)
+    return item.kind === 'FAST_FOOD' && item.country === 'AU' ? normalized.replace(/\bchip\b/g, 'fry') : normalized
+  }
+  const wanted = identity(wantedName).split(' ').filter(Boolean)
   const verifiedAliases = verifiedVoiceMenuAliases.aliases.filter(record => record.country === item.country && compactFoodMatchText(record.brand) === compactFoodMatchText(candidateBrand) && compactFoodMatchText(record.name) === compactFoodMatchText(item.name)).flatMap(record => record.aliases)
   const labels = [item.name, ...(Array.isArray(item.aliases) ? item.aliases : []), ...verifiedAliases]
-  const variants = ['double', 'triple', 'bacon', 'spicy', 'combo', 'box', 'meal', 'deluxe', 'junior', 'vegan', 'vegetarian', 'crispy', 'grilled']
   return labels.some(label => {
-    const available = voicePreparedIdentityText(label).split(' ').filter(Boolean)
-    return wanted.length > 0 && wanted.every(token => available.includes(token)) && !variants.some(token => available.includes(token) && !wanted.includes(token))
+    const available = identity(label).split(' ').filter(Boolean)
+    return wanted.length > 0 && wanted.every(token => available.includes(token)) && available.every(token => wanted.includes(token))
   })
+}
+
+function voiceRecordedPieceCount(value: unknown, allowPack = true) {
+  // A price is never a count: "$10.95 Nuggets" must not become 95 pieces.
+  const text = String(value || '').replace(/[$€£]\s*\d+(?:[.,]\d+)?/g, ' ').replace(/\b\d+[.,]\d+\b/g, ' ')
+  const counts = new Set<number>()
+  for (const pattern of [
+    new RegExp(`\\b([1-9]\\d{0,3})\\s*[- ]?\\s*(?:pieces?|pc\\.?${allowPack ? '|packs?' : ''})\\b`, 'gi'),
+    /\b([1-9]\d{0,3})\s+(?:chicken\s+)?(?:mcnuggets?|nuggets?|wings?|tenders?|bites?|strips?)\b/gi,
+    new RegExp(`\\b(?:mcnuggets?|nuggets?|wings?|tenders?|bites?|strips?)\\s*\\(?\\s*([1-9]\\d{0,3})\\s*(?:x\\s*)?(?:pc|pieces?${allowPack ? '|packs?' : ''})\\b`, 'gi'),
+  ]) for (const match of text.matchAll(pattern)) counts.add(Number(match[1]))
+  return counts.size === 1 ? [...counts][0] : null
 }
 
 function sourceCountedVoiceServing(ingredient: any, found: any) {
@@ -4202,16 +4221,19 @@ function sourceCountedVoiceServing(ingredient: any, found: any) {
     return !requestedSize || new RegExp(`\\b${requestedSize}\\b`).test(label) || new RegExp(`\\b${requestedSize}\\b`).test(String(found.name).toLowerCase())
   })
   if (!requestedSize && new Set(candidates.map(option => String(option.serving_size || option.label).match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()).filter(Boolean)).size > 1) return null
-  const isDiscretePieces = /\b(?:nuggets?|mcnuggets?|wings?|tenders?|bites?|strips?)\b/i.test(ingredient.name)
+  const isDiscretePieces = /^pieces?$/i.test(unit) || /\b(?:nuggets?|mcnuggets?|wings?|tenders?|bites?|strips?|pieces?|pc)\b/i.test(ingredient.name)
+    || (/\b(?:fries|chips)\b/i.test(ingredient.name) && /\b(?:pieces?|individual)\b/i.test(String(ingredient.display || '')))
+    || (/\bchicken\b/i.test(ingredient.name) && /\b\d+\s*(?:pc|pieces?)\b/i.test(String(found.name)))
   let fallback: any = null
   for (const option of candidates) {
     const label = cleanText(option.serving_size || option.label, 160)
-    const piece = label.match(/\b(\d+(?:\.\d+)?)\s*[- ]?\s*(?:pieces?|pc\.?|nuggets?|mcnuggets?|wings?|tenders?|bites?|strips?)\b/i)
-    const whole = label.match(/\b(\d+(?:\.\d+)?)\s*(?:items?|burgers?|sandwich(?:es)?|wraps?|hot dogs?|servings?|packs?)\b/i)
-    const nameCount = String(found.name).match(/\b(\d+)\s*[- ]?\s*(?:pieces?|pc\.?)\b/i)
-      || String(found.name).match(/\b(\d+)\s+(?:chicken\s+)?(?:mcnuggets?|nuggets?|wings?|tenders?|bites?|strips?)\b/i)
-      || String(found.name).match(/\b(?:mcnuggets?|nuggets?)\s*\(?\s*(\d+)\s*(?:pc|pieces?)\b/i)
-    const recordedCount = piece ? Number(piece[1]) : whole && isDiscretePieces && nameCount ? Number(whole[1]) * Number(nameCount[1]) : !isDiscretePieces && whole ? Number(whole[1]) : null
+    const countLabel = label.replace(/[$€£]\s*\d+(?:[.,]\d+)?/g, ' ')
+    const pieceCount = voiceRecordedPieceCount(countLabel, false)
+    const whole = countLabel.match(/\b(\d+(?:\.\d+)?)\s*(?:items?|burgers?|sandwich(?:es)?|wraps?|hot dogs?|servings?|packs?)\b/i)
+    const nameCount = voiceRecordedPieceCount(found.name)
+    const namedSizePortion = !isDiscretePieces && !/^pieces?$/i.test(unit) && requestedSize && /^(?:small|medium|large|regular)$/i.test(label)
+      && label.toLowerCase() === requestedSize.toLowerCase() && Array.isArray(found.servingOptions) && found.servingOptions.includes(option)
+    const recordedCount = pieceCount ? pieceCount : whole && isDiscretePieces && nameCount ? Number(whole[1]) * nameCount : !isDiscretePieces && whole ? Number(whole[1]) : namedSizePortion ? 1 : null
     if (!recordedCount || recordedCount <= 0) continue
     // Count nutrient values are already for this complete recorded serving.
     // Never derive pieces from 100 g or multiply both grams and serving counts.
@@ -4220,6 +4242,29 @@ function sourceCountedVoiceServing(ingredient: any, found: any) {
     if (!fallback) fallback = basis
   }
   return fallback
+}
+
+function selectPreparedVoiceFood(ingredient: any, candidates: any[], country?: string): { item: any | null; ambiguous: boolean } {
+  const requestedSize = ingredient.size || String(ingredient.name || '').match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()
+  const sourceSizes = (item: any) => [item.name, ...(Array.isArray(item.servingOptions) ? item.servingOptions.map((option: any) => option.serving_size || option.label) : [])]
+    .map(label => String(label || '').match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()).filter(Boolean)
+  const matching = candidates.filter(item => voicePreparedIdentityMatches(ingredient, item)).filter(item => !requestedSize || !sourceSizes(item).length || sourceSizes(item).includes(requestedSize))
+  if (!requestedSize) {
+    const sizes = new Set(matching.flatMap(sourceSizes))
+    if (sizes.size > 1) return { item: null, ambiguous: true }
+  }
+  const usable = matching.map(item => ({ item, basis: requestedIngredientBasis(ingredient, item) })).filter(entry => entry.basis)
+  const rank = (entry: any) => [country && entry.item.country === country ? 0 : entry.item.country ? 2 : 1, entry.basis.ratio === 1 ? 0 : 1, /\b(?:uber eats|catering)\b|\(\s*\d+\s*\)/i.test(entry.item.name) ? 1 : 0]
+  const compare = (a: any, b: any) => { const x = rank(a), y = rank(b); return x[0] - y[0] || x[1] - y[1] || x[2] - y[2] }
+  usable.sort(compare)
+  const best = usable[0]
+  if (!best) return { item: null, ambiguous: false }
+  const nutrition = (entry: any) => {
+    const core = itemCore(entry.basis.item || entry.item, 0, entry.basis.ratio)
+    return JSON.stringify([core?.calories, core?.protein, core?.carbs, core?.fat, core?.fiber, core?.sugar].map(value => typeof value === 'number' ? Number(value.toPrecision(12)) : value))
+  }
+  if (usable.some(entry => compare(best, entry) === 0 && nutrition(best) !== nutrition(entry))) return { item: null, ambiguous: true }
+  return { item: best.item, ambiguous: false }
 }
 
 async function findPreparedVoiceFood(ingredient: any, country?: string) {
@@ -4233,8 +4278,8 @@ async function findPreparedVoiceFood(ingredient: any, country?: string) {
       const selected = options[0]
       return { ...row, source: 'custom', id: `custom:${row.id}`, serving_size: selected?.serving_size || selected?.label, ...pickVoiceSourceNutrition(selected || row), servingOptions: options }
     }).filter(candidate => voicePreparedIdentityMatches(ingredient, candidate))
-    const exact = menu.find(candidate => requestedIngredientBasis(ingredient, candidate))
-    if (exact) return exact
+    const selected = selectPreparedVoiceFood(ingredient, menu, country)
+    if (selected.item || selected.ambiguous) return selected.item
   }
   const lookupQueries = [query]
   if (/\bnuggets?\b/i.test(query) && voiceRestaurantBrand(query) === "McDonald's" && !/\bmcnuggets?\b/i.test(query)) lookupQueries.push(query.replace(/\bnuggets?\b/i, 'McNuggets'))
@@ -4260,11 +4305,12 @@ async function findPreparedVoiceFood(ingredient: any, country?: string) {
       const countRank = (item: any) => sourceCountedVoiceServing(ingredient, item)?.ratio === 1 ? 0 : 1
       return countryRank(a) - countryRank(b) || countRank(a) - countRank(b)
     })
+    const resolvedCandidates: any[] = []
     for (const candidate of candidates) {
       const key = `${candidate.source}:${candidate.id}`
       if (seen.has(key)) continue
       seen.add(key)
-      if (requestedIngredientBasis(ingredient, candidate)) return candidate
+      if (requestedIngredientBasis(ingredient, candidate)) { resolvedCandidates.push(candidate); continue }
       if (!['usda', 'fatsecret', 'custom'].includes(candidate.source)) continue
       const servingUrl = new URL('https://helfi.ai/api/food-data/servings')
       servingUrl.searchParams.set('source', candidate.source)
@@ -4273,8 +4319,10 @@ async function findPreparedVoiceFood(ingredient: any, country?: string) {
       const details = await servingResponse.json().catch(() => ({}))
       const options = Array.isArray(details.options) ? details.options : []
       const withServings = { ...candidate, servingOptions: [...(Array.isArray(candidate.servingOptions) ? candidate.servingOptions : []), ...options] }
-      if (requestedIngredientBasis(ingredient, withServings)) return withServings
+      if (requestedIngredientBasis(ingredient, withServings)) resolvedCandidates.push(withServings)
     }
+    const selected = selectPreparedVoiceFood(ingredient, resolvedCandidates, country)
+    if (selected.item || selected.ambiguous) return selected.item
   }
   return null
 }
@@ -4502,8 +4550,8 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
     confirmationMessage: missing.length
       ? `I cannot finish this meal yet. Please clarify ${missing.join(', ')} with a supported amount or choose a matching food. Nothing has been saved.`
       : isSingleIngredient
-      ? `I found ${displayName} for ${meal}.${sourceNote} Review the estimate, then tap Confirm to save it.`
-      : `I found these ingredients for ${meal}: ${ingredientList}.${sourceNote} Review the estimates, then tap Confirm to save them.`,
+      ? `I found ${displayName} for ${meal}.${sourceNote} Would you like me to save that?`
+      : `I found these ingredients for ${meal}: ${ingredientList}.${sourceNote} Would you like me to save that?`,
     canConfirm: missing.length === 0,
     autoSave: false,
     food: {
@@ -6180,7 +6228,7 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary: title,
-        confirmationMessage: `I can add this ${journalLabel} note: "${content.slice(0, 160)}${content.length > 160 ? '...' : ''}" Review it, then tap Confirm to save.`,
+        confirmationMessage: `I can add this ${journalLabel} note: "${content.slice(0, 160)}${content.length > 160 ? '...' : ''}" Would you like me to save that?`,
         canConfirm: true,
         autoSave: false,
         journal: { title, content, tags, journalType },

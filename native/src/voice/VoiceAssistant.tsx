@@ -1,7 +1,8 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vibration, View } from 'react-native'
+import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vibration, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
+import * as WebBrowser from 'expo-web-browser'
 import { CameraView, useCameraPermissions } from 'expo-camera'
 import * as LegacyFileSystem from 'expo-file-system/legacy'
 import { Feather } from '@expo/vector-icons'
@@ -17,7 +18,7 @@ import { isAppleHealthSupportedDevice } from '../health/appleHealth'
 import { theme } from '../ui/theme'
 import { applyReviewedLocalPreference, captureLocalPreferenceReview, validateLocalPreference, type LocalPreference, type LocalPreferenceReview } from './localPreferenceActions'
 import { acceptAdditionalVoiceReceipt, verifiedAdditionalVoiceReceipt, type AdditionalVoiceAction } from './additionalVoiceActions'
-import { nativeReportPdfCompletionMessage, openReviewedNativeReportPdf } from './reportPdfActions'
+import { nativeReportPdfCompletionMessage, openReviewedNativeReportPdf, presentNativeReportPdfViewer } from './reportPdfActions'
 import { hasNativeRealtimeVoiceSupport, startHelfiRealtimeVoiceSession } from './realtimeVoice'
 import { applyReviewedNativeDeviceAction, captureNativeDeviceReview, getSleepDeviceEditorState, validateNativeDeviceAction, type NativeDeviceAction, type NativeDeviceIo, type NativeDeviceReview } from './nativeDeviceActions'
 
@@ -2216,7 +2217,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         if (targetDraft.action === 'notification_action' && (!isCurrentDeviceSave() || targetDraft.notificationAction?.userId !== voiceMemoryUserId)) throw new Error('Please review these notifications again in the current account. Nothing has been sent to change them.')
         let { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
           method: 'POST',
-          headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-capabilities': 'report-pdf-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
+          headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-capabilities': 'report-pdf-v1,report-pdf-inline-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
           signal: saveSignal,
           body: JSON.stringify({ draft: targetDraft }),
         }))
@@ -2280,10 +2281,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           return data
         }
         if (targetDraft.action === 'report_action' && targetDraft.reportAction?.action === 'reports.weekly.export_pdf') {
-          const opened = await openReviewedNativeReportPdf(data, targetDraft, { apiBaseUrl: API_BASE_URL, accountId: voiceMemoryUserId, now: () => Date.now(), isCurrent: isCurrentDeviceSave, openUrl: async url => {
+          const opened = await openReviewedNativeReportPdf(data, targetDraft, { apiBaseUrl: API_BASE_URL, accountId: voiceMemoryUserId, now: () => Date.now(), isCurrent: isCurrentDeviceSave, onStage: stage => traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, stage, stage, startedAt), openUrl: async url => {
             if (!isCurrentDeviceSave()) throw new Error('The PDF opening was cancelled.')
             // The external viewer must never inherit an active microphone. Do
             // not cancel this already-authorized action's own response signal.
+            traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, 'shutdown_started', 'shutdown_started', startedAt)
             setContinuousVoiceSession(false)
             realtimeVoiceConnectedRef.current = false
             const stop = realtimeVoiceStopRef.current
@@ -2297,11 +2299,35 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             clearRealtimeConnectTimeout()
             clearReviewSilenceTimer()
             setRealtimeVoiceStatus('closed')
-            if (stop) await stop()
-            await stopPlayback()
-            await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true }).catch(() => {})
+            let shutdownFailure = 'transport_shutdown_failed'
+            try {
+              if (stop) await stop()
+              traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, 'transport_stopped', 'transport_stopped', startedAt)
+              shutdownFailure = 'playback_shutdown_failed'
+              await stopPlayback()
+              traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, 'playback_stopped', 'playback_stopped', startedAt)
+              shutdownFailure = 'audio_mode_failed'
+              await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true })
+              traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, 'audio_mode_ready', 'audio_mode_ready', startedAt)
+            } catch {
+              traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, shutdownFailure, shutdownFailure, startedAt)
+              throw new Error('The microphone shutdown was not confirmed.')
+            }
             if (!isCurrentDeviceSave()) throw new Error('The PDF opening was cancelled.')
-            await Linking.openURL(url)
+            if (new URL(url).searchParams.get('view') !== 'inline') {
+              traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, 'inline_link_required', 'inline_link_required', startedAt)
+              throw new Error('Please request a fresh PDF link for the viewer.')
+            }
+            if (Number(data.reportPdfAccess?.expiresAt) <= Date.now() + 1000) {
+              traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, 'link_expired_before_viewer', 'link_expired_before_viewer', startedAt)
+              throw new Error('Please request a fresh PDF link for the viewer.')
+            }
+            return presentNativeReportPdfViewer(url, {
+              platform: Platform.OS, isCurrent: isCurrentDeviceSave,
+              openBrowser: (verifiedUrl, browserOptions) => WebBrowser.openBrowserAsync(verifiedUrl, { ...browserOptions, presentationStyle: WebBrowser.WebBrowserPresentationStyle.FULL_SCREEN }),
+              dismissBrowser: () => WebBrowser.dismissBrowser(),
+              onStage: stage => traceVoiceAction(voiceActionRunId, 'report_pdf_io', targetDraft.action, stage, stage, startedAt),
+            })
           } })
           if (!opened || !isCurrentDeviceSave()) return null
           // The signed URL lives only in this callback/helper; no transcript,
@@ -2315,8 +2341,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           appendConversationTurns([makeConversationTurn('assistant', message)])
           DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', accountId: voiceMemoryUserId, completionId: voiceActionRunId, kind: targetDraft.action, action: data.result.action })
           DeviceEventEmitter.emit('helfi:navigate-native-web-tool', { title: 'Insights', path: '/insights', nativeTarget: { type: 'tab', tab: 'Insights' } })
-          setSaveSuccessNotice({ title: data.result.openRequestAccepted ? 'PDF opening requested' : 'PDF prepared', message })
-          addVoiceActivity(data.result.openRequestAccepted ? 'Phone accepted the PDF opening request' : 'PDF opening not verified', 'done')
+          setSaveSuccessNotice({ title: data.result.status === 'pdf_viewer_closed' ? 'PDF viewer closed' : data.result.openRequestAccepted ? 'PDF opening requested' : 'PDF prepared', message })
+          addVoiceActivity(data.result.status === 'pdf_viewer_closed' ? 'PDF viewer closed' : data.result.openRequestAccepted ? 'Phone accepted the PDF opening request' : 'PDF opening not verified', 'done')
           setDraft(null)
           setPendingFollowUpDraft(null)
           setReviewCorrectionActive(false)
@@ -2661,7 +2687,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             form.append('aiConsentGranted', 'true')
             return fetch(`${baseUrl}/api/native-voice-assistant`, {
               method: 'POST',
-              headers: { ...buildNativeAuthHeaders(session.token), 'x-helfi-voice-capabilities': 'report-pdf-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
+              headers: { ...buildNativeAuthHeaders(session.token), 'x-helfi-voice-capabilities': 'report-pdf-v1,report-pdf-inline-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
               signal: requestSignal,
               body: form,
             })
@@ -2669,7 +2695,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         } else {
           responseData = await fetchNativeVoiceAssistant((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant`, {
             method: 'POST',
-            headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-capabilities': 'report-pdf-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
+            headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-capabilities': 'report-pdf-v1,report-pdf-inline-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
             signal: requestSignal,
             body: JSON.stringify({
               transcript: typedTranscript,

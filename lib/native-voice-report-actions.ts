@@ -88,13 +88,14 @@ const defaultPdfIo:VoiceReportPdfIo={
     const headers=new Headers(original.headers);headers.set('content-type','application/json');headers.delete('content-length');headers.delete('host')
     // The deployed Next request may carry an AWS runtime origin. Only the
     // configured, allowlisted public site may receive a temporary PDF token.
-    const request=new NextRequest(new URL('/api/reports/weekly/pdf',pdfPublicOrigin()),{method:'POST',headers,body:JSON.stringify({reportId})})
+    const request=new NextRequest(new URL('/api/reports/weekly/pdf',pdfPublicOrigin()),{method:'POST',headers,body:JSON.stringify({reportId,...(pdfInlineCapability(original)?{view:'inline'}:{})})})
     const response=await(await import('@/app/api/reports/weekly/pdf/route')).POST(request)
     const data=await response.json().catch(()=>({}))
     if(!response.ok||typeof data?.url!=='string')throw new Error('The app could not prepare the selected report PDF. Please check Insights.')
     return {url:data.url}
   },
 }
+function pdfInlineCapability(request:NextRequest){return String(request.headers.get('x-helfi-voice-capabilities')||'').split(',').map(value=>value.trim()).includes('report-pdf-inline-v1')}
 function pdfActive(request:NextRequest){if(request.signal?.aborted)throw new Error('The PDF request stopped. No opened or saved file is being claimed.')}
 function pdfCapability(request:NextRequest){
   pdfActive(request)
@@ -134,13 +135,13 @@ async function pdfAccess(request:NextRequest,userId:string,result:any,io:VoiceRe
   const after=pdfReady(await io.byId(userId,result.reportId),userId)
   if(pdfVersion(after)!==result.sourceVersion)throw new Error('The report changed while preparing its PDF. Please review it again.')
   try{
-    const origin=new URL(request.url),url=new URL(link.url)
-    if(url.protocol!=='https:'||url.origin!==publicOrigin||url.username||url.password||url.hash||url.pathname!=='/api/reports/weekly/pdf'||url.searchParams.getAll('reportId').length!==1||url.searchParams.get('reportId')!==report.id||url.searchParams.getAll('accessToken').length!==1||[...url.searchParams.keys()].some(key=>!['reportId','accessToken'].includes(key)))throw new Error()
+    const origin=new URL(request.url),url=new URL(link.url),inline=pdfInlineCapability(request),allowedKeys=inline?['reportId','accessToken','view']:['reportId','accessToken']
+    if(url.protocol!=='https:'||url.origin!==publicOrigin||url.username||url.password||url.hash||url.pathname!=='/api/reports/weekly/pdf'||url.searchParams.getAll('reportId').length!==1||url.searchParams.get('reportId')!==report.id||url.searchParams.getAll('accessToken').length!==1||[...url.searchParams.keys()].some(key=>!allowedKeys.includes(key))||(inline&&(url.searchParams.getAll('view').length!==1||url.searchParams.get('view')!=='inline')))throw new Error()
     const token=url.searchParams.get('accessToken')||''
     if(!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(token))throw new Error()
     const payload=JSON.parse(Buffer.from(token.split('.')[0],'base64url').toString('utf8'))
-    if(payload.userId!==userId||payload.reportId!==report.id||!Number.isInteger(payload.expiresAt)||payload.expiresAt<=Date.now()||payload.expiresAt>Date.now()+61000)throw new Error()
-    console.info('[native voice PDF]',{event:'report_pdf_link_validated',requestOriginClass:pdfOriginClass(origin),linkOriginClass:pdfOriginClass(url),trustedPublicOriginMatch:true,sameRequestOrigin:url.origin===origin.origin,requestProtocol:origin.protocol==='https:'?'https':origin.protocol==='http:'?'http':'other',linkProtocol:'https',pathMatch:true,queryKeysValid:true,queryCount:2})
+    if(payload.userId!==userId||payload.reportId!==report.id||!Number.isInteger(payload.expiresAt)||payload.expiresAt<=Date.now()||payload.expiresAt>Date.now()+61000||payload.view!==(inline?'inline':undefined)||Object.keys(payload).some(key=>!['userId','reportId','expiresAt',...(inline?['view']:[])].includes(key)))throw new Error()
+    console.info('[native voice PDF]',{event:'report_pdf_link_validated',requestOriginClass:pdfOriginClass(origin),linkOriginClass:pdfOriginClass(url),trustedPublicOriginMatch:true,sameRequestOrigin:url.origin===origin.origin,requestProtocol:origin.protocol==='https:'?'https':origin.protocol==='http:'?'http':'other',linkProtocol:'https',pathMatch:true,queryKeysValid:true,queryCount:inline?3:2})
     return {url:url.toString(),reportId:report.id,actionId:result.actionId,expiresAt:payload.expiresAt}
   }catch{throw new Error('The app could not verify the temporary PDF link. Please request it again from Insights.')}
 }

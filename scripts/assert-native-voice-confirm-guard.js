@@ -1138,6 +1138,7 @@ for (const regression of [
   'voice-recipe-import-confirm-check.cjs',
   'voice-support-actions-check.cjs',
   'voice-spoken-quantities-check.cjs',
+  'voice-handsfree-review-check.cjs',
   'voice-report-actions-check.cjs',
   'voice-native-device-actions-check.cjs',
   'voice-result-receipt-storage-check.cjs',

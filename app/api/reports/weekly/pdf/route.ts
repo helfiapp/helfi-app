@@ -36,18 +36,19 @@ function signPdfPayload(payload: string) {
   return base64UrlEncode(createHmac('sha256', secret).update(payload).digest())
 }
 
-function createPdfAccessToken(userId: string, reportId: string) {
+function createPdfAccessToken(userId: string, reportId: string, view?: 'inline') {
   const payload = base64UrlEncode(JSON.stringify({
     userId,
     reportId,
     expiresAt: Date.now() + PDF_LINK_TTL_MS,
+    ...(view ? { view } : {}),
   }))
   const signature = signPdfPayload(payload)
   if (!signature) return ''
   return `${payload}.${signature}`
 }
 
-function getUserIdFromPdfAccessToken(token: string, reportId: string) {
+function getUserIdFromPdfAccessToken(token: string, reportId: string, view?: 'inline') {
   const [payload, signature] = String(token || '').split('.')
   if (!payload || !signature) return ''
 
@@ -63,6 +64,7 @@ function getUserIdFromPdfAccessToken(token: string, reportId: string) {
   try {
     const parsed = JSON.parse(base64UrlDecode(payload))
     if (String(parsed?.reportId || '') !== reportId) return ''
+    if (parsed?.view !== view) return ''
     if (Number(parsed?.expiresAt || 0) < Date.now()) return ''
     return String(parsed?.userId || '')
   } catch {
@@ -167,14 +169,22 @@ function describeSavedItem(item: any, fallback: string) {
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
+    const view = searchParams.has('view') ? searchParams.get('view') : undefined
+    if (view !== undefined && (view !== 'inline' || searchParams.getAll('view').length !== 1)) {
+      return NextResponse.json({ error: 'Invalid PDF view' }, { status: 400 })
+    }
+    if (view === 'inline' && ([...searchParams.keys()].some(key => !['reportId', 'accessToken', 'view'].includes(key)) || searchParams.getAll('reportId').length !== 1 || searchParams.getAll('accessToken').length !== 1)) {
+      return NextResponse.json({ error: 'Invalid PDF view' }, { status: 400 })
+    }
     const reportId = searchParams.get('reportId')
     if (!reportId) {
       return NextResponse.json({ error: 'Missing reportId' }, { status: 400 })
     }
 
     const requestUser = await getWeeklyReportRequestUser(request)
-    const userId = requestUser?.id || getUserIdFromPdfAccessToken(String(searchParams.get('accessToken') || ''), reportId)
-    if (!userId) {
+    const tokenUserId = view === 'inline' || !requestUser?.id ? getUserIdFromPdfAccessToken(String(searchParams.get('accessToken') || ''), reportId, view) : ''
+    const userId = requestUser?.id || tokenUserId
+    if (!userId || view === 'inline' && (!tokenUserId || tokenUserId !== userId)) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -549,7 +559,7 @@ export async function GET(request: NextRequest) {
       status: 200,
       headers: {
         'Content-Type': 'application/pdf',
-        'Content-Disposition': `attachment; filename="helfi-7-day-report-${report.periodStart || 'latest'}.pdf"`,
+        'Content-Disposition': `${view === 'inline' ? 'inline' : 'attachment'}; filename="helfi-7-day-report-${report.periodStart || 'latest'}.pdf"`,
       },
     })
   } catch (error) {
@@ -571,6 +581,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Missing reportId' }, { status: 400 })
     }
 
+    if (body?.view !== undefined && body.view !== 'inline') {
+      return NextResponse.json({ error: 'Invalid PDF view' }, { status: 400 })
+    }
+
     const report = await getWeeklyReportById(requestUser.id, reportId)
     if (!report) {
       return NextResponse.json({ error: 'Report not found' }, { status: 404 })
@@ -580,7 +594,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Report not ready' }, { status: 403 })
     }
 
-    const accessToken = createPdfAccessToken(requestUser.id, reportId)
+    const view = body?.view === 'inline' ? 'inline' : undefined
+    const accessToken = createPdfAccessToken(requestUser.id, reportId, view)
     if (!accessToken) {
       return NextResponse.json({ error: 'PDF link is not configured' }, { status: 500 })
     }
@@ -588,6 +603,7 @@ export async function POST(request: NextRequest) {
     const url = new URL('/api/reports/weekly/pdf', request.url)
     url.searchParams.set('reportId', reportId)
     url.searchParams.set('accessToken', accessToken)
+    if (view) url.searchParams.set('view', view)
 
     return NextResponse.json({ url: url.toString() })
   } catch (error) {

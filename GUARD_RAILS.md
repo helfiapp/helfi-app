@@ -3654,3 +3654,11 @@ A verified voice preference completion includes the current account, exact actio
 ### Voice mood notes must contain only the intended note —17October2026
 
 Recognize explicit bare `Note:`/`note saying` as well as existing note commands, preserve the note's punctuation and literal quoted words, and omit a separate trailing no-save instruction from proposed data. Clear rating-only commands leave the optional note empty; meaningful feeling prose remains intact. Pending score corrections retain the reviewed note/context/date. Exercise actual preparation POST and the normal mood POST/GET with synthetic storage; preparation must write nothing.
+
+## Voice PDF viewer and final review wording — 17 October 2026
+
+Voice report PDFs use the existing in-app viewer only after microphone shutdown and exact owned READY-report validation. Inline presentation requires the new advertised capability and matching signed inline token/query; older installed apps and ordinary manual downloads retain attachment behavior. A viewer-close or OS request-accepted receipt does not prove report rendering, downloading or saving a file. Never retry an uncertain handoff automatically, expose signed URLs/raw errors in logs or receipts, or dismiss a viewer owned by another action. End/account/background/unmount cancellation must suppress stale receipts.
+
+Ready conversational logging reviews must give the verified final values and ask for confirmation; do not tell users they must tap a button when spoken confirmation is supported. A completed plain-water correction must replace the interim checking message with its final volume. Keep normal consent, identity, permission, credit, no-autosave and human-required boundaries intact.
+
+Voice restaurant selection must retain exact brand, region, product qualifiers and sourced portion size. A plain Whopper/Zinger cannot select Outback/Crunch Stacker; equal-rank conflicting records require clarification. Prices and decimal suffixes are never piece counts. Explicit pack/piece counts and named size servings use their original recorded nutrition/options once; unknown nutrients remain unknown. Require actual mapped competing catalog rows and pending-count correction regressions, not just isolated ideal matches.
