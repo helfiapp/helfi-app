@@ -28,7 +28,61 @@ async function main(){
   await check('stale native IDs/inactive account/incomplete finish cannot claim a played greeting',async()=>{const f=fixture();await f.api.start();f.emit('started',{playbackId:'old-native-id'});f.emit('finished',{completed:true});assert.equal(f.completed.length,0);f.emit('started');f.current(false);f.emit('finished',{completed:true});assert.equal(f.completed.length,0);await f.api.stop('account-changed');assert.equal(f.removed(),1)})
   await check('bundled real UI-generated asset exactly matches recorded provenance and welcome text',async()=>{const crypto=require('node:crypto'),asset=fs.readFileSync(path.join(root,'native/assets/audio/helfi-welcome.mp3')),proof=JSON.parse(fs.readFileSync(path.join(root,'docs/release-evidence/2026-10-17/helfi-welcome-asset-provenance.json'),'utf8'));assert.equal(proof.text,LOCAL_VOICE_WELCOME_TEXT);assert.equal(proof.voice,'marin');assert.equal(asset.length,proof.bytes);assert.equal(crypto.createHash('sha256').update(asset).digest('hex'),proof.sha256);assert.equal(proof.physicalSpeakerAudibilityVerified,false)})
   await check('canonical native bridge matches actual project, plays once under RTC without category/activation changes',async()=>{const bridge=fs.readFileSync(path.join(root,'native/ios/Helfi/HelfiAudioRoute.m'),'utf8'),template=fs.readFileSync(path.join(root,'native/plugins/helfi-audio-route/HelfiAudioRoute.m'),'utf8');assert.equal(bridge,template);const welcome=bridge.slice(bridge.indexOf('- (void)finishWelcome:'),bridge.indexOf('- (NSString *)currentRouteName'));for(const required of ['AVAudioPlayer alloc','player.numberOfLoops = 0','player.delegate = self','[player play]','playbackId','audioPlayerDidFinishPlaying','stopVoiceWelcome','completed:flag','NSCachesDirectory','url.isFileURL'])assert(welcome.includes(required),required);assert(!/setActive:|setCategory:|setConfiguration:|setMode:/.test(welcome));assert(bridge.includes('[strongSelf finishWelcome:@"interrupted" completed:NO]'));assert(bridge.includes('[self finishWelcome:@"stopped" completed:NO]'))})
-  await check('actual iOS generation plugin preserves existing build configuration and copies canonical bridge into the target reproducibly',async()=>{const pluginFile=path.join(root,'native/plugins/with-helfi-audio-route.js'),writes=[],project=require(path.join(root,'native/node_modules/xcode')).project(path.join(root,'native/ios/Helfi.xcodeproj/project.pbxproj'));project.parseSync();const expo=require(path.join(root,'native/node_modules/@expo/config-plugins'));const before=project.writeSync();const module={exports:{}};vm.runInNewContext(fs.readFileSync(pluginFile,'utf8'),{module,exports:module.exports,__dirname:path.dirname(pluginFile),require:name=>name==='node:fs'?{mkdirSync(){},copyFileSync:(from,to)=>writes.push({from,to})}:name==='node:path'?path:name==='@expo/config-plugins'?{withXcodeProject:(_config,action)=>action,IOSConfig:expo.IOSConfig}:(()=>{throw Error('Unexpected plugin import')})()});const apply=module.exports({});const config={modRequest:{projectName:'Helfi',platformProjectRoot:'/synthetic/ios'},modResults:project};apply(config);apply(config);assert.equal(writes.length,2);assert(writes.every(write=>write.from.endsWith('plugins/helfi-audio-route/HelfiAudioRoute.m')&&write.to==='/synthetic/ios/Helfi/HelfiAudioRoute.m'));assert.equal(project.writeSync(),before,'Plugin cannot duplicate existing bridge build entries');const app=JSON.parse(fs.readFileSync(path.join(root,'native/app.json'),'utf8'));assert(app.expo.plugins.includes('./plugins/with-helfi-audio-route'));assert.match(app.expo.ios.buildNumber,/^\d+$/)})
+  await check('actual plugin copies the canonical bridge and delegates exact source linking with a synthetic Expo project boundary',async()=>{
+    // Server CI installs only root packages. This executes the real plugin;
+    // the synthetic Expo boundary is not a test of Expo's Xcode parser/linker.
+    // Actual native compilation and project parsing are separate build checks.
+    const pluginFile=path.join(root,'native/plugins/with-helfi-audio-route.js')
+    for(const projectName of ['Helfi','SyntheticApp',undefined])for(const alreadyLinked of [false,true]){
+      const name=projectName||'Helfi',relative=`${name}/HelfiAudioRoute.m`
+      const destination=path.join('/synthetic/ios',relative),template=path.join(root,'native/plugins/helfi-audio-route/HelfiAudioRoute.m')
+      const copied=[],directories=[],links=[],checks=[],additions=[]
+      const files=new Set(alreadyLinked?[relative]:[])
+      const project={configuration:{buildNumber:'synthetic-preserved',otherSource:'Unrelated.m'},
+        hasFile:filepath=>{checks.push(filepath);return files.has(filepath)},
+        addSourceFile:(filepath,options,groupName)=>{assert.equal(options.target,'synthetic-target');assert.equal(groupName,name);assert(!files.has(filepath));files.add(filepath);additions.push(filepath)}}
+      const before=JSON.stringify(project.configuration),module={exports:{}}
+      let registration
+      const config={marker:'preserved-config'},withXcodeProject=(value,callback)=>{assert.equal(value,config);registration=callback;return value}
+      const addBuildSourceFileToGroup=options=>{
+        assert.deepEqual(Object.keys(options).sort(),['filepath','groupName','project'])
+        assert.equal(options.filepath,relative);assert.equal(options.groupName,name);assert.equal(options.project,project)
+        links.push(options.filepath)
+        // Model only the external helper's source-membership contract; the
+        // actual plugin must forward this exact project/path on every run.
+        if(!project.hasFile(options.filepath))project.addSourceFile(options.filepath,{target:'synthetic-target'},options.groupName)
+        return project
+      }
+      vm.runInNewContext(fs.readFileSync(pluginFile,'utf8'),{module,exports:module.exports,__dirname:path.dirname(pluginFile),require:request=>{
+        if(request==='node:fs')return{mkdirSync:(directory,options)=>{assert.equal(options.recursive,true);directories.push(directory)},copyFileSync:(from,to)=>copied.push({from,to,hash:require('node:crypto').createHash('sha256').update(fs.readFileSync(from)).digest('hex')})}
+        if(request==='node:path')return path
+        if(request==='@expo/config-plugins')return{withXcodeProject,IOSConfig:{XcodeUtils:{addBuildSourceFileToGroup}}}
+        throw Error(`Unexpected plugin import: ${request}`)
+      }})
+      assert.equal(module.exports(config),config);assert.equal(typeof registration,'function')
+      const current={modRequest:{...(projectName?{projectName}:{}),platformProjectRoot:'/synthetic/ios'},modResults:project,marker:'preserved-mod'}
+      assert.equal(registration(current),current);assert.equal(registration(current),current)
+      assert.deepEqual(links,[relative,relative]);assert.deepEqual(checks,[relative,relative]);assert.deepEqual(additions,alreadyLinked?[]:[relative])
+      assert.deepEqual(directories,[path.dirname(destination),path.dirname(destination)])
+      const canonicalHash=require('node:crypto').createHash('sha256').update(fs.readFileSync(template)).digest('hex')
+      assert.deepEqual(copied,[{from:template,to:destination,hash:canonicalHash},{from:template,to:destination,hash:canonicalHash}])
+      assert.equal(JSON.stringify(project.configuration),before)
+    }
+    const app=JSON.parse(fs.readFileSync(path.join(root,'native/app.json'),'utf8'))
+    assert(app.expo.plugins.includes('./plugins/with-helfi-audio-route'));assert.match(app.expo.ios.buildNumber,/^\d+$/)
+  })
+  await check('checked-in actual Xcode project contains exactly one canonical bridge reference and linked source membership',async()=>{
+    const project=fs.readFileSync(path.join(root,'native/ios/Helfi.xcodeproj/project.pbxproj'),'utf8')
+    const section=name=>{const start=project.indexOf(`/* Begin ${name} section */`),end=project.indexOf(`/* End ${name} section */`);assert(start>=0&&end>start,`Missing ${name}`);return project.slice(start,end)}
+    const references=[...section('PBXFileReference').matchAll(/([A-F0-9]{24}) \/\* HelfiAudioRoute\.m \*\/ = \{[^\n]*path = Helfi\/HelfiAudioRoute\.m;[^\n]*\};/g)]
+    assert.equal(references.length,1);const reference=references[0][1]
+    const builds=[...section('PBXBuildFile').matchAll(new RegExp(`([A-F0-9]{24}) /\\* HelfiAudioRoute\\.m in Sources \\*/ = \\{isa = PBXBuildFile; fileRef = ${reference} /\\* HelfiAudioRoute\\.m \\*/; \\};`,'g'))]
+    assert.equal(builds.length,1);const build=builds[0][1]
+    assert.equal(section('PBXGroup').split(`${reference} /* HelfiAudioRoute.m */`).length-1,1)
+    assert.equal(section('PBXSourcesBuildPhase').split(`${build} /* HelfiAudioRoute.m in Sources */`).length-1,1)
+    const crypto=require('node:crypto'),digest=relative=>crypto.createHash('sha256').update(fs.readFileSync(path.join(root,relative))).digest('hex')
+    assert.equal(digest('native/ios/Helfi/HelfiAudioRoute.m'),digest('native/plugins/helfi-audio-route/HelfiAudioRoute.m'))
+  })
   console.log(`PASS ${count} local welcome controller/bridge/plugin groups. No audible or native binary claim.`)
 }
 main().catch(error=>{console.error(error.stack||error.message);process.exitCode=1})

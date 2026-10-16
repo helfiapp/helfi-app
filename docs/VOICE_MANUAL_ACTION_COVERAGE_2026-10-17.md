@@ -77,7 +77,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-symptom-record-check.cjs` | 11 groups |
 | `voice-ordinary-food-lookup-check.cjs` | 21 groups |
 | `voice-greeting-check.cjs` | Greeting/callback boundary suite; no audible proof |
-| `voice-local-welcome-check.cjs` | 10 local welcome/controller/bridge/plugin groups; actual native completion/media proof recorded; no human auditory claim |
+| `voice-local-welcome-check.cjs` | 11 local welcome/controller/bridge/plugin groups; actual native completion/media proof recorded; no human auditory claim |
 | `voice-navigation-parity-check.cjs` | 3 groups |
 | `voice-app-reads-check.cjs` | 19 groups |
 | `voice-recipe-url-import-check.cjs` | 9 groups |
@@ -158,3 +158,5 @@ Actual welcome follow-up: rebuilt iPhone16e Debug app completed the bundled Mari
 | `voice-favorite-recipe-portion-check.cjs` | 9 actual-source portion/review/account/signature/save groups; explicit servings scale from full recipe basis, numeric recipe names excluded, unknown nutrients preserved |
 
 Actual follow-up: the two-serving banana milk recipe saved only to the library with2servings/150.8calories and no diary change. “Log one serving ... for snacks today” plus natural yes saved exactly one row at75.4calories/scale0.5. The normal native editor reopened1of2servings, and unchanged Save preserved the same record/portion/unknown fibre with its normal displayed nutrient rounding.
+
+Server portability: the complete43-suite voice guard and command checks pass under UTC with every native/node_modules resolution deliberately refused. The welcome plugin fixture uses a declared synthetic Expo/project boundary plus exact actual pbxproj membership/canonical source checks; real Debug and signed iOS builds are separate proof.
