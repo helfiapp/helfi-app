@@ -1,0 +1,140 @@
+{
+  "preparedAtUtc": "2026-10-15T08:14:34.630806+00:00",
+  "status": "Local preparation verified; design approval hold remains in force",
+  "ownerInstruction": "Prepare the latest suitable OpenAI voice upgrade and logging fixes locally. Do not deploy or install until design approval.",
+  "linearIssue": "HEL-471",
+  "previousVerifiedProductionCommit": "0f55e1a11e35f762863f7e202dc8012d45deb34e",
+  "candidateIsCommittedOrDeployed": false,
+  "modelChoice": {
+    "conversationalVoice": "gpt-live-1",
+    "delegatedBackend": "gpt-6-luna",
+    "recordedAudioTranscription": "gpt-transcribe",
+    "voice": "marin",
+    "installedClientCompatibility": "Explicit live-v1 negotiation; old clients retain Realtime2.1 protocol and transcription configuration.",
+    "fallbackSpeechGeneration": "Existing gpt-4o-mini-tts retained; current official TTS recommendation.",
+    "reason": "Current official guidance recommends GPT-Live for conversational voice; its voice layer can listen while speaking and delegate app work. This is a local migration candidate, not a verified provider connection.",
+    "pricing": "Existing markup, minimums and feature prices retained. Recorded-audio cost estimate now follows gpt-transcribe pricing rather than the older mini transcriber."
+  },
+  "officialSources": [
+    "https://developers.openai.com/api/docs/guides/audio",
+    "https://developers.openai.com/api/docs/guides/live",
+    "https://developers.openai.com/api/docs/guides/live-migration",
+    "https://developers.openai.com/api/docs/guides/live-delegation",
+    "https://developers.openai.com/api/docs/guides/live-conversations",
+    "https://developers.openai.com/api/docs/guides/voice-webrtc",
+    "https://developers.openai.com/api/docs/guides/voice-server-controls?api=live",
+    "https://developers.openai.com/api/reference/resources/live/methods/create",
+    "https://developers.openai.com/api/docs/models/gpt-transcribe",
+    "https://developers.openai.com/api/docs/guides/text-to-speech"
+  ],
+  "localRepairs": [
+    "Atomic food/water writes and completed save receipts; retries return only original confirmed saved IDs.",
+    "Failed or pending saves never become successful save claims; real microphone startup and late-result cancellation checks.",
+    "Full milk/sugar/honey nutrition, density-aware measurements, correction context and optional unknown nutrients preserved.",
+    "Meal/date/time corrections retain the review; target-date IANA offsets handle daylight saving. Ambiguous/skipped times require clarification.",
+    "Multiple sweeteners require restating the drink; more than12 ingredients requires a smaller complete review rather than silently dropping ingredients.",
+    "Natural confirmations keep the conversation live. Full review details remain available with a concise spoken save question.",
+    "Live captions cannot trigger cancellation or prove speaking; only completed tools act and measured inbound audio drives speaking status.",
+    "Complete ICE handshake, explicit Live/legacy events, reused paid retry claims and allocated-session cleanup.",
+    "Five actual-source offline regression suites are wired into the existing mandatory voice build guard."
+  ],
+  "verification": {
+    "npm run build": {
+      "exitCode": 0,
+      "pagesGenerated": 265,
+      "prebuildGuardsPassed": true,
+      "logSha256": "dee01f1615964938ebaed87ac8c7811135a582ba26db314f23a15124b5d65f41"
+    },
+    "rootTypeScript": {
+      "command": "./node_modules/.bin/tsc --noEmit --incremental false",
+      "exitCode": 0
+    },
+    "nativeTypeScript": {
+      "command": "npm --prefix native run typecheck",
+      "exitCode": 0
+    },
+    "voiceSaveFixtures": {
+      "passed": 17,
+      "scope": "Actual route and synthetic transactional database"
+    },
+    "voiceDraftFixtures": {
+      "passedGroups": 21,
+      "scope": "Actual draft, measurement, date, drink and transcription code with synthetic sources"
+    },
+    "voiceSignSaveIntegration": {
+      "passed": true,
+      "scope": "Actual draft resolution, June date correction, signing/verification, confirmation and retry with synthetic rows"
+    },
+    "voiceClientCallbacks": {
+      "passed": true,
+      "scope": "Actual native callbacks with offline state/network mocks"
+    },
+    "voiceLiveProtocol": {
+      "passed": true,
+      "groups": [
+        "route",
+        "native",
+        "model metering"
+      ],
+      "scope": "Synthetic provider, HTTP, WebRTC, billing ledger and timers"
+    },
+    "existingVoiceCommandGuard": {
+      "passed": true
+    },
+    "existingLifecycleAndCreditRetryChecks": {
+      "passed": true
+    },
+    "existingTalkToHelfiTestflightPreflight": {
+      "passed": true,
+      "doesNotMeanUploadedOrInstalled": true
+    },
+    "pageLocks": {
+      "rootPassed": true,
+      "rootFiles": 286,
+      "nativePassed": true,
+      "nativeFiles": 87,
+      "onlyVoiceSnapshotEntriesRefreshedByThisTask": [
+        "native/src/voice/VoiceAssistant.tsx",
+        "native/src/voice/realtimeVoice.ts"
+      ]
+    },
+    "gitDiffWhitespace": {
+      "passed": true
+    }
+  },
+  "notPerformed": [
+    "Live OpenAI requests or key operations",
+    "Physical microphone/audio validation",
+    "Live diary save/reopen or cross-device testing of these changes",
+    "Git push or deployment",
+    "Package or app installation",
+    "Store upload, distribution or submission",
+    "Design changes or foreground browser/phone control",
+    "Existing meal or reviewer-account changes"
+  ],
+  "nextAfterDesignApproval": [
+    "Verify actual OpenAI account/model connection through the real Helfi app.",
+    "Test physical microphone: prepare banana and100ml milk, change milk to50ml, discard; verify no save.",
+    "Test explicit confirmed food/drink save, retry/reopen and cross-device totals, including failed save and correction cases.",
+    "Only after approval and runtime verification, follow the existing coordinated release procedure."
+  ],
+  "sourceSha256": {
+    "app/api/native/voice-assistant/route.ts": "a5773c9dbf049415fe5c4e67f3ce52fcf560b4010960d3098495f159ac38abf7",
+    "app/api/native/voice-assistant/confirm/route.ts": "1f3f0cce536e79a4a36504009ff4e81185957c822d8510529be5f5ba3748b426",
+    "app/api/native/voice-assistant/realtime/route.ts": "d3e159996623eee22c9c1e63e876602a22a967094a51b7a1a69847b390639dad",
+    "lib/native-voice-review-token.ts": "4bb39e030693062db54b35e2800b277e00315532fda445aeb3ef73addb97987e",
+    "lib/native-voice-time.ts": "90bc17d0fa4ee5a556c3da90cdb2befbc042aefd4bded35fb101792b5267c04b",
+    "lib/cost-meter.ts": "8f16dce7358d93da5b305472e2b3384ef42afd5d950fe0946ab9a80034312438",
+    "native/src/voice/VoiceAssistant.tsx": "d305c85afc727a872d4fac232cf11b1ab3efb1194e43b9c5eaa3b17feab4e5fd",
+    "native/src/voice/realtimeVoice.ts": "77e877ce89ea54d5d627eaefba6921ddd3e569a230f31875069c556a70582e03",
+    "scripts/assert-native-voice-confirm-guard.js": "35d1e23c75174b457da5e90f2e620320225909577870518991aceda6f357958a",
+    "scripts/assert-native-voice-command-behavior.js": "885b54a2d49e7a746a30f43791baa35f012b76f57d0525ef434c59592490f9a0",
+    "scripts/voice-save-integrity-check.cjs": "98625d1e377594cbe7ba3d68ed77b350ce42a340b8a7ae395c49654a6ddb1bdd",
+    "scripts/voice-draft-integrity-check.cjs": "5c112a5b6592355a62cb80a7c389fa7219d62def3b5b9098bc7743db5339699a",
+    "scripts/voice-sign-save-integration-check.cjs": "d6f60fc1f48225be3dabc88b5ffbcab9a85f10a1486e6e79d12f8f81818f5349",
+    "scripts/voice-client-integrity-check.cjs": "4d97e31fe5996f0d73fda3e98af21ba5c50d184360f97f970027ed3c8c346710",
+    "scripts/voice-live-protocol-check.cjs": "df876c5ea4317ae802eeac0b0bb429aff0218d04faa4d7b36654fc6050924a40"
+  },
+  "sharedWorkspace": "Unrelated design/source changes already exist in this main checkout. They remain owned by their existing chat. This task did not stage, commit, push, deploy or install them.",
+  "historicalAudit": "voice-audit.json and original reproduction scripts remain historical pre-fix evidence; they are not healthy-state regression checks."
+}

@@ -1,5 +1,16 @@
 # 🛡️ Helfi Guard Rails (Protected Flows)
 
+## Approved compact native Dashboard — 17 October 2026 (owner hard lock)
+
+The owner approved the entire compact mobile Dashboard in DESIGN MANAGER and explicitly asked that other agents must not change it. This approval supersedes the earlier pending-review status for this Dashboard only. Do not involve Claude in redesigning this approved page.
+
+- Preserve the compact greeting, four daily-tool cards, joined My Health and device rows, small complete/incomplete setup panel, readable labels, existing colour family and circular microphone/profile. Do not restore the earlier large welcome heading, tall cards or oversized completion panel.
+- Preserve credit values/calculation, account/profile/menu actions, health-setup gates, all seven device actions, HealthKit disclosures, consent, source selection and automatic-update behavior. Appearance approval does not authorize unrelated changes.
+- Dedicated baseline: `scripts/dashboard-design-lock.json`. Checker: `scripts/check-dashboard-design-lock.js`. It protects the exact Dashboard plus its shared theme, screen container, bottom navigation and logo. Both normal page-lock checks and write mode run it before accepting a snapshot, as does `scripts/protect-regions.js`. Generic page/ingredient overrides do not bypass it.
+- Do not remove/weaken the check, edit its baseline, or alter shared styles affecting this Dashboard without new explicit owner approval for the exact change. After such approval, visually verify the full page before updating only the approved baseline files.
+- Actual local iPhone16e build and top/middle/bottom review, normal test-account sign-in, water/report navigation, native types, health checks and page locks passed. Private reference: `/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-dashboard/`. Android shares the source but was not separately run for this candidate.
+- Approved local source is recorded by the baseline hashes. It is not deployed yet; last verified live web source remains `0f55e1a11e35f762863f7e202dc8012d45deb34e`, 15 October 2026 / AWS123. Do not describe the new Dashboard as live or install/release apps from this approval alone.
+
 ## Food photo model scope (8 October 2026)
 
 - Keep line breaks when reading the model's Components line: collapsing them into spaces can discard the final ingredient as nutrition text. Photo results must cover every named component before settlement; use the existing model repair, never guessed ingredient cards. Reject incomplete photos before charging. `check:food-photo-model` exercises the captured apple/spinach/almonds failure and final no-charge guard.
@@ -3543,3 +3554,21 @@ for guidance first.
 
 - The owner explicitly rejected heavy ingredient typography and uniformly square food surfaces. Use medium-weight food titles, calm section headings and regular supporting text. Keep gentle 8px corners on nutrient cards/chart panels and food surfaces; action/category controls remain subtly rectangular. Preserve circular nutrient rings, profile shapes, nutrient colours and values.
 - This correction supersedes the earlier all-2px presentation treatment. Keep Portion control as an opt-in toggle with hidden options while OFF; appearance changes must not alter food identity, portions, names/times or saved data.
+
+### Restore existing UI shapes and joined meal sections (15 October 2026 owner correction)
+
+- The owner’s request to simplify large meal/search/action medallion buttons is NOT permission to square profiles, microphones, date navigation, add icons, progress dots, nutrient cards, panels, menus, inputs or the wider app. Restore the existing component-specific shapes from before the 15 October food styling change. Do not use blanket radius overrides across page descendants or bulk numeric replacements.
+- Breakfast, Lunch, Dinner, Snacks and Other in the diary are full-width joined sections: no outer left/right inset and no vertical gaps. Keep inner content padding and clean dividers. This is separate from the four meal-choice buttons inside the editor.
+- Keep lighter ingredient titles, editable suggested meal names, explicit food corrections, all six nutrient colours, and opt-in Portion control with options hidden while OFF. Do not change food data or save behavior as part of this visual restoration.
+- Owner approval is required before further app updates, deployment, store uploads, TestFlight distribution or physical-phone installation. Prepare and verify local previews first. This clarification supersedes the earlier blanket 2px/8px styling directions.
+
+### Voice upgrade and truthful diary logging (15 October 2026, local preparation)
+
+- Initial15October preparation was local only. On17October the owner explicitly requested coordination with DESIGN MANAGER and installation of the upgraded iPhone voice version for testing. The approved compact Dashboard and existing native restoration must be preserved. This permits the necessary coordinated voice online deployment and iPhone test build/upload/install; it does not request a Google or public Apple submission. Previous verified server source: `0f55e1a11e35f762863f7e202dc8012d45deb34e`, 15 October 2026. The local voice candidate is not a released or microphone-verified baseline.
+- New native clients explicitly negotiate the GPT-Live session/event protocol. Preserve the compatible Realtime path for installed clients. Live caption fragments are delayed text, not completed turns, speech-start signals or proof of audible playback. Use actual inbound audio measurements for speaking state; never drop a correction because its text resembles the assistant's words.
+- Save only a complete, unexpired, account-bound signed review after an explicit confirmation. Claim, food/water writes and completed result must share one transaction. A retry returns the original completed IDs; a pending/failed claim never proves a save. Preserve the existing review-first medication/supplement flow.
+- Non-water drinks and water additions require resolved nutrition for every ingredient. Milk, sugar and honey must survive clarification and corrections. Missing source nutrition, ambiguous measurements, invalid quantities or more supported ingredients than can be resolved must require review rather than saving a partial result. Keep unknown optional nutrients distinct from genuine zero and scale each source once.
+- Retain the reviewed date, clock time and device time zone across corrections. Resolve the offset for the target date before signing; daylight-saving gaps or repeated clock times require clarification. Never apply today's daylight-saving offset blindly to a different season.
+- Done, backgrounding and account changes prevent late microphone startup and late actions. Speech may cancel preparation; a save already submitted requires a truthful result rather than a promise of cancellation. A natural confirmation can save and continue the same voice conversation.
+- Existing session charges are scoped to the same account/conversation and reused on connection retry. Close allocated Live sessions when connection delivery fails. Preserve consent, paid-access and usage-safety checks. Do not change user credit prices or access the live key from agent scripts.
+- The required `check:native-voice-confirm-guard` now executes the actual-source offline save, draft, native callback and Live protocol regressions. These checks and a local build do not establish physical microphone quality, provider account availability, live save/reopen or cross-device behaviour; record that evidence separately after approval.

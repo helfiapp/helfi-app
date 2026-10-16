@@ -1,6 +1,8 @@
 import crypto from 'crypto'
 
 const REVIEW_TOKEN_VERSION = 'v1'
+export const NATIVE_VOICE_REVIEW_MAX_AGE_MS = 30 * 60 * 1000
+const REVIEW_TOKEN_FUTURE_ALLOWANCE_MS = 60 * 1000
 
 function reviewTokenSecret() {
   const secret = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || process.env.JWT_SECRET
@@ -38,6 +40,15 @@ export function signNativeVoiceDraft(userId: string, draft: any) {
 }
 
 export function verifyNativeVoiceDraft(userId: string, draft: any) {
+  const issuedAt = draft?.reviewIssuedAt
+  const now = Date.now()
+  if (
+    typeof issuedAt !== 'number' ||
+    !Number.isFinite(issuedAt) ||
+    issuedAt <= 0 ||
+    now - issuedAt > NATIVE_VOICE_REVIEW_MAX_AGE_MS ||
+    issuedAt - now > REVIEW_TOKEN_FUTURE_ALLOWANCE_MS
+  ) return false
   const token = String(draft?.reviewToken || '')
   if (!token.startsWith(`${REVIEW_TOKEN_VERSION}.`)) return false
   const expected = signNativeVoiceDraft(userId, draft)

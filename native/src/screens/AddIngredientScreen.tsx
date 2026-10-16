@@ -1692,7 +1692,7 @@ export function AddIngredientScreen() {
           style={{
             borderWidth: 1,
             borderColor: '#E5E7EB',
-            borderRadius: 8,
+            borderRadius: 16,
             backgroundColor: theme.colors.card,
             padding: 14,
             gap: 12,
@@ -1718,7 +1718,7 @@ export function AddIngredientScreen() {
               style={{
                 borderWidth: 1,
                 borderColor: '#D1D5DB',
-                borderRadius: 4,
+                borderRadius: 10,
                 paddingHorizontal: 12,
                 paddingVertical: 10,
                 paddingRight: 80,
@@ -1830,13 +1830,13 @@ export function AddIngredientScreen() {
             <View>
               <Text style={{ fontSize: 12, color: '#6B7280', marginBottom: 4 }}>Credits remaining</Text>
               <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-                <View style={{ flex: 1, height: 8, borderRadius: 4, backgroundColor: '#E5E7EB', overflow: 'hidden', marginRight: 10 }}>
+                <View style={{ flex: 1, height: 8, borderRadius: 999, backgroundColor: '#E5E7EB', overflow: 'hidden', marginRight: 10 }}>
                   <View style={{ width: `${Math.max(0, 100 - creditsPercentUsed)}%`, height: '100%', backgroundColor: '#4CAF50' }} />
                 </View>
                 <Text style={{ fontSize: 12, fontWeight: '600', color: theme.colors.muted }}>{creditsRemaining !== null ? creditsRemaining.toLocaleString() : '—'}</Text>
               </View>
             </View>
-            {photoPreviewUri ? <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 8, overflow: 'hidden' }}>
+            {photoPreviewUri ? <View style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 12, overflow: 'hidden' }}>
               <Image source={{ uri: photoPreviewUri }} style={{ width: '100%', height: 220 }} resizeMode="cover" />
             </View> : null}
             {query || photoPreviewUri ? <Pressable accessibilityRole="button" accessibilityLabel="Clear search" onPress={resetSearchSection} style={{ alignSelf: 'flex-start', paddingVertical: 8 }}>
@@ -1871,7 +1871,7 @@ export function AddIngredientScreen() {
                         style={{
                           borderWidth: 1,
                           borderColor: '#E5E7EB',
-                          borderRadius: 8,
+                          borderRadius: 14,
                           paddingHorizontal: 12,
                           paddingVertical: 10,
                           marginBottom: 8,
@@ -1929,7 +1929,7 @@ export function AddIngredientScreen() {
             marginTop: 14,
             borderWidth: 1,
             borderColor: '#E5E7EB',
-            borderRadius: 8,
+            borderRadius: 16,
             backgroundColor: theme.colors.card,
             paddingHorizontal: 12,
             paddingVertical: 14,
@@ -1966,7 +1966,7 @@ export function AddIngredientScreen() {
             style={{
               width: '100%',
               maxWidth: 420,
-              borderRadius: 8,
+              borderRadius: 18,
               borderWidth: 1,
               borderColor: '#E5E7EB',
               backgroundColor: theme.colors.card,
@@ -1993,7 +1993,7 @@ export function AddIngredientScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: '#D1D5DB',
-                    borderRadius: 4,
+                    borderRadius: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
                     color: theme.colors.text,
@@ -2011,7 +2011,7 @@ export function AddIngredientScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: '#D1D5DB',
-                    borderRadius: 4,
+                    borderRadius: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
                     color: theme.colors.text,
@@ -2029,7 +2029,7 @@ export function AddIngredientScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: '#D1D5DB',
-                    borderRadius: 4,
+                    borderRadius: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
                     color: theme.colors.text,
@@ -2049,7 +2049,7 @@ export function AddIngredientScreen() {
                   style={{
                     borderWidth: 1,
                     borderColor: '#D1D5DB',
-                    borderRadius: 4,
+                    borderRadius: 10,
                     paddingHorizontal: 12,
                     paddingVertical: 10,
                     minHeight: 84,
@@ -2069,7 +2069,7 @@ export function AddIngredientScreen() {
                   disabled={missingReportBusy}
                   onPress={() => void submitMissingReport()}
                   style={({ pressed }) => ({
-                    borderRadius: 2,
+                    borderRadius: 10,
                     backgroundColor: '#059669',
                     paddingHorizontal: 14,
                     paddingVertical: 10,
@@ -2144,7 +2144,7 @@ export function AddIngredientScreen() {
                     style={({ pressed }) => ({
                       borderWidth: 1,
                       borderColor: '#D1D5DB',
-                      borderRadius: 2,
+                      borderRadius: 8,
                       paddingHorizontal: 12,
                       paddingVertical: 11,
                       backgroundColor: theme.colors.card,
@@ -2179,7 +2179,7 @@ export function AddIngredientScreen() {
                     width: 92,
                     borderWidth: 1,
                     borderColor: '#D1D5DB',
-                    borderRadius: 4,
+                    borderRadius: 8,
                     paddingHorizontal: 10,
                     paddingVertical: 10,
                     color: theme.colors.text,
@@ -2195,7 +2195,7 @@ export function AddIngredientScreen() {
                     style={({ pressed }) => ({
                       borderWidth: 1,
                       borderColor: '#D1D5DB',
-                      borderRadius: 2,
+                      borderRadius: 8,
                       paddingHorizontal: 10,
                       paddingVertical: 10,
                       backgroundColor: theme.colors.card,
@@ -2220,7 +2220,7 @@ export function AddIngredientScreen() {
               </Text>
             </View>
 
-            <NutrientCards cornerRadius={8} values={{ calories: previewCalories, protein: previewProtein, carbs: previewCarbs, fat: previewFat, fiber: previewFiber, sugar: previewSugar }} />
+            <NutrientCards cornerRadius={16} values={{ calories: previewCalories, protein: previewProtein, carbs: previewCarbs, fat: previewFat, fiber: previewFiber, sugar: previewSugar }} />
           </ScrollView>
 
           <View style={{ borderTopWidth: 1, borderTopColor: '#E5E7EB', paddingHorizontal: 16, paddingVertical: 10 }}>
@@ -2233,7 +2233,7 @@ export function AddIngredientScreen() {
                 onPress={() => void addAdjustedItem()}
                 style={({ pressed }) => ({
                   flex: 1,
-                  borderRadius: 2,
+                  borderRadius: 9,
                   backgroundColor: '#059669',
                   alignItems: 'center',
                   justifyContent: 'center',
@@ -2252,7 +2252,7 @@ export function AddIngredientScreen() {
                   resetAdjustState()
                 }}
                 style={({ pressed }) => ({
-                  borderRadius: 2,
+                  borderRadius: 9,
                   borderWidth: 1,
                   borderColor: '#E5E7EB',
                   backgroundColor: theme.colors.card,

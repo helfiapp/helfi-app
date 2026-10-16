@@ -159,10 +159,14 @@ export function costCentsEstimateFromText(
   return costCentsForTokens(model, { promptTokens, completionTokens });
 }
 
-export function estimateTranscriptionCostCents(durationSeconds: number): number {
+export function estimateTranscriptionCostCents(durationSeconds: number, model = 'gpt-4o-mini-transcribe'): number {
   const seconds = Number(durationSeconds);
   const safeSeconds = Number.isFinite(seconds) && seconds > 0 ? seconds : 30;
-  const usdPerMinute = envNumber('HELFI_PRICE_GPT4O_MINI_TRANSCRIBE_USD_PER_MINUTE', 0.003);
+  // Recorded voice upgrade; preserve every existing caller's price/markup.
+  // https://developers.openai.com/api/docs/models/gpt-transcribe (15 October 2026)
+  const usdPerMinute = model === 'gpt-transcribe'
+    ? envNumber('HELFI_PRICE_GPT_TRANSCRIBE_USD_PER_MINUTE', 0.0045)
+    : envNumber('HELFI_PRICE_GPT4O_MINI_TRANSCRIBE_USD_PER_MINUTE', 0.003);
   const cents = (safeSeconds / 60) * usdPerMinute * 100;
   return Math.max(1, Math.ceil(cents * BILLING_MARKUP_MULTIPLIER));
 }

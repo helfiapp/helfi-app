@@ -200,6 +200,14 @@ DEPLOYED:
 
 1. Before working on any area, read GUARD_RAILS.md and any other notes for that area so you are fully informed.
 
+## Approved Mobile Dashboard Design (Owner Lock — 17 October 2026)
+
+- The owner approved the compact FULL native Dashboard in DESIGN MANAGER and expressly required future agents to leave its design alone. No Claude redesign is wanted for this page.
+- Keep the compact greeting, four small daily tools, joined My Health/device rows, existing colours and circular profile/microphone, and compact health-setup status. Preserve all actions and permission checks.
+- `scripts/dashboard-design-lock.json` records the approved Dashboard, shared theme, screen container, bottom navigation and logo. `scripts/check-dashboard-design-lock.js` verifies those exact files during page-lock checks (including write mode) and protected-region checks.
+- Do not bypass/remove this check, restore an older Dashboard, or refresh this separate baseline using a generic page-lock allowance. New explicit owner approval for the EXACT proposed change is required, including shared styling that changes this Dashboard.
+- Reference screenshots and verification: `/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-dashboard/`. This is an approved local design, not a claim that it was deployed. Existing release holds remain until the owner requests the relevant release.
+
 ## Full Page Lock (Must Follow)
 
 The current live web app and current native app are baseline-locked.

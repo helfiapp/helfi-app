@@ -1,0 +1,17 @@
+{
+  "approvedBy": "Owner, DESIGN MANAGER chat, 17 October 2026",
+  "approval": "I like the design. Lock this design in so other agents do not change it.",
+  "scope": "Approved compact native Dashboard and its shared visual foundations. No further appearance changes or baseline refresh without explicit owner approval for the exact change.",
+  "releaseStatus": "Local approved design; this record does not claim a deployment. Last live web commit remains 0f55e1a11e35f762863f7e202dc8012d45deb34e (15 October 2026).",
+  "references": [
+    "/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-dashboard/after-top.jpg",
+    "/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-dashboard/after-bottom.jpg"
+  ],
+  "files": {
+    "native/src/screens/DashboardScreen.tsx": "c4ceba674f286ed4479066899f5ad29df7f343761f5f995b09b10d6f5cfafa00",
+    "native/src/ui/theme.ts": "60e389709fa224cbf99d06e4b29d10ea451988ed176cc5a1f038dcc4907a88a0",
+    "native/src/ui/Screen.tsx": "7f3e8eab601f2dea38f605dc113bfb8395e2a3a99995bb72fe9aa30855514dd4",
+    "native/src/navigation/NativeBottomNav.tsx": "6939c54d1d7f206c98fe57be46df98e7fe9c0edd1f12f03266a142f88ece17a8",
+    "native/assets/helfi-logo.png": "b29170813bebd6181fda4f1c7ea90701c84d50bbd470c6bd46decc807e03f9fd"
+  }
+}

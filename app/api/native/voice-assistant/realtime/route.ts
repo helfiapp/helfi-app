@@ -15,12 +15,20 @@ export const dynamic = 'force-dynamic'
 export const preferredRegion = 'syd1'
 
 const REALTIME_MODEL = process.env.HELFI_VOICE_REALTIME_MODEL || 'gpt-realtime-2.1'
+const LIVE_MODEL = process.env.HELFI_VOICE_LIVE_MODEL || 'gpt-live-1'
+const LIVE_BACKEND_MODEL = process.env.HELFI_VOICE_LIVE_BACKEND_MODEL || 'gpt-6-luna'
 const REALTIME_VOICE = resolveHelfiRealtimeVoice()
 const REALTIME_TRANSCRIPTION_MODEL = process.env.HELFI_VOICE_REALTIME_TRANSCRIPTION_MODEL || 'gpt-4o-mini-transcribe'
 const REALTIME_SESSION_MIN_CREDITS = Number(process.env.HELFI_VOICE_REALTIME_SESSION_CREDITS || 10)
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
 const REALTIME_VOICE_ENABLED = process.env.HELFI_VOICE_REALTIME_ENABLED === 'true'
 const REALTIME_VOICE_PAUSED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
+
+// Negotiate explicitly: already-installed clients retain their supported Realtime
+// handshake. New clients use Live's different session and event protocol.
+function usesLiveProtocol(request: NextRequest) {
+  return request.headers.get('x-helfi-voice-protocol') === 'live-v1'
+}
 
 function hasAiConsentFlag(value: unknown) {
   const text = String(value || '').trim().toLowerCase()
@@ -58,13 +66,16 @@ function voicePaidAccessResponse() {
 
 export async function GET(request: NextRequest) {
   try {
+    const live = usesLiveProtocol(request)
     if (request.nextUrl.searchParams.get('readiness') === '1') {
       const enabled = REALTIME_VOICE_ENABLED
       const configured = Boolean(process.env.OPENAI_API_KEY)
       return NextResponse.json({
         ready: enabled && configured,
         code: !enabled ? 'live_voice_paused' : !configured ? 'ai_service_not_configured' : 'ready',
-        model: REALTIME_MODEL,
+        model: live ? LIVE_MODEL : REALTIME_MODEL,
+        protocol: live ? 'live-v1' : 'realtime',
+        supportedProtocols: ['live-v1', 'realtime'],
         voice: REALTIME_VOICE,
         exactChatGptVoiceAvailable: exactChatGptVoiceAvailable(),
         voiceNote: 'ChatGPT app voices such as Juniper are not exposed as API voice names. Helfi is using Marin, the closest warm natural OpenAI API voice.',
@@ -102,7 +113,8 @@ export async function GET(request: NextRequest) {
 
     return NextResponse.json({
       available: true,
-      model: REALTIME_MODEL,
+      model: live ? LIVE_MODEL : REALTIME_MODEL,
+      protocol: live ? 'live-v1' : 'realtime',
       voice: REALTIME_VOICE,
       exactChatGptVoiceAvailable: exactChatGptVoiceAvailable(),
       voiceNote: 'ChatGPT app voices such as Juniper are not exposed as API voice names. Helfi is using Marin, the closest warm natural OpenAI API voice.',
@@ -126,6 +138,44 @@ function realtimeBillingRunId(userId: string, rawSessionId: unknown) {
   const sessionId = /^[A-Za-z0-9._:-]{12,100}$/.test(supplied) ? supplied : crypto.randomUUID()
   const digest = crypto.createHash('sha256').update(`${userId}:${sessionId}`).digest('hex')
   return `native-realtime:${digest}`
+}
+
+async function existingRealtimeCharge(userId: string, runId: string) {
+  const claim = await prisma.aIUsageEvent.findFirst({
+    where: { userId, runId, feature: 'voice-assistant:realtime-charge-marker', createdAt: { gte: new Date(Date.now() - 2 * 60 * 60 * 1000) } },
+    orderBy: { createdAt: 'desc' },
+    select: { success: true, errorMessage: true },
+  })
+  return Boolean(claim?.success && claim.errorMessage !== 'insufficient_credits')
+}
+
+async function closeUnusedLiveSession(sessionId: string, userId: string) {
+  // Node22's built-in Undici WebSocket supports authenticated server headers.
+  // Use Live's documented sideband/session.close, not the SIP-only hangup API.
+  if (!sessionId || typeof WebSocket === 'undefined') return false
+  return new Promise<boolean>((resolve) => {
+    let socket: any
+    let settled = false
+    const finish = (confirmed: boolean) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      try { socket?.close() } catch {}
+      resolve(confirmed)
+    }
+    const timeout = setTimeout(() => finish(false), 2000)
+    try {
+      socket = new (WebSocket as any)(`wss://api.openai.com/v1/live/sessions/${encodeURIComponent(sessionId)}/attach`, {
+        headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}`, 'OpenAI-Safety-Identifier': safetyIdentifier(userId) },
+      })
+      socket.addEventListener('open', () => { socket.send(JSON.stringify({ type: 'session.close' })) })
+      socket.addEventListener('message', (event: any) => {
+        try { if (JSON.parse(String(event.data))?.type === 'session.closed') finish(true) } catch {}
+      })
+      socket.addEventListener('error', () => finish(false))
+      socket.addEventListener('close', () => finish(false))
+    } catch { finish(false) }
+  })
 }
 
 function realtimeSessionConfig() {
@@ -233,15 +283,52 @@ function realtimeSessionConfig() {
   }
 }
 
+function liveSessionConfig() {
+  const existing = realtimeSessionConfig()
+  return {
+    model: LIVE_MODEL,
+    store: false,
+    audio: { output: { voice: REALTIME_VOICE } },
+    instructions: [
+      'You are Talk to Helfi, a warm, calm and concise health tracking assistant.',
+      'Listen naturally while speaking. Let the user finish, including pauses and self-corrections. Ask one short question when speech is unclear.',
+      'Delegate every app action, meal/drink request, confirmation, rejection and correction to the backend. Keep exact foods, quantities, dates and times.',
+      'You may briefly acknowledge work while it runs, but never say saved, added, created or logged until a completed Helfi tool result has saved=true and safeToClaimSaved=true.',
+      'A proposal is not a save. Read the backend spokenReply for review, then listen for yes, no or a correction and delegate it. Never infer consent from silence.',
+      'A correction or wait/cancel instruction takes precedence over an earlier proposal. Do not promise cancellation of a save already completed; report the verified result.',
+      'Keep meal suggestions brief: name and one reason, then offer ingredients/nutrients or cooking steps. Keep complete detail in the app.',
+      'Medication/supplement changes are always review-first. Do not diagnose or recommend changes to treatment.',
+    ].join('\n'),
+    delegation: {
+      type: 'responses',
+      responses: {
+        model: LIVE_BACKEND_MODEL,
+        instructions: `${existing.instructions}\nYou handle delegated Helfi tasks. Call request_helfi_action with the complete latest user request, preserving corrections and the app review context. Tool output is the only save evidence. Return its spokenReply and factual outcome concisely. Never invent a successful save from a pending, failed or missing tool result.`,
+        tools: existing.tools.map((tool) => ({ ...tool, strict: false })),
+        tool_choice: 'auto',
+        parallel_tool_calls: false,
+        max_output_tokens: 2048,
+      },
+    },
+  }
+}
+
 export async function POST(request: NextRequest) {
   const consentResponse = await aiConsentRequiredResponse(request)
   if (consentResponse) return consentResponse
 
   const requestStartedAt = Date.now()
   const abortController = new AbortController()
+  let allocatedLiveSessionId = ''
+  let allocatedUserId = ''
+  let handedToClient = false
   const abortRealtimeRequest = () => abortController.abort()
   request.signal?.addEventListener?.('abort', abortRealtimeRequest)
+  if (request.signal?.aborted) abortController.abort()
   try {
+    if (abortController.signal.aborted) {
+      return NextResponse.json({ error: 'Live voice session was cancelled before it started.', code: 'live_voice_cancelled' }, { status: 499 })
+    }
     const [user, sdp] = await Promise.all([resolveUser(request), request.text()])
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
@@ -260,6 +347,13 @@ export async function POST(request: NextRequest) {
     if (!sdp.trim()) return NextResponse.json({ error: 'Missing realtime session offer' }, { status: 400 })
 
     const chargeCents = Math.max(1, REALTIME_SESSION_MIN_CREDITS)
+    const billingRunId = realtimeBillingRunId(user.id, request.headers.get('x-helfi-voice-session-id'))
+    const alreadyPaid = await existingRealtimeCharge(user.id, billingRunId)
+    const walletBeforeStart = await new CreditManager(user.id).getWalletStatus()
+    if (!alreadyPaid && !hasPaidVoiceWalletAccess(walletBeforeStart)) return voicePaidAccessResponse()
+    if (!alreadyPaid && Number(walletBeforeStart?.totalAvailableCents || 0) < chargeCents) {
+      return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: Number(walletBeforeStart?.totalAvailableCents || 0) }, { status: 402 })
+    }
     const guardStartedAt = Date.now()
     await assertAiUsageAllowed({
       feature: 'voice-assistant:realtime-session',
@@ -267,26 +361,48 @@ export async function POST(request: NextRequest) {
     })
     const guardMs = Date.now() - guardStartedAt
 
+    const live = usesLiveProtocol(request)
+    const model = live ? LIVE_MODEL : REALTIME_MODEL
     const form = new FormData()
-    form.set('sdp', sdp)
-    form.set('session', JSON.stringify(realtimeSessionConfig()))
+    if (!live) {
+      form.set('sdp', sdp)
+      form.set('session', JSON.stringify(realtimeSessionConfig()))
+    }
 
     const openAiStartedAt = Date.now()
-    const realtimeRes = await fetch('https://api.openai.com/v1/realtime/calls', {
+    if (abortController.signal.aborted) {
+      return NextResponse.json({ error: 'Live voice session was cancelled before it started.', code: 'live_voice_cancelled' }, { status: 499 })
+    }
+    const realtimeRes = await fetch(live ? 'https://api.openai.com/v1/live/sessions' : 'https://api.openai.com/v1/realtime/calls', {
       method: 'POST',
       headers: {
         Authorization: `Bearer ${process.env.OPENAI_API_KEY}`,
         'OpenAI-Safety-Identifier': safetyIdentifier(user.id),
+        ...(live ? { 'Content-Type': 'application/json' } : {}),
       },
       signal: abortController.signal,
-      body: form,
+      body: live ? JSON.stringify({ session: liveSessionConfig(), transport: { type: 'webrtc', sdp } }) : form,
     })
     const openAiMs = Date.now() - openAiStartedAt
 
-    const answerSdp = await realtimeRes.text()
+    const responseText = await realtimeRes.text()
     if (!realtimeRes.ok) {
-      console.error('[native voice realtime] session failed', realtimeRes.status, answerSdp.slice(0, 400))
+      console.error('[native voice realtime] session failed', realtimeRes.status)
       return NextResponse.json({ error: 'Live voice session could not start' }, { status: 502 })
+    }
+    let answerSdp = responseText
+    let liveSessionId = ''
+    if (live) {
+      const response = JSON.parse(responseText)
+      answerSdp = response?.transport?.sdp
+      liveSessionId = response?.session?.id
+      if (typeof liveSessionId === 'string' && liveSessionId) {
+        allocatedLiveSessionId = liveSessionId
+        allocatedUserId = user.id
+      }
+      if (typeof answerSdp !== 'string' || !answerSdp.trim() || typeof liveSessionId !== 'string' || !liveSessionId) {
+        return NextResponse.json({ error: 'The voice service returned an incomplete connection.' }, { status: 502 })
+      }
     }
 
     if (request.signal?.aborted) {
@@ -294,11 +410,10 @@ export async function POST(request: NextRequest) {
     }
 
     const chargeStartedAt = Date.now()
-    const billingRunId = realtimeBillingRunId(user.id, request.headers.get('x-helfi-voice-session-id'))
     const chargeClaim = await new CreditManager(user.id).chargeCentsOnce(chargeCents, {
       feature: 'voice-assistant:realtime-charge-marker',
       runId: billingRunId,
-      model: REALTIME_MODEL,
+      model,
       endpoint: '/api/native/voice-assistant/realtime',
     })
     const chargeMs = Date.now() - chargeStartedAt
@@ -310,12 +425,17 @@ export async function POST(request: NextRequest) {
         availableCredits: Number(wallet?.totalAvailableCents || 0),
       }, { status: 402 })
     }
+    if (abortController.signal.aborted || request.signal?.aborted) {
+      // The atomic charge may have completed concurrently with cancellation.
+      // Keep its retry claim so reconnecting this conversation cannot charge twice.
+      return NextResponse.json({ error: 'The connection was cancelled. Any existing session charge will be reused when you reconnect.', code: 'live_voice_cancelled' }, { status: 499 })
+    }
 
     const usageLog = logAiUsageEvent({
       feature: 'voice-assistant:realtime-session',
       userId: user.id,
       endpoint: '/api/native/voice-assistant/realtime',
-      model: REALTIME_MODEL,
+      model,
       promptTokens: 0,
       completionTokens: 0,
       costCents: chargeClaim.charged ? chargeCents : 0,
@@ -334,13 +454,15 @@ export async function POST(request: NextRequest) {
 
     const totalMs = Date.now() - requestStartedAt
 
-    return new NextResponse(answerSdp, {
+    handedToClient = true
+    return new NextResponse(live ? JSON.stringify({ session: { id: liveSessionId }, transport: { type: 'webrtc', sdp: answerSdp } }) : answerSdp, {
       status: 200,
       headers: {
-        'content-type': 'application/sdp',
+        'content-type': live ? 'application/json' : 'application/sdp',
         'x-helfi-charged-credits': String(chargeClaim.charged ? chargeCents : 0),
         'x-helfi-charge-reused': String(chargeClaim.reused),
-        'x-helfi-realtime-model': REALTIME_MODEL,
+        'x-helfi-realtime-model': model,
+        'x-helfi-voice-protocol': live ? 'live-v1' : 'realtime',
         'server-timing': `guard;dur=${guardMs}, openai;dur=${openAiMs}, charge;dur=${chargeMs}, total;dur=${totalMs}`,
       },
     })
@@ -358,5 +480,9 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Live voice session failed' }, { status: 500 })
   } finally {
     request.signal?.removeEventListener?.('abort', abortRealtimeRequest)
+    if (allocatedLiveSessionId && !handedToClient) {
+      const closed = await closeUnusedLiveSession(allocatedLiveSessionId, allocatedUserId)
+      if (!closed) console.warn('[native voice live] unused session close was not confirmed')
+    }
   }
 }

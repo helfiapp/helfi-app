@@ -10,6 +10,7 @@ type RealtimeCallbacks = {
   onAudioRoute?: (route: string) => void
   onTranscript?: (text: string) => void
   onAssistantText?: (text: string) => void
+  onUserSpeech?: () => void
   onActionRequest?: (args: { request?: string; action?: string; needsReview?: boolean }) => Promise<unknown> | unknown
 }
 
@@ -67,6 +68,8 @@ type VoiceMediaStats = {
   audioLevel: number
   totalAudioEnergy: number
   totalSamplesDuration: number
+  outputAudioLevel: number
+  outputAudioEnergy: number
   roundTripTime: number
 }
 
@@ -93,6 +96,8 @@ async function readVoiceMediaStats(pc: any): Promise<VoiceMediaStats> {
     audioLevel: 0,
     totalAudioEnergy: 0,
     totalSamplesDuration: 0,
+    outputAudioLevel: 0,
+    outputAudioEnergy: 0,
     roundTripTime: 0,
   }
   try {
@@ -107,6 +112,8 @@ async function readVoiceMediaStats(pc: any): Promise<VoiceMediaStats> {
       if (stat.type === 'inbound-rtp' && kind === 'audio') {
         summary.inboundPackets += Math.max(0, Number(stat.packetsReceived || 0))
         summary.inboundBytes += Math.max(0, Number(stat.bytesReceived || 0))
+        summary.outputAudioLevel = Math.max(summary.outputAudioLevel, Number(stat.audioLevel || 0))
+        summary.outputAudioEnergy = Math.max(summary.outputAudioEnergy, Number(stat.totalAudioEnergy || 0))
       }
       if (stat.type === 'media-source' && (kind === 'audio' || stat.audioLevel !== undefined)) {
         summary.audioLevel = Math.max(summary.audioLevel, Number(stat.audioLevel || 0))
@@ -147,17 +154,35 @@ function normalizeEchoText(value: unknown) {
 }
 
 function likelyAssistantEcho(input: unknown, assistant: unknown, assistantAt: number) {
-  const heard = normalizeEchoText(input)
-  const recentReply = normalizeEchoText(assistant)
-  if (!heard || !recentReply || Date.now() - assistantAt > 5000) return false
-  if (['stop', 'cancel', 'done', 'save', 'yes', 'no'].includes(heard)) return false
-  if (heard.length < 5) return false
-  if (recentReply.includes(heard)) return true
-  const words = [...new Set(heard.split(' ').filter((word) => word.length > 2))]
-  if (!words.length) return false
-  const replyWords = new Set(recentReply.split(' '))
-  const overlap = words.filter((word) => replyWords.has(word)).length
-  return words.length <= 3 ? overlap === words.length : overlap / words.length >= 0.8
+  // Matching text cannot distinguish microphone echo from a real repetition or
+  // correction. WebRTC handles acoustic echo; genuine user text must reach review.
+  void input
+  void assistant
+  void assistantAt
+  return false
+}
+
+async function waitForVoiceIceGathering(pc: any, signal?: AbortSignal) {
+  if (signal?.aborted) throw new Error('Live voice session was stopped.')
+  if (!pc.iceGatheringState || pc.iceGatheringState === 'complete') return
+  await new Promise<void>((resolve, reject) => {
+    const previous = pc.onicegatheringstatechange
+    const cleanup = () => {
+      clearTimeout(timeout)
+      pc.onicegatheringstatechange = previous
+      signal?.removeEventListener?.('abort', abort)
+    }
+    const abort = () => { cleanup(); reject(new Error('Live voice session was stopped.')) }
+    const changed = () => {
+      if (pc.iceGatheringState !== 'complete') return
+      cleanup()
+      resolve()
+    }
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('The voice media connection took too long. Please try again.')) }, 6000)
+    pc.onicegatheringstatechange = changed
+    signal?.addEventListener?.('abort', abort)
+    changed()
+  })
 }
 
 function enableRemoteAudioTrack(track: any) {
@@ -238,7 +263,7 @@ export async function fetchHelfiRealtimeVoiceStatus(token: string): Promise<{
   try {
     const res = await fetch(`${realtimeApiBaseUrl()}/api/native/voice-assistant/realtime`, {
       method: 'GET',
-      headers: buildNativeAuthHeaders(token),
+      headers: { ...buildNativeAuthHeaders(token), 'x-helfi-voice-protocol': 'live-v1' },
     })
     const data = await res.json().catch(() => ({}))
     return {
@@ -276,6 +301,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const inCallManager = requireInCallManager()
   const audioRouteBridge = requireHelfiAudioRoute()
   const callbacks = params.callbacks || {}
+  let voiceProtocol: 'live-v1' | 'realtime' = 'live-v1'
   const connectStartedAt = Date.now()
   let nativeAudioConfigured = false
   const reportConnectStage = (stage: string, detail = '') => {
@@ -305,6 +331,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
     await applyPreferredAudioRoute()
   } catch {
     // WebRTC can still connect if the optional route helper cannot be applied.
+  }
+
+  if (params.signal?.aborted) {
+    try { inCallManager?.stop?.() } catch {}
+    throw new Error('Live voice session was stopped.')
   }
 
   const pc = new RTCPeerConnection({
@@ -352,6 +383,14 @@ export async function startHelfiRealtimeVoiceSession(params: {
   let responseRecoveryTimer: ReturnType<typeof setTimeout> | null = null
   let responseFailureTimer: ReturnType<typeof setTimeout> | null = null
   let silenceTimer: ReturnType<typeof setTimeout> | null = null
+  let captionTimer: ReturnType<typeof setTimeout> | null = null
+  let playbackTimer: ReturnType<typeof setInterval> | null = null
+  let outputEnergy = 0
+  let lastOutputActivityAt = 0
+  const liveCaptionFragments: { speaker: 'user' | 'assistant'; delta: string; start_ms: number; end_ms: number }[] = []
+  let liveUserText = ''
+  let liveAssistantText = ''
+  const seenLiveEvents = new Set<string>()
   let silenceReminderSent = false
   let readinessSettled = false
   let readinessError = ''
@@ -400,6 +439,10 @@ export async function startHelfiRealtimeVoiceSession(params: {
       const message = "I didn't hear anything. Please try speaking again."
       callbacks.onError?.(message)
       emitStatus('thinking')
+      if (voiceProtocol === 'live-v1') {
+        sendRealtimeEvent(dataChannel, { type: 'session.instructions.append', delegation_id: null, content: `Say briefly: ${message} Then listen again.` })
+        return
+      }
       sendRealtimeEvent(dataChannel, {
         type: 'response.create',
         response: {
@@ -454,6 +497,9 @@ export async function startHelfiRealtimeVoiceSession(params: {
   }
   const armMissingResponseRecovery = () => {
     clearResponseTimers()
+    // Live owns continuous conversation; response.create would start delegated
+    // backend work rather than recover a spoken turn.
+    if (voiceProtocol === 'live-v1') return
     responseRecoveryTimer = setTimeout(() => {
       if (stopped || !dataChannelOpen) return
       reportConnectStage('response-recovery')
@@ -496,6 +542,13 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const closeRealtimeConnection = () => {
     clearResponseTimers()
     clearSilenceTimer()
+    if (captionTimer) clearTimeout(captionTimer)
+    captionTimer = null
+    if (playbackTimer) clearInterval(playbackTimer)
+    playbackTimer = null
+    liveUserText = ''
+    liveAssistantText = ''
+    liveCaptionFragments.length = 0
     if (statsTimer) {
       clearInterval(statsTimer)
       statsTimer = null
@@ -512,9 +565,13 @@ export async function startHelfiRealtimeVoiceSession(params: {
     }
     audioRouteSubscription = null
     if (dataChannel?.readyState === 'open') {
-      sendRealtimeEvent(dataChannel, { type: 'response.cancel' })
-      sendRealtimeEvent(dataChannel, { type: 'output_audio_buffer.clear' })
-      sendRealtimeEvent(dataChannel, { type: 'input_audio_buffer.clear' })
+      if (voiceProtocol === 'live-v1') {
+        sendRealtimeEvent(dataChannel, { type: 'session.close' })
+      } else {
+        sendRealtimeEvent(dataChannel, { type: 'response.cancel' })
+        sendRealtimeEvent(dataChannel, { type: 'output_audio_buffer.clear' })
+        sendRealtimeEvent(dataChannel, { type: 'input_audio_buffer.clear' })
+      }
     }
     stopped = true
     try {
@@ -585,19 +642,22 @@ export async function startHelfiRealtimeVoiceSession(params: {
     handledToolCallIds.add(callId)
     clearResponseTimers()
     emitStatus('thinking')
-    Promise.resolve(callbacks.onActionRequest?.({
+    Promise.resolve().then(() => {
+      if (stopped || params.signal?.aborted) return { ok: false, saved: false, safeToClaimSaved: false, message: 'Live voice has stopped.' }
+      return callbacks.onActionRequest?.({
       request: cleanText(args.request),
       action: cleanText(args.action),
       needsReview: Boolean(args.needsReview),
-    }))
+      })
+    })
       .then((result) => {
         if (stopped) return
         sendRealtimeEvent(dataChannel, {
-          type: 'conversation.item.create',
+          type: voiceProtocol === 'live-v1' ? 'response.item.create' : 'conversation.item.create',
           item: {
             type: 'function_call_output',
             call_id: callId,
-            output: JSON.stringify(result || { ok: true }),
+            output: JSON.stringify(result || { ok: false, saved: false, safeToClaimSaved: false, message: 'The app returned no completed result.' }),
           },
         })
         sendRealtimeEvent(dataChannel, { type: 'response.create' })
@@ -605,11 +665,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
       .catch((error) => {
         if (stopped) return
         sendRealtimeEvent(dataChannel, {
-          type: 'conversation.item.create',
+          type: voiceProtocol === 'live-v1' ? 'response.item.create' : 'conversation.item.create',
           item: {
             type: 'function_call_output',
             call_id: callId,
-            output: JSON.stringify({ ok: false, message: error?.message || 'The app could not complete that action.' }),
+            output: JSON.stringify({ ok: false, saved: false, safeToClaimSaved: false, message: error?.message || 'The app could not complete that action.' }),
           },
         })
         sendRealtimeEvent(dataChannel, { type: 'response.create' })
@@ -624,11 +684,85 @@ export async function startHelfiRealtimeVoiceSession(params: {
     reportConnectStage('data-channel-ready')
     maybeFinishReadiness()
   }
+  const flushLiveCaptions = () => {
+    if (captionTimer) clearTimeout(captionTimer)
+    captionTimer = null
+    if (stopped) return
+    if (liveUserText.trim()) callbacks.onTranscript?.(liveUserText.trim())
+    if (liveAssistantText.trim()) callbacks.onAssistantText?.(liveAssistantText.trim())
+    liveUserText = ''
+    liveAssistantText = ''
+  }
+  const receiveLiveCaption = (payload: any, speaker: 'user' | 'assistant') => {
+    const delta = typeof payload.delta === 'string' ? payload.delta : ''
+    if (!delta) return
+    const id = cleanText(payload.event_id)
+    if (id && seenLiveEvents.has(id)) return
+    if (id) seenLiveEvents.add(id)
+    // Live fragments can arrive after the backend has already requested the same
+    // action. They are captions, not turn-start/cancel events. The next complete
+    // delegated action supersedes pending preparation through onActionRequest.
+    liveCaptionFragments.push({ speaker, delta, start_ms: Number(payload.start_ms || 0), end_ms: Number(payload.end_ms || 0) })
+    if (liveCaptionFragments.length > 1000) liveCaptionFragments.splice(0, 500)
+    if (speaker === 'user') {
+      liveUserText += delta
+      clearSilenceTimer()
+    } else liveAssistantText += delta
+    // This groups captions for display only, never for consent or app execution.
+    if (captionTimer) clearTimeout(captionTimer)
+    captionTimer = setTimeout(flushLiveCaptions, 1000)
+  }
   dataChannel.onmessage = (event: any) => {
     if (stopped) return
     const payload = parseRealtimeJson(event?.data)
     if (!payload?.type) return
     console.info(`[voice realtime event] ${cleanText(payload.type)} ${Date.now() - connectStartedAt}ms`)
+    if (voiceProtocol === 'live-v1') {
+      if (payload.type === 'session.started') {
+        if (sessionReady) return
+        sessionReady = true
+        reportConnectStage('session-ready')
+        maybeFinishReadiness()
+        // Realtime native media exposes no audio-player completion callback.
+        // Use received audio energy, never captions/packet counts, as evidence.
+        playbackTimer = setInterval(() => {
+          void readVoiceMediaStats(pc).then((stats) => {
+            if (stopped) return
+            const active = stats.outputAudioLevel > 0.005 || stats.outputAudioEnergy - outputEnergy > 0.00001
+            outputEnergy = stats.outputAudioEnergy
+            if (active) {
+              lastOutputActivityAt = Date.now()
+              assistantAudioPlaying = true
+              emitStatus('speaking')
+            } else if (assistantAudioPlaying && Date.now() - lastOutputActivityAt > 500) {
+              assistantAudioPlaying = false
+              emitStatus('live')
+            }
+          })
+        }, 250)
+        return
+      }
+      if (payload.type === 'session.input_transcript.delta' || payload.type === 'session.output_transcript.delta') {
+        receiveLiveCaption(payload, payload.type === 'session.input_transcript.delta' ? 'user' : 'assistant')
+        return
+      }
+      if (payload.type === 'response.event') {
+        const nested = payload.event
+        if (nested?.type === 'response.output_item.done' && nested.item?.type === 'function_call') {
+          flushLiveCaptions()
+          handleToolCall(nested.item)
+        } else if (nested?.type === 'response.failed' || nested?.type === 'response.incomplete') {
+          callbacks.onError?.('Helfi could not complete that app request. Nothing is confirmed saved. Please check your diary before retrying.')
+          emitStatus('live')
+        }
+        return
+      }
+      if (payload.type === 'session.closed') {
+        closeRealtimeConnection()
+        callbacks.onStatus?.('closed')
+        return
+      }
+    }
     if (payload.type === 'session.created' || payload.type === 'session.updated') {
       sessionReady = true
       reportConnectStage('session-ready')
@@ -650,6 +784,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
       clearSilenceTimer()
       silenceReminderSent = false
       assistantAudioPlaying = false
+      callbacks.onUserSpeech?.()
       emitStatus('hearing')
       return
     }
@@ -799,6 +934,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
       throw new Error('Live voice session was stopped.')
     }
     await pc.setLocalDescription(offer)
+    await waitForVoiceIceGathering(pc, params.signal)
     reportConnectStage('local-offer-ready')
     if (stopped || params.signal?.aborted) {
       closeRealtimeConnection()
@@ -812,23 +948,33 @@ export async function startHelfiRealtimeVoiceSession(params: {
         'content-type': 'application/sdp',
         'x-helfi-ai-consent': 'true',
         'x-helfi-voice-session-id': cleanText(params.billingSessionId),
+        'x-helfi-voice-protocol': 'live-v1',
       },
       signal: params.signal,
-      body: String(offer.sdp || ''),
+      body: String(pc.localDescription?.sdp || offer.sdp || ''),
     })
-    const answerSdp = await res.text()
+    const responseText = await res.text()
+    voiceProtocol = res.headers?.get?.('x-helfi-voice-protocol') === 'live-v1' ? 'live-v1' : 'realtime'
+    let answerSdp = responseText
     reportConnectStage('server-answer-received', res.headers?.get?.('server-timing') || '')
     if (!res.ok) {
       closeRealtimeConnection()
       params.signal?.removeEventListener?.('abort', onAbort)
       let message = 'Live voice session could not start.'
       try {
-        const json = JSON.parse(answerSdp)
+        const json = JSON.parse(responseText)
         message = json?.error || message
       } catch {
         // SDP/error text can stay as the generic user-facing message.
       }
       throw new Error(message)
+    }
+    if (voiceProtocol === 'live-v1') {
+      const result = parseRealtimeJson(responseText)
+      if (typeof result?.transport?.sdp !== 'string' || !result.transport.sdp.trim() || !result?.session?.id) {
+        throw new Error('The voice service returned an incomplete connection.')
+      }
+      answerSdp = result.transport.sdp
     }
 
     if (stopped) {
@@ -862,6 +1008,10 @@ export async function startHelfiRealtimeVoiceSession(params: {
   return {
     promptAssistant: (instruction: string) => {
       if (stopped || !cleanText(instruction)) return
+      if (voiceProtocol === 'live-v1') {
+        sendRealtimeEvent(dataChannel, { type: 'session.instructions.append', delegation_id: null, content: cleanText(instruction).slice(0, 1500) })
+        return
+      }
       sendRealtimeEvent(dataChannel, {
         type: 'response.create',
         response: {

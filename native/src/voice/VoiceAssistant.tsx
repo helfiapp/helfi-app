@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, useWindowDimensions, Vibration, View } from 'react-native'
+import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vibration, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
 import { CameraView, useCameraPermissions } from 'expo-camera'
@@ -58,6 +58,10 @@ type VoiceDraft = {
   action: string
   transcript: string
   localDate?: string
+  localTime?: string
+  tzOffsetMin?: number
+  timeZone?: string
+  timingNeedsClarification?: boolean
   summary: string
   confirmationMessage: string
   canConfirm: boolean
@@ -254,8 +258,23 @@ function reviewPromptForDraft(nextDraft: VoiceDraft | null) {
     const items = nextDraft.food.entries?.map((entry) => entry.description ? `${entry.name}, ${entry.description}` : entry.name).filter(Boolean).join('; ')
     exactSummary = [mealLabel(nextDraft.food.meal), items || nextDraft.food.draftText || nextDraft.summary].filter(Boolean).join(': ')
   }
-  const datedSummary = date ? `${exactSummary}, dated ${date}` : exactSummary
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(nextDraft.localTime || '') ? nextDraft.localTime : ''
+  const datedSummary = [exactSummary, date ? `dated ${date}` : '', time ? `at ${time}` : ''].filter(Boolean).join(', ')
   return `Here is what I am about to save: ${datedSummary}. Would you like me to save that for you?`
+}
+
+function spokenReviewPromptForDraft(nextDraft: VoiceDraft | null) {
+  const full = reviewPromptForDraft(nextDraft)
+  if (!nextDraft?.canConfirm || full.length <= 500) return full
+  const food = nextDraft.food
+  const date = cleanFavoriteText(nextDraft.localDate || '', 20)
+  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(nextDraft.localTime || '') ? nextDraft.localTime : ''
+  const entries = food?.entries || []
+  const summary = food
+    ? [mealLabel(food.meal), cleanFavoriteText(food.mealName || '', 90), entries.length ? `${entries.length} food items, starting with ${entries.slice(0, 2).map((entry) => cleanFavoriteText(entry.name, 80)).join(' and ')}` : cleanFavoriteText(food.draftText || nextDraft.summary, 180)].filter(Boolean).join(', ')
+    : cleanFavoriteText(nextDraft.summary || nextDraft.confirmationMessage, 220)
+  const datedSummary = [summary, date ? `dated ${date}` : '', time ? `at ${time}` : ''].filter(Boolean).join(', ')
+  return `Here is what I am about to save: ${datedSummary}. The full details are in your review. Would you like me to save that for you?`
 }
 
 function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
@@ -273,7 +292,7 @@ function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
         : status === 'needs_clarification'
         ? 'I need one detail first.'
         : 'Done.'),
-    500,
+    needsReview ? 4000 : 500,
   )
   const spokenReply = result.action === 'recipe' && !saved
     ? compactRecipeVoiceReply(defaultSpokenReply)
@@ -574,21 +593,36 @@ function followUpTranscript(draft: VoiceDraft | null, answerRaw: string) {
   )
 }
 
-function isExplicitNewVoiceCommand(value: unknown) {
+function isExplicitNewVoiceCommand(value: unknown, reviewedDraft?: VoiceDraft | null) {
   const text = cleanFavoriteText(value, 1200).toLowerCase()
   if (!text) return false
+  if (reviewedDraft?.canConfirm) {
+    const separateEntry = /\b(?:new|another|separate|different)\s+(?:entry|meal|request|command)|\bstart (?:again|over)\b/.test(text)
+    const correction = /\b(?:this|that|it|instead|actually|change|correct|replace|remove|without|only|half|double|portion|make (?:the|my) (?:meal|entry))\b/.test(text)
+      || /\badd\b.+\bto\s+(?:my\s+)?(?:breakfast|lunch|dinner|snacks?|meal)\b/.test(text)
+    const sameMeal = Boolean(reviewedDraft.food) && /\b(?:food|meal|breakfast|lunch|dinner|snacks?)\b/.test(text)
+      && /\b(?:add|log|record|save|make|build)\b/.test(text) && !/\b(?:open|show|go to|take me to)\b/.test(text)
+    const sameWater = reviewedDraft.action === 'water' && /\b(?:water|drink|coffee|tea|juice|milk)\b/.test(text)
+      && /\b(?:add|log|record|save)\b/.test(text) && !/\b(?:open|show|go to|take me to)\b/.test(text)
+    if ((correction || sameMeal || sameWater) && !separateEntry) return false
+  }
   const hasCommand = /\b(add|log|record|save|open|show|go to|take me to|create|build|make|track|write)\b/.test(text)
   const hasTarget =
     /\b(food|meal|breakfast|lunch|dinner|snack|snacks|favourites?|favorites?|saved|diary|water|exercise|workout|mood|journal|symptom|symptoms|medication|medicine|supplement|vitamin|health image|photo|camera|insights)\b/.test(text)
   return hasCommand && hasTarget
 }
 
+function supportsNativeVoiceInput(os: string, isPad: boolean) {
+  return !(os === 'ios' && isPad)
+}
+
 function isPendingFollowUpDraft(draft: VoiceDraft | null) {
   if (!draft || draft.canConfirm) return false
+  if (draft.timingNeedsClarification && (draft.action === 'water' || Boolean(draft.food?.draftText))) return true
   if (draft.action === 'food_draft' && draft.food?.draftText) return true
   if (
     draft.action === 'water' &&
-    /How much liquid should I log|What drink should I log|Should I log\s+.+?\s+as sugar-free, or with sugar or honey|How much\s+(?:sugar|honey)\s+should I add/i.test(
+    /How much liquid should I log|What drink should I log|Should I log\s+.+?\s+as sugar-free, or with sugar or honey|How much\s+(?:sugar|honey|milk)\s+should I add/i.test(
       draft.confirmationMessage || '',
     )
   ) {
@@ -898,6 +932,10 @@ function audioMimeFromUri(uri: string) {
   return 'audio/mp4'
 }
 
+function nativeVoiceTimeZone(): string | undefined {
+  try { return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined } catch { return undefined }
+}
+
 function todayLocalDate() {
   const now = new Date()
   const y = now.getFullYear()
@@ -1131,7 +1169,6 @@ async function loadVoiceFavorites(sessionToken?: string | null, signal?: AbortSi
 export function VoiceAssistantProvider({ children }: { children: React.ReactNode }) {
   const { mode, session } = useAppMode()
   const insets = useSafeAreaInsets()
-  const { width: windowWidth } = useWindowDimensions()
   const [cameraPermission, requestCameraPermission] = useCameraPermissions()
   const [open, setOpen] = useState(false)
   const [transcript, setTranscript] = useState('')
@@ -1178,8 +1215,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const realtimeVoicePromptRef = useRef<null | ((instruction: string) => void)>(null)
   const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
   const realtimeActionAbortRef = useRef<AbortController | null>(null)
+  const voiceSaveRequestsRef = useRef(0)
   const realtimeVoiceRunRef = useRef(0)
   const realtimeVoiceConnectedRef = useRef(false)
+  const voiceAccountTokenRef = useRef('')
+  voiceAccountTokenRef.current = mode === 'signedIn' ? session?.token || '' : ''
+  const voiceProviderMountedRef = useRef(true)
   const realtimeBillingSessionIdRef = useRef(newRealtimeBillingSessionId())
 
   useEffect(() => {
@@ -1204,7 +1245,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const voiceTurnMaxTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const stopRecordingRef = useRef<(options?: StopRecordingOptions) => Promise<void>>(async () => {})
   const startRecordingRef = useRef<() => Promise<void>>(async () => {})
-  const voiceRecordingSupported = !(Platform.OS === 'ios' && windowWidth >= 700)
+  const voiceRecordingSupported = supportsNativeVoiceInput(Platform.OS, Platform.OS === 'ios' && Platform.isPad)
   const liveVoiceEnabled = LIVE_VOICE_ENABLED && voiceRecordingSupported
   const voiceMemoryUserId = cleanFavoriteText(session?.user?.id || '', 120)
 
@@ -1402,6 +1443,16 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     }).catch(() => {})
   }, [clearRealtimeConnectTimeout, clearReviewSilenceTimer])
 
+  useEffect(() => {
+    voiceProviderMountedRef.current = true
+    return () => {
+      voiceProviderMountedRef.current = false
+      openRef.current = false
+      voiceSessionActiveRef.current = false
+      void stopRealtimeVoiceSession()
+    }
+  }, [stopRealtimeVoiceSession])
+
   const clearConversationData = useCallback(() => {
     setConversationTurns([])
     setPendingFollowUpDraft(null)
@@ -1433,6 +1484,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
 
   const deleteChatAndClose = useCallback(() => {
     clearConversationMemory()
+    openRef.current = false
     setOpen(false)
   }, [clearConversationMemory])
 
@@ -1615,10 +1667,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     if (!input?.transcript) {
       void loadConversationMemory()
     }
+    openRef.current = true
     setOpen(true)
     if (shouldAutoSubmit) setAutoSubmitToken((value) => value + 1)
     const hasAccess = await ensureVoicePaidAccess()
     if (!hasAccess) {
+      openRef.current = false
       setOpen(false)
       return
     }
@@ -1640,6 +1694,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [open, session?.token, voicePaidAccessGranted, voiceRecordingSupported])
 
   const closePanel = useCallback(() => {
+    openRef.current = false
     spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
     realtimeVoiceConnectedRef.current = false
@@ -1671,6 +1726,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
       if (state === 'active') return
+      openRef.current = false
       spokenReplyRunRef.current += 1
       realtimeVoiceRunRef.current += 1
       realtimeVoiceConnectedRef.current = false
@@ -1910,6 +1966,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         : 'health record'
       addVoiceActivity(`Saving to your ${saveDestination}`)
       setConfirming(true)
+      voiceSaveRequestsRef.current += 1
       setSaveError('')
       try {
         const { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
@@ -2064,6 +2121,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         Alert.alert('Could not save', message)
         return null
       } finally {
+        voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
         if (saveAbortController && draftRequestAbortRef.current === saveAbortController) {
           draftRequestAbortRef.current = null
         }
@@ -2078,7 +2136,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       if (!session?.token) return { ok: false, message: 'Please sign in first.' }
       if (options?.signal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
       const rawTypedTranscript = (options?.transcriptOverride ?? transcript).trim()
-      const explicitNewCommand = isExplicitNewVoiceCommand(rawTypedTranscript)
+      const explicitNewCommand = isExplicitNewVoiceCommand(rawTypedTranscript, draft)
       const draftIsReviewOrHandoff = Boolean(draft?.canConfirm || draft?.appTarget?.path) && !explicitNewCommand
       if (!options?.audioUri && draft?.canConfirm && isConfirmingDraftText(rawTypedTranscript)) {
         setTranscript(rawTypedTranscript)
@@ -2102,7 +2160,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         Alert.alert('Not saved', NOT_SAVED_MESSAGE)
         return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: draft.action }
       }
-      const nextFollowUpTranscript = options?.audioUri || explicitNewCommand
+      const nextFollowUpTranscript = options?.audioUri || explicitNewCommand || pendingFollowUpDraft?.action === 'water' || pendingFollowUpDraft?.timingNeedsClarification
         ? null
         : followUpTranscript(pendingFollowUpDraft, rawTypedTranscript)
       const typedTranscript = nextFollowUpTranscript || rawTypedTranscript
@@ -2134,8 +2192,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         const favorites = await loadVoiceFavorites(session.token, requestSignal)
         if (requestSignal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
         const requestContext = normalizeLaunchContext(launchContext)
-        const requestLocalDate = (!explicitNewCommand && pendingFollowUpDraft?.localDate) || requestContext.date || todayLocalDate()
+        const requestLocalDate = (!explicitNewCommand && (draft?.canConfirm ? draft.localDate : pendingFollowUpDraft?.localDate)) || requestContext.date || todayLocalDate()
         const confirmationDraftPayload = !explicitNewCommand && draft?.canConfirm ? draft : null
+        const requestTzOffsetMin = new Date().getTimezoneOffset()
+        const requestTimeZone = nativeVoiceTimeZone() || confirmationDraftPayload?.timeZone || pendingFollowUpDraft?.timeZone
         const followUpDraftPayload = !explicitNewCommand && !nextFollowUpTranscript
           ? isPendingFollowUpDraft(pendingFollowUpDraft)
             ? pendingFollowUpDraft
@@ -2152,7 +2212,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             form.append('audio', { uri: audioUri, name, type: audioMimeFromUri(audioUri) } as any)
             form.append('durationMillis', String(options.durationMillis || 0))
             form.append('localDate', requestLocalDate)
-            form.append('tzOffsetMin', String(new Date().getTimezoneOffset()))
+            form.append('tzOffsetMin', String(requestTzOffsetMin))
+            if (requestTimeZone) form.append('timeZone', requestTimeZone)
             form.append('voiceReply', shouldSpeakReply ? 'true' : 'false')
             form.append('favorites', JSON.stringify(favorites))
             form.append('launchContext', JSON.stringify(requestContext))
@@ -2176,7 +2237,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             body: JSON.stringify({
               transcript: typedTranscript,
               localDate: requestLocalDate,
-              tzOffsetMin: new Date().getTimezoneOffset(),
+              tzOffsetMin: requestTzOffsetMin,
+              timeZone: requestTimeZone,
               voiceReply: shouldSpeakReply,
               favorites,
               launchContext: requestContext,
@@ -2225,7 +2287,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           makeConversationTurn('assistant', assistantText),
         ])
         if (data?.confirmNow && nextDraft?.canConfirm) {
-          const saved = await saveDraft(nextDraft, { signal: requestSignal })
+          const saved = await saveDraft(nextDraft, { signal: requestSignal, closeOnSuccess: !options?.realtimeActionHint?.action })
           return {
             ok: Boolean(saved),
             saved: Boolean(saved),
@@ -2251,7 +2313,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           ok: true,
           saved: false,
           needsReview: Boolean(nextDraft?.canConfirm),
-          reviewPrompt: nextDraft?.canConfirm ? reviewPromptForDraft(nextDraft) : undefined,
+          reviewPrompt: nextDraft?.canConfirm ? spokenReviewPromptForDraft(nextDraft) : undefined,
           status: voiceResultStatusFromDraft(nextDraft, data),
           action: nextDraft?.action,
           message: assistantText || (nextDraft ? 'Review is ready.' : 'Done.'),
@@ -2425,7 +2487,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       Alert.alert('Type your request instead', 'Voice input is iPhone only for now. You can type your request here on iPad.')
       return
     }
-    if (!session?.token) return
+    if (!session?.token || !openRef.current || !voiceProviderMountedRef.current) return
     if (checkingRealtimeVoice) {
       setRealtimeVoiceError('Checking live voice availability. Text and camera still work.')
       return
@@ -2440,15 +2502,21 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       setRealtimeVoiceError('This app build does not include live voice yet. Rebuild the iPhone app, then try again.')
       return
     }
+    const realtimeRunId = realtimeVoiceRunRef.current + 1
+    realtimeVoiceRunRef.current = realtimeRunId
+    const startupAccountToken = session.token
     const aiAllowed = await requestAiDataSharingPermission()
+    if (
+      realtimeVoiceRunRef.current !== realtimeRunId || !openRef.current ||
+      !voiceProviderMountedRef.current || voiceAccountTokenRef.current !== startupAccountToken ||
+      AppState.currentState !== 'active'
+    ) return
     if (!aiAllowed) {
       Alert.alert('AI request not sent', 'No microphone data was sent. You can still type your request.')
       return
     }
     setVoiceReplyPreference(true)
     setContinuousVoiceSession(true)
-    const realtimeRunId = realtimeVoiceRunRef.current + 1
-    realtimeVoiceRunRef.current = realtimeRunId
     realtimeVoiceConnectedRef.current = false
     realtimeActionGuardRef.current = null
     const abortController = new AbortController()
@@ -2579,6 +2647,25 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             }
             setRealtimeVoiceStatus('connecting')
           },
+          onUserSpeech: () => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+            clearReviewSilenceTimer()
+            pendingReviewAnswerRef.current = false
+            if (voiceSaveRequestsRef.current > 0) {
+              setRealtimeVoiceError('Your save is still being confirmed. I will check its result before making another change.')
+              return
+            }
+            const preparing = Boolean(realtimeActionAbortRef.current || draftRequestAbortRef.current)
+            realtimeActionAbortRef.current?.abort()
+            realtimeActionAbortRef.current = null
+            draftRequestAbortRef.current?.abort()
+            draftRequestAbortRef.current = null
+            realtimeActionGuardRef.current = null
+            if (preparing) {
+              setBusy(false)
+              addVoiceActivity('Stopped preparing — listening to your change', 'done')
+            }
+          },
           onTranscript: (text) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             if (!text) return
@@ -2645,6 +2732,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             if (guard?.key === guardKey && Date.now() - guard.startedAt < 5000) {
               return guard.promise
             }
+            if (voiceSaveRequestsRef.current > 0) {
+              return realtimeToolResult({
+                ok: false,
+                saved: false,
+                status: 'needs_clarification',
+                message: 'The previous save is still being confirmed. Please wait for its result before changing that entry. I cannot promise it was cancelled.',
+              })
+            }
             const actionAbortController = new AbortController()
             realtimeActionAbortRef.current?.abort()
             realtimeActionAbortRef.current = actionAbortController
@@ -2657,6 +2752,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 needsReview: Boolean(args.needsReview),
               },
             }).then(realtimeToolResult).then((result) => {
+              if (actionAbortController.signal.aborted || realtimeVoiceRunRef.current !== realtimeRunId) return result
               if (result.needsReview || result.saved) {
                 setReviewCorrectionActive(false)
               }
@@ -2751,6 +2847,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [draft, saveDraft])
 
   const rejectDraft = useCallback(() => {
+    openRef.current = false
     addVoiceActivity('Draft discarded — nothing saved', 'done')
     spokenReplyRunRef.current += 1
     spokenReplyAbortRef.current?.abort()

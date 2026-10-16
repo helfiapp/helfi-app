@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react'
-import { Alert, Image, ImageSourcePropType, Linking, Platform, Pressable, ScrollView, Switch, Text, useWindowDimensions, View } from 'react-native'
+import { Alert, Image, ImageSourcePropType, Linking, Platform, Pressable, ScrollView, StyleSheet, Switch, Text, useWindowDimensions, View } from 'react-native'
 
 import { Feather, FontAwesome, MaterialCommunityIcons } from '@expo/vector-icons'
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
@@ -43,8 +43,8 @@ export function DashboardScreen() {
 
   const layout = useMemo(() => {
     const isTablet = width >= 700
-    const horizontalPadding = isTablet ? 32 : 14
-    const gap = isTablet ? 14 : 10
+    const horizontalPadding = isTablet ? 32 : 16
+    const gap = isTablet ? 14 : 8
     const contentWidth = Math.min(width, 860)
     const cardWidth = Math.floor((contentWidth - horizontalPadding * 2 - gap) / 2)
     return { horizontalPadding, gap, cardWidth, isTablet }
@@ -788,7 +788,7 @@ export function DashboardScreen() {
           </View>
         </View>
 
-        <View style={{ marginTop: theme.spacing.lg }}>
+        <View style={{ marginTop: 14 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: theme.spacing.md }}>
             <View
               style={{
@@ -809,35 +809,28 @@ export function DashboardScreen() {
           </View>
         </View>
 
-        <View style={{ alignItems: 'center', marginTop: 22 }}>
-          <Text style={{ fontSize: 18, fontWeight: '600', color: theme.colors.text }}>Dashboard</Text>
-
-          {/* Keep this to two lines on phone */}
-          <Text style={{ marginTop: 14, fontSize: theme.fontSize.heroTitle, fontWeight: '700', color: theme.colors.text, textAlign: 'center', lineHeight: 32 }}>
-            Welcome to Your
+        <View style={{ marginTop: 22, gap: 4 }}>
+          <Text accessibilityRole="header" style={{ fontSize: 25, fontWeight: '700', color: theme.colors.text, lineHeight: 31 }}>
+            Your health, today
           </Text>
-          <Text style={{ fontSize: theme.fontSize.heroTitle, fontWeight: '700', color: theme.colors.primary, textAlign: 'center', lineHeight: 32 }}>
-            Health Dashboard
-          </Text>
-
-          <Text style={{ marginTop: 8, fontSize: 16, fontWeight: '600', color: theme.colors.muted, textAlign: 'center' }}>
-            Decisions Today Define Tomorrow!
+          <Text style={{ fontSize: 13, color: theme.colors.muted, lineHeight: 19 }}>
+            Decisions today define tomorrow.
           </Text>
         </View>
 
-        <View style={{ marginTop: 22 }}>
+        <View style={{ marginTop: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '700', color: theme.colors.text }}>Daily Tools</Text>
+            <Text accessibilityRole="header" style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text }}>Daily tools</Text>
 
-            <Pressable onPress={goToMore}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>See all</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="See all daily tools" onPress={goToMore} hitSlop={10} style={{ minHeight: 36, justifyContent: 'center' }}>
+              <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>See all</Text>
             </Pressable>
           </View>
 
-          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.gap, marginTop: theme.spacing.md }}>
+          <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: layout.gap, marginTop: 6 }}>
             <ToolCard
               title="Daily Check‑In"
-              description="Rate your health issues and track symptoms for today."
+              description="Symptoms & habits"
               width={layout.cardWidth}
               icon={<Feather name="check-circle" size={22} color={theme.colors.primary} />}
               accentColor={theme.colors.primary}
@@ -846,7 +839,7 @@ export function DashboardScreen() {
             />
             <ToolCard
               title="Mood Tracker"
-              description="Track your mood, stress, and energy."
+              description="Mood, stress & energy"
               width={layout.cardWidth}
               icon={<Feather name="smile" size={22} color="#F59E0B" />}
               accentColor="#E7A83A"
@@ -855,7 +848,7 @@ export function DashboardScreen() {
             />
             <ToolCard
               title="Track Calories"
-              description="Log meals and view your daily totals."
+              description="Meals & daily totals"
               width={layout.cardWidth}
               icon={<MaterialCommunityIcons name="food-apple" size={22} color="#F97316" />}
               accentColor="#E98754"
@@ -864,7 +857,7 @@ export function DashboardScreen() {
             />
             <ToolCard
               title="Water Intake"
-              description="Log water and stay hydrated today."
+              description="Drinks & hydration"
               width={layout.cardWidth}
               // Solid droplet icon (not outline)
               icon={<FontAwesome name="tint" size={20} color="#2563EB" />}
@@ -876,18 +869,18 @@ export function DashboardScreen() {
         </View>
 
         {/* Next sections (Dashboard continues below Daily Tools) */}
-        <View style={{ marginTop: theme.spacing.xl }}>
+        <View style={{ marginTop: 18 }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-            <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '700', color: theme.colors.text }}>My Health</Text>
-            <Pressable onPress={goToMore}>
-              <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>See all</Text>
+            <Text accessibilityRole="header" style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text }}>My health</Text>
+            <Pressable accessibilityRole="button" accessibilityLabel="See all health tools" onPress={goToMore} hitSlop={10} style={{ minHeight: 36, justifyContent: 'center' }}>
+              <Text style={{ color: theme.colors.primary, fontWeight: '600', fontSize: 13 }}>See all</Text>
             </Pressable>
           </View>
 
-          <View style={{ marginTop: theme.spacing.md, gap: 10 }}>
+          <View style={{ marginTop: 6, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 16, backgroundColor: theme.colors.card, overflow: 'hidden' }}>
             <WideActionCard
               title="Weekly Health Report"
-              subtitle="Generated every 7 days after Health Setup."
+              subtitle="Your weekly health overview"
               icon={<MaterialCommunityIcons name="chart-line" size={18} color={theme.colors.primary} />}
               accentColor={theme.colors.primary}
               actionLabel="View report"
@@ -896,7 +889,7 @@ export function DashboardScreen() {
 
             <WideActionCard
               title="Health Setup"
-              subtitle={healthSetupComplete ? 'Review or update your saved health profile.' : 'Required to unlock daily check-ins and reports.'}
+              subtitle={healthSetupComplete ? 'Review your saved health profile' : 'Unlock check-ins and reports'}
               icon={<Feather name="clipboard" size={18} color="#4F86E6" />}
               accentColor="#4F86E6"
               actionLabel={healthSetupComplete ? 'Review' : 'Continue'}
@@ -905,7 +898,7 @@ export function DashboardScreen() {
 
             <WideActionCard
               title="Find a Practitioner"
-              subtitle="Browse practitioners based on your needs."
+              subtitle="Find support that suits you"
               icon={<Feather name="search" size={18} color="#E7A83A" />}
               accentColor="#E7A83A"
               actionLabel="Browse"
@@ -914,59 +907,43 @@ export function DashboardScreen() {
           </View>
         </View>
 
-        <View style={{ marginTop: theme.spacing.xl }}>
-          <Text style={{ fontSize: theme.fontSize.sectionTitle, fontWeight: '700', color: theme.colors.text }}>Connect Your Devices</Text>
-          <Text style={{ marginTop: 6, color: theme.colors.muted, lineHeight: 20 }}>
-            Helfi can connect to Apple Health using HealthKit. Helfi does not use CareKit.
-          </Text>
-
-          <View style={{ marginTop: 10, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <Feather name="trending-up" size={18} color={theme.colors.primary} />
-            <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Enhanced Analytics Available</Text>
+        <View style={{ marginTop: 22 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+            <Feather name="activity" size={17} color={theme.colors.primary} />
+            <Text accessibilityRole="header" style={{ fontSize: 17, fontWeight: '600', color: theme.colors.text }}>Your devices</Text>
           </View>
-
-          <View style={{ marginTop: theme.spacing.md, gap: 10 }}>
+          <Text style={{ marginTop: 5, color: theme.colors.muted, fontSize: 13, lineHeight: 19 }}>Connect activity data for a fuller picture.</Text>
+          <View style={{ marginTop: 12, borderWidth: 1, borderColor: theme.colors.border, borderRadius: 16, backgroundColor: theme.colors.card, overflow: 'hidden' }}>
             {Platform.OS === 'ios' ? (
               <>
                 <View
                   style={{
-                    borderWidth: 1,
-                    borderColor: '#BBD7FF',
-                    backgroundColor: '#F2F7FF',
-                    borderRadius: theme.radius.md,
-                    padding: theme.spacing.md,
-                    gap: 6,
+                    paddingHorizontal: 12,
+                    paddingTop: 12,
+                    paddingBottom: 4,
                   }}
                 >
-                  <Text style={{ color: theme.colors.text, fontWeight: '700' }}>Apple Health / HealthKit</Text>
                   {appleHealthAvailable ? (
-                    <>
-                      <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-                        Helfi asks HealthKit for read access only after you tap Continue and approve Apple's Health
-                        permission screen.
-                      </Text>
-                      <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
-                        Helfi reads steps, walking/running distance, and active energy so your dashboard can show your
-                        daily activity summary.
-                      </Text>
-                    </>
+                    <Text style={{ color: theme.colors.muted, fontSize: 12, lineHeight: 18 }}>
+                      Apple Health uses HealthKit to read steps, walking/running distance and active energy only after your approval. Helfi does not use CareKit.
+                    </Text>
                   ) : (
-                    <Text style={{ color: theme.colors.muted, lineHeight: 20 }}>
+                    <Text style={{ color: theme.colors.muted, fontSize: 12, lineHeight: 18 }}>
                       Apple Health needs an iPhone or an iPad with iPadOS 17 or later. You can still use food, water, mood, check-ins, and reports.
                     </Text>
                   )}
                 </View>
                 <DeviceRow
-                  name="Apple Health (HealthKit)"
+                  name="Apple Health"
                   icon={<AppleHealthLogo />}
-                  detail={appleHealthAvailable ? (appleHealthConnected ? 'Import today refreshes available activity without asking for permission again.' : "Continue to Apple's HealthKit permission screen for steps, distance, and active energy.") : 'Requires iPadOS 17 or later.'}
+                  detail={appleHealthAvailable ? (appleHealthConnected ? 'Refresh your activity' : 'Connect with your permission') : 'Requires iPadOS 17 or later.'}
                   rightLabel={!appleHealthAvailable ? 'Unavailable' : appleHealthConnected ? 'Import today' : 'Continue'}
                   rightKind="connect"
                   disabled={appleHealthBusy || healthSync.busy || !appleHealthAvailable}
                   onPress={appleHealthConnected ? onAppleHealthImportToday : onAppleHealthConnect}
                 />
                 {appleHealthAvailable && (appleHealthConnected || healthSync.enabled) ? (
-                  <View style={{ gap: 8 }}>
+                  <View style={{ gap: 6, padding: 12, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border }}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
                       <Text style={{ color: theme.colors.text, fontWeight: '700', flex: 1 }}>Update automatically when Helfi opens</Text>
                       <Switch accessibilityLabel="Automatic Apple Health updates" value={healthSync.enabled} onValueChange={value => {
@@ -1012,7 +989,7 @@ export function DashboardScreen() {
           </View>
         </View>
 
-        <View style={{ marginTop: theme.spacing.xl }}>
+        <View style={{ marginTop: 18 }}>
           {healthSetupComplete ? (
             <StatusCardComplete onPressEdit={goToHealthSetup} chips={healthSetupChips} />
           ) : (
@@ -1050,61 +1027,29 @@ function WideActionCard({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${actionLabel}`}
       onPress={onPress}
       style={({ pressed }) => ({
-        opacity: pressed ? 0.9 : 1,
-        backgroundColor: theme.colors.card,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        borderRadius: theme.radius.lg,
-        padding: 14,
+        opacity: pressed ? 0.75 : 1,
+        minHeight: 70,
+        paddingVertical: 12,
+        paddingHorizontal: 12,
+        borderBottomWidth: StyleSheet.hairlineWidth,
+        borderBottomColor: theme.colors.border,
         flexDirection: 'row',
         alignItems: 'center',
-        gap: 12,
+        gap: 10,
       })}
     >
-      <View
-        style={{
-          width: 36,
-          height: 36,
-          borderRadius: 18,
-          backgroundColor: '#F1F7F5',
-          borderWidth: 1,
-          borderColor: theme.colors.border,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
+      <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}>
         {icon}
       </View>
-
-      <View style={{ flex: 1 }}>
-        <Text style={{ fontWeight: '700', color: theme.colors.text, fontSize: 15 }} numberOfLines={1}>
-          {title}
-        </Text>
-        <Text style={{ marginTop: 4, color: theme.colors.muted, fontSize: 13, lineHeight: 18 }} numberOfLines={2}>
-          {subtitle}
-        </Text>
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontWeight: '600', color: theme.colors.text, fontSize: 15, lineHeight: 21 }}>{title}</Text>
+        <Text style={{ marginTop: 2, color: theme.colors.muted, fontSize: 12, lineHeight: 17 }}>{subtitle}</Text>
       </View>
-
-      <View
-        style={{
-          height: 32,
-          paddingHorizontal: 12,
-          borderRadius: 999,
-          borderWidth: 1,
-          borderColor: `${accentColor}66`,
-          alignItems: 'center',
-          justifyContent: 'center',
-          flexDirection: 'row',
-          gap: 8,
-        }}
-      >
-        <Text style={{ fontWeight: '700', color: accentColor, fontSize: 12 }} numberOfLines={1}>
-          {actionLabel}
-        </Text>
-        <Feather name="chevron-right" size={16} color={accentColor} />
-      </View>
+      <Feather name="chevron-right" size={18} color={accentColor} />
     </Pressable>
   )
 }
@@ -1215,64 +1160,34 @@ function DeviceRow({
   const isConnect = rightKind === 'connect'
   const isDisconnect = rightKind === 'disconnect'
   return (
-    <View
-      style={{
-        backgroundColor: '#F3F6F5',
-        borderRadius: theme.radius.lg,
-        padding: 12,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        flexDirection: 'row',
-        alignItems: 'center',
-        justifyContent: 'space-between',
-        gap: 12,
-      }}
-    >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1 }}>
-        <View
-          style={{
-            width: 40,
-            height: 40,
-            borderRadius: 12,
-            backgroundColor: theme.colors.card,
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {icon ? (
-            icon
-          ) : logo ? (
-            <Image source={logo} style={{ width: 22, height: 22 }} resizeMode="contain" />
-          ) : (
-            <Feather name="watch" size={18} color={theme.colors.muted} />
-          )}
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontWeight: '700', color: theme.colors.text, fontSize: 16 }} numberOfLines={1}>
-            {name}
-          </Text>
-          {detail ? (
-            <Text style={{ marginTop: 3, color: theme.colors.muted, fontSize: 12, lineHeight: 16 }}>
-              {detail}
-            </Text>
-          ) : null}
-        </View>
+    <View style={{ paddingHorizontal: 12, paddingVertical: 8, minHeight: 62, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: theme.colors.border, flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+      <View style={{ width: 32, height: 32, borderRadius: 10, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}>
+        {icon ? icon : logo ? <Image source={logo} style={{ width: 23, height: 23 }} resizeMode="contain" /> : <Feather name="watch" size={18} color={theme.colors.muted} />}
       </View>
-
+      <View style={{ flex: 1, minWidth: 0 }}>
+        <Text style={{ fontWeight: '600', color: theme.colors.text, fontSize: 14, lineHeight: 20 }}>{name}</Text>
+        {detail ? <Text style={{ marginTop: 2, color: theme.colors.muted, fontSize: 12, lineHeight: 17 }}>{detail}</Text> : null}
+      </View>
       <Pressable
+        accessibilityRole="button"
+        accessibilityLabel={`${name}: ${rightLabel}`}
+        accessibilityState={{ disabled: !!disabled }}
         onPress={onPress}
         disabled={disabled}
         style={({ pressed }) => ({
-          opacity: disabled ? 0.5 : pressed ? 0.9 : 1,
-          paddingVertical: 10,
-          paddingHorizontal: 16,
-          borderRadius: 999,
-          backgroundColor: isConnect ? theme.colors.primary : isDisconnect ? '#DC2626' : '#D8DEE4',
+          opacity: disabled ? 0.5 : pressed ? 0.75 : 1,
+          minHeight: 44,
+          minWidth: 78,
+          paddingHorizontal: 10,
+          justifyContent: 'center',
+          alignItems: 'center',
+          borderRadius: 10,
+          backgroundColor: isConnect ? theme.colors.primary : isDisconnect ? theme.colors.card : theme.colors.bg,
+          borderWidth: isDisconnect ? 1 : 0,
+          borderColor: theme.colors.border,
         })}
       >
-        <Text style={{ color: isConnect || isDisconnect ? '#FFFFFF' : '#485563', fontWeight: '700' }}>{rightLabel}</Text>
+        <Text style={{ color: isConnect ? '#FFFFFF' : isDisconnect ? theme.colors.danger : theme.colors.muted, fontWeight: '600', fontSize: 12 }}>{rightLabel}</Text>
       </Pressable>
     </View>
   )
@@ -1286,34 +1201,15 @@ function AppleHealthLogo() {
 
 function StatusCardIncomplete({ onPressContinue }: { onPressContinue: () => void }) {
   return (
-    <View
-      style={{
-        backgroundColor: theme.colors.card,
-        borderRadius: theme.radius.lg,
-        borderWidth: 1,
-        borderColor: theme.colors.border,
-        padding: 16,
-      }}
-    >
-      <Text style={{ fontSize: 18, fontWeight: '700', color: theme.colors.text }}>Complete Your Health Setup</Text>
-      <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 20 }}>
-        Finish your health profile to unlock daily check-ins and weekly health reports.
-      </Text>
-
-      <Pressable
-        onPress={onPressContinue}
-        style={({ pressed }) => ({
-          marginTop: 14,
-          backgroundColor: theme.colors.primary,
-          borderRadius: 14,
-          paddingVertical: 14,
-          alignItems: 'center',
-          opacity: pressed ? 0.9 : 1,
-        })}
-      >
-        <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Continue Health Setup</Text>
-      </Pressable>
-    </View>
+    <Pressable accessibilityRole="button" accessibilityLabel="Complete your health setup. Continue health setup" onPress={onPressContinue}
+      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, backgroundColor: theme.colors.card, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, padding: 14, flexDirection: 'row', alignItems: 'center', gap: 10 })}>
+      <Feather name="clipboard" size={22} color={theme.colors.primary} />
+      <View style={{ flex: 1 }}>
+        <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text }}>Complete your health setup</Text>
+        <Text style={{ marginTop: 4, fontSize: 12, color: theme.colors.muted, lineHeight: 18 }}>Finish your profile to unlock check-ins and weekly reports.</Text>
+      </View>
+      <Feather name="chevron-right" size={18} color={theme.colors.primary} />
+    </Pressable>
   )
 }
 
@@ -1328,11 +1224,11 @@ function HealthSetupChip({ label }: { label: string }) {
         borderColor: '#BCEFD2',
         borderRadius: 999,
         backgroundColor: theme.colors.card,
-        paddingHorizontal: 12,
-        paddingVertical: 7,
+        paddingHorizontal: 8,
+        paddingVertical: 4,
       }}
     >
-      <Text style={{ color: theme.colors.primary, fontWeight: '700', fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: theme.colors.primary, fontWeight: '500', fontSize: 12 }}>{label}</Text>
       <Feather name="check" size={13} color={theme.colors.primary} />
     </View>
   )
@@ -1342,59 +1238,26 @@ function StatusCardComplete({ onPressEdit, chips }: { onPressEdit: () => void; c
   const hasChips = chips.medications || chips.supplements
 
   return (
-    <View
-      style={{
-        backgroundColor: '#E9FBF1',
-        borderRadius: theme.radius.lg,
-        borderWidth: 1,
-        borderColor: '#BCEFD2',
-        padding: 16,
-        alignItems: 'center',
-      }}
-    >
-      <View
-        style={{
-          width: 64,
-          height: 64,
-          borderRadius: 32,
-          backgroundColor: theme.colors.primary,
-          alignItems: 'center',
-          justifyContent: 'center',
-        }}
-      >
-        <Feather name="check" size={28} color="#FFFFFF" />
+    <Pressable accessibilityRole="button" accessibilityLabel="Health setup complete. Edit health info" onPress={onPressEdit}
+      style={({ pressed }) => ({ opacity: pressed ? 0.75 : 1, backgroundColor: theme.colors.card, borderRadius: 16, borderWidth: 1, borderColor: theme.colors.border, padding: 14 })}>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
+        <View style={{ width: 30, height: 30, borderRadius: 15, backgroundColor: theme.colors.primary, alignItems: 'center', justifyContent: 'center' }}>
+          <Feather name="check" size={17} color="#FFFFFF" />
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={{ fontSize: 15, fontWeight: '600', color: theme.colors.text }}>Health setup complete</Text>
+          <Text style={{ marginTop: 2, fontSize: 12, color: theme.colors.muted, lineHeight: 18 }}>Your profile is saved and synced.</Text>
+        </View>
+        <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '600' }}>Edit</Text>
+        <Feather name="chevron-right" size={16} color={theme.colors.primary} />
       </View>
-
-      <Text style={{ marginTop: 14, fontSize: 26, fontWeight: '700', color: theme.colors.text, textAlign: 'center' }}>
-        Onboarding Complete
-      </Text>
-      <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 20, textAlign: 'center' }}>
-        Your health profile has been successfully created and synced across your connected devices.
-      </Text>
-
       {hasChips ? (
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, justifyContent: 'center', marginTop: 14 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginTop: 10, marginLeft: 40 }}>
           {chips.medications ? <HealthSetupChip label="Medications" /> : null}
           {chips.supplements ? <HealthSetupChip label="Supplements" /> : null}
         </View>
       ) : null}
-
-      <Pressable
-        onPress={onPressEdit}
-        style={({ pressed }) => ({
-          marginTop: 16,
-          backgroundColor: theme.colors.primary,
-          borderRadius: 14,
-          paddingVertical: 14,
-          paddingHorizontal: 16,
-          width: '100%',
-          alignItems: 'center',
-          opacity: pressed ? 0.9 : 1,
-        })}
-      >
-        <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>Edit Health Info</Text>
-      </Pressable>
-    </View>
+    </Pressable>
   )
 }
 
@@ -1417,71 +1280,27 @@ function ToolCard({
 }) {
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={`${title}. ${ctaLabel}`}
+      accessibilityHint={description}
       onPress={onPress}
-      style={{
+      style={({ pressed }) => ({
         width,
-        borderRadius: theme.radius.lg,
+        minHeight: 108,
+        padding: 12,
+        borderRadius: 16,
         backgroundColor: theme.colors.card,
         borderWidth: 1,
         borderColor: theme.colors.border,
-        padding: 12,
-        minHeight: 164,
-        shadowColor: '#000',
-        shadowOpacity: 0.06,
-        shadowOffset: { width: 0, height: 8 },
-        shadowRadius: 18,
-        elevation: 2,
-      }}
+        opacity: pressed ? 0.75 : 1,
+      })}
     >
-      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-        <View
-          style={{
-            width: 32,
-            height: 32,
-            borderRadius: 16,
-            backgroundColor: '#F1F7F5',
-            borderWidth: 1,
-            borderColor: theme.colors.border,
-            alignItems: 'center',
-            justifyContent: 'center',
-          }}
-        >
-          {icon}
-        </View>
-        <Text style={{ flex: 1, fontSize: 15, fontWeight: '700', color: theme.colors.text }} numberOfLines={2}>
-          {title}
-        </Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
+        <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: theme.colors.bg, alignItems: 'center', justifyContent: 'center' }}>{icon}</View>
+        <Feather name="arrow-up-right" size={16} color={accentColor} />
       </View>
-
-      <Text style={{ marginTop: 8, color: theme.colors.muted, lineHeight: 16, fontSize: 12 }} numberOfLines={2}>
-        {description}
-      </Text>
-
-      <Pressable
-        onPress={onPress}
-        style={{
-          marginTop: 'auto',
-          height: 32,
-          borderRadius: 999,
-          backgroundColor: theme.colors.card,
-          borderWidth: 1,
-          borderColor: `${accentColor}66`,
-          flexDirection: 'row',
-          alignItems: 'center',
-          justifyContent: 'center',
-          gap: 8,
-        }}
-      >
-        <Text
-          style={{ fontWeight: '700', color: accentColor, fontSize: 12, letterSpacing: 0.2 }}
-          numberOfLines={1}
-          adjustsFontSizeToFit
-          minimumFontScale={0.85}
-        >
-          {ctaLabel}
-        </Text>
-        <Feather name="arrow-right" size={14} color={accentColor} />
-      </Pressable>
+      <Text style={{ marginTop: 8, fontSize: 15, lineHeight: 20, fontWeight: '600', color: theme.colors.text }}>{title}</Text>
+      <Text style={{ marginTop: 2, color: theme.colors.muted, lineHeight: 17, fontSize: 12 }}>{description}</Text>
     </Pressable>
   )
 }

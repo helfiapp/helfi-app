@@ -40,6 +40,21 @@ function localDate(value: unknown) {
   return text
 }
 
+function reviewedTimestamp(draft: any): Date | undefined {
+  if (draft?.localTime === undefined || draft.localTime === null || draft.localTime === '') return undefined
+  const time = draft.localTime
+  if (typeof time !== 'string') throw new Error('Please review the meal or drink time before saving.')
+  if (!/^([01]\d|2[0-3]):[0-5]\d$/.test(time)) throw new Error('Please review the meal or drink time before saving.')
+  const offset = draft?.tzOffsetMin
+  if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < -840 || offset > 840) {
+    throw new Error('Please review the time zone before saving this time.')
+  }
+  const [year, month, day] = localDate(draft.localDate).split('-').map(Number)
+  const [hour, minute] = time.split(':').map(Number)
+  // JS getTimezoneOffset is UTC minus local time (Melbourne summer is -660).
+  return new Date(Date.UTC(year, month - 1, day, hour, minute) + offset * 60 * 1000)
+}
+
 function cleanText(value: unknown, max = 1000) {
   return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
 }
@@ -215,6 +230,7 @@ function makeManualDeviceId() {
 }
 
 const USED_REVIEW_TOKEN_IDENTIFIER_PREFIX = 'native-voice-review-used'
+const COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX = 'native-voice-review-result'
 const USED_REVIEW_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
 function usedReviewTokenIdentifier(userId: string) {
@@ -225,43 +241,46 @@ function usedReviewTokenDigest(token: unknown) {
   return crypto.createHash('sha256').update(String(token || '')).digest('base64url')
 }
 
-async function markReviewTokenUsed(userId: string, draft: any) {
+async function markReviewTokenUsed(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
   const token = String(draft?.reviewToken || '')
-  if (!token) return false
+  if (!token) throw new Error('Review token is missing.')
   const identifier = usedReviewTokenIdentifier(userId)
-  await prisma.verificationToken
+  await db.verificationToken
     .deleteMany({
       where: {
-        identifier,
+        OR: [
+          { identifier },
+          { identifier: { startsWith: `${COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX}:${userId}:` } },
+        ],
         expires: { lt: new Date() },
       },
     })
-    .catch(() => {})
 
-  try {
-    await prisma.verificationToken.create({
-      data: {
-        identifier,
-        token: usedReviewTokenDigest(token),
-        expires: new Date(Date.now() + USED_REVIEW_TOKEN_TTL_MS),
-      },
-    })
-    return true
-  } catch (error: any) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') return false
-    throw error
-  }
-}
-
-async function releaseReviewToken(userId: string, draft: any) {
-  const token = String(draft?.reviewToken || '')
-  if (!token) return
-  await prisma.verificationToken.deleteMany({
-    where: {
-      identifier: usedReviewTokenIdentifier(userId),
+  await db.verificationToken.create({
+    data: {
+      identifier,
       token: usedReviewTokenDigest(token),
+      expires: new Date(Date.now() + USED_REVIEW_TOKEN_TTL_MS),
     },
   })
+}
+
+async function completeReviewToken(userId: string, draft: any, result: any, db: Prisma.TransactionClient = prisma) {
+  await db.verificationToken.update({
+    where: { token: usedReviewTokenDigest(draft.reviewToken) },
+    data: { identifier: `${COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX}:${userId}:${JSON.stringify(result)}` },
+  })
+}
+
+async function completedReviewResult(userId: string, draft: any) {
+  const row = await prisma.verificationToken.findUnique({ where: { token: usedReviewTokenDigest(draft.reviewToken) } })
+  const prefix = `${COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX}:${userId}:`
+  if (!row?.identifier.startsWith(prefix)) return null
+  try {
+    const result = JSON.parse(row.identifier.slice(prefix.length))
+    if (typeof result?.kind !== 'string' || typeof result?.message !== 'string') return null
+    return result
+  } catch { return null }
 }
 
 function normalizeWaterUnit(value: unknown): 'ml' | 'l' | 'oz' {
@@ -277,25 +296,6 @@ function waterAmountToMl(amount: number, unit: 'ml' | 'l' | 'oz') {
   return Math.round(amount * 10) / 10
 }
 
-function sweetenerMacros(sweetener: any) {
-  const type = String(sweetener?.type || '').toLowerCase()
-  if (type !== 'sugar' && type !== 'honey') return { calories: 0, carbs: 0, sugar: 0 }
-  const grams = Number(sweetener?.grams)
-  const safeGrams = Number.isFinite(grams) && grams > 0 ? grams : 0
-  if (type === 'honey') {
-    const scale = safeGrams / 21
-    return {
-      calories: Math.round(64 * scale),
-      carbs: Math.round(17.3 * scale * 10) / 10,
-      sugar: Math.round(17.2 * scale * 10) / 10,
-    }
-  }
-  return {
-    calories: Math.round(safeGrams * 4),
-    carbs: Math.round(safeGrams * 10) / 10,
-    sugar: Math.round(safeGrams * 10) / 10,
-  }
-}
 
 async function saveExercise(userId: string, draft: any) {
   const exercise = draft?.exercise || {}
@@ -485,15 +485,13 @@ async function saveSymptomNote(userId: string, draft: any) {
   return { kind: 'symptom_note', id: created.id, message: 'Symptom note saved.' }
 }
 
-async function saveWater(userId: string, draft: any) {
+async function saveWater(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
   const water = draft?.water || {}
   const amount = Number(water.amount)
   const unit = normalizeWaterUnit(water.unit)
-  if (!Number.isFinite(amount) || amount <= 0) {
-    throw new Error('Water amount is missing')
-  }
-
+  if (!Number.isFinite(amount) || amount <= 0) throw new Error('Water amount is missing')
   const date = localDate(draft?.localDate)
+  const createdAt = reviewedTimestamp(draft)
   const amountMl = Number.isFinite(Number(water.amountMl)) && Number(water.amountMl) > 0
     ? Math.round(Number(water.amountMl) * 10) / 10
     : waterAmountToMl(amount, unit)
@@ -503,96 +501,53 @@ async function saveWater(userId: string, draft: any) {
   const label = cleanText(water.label || water.drinkType || `${amount} ${unit}`, 48)
   const category = cleanText(water.category || 'other', 40).toLowerCase() || 'other'
   const drinkType = cleanText(water.drinkType || label, 48)
-
-  const created = await prisma.waterLog.create({
-    data: {
-      userId,
-      amount,
-      unit,
-      amountMl,
-      label,
-      category,
-      localDate: date,
-    },
+  const hasIngredientAdditions = Array.isArray(water.ingredients) && water.ingredients.some((item: any) => {
+    const name = cleanText(item?.name, 120).toLowerCase()
+    return name && !/^(?:(?:plain|tap|mineral|sparkling|still|filtered|bottled)\s+)?water$/.test(name)
   })
+  const hasSweetener = water.sweetener && water.sweetener.type !== 'free'
+  const mentionsAdditions = /\b(?:with|plus|and)\s+(?!no\b|without\b)(?:[^.,;]{0,60}\s+)?(?:sugar|honey|milk|lemon|lime|syrup|juice)\b/i.test(String(draft?.transcript || ''))
+  const needsFood = drinkType.toLowerCase() !== 'water' || draft?.food != null || hasIngredientAdditions || hasSweetener || mentionsAdditions
+  // Nutrition must already cover the actual drink and every milk/sugar addition.
+  // Reject legacy sweetener-only drafts; they cannot represent the drink itself.
+  if (needsFood && (!Array.isArray(draft?.food?.items) || !draft.food.items.length || !draft?.food?.nutrition)) {
+    throw new Error('Please review the drink and its complete nutrition before saving.')
+  }
 
-  const sweetener = water.sweetener && typeof water.sweetener === 'object' ? water.sweetener : null
-  const shouldCreateFoodDrink = drinkType && drinkType.toLowerCase() !== 'water' && sweetener
+  const created = await db.waterLog.create({
+    data: { userId, amount, unit, amountMl, label, category, localDate: date, ...(createdAt ? { createdAt } : {}) },
+  })
   let foodId: string | null = null
-  if (shouldCreateFoodDrink) {
-    const macros = sweetenerMacros(sweetener)
-    const nutrition = {
-      calories: macros.calories,
-      calories_kcal: macros.calories,
-      protein: 0,
-      protein_g: 0,
-      carbs: macros.carbs,
-      carbs_g: macros.carbs,
-      fat: 0,
-      fat_g: 0,
-      fiber: 0,
-      fiber_g: 0,
-      sugar: macros.sugar,
-      sugar_g: macros.sugar,
-      __drinkType: drinkType,
-      __drinkAmount: amount,
-      __drinkUnit: unit,
-      __drinkAmountMl: amountMl,
-      __waterLogId: created.id,
-      __sweetenerType: sweetener.type || 'free',
-      __sweetenerAmount: sweetener.amount ?? null,
-      __sweetenerUnit: sweetener.unit ?? null,
-    }
-    const food = await prisma.foodLog.create({
-      data: {
-        userId,
-        name: label,
-        description: label,
-        imageUrl: null,
-        nutrients: nutrition,
-        items: [
-          {
-            name: label,
-            calories: macros.calories,
-            calories_kcal: macros.calories,
-            protein_g: 0,
-            carbs_g: macros.carbs,
-            fat_g: 0,
-            fiber_g: 0,
-            sugar_g: macros.sugar,
-            waterLogId: created.id,
-          },
-        ],
-        localDate: date,
-        meal: category === 'other' ? 'uncategorized' : category,
-        category: category === 'other' ? 'uncategorized' : category,
+  if (needsFood) {
+    const foodResult = await saveBuiltMeal(userId, {
+      ...draft,
+      food: {
+        ...draft.food,
+        mealName: label,
+        meal: draft.food.meal || (category === 'other' ? 'uncategorized' : category),
+        nutrition: {
+          ...draft.food.nutrition,
+          __drinkType: drinkType,
+          __drinkAmount: amount,
+          __drinkUnit: unit,
+          __drinkAmountMl: amountMl,
+          __waterLogId: created.id,
+        },
       },
-    })
-    foodId = food.id
-    void triggerBackgroundRegeneration({
-      userId,
-      changeType: 'food',
-      timestamp: new Date(),
-    }).catch(() => {})
-    void deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
+    }, db)
+    foodId = foodResult.ids[0]
   }
-
-  void deleteSmartCoachNotificationsByCategories(userId, ['hydration']).catch(() => {})
-  return {
-    kind: 'water',
-    id: created.id,
-    foodId,
-    message: `${label} saved.`,
-  }
+  return { kind: 'water', id: created.id, foodId, message: `${label} saved.` }
 }
 
-async function copyPreviousFood(userId: string, draft: any) {
+async function copyPreviousFood(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
   const food = draft?.food || {}
   const ids = Array.isArray(food.sourceLogIds) ? food.sourceLogIds.map((id: any) => String(id || '').trim()).filter(Boolean) : []
   const targetDate = localDate(draft?.localDate)
+  const createdAt = reviewedTimestamp(draft)
   if (ids.length === 0) throw new Error('No food entries to copy')
 
-  const sourceRows = await prisma.foodLog.findMany({
+  const sourceRows = await db.foodLog.findMany({
     where: { id: { in: ids }, userId },
     orderBy: { createdAt: 'asc' },
   })
@@ -600,7 +555,7 @@ async function copyPreviousFood(userId: string, draft: any) {
 
   const createdIds: string[] = []
   for (const row of sourceRows) {
-    const created = await prisma.foodLog.create({
+    const created = await db.foodLog.create({
       data: {
         userId,
         name: row.name,
@@ -609,19 +564,13 @@ async function copyPreviousFood(userId: string, draft: any) {
         nutrients: row.nutrients ?? Prisma.JsonNull,
         items: row.items ?? Prisma.JsonNull,
         localDate: targetDate,
+        ...(createdAt ? { createdAt } : {}),
         meal: row.meal,
         category: row.category,
       },
     })
     createdIds.push(created.id)
   }
-
-  triggerBackgroundRegeneration({
-    userId,
-    changeType: 'food',
-    timestamp: new Date(),
-  }).catch(() => {})
-  void deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
 
   return {
     kind: 'food',
@@ -660,13 +609,14 @@ async function touchStoredFavorite(userId: string, favoriteId: string) {
   })
 }
 
-async function saveFavoriteFood(userId: string, draft: any) {
+async function saveFavoriteFood(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
   const food = draft?.food || {}
   const favorite = food?.favorite || {}
   const label = cleanText(favorite.label || favorite.name || food.entries?.[0]?.name || draft?.summary, 160)
   if (!label) throw new Error('Favorite food is missing')
 
   const targetDate = localDate(draft?.localDate)
+  const createdAt = reviewedTimestamp(draft)
   const meal = cleanText(mealTargetFromText(draft?.transcript) || food.meal || favorite.meal || 'uncategorized', 40).toLowerCase() || 'uncategorized'
   const favoriteId = cleanText(favorite.id, 120)
   const baseNutrition =
@@ -685,7 +635,7 @@ async function saveFavoriteFood(userId: string, draft: any) {
     : null
   const items = Array.isArray(favorite.items) ? favorite.items : Prisma.JsonNull
 
-  const created = await prisma.foodLog.create({
+  const created = await db.foodLog.create({
     data: {
       userId,
       name: label,
@@ -694,20 +644,11 @@ async function saveFavoriteFood(userId: string, draft: any) {
       nutrients: nutrition ?? Prisma.JsonNull,
       items,
       localDate: targetDate,
+      ...(createdAt ? { createdAt } : {}),
       meal,
       category: meal,
     },
   })
-
-  if (favoriteId) {
-    void touchStoredFavorite(userId, favoriteId).catch(() => {})
-  }
-  void triggerBackgroundRegeneration({
-    userId,
-    changeType: 'food',
-    timestamp: new Date(),
-  }).catch(() => {})
-  void deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
 
   return {
     kind: 'food',
@@ -716,9 +657,25 @@ async function saveFavoriteFood(userId: string, draft: any) {
   }
 }
 
-async function saveBuiltMeal(userId: string, draft: any) {
+function reviewedNutrient(item: any, keys: string[], required: boolean): number | null {
+  let raw: unknown
+  for (const key of keys) {
+    if (item?.[key] !== undefined) { raw = item[key]; break }
+  }
+  if (raw === null || raw === undefined || (typeof raw === 'string' && !raw.trim())) {
+    if (required) throw new Error('Meal nutrition is incomplete. Please review each food before saving.')
+    return null
+  }
+  if (typeof raw !== 'number' && typeof raw !== 'string') throw new Error('Meal nutrition is invalid. Please review each food before saving.')
+  const value = Number(raw)
+  if (!Number.isFinite(value) || value < 0) throw new Error('Meal nutrition is invalid. Please review each food before saving.')
+  return value
+}
+
+async function saveBuiltMeal(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
   const food = draft?.food || {}
   const targetDate = localDate(draft?.localDate)
+  const createdAt = reviewedTimestamp(draft)
   const meal = cleanText(food.meal || 'uncategorized', 40).toLowerCase() || 'uncategorized'
   const items = Array.isArray(food.items) ? food.items : []
   if (items.length === 0) throw new Error('Meal ingredients are missing')
@@ -734,20 +691,27 @@ async function saveBuiltMeal(userId: string, draft: any) {
       item?.serving_size || item?.serving || item?.unit || matchingEntry?.amount || item?.requestedAmount || '1 serving',
       120,
     ) || '1 serving'
+    const servings = item?.servings === undefined || item.servings === null ? 1 : Number(item.servings)
+    if (!Number.isFinite(servings) || servings <= 0) throw new Error('Please review the food amount before saving.')
+    const calories = reviewedNutrient(item, ['calories', 'calories_kcal'], true)
+    const fiber = reviewedNutrient(item, ['fiber_g', 'fiber'], false)
+    const sugar = reviewedNutrient(item, ['sugar_g', 'sugar'], false)
     return {
       ...(item && typeof item === 'object' ? item : {}),
       id: item?.id || `voice-meal:${crypto.randomUUID()}`,
       name: requestedName,
       label: requestedName,
       serving_size: serving,
-      servings: Number.isFinite(Number(item?.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1,
-      calories: Math.max(0, Math.round(Number(item?.calories ?? item?.calories_kcal) || 0)),
-      calories_kcal: Math.max(0, Math.round(Number(item?.calories ?? item?.calories_kcal) || 0)),
-      protein_g: Math.max(0, Number(item?.protein_g ?? item?.protein) || 0),
-      carbs_g: Math.max(0, Number(item?.carbs_g ?? item?.carbs) || 0),
-      fat_g: Math.max(0, Number(item?.fat_g ?? item?.fat) || 0),
-      fiber_g: Math.max(0, Number(item?.fiber_g ?? item?.fiber) || 0),
-      sugar_g: Math.max(0, Number(item?.sugar_g ?? item?.sugar) || 0),
+      servings,
+      calories,
+      calories_kcal: calories,
+      protein_g: reviewedNutrient(item, ['protein_g', 'protein'], true),
+      carbs_g: reviewedNutrient(item, ['carbs_g', 'carbs'], true),
+      fat_g: reviewedNutrient(item, ['fat_g', 'fat'], true),
+      fiber,
+      fiber_g: fiber,
+      sugar,
+      sugar_g: sugar,
       __voicePlainIngredient: true,
     }
   })
@@ -755,10 +719,8 @@ async function saveBuiltMeal(userId: string, draft: any) {
   const firstItemLabel = isSingleIngredient
     ? cleanText(entries[0]?.name || normalizedItems[0]?.requestedName || normalizedItems[0]?.label || normalizedItems[0]?.name, 160)
     : ''
-  const label =
-    (isSingleIngredient
-      ? firstItemLabel
-      : cleanText(food.mealName || food.name || food.label || draft?.summary || `${meal} meal`, 160)) ||
+  const label = cleanText(food.mealName || food.name || food.label, 160) ||
+    (isSingleIngredient ? firstItemLabel : cleanText(draft?.summary || `${meal} meal`, 160)) ||
     `${meal} meal`
   const totals = normalizedItems.reduce(
     (acc: any, item: any) => {
@@ -767,8 +729,8 @@ async function saveBuiltMeal(userId: string, draft: any) {
       acc.protein += Math.max(0, Number(item?.protein_g ?? item?.protein) || 0) * servings
       acc.carbs += Math.max(0, Number(item?.carbs_g ?? item?.carbs) || 0) * servings
       acc.fat += Math.max(0, Number(item?.fat_g ?? item?.fat) || 0) * servings
-      acc.fiber += Math.max(0, Number(item?.fiber_g ?? item?.fiber) || 0) * servings
-      acc.sugar += Math.max(0, Number(item?.sugar_g ?? item?.sugar) || 0) * servings
+      acc.fiber = acc.fiber === null || item.fiber_g === null ? null : acc.fiber + item.fiber_g * servings
+      acc.sugar = acc.sugar === null || item.sugar_g === null ? null : acc.sugar + item.sugar_g * servings
       return acc
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
@@ -782,16 +744,23 @@ async function saveBuiltMeal(userId: string, draft: any) {
     carbs_g: Math.max(0, Number(totals.carbs) || 0),
     fat: Math.max(0, Number(totals.fat) || 0),
     fat_g: Math.max(0, Number(totals.fat) || 0),
-    fiber: Math.max(0, Number(totals.fiber) || 0),
-    fiber_g: Math.max(0, Number(totals.fiber) || 0),
-    sugar: Math.max(0, Number(totals.sugar) || 0),
-    sugar_g: Math.max(0, Number(totals.sugar) || 0),
+    fiber: totals.fiber,
+    fiber_g: totals.fiber,
+    sugar: totals.sugar,
+    sugar_g: totals.sugar,
+    ...(typeof food.nutrition?.__waterLogId === 'string' ? {
+      __drinkType: food.nutrition.__drinkType,
+      __drinkAmount: food.nutrition.__drinkAmount,
+      __drinkUnit: food.nutrition.__drinkUnit,
+      __drinkAmountMl: food.nutrition.__drinkAmountMl,
+      __waterLogId: food.nutrition.__waterLogId,
+    } : {}),
     ...(isSingleIngredient
       ? { __voiceSingleIngredient: true, method: 'single-ingredient' }
       : { __voiceBuiltMeal: true, customMeal: true, method: 'meal-builder' }),
   }
 
-  const created = await prisma.foodLog.create({
+  const created = await db.foodLog.create({
     data: {
       userId,
       name: label,
@@ -800,17 +769,11 @@ async function saveBuiltMeal(userId: string, draft: any) {
       nutrients: nutrition,
       items: normalizedItems,
       localDate: targetDate,
+      ...(createdAt ? { createdAt } : {}),
       meal,
       category: meal,
     },
   })
-
-  void triggerBackgroundRegeneration({
-    userId,
-    changeType: 'food',
-    timestamp: new Date(),
-  }).catch(() => {})
-  void deleteSmartCoachNotificationsByCategories(userId, ['meal', 'macro']).catch(() => {})
 
   return {
     kind: 'food',
@@ -1000,38 +963,52 @@ export async function POST(request: NextRequest) {
       draft.action === 'food_favorite' ||
       draft.action === 'food_build_meal'
     if (!supportedAction) return NextResponse.json({ error: 'This action is not supported yet.' }, { status: 400 })
-    const tokenWasFresh = await markReviewTokenUsed(user.id, draft)
-    if (!tokenWasFresh) {
-      const replayKind = draft.action === 'food_copy_previous' || draft.action === 'food_favorite' || draft.action === 'food_build_meal'
-        ? 'food'
-        : draft.action === 'health_intake_items'
-        ? 'health_intake'
-        : draft.action
-      return NextResponse.json({
-        success: true,
-        idempotentReplay: true,
-        result: {
-          kind: replayKind,
-          message: 'This was already saved. Nothing was duplicated.',
-        },
-      })
+    try {
+      const atomicFoodAction = ['water', 'food_copy_previous', 'food_favorite', 'food_build_meal'].includes(draft.action)
+      if (atomicFoodAction) {
+        result = await prisma.$transaction(async (tx) => {
+          await markReviewTokenUsed(user.id, draft, tx)
+          let saved: any
+          if (draft.action === 'water') saved = await saveWater(user.id, draft, tx)
+          else if (draft.action === 'food_copy_previous') saved = await copyPreviousFood(user.id, draft, tx)
+          else if (draft.action === 'food_favorite') saved = await saveFavoriteFood(user.id, draft, tx)
+          else saved = await saveBuiltMeal(user.id, draft, tx)
+          await completeReviewToken(user.id, draft, saved, tx)
+          return saved
+        }, { maxWait: 5000, timeout: 15000 })
+      } else {
+        // Existing non-food handlers retain their own schema/catalog behavior.
+        // An interrupted claim stays pending, never evidence of a completed save.
+        await markReviewTokenUsed(user.id, draft)
+        if (draft.action === 'exercise') result = await saveExercise(user.id, draft)
+        else if (draft.action === 'mood') result = await saveMood(user.id, draft)
+        else if (draft.action === 'journal') result = await saveJournal(user.id, draft)
+        else if (draft.action === 'symptom_note') result = await saveSymptomNote(user.id, draft)
+        else if (draft.action === 'health_intake_items') result = await saveHealthIntakeItems(user.id, draft)
+        await completeReviewToken(user.id, draft, result)
+      }
+    } catch (error: any) {
+      if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
+        const saved = await completedReviewResult(user.id, draft)
+        if (saved) return NextResponse.json({ success: true, idempotentReplay: true, result: saved })
+        return NextResponse.json({
+          error: 'The earlier save has no confirmed result yet. Please check your history before trying again.',
+          code: 'voice_save_result_unconfirmed',
+        }, { status: 409 })
+      }
+      throw error
     }
 
-    try {
-      if (draft.action === 'exercise') result = await saveExercise(user.id, draft)
-      else if (draft.action === 'mood') result = await saveMood(user.id, draft)
-      else if (draft.action === 'journal') result = await saveJournal(user.id, draft)
-      else if (draft.action === 'water') result = await saveWater(user.id, draft)
-      else if (draft.action === 'symptom_note') result = await saveSymptomNote(user.id, draft)
-      else if (draft.action === 'health_intake_items') result = await saveHealthIntakeItems(user.id, draft)
-      else if (draft.action === 'food_copy_previous') result = await copyPreviousFood(user.id, draft)
-      else if (draft.action === 'food_favorite') result = await saveFavoriteFood(user.id, draft)
-      else if (draft.action === 'food_build_meal') result = await saveBuiltMeal(user.id, draft)
-    } catch (error) {
-      await releaseReviewToken(user.id, draft).catch((releaseError) => {
-        console.error('[native voice assistant] failed to release review token after save error', releaseError)
-      })
-      throw error
+    if (result.kind === 'food' || (result.kind === 'water' && result.foodId)) {
+      void triggerBackgroundRegeneration({ userId: user.id, changeType: 'food', timestamp: new Date() }).catch(() => {})
+      void deleteSmartCoachNotificationsByCategories(user.id, ['meal', 'macro']).catch(() => {})
+    }
+    if (result.kind === 'water') {
+      void deleteSmartCoachNotificationsByCategories(user.id, ['hydration']).catch(() => {})
+    }
+    if (draft.action === 'food_favorite') {
+      const favoriteId = cleanText(draft.food?.favorite?.id, 120)
+      if (favoriteId) void touchStoredFavorite(user.id, favoriteId).catch(() => {})
     }
 
     return NextResponse.json({ success: true, result })

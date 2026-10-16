@@ -19,6 +19,8 @@ import { createNativeVoicePromptHandoff } from '@/lib/native-voice-prompt-handof
 import { findHealthIntakeReviewMatch, type HealthIntakeReviewMatch } from '@/lib/health-intake-review-match'
 import { resolveHelfiTtsVoice } from '@/lib/openai-voice-config'
 import { estimateVoiceExerciseDurationMinutes } from '@/lib/exercise/voice-duration'
+import { servingRatioFromMeasurement } from '@/lib/food/serving-measurements'
+import { normalizeVoiceTimeZone, resolveVoiceWallTime } from '@/lib/native-voice-time'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -26,7 +28,7 @@ export const dynamic = 'force-dynamic'
 const COMMAND_MODEL = process.env.HELFI_VOICE_COMMAND_MODEL || 'gpt-5.5'
 const COMMAND_FAST_MODEL = process.env.HELFI_VOICE_COMMAND_FAST_MODEL || 'gpt-4o-mini'
 const FALLBACK_MODEL = process.env.HELFI_VOICE_COMMAND_FALLBACK_MODEL || 'gpt-5.2'
-const TRANSCRIBE_MODEL = process.env.HELFI_VOICE_TRANSCRIBE_MODEL || 'gpt-4o-mini-transcribe'
+const TRANSCRIBE_MODEL = process.env.HELFI_VOICE_TRANSCRIBE_MODEL || 'gpt-transcribe'
 const TTS_MODEL = process.env.HELFI_VOICE_TTS_MODEL || 'gpt-4o-mini-tts'
 const TTS_VOICE = resolveHelfiTtsVoice()
 const SIMPLE_MIN_CREDITS = 3
@@ -101,6 +103,10 @@ type VoiceDraft = {
   action: VoiceAction
   transcript: string
   localDate: string
+  localTime?: string
+  tzOffsetMin?: number
+  timeZone?: string
+  timingNeedsClarification?: boolean
   summary: string
   confirmationMessage: string
   canConfirm: boolean
@@ -149,6 +155,7 @@ type VoiceDraft = {
     label: string
     category?: string | null
     drinkType?: string | null
+    ingredients?: Array<{ name: string; quantity: any; unit: string | null; display: string }>
     sweetener?: {
       type: 'free' | 'sugar' | 'honey'
       amount?: number | null
@@ -266,7 +273,7 @@ async function rewritePrivateChatPrompt(userId: string, draft: VoiceDraft): Prom
 }
 
 async function sealReviewDraft(userId: string, draft: VoiceDraft): Promise<VoiceDraft> {
-  const preparedDraft = await rewritePrivateChatPrompt(userId, draft)
+  const preparedDraft = await resolveVoiceDrinkDraft(await rewritePrivateChatPrompt(userId, draft))
   if (!preparedDraft?.canConfirm) return preparedDraft
   const enrichedDraft = await enrichHealthIntakeDraftWithCatalogMatches(userId, preparedDraft)
   const reviewableDraft = {
@@ -347,7 +354,7 @@ function voicePaidAccessResponse() {
 
 function localDateFromRequest(raw: unknown, tzOffsetRaw: unknown) {
   const requested = typeof raw === 'string' ? raw.trim() : ''
-  if (/^\d{4}-\d{2}-\d{2}$/.test(requested)) return requested
+  if (isValidLocalDate(requested)) return requested
   const offset = Number(tzOffsetRaw)
   const tzOffsetMin = Number.isFinite(offset) ? offset : new Date().getTimezoneOffset()
   return new Date(Date.now() - tzOffsetMin * 60 * 1000).toISOString().slice(0, 10)
@@ -372,6 +379,7 @@ function transcriptHasDateEvidence(value: string) {
   return (
     /\b(?:today|yesterday|tomorrow|last night|days? ago|hoy|ayer|mañana|anoche|hier|demain|gestern|morgen|oggi|ieri|domani|hoje|ontem|amanhã)\b/.test(text) ||
     /\b\d{4}-\d{2}-\d{2}\b/.test(text) ||
+    /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\b/.test(text) ||
     /\b(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}\b/.test(text) ||
     /(денес|вчера|утре|昨日|今日|明日|昨天|今天|明天|أمس|اليوم|غدًا|غدا)/.test(text)
   )
@@ -380,6 +388,21 @@ function transcriptHasDateEvidence(value: string) {
 function resolveRequestedActionDate(transcript: string, baseLocalDate: string) {
   const text = cleanText(transcript, 1200).toLowerCase()
   if (!text) return baseLocalDate
+
+  const isoDate = text.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0]
+  if (isoDate && isValidLocalDate(isoDate)) return isoDate
+  const months = ['january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 'september', 'october', 'november', 'december']
+  const named = text.match(/\b(\d{1,2})(?:st|nd|rd|th)?\s+(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)(?:\s+(\d{4}))?\b/)
+  const monthFirst = text.match(/\b(jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+(\d{1,2})(?:st|nd|rd|th)?(?:,?\s+(\d{4}))?\b/)
+  if (named || monthFirst) {
+    const monthText = named?.[2] || monthFirst![1]
+    const month = months.findIndex((value) => value.startsWith(monthText)) + 1
+    const day = Number(named?.[1] || monthFirst![2])
+    const year = named?.[3] || monthFirst?.[3] || baseLocalDate.slice(0, 4)
+    const candidate = `${year}-${String(month).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    return candidate
+  }
+  if (/\b(?:tomorrow|mañana|demain|morgen|domani|amanhã)\b/.test(text) || /(утре|明日|明天|غدا)/.test(text)) return shiftLocalDate(baseLocalDate, 1)
 
   // In "the same meal as yesterday", yesterday identifies the source meal,
   // not the date where the new entry should be saved.
@@ -410,6 +433,44 @@ function resolveRequestedActionDate(transcript: string, baseLocalDate: string) {
     if (Number.isFinite(count) && count > 0) return shiftLocalDate(baseLocalDate, -count)
   }
   return baseLocalDate
+}
+
+function requestedLocalTime(transcript: string): string | null {
+  const text = cleanText(transcript, 1600).toLowerCase()
+  if (/\bat noon\b/.test(text)) return '12:00'
+  if (/\bat midnight\b/.test(text)) return '00:00'
+  const clock = text.match(/\b(?:at\s+)?(\d{1,2}):(\d{2})\s*(am|pm)?\b/) || text.match(/\bat\s+(\d{1,2})(?:\s*o['’]?clock)?\s*(am|pm)\b/)
+  if (!clock) return null
+  let hour = Number(clock[1])
+  const minutes = clock[3] ? Number(clock[2]) : clock[2] === 'am' || clock[2] === 'pm' ? 0 : Number(clock[2])
+  const meridiem = clock[3] || (/^(am|pm)$/.test(clock[2]) ? clock[2] : '')
+  if (minutes > 59 || hour > (meridiem ? 12 : 23) || (meridiem && hour < 1)) return null
+  if (meridiem) hour = hour % 12 + (meridiem === 'pm' ? 12 : 0)
+  return `${String(hour).padStart(2, '0')}:${String(minutes).padStart(2, '0')}`
+}
+
+function applyDraftTiming(draft: VoiceDraft, transcript: string, tzOffsetMin: number, previous?: any, timeZoneRaw?: unknown, todayLocalDate = localDateFromRequest(null, tzOffsetMin)): VoiceDraft {
+  const explicitTime = requestedLocalTime(transcript)
+  const isoDate = transcript.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0]
+  const zoneInput = timeZoneRaw || previous?.timeZone || draft.timeZone
+  const timeZone = normalizeVoiceTimeZone(zoneInput)
+  const inheritedTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(previous?.localTime || '') ? previous.localTime : draft.localTime
+  const time = explicitTime || inheritedTime
+  const prepared = { ...draft, ...(time ? { localTime: time } : {}), tzOffsetMin, ...(timeZone ? { timeZone } : {}), timingNeedsClarification: false }
+  const clarification = (message: string): VoiceDraft => ({ ...prepared, canConfirm: false, timingNeedsClarification: true, confirmationMessage: `${message} Nothing has been saved.` })
+  if ((isoDate && !isValidLocalDate(isoDate)) || !isValidLocalDate(draft.localDate)) return clarification('That date is not valid. Please give the correct date.')
+  if (/\b(?:at\s+)?\d{1,2}:\d{2}\s*(?:am|pm)?\b/i.test(transcript) && !explicitTime) return clarification('That time is not valid. Please give the correct time.')
+  if (!time) return prepared
+  if (zoneInput && !timeZone) return clarification('I could not verify the time zone. Please review the date and time in your diary.')
+  if (!timeZone) {
+    if (draft.localDate !== todayLocalDate) return clarification('I need your device time zone to save that date and clock time accurately. Please review it in your diary.')
+    return prepared
+  }
+  const resolved = resolveVoiceWallTime(draft.localDate, time, timeZone)
+  if (resolved.status === 'unique') return { ...prepared, tzOffsetMin: resolved.tzOffsetMin }
+  if (resolved.status === 'ambiguous') return clarification('That clock time happens twice when the clocks change. Please choose another time or review it in your diary.')
+  if (resolved.status === 'nonexistent') return clarification('That clock time does not exist when the clocks change. Please give another time.')
+  return clarification('That date or time is not valid. Please give the correct date and time.')
 }
 
 function cleanText(value: unknown, max = 1000) {
@@ -953,6 +1014,11 @@ function stripIngredientLookupModifiers(value: unknown) {
 
 function stripVoiceFoodCommandWords(value: string) {
   return cleanText(value, 1200)
+    .replace(/\b(?:on\s+)?\d{4}-\d{2}-\d{2}\b/gi, ' ')
+    .replace(/\b(?:at\s+)?\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
+    .replace(/\bat\s+\d{1,2}\s*(?:am|pm)\b/gi, ' ')
+    .replace(/\b(?:on\s+)?(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)(?:,?\s+\d{4})?\b/gi, ' ')
+    .replace(/\b(?:today|yesterday|tomorrow|last night|this morning|this afternoon|tonight)\b/gi, ' ')
     .replace(/\b(can you|could you|please|i want to|i need to|i would like to|i'd like to|help me)\b/gi, ' ')
     .replace(/\b(add|log|logged|lobbed|put|input|record|track|save|create|make|build|enter)\b/gi, ' ')
     .replace(/\b(new|a|an|my|this|that)\b/gi, ' ')
@@ -1161,31 +1227,31 @@ function inferDrinkType(text: string) {
   if (/\bmilk\b/.test(lower)) return 'Milk'
   if (/\bsoft drink|soda|coke zero|coke|cola|lemonade\b/.test(lower)) return 'Soft drink'
   if (/\bwater|hydration\b/.test(lower)) return 'Water'
-  if (/(кафе|еспресо|капучино|лате)/i.test(text)) return 'Coffee'
-  if (/(чај|чаj)/i.test(text)) return 'Tea'
-  if (/(сок)/i.test(text)) return 'Juice'
-  if (/(млеко)/i.test(text)) return 'Milk'
-  if (/(вода|хидратац)/i.test(text)) return 'Water'
-  if (/(café|cafe)/i.test(text)) return 'Coffee'
-  if (/(thé|té)/i.test(text)) return 'Tea'
-  if (/(jus|jugo|zumo)/i.test(text)) return 'Juice'
-  if (/(lait|leche)/i.test(text)) return 'Milk'
-  if (/(eau|agua)/i.test(text)) return 'Water'
-  if (/(caffè|caffe|espresso|latte|cappuccino)/i.test(text)) return 'Coffee'
-  if (/(tè|te)/i.test(text)) return 'Tea'
-  if (/(succo)/i.test(text)) return 'Juice'
-  if (/(latte)/i.test(text)) return 'Milk'
-  if (/(acqua)/i.test(text)) return 'Water'
-  if (/(café|cafe)/i.test(text)) return 'Coffee'
-  if (/(chá|cha)/i.test(text)) return 'Tea'
-  if (/(suco)/i.test(text)) return 'Juice'
-  if (/(leite)/i.test(text)) return 'Milk'
-  if (/(água|agua)/i.test(text)) return 'Water'
-  if (/(kaffee|espresso|latte|cappuccino)/i.test(text)) return 'Coffee'
-  if (/(tee)/i.test(text)) return 'Tea'
-  if (/(saft)/i.test(text)) return 'Juice'
-  if (/(milch)/i.test(text)) return 'Milk'
-  if (/(wasser)/i.test(text)) return 'Water'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(кафе|еспресо|капучино|лате)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Coffee'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(чај|чаj)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Tea'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(сок)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Juice'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(млеко)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Milk'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(вода|хидратац)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Water'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(café|cafe)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Coffee'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(thé|té)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Tea'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(jus|jugo|zumo)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Juice'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(lait|leche)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Milk'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(eau|agua)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Water'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(caffè|caffe|espresso|latte|cappuccino)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Coffee'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(tè|te)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Tea'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(succo)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Juice'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(latte)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Milk'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(acqua)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Water'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(café|cafe)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Coffee'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(chá|cha)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Tea'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(suco)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Juice'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(leite)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Milk'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(água|agua)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Water'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(kaffee|espresso|latte|cappuccino)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Coffee'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(tee)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Tea'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(saft)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Juice'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(milch)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Milk'
+  if (/(?<![A-Za-zÀ-žА-Яа-я])(wasser)(?![A-Za-zÀ-žА-Яа-я])/i.test(text)) return 'Water'
   return ''
 }
 
@@ -1197,16 +1263,74 @@ function sweetenerGrams(amount: number, unit: 'g' | 'tsp' | 'tbsp', type: 'sugar
 
 function parseSweetener(text: string): { type: 'free' | 'sugar' | 'honey'; amount?: number | null; unit?: 'g' | 'tsp' | 'tbsp' | null; grams?: number | null; needsAmount?: boolean } | null {
   const lower = text.toLowerCase()
-  if (/\b(black|plain|unsweetened|sugar[-\s]?free|no sugar|without sugar|zero)\b/.test(lower)) return { type: 'free' }
   const sweetType: 'sugar' | 'honey' | null = /\bhoney\b/.test(lower) ? 'honey' : /\bsugar\b/.test(lower) ? 'sugar' : null
-  if (!sweetType) return null
-  const match = lower.match(/\b(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter)\s*(g|grams?|tsp|teaspoons?|tbsp|tablespoons?)\s+(?:of\s+)?(?:sugar|honey)\b/)
-  if (!match) return { type: sweetType, needsAmount: true }
-  const amount = numberFromWords(match[1]) || Number(match[1])
-  const rawUnit = match[2]
-  const unit: 'g' | 'tsp' | 'tbsp' = rawUnit.startsWith('g') ? 'g' : rawUnit.startsWith('tbsp') || rawUnit.startsWith('tablespoon') ? 'tbsp' : 'tsp'
-  const grams = Number.isFinite(amount) && amount > 0 ? sweetenerGrams(amount, unit, sweetType) : null
-  return { type: sweetType, amount, unit, grams }
+  // A base drink described as unsweetened can still have explicitly added sugar.
+  const match = lower.match(/\b(\d+(?:\.\d+)?|one|two|three|four|five|six|seven|eight|nine|ten|half|quarter)\s*(g|grams?|tsp|teaspoons?|tbsp|tablespoons?)\s+(?:of\s+)?(sugar|honey)\b/)
+  if (match) {
+    const type = match[3] as 'sugar' | 'honey'
+    const amount = numberFromWords(match[1]) || Number(match[1])
+    const rawUnit = match[2]
+    const unit: 'g' | 'tsp' | 'tbsp' = rawUnit.startsWith('g') ? 'g' : rawUnit.startsWith('tbsp') || rawUnit.startsWith('tablespoon') ? 'tbsp' : 'tsp'
+    const grams = Number.isFinite(amount) && amount > 0 ? sweetenerGrams(amount, unit, type) : null
+    return { type, amount, unit, grams, ...(grams == null ? { needsAmount: true } : {}) }
+  }
+  if (/\b(black|plain|unsweetened|sugar[-\s]?free|no sugar|without sugar|zero)\b/.test(lower)) return { type: 'free' }
+  return sweetType ? { type: sweetType, needsAmount: true } : null
+}
+
+function hasMultipleVoiceSweeteners(raw: string) {
+  const additions = raw.replace(/\b(?:no|without)\s+(?:added\s+)?(?:sugar|honey)\b|\bsugar[-\s]?free\b/gi, ' ')
+  return /\bsugar\b/i.test(additions) && /\bhoney\b/i.test(additions)
+}
+
+function multipleSweetenerClarification(transcript: string, localDate: string): VoiceDraft {
+  return { action: 'water', transcript, localDate, summary: 'Drink clarification needed', canConfirm: false, autoSave: false,
+    confirmationMessage: 'This request includes both sugar and honey. Please restate the drink with one sweetener at a time, including its amount. Nothing has been saved.' }
+}
+
+function isPlainVoiceWaterRequest(raw: string, drinkType: string) {
+  if (drinkType !== 'Water') return false
+  if (/\b(?:with|plus|and|milk|honey|lemon|lime|cream|juice|syrup|protein)\b/i.test(raw)) return false
+  const sweetener = parseSweetener(raw)
+  return !sweetener || sweetener.type === 'free'
+}
+
+function voiceDrinkIngredients(raw: string, amountMl: number, drinkType: string, sweetener: ReturnType<typeof parseSweetener>) {
+  const noMilk = /\b(no|without)\s+(?:any\s+)?milk\b|\bblack\b/i.test(raw)
+  const baseText = stripVoiceFoodCommandWords(raw).replace(/^\s*\d+(?:\.\d+)?\s*(?:ml|millilitres?|milliliters?|l|litres?|liters?|(?:fl\s*)?oz|ounces?)\b/i, '')
+    .split(/\b(?:with|plus|and|without|no)\b|,/i)[0]
+    .replace(/\b(?:plain|unsweetened|sugar[-\s]?free|black|zero)\b/gi, ' ').replace(/\s+/g, ' ').trim()
+  const baseName = drinkType === 'Water' ? 'Water' : baseText || drinkType
+  const ingredients: any[] = [{ name: baseName, quantity: amountMl, unit: 'ml', display: `${amountMl} ml ${baseName}` }]
+  const milk = !noMilk && raw.match(/\b(\d+(?:\.\d+)?|one|two|half|quarter)\s*(ml|millilitres?|milliliters?|l|litres?|liters?|tsp|teaspoons?|tbsp|tablespoons?)\s+(?:of\s+)?((?:(?:whole|skim(?:med)?|low[- ]fat|full cream|oat|almond|soy|soya|coconut)\s+)?milk)\b/i)
+  if (drinkType !== 'Milk' && milk) {
+    const quantity = numberFromWords(milk[1])!
+    const unit = normalizeFoodAmountUnit(milk[2])
+    ingredients.push({ name: milk[3], quantity, unit, display: `${quantity} ${unit} ${milk[3]}` })
+  } else if (drinkType !== 'Milk' && !noMilk && /\b(?:with|plus|and)\s+(?:(?:whole|skim|oat|almond|soy)\s+)?milk\b/i.test(raw)) {
+    ingredients.push({ name: 'milk', quantity: null, unit: null, display: 'some milk' })
+  }
+  if (sweetener && sweetener.type !== 'free' && sweetener.grams) ingredients.push({ name: sweetener.type, quantity: sweetener.grams, unit: 'g', display: `${sweetener.grams} g ${sweetener.type}` })
+  const additions = raw.split(/\b(?:with|plus|and)\b|,/i).slice(1)
+  for (const addition of additions) {
+    const text = stripVoiceFoodCommandWords(addition)
+    if (!text || /\b(?:milk|sugar|honey|unsweetened|black|plain)\b/i.test(text) || /^(?:no|without)\b/i.test(text)) continue
+    const ingredient = parseIngredientPhrase(text)
+    if (ingredient) ingredients.push(ingredient)
+  }
+  return ingredients
+}
+
+async function resolveVoiceDrinkDraft(draft: VoiceDraft): Promise<VoiceDraft> {
+  if (draft.action === 'water' && hasMultipleVoiceSweeteners(draft.transcript)) return multipleSweetenerClarification(draft.transcript, draft.localDate)
+  if (draft.action !== 'water' || !draft.water || !draft.water.amountMl || draft.timingNeedsClarification || /That (?:date|time) is not valid/.test(draft.confirmationMessage)) return draft
+  if (isPlainVoiceWaterRequest(draft.transcript, draft.water.drinkType || '')) return { ...draft, canConfirm: true, food: undefined }
+  if (/Should I log|How much (?:sugar|honey|milk)/i.test(draft.confirmationMessage)) return draft
+  const ingredients = draft.water.ingredients?.length ? draft.water.ingredients : voiceDrinkIngredients(draft.transcript, draft.water.amountMl, draft.water.drinkType || draft.water.label, draft.water.sweetener || null)
+  const meal = draft.water.category || 'other'
+  const built = await buildVoiceMealDraft({ meal, mealName: draft.water.label, ingredients }, draft.transcript, draft.localDate)
+  if (!built || !built.canConfirm) return { ...draft, canConfirm: false, food: built?.food, confirmationMessage: built?.confirmationMessage || 'I could not resolve the drink nutrition. Please choose a matching drink and amount. Nothing has been saved.' }
+  return { ...draft, canConfirm: true, food: built.food, summary: `${draft.water.amount} ${draft.water.unit} ${draft.water.label}, ${built.food.nutrition!.calories} kcal`, confirmationMessage: `I can log ${draft.water.amount} ${draft.water.unit} ${draft.water.label} with ${Math.round(built.food.nutrition!.calories)} kcal. Review the ingredients and confirm to save. Nothing has been saved yet.` }
 }
 
 function tryParseWaterRequest(transcript: string, localDate: string, launchContext?: VoiceLaunchContext): VoiceDraft | null {
@@ -1225,7 +1349,7 @@ function tryParseWaterRequest(transcript: string, localDate: string, launchConte
     /(água|agua)/i.test(raw)
   if (!(hasWaterAction && hasDrinkWords) && !(inWaterContext && (amount || hasDrinkWords))) return null
 
-  const drinkType = inferDrinkType(raw) || (inWaterContext ? 'Water' : '')
+  const drinkType = inferDrinkType(raw.split(/\b(?:with|plus|and)\b/i)[0]) || inferDrinkType(raw) || (inWaterContext ? 'Water' : '')
   const meal = inferMealFromText(raw, 'other')
   const category = meal === 'uncategorized' ? 'other' : meal
   if (!amount) {
@@ -1249,8 +1373,9 @@ function tryParseWaterRequest(transcript: string, localDate: string, launchConte
     }
   }
 
+  if (hasMultipleVoiceSweeteners(raw)) return multipleSweetenerClarification(raw, localDate)
   const sweetener = parseSweetener(raw)
-  const isPlainWater = drinkType === 'Water'
+  const isPlainWater = isPlainVoiceWaterRequest(raw, drinkType)
   if (!isPlainWater && !sweetener) {
     return {
       action: 'water',
@@ -1278,20 +1403,23 @@ function tryParseWaterRequest(transcript: string, localDate: string, launchConte
     sweetener && sweetener.type !== 'free' && sweetener.amount && sweetener.unit
       ? ` (${sweetener.type} ${sweetener.amount} ${sweetener.unit})`
       : ''
-  const label = `${drinkType}${sweetenerLabel}`
+  const ingredients = isPlainWater ? [] : voiceDrinkIngredients(raw, amount.amountMl, drinkType, sweetener)
+  const milkLabel = ingredients.slice(1).filter((item) => /milk/i.test(item.name)).map((item) => item.display).join(', ')
+  const label = `${drinkType}${milkLabel ? ` with ${milkLabel}` : ''}${sweetenerLabel}`
   return {
     action: 'water',
     transcript: raw,
     localDate,
     summary: `${amount.amount} ${amount.unit} ${label}`,
-    confirmationMessage: `I can log ${amount.amount} ${amount.unit} ${label}. Review it, then tap Confirm to save.`,
-    canConfirm: true,
+    confirmationMessage: isPlainWater ? `I can log ${amount.amount} ${amount.unit} ${label}. Review it, then tap Confirm to save.` : 'Checking the drink ingredients and nutrition before saving.',
+    canConfirm: isPlainWater,
     autoSave: false,
     water: {
       ...amount,
       label,
       category,
       drinkType,
+      ingredients,
       sweetener: isPlainWater ? null : sweetener || { type: 'free' },
     },
   }
@@ -1350,6 +1478,7 @@ function parseFollowUpDraft(raw: unknown) {
     if (!parsed || typeof parsed !== 'object') return null
     const action = cleanText((parsed as any).action, 40)
     const canConfirm = Boolean((parsed as any).canConfirm)
+    if ((parsed as any).timingNeedsClarification && ['food_build_meal', 'food_draft', 'water'].includes(action)) return parsed
     if (action === 'food_draft') {
       const draftText = cleanText((parsed as any).food?.draftText, 1000)
       if (!draftText) return null
@@ -1358,7 +1487,7 @@ function parseFollowUpDraft(raw: unknown) {
     if (
       action === 'water' &&
       !canConfirm &&
-      /How much liquid should I log|What drink should I log|Should I log\s+.+?\s+as sugar-free, or with sugar or honey|How much\s+(?:sugar|honey)\s+should I add/i.test(
+      /How much liquid should I log|What drink should I log|Should I log\s+.+?\s+as sugar-free, or with sugar or honey|How much\s+(?:sugar|honey|milk)\s+should I add/i.test(
         cleanText((parsed as any).confirmationMessage, 240),
       )
     ) {
@@ -1598,13 +1727,14 @@ function round1(value: unknown) {
   return Math.round(Math.max(0, n) * 10) / 10
 }
 
+function finiteNutrition(value: unknown): number | null {
+  if (value == null || (typeof value !== 'number' && typeof value !== 'string') || String(value).trim() === '') return null
+  const number = Number(value)
+  return Number.isFinite(number) && number >= 0 ? number : null
+}
+
 function hasCoreNutrition(item: any) {
-  return (
-    Number.isFinite(Number(item?.calories ?? item?.calories_kcal)) &&
-    Number.isFinite(Number(item?.protein_g ?? item?.protein)) &&
-    Number.isFinite(Number(item?.carbs_g ?? item?.carbs)) &&
-    Number.isFinite(Number(item?.fat_g ?? item?.fat))
-  )
+  return [item?.calories ?? item?.calories_kcal, item?.protein_g ?? item?.protein, item?.carbs_g ?? item?.carbs, item?.fat_g ?? item?.fat].every((value) => finiteNutrition(value) != null)
 }
 
 function servingGramsFromText(value: unknown) {
@@ -1641,6 +1771,8 @@ function estimateIngredientGrams(nameRaw: string, quantityRaw: unknown, unitRaw:
   const name = compactFoodMatchText(nameRaw)
   const unit = compactFoodMatchText(unitRaw)
   const quantity = numberFromWords(quantityRaw) || 1
+  if (/^(?:oz|ounces?)$/.test(unit)) return quantity * 28.349523125
+  if (/^(?:lb|lbs|pounds?)$/.test(unit)) return quantity * 453.59237
   const explicit = servingGramsFromText(`${quantityRaw || ''} ${unitRaw || ''}`)
   if (explicit) return explicit
   if (unit.includes('gram')) return quantity
@@ -1906,14 +2038,18 @@ function followUpWaterTranscript(draft: any, answerRaw: string) {
     const detail = /^(?:with\b|as\b|sugar[-\s]?free|no sugar|without sugar|black|plain|unsweetened|zero)/i.test(answer)
       ? answer
       : `with ${answer}`
-    return `log ${amountText} ${drinkText} ${detail}`
+    return `log ${cleanText(draft.transcript, 800).replace(/^\s*(?:log|add|record|track)\s+/i, '')} ${detail}`
+  }
+  if (/How much\s+milk\s+should I/i.test(message) && parseWaterAmount(answer)) {
+    const original = cleanText(draft.transcript, 1000)
+    return original.replace(/\b(?:(?:\d+(?:\.\d+)?|one|two|half|quarter)\s*(?:ml|millilitres?|milliliters?|l|litres?|liters?|tsp|teaspoons?|tbsp|tablespoons?)\s+)?((?:(?:whole|skim(?:med)?|oat|almond|soy|full cream)\s+)?milk)\b/i, (_match, name) => `${answer} ${name}`)
   }
   const sweetenerMatch = message.match(/How much\s+(sugar|honey)\s+should I add/i)
   if (sweetenerMatch?.[1]) {
     const amountText = amountTextFromWaterDraft(draft)
     const drinkText = drinkTextFromWaterDraft(draft)
     if (!amountText || !answerLooksLikeFoodAmount(answer)) return null
-    return `log ${amountText} ${drinkText} with ${answer} ${sweetenerMatch[1]}`
+    return `${cleanText(draft.transcript, 800).replace(/\b(?:with\s+)?(?:sugar|honey)\b/gi, ' ')} with ${answer} ${sweetenerMatch[1]}`
   }
   return null
 }
@@ -1966,6 +2102,7 @@ function followUpTranscript(draft: any, answerRaw: string) {
 function isExplicitNewVoiceCommand(value: unknown) {
   const text = cleanText(value, 1200).toLowerCase()
   if (!text) return false
+  if (/\b(?:this|that|current|reviewed)\s+(?:meal|draft|entry|drink)\b/.test(text) || /\b(?:change|correct|update|adjust|instead|remove|without)\b/.test(text)) return false
   const hasCommand = /\b(add|log|record|save|open|show|go to|take me to|create|build|make|track|write)\b/.test(text)
   const hasTarget =
     /\b(food|meal|breakfast|lunch|dinner|snack|snacks|favourites?|favorites?|saved|diary|water|exercise|workout|mood|journal|symptom|symptoms|medication|medicine|supplement|vitamin|health image|photo|camera|insights)\b/.test(text)
@@ -1974,6 +2111,8 @@ function isExplicitNewVoiceCommand(value: unknown) {
 
 function normalizeFoodAmountUnit(unitRaw: string) {
   const unit = cleanText(unitRaw, 24).toLowerCase()
+  if (/^ounces?$/.test(unit)) return 'oz'
+  if (/^(?:lbs?|pounds?)$/.test(unit)) return 'lb'
   if (/^grams?$/.test(unit)) return 'g'
   if (/^(грама?|гр|г)$/.test(unit)) return 'g'
   if (/^tablespoons?$/.test(unit)) return 'tbsp'
@@ -2022,14 +2161,14 @@ function reviewedFoodCountPartForTarget(raw: string, translated: string, targetN
 }
 
 function extractReviewedFoodAmountCorrection(draft: any, answerRaw: string) {
-  if (!draft?.canConfirm || !['food_build_meal', 'food_draft'].includes(draft?.action)) return null
+  if (!['food_build_meal', 'food_draft'].includes(draft?.action)) return null
   const raw = cleanText(answerRaw, 800)
   const meal = cleanText(draft?.food?.meal, 40) || 'snacks'
   const translated = cleanText(translateLocalizedFoodRequest(raw, { section: 'food', title: 'Food Diary', meal }), 1000)
   const lower = translated.toLowerCase()
   const rawHasCorrectionWords = /\b(change|make|set|use|replace|instead|correct|update|adjust)\b/i.test(raw) || /(смени|намести|стави|коригирај|коригираj|замени)/i.test(raw)
   const amountMatch =
-    translated.match(/(\d+(?:[.,]\d+)?)\s*(g|grams?|kg|ml|cup|cups|tbsp|tablespoons?|tsp|teaspoons?|slice|slices|piece|pieces|egg|eggs)\b/i) ||
+    translated.match(/(\d+(?:[.,]\d+)?)\s*(g|grams?|kg|oz|ounces?|lb|lbs|pounds?|ml|cup|cups|tbsp|tablespoons?|tsp|teaspoons?|slice|slices|piece|pieces|egg|eggs)\b/i) ||
     raw.match(/(\d+(?:[.,]\d+)?)\s*(грама?|гр|г)(?=$|[^А-Яа-яЃѓЌќЅѕЉљЊњЈј])/i)
   if (!amountMatch?.[1] || !amountMatch?.[2]) return null
 
@@ -2061,7 +2200,7 @@ function extractReviewedFoodAmountCorrection(draft: any, answerRaw: string) {
 }
 
 function extractReviewedFoodCountCorrection(draft: any, answerRaw: string) {
-  if (!draft?.canConfirm || !['food_build_meal', 'food_draft'].includes(draft?.action)) return null
+  if (!['food_build_meal', 'food_draft'].includes(draft?.action)) return null
   const raw = cleanText(answerRaw, 800)
   if (!hasReviewedCorrectionWords(raw)) return null
 
@@ -2109,7 +2248,7 @@ function voiceMealNameForMeal(meal: string) {
 }
 
 function extractReviewedFoodMealCorrection(draft: any, answerRaw: string) {
-  if (!draft?.canConfirm || !['food_build_meal', 'food_draft'].includes(draft?.action)) return null
+  if (!['food_build_meal', 'food_draft'].includes(draft?.action)) return null
   const raw = cleanText(answerRaw, 800)
   if (!hasReviewedCorrectionWords(raw)) return null
 
@@ -2132,7 +2271,7 @@ function extractReviewedFoodMealCorrection(draft: any, answerRaw: string) {
 }
 
 function extractReviewedFoodAddition(draft: any, answerRaw: string) {
-  if (!draft?.canConfirm || !['food_build_meal', 'food_draft'].includes(draft?.action)) return null
+  if (!['food_build_meal', 'food_draft'].includes(draft?.action)) return null
   const raw = cleanText(answerRaw, 800)
   const currentMeal = cleanText(draft?.food?.meal, 40).toLowerCase() || 'snacks'
   const translated = cleanText(translateLocalizedFoodRequest(raw, { section: 'food', title: 'Food Diary', meal: currentMeal }), 1000)
@@ -2157,20 +2296,19 @@ function extractReviewedFoodAddition(draft: any, answerRaw: string) {
     ? parsedFood.ingredients
         .map((entry: any) => cleanText(entry?.display || entry?.name, 120))
         .filter(Boolean)
-        .slice(0, 6)
     : []
   if (!additions.length) return null
 
   const meal = localizedMealFromText(`${raw} ${translated}`) || cleanText(parsedFood?.meal, 40).toLowerCase() || currentMeal
   return {
-    correctedParts: [...existingParts, ...additions].slice(0, 12),
+    correctedParts: [...existingParts, ...additions],
     meal,
     mealName: cleanText(draft?.food?.mealName, 120) || voiceMealNameForMeal(meal),
   }
 }
 
 function extractReviewedFoodRemoval(draft: any, answerRaw: string) {
-  if (!draft?.canConfirm || !['food_build_meal', 'food_draft'].includes(draft?.action)) return null
+  if (!['food_build_meal', 'food_draft'].includes(draft?.action)) return null
   const raw = cleanText(answerRaw, 800)
   const currentMeal = cleanText(draft?.food?.meal, 40).toLowerCase() || 'snacks'
   const translated = cleanText(translateLocalizedFoodRequest(raw, { section: 'food', title: 'Food Diary', meal: currentMeal }), 1000)
@@ -2218,7 +2356,7 @@ function parseReviewedFoodReplacementParts(raw: string) {
 }
 
 function extractReviewedFoodReplacement(draft: any, answerRaw: string) {
-  if (!draft?.canConfirm || !['food_build_meal', 'food_draft'].includes(draft?.action)) return null
+  if (!['food_build_meal', 'food_draft'].includes(draft?.action)) return null
   const raw = cleanText(answerRaw, 800)
   const replacement = parseReviewedFoodReplacementParts(raw)
   if (!replacement) return null
@@ -2245,14 +2383,13 @@ function extractReviewedFoodReplacement(draft: any, answerRaw: string) {
   const additions = replacementParts
     .map((entry: any) => cleanText(entry?.display || entry?.name, 120))
     .filter(Boolean)
-    .slice(0, 6)
   if (!additions.length) return null
 
   const correctedParts = [...existingParts]
   correctedParts.splice(targetIndex, 1, ...additions)
 
   return {
-    correctedParts: correctedParts.slice(0, 12),
+    correctedParts,
     meal: currentMeal,
     mealName: cleanText(draft?.food?.mealName, 120) || voiceMealNameForMeal(currentMeal),
   }
@@ -2278,33 +2415,48 @@ function extractReviewedNoteCorrectionText(value: string, max = 1200) {
 }
 
 function buildReviewedWaterCorrection(draft: any, answerRaw: string, localDate: string): VoiceDraft | null {
-  if (draft?.action !== 'water' || !draft?.canConfirm) return null
+  if (draft?.action !== 'water' || !draft?.water) return null
   const raw = cleanText(answerRaw, 800)
-  const amount = parseWaterAmount(raw)
-  if (!amount || !hasReviewedCorrectionWords(raw)) return null
-
-  const drinkType = cleanText(draft?.water?.drinkType || draft?.water?.label || inferDrinkType(raw) || 'Water', 48) || 'Water'
-  const sweetener = draft?.water?.sweetener || (drinkType === 'Water' ? null : { type: 'free' })
-  const sweetenerLabel =
-    sweetener && sweetener.type !== 'free' && sweetener.amount && sweetener.unit
-      ? ` (${sweetener.type} ${sweetener.amount} ${sweetener.unit})`
-      : ''
-  const label = `${drinkType}${sweetenerLabel}`
+  if (hasMultipleVoiceSweeteners(raw)) return multipleSweetenerClarification(raw, localDate)
+  if (!hasReviewedCorrectionWords(raw) && !/\b(?:no milk|no sugar|black|unsweetened)\b/i.test(raw)) return null
+  const oldIngredients = draft.water.ingredients?.length ? draft.water.ingredients : draft.water.drinkType === 'Water' ? [{ name: 'Water', quantity: draft.water.amountMl, unit: 'ml', display: `${draft.water.amountMl} ml Water` }] : voiceDrinkIngredients(draft.transcript, draft.water.amountMl, draft.water.drinkType, draft.water.sweetener)
+  let ingredients = oldIngredients.map((item: any) => ({ ...item }))
+  let amount = { amount: draft.water.amount, unit: draft.water.unit, amountMl: draft.water.amountMl }
+  const change = parseWaterAmount(raw)
+  const milkEdit = /\bmilk\b/i.test(raw) && draft.water.drinkType !== 'Milk'
+  if (milkEdit) {
+    const previousMilk = ingredients.find((item: any, index: number) => index > 0 && /\bmilk\b/i.test(item.name))
+    ingredients = ingredients.filter((item: any, index: number) => index === 0 || !/\bmilk\b/i.test(item.name))
+    if (!/\b(?:no|without|remove|delete)\s+(?:the\s+)?milk\b/i.test(raw)) {
+      if (!change) return { ...draft, localDate, canConfirm: false, confirmationMessage: 'How much milk should I add? Please give the amount in ml.' }
+      ingredients.push({ name: raw.match(/(?:whole|skim(?:med)?|oat|almond|soy|full cream)\s+milk/i)?.[0] || previousMilk?.name || 'milk', quantity: change.amountMl, unit: 'ml', display: `${change.amountMl} ml milk` })
+    }
+  } else if (change) {
+    amount = change
+    if (ingredients[0]) ingredients[0] = { ...ingredients[0], quantity: change.amountMl, unit: 'ml', display: `${change.amountMl} ml ${ingredients[0].name}` }
+  }
+  let sweetener = draft.water.sweetener
+  if (/\b(?:sugar|honey|unsweetened|black)\b/i.test(raw)) {
+    sweetener = parseSweetener(raw)
+    ingredients = ingredients.filter((item: any) => !/^(?:sugar|honey)$/i.test(item.name))
+    if (sweetener?.needsAmount) return { ...draft, localDate, canConfirm: false, confirmationMessage: `How much ${sweetener.type} should I add to the ${draft.water.drinkType}?` }
+    if (sweetener && sweetener.type !== 'free') ingredients.push({ name: sweetener.type, quantity: sweetener.grams, unit: 'g', display: `${sweetener.grams} g ${sweetener.type}` })
+  }
+  const requestedType = inferDrinkType(raw)
+  let drinkType = draft.water.drinkType || 'Water'
+  if (requestedType && !milkEdit && !/\b(?:sugar|honey)\b/i.test(raw)) {
+    drinkType = requestedType
+    ingredients[0] = { name: requestedType, quantity: amount.amountMl, unit: 'ml', display: `${amount.amountMl} ml ${requestedType}` }
+  }
+  const meal = inferMealFromText(raw, draft.water.category || 'other')
+  const label = [ingredients[0]?.name || drinkType, ...ingredients.slice(1).map((item: any) => item.display)].join(' with ')
   return {
-    action: 'water',
-    transcript: raw,
-    localDate,
+    ...draft, transcript: `log ${ingredients.map((item: any) => item.display).join(' with ')}`, localDate,
+    canConfirm: drinkType === 'Water' && ingredients.length === 1, autoSave: false,
     summary: `${amount.amount} ${amount.unit} ${label}`,
-    confirmationMessage: `I can update this water draft to ${amount.amount} ${amount.unit} ${label}. Review it, then tap Confirm to save.`,
-    canConfirm: true,
-    autoSave: false,
-    water: {
-      ...amount,
-      label,
-      category: cleanText(draft?.water?.category, 40) || 'other',
-      drinkType,
-      sweetener,
-    },
+    confirmationMessage: 'Checking the corrected drink ingredients and nutrition before saving.',
+    water: { ...amount, drinkType, label, category: meal, sweetener, ingredients },
+    food: undefined,
   }
 }
 
@@ -2568,7 +2720,7 @@ async function buildReviewedDraftCorrection(draft: any, answerRaw: string, local
   if (exerciseCorrection) return exerciseCorrection
 
   const waterCorrection = buildReviewedWaterCorrection(draft, answerRaw, localDate)
-  if (waterCorrection) return waterCorrection
+  if (waterCorrection) return await resolveVoiceDrinkDraft(waterCorrection)
 
   const correction =
     extractReviewedFoodAmountCorrection(draft, answerRaw) ||
@@ -2577,7 +2729,14 @@ async function buildReviewedDraftCorrection(draft: any, answerRaw: string, local
     extractReviewedFoodRemoval(draft, answerRaw) ||
     extractReviewedFoodAddition(draft, answerRaw) ||
     extractReviewedFoodMealCorrection(draft, answerRaw)
-  if (!correction) return null
+  if (!correction) {
+    if (['water', 'food_build_meal', 'food_draft'].includes(draft?.action) && (transcriptHasDateEvidence(answerRaw) || requestedLocalTime(answerRaw))) {
+      if (draft.action === 'water') return resolveVoiceDrinkDraft({ ...draft, localDate, timingNeedsClarification: false, reviewToken: undefined, confirmationMessage: 'Checking the corrected drink date and time.' })
+      const parts = splitIngredientList(cleanText(draft.food?.draftText, 1200))
+      return buildVoiceMealDraft({ meal: draft.food?.meal, mealName: draft.food?.mealName, ingredients: parts.map(parseIngredientPhrase).filter(Boolean) }, draft.transcript, localDate)
+    }
+    return null
+  }
   const draftText = correction.correctedParts.join(', ')
   return buildVoiceMealDraft(
     {
@@ -2592,6 +2751,7 @@ async function buildReviewedDraftCorrection(draft: any, answerRaw: string, local
 }
 
 function ingredientNeedsAmountClarification(ingredient: any) {
+  if (ingredient?.quantity != null && numberFromWords(ingredient.quantity) == null) return true
   const display = cleanText([ingredient?.display, ingredient?.quantity, ingredient?.name].filter(Boolean).join(' '), 180)
   if (!/\b(?:some|a few|few|couple(?: of)?|a couple(?: of)?|handful(?: of)?|a handful(?: of)?|bit(?: of)?|a bit(?: of)?|little(?: bit)?(?: of)?|a little(?: bit)?(?: of)?|several)\b/i.test(display)) return false
   if (numberFromWords(ingredient?.quantity)) return false
@@ -2606,13 +2766,12 @@ function splitIngredientList(value: string) {
     .split(',')
     .map((part) => cleanText(part.replace(/[.?!]+$/g, ''), 120))
     .filter(Boolean)
-    .slice(0, 12)
 }
 
 function parseIngredientPhrase(value: string) {
-  const text = cleanText(value, 160)
+  const text = cleanText(value, 160).replace(/^(\d+(?:\.\d+)?)(?=(?:g|kg|ml|oz|lbs?)\b)/i, '$1 ')
   const match = text.match(
-    /^(?:(one|two|three|four|five|six|seven|eight|nine|ten|half|\d+(?:\.\d+)?)\s+)?(?:(cup|cups|slice|slices|egg|eggs|gram|grams|g|kg|ml|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp)\s+(?:of\s+)?)?(.+)$/i,
+    /^(?:(one|two|three|four|five|six|seven|eight|nine|ten|half|\d+(?:\.\d+)?)\s+)?(?:(cup|cups|slice|slices|egg|eggs|gram|grams|g|kg|oz|ounce|ounces|lb|lbs|pound|pounds|ml|millilitres|milliliters|l|litres|liters|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp)\s+(?:of\s+)?)?(.+)$/i,
   )
   if (!match) return normalizeIngredientRequest(text)
   const quantity = match[1] || null
@@ -3625,16 +3784,37 @@ async function findExactCustomPlainFood(lookupQueries: string[]) {
   return null
 }
 
-function itemCore(item: any, grams: number) {
-  const baseGrams = servingGramsFromText(item?.serving_size) || 100
-  const scale = baseGrams > 0 ? grams / baseGrams : 1
-  const calories = Math.round(Number(item?.calories ?? item?.calories_kcal ?? 0) * scale)
-  const protein = round1(Number(item?.protein_g ?? item?.protein ?? 0) * scale)
-  const carbs = round1(Number(item?.carbs_g ?? item?.carbs ?? 0) * scale)
-  const fat = round1(Number(item?.fat_g ?? item?.fat ?? 0) * scale)
-  const fiber = round1(Number(item?.fiber_g ?? item?.fiber ?? 0) * scale)
-  const sugar = round1(Number(item?.sugar_g ?? item?.sugar ?? 0) * scale)
-  return { calories, protein, carbs, fat, fiber, sugar, grams: Math.round(grams) }
+function itemCore(item: any, grams: number, servingRatio?: number) {
+  const baseGrams = servingGramsFromText(item?.serving_size)
+  const scale = servingRatio ?? (baseGrams && grams > 0 ? grams / baseGrams : NaN)
+  if (!hasCoreNutrition(item) || !Number.isFinite(scale) || scale <= 0) return null
+  const scaled = (value: unknown) => {
+    const number = finiteNutrition(value)
+    return number == null ? null : number * scale
+  }
+  const calories = scaled(item?.calories ?? item?.calories_kcal)!
+  const protein = scaled(item?.protein_g ?? item?.protein)!
+  const carbs = scaled(item?.carbs_g ?? item?.carbs)!
+  const fat = scaled(item?.fat_g ?? item?.fat)!
+  const fiber = scaled(Object.prototype.hasOwnProperty.call(item, 'fiber_g') ? item.fiber_g : item?.fiber)
+  const sugar = scaled(Object.prototype.hasOwnProperty.call(item, 'sugar_g') ? item.sugar_g : item?.sugar)
+  return { calories, protein, carbs, fat, fiber, sugar, grams }
+}
+
+function requestedIngredientBasis(ingredient: any, found: any) {
+  const quantity = numberFromWords(ingredient.quantity) || 1
+  const unit = normalizeFoodAmountUnit(ingredient.unit || '')
+  const physicalUnit = unit === 'kg' ? 'g' : /^(l|litres?|liters?)$/.test(unit) ? 'ml' : /^(millilitres?|milliliters?)$/.test(unit) ? 'ml' : unit === 'lb' ? 'oz' : unit
+  const physicalAmount = unit === 'kg' ? quantity * 1000 : /^(l|litres?|liters?)$/.test(unit) ? quantity * 1000 : unit === 'lb' ? quantity * 16 : quantity
+  if (physicalUnit && ['g', 'oz', 'ml', 'cup', 'tbsp', 'tsp', 'slice'].includes(physicalUnit)) {
+    const ratio = servingRatioFromMeasurement(found, physicalAmount, physicalUnit as any)
+    if (ratio == null) return null
+    return { ratio, label: `${physicalAmount} ${physicalUnit}`, estimated: false }
+  }
+  if (unit && !/^(each|pieces?|eggs?|slices?)$/.test(unit)) return null
+  const grams = estimateIngredientGrams(ingredient.name, ingredient.quantity, ingredient.unit)
+  const ratio = servingRatioFromMeasurement(found, grams, 'g')
+  return ratio == null ? null : { ratio, label: `${grams} g estimated`, estimated: true }
 }
 
 function normalizeFoodItem(item: any): NormalizedFoodItem | null {
@@ -3719,6 +3899,13 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
   const mealName =
     cleanText(parsedFood?.mealName || parsedFood?.title, 120) ||
     `${meal === 'uncategorized' ? 'Meal' : `${meal.charAt(0).toUpperCase()}${meal.slice(1)}`} from voice`
+  if (parsedIngredients.length > 12) {
+    return {
+      action: 'food_draft' as const, transcript, localDate, summary: 'Meal needs a smaller ingredient list', canConfirm: false, autoSave: false,
+      confirmationMessage: `This meal has ${parsedIngredients.length} ingredients. I can prepare up to 12 at a time. Please remove an ingredient or split the request into separate meals. Nothing has been saved.`,
+      food: { meal, mealName, draftText: parsedIngredients.map((entry: any) => entry.display || entry.name).join(', '), entries: parsedIngredients.map((entry: any) => ({ name: entry.display || entry.name, meal })) },
+    }
+  }
   const vagueIngredients = parsedIngredients.filter(ingredientNeedsAmountClarification)
   if (vagueIngredients.length) {
     const names = vagueIngredients
@@ -3743,11 +3930,12 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
   }
 
   const resolved = await Promise.all(
-    parsedIngredients.slice(0, 12).map(async (ingredient: any) => {
+    parsedIngredients.map(async (ingredient: any) => {
       const found = await findFoodIngredient(ingredient.name)
       if (!found) return { ingredient, found: null }
-      const grams = estimateIngredientGrams(ingredient.name, ingredient.quantity, ingredient.unit)
-      const core = itemCore(found, grams)
+      const basis = requestedIngredientBasis(ingredient, found)
+      const core = basis ? itemCore(found, 0, basis.ratio) : null
+      if (!core || !basis) return { ingredient, found: null }
       return {
         ingredient,
         found,
@@ -3758,7 +3946,9 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
           label: found.name,
           requestedName: ingredient.name,
           requestedAmount: ingredient.display,
-          serving_size: `${core.grams} g estimated`,
+          serving_size: basis.label,
+          nutritionCoversServing: true,
+          estimatedPortion: basis.estimated,
           calories: core.calories,
           calories_kcal: core.calories,
           protein_g: core.protein,
@@ -3772,8 +3962,6 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
   )
 
   const found = resolved.filter((entry) => entry.found && entry.item)
-  if (found.length === 0) return null
-
   const missing = resolved.filter((entry) => !entry.found).map((entry) => entry.ingredient.name)
   const totals = found.reduce(
     (acc, entry: any) => {
@@ -3781,54 +3969,53 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
       acc.protein += Number(entry.core.protein) || 0
       acc.carbs += Number(entry.core.carbs) || 0
       acc.fat += Number(entry.core.fat) || 0
-      acc.fiber += Number(entry.core.fiber) || 0
-      acc.sugar += Number(entry.core.sugar) || 0
+      acc.fiber = acc.fiber == null || entry.core.fiber == null ? null : acc.fiber + entry.core.fiber
+      acc.sugar = acc.sugar == null || entry.core.sugar == null ? null : acc.sugar + entry.core.sugar
       return acc
     },
-    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
+    { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null },
   )
   const nutrition = {
     calories: Math.round(totals.calories),
     calories_kcal: Math.round(totals.calories),
-    protein: round1(totals.protein),
-    protein_g: round1(totals.protein),
-    carbs: round1(totals.carbs),
-    carbs_g: round1(totals.carbs),
-    fat: round1(totals.fat),
-    fat_g: round1(totals.fat),
-    fiber: round1(totals.fiber),
-    fiber_g: round1(totals.fiber),
-    sugar: round1(totals.sugar),
-    sugar_g: round1(totals.sugar),
+    protein: totals.protein,
+    protein_g: totals.protein,
+    carbs: totals.carbs,
+    carbs_g: totals.carbs,
+    fat: totals.fat,
+    fat_g: totals.fat,
+    fiber: totals.fiber == null ? null : totals.fiber,
+    fiber_g: totals.fiber == null ? null : totals.fiber,
+    sugar: totals.sugar == null ? null : totals.sugar,
+    sugar_g: totals.sugar == null ? null : totals.sugar,
     __voiceBuiltMeal: true,
   }
   const items = found.map((entry: any) => entry.item)
   const entries = found.map((entry: any) => ({
     name: entry.ingredient.display || entry.ingredient.name,
-    description: `${entry.found.name} - ${entry.core.grams} g estimated`,
+    description: `${entry.found.name} - ${entry.item.serving_size}`,
     meal,
   }))
   const ingredientList = entries.map((entry) => entry.name).join(', ')
-  const missingLine = missing.length ? ` I could not find ${missing.join(', ')}, so please check before saving.` : ''
-  const isSingleIngredient = items.length === 1
+  const isSingleIngredient = parsedIngredients.length === 1
   const displayName = isSingleIngredient ? entries[0]?.name || items[0]?.name || mealName : mealName
 
   return {
-    action: 'food_build_meal' as const,
+    action: (missing.length ? 'food_draft' : 'food_build_meal') as 'food_draft' | 'food_build_meal',
     transcript,
     localDate,
-    summary: `${displayName}, ${nutrition.calories} kcal`,
+    summary: missing.length ? 'Food details needed' : `${displayName}, ${nutrition.calories} kcal`,
     confirmationMessage: missing.length
-      ? `I found these ingredients for ${meal}: ${ingredientList}.${missingLine} Review the estimated amounts, then tap Confirm if it looks right.`
+      ? `I cannot finish this meal yet. Please clarify ${missing.join(', ')} with a supported amount or choose a matching food. Nothing has been saved.`
       : isSingleIngredient
       ? `I found ${displayName} for ${meal}. Review the estimate, then tap Confirm to save it.`
       : `I found these ingredients for ${meal}: ${ingredientList}. Review the estimates, then tap Confirm to save them.`,
-    canConfirm: true,
+    canConfirm: missing.length === 0,
     autoSave: false,
     food: {
       meal,
       mealName: displayName,
-      draftText: ingredientList,
+      draftText: parsedIngredients.map((entry: any) => entry.display || entry.name).join(', '),
       entries,
       items,
       nutrition,
@@ -3951,10 +4138,9 @@ async function transcribeAudio(openai: OpenAI, file: File, userId: string, durat
   const response = await openai.audio.transcriptions.create({
     model: TRANSCRIBE_MODEL,
     file,
-    response_format: 'text',
   } as any)
   const text = typeof response === 'string' ? response : String((response as any)?.text || '')
-  const costCents = estimateTranscriptionCostCents(durationSeconds)
+  const costCents = estimateTranscriptionCostCents(durationSeconds, TRANSCRIBE_MODEL)
   await logAiUsageEvent({
     feature: 'voice-assistant:transcribe',
     userId,
@@ -4820,14 +5006,8 @@ async function normalizeDraft(
   conversationHistory: VoiceConversationTurn[] = [],
 ): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
   const parsedAction = cleanText(parsed?.action, 40).toLowerCase()
-  const parsedLocalDate = cleanText(parsed?.localDate, 20)
-  if (
-    parsedAction !== 'food_copy_previous' &&
-    isValidLocalDate(parsedLocalDate) &&
-    transcriptHasDateEvidence(transcript)
-  ) {
-    localDate = parsedLocalDate
-  }
+  // The request date has already been resolved from explicit speech evidence.
+  // A model-proposed date cannot silently replace it.
   if (hasSelfHarmRisk(transcript)) {
     return { aiCostCents: 0, draft: buildSelfHarmSupportDraft(transcript, localDate) }
   }
@@ -5134,44 +5314,14 @@ async function normalizeDraft(
 
   if (action === 'water') {
     const water = parsed?.water || {}
-    const amount = Number(water?.amount)
-    const unit = normalizeWaterUnit(String(water?.unit || ''))
-    const drinkType = cleanText(water?.label || water?.drinkType || 'Water', 48) || 'Water'
-    if (!Number.isFinite(amount) || amount <= 0 || !unit) {
-      return {
-        aiCostCents,
-        draft: {
-          action: 'water',
-          transcript,
-          localDate,
-          summary: 'Water amount needed',
-          confirmationMessage: 'How much liquid should I log? For example, say "Log 500 ml water."',
-          canConfirm: false,
-        },
-      }
+    const parsedWater = tryParseWaterRequest(transcript, localDate, launchContext)
+    if (parsedWater) return { aiCostCents, draft: await resolveVoiceDrinkDraft(parsedWater) }
+    const amount = Number(water.amount)
+    const unit = normalizeWaterUnit(String(water.unit || ''))
+    if (unit && amount > 0 && Number.isFinite(amount) && /^(?:water)$/i.test(cleanText(water.label || water.drinkType, 80)) && transcript.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))).includes(String(amount))) {
+      return { aiCostCents, draft: tryParseWaterRequest(`log ${amount} ${unit} water`, localDate)! }
     }
-    const amountMl = waterAmountToMl(amount, unit)
-    return {
-      aiCostCents,
-      draft: {
-        action: 'water',
-        transcript,
-        localDate,
-        summary: `${amount} ${unit} ${drinkType}`,
-        confirmationMessage: `I can log ${amount} ${unit} ${drinkType}. Review it, then tap Confirm to save.`,
-        canConfirm: true,
-        autoSave: false,
-        water: {
-          amount,
-          unit,
-          amountMl,
-          label: drinkType,
-          category: inferMealFromText(transcript, 'other'),
-          drinkType,
-          sweetener: drinkType === 'Water' ? null : { type: 'free' },
-        },
-      },
-    }
+    return { aiCostCents, draft: { action: 'water', transcript, localDate, summary: 'Drink details needed', canConfirm: false, confirmationMessage: 'Please tell me the drink, amount and any milk, sugar or honey. Nothing has been saved.' } }
   }
 
   if (action === 'food_copy_previous') {
@@ -5302,6 +5452,7 @@ export async function POST(request: NextRequest) {
     let transcript = ''
     let localDate = ''
     let tzOffsetMin = new Date().getTimezoneOffset()
+    let timeZoneRaw: unknown
     let wantsVoiceReply = false
     let durationSeconds = 30
     let transcriptionCostCents = 0
@@ -5317,6 +5468,7 @@ export async function POST(request: NextRequest) {
       const form = await request.formData()
       const file = form.get('audio') || form.get('file')
       transcript = cleanText(form.get('transcript'), 2000)
+      timeZoneRaw = form.get('timeZone')
       tzOffsetMin = Number(form.get('tzOffsetMin'))
       if (!Number.isFinite(tzOffsetMin)) tzOffsetMin = new Date().getTimezoneOffset()
       localDate = localDateFromRequest(form.get('localDate'), tzOffsetMin)
@@ -5336,7 +5488,7 @@ export async function POST(request: NextRequest) {
         if (!aiConsentGranted) return NextResponse.json({ error: 'AI sharing consent is required before voice audio can be sent to AI.' }, { status: 403 })
         const estimatedVoiceCost = Math.max(
           SIMPLE_MIN_CREDITS,
-          estimateTranscriptionCostCents(durationSeconds) + (wantsVoiceReply ? VOICE_REPLY_MIN_CREDITS : 0),
+          estimateTranscriptionCostCents(durationSeconds, TRANSCRIBE_MODEL) + (wantsVoiceReply ? VOICE_REPLY_MIN_CREDITS : 0),
         )
         const preflightWallet = await new CreditManager(user.id).getWalletStatus()
         if (!hasPaidVoiceWalletAccess(preflightWallet)) {
@@ -5357,6 +5509,7 @@ export async function POST(request: NextRequest) {
     } else {
       const body = await request.json().catch(() => ({} as any))
       transcript = cleanText(body?.transcript || body?.message, 2000)
+      timeZoneRaw = body?.timeZone
       tzOffsetMin = Number(body?.tzOffsetMin)
       if (!Number.isFinite(tzOffsetMin)) tzOffsetMin = new Date().getTimezoneOffset()
       localDate = localDateFromRequest(body?.localDate, tzOffsetMin)
@@ -5371,8 +5524,12 @@ export async function POST(request: NextRequest) {
     }
 
     transcript = cleanWakePhrase(transcript)
-    const explicitNewCommand = isExplicitNewVoiceCommand(transcript)
+    const todayLocalDate = localDateFromRequest(null, tzOffsetMin)
+    let editableDraft = confirmationDraft || followUpDraft
+    const reviewedFoodEdit = editableDraft && (extractReviewedFoodAddition(editableDraft, transcript) || extractReviewedFoodMealCorrection(editableDraft, transcript))
+    const explicitNewCommand = !reviewedFoodEdit && isExplicitNewVoiceCommand(transcript)
     if (explicitNewCommand) {
+      editableDraft = null
       confirmationDraft = null
       followUpDraft = null
     }
@@ -5382,7 +5539,8 @@ export async function POST(request: NextRequest) {
     if (/^\d{4}-\d{2}-\d{2}$/.test(activeDraftDate)) localDate = activeDraftDate
     transcript = explicitNewCommand ? transcript : followUpTranscript(followUpDraft, transcript) || transcript
     if (!transcript) return NextResponse.json({ error: 'No speech found' }, { status: 400 })
-    localDate = resolveRequestedActionDate(transcript, localDate)
+    localDate = resolveRequestedActionDate(transcript, transcriptHasDateEvidence(transcript) ? todayLocalDate : localDate)
+    const sealDraft = (draft: VoiceDraft) => sealReviewDraft(user.id, applyDraftTiming(draft, transcript, tzOffsetMin, confirmationDraft || followUpDraft, timeZoneRaw, todayLocalDate))
     if (wantsVoiceReply && !aiConsentGranted) {
       return NextResponse.json({ error: 'AI sharing consent is required before spoken replies can be created.' }, { status: 403 })
     }
@@ -5391,7 +5549,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, buildSelfHarmSupportDraft(transcript, localDate)),
+        draft: await sealDraft(buildSelfHarmSupportDraft(transcript, localDate)),
         audio: null,
         chargedCredits: 0,
         voiceReply: false,
@@ -5458,7 +5616,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const correctedDraft = confirmationDraft ? await buildReviewedDraftCorrection(confirmationDraft, transcript, localDate) : null
+    const correctedDraft = editableDraft ? await buildReviewedDraftCorrection(editableDraft, transcript, localDate) : null
     if (correctedDraft) {
       let aiCostCents = transcriptionCostCents
       const chargeCents = 0
@@ -5479,7 +5637,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, correctedDraft),
+        draft: await sealDraft(correctedDraft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5532,7 +5690,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5543,7 +5701,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, earlyFavoriteDraft),
+        draft: await sealDraft(earlyFavoriteDraft),
         confirmNow: true,
         audio: null,
         chargedCredits: transcriptionCostCents > 0 ? Math.max(SIMPLE_MIN_CREDITS, transcriptionCostCents) : 0,
@@ -5554,7 +5712,7 @@ export async function POST(request: NextRequest) {
       let aiCostCents = transcriptionCostCents
       let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
       let audio: string | null = null
-      const sealedDraft = await sealReviewDraft(user.id, {
+      const sealedDraft = await sealDraft({
         ...earlyFavoriteDraft,
         confirmationMessage: `${earlyFavoriteDraft.confirmationMessage} I have not saved it yet. Say "confirm" to add it to your diary.`,
       })
@@ -5652,7 +5810,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5697,7 +5855,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5742,7 +5900,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5794,7 +5952,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5841,7 +5999,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5892,7 +6050,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -5946,7 +6104,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, fastRealtimeDraft),
+        draft: await sealDraft(fastRealtimeDraft),
         audio: null,
         chargedCredits: chargeCents,
         voiceReply: false,
@@ -6005,7 +6163,7 @@ export async function POST(request: NextRequest) {
         return NextResponse.json({
           success: true,
           transcript,
-          draft: await sealReviewDraft(user.id, draft),
+          draft: await sealDraft(draft),
           audio,
           chargedCredits: chargeCents,
           voiceReply: Boolean(audio),
@@ -6059,7 +6217,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -6109,7 +6267,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -6160,7 +6318,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -6197,7 +6355,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio: null,
         chargedCredits: chargeCents,
         voiceReply: false,
@@ -6247,7 +6405,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -6302,7 +6460,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealReviewDraft(user.id, draft),
+        draft: await sealDraft(draft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),
@@ -6440,7 +6598,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({
       success: true,
       transcript,
-      draft: await sealReviewDraft(user.id, draft),
+      draft: await sealDraft(draft),
       audio,
       chargedCredits: chargeCents,
       voiceReply: Boolean(audio),

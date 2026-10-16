@@ -14,6 +14,21 @@ const audioRoutePath = path.join(root, 'native/ios/Helfi/HelfiAudioRoute.m')
 const creditSystemPath = path.join(root, 'lib/credit-system.ts')
 const voiceDurationPath = path.join(root, 'lib/exercise/voice-duration.ts')
 
+// Load the actual pure measurement modules; never invent conversion stubs.
+const measurementModules = new Map()
+const measurementAllowlist = new Set(['lib/native-voice-time.ts', 'native/src/lib/foodUnits.ts', 'lib/food/serving-measurements.ts', 'lib/food/measurement-units.ts', 'lib/food/produce-measurements.ts', 'lib/food/dry-food-measurements.ts', 'lib/food/dairy-semi-solid-measurements.ts'])
+function loadMeasurementModule(relative) {
+  if (!measurementAllowlist.has(relative)) throw new Error(`Unexpected measurement dependency: ${relative}`)
+  if (measurementModules.has(relative)) return measurementModules.get(relative)
+  const module = { exports: {} }
+  const code = ts.transpileModule(fs.readFileSync(path.join(root, relative), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
+  vm.runInNewContext(code, { module, exports: module.exports, require: request => loadMeasurementModule(path.posix.normalize(path.posix.join(path.posix.dirname(relative), request)) + '.ts') }, { filename: relative })
+  measurementModules.set(relative, module.exports)
+  return module.exports
+}
+const actualMeasurements = loadMeasurementModule('lib/food/serving-measurements.ts')
+const actualVoiceTimes = loadMeasurementModule('lib/native-voice-time.ts')
+
 let source = fs.readFileSync(routePath, 'utf8')
 const realtimeSource = fs.existsSync(realtimeRoutePath) ? fs.readFileSync(realtimeRoutePath, 'utf8') : ''
 const voiceAssistantSource = fs.existsSync(voiceAssistantPath) ? fs.readFileSync(voiceAssistantPath, 'utf8') : ''
@@ -545,7 +560,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(/log 500 ml coffee no sugar/i.test(portugueseNoSugarFollowUp || ''), 'Water follow-up must understand Portuguese no-sugar wording.')
 
   const honeyAmountDraft = tryParseWaterRequest('500 ml coffee with one teaspoon honey', localDate, waterContext)
-  assert(honeyAmountDraft?.canConfirm === true, 'One teaspoon honey should create a reviewable drink draft.')
+  assert(honeyAmountDraft?.canConfirm === false, 'A honey drink cannot confirm before its base and honey nutrition are resolved.')
   assert(honeyAmountDraft?.water?.sweetener?.amount === 1, 'One teaspoon honey must store amount 1.')
   assert(honeyAmountDraft?.water?.sweetener?.unit === 'tsp', 'One teaspoon honey must store tsp unit.')
   assert(honeyAmountDraft?.water?.sweetener?.type === 'honey', 'One teaspoon honey must store honey type.')
@@ -1726,6 +1741,8 @@ const compiled = ts.transpileModule(`${source}\n${appended}`, {
 }).outputText
 
 const sandbox = {
+  ...actualMeasurements,
+  ...actualVoiceTimes,
   console,
   URLSearchParams,
   URL,
@@ -1826,7 +1843,7 @@ const sandbox = {
     }
     return rows
   },
-  process: { env: { ...process.env, OPENAI_API_KEY: '' } },
+  process: { env: {} },
   globalThis: {},
 }
 

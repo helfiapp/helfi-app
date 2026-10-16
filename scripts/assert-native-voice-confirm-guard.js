@@ -701,7 +701,7 @@ if (!/accessibilityLabel="Delete chat"/.test(native) || !/delete_conversation/.t
   failures.push('Talk to Helfi must offer visible and spoken conversation deletion without touching saved health records.')
 }
 
-if (!/idempotentReplay:\s*true/.test(confirmRoute) || !/Nothing was duplicated/.test(confirmRoute)) {
+if (!/idempotentReplay:\s*true/.test(confirmRoute) || !/completedReviewResult/.test(confirmRoute)) {
   failures.push('Repeated save confirmation must return success without creating a duplicate record.')
 }
 
@@ -967,7 +967,7 @@ if (
 }
 
 for (const [action, handler] of requiredSaveHandlers) {
-  if (!new RegExp(`draft\\.action === '${action}'[\\s\\S]*?${handler}\\(user\\.id, draft\\)`).test(confirmRoute)) {
+  if (!new RegExp(`draft\\.action === '${action}'[\\s\\S]*?${handler}\\(user\\.id, draft(?:, tx)?\\)`).test(confirmRoute)) {
     failures.push(`Confirm route must keep ${action} save support.`)
   }
 }
@@ -980,20 +980,20 @@ if (!/amountMl > 10000/.test(confirmRoute) || !/Water amount is outside the safe
   failures.push('Confirm route must cap water saves by converted millilitres, not only the raw spoken number.')
 }
 
-if (!/verifyNativeVoiceDraft\(user\.id,\s*draft\)/.test(confirmRoute) || !/sealReviewDraft\(user\.id,\s*draft\)/.test(route) || !/signNativeVoiceDraft/.test(reviewToken) || !/timingSafeEqual/.test(reviewToken) || !/NODE_ENV === 'production'/.test(reviewToken)) {
+if (!/verifyNativeVoiceDraft\(user\.id,\s*draft\)/.test(confirmRoute) || !/sealReviewDraft\(user\.id,\s*applyDraftTiming\(draft,/.test(route) || !/signNativeVoiceDraft/.test(reviewToken) || !/timingSafeEqual/.test(reviewToken) || !/NODE_ENV === 'production'/.test(reviewToken)) {
   failures.push('Confirm route must only save Talk to Helfi drafts with a valid signed review token.')
 }
 
 if (
   !/reviewNonce:\s*crypto\.randomUUID\(\)/.test(route) ||
   !/reviewIssuedAt:\s*Date\.now\(\)/.test(route) ||
-  !/markReviewTokenUsed\(user\.id,\s*draft\)/.test(confirmRoute) ||
-  !/prisma\.verificationToken\.create/.test(confirmRoute) ||
+  !/markReviewTokenUsed\(user\.id,\s*draft(?:, tx)?\)/.test(confirmRoute) ||
+  !/db\.verificationToken\.create/.test(confirmRoute) ||
   !/P2002/.test(confirmRoute) ||
-  !/already saved/i.test(confirmRoute) ||
-  !/releaseReviewToken\(user\.id,\s*draft\)/.test(confirmRoute)
+  !/completeReviewToken/.test(confirmRoute) ||
+  !/prisma\.\$transaction/.test(confirmRoute) || !/voice_save_result_unconfirmed/.test(confirmRoute) || !/NATIVE_VOICE_REVIEW_MAX_AGE_MS/.test(reviewToken)
 ) {
-  failures.push('Confirm route must keep one-use Talk to Helfi review tokens to prevent duplicates and release failed saves for a safe retry.')
+  failures.push('Confirm route must atomically save food/drinks with completed receipts, bound review age, and never claim pending results were saved.')
 }
 
 if (
@@ -1012,7 +1012,7 @@ if (!/triggerBackgroundRegeneration/.test(confirmRoute) || !/deleteSmartCoachNot
   failures.push('Confirm route must keep food save refresh/regeneration hooks.')
 }
 
-if (!/estimatedVoiceCost/.test(route) || !/estimateTranscriptionCostCents\(durationSeconds\)[\s\S]*?preflightWallet/.test(route)) {
+if (!/estimatedVoiceCost/.test(route) || !/estimateTranscriptionCostCents\(durationSeconds, TRANSCRIBE_MODEL\)[\s\S]*?preflightWallet/.test(route)) {
   failures.push('Voice audio transcription must check credits before sending audio to AI.')
 }
 
@@ -1079,4 +1079,16 @@ if (failures.length) {
   process.exit(1)
 }
 
+// Execute the save/draft/client/protocol regressions as part of the existing
+// required build guard. These use synthetic fixtures and never load app secrets.
+const { execFileSync } = require('node:child_process')
+for (const regression of [
+  'voice-save-integrity-check.cjs',
+  'voice-draft-integrity-check.cjs',
+  'voice-sign-save-integration-check.cjs',
+  'voice-client-integrity-check.cjs',
+  'voice-live-protocol-check.cjs',
+]) {
+  execFileSync(process.execPath, [path.join(root, 'scripts', regression)], { cwd: root, stdio: 'inherit' })
+}
 console.log('Native voice confirm guard passed.')
