@@ -49,7 +49,7 @@
       ]
     }
   ],
-  "updatedAt": "2026-10-16T19:17:58.438102+00:00",
+  "updatedAt": "2026-10-16T19:34:42.402826+00:00",
   "limits": [
     "No physical microphone recognition or audible greeting proof from typed/synthetic tests",
     "No new repair deployment/build/install yet",
@@ -301,5 +301,61 @@
     "newProviderTtsRequestForWelcome": false,
     "physicalSpeechRecognitionVerified": false,
     "auditoryVerification": false
+  },
+  "twoServingRecipeLibraryActualAppTest": {
+    "request": "Create and save a recipe called Voice repair test two serving banana milk. It makes two servings. Ingredients are 100 grams of banana and100 millilitres of whole milk. The step is blend the banana and milk until smooth. Save it to my recipe library without logging that I ate it.",
+    "confirmation": "Yes, save it.",
+    "id": "6ddada17-199d-4132-b7c4-ee4a442d8078",
+    "nativeFavoritesLabel": "2 servings,151kcal",
+    "exactCalories": 150.8,
+    "portionAmount": 2,
+    "recipeYield": 2,
+    "portionScale": 1,
+    "fiber": null,
+    "ingredientCount": 2,
+    "foodDiaryCountBeforeAndAfter": 2,
+    "physicalMicrophoneTest": false
+  },
+  "pipelineFirstAttempt": {
+    "commit": "3a4e384e158941be6c532589c0c5e7926bb6c2f9",
+    "awsJob": "127",
+    "deploymentOccurred": false,
+    "result": "Build failed in deterministic device-host test fixture: reviewed17Oct coupled to real UTC16Oct machine clock",
+    "repair": "Only fixture clock fixed; UTC/Melbourne/LosAngeles client suite and full required UTC voice guard passed; real future-date refusal retained",
+    "signedBuild50OfficialAppleValidationPassed": true,
+    "uploaded": false
+  },
+  "favoriteRecipePortionActualAppTest": {
+    "request": "Log one serving of Voice repair test two serving banana milk for snacks today.",
+    "confirmation": "Yes, save it.",
+    "libraryId": "6ddada17-199d-4132-b7c4-ee4a442d8078",
+    "savedFoodId": "cmvbd81ao000hk8ymyoip192b",
+    "meal": "snacks",
+    "localDate": "2026-10-17",
+    "reviewAndInitialSavedNutrition": {
+      "calories": 75.4,
+      "protein": 2.2342,
+      "carbs": 13.82505,
+      "fat": 1.813,
+      "fiber": null,
+      "sugar": 8.59215
+    },
+    "recipeYield": 2,
+    "servingsEaten": 1,
+    "portionScale": 0.5,
+    "fullIngredientBasisRetained": true,
+    "savedFoodCount": 1,
+    "normalNativeEditorReopened": "Full recipe makes2servings;1of2recipe servings; allsixnutrients includingunknownfibre",
+    "normalUnchangedSavePassed": true,
+    "normalManualSaveRounding": {
+      "calories": 75,
+      "protein": 2.234,
+      "carbs": 13.825,
+      "fat": 1.813,
+      "fiber": null,
+      "sugar": 8.592
+    },
+    "normalManualSavePreservedSameIdRecipeYieldPortionAndUnknownFibre": true,
+    "physicalMicrophoneTest": false
   }
 }

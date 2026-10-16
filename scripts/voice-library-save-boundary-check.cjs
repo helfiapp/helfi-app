@@ -24,6 +24,19 @@ function load(relative, bindings = {}) {
 }
 const library = load('lib/native-voice-record-actions.ts')
 const PublicError = vm.runInContext('VoiceRecordActionError', library)
+const pureModules = new Map()
+function nativePure(relative) {
+  assert(/^(?:native\/src\/lib\/(?:foodUnits|nutrientValues|mealPortions)|lib\/food\/[a-z-]+)\.ts$/.test(relative), `Non-pure native dependency forbidden: ${relative}`)
+  if (pureModules.has(relative)) return pureModules.get(relative)
+  const module = { exports: {} }
+  const code = ts.transpileModule(fs.readFileSync(path.join(root, relative), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText
+  vm.runInNewContext(code, { module, exports: module.exports, require: name => { assert(name.startsWith('.')); return nativePure(path.posix.normalize(path.posix.join(path.posix.dirname(relative), name)) + '.ts') } })
+  pureModules.set(relative, module.exports); return module.exports
+}
+const nativeSource = ts.createSourceFile('TrackCaloriesScreen.tsx', fs.readFileSync(path.join(root, 'native/src/screens/TrackCaloriesScreen.tsx'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const nativeFunctions = nativeSource.statements.filter(node => ts.isFunctionDeclaration(node) && node.name && !/^[A-Z]/.test(node.name.text)).map(node => node.getText(nativeSource)).join('\n')
+const native = vm.createContext({ ...nativePure('native/src/lib/foodUnits.ts'), ...nativePure('native/src/lib/nutrientValues.ts'), ...nativePure('native/src/lib/mealPortions.ts') })
+vm.runInContext(ts.transpileModule(nativeFunctions, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText, native)
 const recipe = {
   label: 'Voice repair test library recipe', meal: 'dinner',
   nutrition: { calories: 320, protein_g: 20, carbs_g: 40, fat_g: 9, fiber_g: null, sugar_g: 0,
@@ -94,6 +107,36 @@ async function run() {
   await check('normal library POST creates a first library with unchanged unknown recipe nutrients', async () => {
     const f = fixture([]), review = await mutation(f); const response = await f.post(review); assert.equal(response.status, 200)
     const after = await f.read(); assert.equal(after.favorites.length, 1); assert.deepEqual(after.favorites[0].nutrition, recipe.nutrition)
+  })
+  await check('new source-built recipe saves its reviewed serving basis and actual native card never labels it as the first100g ingredient', async () => {
+    for (const [yieldCount, amount] of [[1, 1], [2, 2], [4, 4], [4, 1]]) {
+      const f = fixture(initial()), review = await mutation(f), scale = amount / yieldCount
+      const wholeItems = [
+        { id: 'synthetic-banana', name: 'Banana', serving_size: '100 g', calories: 89, protein_g: 1.09, carbs_g: 22.84, fat_g: 0.33, fiber_g: 2.6, sugar_g: 12.23 },
+        { id: 'synthetic-whole-milk', name: 'Whole milk', serving_size: '100 ml', calories: 61.8, protein_g: 3.3784, carbs_g: 4.8101, fat_g: 3.296, fiber_g: null, sugar_g: 4.9543 },
+      ]
+      review.changes.items = wholeItems
+      review.changes.nutrition = { calories: 150.8 * scale, protein_g: 4.4684 * scale, carbs_g: 27.6501 * scale, fat_g: 3.626 * scale, fiber_g: null, sugar_g: 17.1843 * scale,
+        __importRecipe: { title: recipe.label, servings: yieldCount, ingredients: ['100 grams of banana', '100 millilitres of whole milk'], steps: ['blend the banana and milk until smooth'] },
+        __portionScale: scale, __portionControlEnabled: scale !== 1, __portionUnit: 'serving', __portionAmount: amount, __portionRecipeServings: yieldCount }
+      const response = await f.post(review); assert.equal(response.status, 200)
+      const saved = (await f.read()).favorites.find(row => row.id === review.id), serving = `${amount} ${amount === 1 ? 'serving' : 'servings'}`
+      assert.equal(saved.serving, serving); assert.deepEqual(saved.nutrition, review.changes.nutrition); assert.deepEqual(saved.total, review.changes.nutrition); assert.deepEqual(saved.items, wholeItems)
+      const card = native.normalizeFavoriteMeal(saved)
+      assert.equal(native.favoriteServingLabel(card), serving); assert.equal(card.nutrients.calories, Math.round(150.8 * scale)); assert.equal(card.nutrients.fiber, null)
+      assert.notEqual(native.favoriteServingLabel(card), '100 g')
+    }
+  })
+  await check('recipe serving derivation never edits old library rows or accepts an unrestricted model serving field', async () => {
+    const previous = initial(); const old = JSON.parse(previous[0].category); old.favorites[0].items = [{ name: 'Legacy ingredient', serving_size: '100 g' }]; previous[0].category = JSON.stringify(old)
+    const f = fixture(previous), review = await mutation(f)
+    assert.equal((await f.post(review)).status, 200)
+    assert.deepEqual((await f.read()).favorites.find(row => row.id === 'keep'), old.favorites[0])
+    const current = await library.readNativeVoiceFavoriteLibrary(f.db, owner)
+    const forbidden = { entity: 'favorite', operation: 'create', id: 'forbidden-serving', expectedVersion: current.voiceLibraryVersion, changes: { ...copy(recipe), serving: '999 servings' } }
+    const before = f.state(), response = await f.post(forbidden); assert.equal(response.status, 409); assert.deepEqual(f.state(), before)
+    const update = { entity: 'favorite', operation: 'update', id: 'keep', expectedVersion: current.voiceLibraryVersion, changes: { nutrition: { ...recipe.nutrition, __portionAmount: 2, __portionRecipeServings: 2, __portionScale: 1, __portionUnit: 'serving', __portionControlEnabled: false, __importRecipe: { ...recipe.nutrition.__importRecipe, servings: 2 } } } }
+    assert.equal((await f.post(update)).status, 200); assert.equal((await f.read()).favorites.find(row => row.id === 'keep').serving, undefined)
   })
   await check('backup failure or transaction timeout rolls back pending library changes and never exposes PRIVATE database text', async () => {
     for (const mode of ['create-failure', 'timeout']) for (const starting of [initial(), []]) {

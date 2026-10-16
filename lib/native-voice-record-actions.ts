@@ -80,6 +80,22 @@ function parsedList(value: unknown, key: string) {
   if (!Array.isArray(values)) throw new Error('The saved food library needs review before changing it.')
   return values
 }
+function createdRecipeServing(nutrition: any): string | undefined {
+  const recipe = nutrition?.__importRecipe
+  const amount = nutrition?.__portionAmount
+  const yieldCount = nutrition?.__portionRecipeServings
+  const scale = nutrition?.__portionScale
+  // This label describes the same stored nutrition portion reviewed by voice.
+  // Never borrow the first ingredient's mass as the recipe's serving basis.
+  if (!recipe || typeof recipe !== 'object' || Array.isArray(recipe) || nutrition.__portionUnit !== 'serving' ||
+    typeof nutrition.__portionControlEnabled !== 'boolean' ||
+    typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 || amount > 1000 ||
+    typeof yieldCount !== 'number' || !Number.isFinite(yieldCount) || yieldCount <= 0 || yieldCount > 1000 ||
+    recipe.servings !== yieldCount || typeof scale !== 'number' || !Number.isFinite(scale) || scale <= 0 ||
+    Math.abs(scale - amount / yieldCount) > 8 * Number.EPSILON * Math.max(1, scale, amount / yieldCount) ||
+    (!nutrition.__portionControlEnabled && amount !== yieldCount)) return undefined
+  return `${amount} ${amount === 1 ? 'serving' : 'servings'}`
+}
 export async function readNativeVoiceFavoriteLibrary(db: any, userId: string) {
   const primary = await db.healthGoal.findFirst({ where: { userId, name: FAVORITES_NAME }, orderBy: { createdAt: 'desc' } })
   const tombstones = await db.healthGoal.findFirst({ where: { userId, name: VOICE_DELETED_FAVORITES_NAME }, orderBy: { createdAt: 'desc' } })
@@ -98,7 +114,9 @@ export async function mutateNativeVoiceFavoriteLibrary(db: any, userId: string, 
     if (command.operation === 'create' ? Boolean(existing) : !existing) throw new VoiceRecordActionError('identity_changed')
     if (command.entity === 'custom_food' && existing && !isCustom(existing)) throw new VoiceRecordActionError('not_custom')
     if (command.operation === 'create' && state.favorites.length >= 300) throw new VoiceRecordActionError('library_full')
+    const serving = command.operation === 'create' ? createdRecipeServing(command.changes?.nutrition) : undefined
     const libraryChanges = { ...command.changes,
+      ...(serving ? { serving } : {}),
       ...(command.changes?.nutrition ? { total: { ...command.changes.nutrition } } : {}),
       ...(command.changes?.label ? { description: command.changes.label } : {}) }
     const favorites = command.operation === 'delete' ? state.favorites.filter((row: any) => String(row.id) !== command.id)

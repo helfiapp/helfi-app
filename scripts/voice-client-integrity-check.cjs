@@ -890,6 +890,13 @@ async function verifyNativeDeviceHost() {
   assert(boundary > 0)
   const { client } = new Function('require', '__dirname', `${fixtureSource.slice(0, boundary)}\nreturn { client }`)(require, __dirname)
   const owner = 'synthetic-health-owner', date = '2026-10-17', watch = { sourceId: 'synthetic.watch', sourceName: 'Exact Watch Source' }
+  // Noon UTC is this fixture's reviewed day in UTC, Melbourne and Los Angeles.
+  // Keep the real calendar/Intl guard; never depend on the build machine's now.
+  const fixtureNow = Date.parse(`${date}T12:00:00Z`)
+  class DeviceFixtureDate extends Date {
+    constructor(...args) { super(...(args.length ? args : [fixtureNow])) }
+    static now() { return fixtureNow }
+  }
   let token = 0
   function setup(action, empty = false) {
     const box = baseBox(), writes = [], calls = [], events = [], turns = [], notices = [], drafts = [], store = new Map(), requests = []
@@ -904,7 +911,7 @@ async function verifyNativeDeviceHost() {
     }
     const draft = { action: 'device_action', transcript: 'Apply the exact Apple Health control', localDate: date, summary: 'Apple Health control', confirmationMessage: 'Apply the exact reviewed Apple Health control? This does not grant Health permissions.', canConfirm: true, requiresDeviceReview: true, reviewToken: `synthetic-health-token-${++token}`, deviceAction: action }
     const authorization = { success: true, deviceActionAuthorized: true, authorizedDeviceAction: action, status: 'device_authorized', safeToClaimSaved: false }
-    Object.assign(box, { voiceMemoryUserId: owner, voiceAccountUserIdRef: { current: owner }, appleHealthSyncRef: { current: provider },
+    Object.assign(box, { Date: DeviceFixtureDate, voiceMemoryUserId: owner, voiceAccountUserIdRef: { current: owner }, appleHealthSyncRef: { current: provider },
       AsyncStorage: { getItem: async key => store.get(key) ?? null, setItem: async (key, value) => { writes.push(key); store.set(key, value) } },
       isAppleHealthSupportedDevice: () => supported, getSleepDeviceEditorState: client.getSleepDeviceEditorState, validateNativeDeviceAction: client.validateNativeDeviceAction, captureNativeDeviceReview: client.captureNativeDeviceReview, applyReviewedNativeDeviceAction: client.applyReviewedNativeDeviceAction,
       buildNativeAuthHeaders: () => ({}), todayLocalDate: () => date,
@@ -916,6 +923,11 @@ async function verifyNativeDeviceHost() {
     return { box, state, provider, draft, authorization, calls, writes, events, turns, notices, drafts, store, requests, io, setSupported: value => { supported = value }, resolve: (data = authorization) => resolve({ res: { ok: true }, data }), capture: async () => { box.nativeDeviceReviewRef.current = await client.captureNativeDeviceReview(draft.reviewToken, owner, action, io) } }
   }
   const cases = [{ action: 'apple_health.automatic.update', values: { enabled: true } }, { action: 'apple_health.source.select', values: { sourceName: watch.sourceName } }, { action: 'apple_health.import', values: { localDate: date } }]
+  const future = setup({ action: 'apple_health.import', values: { localDate: '2026-10-18' } })
+  await assert.rejects(future.capture(), /today or an earlier activity date/)
+  assert.equal(future.calls.length + future.writes.length + future.requests.length, 0, 'A future activity date still cannot import, write or request authorization')
+  const earlier = setup({ action: 'apple_health.import', values: { localDate: '2026-10-16' } })
+  await earlier.capture()
   for (const action of cases) for (const empty of action.action === 'apple_health.import' ? [false, true] : [false]) {
     const f = setup(action, empty); await f.capture()
     const prompt = f.box.spokenReviewPromptForDraft(f.draft, f.box.nativeDeviceReviewRef.current)

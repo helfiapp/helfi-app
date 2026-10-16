@@ -42,14 +42,14 @@ The durable evidence is [the runtime verification record](release-evidence/2026-
 | Daily check-in display wording and score | **Passed:** “Stress levels” at four out of seven maps once to the normal stored zero-based value three, with exact note “Voice repair test check-in.” and local date 17 October. Saved ID: `4949c077-73e1-4bc4-b916-96471db8f3b5`. | The web Today local-date repair still needs exact-deployment/live verification; this row does not claim that web date fix is live. |
 | Selected health-goal synchronization | **Passed:** adding Energy showed the same six selected names in native and existing web screens. Removing Energy restored the exact original five selected names, all original HealthGoal IDs and all original CheckinIssue IDs. Existing ratings were retained; the test concerned selection, not deletion of an older unselected underlying goal. | Other goal/target edits and cache/race cases retain their separate limits. |
 | Hydration-target synchronization | **Passed:** custom target 2,450 → 2,460 ml, then back to 2,450 ml, confirmed through normal voice reviews and refreshed native/web settings. Existing 550 ml hydration was retained. | Other profile/target fields and automatic reset are not proved by this example. |
-| Local welcome in the rebuilt app | The actual rebuilt-app check is underway. Offline controller/bridge/plugin tests do not establish playback through the speaker. | **No actual welcome pass or audible completion is recorded yet.** |
+| Local welcome in the rebuilt app | Native playback started and completed in3.476s; microphone outbound packets increased before/during/after; Ready and End/microphone-off verified. | Human auditory and physical speech recognition remain unverified. |
 
 
 Only the recorded disposable test entries and explicitly reviewed reversible settings/goal selections were changed; original selected-goal/check-in IDs and the original water target were restored. Android and physical iPhone microphone input/audible replies remain unverified for this candidate. Local Debug/rebuilt simulator checks do not prove a store/live release or installation on the physical iPhone. Build 50 fields and a rebuilt welcome test are not release or audible-success receipts. No claim of complete manual-action runtime parity is made. The primary agent owns final exact-source checks, the ongoing welcome result and web local-date deployment verification.
 
 ## Required offline regression coverage
 
-`scripts/assert-native-voice-confirm-guard.js` currently registers **42 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
+`scripts/assert-native-voice-confirm-guard.js` currently registers **43 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
 
 | Required suite (`scripts/`) | Recorded offline count / scope |
 |---|---|
@@ -62,7 +62,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-action-matrix-check.cjs` | 78 cases |
 | `voice-action-outcome-check.cjs` | Actual outcome/receipt boundary suite |
 | `voice-record-actions-check.cjs` | 41 groups |
-| `voice-library-save-boundary-check.cjs` | 6 targeted normal library-handler groups, including bounded transactions, exact readback, rollback and sanitized failures |
+| `voice-library-save-boundary-check.cjs` | 8 targeted normal library-handler groups, including bounded transactions, exact readback, rollback and sanitized failures |
 | `voice-preference-actions-check.cjs` | 48 current fixture groups, including Stress display aliases/seven-choice mapping, exact notes and singular semantic list changes |
 | `voice-recipe-metadata-check.cjs` | 5 groups |
 | `voice-recipe-integration-check.cjs` | 11 groups |
@@ -77,7 +77,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-symptom-record-check.cjs` | 11 groups |
 | `voice-ordinary-food-lookup-check.cjs` | 21 groups |
 | `voice-greeting-check.cjs` | Greeting/callback boundary suite; no audible proof |
-| `voice-local-welcome-check.cjs` | 10 local welcome/controller/bridge/plugin groups; actual rebuilt-app check underway, no audible pass |
+| `voice-local-welcome-check.cjs` | 10 local welcome/controller/bridge/plugin groups; actual native completion/media proof recorded; no human auditory claim |
 | `voice-navigation-parity-check.cjs` | 3 groups |
 | `voice-app-reads-check.cjs` | 19 groups |
 | `voice-recipe-url-import-check.cjs` | 9 groups |
@@ -154,3 +154,7 @@ The coffee portion was independently verified in the [official USDA SR Legacy CS
 The actual local saves verified so far are limited to the examples in the runtime evidence table. Remaining checklist items require their own recorded result. No physical-microphone, Android or new-candidate release pass is claimed.
 
 Actual welcome follow-up: rebuilt iPhone16e Debug app completed the bundled Marin clip in3.476s (asset3.456s), retained increasing microphone outbound packets through/after playback, returned Ready, and End visibly turned microphone off. Physical hearing and speech recognition remain unverified. Normal native Favorites/Edit meal also reopened the exact banana-milk recipe with two foods and all six nutrient states.
+
+| `voice-favorite-recipe-portion-check.cjs` | 9 actual-source portion/review/account/signature/save groups; explicit servings scale from full recipe basis, numeric recipe names excluded, unknown nutrients preserved |
+
+Actual follow-up: the two-serving banana milk recipe saved only to the library with2servings/150.8calories and no diary change. “Log one serving ... for snacks today” plus natural yes saved exactly one row at75.4calories/scale0.5. The normal native editor reopened1of2servings, and unchanged Save preserved the same record/portion/unknown fibre with its normal displayed nutrient rounding.

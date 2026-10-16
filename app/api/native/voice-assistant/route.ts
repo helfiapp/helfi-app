@@ -4833,29 +4833,103 @@ async function buildFavoriteFoodDraft(transcript: string, localDate: string, fav
   const favorite = findRequestedFavorite(transcript, favorites)
   if (!favorite) return null
   const meal = inferTargetMealFromText(transcript, favorite.meal)
-  const calories = Math.round(Number((favorite.nutrition as any)?.calories ?? (favorite.total as any)?.calories) || 0)
-  const summary = `${favorite.label}${calories ? `, ${calories} kcal` : ''}`
+  let nutrition = favorite.nutrition || favorite.total || null
+  let total = favorite.total || favorite.nutrition || null
+  let portionDescription = ''
+  try {
+    // Exclude the exact selected title before parsing amounts. A recipe named
+    // "two serving banana milk" does not itself request two consumed servings.
+    const title = favorite.label.trim().split(/\s+/).map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+')
+    const namePattern = new RegExp(`(^|[\\s"“'’(])${title}(?=$|[\\s"”'’),.!?])`, 'i')
+    const request = transcript.replace(namePattern, '$1').replace(/^\s*(?:please\s+)?(?:(?:can|could|would)\s+you\s+(?:please\s+)?)?(?:log|add|record|eat|ate|have|had|save)\s+/i, '').trim()
+    const amountError = () => new Error('Please specify an exact number of recipe servings, or the whole recipe. Nothing has been saved.')
+    const quantity = (text: string) => {
+      const measured = `${text.trim()} servings`
+      if (hasUnsafeMeasurementQuantity(measured, 'food')) throw amountError()
+      const normalized = normalizeSpokenMeasurementQuantities(measured, 'food')
+      const match = normalized.match(/^(\d+(?:\.\d+)?)\s+servings$/i)
+      if (!match || !(Number(match[1]) > 0) || Number(match[1]) > 1000) throw amountError()
+      return Number(match[1])
+    }
+    const hasPortionWords = /\b(?:servings?|portions?|half|quarter|whole|entire|full|double|triple|grams?|g|kg|ounces?|oz|millilitres?|milliliters?|ml|cups?|bowls?|plates?|slices?|pieces?)\b/i.test(request)
+    const startsWithAmount = /^(?:[+\-]?\d|one\b|two\b|three\b|four\b|five\b|six\b|seven\b|eight\b|nine\b|ten\b|a\s+(?:half|quarter|serving)\b)/i.test(request)
+    if (hasPortionWords || startsWithAmount) {
+      if (/\b(?:portions?|grams?|g|kg|ounces?|oz|millilitres?|milliliters?|ml|cups?|bowls?|plates?|slices?|pieces?|double|triple)\b/i.test(request)) throw amountError()
+      let requestedServings: number | 'whole' | 'half' | 'quarter'
+      let statedYield: number | null = null
+      const ofYield = request.match(/^(.{1,80}?)\s+of\s+(.{1,80}?)\s+(?:recipe\s+)?servings?\b/i)
+      if (ofYield) {
+        requestedServings = quantity(ofYield[1]); statedYield = quantity(ofYield[2])
+        if (/\b(?:servings?|half|quarter|whole|entire|full)\b/i.test(request.slice(ofYield[0].length))) throw amountError()
+      } else {
+        if (hasUnsafeMeasurementQuantity(request, 'food')) throw amountError()
+        const normalized = normalizeSpokenMeasurementQuantities(request, 'food')
+        const counts = [...normalized.matchAll(/(?<![\d.])\b(\d+(?:\.\d+)?)\s+servings?\b/gi)]
+        const fractions = [...request.matchAll(/\b(half|quarter)\s+(?:(?:of\s+)?(?:the\s+)?(?:whole\s+)?(?:recipe|batch)\b|of\b)/gi)]
+        const whole = /\b(?:whole|entire|full)\s+(?:recipe|batch)\b|\ball\s+of\b/i.test(request)
+        if (counts.length === 1 && !fractions.length && !whole) requestedServings = quantity(counts[0][1])
+        else if (!counts.length && fractions.length === 1 && !whole) requestedServings = fractions[0][1].toLowerCase() as 'half' | 'quarter'
+        else if (!counts.length && !fractions.length && whole) requestedServings = 'whole'
+        else throw amountError()
+      }
+      const recipe = validateNativeVoiceImportedRecipe(nutrition?.__importRecipe)
+      const yieldServings = recipe.servings
+      if (statedYield !== null && statedYield !== yieldServings) throw new Error(`This recipe makes ${yieldServings} servings. Please review the number you want to eat. Nothing has been saved.`)
+      const oldScale = nutrition?.__portionScale === undefined ? 1 : nutrition.__portionScale
+      if (typeof oldScale !== 'number' || !Number.isFinite(oldScale) || oldScale <= 0 || oldScale > 1000 ||
+        (nutrition.__portionRecipeServings !== undefined && nutrition.__portionRecipeServings !== yieldServings) ||
+        (nutrition.__portionUnit !== undefined && nutrition.__portionUnit !== 'serving') ||
+        (nutrition.__portionControlEnabled === false && oldScale !== 1)) throw new Error('The saved recipe portion needs review before choosing servings. Nothing has been saved.')
+      for (const field of ['__portionAmount', '__nativeRecipeServingsEaten']) {
+        const value = nutrition[field]
+        if (value !== undefined && (typeof value !== 'number' || !Number.isFinite(value) || value <= 0 || Math.abs(value / yieldServings - oldScale) > 0.0000001)) throw new Error('The saved recipe portion is inconsistent. Please review it before logging servings. Nothing has been saved.')
+      }
+      const items = favorite.items
+      if (!Array.isArray(items) || items.length !== recipe.ingredients.length || !items.length) throw new Error('Please review every saved recipe ingredient before logging servings. Nothing has been saved.')
+      const amount = requestedServings === 'whole' ? yieldServings : requestedServings === 'half' ? yieldServings / 2 : requestedServings === 'quarter' ? yieldServings / 4 : requestedServings
+      const scale = amount / yieldServings
+      if (!(scale > 0) || scale > 1000) throw amountError()
+      const scaled = { ...nutrition }
+      for (const [index, names] of [['calories','calories_kcal'],['protein_g','protein'],['carbs_g','carbs'],['fat_g','fat'],['fiber_g','fiber'],['sugar_g','sugar']].entries()) {
+        const value = (record: any) => {
+          const present = names.filter(name => Object.prototype.hasOwnProperty.call(record || {}, name))
+          const raw = present.length ? record[present[0]] : undefined
+          if (index >= 4 && (raw === null || raw === undefined)) {
+            if (present.some(name => record[name] !== null && record[name] !== undefined)) throw amountError()
+            return null
+          }
+          if (typeof raw !== 'number' || !Number.isFinite(raw) || raw < 0 || present.some(name => record[name] !== raw)) throw amountError()
+          return raw
+        }
+        const values = items.map(item => value(item))
+        const wholeValue = values.some(entry => entry === null) ? null : values.reduce<number>((sum, entry) => sum + Number(entry), 0)
+        const savedValue = value(nutrition)
+        if ((wholeValue === null) !== (savedValue === null) || (wholeValue !== null && savedValue !== null && Math.abs(wholeValue * oldScale - savedValue) > (index === 0 ? 0.51 : 0.00001))) throw new Error('The saved recipe totals do not match its complete ingredient basis. Please review it before logging servings. Nothing has been saved.')
+        for (const name of names) scaled[name] = wholeValue === null ? null : wholeValue * scale
+      }
+      Object.assign(scaled, { __importRecipe: recipe, __portionScale: scale, __portionControlEnabled: scale !== 1, __portionUnit: 'serving', __portionAmount: amount, __portionTotalWeightG: null, __portionRecipeServings: yieldServings, __nativeRecipeServingsEaten: amount })
+      nutrition = scaled; total = scaled
+      portionDescription = `${amount} of ${yieldServings} recipe servings`
+    }
+  } catch (error: any) {
+    return { action: 'food_favorite' as const, transcript, localDate, summary: 'Recipe portion needs clarification', confirmationMessage: cleanText(error?.message || 'Please review the saved recipe portion.', 500), canConfirm: false, autoSave: false,
+      food: { meal, entries: [{ name: favorite.label, description: favorite.description || favorite.label, meal }] } }
+  }
+  const calories = Number(nutrition?.calories ?? nutrition?.calories_kcal) || 0
+  const displayCalories = Math.round(calories * 10) / 10
+  const summary = `${favorite.label}${portionDescription ? `, ${portionDescription}` : ''}${calories ? `, ${displayCalories} kcal` : ''}`
+  const portionNutrition = portionDescription ? [['calories','calories_kcal','calories'],['protein_g','protein','grams protein'],['carbs_g','carbs','grams carbohydrate'],['fat_g','fat','grams fat'],['fiber_g','fiber','grams fibre'],['sugar_g','sugar','grams sugar']].map(([primary,alias,label]) => {
+    const value = Object.prototype.hasOwnProperty.call(nutrition, primary) ? nutrition[primary] : nutrition[alias]
+    return value === null || value === undefined ? `${label.replace(/^grams /, '')} unknown` : `${Math.round(Number(value) * 10) / 10} ${label}`
+  }).join(', ') : ''
   return {
-    action: 'food_favorite' as const,
-    transcript,
-    localDate,
-    summary,
-    confirmationMessage: `I found ${favorite.label} in your favourites for ${meal}. Review it, then tap Confirm to save.`,
-    canConfirm: true,
-    autoSave: false,
-    food: {
-      meal,
-      entries: [{ name: favorite.label, description: favorite.description || favorite.label, meal }],
-      favorite: {
-        id: favorite.id || null,
-        label: favorite.label,
-        description: favorite.description || favorite.label,
-        meal,
-        nutrition: favorite.nutrition || favorite.total || null,
-        total: favorite.total || favorite.nutrition || null,
-        items: Array.isArray(favorite.items) ? favorite.items : null,
-      },
-    },
+    action: 'food_favorite' as const, transcript, localDate, summary,
+    confirmationMessage: `I found ${favorite.label} in your favourites for ${meal}.${portionDescription ? ` ${portionDescription}: ${portionNutrition}.` : ''} Would you like me to save it?`,
+    canConfirm: true, autoSave: false,
+    food: { meal, entries: [{ name: favorite.label, description: favorite.description || favorite.label, meal }], favorite: {
+      id: favorite.id || null, label: favorite.label, description: favorite.description || favorite.label, meal,
+      nutrition, total, items: Array.isArray(favorite.items) ? favorite.items : null,
+    } },
   }
 }
 
