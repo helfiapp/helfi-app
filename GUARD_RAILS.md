@@ -3621,3 +3621,7 @@ for guidance first.
 ### Voice recipe serving basis (17 October 2026)
 
 - A new voice recipe library item derives its serving label from its validated recipe portion and yield; never use the first ingredient amount as the whole recipe label. Existing library entries are not backfilled. Explicit requested recipe servings must scale every known nutrient from the complete ingredient basis and preserve unknown fibre/sugar. Inconsistent or unsupported amounts require clarification before a save. No amount request preserves the saved portion.
+
+### Voice controls without an active review (17 October 2026)
+
+After existing identity, consent, safety, paid-access and minimum-credit gates, anchored discard/cancel or explicit save wording without an editable draft must return a truthful read-only explanation. Never reconstruct a save from conversation history, claim earlier/in-flight saves were undone, charge another preparation request or invoke a provider for this response. Existing pending review rejection/confirmation and substantive commands remain unchanged. Required actual-source synthetic regression: `scripts/voice-no-pending-cancel-check.cjs`.

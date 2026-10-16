@@ -1108,6 +1108,7 @@ for (const regression of [
   'voice-record-actions-check.cjs',
   'voice-library-save-boundary-check.cjs',
   'voice-favorite-recipe-portion-check.cjs',
+  'voice-no-pending-cancel-check.cjs',
   'voice-preference-actions-check.cjs',
   'voice-recipe-metadata-check.cjs',
   'voice-recipe-integration-check.cjs',

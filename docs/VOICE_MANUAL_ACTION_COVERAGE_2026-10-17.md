@@ -49,7 +49,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 
 ## Required offline regression coverage
 
-`scripts/assert-native-voice-confirm-guard.js` currently registers **43 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
+`scripts/assert-native-voice-confirm-guard.js` currently registers **44 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
 
 | Required suite (`scripts/`) | Recorded offline count / scope |
 |---|---|
@@ -159,4 +159,6 @@ Actual welcome follow-up: rebuilt iPhone16e Debug app completed the bundled Mari
 
 Actual follow-up: the two-serving banana milk recipe saved only to the library with2servings/150.8calories and no diary change. “Log one serving ... for snacks today” plus natural yes saved exactly one row at75.4calories/scale0.5. The normal native editor reopened1of2servings, and unchanged Save preserved the same record/portion/unknown fibre with its normal displayed nutrient rounding.
 
-Server portability: the complete43-suite voice guard and command checks pass under UTC with every native/node_modules resolution deliberately refused. The welcome plugin fixture uses a declared synthetic Expo/project boundary plus exact actual pbxproj membership/canonical source checks; real Debug and signed iOS builds are separate proof.
+Server portability: the complete44-suite voice guard and command checks pass under UTC with every native/node_modules resolution deliberately refused. The welcome plugin fixture uses a declared synthetic Expo/project boundary plus exact actual pbxproj membership/canonical source checks; real Debug and signed iOS builds are separate proof.
+
+No-pending controls: `voice-no-pending-cancel-check.cjs` executes actual preparation handlers with synthetic gates. Whole-utterance discard/cancel and explicit save without an editable review return truthful read-only replies, zero extra charge and no provider call. Active reviews still use existing rejection/confirmation. Substantive negative requests and safety messages stay outside this classifier. Physical50 lost-review recovery exposed this edge case; final production retest is recorded separately.

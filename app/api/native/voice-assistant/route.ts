@@ -5421,6 +5421,26 @@ function isAdviceStyleHealthQuestion(value: unknown) {
   )
 }
 
+function buildNoPendingVoiceControlDraft(transcript: string, localDate: string): VoiceDraft | null {
+  // Match the whole utterance. A negative word inside a real request is not a
+  // cancellation, and conversation history is never a substitute for a review.
+  const raw = cleanText(transcript, 2000)
+  if (!raw || raw.length > 120 || hasSelfHarmRisk(raw)) return null
+  const control = normalizeControlText(raw)
+  const cancellation = isRejectingDraftText(control) || /^(?:(?:no|nope|nah)[, ]+)?(?:please\s+)?(?:(?:cancel|discard)(?:\s+(?:it|that|this|(?:the|this|that)\s+(?:draft|request)))?|forget\s+(?:it|that)|never\s*mind)(?:[, ]+please)?$/.test(control)
+  const confirmation = /^(?:(?:yes|okay|ok)[, ]+)?(?:please\s+)?(?:save\s+(?:it|that|this)|confirm(?:\s+(?:it|that|this))?)(?:[, ]+please)?$/.test(control) || control === 'please save'
+  if (!cancellation && !confirmation) return null
+  return {
+    action: 'unknown', transcript: raw, localDate,
+    summary: cancellation ? 'No draft waiting' : 'No reviewed draft ready',
+    confirmationMessage: cancellation
+      ? 'No draft is waiting to be saved. Anything already saved stays unchanged.'
+      : 'No reviewed draft is ready to save. Tell me what you’d like to add so I can prepare it for confirmation.',
+    canConfirm: false,
+    autoSave: false,
+  }
+}
+
 function buildQuickToolDraft(transcript: string, localDate: string, launchContext?: VoiceLaunchContext): VoiceDraft | null {
   const raw = cleanText(transcript, 1200)
   const lower = raw.toLowerCase()
@@ -6490,6 +6510,13 @@ async function prepareVoiceAction(request: NextRequest, trace?: { userId?: strin
     const minimumRequestCredits = SIMPLE_MIN_CREDITS + (wantsVoiceReply ? VOICE_REPLY_MIN_CREDITS : 0)
     if (!verifiedReviewedFollowUp && wallet.totalAvailableCents < minimumRequestCredits) {
       return NextResponse.json({ error: 'Insufficient credits', estimatedCost: minimumRequestCredits, availableCredits: wallet.totalAvailableCents }, { status: 402 })
+    }
+
+    // This request cannot cancel an earlier submitted save or reconstruct an
+    // absent review from chat history. It only reports the current draft state.
+    const noPendingControlDraft = !editableDraft ? buildNoPendingVoiceControlDraft(transcript, localDate) : null
+    if (noPendingControlDraft) {
+      return NextResponse.json({ success: true, transcript, draft: noPendingControlDraft, audio: null, chargedCredits: 0, voiceReply: false })
     }
 
     if (!editableDraft && /https?:\/\//i.test(transcript) && /\b(?:import|use|save|add|recipe)\b/i.test(transcript)) {
