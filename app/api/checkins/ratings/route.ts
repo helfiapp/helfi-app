@@ -1,6 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { prisma } from '@/lib/prisma'
 import { getCheckinUser } from '@/app/api/checkins/_auth'
+import { deleteNativeVoiceReviewedHistory, nativeVoiceHistoryHttpError, nativeVoiceHistoryRequestScope, readNativeVoiceHistorySnapshot } from '@/lib/native-voice-history-actions'
+
+// This bounded snapshot is separate from the unchanged manual history actions.
+export async function GET(req: NextRequest) {
+  const user = await getCheckinUser(req)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  try {
+    const scope = nativeVoiceHistoryRequestScope(new URL(req.url).searchParams)
+    return NextResponse.json(await readNativeVoiceHistorySnapshot(prisma, user.id, 'checkin', scope))
+  } catch (error) {
+    const result = nativeVoiceHistoryHttpError(error)
+    return NextResponse.json(result.body, { status: result.status })
+  }
+}
 
 // Delete a single rating entry
 export async function DELETE(req: NextRequest) {
@@ -62,6 +76,15 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const { action, issueIds } = body
+
+  if (action === 'delete-reviewed') {
+    try {
+      return NextResponse.json(await deleteNativeVoiceReviewedHistory(prisma, user.id, 'checkin', body.expectedRows))
+    } catch (error) {
+      const result = nativeVoiceHistoryHttpError(error)
+      return NextResponse.json(result.body, { status: result.status })
+    }
+  }
 
   if (action === 'delete-all') {
     try {

@@ -350,7 +350,7 @@ if (!/const draftIsReviewOrHandoff\s*=\s*Boolean\(draft\?\.canConfirm\s*\|\|\s*d
   failures.push('Typed rejection shortcuts must only cancel real review or handoff drafts, so normal conversation replies can continue through Talk to Helfi.')
 }
 
-if (!/discardFooterLabel\s*=\s*primaryFooterIsHandoff\s*\?\s*'Cancel'\s*:\s*draft\?\.action\s*===\s*'recipe_import_url'\s*\?\s*"Don't import"\s*:\s*\['support_action', 'report_action', 'device_action'\]\.includes\(draft\?\.action \|\| ''\)\s*\?\s*'Cancel'\s*:\s*"Don't save"/.test(native) || /style=\{styles\.handoffButton\}/.test(native)) {
+if (!/discardFooterLabel\s*=\s*primaryFooterIsHandoff\s*\?\s*'Cancel'\s*:\s*draft\?\.action\s*===\s*'recipe_import_url'\s*\?\s*"Don't import"\s*:\s*\['support_action', 'report_action', 'additional_action', 'device_action'\]\.includes\(draft\?\.action \|\| ''\)\s*\?\s*'Cancel'\s*:\s*"Don't save"/.test(native) || /style=\{styles\.handoffButton\}/.test(native)) {
   failures.push('Talk to Helfi handoff drafts must use one clear footer action, with Cancel wording instead of a duplicate in-panel handoff button.')
 }
 
@@ -1109,6 +1109,11 @@ for (const regression of [
   'voice-library-save-boundary-check.cjs',
   'voice-favorite-recipe-portion-check.cjs',
   'voice-no-pending-cancel-check.cjs',
+  'voice-report-pdf-check.cjs',
+  'voice-report-pdf-client-check.cjs',
+  'voice-additional-actions-check.cjs',
+  'voice-additional-client-check.cjs',
+  'voice-history-actions-check.cjs',
   'voice-preference-actions-check.cjs',
   'voice-recipe-metadata-check.cjs',
   'voice-recipe-integration-check.cjs',

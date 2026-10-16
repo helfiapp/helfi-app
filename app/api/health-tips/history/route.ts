@@ -4,6 +4,7 @@ import { getToken } from 'next-auth/jwt'
 import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
+import { deleteNativeVoiceReviewedHistory, nativeVoiceHistoryHttpError, nativeVoiceHistoryRequestScope, readNativeVoiceHistorySnapshot } from '@/lib/native-voice-history-actions'
 
 type HealthTipUser = {
   id: string
@@ -54,6 +55,16 @@ export async function GET(req: NextRequest) {
   }
 
   const { searchParams } = new URL(req.url)
+
+  if (searchParams.has('voiceSnapshot')) {
+    try {
+      const scope = nativeVoiceHistoryRequestScope(searchParams)
+      return NextResponse.json(await readNativeVoiceHistorySnapshot(prisma, user.id, 'coach', scope))
+    } catch (error) {
+      const result = nativeVoiceHistoryHttpError(error)
+      return NextResponse.json(result.body, { status: result.status })
+    }
+  }
 
   // Ensure table exists
   await prisma.$executeRawUnsafe(`
@@ -184,6 +195,14 @@ export async function DELETE(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => ({}))
+  if (body?.action === 'delete-reviewed') {
+    try {
+      return NextResponse.json(await deleteNativeVoiceReviewedHistory(prisma, user.id, 'coach', body.expectedRows))
+    } catch (error) {
+      const result = nativeVoiceHistoryHttpError(error)
+      return NextResponse.json(result.body, { status: result.status })
+    }
+  }
   const ids = Array.isArray((body as any)?.ids)
     ? (body as any).ids
         .filter((value: unknown): value is string => typeof value === 'string')

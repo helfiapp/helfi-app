@@ -545,14 +545,19 @@ export async function getWeeklyReportByPeriod(
   }
 }
 
-export async function listWeeklyReports(userId: string, limit = 8): Promise<WeeklyReportRecord[]> {
+export async function listWeeklyReports(userId: string, limit = 8, status?: WeeklyReportStatus): Promise<WeeklyReportRecord[]> {
   await ensureWeeklyReportTables()
   try {
-    const rows: any[] = await prisma.$queryRawUnsafe(
-      'SELECT * FROM WeeklyHealthReports WHERE userId = $1 ORDER BY createdAt DESC LIMIT $2',
-      userId,
-      Math.max(limit * 3, limit)
-    )
+    const queryLimit = Math.max(limit * 3, limit)
+    const rows: any[] = status
+      ? await prisma.$queryRawUnsafe(
+        'SELECT * FROM WeeklyHealthReports WHERE userId = $1 AND status = $3 ORDER BY createdAt DESC LIMIT $2',
+        userId, queryLimit, status
+      )
+      : await prisma.$queryRawUnsafe(
+        'SELECT * FROM WeeklyHealthReports WHERE userId = $1 ORDER BY createdAt DESC LIMIT $2',
+        userId, queryLimit
+      )
     const unique = new Map<string, WeeklyReportRecord>()
     for (const row of rows) {
       const report = normalizeReportRow(row)

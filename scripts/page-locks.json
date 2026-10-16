@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16T18:00:05.197Z",
+  "generatedAt": "2026-10-16T20:29:31.949Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -285,11 +285,13 @@
     "native/src/ui/HuaweiHealthSetupCard.tsx": "4b737730447bb845d1cb04fcd88c660b8940f31e23abcaf13b2aeec133b586d5",
     "native/src/ui/Screen.tsx": "7f3e8eab601f2dea38f605dc113bfb8395e2a3a99995bb72fe9aa30855514dd4",
     "native/src/ui/theme.ts": "60e389709fa224cbf99d06e4b29d10ea451988ed176cc5a1f038dcc4907a88a0",
+    "native/src/voice/additionalVoiceActions.ts": "4638e1b4aea6bd44aa266d56aee827d1d68cbaaea0ed4ff7ee18213b03f6ec7c",
     "native/src/voice/localPreferenceActions.ts": "2854ae410707d18ff5dffc8170aa793540349d3bc3bc0da9b1b3982bee327195",
-    "native/src/voice/nativeDeviceActions.ts": "6f2b08899e7ce7bc4df69940c841d0a02ca4692c023f8299a09166bfd77c88cf",
+    "native/src/voice/localVoiceWelcome.ts": "9206670a50b1c89b26d9cd47f339b0cd109dead8303bbd6e858e516703edb80f",
+    "native/src/voice/nativeDeviceActions.ts": "4ae6d7de1e6c4a2d1e9fe8e8d7af26f33592c9d0a399ca729c69391745b80e95",
     "native/src/voice/realtimeVoice.ts": "0e7e3d7474b8e4f560bb2c0c1614cc7393e6f0de32376c53ab73fd0410269e68",
-    "native/src/voice/VoiceAssistant.tsx": "2eec21cad736895f35f3e01f9abf42c8a3a8b7fb1ef6867e248e18b1ee9a4b8c",
-    "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e",
-    "native/src/voice/localVoiceWelcome.ts": "9206670a50b1c89b26d9cd47f339b0cd109dead8303bbd6e858e516703edb80f"
+    "native/src/voice/reportPdfActions.ts": "730d4abdc9ce666a4562fce1231c143b57c0a5c1e66ddea48a481a708ad9d5e6",
+    "native/src/voice/VoiceAssistant.tsx": "0cd1a18f7535dbe34b5aa816450fb539165ffb6efb1a45573506d1b5de19e1a9",
+    "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e"
   }
 }

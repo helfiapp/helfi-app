@@ -1,0 +1,77 @@
+#!/usr/bin/env node
+'use strict'
+// Actual native PDF helper and VoiceAssistant callbacks, synthetic OS/network.
+// No real PDF, account, browser, storage, provider, audio or app is accessed.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),ts=require('typescript'),{createRequire}=require('node:module')
+const root=path.resolve(__dirname,'..'),helperModule={exports:{}}
+const deviceSource=ts.createSourceFile('nativeDeviceActions.ts',fs.readFileSync(path.join(root,'native/src/voice/nativeDeviceActions.ts'),'utf8'),ts.ScriptTarget.Latest,true)
+const digestCode=deviceSource.statements.filter(node=>ts.isFunctionDeclaration(node)&&['digest','nativeVoiceReviewTokenDigest'].includes(node.name?.text)).map(node=>node.getText(deviceSource)).join('\n')
+const digestModule={exports:{}}
+vm.runInNewContext(ts.transpileModule(digestCode,{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{module:digestModule,exports:digestModule.exports,RawSha256:require('@aws-crypto/sha256-js/build/main/RawSha256').RawSha256,Uint8Array,Array,encodeURIComponent,parseInt})
+const nativeVoiceReviewTokenDigest=digestModule.exports.nativeVoiceReviewTokenDigest
+for(const token of ['synthetic-review','Unicode café 中文 🌱'])assert.equal(nativeVoiceReviewTokenDigest(token),require('node:crypto').createHash('sha256').update(token).digest('base64url'))
+
+vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'native/src/voice/reportPdfActions.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2022,module:ts.ModuleKind.CommonJS}}).outputText,{module:helperModule,exports:helperModule.exports,URL,Date,Map,Promise,Error,require:name=>{assert.equal(name,'./nativeDeviceActions');return{nativeVoiceReviewTokenDigest}}})
+const {openReviewedNativeReportPdf,nativeReportPdfCompletionMessage}=helperModule.exports
+const harnessPath=path.join(__dirname,'voice-client-integrity-check.cjs'),harness={exports:{}}
+new Function('require','__dirname','module','exports',fs.readFileSync(harnessPath,'utf8').replace(/^#!.*\n/,'')+'\nmodule.exports={baseBox,evaluate,callback,draftRequest,footerExpressions};')(createRequire(harnessPath),__dirname,harness,harness.exports)
+const {baseBox,evaluate,callback,draftRequest,footerExpressions}=harness.exports
+const now=Date.parse('2026-10-17T12:00:00Z'),owner='synthetic-pdf-owner',reportId='selected-ready-report',periodStart='2026-10-10',periodEnd='2026-10-17'
+let sequence=0
+const tick=async()=>{for(let i=0;i<20;i++)await Promise.resolve()}
+function fixture(options={}){
+ const draft={action:'report_action',canConfirm:true,reviewToken:`synthetic-pdf-review-${++sequence}`,summary:'Open selected report PDF',confirmationMessage:'Open the exact ready report PDF for 10 October to 17 October? Saving or sharing has not been verified.',localDate:periodEnd,reportAction:{action:'reports.weekly.export_pdf',userId:owner,reportId,periodStart,periodEnd,reportStatus:'READY',sourceVersion:'a'.repeat(64)}}
+ const actionId=nativeVoiceReviewTokenDigest(draft.reviewToken),expiresAt=now+59000
+ const result={kind:'report_action',action:'reports.weekly.export_pdf',actionId,status:'pdf_ready',reportId,periodStart,periodEnd,reportStatus:'READY',sourceVersion:'a'.repeat(64),generated:false,unlocked:false,opened:false,downloaded:false,message:'Your report PDF is ready to open.'}
+ const token=Buffer.from(JSON.stringify({userId:owner,reportId,expiresAt})).toString('base64url')+'.'+'s'.repeat(43)
+ const url=`https://offline.invalid/api/reports/weekly/pdf?reportId=${reportId}&accessToken=${token}`
+ const data={success:true,result,reportPdfAccess:{url,reportId,actionId,expiresAt}},opened=[]
+ let current=true,release
+ const io={apiBaseUrl:'https://offline.invalid',accountId:owner,isCurrent:()=>current,now:()=>now,openUrl:async value=>{opened.push(value);if(options.fail)throw Error('Synthetic OS failure '+url);if(options.pending)return new Promise(resolve=>{release=resolve})}}
+ return{draft,data,io,opened,current:value=>{current=value},finish:()=>release(),run:()=>openReviewedNativeReportPdf(data,draft,io)}
+}
+let count=0
+async function check(name,run){await run();count++;console.log('PASS '+name)}
+async function main(){
+ await check('exact selected READY PDF access is handed to the OS once and returns no signed URL or save claim',async()=>{const f=fixture(),result=await f.run();assert.equal(f.opened[0],f.data.reportPdfAccess.url);assert.equal(result.result.status,'pdf_open_requested');assert.equal(result.result.openRequestAccepted,true);assert.equal(result.result.opened,false);assert.equal(result.result.saved,false);assert.equal(result.result.downloaded,false);assert.equal(nativeReportPdfCompletionMessage(result,f.draft),result.result.message);assert(!JSON.stringify(result).includes('accessToken'));assert(!JSON.stringify(result).includes('https:'));assert.equal(nativeReportPdfCompletionMessage(f.data,f.draft),'');const again=await f.run();assert.equal(again.idempotentReplay,true);assert.equal(f.opened.length,1)})
+ await check('first receipt must match the actual SHA256 review token rather than an older valid receipt for the same report',async()=>{const f=fixture();const prior=nativeVoiceReviewTokenDigest('different-prior-signed-review');f.data.result.actionId=prior;f.data.reportPdfAccess.actionId=prior;await assert.rejects(f.run(),/verify/);assert.equal(f.opened.length,0)})
+ await check('wrong origin scheme path credentials fragment query report or access identity cannot open',async()=>{
+  for(const change of [f=>{f.data.reportPdfAccess.url=f.data.reportPdfAccess.url.replace('offline.invalid','other.invalid')},f=>{f.data.reportPdfAccess.url=f.data.reportPdfAccess.url.replace('https:','http:')},f=>{f.data.reportPdfAccess.url=f.data.reportPdfAccess.url.replace('/weekly/pdf','/weekly/run')},f=>{f.data.reportPdfAccess.url=f.data.reportPdfAccess.url.replace('https://','https://user:pass@')},f=>{f.data.reportPdfAccess.url+='#fragment'},f=>{f.data.reportPdfAccess.url+='&extra=1'},f=>{f.data.reportPdfAccess.url+='&reportId='+reportId},f=>{f.data.reportPdfAccess.url=f.data.reportPdfAccess.url.replace('reportId='+reportId,'reportId=foreign')},f=>{f.data.reportPdfAccess.actionId='foreign-action'},f=>{f.data.reportPdfAccess.reportId='foreign-report'},f=>{const url=new URL(f.data.reportPdfAccess.url);url.searchParams.set('accessToken',Buffer.from(JSON.stringify({userId:'foreign',reportId,expiresAt:f.data.reportPdfAccess.expiresAt})).toString('base64url')+'.'+'s'.repeat(43));f.data.reportPdfAccess.url=url.toString()}]){const f=fixture();change(f);await assert.rejects(f.run());assert.equal(f.opened.length,0)}
+ })
+ await check('malformed partial failed unready or different selected receipts never become PDF completion',async()=>{
+  for(const patch of [{reportId:'other'},{sourceVersion:'b'.repeat(64)},{actionId:''},{actionId:'x'.repeat(43)},{action:'reports.weekly.generate'},{kind:'food'},{periodStart:'2026-10-09'},{reportStatus:'LOCKED'},{reportStatus:'RUNNING'},{generated:true},{unlocked:true},{opened:true},{downloaded:true},{saved:true},{status:'completed'},{message:'Your PDF was saved.'}]){const f=fixture();Object.assign(f.data.result,patch);await assert.rejects(f.run());assert.equal(f.opened.length,0)}
+  for(const change of [f=>{f.data.success=false},f=>{delete f.data.reportPdfAccess},f=>{f.draft.canConfirm=false},f=>{f.draft.reportAction.reportId='different'},f=>{f.data.reportPdfAccess.url='not a URL'}]){const f=fixture();change(f);await assert.rejects(f.run());assert.equal(f.opened.length,0)}
+ })
+ await check('expired and implausibly future access cannot open; fresh server reauthorization can regenerate',async()=>{const f=fixture();f.data.reportPdfAccess.expiresAt=now;await assert.rejects(f.run(),/expired|timing/);assert.equal(f.opened.length,0);const fresh=fixture();await fresh.run();const tooLong=fixture();tooLong.data.reportPdfAccess.expiresAt=now+62000;await assert.rejects(tooLong.run());assert.equal(tooLong.opened.length,0)})
+ await check('account End unmount run and cancellation guards reject pre-open and suppress late pending outcomes',async()=>{for(const reason of ['account','end','unmount','run','abort']){const f=fixture();f.current(false);assert.equal(await f.run(),null);assert.equal(f.opened.length,0);const pending=fixture({pending:true}),running=pending.run();await tick();assert.equal(pending.opened.length,1);pending.current(false);pending.finish();assert.equal(await running,null);pending.current(true);const repeated=await pending.run();assert.equal(repeated.result.status,'pdf_open_not_verified');assert.equal(pending.opened.length,1,reason+' cannot automatically repeat an uncertain handoff')}})
+ await check('OS rejection is a prepared but opening-unverified receipt without leaking raw errors or auto-retry',async()=>{const f=fixture({fail:true}),result=await f.run();assert.equal(result.result.status,'pdf_open_not_verified');assert.equal(result.result.openRequestAccepted,false);assert.equal(result.result.saved,false);assert(!result.result.message.includes('Synthetic'));assert(!JSON.stringify(result).includes('accessToken'));await f.run();assert.equal(f.opened.length,1)})
+ await check('concurrent same-review delivery opens once and changed replay action identities are refused',async()=>{const f=fixture({pending:true}),a=f.run();await tick();const b=f.run();await tick();assert.equal(f.opened.length,1);f.finish();await Promise.all([a,b]);f.data.result.actionId='different-action';f.data.reportPdfAccess.actionId='different-action';await assert.rejects(f.run(),/verify|review changed/);assert.equal(f.opened.length,1)})
+ await check('actual native confirmation advertises capability and completes only sanitized selected PDF receipt',async()=>{
+  const f=fixture(),box=baseBox(),turns=[],notices=[],events=[],requests=[],release=[];let resolve
+  class FixtureDate extends Date{static now(){return now}}
+  Object.assign(box,{Date:FixtureDate,API_BASE_URL:f.io.apiBaseUrl,voiceMemoryUserId:owner,voiceAccountUserIdRef:{current:owner},buildNativeAuthHeaders:()=>({}),nativeReportPdfCompletionMessage,openReviewedNativeReportPdf,Linking:{openURL:async url=>{assert.deepEqual(release,['transport','playback','audio-mode']);assert.equal(box.voiceSessionActiveRef.current,false);return f.io.openUrl(url)}},stopPlayback:async()=>release.push('playback'),Audio:{setAudioModeAsync:async value=>{assert.equal(value.allowsRecordingIOS,false);release.push('audio-mode')}},DeviceEventEmitter:{emit:(...value)=>events.push(value)},appendConversationTurns:value=>turns.push(...value),setSaveSuccessNotice:value=>notices.push(value),fetch:async(url,request)=>{requests.push({url,request});return new Promise(done=>{resolve=data=>done({res:{ok:true},data})})},fetchNativeVoiceConfirm:async factory=>factory(f.io.apiBaseUrl)})
+  box.voiceSessionActiveRef.current=true;box.realtimeVoiceStopRef.current=async()=>release.push('transport')
+  evaluate(box,`globalThis.save=${callback('saveDraft')}`)
+  assert.equal(box.reviewPromptForDraft(f.draft),f.draft.confirmationMessage)
+  const footer=vm.createContext({draft:f.draft,primaryFooterIsHandoff:false});vm.runInContext(ts.transpileModule(`globalThis.label=${footerExpressions.get('primaryFooterLabel')}`,{compilerOptions:{target:ts.ScriptTarget.ES2022}}).outputText,footer);assert.equal(footer.label,'Open report PDF')
+  const pending=box.save(f.draft,{closeOnSuccess:false});assert.equal(await box.save(f.draft),null);assert.match(requests[0].request.headers['x-helfi-voice-capabilities'],/report-pdf-v1/);resolve(f.data);const result=await pending;assert(result);assert.equal(f.opened.length,1);assert.equal(notices[0].title,'PDF opening requested');assert.equal(box.confirmationRequestResult(result,f.draft,'synthetic').saved,false);assert.equal(box.realtimeToolResult(box.confirmationRequestResult(result,f.draft,'synthetic')).safeToClaimSaved,false);for(const value of [result,turns,notices,events])assert(!JSON.stringify(value).includes('accessToken'));assert.equal(events.filter(event=>event[0]==='helfi:voice-action-saved').length,0)
+ })
+ await check('actual JSON and multipart voice preparation advertise the new capability without another request',async()=>{
+  const f=fixture(),pending={...f.draft,canConfirm:false},typed=await draftRequest('Open my report PDF',{draft:pending},false,{draft:null})
+  assert.match(typed.headers[0]['x-helfi-voice-capabilities'],/report-pdf-v1/);assert.match(typed.headers[0]['x-helfi-voice-capabilities'],/additional-actions-v1/)
+  const headers=[],audio=await draftRequest('',{draft:pending},false,{draft:null,requestOptions:{audioUri:'file:///synthetic/voice.m4a'},FormData:class{append(){}},audioMimeFromUri:()=> 'audio/mp4',fetch:async(_url,request)=>{headers.push(request.headers);return{}},allowSpokenReply:false})
+  assert.match(headers[0]['x-helfi-voice-capabilities'],/report-pdf-v1/);assert.equal(audio.result.needsReview,false)
+ })
+ await check('actual host End or account switch during microphone shutdown prevents the later external handoff',async()=>{
+  for(const reason of ['end','account','unmount','abort']){const f=fixture(),box=baseBox(),controller=new AbortController();let resolve,release
+   class FixtureDate extends Date{static now(){return now}}
+   Object.assign(box,{Date:FixtureDate,API_BASE_URL:f.io.apiBaseUrl,voiceMemoryUserId:owner,voiceAccountUserIdRef:{current:owner},buildNativeAuthHeaders:()=>({}),nativeReportPdfCompletionMessage,openReviewedNativeReportPdf,Linking:{openURL:f.io.openUrl},stopPlayback:async()=>{},Audio:{setAudioModeAsync:async()=>{}},fetch:async()=>new Promise(done=>{resolve=data=>done({res:{ok:true},data})}),fetchNativeVoiceConfirm:async factory=>factory(f.io.apiBaseUrl)})
+   box.voiceSessionActiveRef.current=true;box.realtimeVoiceStopRef.current=()=>new Promise(done=>{release=done})
+   evaluate(box,`globalThis.save=${callback('saveDraft')}`);const pending=box.save(f.draft,{signal:controller.signal});resolve(f.data);await tick();assert.equal(typeof release,'function');assert.equal(f.opened.length,0)
+   if(reason==='end')box.realtimeVoiceRunRef.current++;if(reason==='account')box.voiceAccountUserIdRef.current='foreign';if(reason==='unmount')box.voiceProviderMountedRef.current=false;if(reason==='abort')controller.abort();release();assert.equal(await pending,null);assert.equal(f.opened.length,0)
+  }
+ })
+ await check('actual host ignores late account or End response before any external URL opening',async()=>{for(const change of [box=>{box.voiceAccountUserIdRef.current='foreign'},box=>{box.openRef.current=false},box=>{box.voiceProviderMountedRef.current=false},box=>{box.realtimeVoiceRunRef.current++}]){const f=fixture(),box=baseBox();let resolve;Object.assign(box,{API_BASE_URL:f.io.apiBaseUrl,voiceMemoryUserId:owner,voiceAccountUserIdRef:{current:owner},buildNativeAuthHeaders:()=>({}),nativeReportPdfCompletionMessage,openReviewedNativeReportPdf,Linking:{openURL:f.io.openUrl},fetch:async()=>new Promise(done=>{resolve=data=>done({res:{ok:true},data})}),fetchNativeVoiceConfirm:async factory=>factory(f.io.apiBaseUrl)});evaluate(box,`globalThis.save=${callback('saveDraft')}`);const pending=box.save(f.draft);change(box);resolve(f.data);assert.equal(await pending,null);assert.equal(f.opened.length,0)}})
+ console.log(`PASS ${count} actual-source report PDF client groups. Synthetic OS/network only; no real PDF was opened or saved.`)
+}
+main().catch(error=>{console.error(error.stack||error.message);process.exitCode=1})

@@ -35,6 +35,15 @@ async function run() {
   assert.equal(outcome({ success: true, result: { kind: 'recipe_import', status: 'imported_not_saved', saved: false } }, 200, 'save').success, false)
   assert.equal(outcome({ success: true, result: { kind: 'report_action', action: 'reports.weekly.generate', status: 'preparing', actionId: 'synthetic', reportId: 'report-synthetic', reportStatus: 'RUNNING', generated: false, unlocked: false } }, 200, 'save').status, 'report_request_recorded')
   assert.equal(outcome({ success: true, result: { kind: 'report_action', status: 'ready', reportId: 'synthetic' } }, 200, 'save').success, false)
+  const absent = { kind: 'chat_thread', action: 'chat_history.delete', actionId: 'synthetic-history-action', status: 'already_absent', saved: false, changed: false, message: 'The selected saved item is already absent. No deletion was performed by this action.' }
+  assert.equal(outcome({ success: true, result: absent }, 200, 'save').status, 'already_absent')
+  assert.equal(outcome({ success: true, result: absent }, 200, 'save').reasonCode, 'no_deletion_performed')
+  assert.equal(outcome({ success: true, result: { ...absent, changed: true } }, 200, 'save').success, false)
+  assert.equal(outcome({ success: true, result: { ...absent, status: 'completed', saved: true, changed: true } }, 200, 'save').status, 'action_completed')
+  const history = { kind: 'history_action', action: 'checkin_history.delete', actionId: 'synthetic-history-action', operation: 'delete', status: 'completed', saved: true, changed: true, ids: ['synthetic-one'], deletedIds: ['synthetic-one'], count: 1, message: 'The reviewed daily check-in history entries were deleted.' }
+  assert.equal(outcome({ success: true, result: history }, 200, 'save').status, 'action_completed')
+  assert.equal(outcome({ success: true, result: { ...history, deletedIds: ['synthetic-other'] } }, 200, 'save').success, false)
+  assert.equal(outcome({ success: true, result: { ...history, status: 'already_absent', saved: false, changed: false, count: 0, deletedIds: [] } }, 200, 'save').reasonCode, 'no_deletion_performed')
   assert.equal(outcome({ success: true, draft: { action: 'health_question', canConfirm: false, reasonCode: 'app_read_unverified' } }).success, false)
   assert.equal(outcome({ success: true, draft: { action: 'greeting', canConfirm: false } }).status, 'answered')
   assert.equal(outcome({ error: 'Synthetic private error' }, 500).reasonCode, 'http_500')

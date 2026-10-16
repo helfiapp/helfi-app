@@ -133,6 +133,14 @@ function digest(value:string){
   const hash=new RawSha256();hash.update(new Uint8Array(bytes))
   return Array.from(hash.digest(),byte=>byte.toString(16).padStart(2,'0')).join('')
 }
+// Match the normal server receipt identity without Node/Buffer/TextEncoder.
+export function nativeVoiceReviewTokenDigest(value:string){
+  const hex=digest(value),alphabet='ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789-_'
+  let encoded='',bits=0,buffer=0
+  for(let i=0;i<hex.length;i+=2){buffer=(buffer<<8)|parseInt(hex.slice(i,i+2),16);bits+=8;while(bits>=6){bits-=6;encoded+=alphabet[(buffer>>bits)&63]}}
+  if(bits>0)encoded+=alphabet[(buffer<<(6-bits))&63]
+  return encoded
+}
 type ImportJournalEntry={digest:string;action:'apple_health.import';payloadDigest:string;before:string;after?:string;status:'pending'|'imported'|'no_data';expiresAt:number}
 const journalKey=(accountId:string)=>`helfi_voice_health_import_receipts_v1:${encodeURIComponent(accountId)}`
 async function readImportJournal(io:NativeDeviceIo,accountId:string){

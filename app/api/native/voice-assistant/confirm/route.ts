@@ -23,7 +23,9 @@ import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
 import { applyNativeVoiceRecipeMetadata } from '@/lib/native-voice-recipe-metadata'
 import { executeVoiceRecipeUrlImport } from '@/lib/native-voice-recipe-url-import'
 import { executeVoiceSupportAction } from '@/lib/native-voice-support-actions'
-import { executeVoiceReportAction } from '@/lib/native-voice-report-actions'
+import { executeVoiceReportAction, executeVoiceReportPdfAction, refreshVoiceReportPdfAccess } from '@/lib/native-voice-report-actions'
+import { executeVoiceAdditionalAction } from '@/lib/native-voice-additional-actions'
+import { executeVoiceHistoryAction } from '@/lib/native-voice-history-actions'
 import { authorizeNativeVoiceDeviceAction } from '@/lib/native-voice-device-actions'
 import { saveNativeVoiceMood } from '@/lib/native-voice-mood-context'
 import { nativeVoiceFoodCopyVersion, nativeVoiceFoodCopyWaterVersion, nativeVoiceFoodCopyWaterId, relinkNativeVoiceCopiedDrink } from '@/lib/native-voice-food-copy'
@@ -1085,12 +1087,13 @@ async function confirmVoiceAction(request: NextRequest, trace?: { userId?: strin
 
     const body = await request.json().catch(() => ({} as any))
     const draft = body?.draft || body
-    if (trace && ['exercise', 'mood', 'journal', 'water', 'symptom_note', 'health_intake_items', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'record_action', 'preference_action', 'local_preference_action', 'notification_action', 'recipe_import_url', 'support_action', 'report_action', 'device_action'].includes(draft?.action)) trace.action = draft.action
+    if (trace && ['exercise', 'mood', 'journal', 'water', 'symptom_note', 'health_intake_items', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'record_action', 'preference_action', 'local_preference_action', 'notification_action', 'recipe_import_url', 'support_action', 'report_action', 'additional_action', 'device_action'].includes(draft?.action)) trace.action = draft.action
     // A completed receipt is an authenticated, read-only recovery by opaque
     // token. Its own 24-hour expiry applies even after the shorter review ends.
     // Return only stored data; edited client payload fields never execute here.
     if (typeof draft?.reviewToken === 'string' && /^v1\.[A-Za-z0-9_-]{43}$/.test(draft.reviewToken)) {
       const completed = await completedReviewResult(user.id, { reviewToken: draft.reviewToken })
+      if (completed?.action === 'reports.weekly.export_pdf') return NextResponse.json({ success: true, idempotentReplay: true, result: completed, reportPdfAccess: await refreshVoiceReportPdfAccess(request, user.id, completed) })
       if (completed) return NextResponse.json({ success: true, idempotentReplay: true, result: completed })
     }
     if (hasSelfHarmRisk(draft?.transcript) || hasSelfHarmRisk(draft?.mood?.note) || hasSelfHarmRisk(draft?.journal?.content)) {
@@ -1104,6 +1107,7 @@ async function confirmVoiceAction(request: NextRequest, trace?: { userId?: strin
     }
 
     let result: any
+    let reportPdfAccess: any
     const supportedAction =
       draft.action === 'exercise' ||
       draft.action === 'mood' ||
@@ -1121,6 +1125,7 @@ async function confirmVoiceAction(request: NextRequest, trace?: { userId?: strin
       || draft.action === 'recipe_import_url'
       || draft.action === 'support_action'
       || draft.action === 'report_action'
+      || draft.action === 'additional_action'
       || draft.action === 'device_action'
     if (!supportedAction) return NextResponse.json({ error: 'This action is not supported yet.' }, { status: 400 })
     if (draft.action === 'device_action') return NextResponse.json(await authorizeNativeVoiceDeviceAction(request, user.id, draft))
@@ -1167,7 +1172,14 @@ async function confirmVoiceAction(request: NextRequest, trace?: { userId?: strin
         } else if (draft.action === 'support_action') {
           result = await executeVoiceSupportAction(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
         } else if (draft.action === 'report_action') {
-          result = await executeVoiceReportAction(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
+          if (draft.reportAction?.action === 'reports.weekly.export_pdf') {
+            const exported = await executeVoiceReportPdfAction(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
+            result = exported.result
+            reportPdfAccess = exported.reportPdfAccess
+          } else result = await executeVoiceReportAction(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
+        } else if (draft.action === 'additional_action') {
+          const execute = ['coach_history.delete', 'checkin_history.delete'].includes(draft.additionalAction?.action) ? executeVoiceHistoryAction : executeVoiceAdditionalAction
+          result = await execute(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
         } else if (draft.action === 'record_action') {
           const saved = await executeNativeVoiceRecordAction(request, user.id, draft.recordAction)
           result = { ...saved, kind: 'record_action', entity: draft.recordAction.entity }
@@ -1189,6 +1201,7 @@ async function confirmVoiceAction(request: NextRequest, trace?: { userId?: strin
     } catch (error: any) {
       if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2002') {
         const saved = await completedReviewResult(user.id, draft)
+        if (saved?.action === 'reports.weekly.export_pdf') return NextResponse.json({ success: true, idempotentReplay: true, result: saved, reportPdfAccess: await refreshVoiceReportPdfAccess(request, user.id, saved) })
         if (saved) return NextResponse.json({ success: true, idempotentReplay: true, result: saved })
         return NextResponse.json({
           error: 'The earlier save has no confirmed result yet. Please check your history before trying again.',
@@ -1210,7 +1223,7 @@ async function confirmVoiceAction(request: NextRequest, trace?: { userId?: strin
       if (favoriteId) void touchStoredFavorite(user.id, favoriteId).catch(() => {})
     }
 
-    return NextResponse.json({ success: true, result })
+    return NextResponse.json({ success: true, result, ...(reportPdfAccess ? { reportPdfAccess } : {}) })
   } catch (error: any) {
     const databaseCode = /^P\d{4}$/.test(String(error?.code || '')) ? String(error.code) : null
     const reasonCode = databaseCode === 'P2028' ? 'voice_transaction_timeout' : /^[a-z_]{1,80}$/.test(String(error?.code || '')) ? String(error.code) : 'voice_action_failed'

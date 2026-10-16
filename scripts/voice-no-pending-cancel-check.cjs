@@ -51,6 +51,7 @@ async function run() {
     assert.equal(response.status, 200, text)
     assert.equal(response.body.draft?.confirmationMessage, 'No draft is waiting to be saved. Anything already saved stays unchanged.', text)
     assert.equal(response.body.draft.canConfirm, false)
+    assert.equal(response.body.draft.reasonCode, 'no_pending_review')
     assert.equal(response.body.draft.reviewToken, undefined)
     assert.equal(response.body.rejectNow, undefined, 'No claim that a previous review/save was discarded')
     assert.equal(response.body.confirmNow, undefined)
@@ -75,6 +76,13 @@ async function run() {
     assert.equal(h.effects.provider, 0)
   }
   const classifier = harness().ctx
+  vm.runInContext(ts.transpileModule(sourceFunctions('lib/native-voice-action-observability.ts'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, classifier)
+  const noPending = classifier.buildNoPendingVoiceControlDraft('No, discard it.', '2026-10-17')
+  const outcome = classifier.voiceActionOutcome({ success: true, draft: noPending }, 200, 'prepare')
+  assert.equal(outcome.status, 'answered', 'A truthful state answer is not a failed food operation')
+  assert.equal(outcome.reasonCode, 'no_pending_review')
+  assert.equal(outcome.success, true)
+  assert.equal(classifier.voiceActionOutcome({ success: true, draft: { ...noPending, canConfirm: true } }, 200, 'prepare').status, 'needs_review')
   for (const text of ['yes', 'okay', 'No milk in my coffee', 'Do not stop tracking my mood', 'No, log my mood as 3', 'Cancel the alarm at 7 pm', 'Discard the milk and use water', 'Forget it and log 100 g rice', 'Save my mood as 3', 'confirm this medication dose is safe', 'I want to kill myself', 'Cancel it because I want to hurt myself']) {
     assert.equal(classifier.buildNoPendingVoiceControlDraft(text, '2026-10-17'), null, `Substantive or ambiguous request stays outside the bounded handler: ${text}`)
   }

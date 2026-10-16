@@ -36,6 +36,8 @@ import { readVoiceAppData, VOICE_APP_READ_SCHEMAS } from '@/lib/native-voice-app
 import { prepareVoiceRecipeUrlImport } from '@/lib/native-voice-recipe-url-import'
 import { prepareVoiceSupportAction, readVoiceSupportFacts, VOICE_SUPPORT_ACTION_SCHEMAS } from '@/lib/native-voice-support-actions'
 import { prepareVoiceReportAction, VOICE_REPORT_ACTION_SCHEMAS } from '@/lib/native-voice-report-actions'
+import { prepareVoiceAdditionalAction, VOICE_ADDITIONAL_ACTION_SCHEMAS } from '@/lib/native-voice-additional-actions'
+import { prepareVoiceHistoryAction, VOICE_HISTORY_ACTION_SCHEMAS } from '@/lib/native-voice-history-actions'
 import { parseNativeVoiceMoodContext, validateNativeVoiceMoodContext, nativeVoiceMoodContextSummary, type NativeVoiceMoodContext } from '@/lib/native-voice-mood-context'
 import { nativeVoiceFoodCopyVersion, nativeVoiceFoodCopyWaterVersion, nativeVoiceFoodCopyWaterId, nativeVoiceFoodCopyReview } from '@/lib/native-voice-food-copy'
 import { prepareNativeVoiceDeviceAction, VOICE_DEVICE_ACTION_SCHEMAS } from '@/lib/native-voice-device-actions'
@@ -80,6 +82,7 @@ type VoiceAction =
   | 'recipe_import_url'
   | 'support_action'
   | 'report_action'
+  | 'additional_action'
   | 'device_action'
   | 'unknown'
 
@@ -218,6 +221,7 @@ type VoiceDraft = {
   appRead?: any
   supportAction?: any
   reportAction?: any
+  additionalAction?: any
   deviceAction?: any
   requiresDeviceReview?: boolean
   localPreference?: { key: 'darkMode' | 'hapticsEnabled' | 'profileVisibility' | 'dataAnalytics'; value: boolean | 'private' | 'public' | 'friends' }
@@ -1551,7 +1555,7 @@ function parseFollowUpDraft(raw: unknown) {
     if (!parsed || typeof parsed !== 'object') return null
     const action = cleanText((parsed as any).action, 40)
     const canConfirm = Boolean((parsed as any).canConfirm)
-    if (['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'recipe_import_url', 'support_action', 'report_action', 'device_action'].includes(action)) return parsed
+    if (['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'recipe_import_url', 'support_action', 'report_action', 'additional_action', 'device_action'].includes(action)) return parsed
     if ((parsed as any).timingNeedsClarification && ['food_build_meal', 'food_draft', 'water'].includes(action)) return parsed
     if (action === 'food_draft') {
       const draftText = cleanText((parsed as any).food?.draftText, 1000)
@@ -1602,6 +1606,7 @@ function reviewedDraftContextLine(draft: any) {
   if (draft.notificationAction) context.notificationAction = draft.notificationAction
   if (draft.supportAction) context.supportAction = draft.supportAction
   if (draft.reportAction) context.reportAction = draft.reportAction
+  if (draft.additionalAction) context.additionalAction = draft.additionalAction
   if (draft.deviceAction) context.deviceAction = draft.deviceAction
   if (draft.localPreference) context.localPreference = draft.localPreference
   if (draft.exercise) {
@@ -4542,11 +4547,12 @@ async function runJsonCommandModel(
         'If current section is symptoms or health-image, use safe tracking/handoff behavior only; do not diagnose, treat, or ask the user to show food.',
         'For clear low-risk logging requests, prepare a saveable draft for the user to review before saving. If important details are missing, ask one short follow-up question instead of guessing.',
         'For any logging or save action, if the user states a date, return localDate as an exact YYYY-MM-DD calculated from Today. Otherwise use null. Preserve relative dates such as yesterday in every language. For food_copy_previous, yesterday describes the source meal and localDate must remain null.',
-        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, health_intake_items, recipe, recipe_import_url, symptom_note, health_question, app_handoff, record_action, preference_action, local_preference_action, notification_action, app_read, support_action, report_action, device_action, confirm_draft, reject_draft, unknown.',
+        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, health_intake_items, recipe, recipe_import_url, symptom_note, health_question, app_handoff, record_action, preference_action, local_preference_action, notification_action, app_read, support_action, report_action, additional_action, device_action, confirm_draft, reject_draft, unknown.',
         `Use app_read for actual saved app information; return appRead:{action:"registered ID",values:{...}} using these schemas: ${JSON.stringify(VOICE_APP_READ_SCHEMAS)}. Never invent a balance, report, hydration total or device connection. This checks information only and cannot claim a save or a live device sync.`,
+        `Use additional_action only for explicitly requested saved chat-history title changes/deletion, saved health-image-note deletion, coach/check-in history deletion, or existing Google Fit/Oura/Polar interest preferences. Return additionalAction:{action:"registered ID",values:{...}} from ${JSON.stringify({ ...VOICE_ADDITIONAL_ACTION_SCHEMAS, ...VOICE_HISTORY_ACTION_SCHEMAS })}. Use the user's exact title/summary/issue/date range to select; never invent IDs or replacement titles. Bulk history changes require the exact captured rows and count to be reviewed; later arrivals are retained. Interest is only an interest preference, never a device connection. Current voice conversation cleanup is delete_conversation, not saved chat-history deletion.`,
         'Use recipe_import_url only when the newest request contains exactly one complete http or https recipe URL and asks to import/use it. The app reviews the normal 10-credit import cost before fetching or importing. A completed import still requires recipe review before any diary or library save.',
         `Use support_action for support ticket facts or an explicitly requested support message/change; return supportAction:{action:"registered ID",values:{...}} from ${JSON.stringify(VOICE_SUPPORT_ACTION_SCHEMAS)}. Preserve exact user-dictated text. Never send a message merely because someone describes an app problem, never invent subjects/messages/recipients, and never claim email delivery. Read/list are observational; sending, closing, feedback and deletion require an exact review.`,
-        `Use report_action only for an explicit request to generate a weekly report; return reportAction:{action:"reports.weekly.generate",values:{}} from ${JSON.stringify(VOICE_REPORT_ACTION_SCHEMAS)}. Normal account access, consent, profile completion and variable usage charges remain required. A request being accepted is not proof it completed, unlocked or emailed. Use app_read for report status/content instead.`,
+        `Use report_action for an explicit weekly report generation or PDF export request from ${JSON.stringify(VOICE_REPORT_ACTION_SCHEMAS)}. Generate uses reports.weekly.generate with values:{}. PDF uses reports.weekly.export_pdf with an exact owned reportId or exact period, or values:{} for the latest ready owned report; never invent IDs. Normal generation account access, consent, profile completion and variable usage charges remain required. PDF export opens an existing READY report and does not create a new AI report, unlock a purchase or prove a downloaded file. Use app_read for report status/content instead.`,
         `Use device_action for these existing phone controls; return deviceAction:{action:"registered ID",values:{...}} from ${JSON.stringify(VOICE_DEVICE_ACTION_SCHEMAS)}. Apple Health source names must be discovered on the actual phone; never invent source IDs. The server only authorizes a review; actual phone execution and readback must prove completion. OS access approvals remain real device UI.`,
         'Also use record_action to create a saved favorite/custom meal from an existing food entry, or to update/delete an already saved food, drink/water, mood rating, health journal, mood journal, exercise, favorite or custom-food record. This is different from correcting a proposal that has not been saved.',
         'For record_action return recordAction:{operation:"create"|"update"|"delete",entity:"food"|"water"|"mood"|"journal"|"mood_journal"|"exercise"|"favorite"|"custom_food"|"supplement"|"medication"|"symptom_note",query:"exact words identifying the existing record",localDate:"YYYY-MM-DD",changes:{...},sourceFoodId:null}. Never invent a record ID. The app finds the user-owned record and asks if more than one matches. Use the exact date requested, default Today. The query contains only words naming the EXISTING record; exclude the change instruction, new amounts, and temporal clauses such as I just logged today. For In the coffee I just logged today change the milk to 50 ml, query is coffee and ingredientChanges changes milk; do not query coffee with 50 ml milk.',
@@ -5433,6 +5439,7 @@ function buildNoPendingVoiceControlDraft(transcript: string, localDate: string):
   return {
     action: 'unknown', transcript: raw, localDate,
     summary: cancellation ? 'No draft waiting' : 'No reviewed draft ready',
+    reasonCode: 'no_pending_review',
     confirmationMessage: cancellation
       ? 'No draft is waiting to be saved. Anything already saved stays unchanged.'
       : 'No reviewed draft is ready to save. Tell me what you’d like to add so I can prepare it for confirmation.',
@@ -5778,6 +5785,15 @@ async function normalizeDraft(
       return { aiCostCents: 0, draft: await prepareVoiceSupportAction(actionRequest, userId, input, transcript, localDate) }
     } catch (error: any) {
       return { aiCostCents: 0, draft: { action: 'support_action', transcript, localDate, summary: 'Support request needs review', confirmationMessage: cleanText(error?.message || 'Please state the exact support request.', 500), canConfirm: false, autoSave: false } }
+    }
+  }
+  if (parsedAction === 'additional_action') {
+    try {
+      if (!actionRequest) throw new Error('Please open the app to review this action.')
+      const prepare = ['coach_history.delete', 'checkin_history.delete'].includes(parsed?.additionalAction?.action) ? prepareVoiceHistoryAction : prepareVoiceAdditionalAction
+      return { aiCostCents: 0, draft: await prepare(actionRequest, userId, parsed?.additionalAction, transcript, localDate) }
+    } catch (error: any) {
+      return { aiCostCents: 0, draft: { action: 'additional_action', transcript, localDate, summary: 'Action needs review', confirmationMessage: cleanText(error?.message || 'Please identify the exact saved item or device preference.', 500), canConfirm: false, autoSave: false } }
     }
   }
   if (parsedAction === 'report_action') {
@@ -6279,7 +6295,10 @@ async function buildAiDraftDecisionResponse(
 }
 
 function needsReviewedAppControl(transcript: string, hint?: RealtimeActionHint | null) {
-  if (['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'app_read', 'support_action', 'report_action', 'recipe_import_url', 'device_action'].includes(hint?.action || '')) return true
+  if (/\b(?:pdf|export|download)\b/i.test(transcript) && /\breports?\b/i.test(transcript) && /\b(?:open|save|export|download|create|make)\b/i.test(transcript)) return true
+  if (['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'app_read', 'support_action', 'report_action', 'additional_action', 'recipe_import_url', 'device_action'].includes(hint?.action || '')) return true
+  if (/\b(?:google fit|oura|polar|health image|medical image|chat history|saved chat|chat thread)\b/i.test(transcript) && /\b(?:interest|interested|change|edit|rename|delete|remove|enable|disable|turn|set)\b/i.test(transcript)) return true
+  if (/\b(?:coach|health tips?|tip history|check[ -]?in history)\b/i.test(transcript) && /\b(?:delete|remove|clear|reset)\b/i.test(transcript)) return true
   if (/\b(?:apple health|sleep coach|sleep routine|sleep settings|listening settings)\b/i.test(transcript) && /\b(?:import|refresh|update|change|enable|disable|turn|select|set|check|uncheck)\b/i.test(transcript)) return true
   if (/\b(?:support tickets?|weekly reports?|credit balance|credits available|device connection)\b/i.test(transcript) && /\b(?:check|show|read|list|how|what|generate|create|send|reply|close|end|delete|feedback)\b/i.test(transcript)) return true
   if (/\b(?:notifications?|inbox)\b/i.test(transcript) && /\b(?:mark|read|delete|remove|clear)\b/i.test(transcript)) return true
@@ -6540,7 +6559,7 @@ async function prepareVoiceAction(request: NextRequest, trace?: { userId?: strin
 
     const storedFavorites = await loadStoredFavorites(user.id).catch(() => [])
     const recentFoodFavorites = await loadRecentFoodLibraryFavorites(user.id).catch(() => [])
-    const appControlRequest = ['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'support_action', 'report_action', 'recipe_import_url', 'device_action'].includes(editableDraft?.action || '') || (!editableDraft && needsReviewedAppControl(transcript, realtimeActionHint))
+    const appControlRequest = ['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'support_action', 'report_action', 'additional_action', 'recipe_import_url', 'device_action'].includes(editableDraft?.action || '') || (!editableDraft && needsReviewedAppControl(transcript, realtimeActionHint))
     const allowsFavoriteShortcut = !appControlRequest && (!editableDraft || /\b(favourites?|favorites?|my saved)\b/i.test(transcript)) && (!realtimeActionHint || realtimeActionHint.action === 'food_favorite' || /\b(favourites?|favorites?|my saved)\b/i.test(transcript))
     const favorites = allowsFavoriteShortcut ? mergeFavorites(mergeFavorites(clientFavorites, storedFavorites), recentFoodFavorites) : []
     const quickHealthIntakeDraft = appControlRequest ? null : tryParseHealthIntakeItemsRequest(transcript, localDate, launchContext)

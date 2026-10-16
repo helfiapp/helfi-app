@@ -1,5 +1,5 @@
 import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react'
-import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vibration, View } from 'react-native'
+import { ActivityIndicator, Alert, AppState, DeviceEventEmitter, Linking, Modal, Platform, Pressable, ScrollView, StyleSheet, Text, TextInput, Vibration, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Audio } from 'expo-av'
 import { CameraView, useCameraPermissions } from 'expo-camera'
@@ -16,6 +16,8 @@ import { useAppleHealthSync } from '../health/AppleHealthSyncProvider'
 import { isAppleHealthSupportedDevice } from '../health/appleHealth'
 import { theme } from '../ui/theme'
 import { applyReviewedLocalPreference, captureLocalPreferenceReview, validateLocalPreference, type LocalPreference, type LocalPreferenceReview } from './localPreferenceActions'
+import { acceptAdditionalVoiceReceipt, verifiedAdditionalVoiceReceipt, type AdditionalVoiceAction } from './additionalVoiceActions'
+import { nativeReportPdfCompletionMessage, openReviewedNativeReportPdf } from './reportPdfActions'
 import { hasNativeRealtimeVoiceSupport, startHelfiRealtimeVoiceSession } from './realtimeVoice'
 import { applyReviewedNativeDeviceAction, captureNativeDeviceReview, getSleepDeviceEditorState, validateNativeDeviceAction, type NativeDeviceAction, type NativeDeviceIo, type NativeDeviceReview } from './nativeDeviceActions'
 
@@ -74,7 +76,8 @@ type VoiceDraft = {
   recipe?: { text?: string; importDraft?: Record<string, unknown> }
   recipeImport?: { userId: string; url: string; costCredits: number; localDate?: string; meal?: string; destination?: 'diary' | 'library' }
   supportAction?: { action: 'support.create' | 'support.reply' | 'support.end_chat' | 'support.feedback' | 'support.delete'; userId?: string; ticketId?: string; payload?: Record<string, unknown>; beforeHash?: string }
-  reportAction?: { action: 'reports.weekly.generate'; userId?: string; beforeHash?: string; pricePolicy?: { minimumAvailableCredits: number; chargeMode: 'normal_usage_based' }; periodStart?: string; periodEnd?: string }
+  reportAction?: { action: 'reports.weekly.generate' | 'reports.weekly.export_pdf'; userId?: string; reportId?: string; reportStatus?: 'READY'; sourceVersion?: string; beforeHash?: string; pricePolicy?: { minimumAvailableCredits: number; chargeMode: 'normal_usage_based' }; periodStart?: string; periodEnd?: string }
+  additionalAction?: AdditionalVoiceAction
   deviceAction?: NativeDeviceAction
   requiresDeviceReview?: boolean
   mood?: { mood?: number; tags?: string[]; note?: string; context?: { intensityPercent?: number; feelings?: string[]; energyLevel?: number; sleepQuality?: number; nutrition?: number; supplements?: number; medicationEffect?: number; physicalActivity?: number; localHour?: number } }
@@ -230,7 +233,7 @@ function voiceConversationStorageKey(userId: string) {
 }
 
 function traceVoiceAction(voiceActionRunId: string, event: string, action: unknown, status: string, reasonCode: string, startedAt: number) {
-  const safeAction = /^(?:record_action|preference_action|local_preference_action|notification_action|support_action|report_action|device_action|recipe_import_url|app_read|food_favorite|food_draft|food_build_meal|food_copy_previous|water|exercise|journal|symptom_note|mood|health_intake_items|app_handoff|health_question|recipe|general_chat|navigate|delete_conversation)$/.test(String(action)) ? String(action) : 'unknown'
+  const safeAction = /^(?:record_action|preference_action|local_preference_action|notification_action|support_action|report_action|device_action|recipe_import_url|app_read|additional_action|food_favorite|food_draft|food_build_meal|food_copy_previous|water|exercise|journal|symptom_note|mood|health_intake_items|app_handoff|health_question|recipe|general_chat|navigate|delete_conversation)$/.test(String(action)) ? String(action) : 'unknown'
   console.info('[helfi voice action]', JSON.stringify({ version: 1, voiceActionRunId, event, action: safeAction, status, reasonCode, durationMs: Math.max(0, Date.now() - startedAt) }))
 }
 
@@ -301,6 +304,8 @@ function isConfirmedRecipeImport(data: any, draft: VoiceDraft | null) {
 }
 
 function verifiedActionCompletionMessage(data: any, draft: VoiceDraft | null) {
+  if (draft?.action === 'additional_action') return verifiedAdditionalVoiceReceipt(data, draft)?.message || ''
+  if (draft?.action === 'report_action' && draft.reportAction?.action === 'reports.weekly.export_pdf') return nativeReportPdfCompletionMessage(data, draft)
   const result = data?.result
   if (data?.success !== true || !result || result.saved === true || typeof result.actionId !== 'string' || !result.actionId.trim()) return ''
   if (draft?.action === 'support_action' && result.kind === 'support_action' && result.action === draft.supportAction?.action && result.status === 'completed' && typeof result.id === 'string' && result.id.trim()) {
@@ -333,7 +338,7 @@ function confirmationRequestResult(data: any, draft: VoiceDraft, voiceActionRunI
     return { ok: true, saved: false, needsReview: next.canConfirm, status: next.canConfirm ? 'review_draft' : 'needs_clarification', action: next.action, voiceActionRunId, reviewPrompt: `${data.result.message} ${prompt}`, message: `${data.result.message} ${prompt}` }
   }
   const saved = isConfirmedVoiceSave(data, draft.action)
-  return { ok: saved, saved, status: saved ? 'saved' : 'general_answer', message: saved ? data.result.message || 'Saved.' : draft.action === 'recipe_import_url' ? 'The recipe import was not verified. Please check before trying again.' : ['support_action', 'report_action', 'device_action'].includes(draft.action) ? 'This action was not verified. Please check its normal screen.' : 'I could not save that.', action: draft.action, voiceActionRunId }
+  return { ok: saved, saved, status: saved ? 'saved' : 'general_answer', message: saved ? data.result.message || 'Saved.' : draft.action === 'recipe_import_url' ? 'The recipe import was not verified. Please check before trying again.' : ['support_action', 'report_action', 'additional_action', 'device_action'].includes(draft.action) ? 'This action was not verified. Please check its normal screen.' : 'I could not save that.', action: draft.action, voiceActionRunId }
 }
 
 function normalizeLaunchContext(input?: VoiceAssistantLaunchContext | null): VoiceAssistantLaunchContext {
@@ -394,7 +399,7 @@ function voiceFoodSourceNotice(nextDraft: VoiceDraft | null) {
 function reviewPromptForDraft(nextDraft: VoiceDraft | null, deviceReview?: NativeDeviceReview | null) {
   if (!nextDraft?.canConfirm) return spokenReplyTextForDraft(nextDraft)
   if (nextDraft.action === 'device_action') return reviewedNativeDevicePrompt(nextDraft, deviceReview)
-  if (nextDraft.action === 'support_action' || nextDraft.action === 'report_action') return nextDraft.confirmationMessage
+  if (nextDraft.action === 'support_action' || nextDraft.action === 'report_action' || nextDraft.action === 'additional_action') return nextDraft.confirmationMessage
   if (nextDraft.action === 'record_action' && ['food', 'water', 'favorite', 'custom_food'].includes(nextDraft.recordAction?.entity || '')) return nextDraft.confirmationMessage
   if (nextDraft.action === 'recipe_import_url') return `Recipe link: ${nextDraft.recipeImport?.url || ''}. ${nextDraft.confirmationMessage}`
   const date = cleanFavoriteText(nextDraft.localDate || '', 20)
@@ -444,7 +449,7 @@ function spokenReviewPromptForDraft(nextDraft: VoiceDraft | null, deviceReview?:
   const full = reviewPromptForDraft(nextDraft, deviceReview)
   if (nextDraft?.canConfirm && nextDraft.action === 'record_action' && nextDraft.recordAction?.operation === 'create' && ['favorite', 'custom_food'].includes(nextDraft.recordAction.entity) && nextDraft.recordAction.spokenReview) return nextDraft.recordAction.spokenReview
   if (nextDraft?.canConfirm && nextDraft.action === 'recipe_import_url') return nextDraft.confirmationMessage
-  if (!nextDraft?.canConfirm || ['mood', 'journal', 'support_action', 'report_action', 'device_action'].includes(nextDraft.action) || (nextDraft.action === 'record_action' && ['food', 'water', 'favorite', 'custom_food'].includes(nextDraft.recordAction?.entity || '')) || full.length <= 500) return full
+  if (!nextDraft?.canConfirm || ['mood', 'journal', 'support_action', 'report_action', 'additional_action', 'device_action'].includes(nextDraft.action) || (nextDraft.action === 'record_action' && ['food', 'water', 'favorite', 'custom_food'].includes(nextDraft.recordAction?.entity || '')) || full.length <= 500) return full
   const food = nextDraft.food
   const date = cleanFavoriteText(nextDraft.localDate || '', 20)
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(nextDraft.localTime || '') ? nextDraft.localTime : ''
@@ -472,7 +477,7 @@ function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
         : status === 'needs_clarification'
         ? 'I need one detail first.'
         : 'Done.'),
-    needsReview ? result.action === 'record_action' ? 400000 : ['support_action', 'report_action', 'mood', 'journal', 'device_action'].includes(result.action || '') ? 24000 : 4000 : 500,
+    needsReview ? result.action === 'record_action' ? 400000 : ['support_action', 'report_action', 'additional_action', 'mood', 'journal', 'device_action'].includes(result.action || '') ? 24000 : 4000 : 500,
   )
   const spokenReply = result.action === 'recipe' && !saved && status === 'general_answer'
     ? compactRecipeVoiceReply(defaultSpokenReply)
@@ -801,7 +806,7 @@ function supportsNativeVoiceInput(os: string, isPad: boolean) {
 function isPendingFollowUpDraft(draft: VoiceDraft | null) {
   if (!draft || draft.canConfirm) return false
   if (draft.action === 'recipe' && draft.recipe?.importDraft) return true
-  if (draft.action === 'record_action' || draft.action === 'preference_action' || draft.action === 'local_preference_action' || draft.action === 'notification_action' || draft.action === 'support_action' || draft.action === 'report_action' || draft.action === 'device_action') return !draft.appTarget?.path
+  if (draft.action === 'record_action' || draft.action === 'preference_action' || draft.action === 'local_preference_action' || draft.action === 'notification_action' || draft.action === 'support_action' || draft.action === 'report_action' || draft.action === 'additional_action' || draft.action === 'device_action') return !draft.appTarget?.path
   if (draft.timingNeedsClarification && (draft.action === 'water' || Boolean(draft.food?.draftText))) return true
   if (draft.action === 'food_draft' && draft.food?.draftText) return true
   if (
@@ -2191,7 +2196,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         : targetDraft.action === 'mood'
         ? 'mood history'
         : 'health record'
-      addVoiceActivity(targetDraft.action === 'recipe_import_url' ? 'Importing recipe for review' : targetDraft.action === 'device_action' ? 'Applying reviewed Apple Health action' : targetDraft.action === 'support_action' ? 'Submitting reviewed support action' : targetDraft.action === 'report_action' ? 'Requesting weekly report' : `Saving to your ${saveDestination}`)
+      addVoiceActivity(targetDraft.action === 'recipe_import_url' ? 'Importing recipe for review' : targetDraft.action === 'device_action' ? 'Applying reviewed Apple Health action' : targetDraft.action === 'additional_action' ? 'Applying reviewed saved-item action' : targetDraft.action === 'support_action' ? 'Submitting reviewed support action' : targetDraft.action === 'report_action' ? targetDraft.reportAction?.action === 'reports.weekly.export_pdf' ? 'Preparing reviewed report PDF' : 'Requesting weekly report' : `Saving to your ${saveDestination}`)
       setConfirming(true)
       voiceSaveRequestsRef.current += 1
       let saveRequestOutstanding = true
@@ -2200,20 +2205,22 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         const guardedRecord = targetDraft.action === 'record_action' && ['symptom_note', 'supplement', 'medication'].includes(targetDraft.recordAction?.entity || '')
         const recipeImport = targetDraft.action === 'recipe_import_url'
         const separateAction = targetDraft.action === 'support_action' || targetDraft.action === 'report_action'
+        const additionalAction = targetDraft.action === 'additional_action'
         const deviceAction = targetDraft.action === 'device_action'
         if (deviceAction && (!isCurrentDeviceSave() || !nativeDeviceReviewRef.current || nativeDeviceReviewRef.current.accountId !== voiceMemoryUserId || nativeDeviceReviewRef.current.token !== targetDraft.reviewToken || !['apple_health.import', 'apple_health.automatic.update', 'apple_health.source.select'].includes(targetDraft.deviceAction?.action || ''))) throw new Error('Please review the current Apple Health action again. Nothing has been sent to change it.')
+        if (additionalAction && (!isCurrentDeviceSave() || targetDraft.additionalAction?.userId !== voiceMemoryUserId)) throw new Error('Please review this exact saved-item action in the current account. Nothing has been submitted.')
         if (separateAction && (!isCurrentDeviceSave() || (targetDraft.action === 'support_action' ? targetDraft.supportAction?.userId : targetDraft.reportAction?.userId) !== voiceMemoryUserId)) throw new Error('Please review this action again in the current account. Nothing has been submitted.')
         if (recipeImport && (!isCurrentDeviceSave() || targetDraft.recipeImport?.userId !== voiceMemoryUserId || targetDraft.recipeImport?.costCredits !== 10)) throw new Error('Please review this recipe import again in the current account. No import has been requested.')
         if (guardedRecord && (!isCurrentDeviceSave() || (targetDraft.recordAction?.ownerId && targetDraft.recordAction.ownerId !== voiceMemoryUserId))) throw new Error('Please review this recorded change again in the current account. Nothing has been sent to change it.')
         if (targetDraft.action === 'notification_action' && (!isCurrentDeviceSave() || targetDraft.notificationAction?.userId !== voiceMemoryUserId)) throw new Error('Please review these notifications again in the current account. Nothing has been sent to change them.')
         let { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
           method: 'POST',
-          headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-action-id': voiceActionRunId },
+          headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-capabilities': 'report-pdf-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
           signal: saveSignal,
           body: JSON.stringify({ draft: targetDraft }),
         }))
         if (saveSignal?.aborted) return null
-        if ((targetDraft.action === 'notification_action' || guardedRecord || recipeImport || separateAction || deviceAction) && !isCurrentDeviceSave()) return null
+        if ((targetDraft.action === 'notification_action' || guardedRecord || recipeImport || separateAction || additionalAction || deviceAction) && !isCurrentDeviceSave()) return null
         if (!res.ok) throw new Error(data?.error || 'Could not save that.')
         if (deviceAction) {
           const reviewed = validateNativeDeviceAction(targetDraft.deviceAction)
@@ -2243,6 +2250,77 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           setTranscript('')
           setChargedCredits(null)
           if (receipt.verified && options?.closeOnSuccess !== false) closePanel()
+          return data
+        }
+        if (additionalAction) {
+          const accepted = acceptAdditionalVoiceReceipt(data, targetDraft, voiceMemoryUserId, isCurrentDeviceSave, Date.now())
+          if (!accepted || !isCurrentDeviceSave()) return null
+          data = { ...accepted, voiceActionRunId }
+          const receipt = accepted.result
+          voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
+          saveRequestOutstanding = false
+          traceVoiceAction(voiceActionRunId, 'action_completed', targetDraft.action, receipt.status, accepted.idempotentReplay ? 'replayed_saved_item_receipt' : 'verified_saved_item_receipt', startedAt)
+          appendConversationTurns([makeConversationTurn('assistant', receipt.message)])
+          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', kind: receipt.kind, action: receipt.action, changedAreas: receipt.changedAreas })
+          const target = receipt.kind === 'history_action' ? receipt.action === 'coach_history.delete' ? { title: 'Health Coach', path: '/health-tips/history', nativeTarget: { type: 'stack', route: 'SmartHealthCoach', params: { tab: 'history' } } } : { title: 'Daily Check-in', path: '/check-in?tab=history', nativeTarget: { type: 'stack', route: 'DailyCheckIn', params: { tab: 'history' } } }
+            : receipt.kind === 'device_interest' ? { title: 'Devices', path: '/devices', nativeTarget: { type: 'stack', route: 'Devices' } }
+            : receipt.kind === 'health_image_note' ? { title: 'Health Image Notes', path: '/medical-images', nativeTarget: { type: 'stack', route: 'HealthImageNotes' } }
+            : { title: 'Chat History', path: `/chat?history=1&context=${targetDraft.additionalAction?.values.context}&voiceActionNonce=${Date.now()}`, nativeTarget: { type: 'stack', route: 'NativeWebTool', params: { title: 'Chat History', path: `/chat?history=1&context=${targetDraft.additionalAction?.values.context}&voiceActionNonce=${Date.now()}` } } }
+          DeviceEventEmitter.emit('helfi:navigate-native-web-tool', target)
+          setSaveSuccessNotice({ title: receipt.status === 'already_absent' ? 'Saved item already absent' : receipt.kind === 'device_interest' ? 'Device interest reviewed' : receipt.operation === 'rename' ? 'Saved chat title reviewed' : 'Saved item removed', message: receipt.message })
+          addVoiceActivity(receipt.status === 'already_absent' ? 'Already absent — no deletion performed' : receipt.changed ? 'Reviewed saved-item action verified' : 'Reviewed value already matches', 'done')
+          setDraft(null)
+          setPendingFollowUpDraft(null)
+          setReviewCorrectionActive(false)
+          setTranscript('')
+          setChargedCredits(null)
+          if (options?.closeOnSuccess !== false) closePanel()
+          return data
+        }
+        if (targetDraft.action === 'report_action' && targetDraft.reportAction?.action === 'reports.weekly.export_pdf') {
+          const opened = await openReviewedNativeReportPdf(data, targetDraft, { apiBaseUrl: API_BASE_URL, accountId: voiceMemoryUserId, now: () => Date.now(), isCurrent: isCurrentDeviceSave, openUrl: async url => {
+            if (!isCurrentDeviceSave()) throw new Error('The PDF opening was cancelled.')
+            // The external viewer must never inherit an active microphone. Do
+            // not cancel this already-authorized action's own response signal.
+            setContinuousVoiceSession(false)
+            realtimeVoiceConnectedRef.current = false
+            const stop = realtimeVoiceStopRef.current
+            realtimeVoiceStopRef.current = null
+            realtimeVoiceMuteRef.current = null
+            realtimeVoicePromptRef.current = null
+            realtimeVoiceFlushRef.current = null
+            const connection = realtimeVoiceAbortRef.current
+            realtimeVoiceAbortRef.current = null
+            connection?.abort()
+            clearRealtimeConnectTimeout()
+            clearReviewSilenceTimer()
+            setRealtimeVoiceStatus('closed')
+            if (stop) await stop()
+            await stopPlayback()
+            await Audio.setAudioModeAsync({ allowsRecordingIOS: false, playsInSilentModeIOS: true, staysActiveInBackground: false, shouldDuckAndroid: true }).catch(() => {})
+            if (!isCurrentDeviceSave()) throw new Error('The PDF opening was cancelled.')
+            await Linking.openURL(url)
+          } })
+          if (!opened || !isCurrentDeviceSave()) return null
+          // The signed URL lives only in this callback/helper; no transcript,
+          // trace, returned action receipt or durable client storage contains it.
+          data = { ...opened, voiceActionRunId }
+          const message = nativeReportPdfCompletionMessage(data, targetDraft)
+          if (!message) throw new Error('The phone did not verify this report PDF action. Please use Save as PDF in Insights.')
+          voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
+          saveRequestOutstanding = false
+          traceVoiceAction(voiceActionRunId, 'report_pdf_completed', targetDraft.action, data.result.status, data.idempotentReplay ? 'replayed_pdf_handoff' : 'verified_pdf_handoff', startedAt)
+          appendConversationTurns([makeConversationTurn('assistant', message)])
+          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', kind: targetDraft.action, action: data.result.action })
+          DeviceEventEmitter.emit('helfi:navigate-native-web-tool', { title: 'Insights', path: '/insights', nativeTarget: { type: 'tab', tab: 'Insights' } })
+          setSaveSuccessNotice({ title: data.result.openRequestAccepted ? 'PDF opening requested' : 'PDF prepared', message })
+          addVoiceActivity(data.result.openRequestAccepted ? 'Phone accepted the PDF opening request' : 'PDF opening not verified', 'done')
+          setDraft(null)
+          setPendingFollowUpDraft(null)
+          setReviewCorrectionActive(false)
+          setTranscript('')
+          setChargedCredits(null)
+          if (options?.closeOnSuccess !== false) closePanel()
           return data
         }
         if (separateAction) {
@@ -2470,10 +2548,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         traceVoiceAction(voiceActionRunId, 'save_completed', targetDraft.action, 'not_confirmed', saveSignal?.aborted ? 'cancelled_check_diary' : 'save_not_confirmed', startedAt)
         if (saveSignal?.aborted || error?.name === 'AbortError') return null
         const message = error?.message || 'Please check your internet connection and try again.'
-        appendConversationTurns([makeConversationTurn('assistant', `${targetDraft.action === 'recipe_import_url' ? 'I could not confirm the recipe import.' : ['support_action', 'report_action', 'device_action'].includes(targetDraft.action) ? 'I could not confirm this action.' : 'I could not confirm the save.'} ${message}`)])
-        addVoiceActivity(['recipe_import_url', 'support_action', 'report_action', 'device_action'].includes(targetDraft.action) ? 'Action not verified — check before retrying' : 'Save failed — ready to retry', 'error')
+        appendConversationTurns([makeConversationTurn('assistant', `${targetDraft.action === 'recipe_import_url' ? 'I could not confirm the recipe import.' : ['support_action', 'report_action', 'additional_action', 'device_action'].includes(targetDraft.action) ? 'I could not confirm this action.' : 'I could not confirm the save.'} ${message}`)])
+        addVoiceActivity(['recipe_import_url', 'support_action', 'report_action', 'additional_action', 'device_action'].includes(targetDraft.action) ? 'Action not verified — check before retrying' : 'Save failed — ready to retry', 'error')
         setSaveError(message)
-        Alert.alert(targetDraft.action === 'recipe_import_url' ? 'Import not verified' : ['support_action', 'report_action', 'device_action'].includes(targetDraft.action) ? 'Action not verified' : 'Could not save', message)
+        Alert.alert(targetDraft.action === 'recipe_import_url' ? 'Import not verified' : ['support_action', 'report_action', 'additional_action', 'device_action'].includes(targetDraft.action) ? 'Action not verified' : 'Could not save', message)
         return null
       } finally {
         if (saveRequestOutstanding) voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
@@ -2483,7 +2561,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setConfirming(false)
       }
     },
-    [addVoiceActivity, appendConversationTurns, closePanel, makeConversationTurn, session?.token, voiceMemoryUserId],
+    [addVoiceActivity, appendConversationTurns, clearRealtimeConnectTimeout, clearReviewSilenceTimer, closePanel, makeConversationTurn, session?.token, setContinuousVoiceSession, stopPlayback, voiceMemoryUserId],
   )
 
   const sendDraftRequest = useCallback(
@@ -2580,7 +2658,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             form.append('aiConsentGranted', 'true')
             return fetch(`${baseUrl}/api/native-voice-assistant`, {
               method: 'POST',
-              headers: { ...buildNativeAuthHeaders(session.token), 'x-helfi-voice-action-id': voiceActionRunId },
+              headers: { ...buildNativeAuthHeaders(session.token), 'x-helfi-voice-capabilities': 'report-pdf-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
               signal: requestSignal,
               body: form,
             })
@@ -2588,7 +2666,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         } else {
           responseData = await fetchNativeVoiceAssistant((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant`, {
             method: 'POST',
-            headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-action-id': voiceActionRunId },
+            headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-capabilities': 'report-pdf-v1,additional-actions-v1', 'x-helfi-voice-action-id': voiceActionRunId },
             signal: requestSignal,
             body: JSON.stringify({
               transcript: typedTranscript,
@@ -3099,7 +3177,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             }
             const request = cleanFavoriteText(args.request || '', 2000)
             if (!request) return { ok: false, message: 'No app action was requested.' }
-            const action = cleanFavoriteText(args.action || '', 40)
+            const requestedAction = cleanFavoriteText(args.action || '', 40)
+            const savedHistoryTarget = /\b(?:saved|history|previous|older)\b/i.test(request)
+            const action = requestedAction === 'delete_conversation' && savedHistoryTarget ? 'additional_action' : requestedAction
             const actionLabel = action === 'exercise'
               ? 'exercise entry'
               : action.startsWith('food_')
@@ -3112,7 +3192,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               ? 'journal entry'
               : 'app action'
             addVoiceActivity(`Preparing ${actionLabel}`)
-            if (action === 'delete_conversation' || /\bdelete (?:this |the )?(?:chat|conversation)\b/i.test(request)) {
+            if (!savedHistoryTarget && (action === 'delete_conversation' || (action !== 'additional_action' && /\bdelete (?:this |the )?(?:chat|conversation)\b/i.test(request)))) {
               pendingVoiceDeleteRef.current = true
               clearConversationData()
               return {
@@ -3340,9 +3420,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const draftIsActionable = Boolean(draft?.canConfirm || draft?.appTarget?.path)
   const showDraftCard = Boolean(draft && draftIsActionable && !reviewCorrectionActive)
   const primaryFooterIsHandoff = Boolean(draft?.appTarget?.path && !draft?.canConfirm)
-  const primaryFooterLabel = primaryFooterIsHandoff ? draft?.appTarget?.buttonLabel || 'Open Helfi tool' : draft?.action === 'recipe_import_url' ? 'Import recipe · 10 credits' : draft?.action === 'device_action' ? 'Apply reviewed action' : draft?.action === 'support_action' ? 'Confirm support action' : draft?.action === 'report_action' ? 'Request report' : 'Save this'
+  const primaryFooterLabel = primaryFooterIsHandoff ? draft?.appTarget?.buttonLabel || 'Open Helfi tool' : draft?.action === 'recipe_import_url' ? 'Import recipe · 10 credits' : draft?.action === 'device_action' ? 'Apply reviewed action' : draft?.action === 'additional_action' ? 'Confirm reviewed action' : draft?.action === 'support_action' ? 'Confirm support action' : draft?.action === 'report_action' ? draft.reportAction?.action === 'reports.weekly.export_pdf' ? 'Open report PDF' : 'Request report' : 'Save this'
   const primaryFooterDisabled = !draft || busy || confirming || (!draft.canConfirm && !primaryFooterIsHandoff)
-  const discardFooterLabel = primaryFooterIsHandoff ? 'Cancel' : draft?.action === 'recipe_import_url' ? "Don't import" : ['support_action', 'report_action', 'device_action'].includes(draft?.action || '') ? 'Cancel' : "Don't save"
+  const discardFooterLabel = primaryFooterIsHandoff ? 'Cancel' : draft?.action === 'recipe_import_url' ? "Don't import" : ['support_action', 'report_action', 'additional_action', 'device_action'].includes(draft?.action || '') ? 'Cancel' : "Don't save"
   const primaryFooterPress = useCallback(() => {
     if (primaryFooterIsHandoff) {
       openAppTarget()
@@ -3505,7 +3585,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     ) : null}
                     {voiceSessionActive && draft?.canConfirm ? (
                       <View style={styles.voiceReviewFallback}>
-                        <Text style={styles.voiceReviewFallbackTitle}>{draft.action === 'recipe_import_url' ? 'Ready to import · 10 credits' : draft.action === 'device_action' ? 'Ready to apply reviewed action' : draft.action === 'report_action' ? 'Ready to request report' : draft.action === 'support_action' ? 'Ready to confirm support action' : 'Ready to save'}</Text>
+                        <Text style={styles.voiceReviewFallbackTitle}>{draft.action === 'recipe_import_url' ? 'Ready to import · 10 credits' : draft.action === 'device_action' ? 'Ready to apply reviewed action' : draft.action === 'report_action' ? draft.reportAction?.action === 'reports.weekly.export_pdf' ? 'Ready to open report PDF' : 'Ready to request report' : draft.action === 'additional_action' ? 'Ready to confirm reviewed action' : draft.action === 'support_action' ? 'Ready to confirm support action' : 'Ready to save'}</Text>
                         <Text style={styles.voiceReviewFallbackSummary} numberOfLines={2}>{draft.summary}</Text>
                         <View style={styles.voiceReviewFallbackButtons}>
                           <Pressable accessibilityRole="button" accessibilityLabel={discardFooterLabel} onPress={rejectDraft} disabled={confirming} style={styles.voiceReviewDiscardButton}>

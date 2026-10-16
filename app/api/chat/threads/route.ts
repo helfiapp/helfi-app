@@ -2,6 +2,12 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
+
+async function getChatThreadUserId(request: Request) {
+  const session = await getServerSession(authOptions)
+  return session?.user?.id || await getUserIdFromNativeAuth(request as NextRequest)
+}
 
 let tablesEnsured = false
 
@@ -49,23 +55,32 @@ const normalizeChatContext = (value?: string | null) => (value === 'food' ? 'foo
 
 export async function GET(request: Request) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = await getChatThreadUserId(request)
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const url = new URL(request.url)
     const context = normalizeChatContext(url.searchParams.get('context'))
+    const exactThreadId = url.searchParams.get('threadId')
+    if (exactThreadId !== null && (!exactThreadId.trim() || exactThreadId.length > 200)) return NextResponse.json({ error: 'Invalid threadId' }, { status: 400 })
     await ensureChatTables()
     const rows: Array<{ id: string; title: string | null; chargedOnce: boolean; context: string | null; createdAt: Date; updatedAt: Date }> =
-      context === 'food'
+      exactThreadId !== null
+        ? await prisma.$queryRawUnsafe(
+            context === 'food'
+              ? 'SELECT "id","title","chargedOnce","context","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "id" = $1 AND "userId" = $2 AND "context" = $3'
+              : 'SELECT "id","title","chargedOnce","context","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "id" = $1 AND "userId" = $2 AND ("context" IS NULL OR "context" = $3)',
+            exactThreadId, userId, context
+          )
+        : context === 'food'
         ? await prisma.$queryRawUnsafe(
             'SELECT "id","title","chargedOnce","context","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "userId" = $1 AND "context" = $2 ORDER BY "updatedAt" DESC LIMIT 50',
-            session.user.id,
+            userId,
             context
           )
         : await prisma.$queryRawUnsafe(
             'SELECT "id","title","chargedOnce","context","createdAt","updatedAt" FROM "TalkToAIChatThread" WHERE "userId" = $1 AND ("context" IS NULL OR "context" = $2) ORDER BY "updatedAt" DESC LIMIT 50',
-            session.user.id,
+            userId,
             context
           )
     const threads = rows.map((r) => ({
@@ -76,7 +91,7 @@ export async function GET(request: Request) {
       createdAt: r.createdAt.toISOString(),
       updatedAt: r.updatedAt.toISOString(),
     }))
-    return NextResponse.json({ threads }, { status: 200 })
+    return NextResponse.json({ threads, ...(exactThreadId !== null ? { exactThreadId } : {}) }, { status: 200 })
   } catch (error) {
     console.error('[talk-to-ai-threads.GET] error', error)
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
@@ -85,8 +100,8 @@ export async function GET(request: Request) {
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = await getChatThreadUserId(request)
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const body = await request.json().catch(() => ({}))
@@ -97,7 +112,7 @@ export async function POST(request: NextRequest) {
     await prisma.$executeRawUnsafe(
       'INSERT INTO "TalkToAIChatThread" ("id","userId","title","context") VALUES ($1,$2,$3,$4)',
       id,
-      session.user.id,
+      userId,
       title,
       context
     )
@@ -110,8 +125,8 @@ export async function POST(request: NextRequest) {
 
 export async function PATCH(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = await getChatThreadUserId(request)
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const body = await request.json().catch(() => ({}))
@@ -125,7 +140,7 @@ export async function PATCH(request: NextRequest) {
       'UPDATE "TalkToAIChatThread" SET "title" = $1, "updatedAt" = NOW() WHERE "id" = $2 AND "userId" = $3',
       title,
       threadId,
-      session.user.id
+      userId
     )
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {
@@ -136,8 +151,8 @@ export async function PATCH(request: NextRequest) {
 
 export async function DELETE(request: NextRequest) {
   try {
-    const session = await getServerSession(authOptions)
-    if (!session?.user?.id) {
+    const userId = await getChatThreadUserId(request)
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
     const body = await request.json().catch(() => ({}))
@@ -149,7 +164,7 @@ export async function DELETE(request: NextRequest) {
     await prisma.$executeRawUnsafe(
       'DELETE FROM "TalkToAIChatThread" WHERE "id" = $1 AND "userId" = $2',
       threadId,
-      session.user.id
+      userId
     )
     return NextResponse.json({ success: true }, { status: 200 })
   } catch (error) {

@@ -367,5 +367,27 @@
     "portableVerification": "All43 required suites and command behavior passed under TZ=UTC with NODE_OPTIONS fixture denying every native/node_modules resolution; former imports explicitly rejected in hook self-test",
     "welcomeOfflineGroups": 11,
     "nativeDebugAndSignedBuildCompileEvidenceRetained": true
+  },
+  "latestVerifiedRelease": {
+    "nativeBuild": 50,
+    "nativeSourceCommit": "e7c74f7237c7d1895482cd0f99897d94da205ed8",
+    "serverSourceCommit": "c7a2608d915c4380becf67d3ce9e8feb2c632c14",
+    "awsJob": "130",
+    "bothDomainsVerified": true,
+    "physicalInstalledSignedIn": true,
+    "physicalTypedRestaurantReviewCalories": 1020,
+    "physicalNoPendingRecoveryVerified": true,
+    "foodCountAfterRecovery": 3
+  },
+  "native51Candidate": {
+    "requiredOfflineSuites": 49,
+    "utcRootOnlyGuardPassed": true,
+    "pdfServerGroups": 13,
+    "pdfClientGroups": 12,
+    "additionalServerGroups": 14,
+    "additionalClientGroups": 13,
+    "historyServerGroups": 18,
+    "realHistoryDeletionPerformed": false,
+    "actualNewNativeFeatureChecks": "Follow exact release evidence; candidate fixture checks alone do not prove physical execution."
   }
 }
