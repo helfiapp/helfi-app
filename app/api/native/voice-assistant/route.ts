@@ -12,15 +12,33 @@ import { logAiUsageEvent } from '@/lib/ai-usage-logger'
 import { buildFoodDiarySnapshot } from '@/lib/food-diary-context'
 import { estimateTextToSpeechCostCents, estimateTranscriptionCostCents } from '@/lib/cost-meter'
 import { searchLocalFoods, type NormalizedFoodItem } from '@/lib/food-data'
-import { searchCustomFoodMacros } from '@/lib/food/custom-foods'
-import { signNativeVoiceDraft } from '@/lib/native-voice-review-token'
+import { GET as searchDiaryFoods } from '@/app/api/food-data/route'
+import { GET as searchDiaryFoodServings } from '@/app/api/food-data/servings/route'
+import { searchCustomFoodMacros, getCustomPackagedItems } from '@/lib/food/custom-foods'
+import verifiedVoiceMenuAliases from '@/data/food-overrides/voice-menu-aliases.json'
+import { applyNativeVoiceRecipeMetadata, validateNativeVoiceImportedRecipe } from '@/lib/native-voice-recipe-metadata'
+import { signNativeVoiceDraft, verifyNativeVoiceDraft } from '@/lib/native-voice-review-token'
 import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
 import { createNativeVoicePromptHandoff } from '@/lib/native-voice-prompt-handoff'
 import { findHealthIntakeReviewMatch, type HealthIntakeReviewMatch } from '@/lib/health-intake-review-match'
 import { resolveHelfiTtsVoice } from '@/lib/openai-voice-config'
 import { estimateVoiceExerciseDurationMinutes } from '@/lib/exercise/voice-duration'
+import { normalizeSpokenMeasurementQuantities, hasUnsafeMeasurementQuantity, splitSpokenFoodMeasurementList } from '@/lib/native-voice-spoken-quantities'
 import { servingRatioFromMeasurement } from '@/lib/food/serving-measurements'
+import { liquidHouseholdMl } from '@/native/src/lib/foodUnits'
 import { normalizeVoiceTimeZone, resolveVoiceWallTime } from '@/lib/native-voice-time'
+import { beginVoiceActionTrace, finishVoiceActionTrace } from '@/lib/native-voice-action-observability'
+import { prepareNativeVoiceRecordAction, prepareNativeVoiceFoodLibraryFromResolved, selectNativeVoiceFoodRecordForEdit, prepareNativeVoiceResolvedFoodRecordAction } from '@/lib/native-voice-record-actions'
+import { prepareVoicePreferenceAction, VOICE_PREFERENCE_ACTION_SCHEMAS, VoicePreferenceActionError } from '@/lib/native-voice-preference-actions'
+import { prepareVoiceNotificationAction, VOICE_NOTIFICATION_ACTION_SCHEMAS } from '@/lib/native-voice-notification-actions'
+import { isHealthIntakeRecordEntity, isFactualHealthIntakeRecordRequest, hasExplicitHealthIntakeRecordChanges } from '@/lib/native-voice-health-intake-record-actions'
+import { readVoiceAppData, VOICE_APP_READ_SCHEMAS } from '@/lib/native-voice-app-reads'
+import { prepareVoiceRecipeUrlImport } from '@/lib/native-voice-recipe-url-import'
+import { prepareVoiceSupportAction, readVoiceSupportFacts, VOICE_SUPPORT_ACTION_SCHEMAS } from '@/lib/native-voice-support-actions'
+import { prepareVoiceReportAction, VOICE_REPORT_ACTION_SCHEMAS } from '@/lib/native-voice-report-actions'
+import { parseNativeVoiceMoodContext, validateNativeVoiceMoodContext, nativeVoiceMoodContextSummary, type NativeVoiceMoodContext } from '@/lib/native-voice-mood-context'
+import { nativeVoiceFoodCopyVersion, nativeVoiceFoodCopyWaterVersion, nativeVoiceFoodCopyWaterId, nativeVoiceFoodCopyReview } from '@/lib/native-voice-food-copy'
+import { prepareNativeVoiceDeviceAction, VOICE_DEVICE_ACTION_SCHEMAS } from '@/lib/native-voice-device-actions'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -38,6 +56,7 @@ const MAX_AUDIO_BYTES = 12 * 1024 * 1024
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
 
 type VoiceAction =
+  | 'greeting'
   | 'exercise'
   | 'mood'
   | 'journal'
@@ -54,6 +73,14 @@ type VoiceAction =
   | 'app_handoff'
   | 'confirm_draft'
   | 'reject_draft'
+  | 'record_action'
+  | 'preference_action'
+  | 'local_preference_action'
+  | 'notification_action'
+  | 'recipe_import_url'
+  | 'support_action'
+  | 'report_action'
+  | 'device_action'
   | 'unknown'
 
 type VoiceFoodFavorite = {
@@ -126,11 +153,12 @@ type VoiceDraft = {
     mood: number
     tags: string[]
     note: string
+    context?: NativeVoiceMoodContext
   }
   journal?: {
-    title: string
+    title?: string
     content: string
-    tags: string[]
+    tags?: string[]
     journalType?: 'mood' | 'health'
   }
   food?: {
@@ -140,6 +168,8 @@ type VoiceDraft = {
     items?: any[]
     sourceDate?: string
     sourceLogIds?: string[]
+    sourceVersions?: Array<{id:string;version:string}>
+    sourceWaterVersions?: Array<{id:string;version:string}>
     entries?: Array<{ name: string; description?: string | null; meal?: string | null }>
     draftText?: string
     favorite?: VoiceFoodFavorite
@@ -180,6 +210,17 @@ type VoiceDraft = {
   reviewNonce?: string
   reviewIssuedAt?: number
   reviewToken?: string
+  reasonCode?: string
+  recordAction?: any
+  preferenceAction?: any
+  notificationAction?: any
+  recipeImport?: any
+  appRead?: any
+  supportAction?: any
+  reportAction?: any
+  deviceAction?: any
+  requiresDeviceReview?: boolean
+  localPreference?: { key: 'darkMode' | 'hapticsEnabled' | 'profileVisibility' | 'dataAnalytics'; value: boolean | 'private' | 'public' | 'friends' }
 }
 
 const SELF_HARM_RISK_PATTERN =
@@ -261,7 +302,7 @@ async function rewritePrivateChatPrompt(userId: string, draft: VoiceDraft): Prom
       },
     }
   } catch (error) {
-    console.warn('[native voice assistant] private prompt handoff failed; opening Talk to Helfi without URL prompt', error)
+    console.warn('[native voice assistant] private prompt handoff failed; opening Talk to Helfi without URL prompt')
     return {
       ...draft,
       appTarget: {
@@ -333,7 +374,7 @@ async function resolveUser(request: NextRequest) {
   if (!userId) return null
   return prisma.user.findUnique({
     where: { id: userId },
-    select: { id: true, email: true },
+    select: { id: true, email: true, country: true },
   })
 }
 
@@ -450,16 +491,28 @@ function requestedLocalTime(transcript: string): string | null {
 }
 
 function applyDraftTiming(draft: VoiceDraft, transcript: string, tzOffsetMin: number, previous?: any, timeZoneRaw?: unknown, todayLocalDate = localDateFromRequest(null, tzOffsetMin)): VoiceDraft {
+  if (draft.action === 'journal' && draft.journal && draft.journal.journalType !== 'mood' && (draft.journal.journalType === 'health' || /\bhealth journal\b/i.test(transcript))) {
+    // The normal health journal stores content and calendar date only.
+    // Titles/tags must not be offered as fields that will be saved.
+    draft = { ...draft, summary: 'Health journal note', journal: { content: draft.journal.content, journalType: 'health' } }
+  }
   const explicitTime = requestedLocalTime(transcript)
   const isoDate = transcript.match(/\b\d{4}-\d{2}-\d{2}\b/)?.[0]
-  const zoneInput = timeZoneRaw || previous?.timeZone || draft.timeZone
+  const foodActions = ['food_draft', 'food_build_meal', 'recipe', 'food_favorite', 'food_copy_previous']
+  const sameAction = previous?.action === draft.action || (foodActions.includes(previous?.action) && foodActions.includes(draft.action))
+  const startsFreshLog = !hasReviewedCorrectionWords(transcript) && /\b(?:log|record|track|create|build|write|i\s+(?:ate|drank|consumed|walked|ran|did|had))\b/i.test(transcript)
+  const timingPrevious = sameAction && !startsFreshLog ? previous : undefined
+  const zoneInput = timeZoneRaw || timingPrevious?.timeZone || draft.timeZone
   const timeZone = normalizeVoiceTimeZone(zoneInput)
-  const inheritedTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(previous?.localTime || '') ? previous.localTime : draft.localTime
-  const time = explicitTime || inheritedTime
-  const prepared = { ...draft, ...(time ? { localTime: time } : {}), tzOffsetMin, ...(timeZone ? { timeZone } : {}), timingNeedsClarification: false }
+  const inheritedTime = /^([01]\d|2[0-3]):[0-5]\d$/.test(timingPrevious?.localTime || '') ? timingPrevious.localTime : startsFreshLog ? undefined : draft.localTime
+  const clearsUnsupportedTime = ['journal', 'symptom_note'].includes(draft.action) && /\b(?:without\s+(?:a\s+)?(?:chosen\s+|specific\s+)?(?:clock\s+)?time|(?:clear|remove)\s+(?:the\s+)?(?:clock\s+)?time|no\s+clock\s+time)\b/i.test(transcript)
+  const time = clearsUnsupportedTime ? undefined : explicitTime || inheritedTime
+  const prepared = { ...draft, localTime: time || undefined, tzOffsetMin, ...(timeZone ? { timeZone } : {}), timingNeedsClarification: false }
   const clarification = (message: string): VoiceDraft => ({ ...prepared, canConfirm: false, timingNeedsClarification: true, confirmationMessage: `${message} Nothing has been saved.` })
   if ((isoDate && !isValidLocalDate(isoDate)) || !isValidLocalDate(draft.localDate)) return clarification('That date is not valid. Please give the correct date.')
   if (/\b(?:at\s+)?\d{1,2}:\d{2}\s*(?:am|pm)?\b/i.test(transcript) && !explicitTime) return clarification('That time is not valid. Please give the correct time.')
+  if (draft.action === 'symptom_note' && draft.localDate !== todayLocalDate) return clarification('Symptom Notes records when a note is saved. I cannot save it under another date. You can include when the symptoms happened in the note.')
+  if (time && (draft.action === 'journal' || draft.action === 'symptom_note')) return clarification('This journal or symptom note does not support a chosen clock time. Please ask to save it without a clock time; you can include the time in the note itself.')
   if (!time) return prepared
   if (zoneInput && !timeZone) return clarification('I could not verify the time zone. Please review the date and time in your diary.')
   if (!timeZone) {
@@ -994,9 +1047,11 @@ const INGREDIENT_LOOKUP_FILLER_WORDS = new Set([
 ])
 
 function singularFoodToken(token: string) {
+  if (['asparagus', 'citrus', 'couscous', 'hummus', 'molasses'].includes(token)) return token
+  if (/(?:cookies|brownies|smoothies|pies|veggies)$/.test(token)) return token.slice(0, -1)
   if (token.endsWith('ies') && token.length > 4) return `${token.slice(0, -3)}y`
-  if (token.endsWith('es') && token.length > 3 && !/(ses|xes|zes|ches|shes)$/.test(token)) return token.slice(0, -2)
-  if (token.endsWith('s') && token.length > 3 && !token.endsWith('ss')) return token.slice(0, -1)
+  if (/(?:ches|shes|sses|xes|zes|oes)$/.test(token) && token.length > 4) return token.slice(0, -2)
+  if (token.endsWith('s') && token.length > 3 && !/(?:ss|us|is)$/.test(token)) return token.slice(0, -1)
   return token
 }
 
@@ -1201,8 +1256,9 @@ function waterAmountToMl(amount: number, unit: 'ml' | 'l' | 'oz') {
   return Math.round(amount * 10) / 10
 }
 
-function parseWaterAmount(text: string): { amount: number; unit: 'ml' | 'l' | 'oz'; amountMl: number } | null {
-  const lower = text.toLowerCase()
+function parseWaterAmount(text: string, country?: string): { amount: number; unit: 'ml' | 'l' | 'oz'; amountMl: number } | null {
+  if (hasUnsafeMeasurementQuantity(text, 'water')) return null
+  const lower = normalizeSpokenMeasurementQuantities(text, 'water').toLowerCase()
   const explicit = lower.match(/\b(\d+(?:\.\d+)?)\s*(ml|millilitres?|milliliters?|l|litres?|liters?|oz|ounces?)\b/)
   if (explicit) {
     const amount = Number(explicit[1])
@@ -1214,6 +1270,13 @@ function parseWaterAmount(text: string): { amount: number; unit: 'ml' | 'l' | 'o
     const amount = Number(macedonianExplicit[1].replace(',', '.'))
     const unit = normalizeWaterUnit(macedonianExplicit[2])
     if (Number.isFinite(amount) && amount > 0 && unit) return { amount, unit, amountMl: waterAmountToMl(amount, unit) }
+  }
+  const cupText = lower.replace(/\b(one|two|three|four|five|six|\d+)\s+and\s+(?:a\s+)?half\s+(?=cups?\b)/g, (_all, whole) => `${Number(numberFromWords(whole)) + 0.5} `)
+  const cups = cupText.match(/\b(a|an|one|two|three|four|five|six|half|quarter|\d+(?:\.\d+)?)\s+(?:a\s+)?cups?\b/)
+  if (cups) {
+    const count = /^(a|an)$/.test(cups[1]) ? 1 : numberFromWords(cups[1])
+    const cupMl = liquidHouseholdMl(country).cup
+    if (count && cupMl) return { amount: count * cupMl, unit: 'ml', amountMl: count * cupMl }
   }
   return null
 }
@@ -1290,28 +1353,35 @@ function multipleSweetenerClarification(transcript: string, localDate: string): 
 
 function isPlainVoiceWaterRequest(raw: string, drinkType: string) {
   if (drinkType !== 'Water') return false
-  if (/\b(?:with|plus|and|milk|honey|lemon|lime|cream|juice|syrup|protein)\b/i.test(raw)) return false
-  const sweetener = parseSweetener(raw)
+  if (hasUnsafeMeasurementQuantity(raw, 'food')) return false
+  const text = normalizeSpokenMeasurementQuantities(raw, 'food')
+  if (/\b(?:with|plus|and|milk|honey|lemon|lime|cream|juice|syrup|protein)\b/i.test(text)) return false
+  const sweetener = parseSweetener(text)
   return !sweetener || sweetener.type === 'free'
 }
 
-function voiceDrinkIngredients(raw: string, amountMl: number, drinkType: string, sweetener: ReturnType<typeof parseSweetener>) {
-  const noMilk = /\b(no|without)\s+(?:any\s+)?milk\b|\bblack\b/i.test(raw)
-  const baseText = stripVoiceFoodCommandWords(raw).replace(/^\s*\d+(?:\.\d+)?\s*(?:ml|millilitres?|milliliters?|l|litres?|liters?|(?:fl\s*)?oz|ounces?)\b/i, '')
+function voiceDrinkIngredients(raw: string, amountMl: number, drinkType: string, sweetener: ReturnType<typeof parseSweetener>, country?: string) {
+  if (hasUnsafeMeasurementQuantity(raw, 'food')) return [{ name: 'drink ingredients', quantity: 'unclear', unit: null, display: raw }]
+  const text = normalizeSpokenMeasurementQuantities(raw, 'food')
+  const noMilk = /\b(no|without)\s+(?:any\s+)?milk\b/i.test(text) || (/\bblack\b/i.test(text) && !/\bmilk\b/i.test(text))
+  const baseText = stripVoiceFoodCommandWords(text)
+    .replace(/^(?:i\s+(?:(?:have|had)\s+)?(?:drank|drunk|had|consumed|finished)|drank|consumed|finished)\s+/i, '')
+    .replace(/^\s*(?:(?:one|two|three|four|five|six|\d+)\s+and\s+)?(?:(?:a|an|one|two|three|four|five|six|half|quarter|\d+(?:\.\d+)?)\s*)?(?:cups?|ml|millilitres?|milliliters?|l|litres?|liters?|(?:fl\s*)?oz|ounces?)\b/i, '')
+    .replace(/^\s*of\s+/i, '')
     .split(/\b(?:with|plus|and|without|no)\b|,/i)[0]
     .replace(/\b(?:plain|unsweetened|sugar[-\s]?free|black|zero)\b/gi, ' ').replace(/\s+/g, ' ').trim()
   const baseName = drinkType === 'Water' ? 'Water' : baseText || drinkType
   const ingredients: any[] = [{ name: baseName, quantity: amountMl, unit: 'ml', display: `${amountMl} ml ${baseName}` }]
-  const milk = !noMilk && raw.match(/\b(\d+(?:\.\d+)?|one|two|half|quarter)\s*(ml|millilitres?|milliliters?|l|litres?|liters?|tsp|teaspoons?|tbsp|tablespoons?)\s+(?:of\s+)?((?:(?:whole|skim(?:med)?|low[- ]fat|full cream|oat|almond|soy|soya|coconut)\s+)?milk)\b/i)
+  const milk = !noMilk && text.match(/\b(\d+(?:\.\d+)?|one|two|half|quarter)\s*(?:a\s+)?(cups?|ml|millilitres?|milliliters?|l|litres?|liters?|tsp|teaspoons?|tbsp|tablespoons?)\s+(?:of\s+)?((?:(?:whole|skim(?:med)?|low[- ]fat|full cream|oat|almond|soy|soya|coconut)\s+)?milk)\b/i)
   if (drinkType !== 'Milk' && milk) {
-    const quantity = numberFromWords(milk[1])!
-    const unit = normalizeFoodAmountUnit(milk[2])
+    const quantity = numberFromWords(milk[1])! * (/^cups?$/i.test(milk[2]) ? liquidHouseholdMl(country).cup! : 1)
+    const unit = /^cups?$/i.test(milk[2]) ? 'ml' : normalizeFoodAmountUnit(milk[2])
     ingredients.push({ name: milk[3], quantity, unit, display: `${quantity} ${unit} ${milk[3]}` })
-  } else if (drinkType !== 'Milk' && !noMilk && /\b(?:with|plus|and)\s+(?:(?:whole|skim|oat|almond|soy)\s+)?milk\b/i.test(raw)) {
+  } else if (drinkType !== 'Milk' && !noMilk && /\bmilk\b/i.test(text)) {
     ingredients.push({ name: 'milk', quantity: null, unit: null, display: 'some milk' })
   }
   if (sweetener && sweetener.type !== 'free' && sweetener.grams) ingredients.push({ name: sweetener.type, quantity: sweetener.grams, unit: 'g', display: `${sweetener.grams} g ${sweetener.type}` })
-  const additions = raw.split(/\b(?:with|plus|and)\b|,/i).slice(1)
+  const additions = text.split(/\b(?:with|plus|and)\b|,/i).slice(1)
   for (const addition of additions) {
     const text = stripVoiceFoodCommandWords(addition)
     if (!text || /\b(?:milk|sugar|honey|unsweetened|black|plain)\b/i.test(text) || /^(?:no|without)\b/i.test(text)) continue
@@ -1329,17 +1399,18 @@ async function resolveVoiceDrinkDraft(draft: VoiceDraft): Promise<VoiceDraft> {
   const ingredients = draft.water.ingredients?.length ? draft.water.ingredients : voiceDrinkIngredients(draft.transcript, draft.water.amountMl, draft.water.drinkType || draft.water.label, draft.water.sweetener || null)
   const meal = draft.water.category || 'other'
   const built = await buildVoiceMealDraft({ meal, mealName: draft.water.label, ingredients }, draft.transcript, draft.localDate)
-  if (!built || !built.canConfirm) return { ...draft, canConfirm: false, food: built?.food, confirmationMessage: built?.confirmationMessage || 'I could not resolve the drink nutrition. Please choose a matching drink and amount. Nothing has been saved.' }
+  if (!built || !built.canConfirm) return { ...draft, canConfirm: false, reasonCode: built?.reasonCode || 'food_source_unavailable', food: built?.food, confirmationMessage: built?.confirmationMessage || 'I could not resolve the drink nutrition. Please choose a matching drink and amount. Nothing has been saved.' }
   return { ...draft, canConfirm: true, food: built.food, summary: `${draft.water.amount} ${draft.water.unit} ${draft.water.label}, ${built.food.nutrition!.calories} kcal`, confirmationMessage: `I can log ${draft.water.amount} ${draft.water.unit} ${draft.water.label} with ${Math.round(built.food.nutrition!.calories)} kcal. Review the ingredients and confirm to save. Nothing has been saved yet.` }
 }
 
-function tryParseWaterRequest(transcript: string, localDate: string, launchContext?: VoiceLaunchContext): VoiceDraft | null {
+function tryParseWaterRequest(transcript: string, localDate: string, launchContext?: VoiceLaunchContext, country?: string): VoiceDraft | null {
   const raw = cleanText(transcript, 800)
-  const lower = raw.toLowerCase()
-  const amount = parseWaterAmount(raw)
+  const parsingText = normalizeSpokenMeasurementQuantities(raw, 'food')
+  const lower = parsingText.toLowerCase()
+  const amount = hasUnsafeMeasurementQuantity(raw, 'food') ? null : parseWaterAmount(parsingText, country)
   const inWaterContext = launchContext?.section === 'water'
   const hasWaterAction =
-    /\b(log|add|record|track)\b/.test(lower) ||
+    /\b(log|add|record|track|drank|consumed|finished)\b/.test(lower) || /\bi\s+(?:have\s+drunk|had)\b/.test(lower) ||
     /(додај|додаj|зачувај|зачуваj|запиши|внеси|логирај|логираj|испив|испиј|испиj)/i.test(raw) ||
     /\b(agrega|agregar|añade|anade|registrar|registra|guardar|guarda|bebí|bebi|tomé|tome|ajoute|ajouter|enregistre|noter|note|bu|aggiungi|aggiungere|registra|salva|bevo|bevuto|ho\s+bevuto|adiciona|adicione|adicionar|registra|salva|bebi|beber|füge|fuge|hinzufügen|hinzufugen|trage|trag|notiere|speichere|getrunken|trank)\b/i.test(raw)
   const hasDrinkWords =
@@ -1349,7 +1420,7 @@ function tryParseWaterRequest(transcript: string, localDate: string, launchConte
     /(água|agua)/i.test(raw)
   if (!(hasWaterAction && hasDrinkWords) && !(inWaterContext && (amount || hasDrinkWords))) return null
 
-  const drinkType = inferDrinkType(raw.split(/\b(?:with|plus|and)\b/i)[0]) || inferDrinkType(raw) || (inWaterContext ? 'Water' : '')
+  const drinkType = inferDrinkType(parsingText.split(/\b(?:with|plus|and)\b/i)[0]) || inferDrinkType(parsingText) || (inWaterContext ? 'Water' : '')
   const meal = inferMealFromText(raw, 'other')
   const category = meal === 'uncategorized' ? 'other' : meal
   if (!amount) {
@@ -1374,7 +1445,9 @@ function tryParseWaterRequest(transcript: string, localDate: string, launchConte
   }
 
   if (hasMultipleVoiceSweeteners(raw)) return multipleSweetenerClarification(raw, localDate)
-  const sweetener = parseSweetener(raw)
+  const milkBase = drinkType === 'Milk' ? voiceDrinkIngredients(parsingText, amount.amountMl, drinkType, null, country)[0]?.name : ''
+  const plainMilk = drinkType === 'Milk' && /^(?:(?:whole|skim(?:med)?|low[- ]fat|full cream|nonfat|reduced fat|fluid)\s+)?milk$/i.test(milkBase || '') && !/\b(?:with|plus|and|flavou?red|sweetened)\b/i.test(parsingText)
+  const sweetener = parseSweetener(parsingText) || (plainMilk ? { type: 'free' as const } : null)
   const isPlainWater = isPlainVoiceWaterRequest(raw, drinkType)
   if (!isPlainWater && !sweetener) {
     return {
@@ -1403,7 +1476,7 @@ function tryParseWaterRequest(transcript: string, localDate: string, launchConte
     sweetener && sweetener.type !== 'free' && sweetener.amount && sweetener.unit
       ? ` (${sweetener.type} ${sweetener.amount} ${sweetener.unit})`
       : ''
-  const ingredients = isPlainWater ? [] : voiceDrinkIngredients(raw, amount.amountMl, drinkType, sweetener)
+  const ingredients = isPlainWater ? [] : voiceDrinkIngredients(raw, amount.amountMl, drinkType, sweetener, country)
   const milkLabel = ingredients.slice(1).filter((item) => /milk/i.test(item.name)).map((item) => item.display).join(', ')
   const label = `${drinkType}${milkLabel ? ` with ${milkLabel}` : ''}${sweetenerLabel}`
   return {
@@ -1478,6 +1551,7 @@ function parseFollowUpDraft(raw: unknown) {
     if (!parsed || typeof parsed !== 'object') return null
     const action = cleanText((parsed as any).action, 40)
     const canConfirm = Boolean((parsed as any).canConfirm)
+    if (['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'recipe_import_url', 'support_action', 'report_action', 'device_action'].includes(action)) return parsed
     if ((parsed as any).timingNeedsClarification && ['food_build_meal', 'food_draft', 'water'].includes(action)) return parsed
     if (action === 'food_draft') {
       const draftText = cleanText((parsed as any).food?.draftText, 1000)
@@ -1523,6 +1597,13 @@ function reviewedDraftContextLine(draft: any) {
     confirmationMessage: cleanText(draft.confirmationMessage, 260),
     localDate: cleanText(draft.localDate, 20),
   }
+  if (draft.recordAction) context.recordAction = draft.recordAction
+  if (draft.preferenceAction) context.preferenceAction = draft.preferenceAction
+  if (draft.notificationAction) context.notificationAction = draft.notificationAction
+  if (draft.supportAction) context.supportAction = draft.supportAction
+  if (draft.reportAction) context.reportAction = draft.reportAction
+  if (draft.deviceAction) context.deviceAction = draft.deviceAction
+  if (draft.localPreference) context.localPreference = draft.localPreference
   if (draft.exercise) {
     context.exercise = {
       exerciseName: cleanText(draft.exercise.exerciseName || draft.exercise.name, 80),
@@ -1681,7 +1762,7 @@ function shouldUseFavoriteFood(transcript: string, favorites: VoiceFoodFavorite[
   ) {
     return false
   }
-  const mentionsFavorite = /\b(favourites?|favorites?|saved)\b/i.test(transcript)
+  const mentionsFavorite = /\b(favourites?|favorites?)\b|\b(?:my|the|a|from)\s+saved\s+(?:food|meal|breakfast|lunch|dinner|snack|[A-Z])/i.test(transcript)
   const looksLikeHealthIntake =
     HEALTH_INTAKE_RECORD_PATTERN.test(transcript) ||
     SUPPLEMENT_NAME_HINT_PATTERN.test(transcript) ||
@@ -1693,12 +1774,12 @@ function shouldUseFavoriteFood(transcript: string, favorites: VoiceFoodFavorite[
   if (!mentionsFavorite && !foodishFavoriteContext) return false
   const directFood = tryParseIngredientMealRequest(transcript) || tryParseDirectFoodRequest(transcript, { section: 'food', title: 'Food Diary' })
   if ((directFood?.ingredients || []).length > 1 && !mentionsFavorite) return false
-  if (findRequestedFavorite(transcript, favorites)) return true
   if (mentionsFavorite) return true
   return favorites.some((favorite) => {
     const label = compactFoodMatchText(favorite.label || favorite.description || '')
     const labelTokens = label.split(' ').filter(Boolean)
     if (!label || label.length < 10 || labelTokens.length < 2) return false
+    if (!labelTokens.some((token) => !/^(?:a|an|the|for|my|today|yesterday|meal|food|breakfast|lunch|dinner|snack|snacks)$/.test(token))) return false
     return request.includes(label)
   })
 }
@@ -1761,6 +1842,9 @@ function numberFromWords(value: unknown) {
     eight: 8,
     nine: 9,
     ten: 10,
+    eleven: 11,
+    twelve: 12,
+    twenty: 20,
     half: 0.5,
     quarter: 0.25,
   }
@@ -1825,6 +1909,9 @@ function normalizeIngredientRequest(raw: any) {
     quantity: raw?.quantity ?? raw?.amount ?? null,
     unit: cleanText(raw?.unit || raw?.measure, 40) || null,
     display: cleanText(raw?.display || raw?.text || name, 160) || name,
+    ...(raw?.brand ? { brand: cleanText(raw.brand, 80) } : {}),
+    ...(raw?.requiresSourceServing ? { requiresSourceServing: true } : {}),
+    ...(raw?.size ? { size: cleanText(raw.size, 30).toLowerCase() } : {}),
   }
 }
 
@@ -2102,15 +2189,17 @@ function followUpTranscript(draft: any, answerRaw: string) {
 function isExplicitNewVoiceCommand(value: unknown) {
   const text = cleanText(value, 1200).toLowerCase()
   if (!text) return false
-  if (/\b(?:this|that|current|reviewed)\s+(?:meal|draft|entry|drink)\b/.test(text) || /\b(?:change|correct|update|adjust|instead|remove|without)\b/.test(text)) return false
-  const hasCommand = /\b(add|log|record|save|open|show|go to|take me to|create|build|make|track|write)\b/.test(text)
+  if (/\b(?:this|that|current|reviewed)\s+(?:meal|draft|entry|drink|coffee|tea|milk|water|exercise|workout|journal|mood)\b/.test(text) || /\b(?:make|set|use)\s+(?:it|this|that)\b/.test(text) || /\b(?:change|correct|update|adjust|instead|remove|without)\b/.test(text)) return false
+  const hasCommand = /\b(add|log|record|save|open|show|go to|take me to|create|build|make|track|write|drank|ate|consumed|walked|ran|jogged|cycled|swam)\b/.test(text) || /\bi\s+(?:had|did)\b/.test(text)
   const hasTarget =
-    /\b(food|meal|breakfast|lunch|dinner|snack|snacks|favourites?|favorites?|saved|diary|water|exercise|workout|mood|journal|symptom|symptoms|medication|medicine|supplement|vitamin|health image|photo|camera|insights)\b/.test(text)
+    /\b(food|meal|breakfast|lunch|dinner|snack|snacks|favourites?|favorites?|saved|diary|water|coffee|tea|milk|drinks?|hydration|yoga|pilates|exercise|workout|mood|journal|symptom|symptoms|medication|medicine|supplement|vitamin|health image|photo|camera|insights)\b/.test(text)
   return hasCommand && hasTarget
 }
 
 function normalizeFoodAmountUnit(unitRaw: string) {
   const unit = cleanText(unitRaw, 24).toLowerCase()
+  if (/^millilit(?:re|er)s?$/.test(unit)) return 'ml'
+  if (/^lit(?:re|er)s?$/.test(unit)) return 'l'
   if (/^ounces?$/.test(unit)) return 'oz'
   if (/^(?:lbs?|pounds?)$/.test(unit)) return 'lb'
   if (/^grams?$/.test(unit)) return 'g'
@@ -2211,6 +2300,26 @@ function extractReviewedFoodCountCorrection(draft: any, answerRaw: string) {
     (Array.isArray(draft?.food?.entries) ? draft.food.entries.map((entry: any) => cleanText(entry?.name, 120)).filter(Boolean).join(', ') : '')
   const parts = splitIngredientList(draftText)
   if (!parts.length) return null
+
+  const preparedTargets = parts.map((part, index) => ({ part, index, parsed: parseIngredientPhrase(part) })).filter(({ parsed }) => isPreparedVoiceFood(parsed?.name))
+  const countWords = '(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|\\d+(?:[.,]\\d+)?)'
+  const countEdit = raw.match(new RegExp(`\\b(?:to|make (?:it|them))\\s+${countWords}\\b(?!\\s*(?:g|grams?|ml|oz|ounces?|kg|cups?))`, 'i'))
+    || raw.match(new RegExp(`\\b${countWords}\\s+(?:pieces?\\s+(?:of\\s+)?)?(?:nuggets?|mcnuggets?|burgers?|sandwich(?:es)?|whoppers?|zingers?)\\b`, 'i'))
+  if (countEdit) {
+    const mentioned = preparedTargets.filter(({ parsed }) => {
+      const identity = voicePreparedIdentityText(parsed!.name)
+      const request = voicePreparedIdentityText(raw)
+      if (/\b(?:nuggets?|mcnuggets?)\b/i.test(raw)) return /\bnugget\b/.test(identity)
+      if (/\bburgers?\b/i.test(raw)) return /\b(?:burger|pounder|whopper|zinger)\b/.test(identity)
+      return identity.split(' ').filter(token => token.length > 3).some(token => request.split(' ').includes(token))
+    })
+    if (mentioned.length === 1) {
+      const target = mentioned[0]
+      const correctedParts = [...parts]
+      correctedParts[target.index] = `${countEdit[1].replace(',', '.')} ${target.parsed!.name}`
+      return { correctedParts, meal, mealName: cleanText(draft?.food?.mealName, 120) || voiceMealNameForMeal(meal) }
+    }
+  }
 
   const correctionText = compactFoodMatchText(`${raw} ${translated} ${localizedFoodCorrectionAliases(raw)}`)
   const targetIndex = parts.findIndex((part) => {
@@ -2414,7 +2523,7 @@ function extractReviewedNoteCorrectionText(value: string, max = 1200) {
   return cleaned && cleaned !== raw ? cleaned : null
 }
 
-function buildReviewedWaterCorrection(draft: any, answerRaw: string, localDate: string): VoiceDraft | null {
+function buildReviewedWaterCorrection(draft: any, answerRaw: string, localDate: string, country?: string): VoiceDraft | null {
   if (draft?.action !== 'water' || !draft?.water) return null
   const raw = cleanText(answerRaw, 800)
   if (hasMultipleVoiceSweeteners(raw)) return multipleSweetenerClarification(raw, localDate)
@@ -2422,7 +2531,7 @@ function buildReviewedWaterCorrection(draft: any, answerRaw: string, localDate: 
   const oldIngredients = draft.water.ingredients?.length ? draft.water.ingredients : draft.water.drinkType === 'Water' ? [{ name: 'Water', quantity: draft.water.amountMl, unit: 'ml', display: `${draft.water.amountMl} ml Water` }] : voiceDrinkIngredients(draft.transcript, draft.water.amountMl, draft.water.drinkType, draft.water.sweetener)
   let ingredients = oldIngredients.map((item: any) => ({ ...item }))
   let amount = { amount: draft.water.amount, unit: draft.water.unit, amountMl: draft.water.amountMl }
-  const change = parseWaterAmount(raw)
+  const change = parseWaterAmount(raw, country)
   const milkEdit = /\bmilk\b/i.test(raw) && draft.water.drinkType !== 'Milk'
   if (milkEdit) {
     const previousMilk = ingredients.find((item: any, index: number) => index > 0 && /\bmilk\b/i.test(item.name))
@@ -2462,7 +2571,8 @@ function buildReviewedWaterCorrection(draft: any, answerRaw: string, localDate: 
 
 function extractExerciseDurationMinutes(value: string) {
   const raw = cleanText(value, 800)
-  const lower = raw.toLowerCase()
+  if (hasUnsafeMeasurementQuantity(raw, 'exercise-duration')) return null
+  const lower = normalizeSpokenMeasurementQuantities(raw, 'exercise-duration').toLowerCase()
   const durationMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(minute|minutes|min|mins|hour|hours|hr|hrs)\b/)
   const macedonianDurationMatch = raw.match(/(\d+(?:[.,]\d+)?)\s*(минути?|мин|часа|час)(?=$|[^А-Яа-яЃѓЌќЅѕЉљЊњЈј])/i)
   if (!durationMatch && !macedonianDurationMatch) return null
@@ -2554,26 +2664,48 @@ function buildReviewedJournalCorrection(draft: any, answerRaw: string, localDate
 }
 
 function buildReviewedMoodCorrection(draft: any, answerRaw: string, localDate: string): VoiceDraft | null {
-  if (draft?.action !== 'mood' || !draft?.canConfirm || !draft?.mood) return null
+  if (draft?.action !== 'mood' || !draft?.mood || !Number.isInteger(draft.mood.mood) || draft.mood.mood<1 || draft.mood.mood>7) return null
   const raw = cleanText(answerRaw, 800)
-  const note = extractReviewedNoteCorrectionText(raw, 600)
+  const spokenContext=parseNativeVoiceMoodContext(raw)
+  if(spokenContext.error)return {...draft,transcript:raw,localDate,canConfirm:false,autoSave:false,confirmationMessage:spokenContext.error}
+  if(spokenContext.matched&&moodSpeechEvidence(raw).numeric===null&&explicitVoiceMoodNote(raw)===null&&!/\b(?:mood|i(?:\s+am)?\s+feel(?:ing)?|i['’]m\s+feeling)\b/i.test(raw.replace(/\bmood\s+intensity/gi,'intensity'))){
+    const context={...validateNativeVoiceMoodContext(draft.mood.context),...spokenContext.context}
+    const mood={...draft.mood,context}
+    const summary=`Mood ${mood.mood}/7; ${nativeVoiceMoodContextSummary(context)}`
+    return {...draft,transcript:raw,localDate,mood,summary,canConfirm:true,autoSave:false,reviewToken:undefined,confirmationMessage:`I can update this mood draft: ${summary}. The mood score, tags and note stay as reviewed. Would you like me to save that?`}
+  }
+  const note = extractReviewedNoteCorrectionText(raw.replace(/^(?:no[ ,]+)?actually[ ,:]*/i, ''), 600)
   if (!note) return null
 
+  const explicitNote = explicitVoiceMoodNote(raw)
+  const noteOnly = explicitNote !== null && !/\b(?:mood|rating|score)\b/i.test(raw.split(/\bnote\b/i)[0])
   const parsed = tryParseMoodRequest(`log mood: ${note}`, { section: 'mood', title: 'Mood Tracker' })
-  const mood = parsed?.mood || draft.mood
+  const mood = noteOnly ? draft.mood : parsed?.mood
+  if (!mood) return {
+    ...draft,
+    transcript: raw,
+    localDate,
+    summary: 'Mood details needed',
+    canConfirm: false,
+    autoSave: false,
+    mood: undefined,
+    confirmationMessage: 'How are you feeling, and would you like me to add any note?',
+  }
   const safeMood = {
     mood: clampNumber(mood?.mood, 1, 7, clampNumber(draft.mood.mood, 1, 7, 4)),
     tags: Array.isArray(mood?.tags) ? mood.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 8) : [],
-    note,
+    note: explicitNote ?? (moodSpeechEvidence(note).numeric !== null ? draft.mood.note : note),
+    context:{...validateNativeVoiceMoodContext(draft.mood.context),...spokenContext.context},
   }
   const tagLine = safeMood.tags.length ? `, ${safeMood.tags.join(', ')}` : ''
-  const summary = `Mood ${safeMood.mood}/7${tagLine}`
+  const contextLine=nativeVoiceMoodContextSummary(safeMood.context)
+  const summary = `Mood ${safeMood.mood}/7${tagLine}${contextLine?`; ${contextLine}`:''}`
   return {
     action: 'mood',
     transcript: raw,
     localDate,
     summary,
-    confirmationMessage: `I can update this mood draft: ${summary}. Review it, then tap Confirm to save.`,
+    confirmationMessage: `I can update this mood draft: ${summary}.${safeMood.note ? ` Note: "${safeMood.note}".` : ''} Would you like me to save that?`,
     canConfirm: true,
     autoSave: false,
     mood: safeMood,
@@ -2703,7 +2835,22 @@ function buildReviewedHealthIntakeCorrection(draft: any, answerRaw: string, loca
   return buildHealthIntakeItemsDraft(nextItems, raw, localDate)
 }
 
-async function buildReviewedDraftCorrection(draft: any, answerRaw: string, localDate: string): Promise<VoiceDraft | null> {
+async function buildReviewedDraftCorrection(draft: any, answerRaw: string, localDate: string, country?: string, trustedItems?: any[]): Promise<VoiceDraft | null> {
+  if (['food_build_meal', 'food_draft'].includes(draft?.action) && draft?.food) {
+    const nameOnly = cleanText(answerRaw, 180).match(/^(?:please\s+)?(?:call|name|rename)\s+(?:this\s+meal|the\s+meal|my\s+meal|it)(?:\s+(?:to|as))?\s+(.+?)\s*[.!]?$/i)
+    if (nameOnly && !/\b(?:and|then|also)\b/i.test(nameOnly[1])) {
+      const name = cleanText(nameOnly[1].replace(/[.!]+$/, '').replace(/^["“']|["”']$/g, ''), 100)
+      if (name) {
+        // Only a verified review may retain its original nutrition unchanged.
+        // Untrusted/incomplete proposals must resolve their foods again.
+        const reviewed = Array.isArray(trustedItems) && trustedItems.length && trustedItems === draft.food.items
+          ? draft
+          : await buildVoiceMealDraft({ meal: draft.food.meal, mealName: name, ingredients: splitIngredientList(cleanText(draft.food.draftText, 1200)).map(parseIngredientPhrase).filter(Boolean) }, draft.transcript, localDate, country)
+        if (!reviewed?.food) return null
+        return { ...reviewed, reviewToken: undefined, localDate, food: { ...reviewed.food, mealName: name }, summary: `${name}, ${Math.round(Number(reviewed.food.nutrition?.calories_kcal ?? reviewed.food.nutrition?.calories ?? 0))} kcal`, confirmationMessage: reviewed.canConfirm ? `Call this meal ${name}, keeping the reviewed foods and amounts. Would you like me to save it?` : reviewed.confirmationMessage, autoSave: false }
+      }
+    }
+  }
   const symptomNoteCorrection = buildReviewedSymptomNoteCorrection(draft, answerRaw, localDate)
   if (symptomNoteCorrection) return symptomNoteCorrection
 
@@ -2719,7 +2866,7 @@ async function buildReviewedDraftCorrection(draft: any, answerRaw: string, local
   const exerciseCorrection = buildReviewedExerciseCorrection(draft, answerRaw, localDate)
   if (exerciseCorrection) return exerciseCorrection
 
-  const waterCorrection = buildReviewedWaterCorrection(draft, answerRaw, localDate)
+  const waterCorrection = buildReviewedWaterCorrection(draft, answerRaw, localDate, country)
   if (waterCorrection) return await resolveVoiceDrinkDraft(waterCorrection)
 
   const correction =
@@ -2733,7 +2880,7 @@ async function buildReviewedDraftCorrection(draft: any, answerRaw: string, local
     if (['water', 'food_build_meal', 'food_draft'].includes(draft?.action) && (transcriptHasDateEvidence(answerRaw) || requestedLocalTime(answerRaw))) {
       if (draft.action === 'water') return resolveVoiceDrinkDraft({ ...draft, localDate, timingNeedsClarification: false, reviewToken: undefined, confirmationMessage: 'Checking the corrected drink date and time.' })
       const parts = splitIngredientList(cleanText(draft.food?.draftText, 1200))
-      return buildVoiceMealDraft({ meal: draft.food?.meal, mealName: draft.food?.mealName, ingredients: parts.map(parseIngredientPhrase).filter(Boolean) }, draft.transcript, localDate)
+      return buildVoiceMealDraft({ meal: draft.food?.meal, mealName: draft.food?.mealName, ingredients: parts.map(parseIngredientPhrase).filter(Boolean) }, draft.transcript, localDate, country, trustedItems)
     }
     return null
   }
@@ -2747,6 +2894,8 @@ async function buildReviewedDraftCorrection(draft: any, answerRaw: string, local
     },
     `Correct reviewed food draft: ${draftText}`,
     localDate,
+    country,
+    trustedItems,
   )
 }
 
@@ -2761,23 +2910,83 @@ function ingredientNeedsAmountClarification(ingredient: any) {
 }
 
 function splitIngredientList(value: string) {
-  return String(value || '')
-    .replace(/\band\b/gi, ',')
-    .split(',')
+  return splitSpokenFoodMeasurementList(String(value || ''))
     .map((part) => cleanText(part.replace(/[.?!]+$/g, ''), 120))
     .filter(Boolean)
 }
 
+function parseVoiceCountPack(value: string) {
+  const count = '(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|half|\\d+(?:\\.\\d+)?)'
+  const packaged = value.match(new RegExp(`^(?:(a|${count.slice(1, -1)})\\s+)?(?:packs?|box(?:es)?|packets?)\\s+of\\s+${count}\\s+(.+)$`, 'i'))
+  if (packaged) return { quantity: (packaged[1]?.toLowerCase() === 'a' ? 1 : numberFromWords(packaged[1]) || 1) * numberFromWords(packaged[2])!, name: packaged[3] }
+  const pieces = value.match(new RegExp(`^(?:a\\s+)?${count}[-\\s]*(?:pieces?|pack)\\s+(?:of\\s+)?(.+)$`, 'i'))
+  return pieces ? { quantity: numberFromWords(pieces[1])!, name: pieces[2] } : null
+}
+
 function parseIngredientPhrase(value: string) {
-  const text = cleanText(value, 160).replace(/^(\d+(?:\.\d+)?)(?=(?:g|kg|ml|oz|lbs?)\b)/i, '$1 ')
+  const display = cleanText(value, 160)
+  if (hasUnsafeMeasurementQuantity(display, 'food')) return normalizeIngredientRequest({ name: display, display, quantity: 'unclear', unit: null })
+  const text = normalizeSpokenMeasurementQuantities(display, 'food').replace(/^(\d+(?:\.\d+)?)(?=(?:g|kg|ml|oz|lbs?)\b)/i, '$1 ')
+  const pack = parseVoiceCountPack(text)
+  if (pack) return normalizeIngredientRequest({ name: pack.name, quantity: pack.quantity, unit: 'each', display, requiresSourceServing: true })
   const match = text.match(
-    /^(?:(one|two|three|four|five|six|seven|eight|nine|ten|half|\d+(?:\.\d+)?)\s+)?(?:(cup|cups|slice|slices|egg|eggs|gram|grams|g|kg|oz|ounce|ounces|lb|lbs|pound|pounds|ml|millilitres|milliliters|l|litres|liters|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp)\s+(?:of\s+)?)?(.+)$/i,
+    /^(?:(one|two|three|four|five|six|seven|eight|nine|ten|half|quarter|\d+(?:\.\d+)?)\s+)?(?:(cup|cups|slice|slices|egg|eggs|gram|grams|g|kg|oz|ounce|ounces|lb|lbs|pound|pounds|ml|millilitres?|milliliters?|l|litres?|liters?|tablespoon|tablespoons|tbsp|teaspoon|teaspoons|tsp)\s+(?:of\s+)?)?(.+)$/i,
   )
-  if (!match) return normalizeIngredientRequest(text)
+  if (!match) return normalizeIngredientRequest({ name: display, display })
   const quantity = match[1] || null
   const unit = match[2] || null
   const name = cleanText(match[3] || text, 120)
-  return normalizeIngredientRequest({ name, quantity, unit, display: text })
+  return normalizeIngredientRequest({ name, quantity, unit, display })
+}
+
+function voiceRestaurantBrand(value: unknown) {
+  const text = String(value || '')
+  const brands: Array<[RegExp, string]> = [
+    [/\b(?:mc\s*donald['’]?s?|maccas?|macca['’]s|mcnuggets?|big mac|mcchicken|mcmuffin|mccrispy|mcspicy|mcwrap|filet[- ]o[- ]fish)\b/i, "McDonald's"],
+    [/\b(?:kfc|kentucky fried chicken)\b/i, 'KFC'],
+    [/\bhungry\s+jack['’]?s?\b/i, "Hungry Jack's"],
+    [/\bburger\s+king\b/i, 'Burger King'], [/\bsubway\b/i, 'Subway'],
+    [/\bnando['’]?s?\b/i, "Nando's"], [/\bdomino['’]?s?\b/i, "Domino's"],
+    [/\bpizza\s+hut\b/i, 'Pizza Hut'], [/\btaco\s+bell\b/i, 'Taco Bell'],
+    [/\bred\s+rooster\b/i, 'Red Rooster'], [/\boporto\b/i, 'Oporto'],
+    [/\bstarbucks\b/i, 'Starbucks'],
+  ]
+  return brands.find(([pattern]) => pattern.test(text))?.[1] || ''
+}
+
+function isPreparedVoiceFood(value: unknown) {
+  return Boolean(voiceRestaurantBrand(value)) || /\b(?:burgers?|cheeseburgers?|nuggets?|mcnuggets?|pizza|fries|hot dogs?|quarter pounder|whopper|zinger)\b/i.test(String(value || ''))
+}
+
+function parsePreparedVoiceFoodRequest(transcript: string) {
+  if (!isPreparedVoiceFood(transcript)) return null
+  if (!/\b(?:add|log|record|track|save|enter|put|prepare|ate|eat|eating|had|having)\b/i.test(transcript)) return null
+  const meal = inferMealFromText(transcript, 'uncategorized')
+  const sharedBrand = voiceRestaurantBrand(transcript) || cleanText(transcript.match(/\bfrom\s+(.+?)(?=\s+(?:for|at|today|yesterday)\b|[.!?]|$)/i)?.[1], 60)
+  let text = naturalFoodListFromSpeech(transcript) || stripVoiceFoodCommandWords(transcript)
+  text = stripVoiceFoodCommandWords(text).replace(/\bprepare\b/gi, '').replace(/\b(?:don['’]?t|do not)\s*(?:save\s*)?(?:it\s*)?yet\b/gi, '').replace(/\b(?:for|as)\s*$/i, '').replace(/[.?!\s]+$/g, '').trim()
+  // "with cheese" belongs to the named product. Only list boundaries split it.
+  const pieces = text.split(/\s*(?:,|\band\b|\bplus\b)\s*/i).map(part => part.replace(/[.?!\s]+$/g, '').trim()).filter(Boolean)
+  const ingredients = pieces.map(part => {
+    const brand = voiceRestaurantBrand(part) || sharedBrand
+    let name = part.replace(/\bfrom\s+.+$/i, '').trim()
+    if (!name) return null
+    const physical = parseIngredientPhrase(name)
+    if (physical?.unit && /^(?:g|grams?|kg|oz|ounces?|lb|lbs|pounds?|ml|millilitres?|milliliters?|l|litres?|liters?|cups?|tbsp|tablespoons?|tsp|teaspoons?)$/i.test(physical.unit)) {
+      return normalizeIngredientRequest({ ...physical, ...(isPreparedVoiceFood(name) ? { brand, requiresSourceServing: true } : {}) })
+    }
+    const countToken = '(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|twenty|half|\\d+(?:\\.\\d+)?)'
+    const pack = parseVoiceCountPack(name)
+    const counted = !pack ? name.match(new RegExp(`^${countToken}\\s+(.+)$`, 'i')) : null
+    const quantity = pack?.quantity || counted?.[1] || 1
+    name = (pack?.name || counted?.[2] || name).replace(/^(?:a|an)\s+/i, '').trim()
+    const size = name.match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()
+    name = name.replace(/\b(?:pieces?|pack|box|packet)\s+of\s+/i, '').trim()
+    // Preserve the restaurant on each item when it was stated once for the list.
+    if (brand && !voiceRestaurantBrand(name)) name = `${brand} ${name}`
+    return normalizeIngredientRequest({ name, quantity, unit: 'each', display: part, brand, size, requiresSourceServing: true })
+  }).filter(Boolean)
+  return ingredients.length ? { meal, mealName: meal === 'uncategorized' ? 'Meal' : `${meal.charAt(0).toUpperCase()}${meal.slice(1)}`, draftText: ingredients.map(item => item!.display).join(', '), ingredients } : null
 }
 
 function naturalFoodListFromSpeech(value: string) {
@@ -2785,12 +2994,16 @@ function naturalFoodListFromSpeech(value: string) {
   const match = text.match(/\b(?:i(?:'m| am)?\s+)?(?:eat|eating|ate|having|have had|had)\b\s+(.+)$/i)
   const candidate = cleanText(match?.[1] || '', 1000)
     .replace(/\b(?:while|when|because)\b.+$/i, ' ')
-    .replace(/\.$/, '')
+    .replace(/\s+\b(?:for|as)\s+(?:my\s+)?(?:breakfast|lunch|dinner|snacks?)\b.*$/i, ' ')
+    .replace(/\b(?:don['’]?t|do not)\s+save\s+(?:it\s+)?yet\b/gi, ' ')
+    .replace(/[.?!\s]+$/g, '')
     .trim()
   return candidate || null
 }
 
 function tryParseIngredientMealRequest(transcript: string) {
+  const prepared = parsePreparedVoiceFoodRequest(transcript)
+  if (prepared) return prepared
   const text = cleanText(translateLocalizedFoodRequest(transcript), 1400)
   const lower = text.toLowerCase()
   const asksForFood =
@@ -2824,6 +3037,8 @@ function tryParseIngredientMealRequest(transcript: string) {
 }
 
 function tryParseDirectFoodRequest(transcript: string, launchContext?: VoiceLaunchContext) {
+  const prepared = parsePreparedVoiceFoodRequest(transcript)
+  if (prepared) return prepared
   const text = cleanText(translateLocalizedFoodRequest(transcript, launchContext), 1400)
   const lower = text.toLowerCase()
   const hasSaveCommand = /\b(add|log|logged|lobbed|put|input|record|track|save|enter)\b/.test(lower)
@@ -2862,7 +3077,9 @@ function parseVoiceNumber(value: string | undefined | null) {
 
 function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunchContext) {
   const raw = cleanText(transcript, 600)
-  const lower = raw.toLowerCase()
+  if (hasUnsafeMeasurementQuantity(raw, 'exercise')) return null
+  const lower = normalizeSpokenMeasurementQuantities(raw, 'exercise').toLowerCase()
+  if (/\b(?:did not|didn't|never)\s+(?:do\s+|go\s+)?(?:walk|run|jog|cycle|swim|yoga|pilates|exercise)\b/i.test(raw)) return null
   const speedMatch = lower.match(/\b(\d+(?:\.\d+)?)\s*(km\s*\/\s*h|kph|kilometres?\s+per\s+hour|kilometers?\s+per\s+hour|mph|miles?\s+per\s+hour)\b/)
   const speedKph = speedMatch
     ? Number(speedMatch[1]) * (/mph|miles?/i.test(speedMatch[2]) ? 1.60934 : 1)
@@ -2877,11 +3094,11 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
   const caloriesKcal = parseVoiceNumber(caloriesMatch?.[1])
   const inExerciseContext = launchContext?.section === 'exercise'
   const hasExerciseAction =
-    /\b(log|add|record|track|did|done|completed|finished|went|ran|walked|walking|jogged|jogging|biked|biking|cycled|cycling|rode|riding|exercised)\b/.test(lower) ||
+    /\b(log|add|record|track|did|done|completed|finished|went|ran|walked|walking|jogged|jogging|biked|biking|cycled|cycling|rode|riding|exercised|swam|swimming|hiked|hiking|rowed|rowing|danced|dancing)\b/.test(lower) ||
     /(запиши|додај|додаj|зачувај|зачуваj|сними|внеси|пешачев|одев|трчав|возев|вежбав)/i.test(raw) ||
     /(registra|registrar|agrega|añade|anade|hice|caminé|camine|corrí|corri|monté|monte|entrené|entrene|enregistre|ajoute|j'ai fait|marché|marche|couru|vélo|velo|entraîné|entraine|aggiungi|registra|ho fatto|camminato|corso|allenato|bici|bicicletta|registra|adicione|adiciona|caminhei|corri|treinei|bicicleta|trage|trag|notiere|speichere|ging|gegangen|gelaufen|gerannt|trainiert|fahrrad|rad gefahren)/i.test(raw)
   const hasExerciseWords =
-    /\b(walk(?:ed|ing)?|run|running|ran|jog(?:ged|ging)?|gym|workout|bike(?:d|ing)?|cycl(?:e|ed|ing)|rode|riding|exercise(?:d)?)\b/.test(lower) ||
+    /\b(walk(?:ed|ing)?|run|running|ran|jog(?:ged|ging)?|gym|workout|bike(?:d|ing)?|cycl(?:e|ed|ing)|rode|riding|exercise(?:d)?|yoga|pilates|swim|swam|swimming|hike|hiked|hiking|row|rowed|rowing|dance|danced|dancing|strength training|weight training)\b/.test(lower) ||
     /(пешач|одев|трч|џог|jог|теретана|вежб|велосипед|точак|возев)/i.test(raw) ||
     /(caminar|caminé|camine|caminata|correr|corrí|corri|gimnasio|entreno|bicicleta|bici|marcher|marché|marche|course|couru|vélo|velo|sport|entraînement|entrainement|camminare|camminato|corsa|correre|corso|palestra|allenamento|bicicletta|bici|andare in bici|caminhar|caminhei|corrida|correr|corri|academia|treino|bicicleta|gehen|gegangen|spazieren|laufen|gelaufen|rennen|gerannt|joggen|fitnessstudio|training|fahrrad|radfahren|rad gefahren)/i.test(raw)
   if (!(hasExerciseAction && (hasExerciseWords || steps || caloriesKcal)) && !(inExerciseContext && (hasExerciseWords || distanceMatch || macedonianDistanceMatch || durationMatch || macedonianDurationMatch || steps || caloriesKcal))) return null
@@ -2894,13 +3111,15 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
   const durationMinutes = durationRaw
     ? durationRaw * (/hour|hr|час/.test(durationMatch?.[2] || macedonianDurationMatch?.[2] || '') ? 60 : 1)
     : null
-  const name = /\b(run|ran|running|jog|jogged|jogging)\b/.test(lower) || /трч|џог|jог|corr|couru|course|correre|corso|corsa|correr|corri|corrida|laufen|gelaufen|rennen|gerannt|joggen/i.test(raw)
+  const specificActivity = lower.match(/\b(yoga|pilates|swim(?:ming)?|swam|hik(?:e|ed|ing)|row(?:ed|ing)?|danc(?:e|ed|ing)|strength training|weight training)\b/)?.[1]
+  const specificName = specificActivity && (/swim|swam/.test(specificActivity) ? 'swimming' : /^hik/.test(specificActivity) ? 'hiking' : /^row/.test(specificActivity) ? 'rowing' : /^danc/.test(specificActivity) ? 'dancing' : /strength|weight/.test(specificActivity) ? 'strength training' : specificActivity)
+  const name = specificName || (/\b(run|ran|running|jog|jogged|jogging)\b/.test(lower) || /трч|џог|jог|corr|couru|course|correre|corso|corsa|correr|corri|corrida|laufen|gelaufen|rennen|gerannt|joggen/i.test(raw)
     ? 'running'
     : lower.includes('bike') || lower.includes('cycling') || lower.includes('cycle') || lower.includes('ride') || lower.includes('rode') || /велосипед|точак|возев|bicicleta|bici|vélo|velo|bicicletta|bici|bicicleta|fahrrad|radfahren|rad gefahren/i.test(raw)
     ? 'cycling'
     : lower.includes('gym') || lower.includes('workout') || /теретана|вежб|gimnasio|entreno|sport|entraînement|entrainement|palestra|allenamento|academia|treino|fitnessstudio|training/i.test(raw)
     ? 'gym'
-    : 'walking'
+    : 'walking')
   const intensity = lower.includes('hard') || lower.includes('intense') || /тешк|интензив/i.test(raw)
     ? 'hard'
     : lower.includes('easy') || lower.includes('light') || /лесн|полесн/i.test(raw)
@@ -2924,15 +3143,45 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
   }
 }
 
+function explicitVoiceMoodNote(value: string): string | null {
+  const matched = value.match(/\b(?:add|include|with|set|change|update)\s+(?:(?:a|the|my)\s+)?note\s*(?:(?:to|saying|of|as)\s+|:\s*)?(.+)$/i)
+  return matched ? cleanText(matched[1].replace(/[.!]+$/, '').replace(/^["“']|["”']$/g, ''), 600) : null
+}
+
+function moodSpeechEvidence(value: string) {
+  const raw = cleanText(value, 800)
+  const parts = raw.split(/\b(?:no[ ,]+actually|actually|i mean|rather|instead|but now|but today)\b/i)
+  const latest = cleanText(parts[parts.length - 1] || raw, 800)
+  const numeric = latest.match(/\b(?:mood\s*(?:is|was|as|to)?\s*)?(one|two|three|four|five|six|seven|[1-7])\s*(?:\/|out of\s*|over\s*)(?:7|seven)\b/i)
+  const withoutNegatedFeelings = latest.replace(/\b(?:not|never|no longer|don['’]?t|do not|didn['’]?t|did not|isn['’]?t|wasn['’]?t)\s+(?:(?:really|very|particularly|so|that|feel|feeling|felt|as)\s+){0,3}(?:happy|good|great|better|excellent|amazing|calm|okay|ok|sad|low|down|angry|upset|anxious|anxiety|stressed|stress|overwhelmed|terrible|awful)\b/gi, ' ')
+  const positive = /\b(?:happy|good|great|better|excellent|amazing|calm|okay|ok)\b/i.test(withoutNegatedFeelings)
+  const negative = /\b(?:sad|low|down|angry|upset|anxious|anxiety|stressed|stress|overwhelmed|terrible|awful)\b/i.test(withoutNegatedFeelings)
+  return { text: withoutNegatedFeelings, numeric: numeric ? numberFromWords(numeric[1]) : null, ambiguous: positive && negative, negatedOnly: withoutNegatedFeelings !== latest && !positive && !negative }
+}
+
 function tryParseMoodRequest(transcript: string, launchContext?: VoiceLaunchContext) {
   const raw = cleanText(transcript, 600)
-  const lower = raw.toLowerCase()
   const inMoodContext = launchContext?.section === 'mood'
+  const asksToLogMood = /\b(?:log|record|track|save|add)\b[\s\S]{0,50}\b(?:mood|feeling)\b/i.test(raw)
+  if (!asksToLogMood && (/\?/.test(raw) || /^(?:what|why|how|when|where|can|could|should|would|does|do|is|are|will)\b/i.test(raw))) return null
+  const spokenContext=parseNativeVoiceMoodContext(raw)
+  if(spokenContext.error)return asksToLogMood||inMoodContext?{action:'mood',mood:null,moodContextError:spokenContext.error}:null
+  const evidence = moodSpeechEvidence(raw)
+  if (evidence.numeric !== null && (asksToLogMood || inMoodContext || /\b(?:my mood|i feel|i am feeling|rating|score)\b/i.test(raw))) return { action: 'mood', mood: { mood: evidence.numeric, tags: [] as string[], note: explicitVoiceMoodNote(raw) ?? raw,context:spokenContext.context } }
+  if (evidence.ambiguous || evidence.negatedOnly) return { action: 'mood', mood: null }
+  const lower = evidence.text.toLowerCase()
   const hasMoodWords =
     /\b(feel|feeling|felt|mood|sad|down|anxious|anxiety|great|happy|good|better|okay|ok|low|stressed|stress|overwhelmed|angry|upset|calm)\b/.test(lower) ||
     /(се чувствувам|расположение|таж|лошо|анксиозн|вознемир|среќ|добро|подобро|стрес|преплавен|лут|вознемирен|смирен|мирно)/i.test(raw) ||
     /\b(me siento|estado de ánimo|estado de animo|triste|ansioso|ansiosa|estresado|estresada|feliz|bien|mejor|tranquilo|tranquila|calmado|calmada|je me sens|humeur|triste|anxieux|anxieuse|stressé|stressée|stresse|heureux|heureuse|bien|mieux|calme|mi sento|umore|triste|ansioso|ansiosa|stressato|stressata|felice|bene|meglio|tranquillo|tranquilla|calmo|calma|me sinto|humor|triste|ansioso|ansiosa|estressado|estressada|feliz|bem|melhor|tranquilo|tranquila|calmo|calma|ich fühle mich|ich fuehle mich|stimmung|traurig|ängstlich|aengstlich|gestresst|glücklich|gluecklich|gut|besser|ruhig|wütend|wuetend)\b/i.test(raw)
   if (!hasMoodWords && !inMoodContext) return null
+  // Physical sensations and comments about something being good are not mood
+  // reports. An unknown feeling in Mood Tracker should ask for clarification.
+  const englishEmotion = /\b(?:terrible|awful|low|sad|down|angry|upset|anxious|anxiety|stressed|stress|overwhelmed|calm|great|happy|good|better|excellent|amazing|okay|ok|neutral)\b/.test(lower)
+  const otherEmotion = /(таж|лошо|анксиозн|стрес|преплавен|лут|вознемирен|смирен|мирно|среќ|добро|подобро|одлично|ужасно)/i.test(evidence.text) || /\b(?:triste|ansioso|ansiosa|estresado|estresada|feliz|bien|mejor|tranquilo|tranquila|calmado|calmada|anxieux|anxieuse|stressé|stressée|heureux|heureuse|mieux|calme|stressato|stressata|felice|bene|meglio|estressado|estressada|bem|melhor|traurig|ängstlich|aengstlich|gestresst|glücklich|gluecklich|gut|besser|ruhig|wütend|wuetend)\b/i.test(evidence.text)
+  const englishFeelingIntent = /\b(?:i['’]?m|i am|i feel|i felt|i was|i have been|feeling|felt|mood)\b/i.test(raw) || asksToLogMood || /^(?:very |really |quite )?(?:happy|good|great|sad|low|down|angry|upset|anxious|stressed|calm|terrible|awful|okay|ok)[.!]?$/i.test(raw)
+  if (englishEmotion && !englishFeelingIntent && !inMoodContext) return null
+  if (!englishEmotion && !otherEmotion) return { action: 'mood', mood: null }
   const mood = /\b(terrible|awful|very low|really low|crisis)\b/.test(lower) || /(многу лошо|криза|ужасно)/i.test(raw) || /\b(muy mal|terrible|horrible|crisis|très mal|tres mal|crise)\b/i.test(raw)
     ? 1
     : /\b(great|happy|excellent|amazing)\b/.test(lower) || /(одлично|среќ|прекрасно)/i.test(raw) || /\b(feliz|excelente|genial|heureux|heureuse|excellent|felice|eccellente|benissimo|feliz|excelente|ótimo|otimo|glücklich|gluecklich|ausgezeichnet)\b/i.test(raw)
@@ -2952,12 +3201,13 @@ function tryParseMoodRequest(transcript: string, launchContext?: VoiceLaunchCont
     /\b(calm)\b/.test(lower) || /смирен|мирно/i.test(raw) || /\b(tranquilo|tranquila|calmado|calmada|calme|tranquillo|tranquilla|calmo|calma|tranquilo|tranquila|ruhig)\b/i.test(raw) ? 'calm' : '',
     /\b(great|happy|good|better|excellent|amazing)\b/.test(lower) || /среќ|добро|подобро|одлично/i.test(raw) || /\b(feliz|bien|mejor|excelente|genial|heureux|heureuse|mieux|excellent|felice|bene|meglio|eccellente|benissimo|bem|melhor|ótimo|otimo|glücklich|gluecklich|gut|besser|ausgezeichnet)\b/i.test(raw) ? 'positive' : '',
   ].filter(Boolean)
-  return { action: 'mood', mood: { mood, tags, note: raw } }
+  return { action: 'mood', mood: { mood, tags, note: raw,context:spokenContext.context } }
 }
 
 function tryParseJournalRequest(transcript: string, launchContext?: VoiceLaunchContext) {
   const raw = cleanText(transcript, 1200)
   const lower = raw.toLowerCase()
+  if (!/\b(?:journal|diary)\b/i.test(raw) && /\b(?:log|record|track|save|add)\b[\s\S]{0,50}\bmood\b/i.test(raw) && moodSpeechEvidence(raw).numeric !== null) return null
   const inJournalContext = launchContext?.section === 'journal'
   const hasMacedonianJournalWord = /(дневник|белешка|белешки)/i.test(raw)
   const hasRomanceJournalWord = /\b(diario|diário|journal|nota|note|carnet)\b/i.test(raw)
@@ -2969,7 +3219,8 @@ function tryParseJournalRequest(transcript: string, launchContext?: VoiceLaunchC
     /(запиши|додај|додаj|зачувај|зачуваj|сними|внеси)/i.test(raw) ||
     /(escribe|escribir|agrega|añade|anade|guarda|registrar|registra|écris|ecris|ajoute|enregistre|note|scrivi|aggiungi|registra|salva|annota|escreve|escreva|adicione|adiciona|registra|salva|anota|schreib|schreibe|speichere|notiere|trag|trage)/i.test(raw)
   if (!hasJournalAction && !inJournalContext) return null
-  const journalType = /\bhealth journal\b/.test(lower) || /(здравствен|здравје|здравjе)/i.test(raw) || /(salud|santé|sante|salute|saúde|saude|gesundheit)/i.test(raw) || inJournalContext ? 'health' : 'mood'
+  const explicitJournalType = raw.match(/^(?:please\s+)?(?:add|save|record|log|write|update|create)\s+(?:this\s+)?(?:(?:to|in|into)\s+)?(?:a\s+|my\s+|the\s+)?(mood|health)\s+(?:journal|diary)\b/i)?.[1]?.toLowerCase()
+  const journalType = explicitJournalType === 'mood' ? 'mood' : explicitJournalType === 'health' || /\bhealth journal\b/.test(lower.split(/\bthat\b|:/)[0]) || /(здравствен|здравје|здравjе)/i.test(raw) || /(salud|santé|sante|salute|saúde|saude|gesundheit)/i.test(raw) || inJournalContext ? 'health' : 'mood'
   const content = hasJournalAction
     ? cleanText(
         raw
@@ -3006,7 +3257,7 @@ function buildQuickJournalDraft(parsed: any, transcript: string, localDate: stri
   const title = cleanText(journal.title || 'Voice journal note', 120)
   const tags = Array.isArray(journal.tags) ? journal.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 8) : []
   const journalTypeRaw = String(journal.journalType || journal.type || '').toLowerCase()
-  const journalType = journalTypeRaw === 'health' || /\bhealth journal\b/i.test(transcript) ? 'health' : 'mood'
+  const journalType = journalTypeRaw === 'mood' ? 'mood' : journalTypeRaw === 'health' || /\bhealth journal\b/i.test(transcript) ? 'health' : 'mood'
   const journalLabel = journalType === 'health' ? 'health journal' : 'journal'
   return {
     action: 'journal',
@@ -3104,95 +3355,9 @@ function isFoodRecommendationRequest(transcript: string, launchContext?: VoiceLa
   return asksForMealAdvice && (inFoodContext || hasFoodMeaning)
 }
 
-function buildQuickRecipeDraft(transcript: string, localDate: string, launchContext?: VoiceLaunchContext): VoiceDraft | null {
-  const raw = cleanText(transcript, 1000)
-  const lower = raw.toLowerCase()
-  const recipeIntent =
-    /\b(recipe|meal idea|meal plan|dinner idea|lunch idea|breakfast idea|snack idea)\b/.test(lower) ||
-    /\b(what can i make|what should i make|what can i cook|what should i cook|give me something to cook|suggest a meal|suggest something to eat)\b/.test(lower)
-  if (!recipeIntent) return null
-  if (isFoodRecommendationRequest(raw, launchContext)) return null
-  if (!/\b(create|make|give|suggest|build|cook|prepare|want|need|can|should)\b/.test(lower)) return null
-  const hasDetailedConstraints =
-    /\b(no|without|avoid|allergy|allergic|free|dairy|gluten|nuts?|egg-free|vegan|vegetarian|keto|low carb|low calorie|high protein|calorie|calories|protein|servings?|serve|for two|for three|for four|for \d+)\b/.test(lower)
-  if (hasDetailedConstraints) return null
-  const meal = lower.includes('breakfast') ? 'breakfast' : lower.includes('lunch') ? 'lunch' : lower.includes('snack') ? 'snack' : 'dinner'
-  const highProtein = /\b(high protein|high-protein|protein)\b/.test(lower)
-  const lowCalorie = /\b(low calorie|low-calorie|light)\b/.test(lower)
-  const requestedIngredients = requestedRecipeIngredients(raw)
-  const title = requestedIngredients.length
-    ? `${meal.charAt(0).toUpperCase()}${meal.slice(1)} recipe`
-    : `${highProtein ? 'High-protein ' : lowCalorie ? 'Low-calorie ' : ''}${meal} recipe`
-  const ingredients = requestedIngredients.length
-    ? requestedIngredients
-    : meal === 'breakfast'
-    ? highProtein
-      ? ['2 large eggs', '170 g plain Greek yogurt', '1 slice sourdough toast', '75 g avocado']
-      : ['1 cup rolled oats', '170 g plain Greek yogurt', '100 g blueberries', '1 tbsp chia seeds']
-    : meal === 'lunch'
-    ? highProtein
-      ? ['150 g chicken breast', '120 g cooked brown rice', '75 g spinach', '1 tbsp olive oil']
-      : ['120 g cooked brown rice', '100 g chickpeas', '75 g spinach', '1 tbsp olive oil']
-    : meal === 'snack'
-    ? highProtein
-      ? ['1 protein shake', '1 banana']
-      : ['170 g plain Greek yogurt', '100 g berries']
-    : highProtein
-    ? ['150 g chicken breast', '150 g sweet potato', '100 g broccoli', '1 tbsp olive oil']
-    : ['150 g salmon', '150 g potato', '100 g broccoli', '1 tbsp olive oil']
-  const steps = [
-    'Prepare the ingredients.',
-    requestedIngredients.length
-      ? 'Cook any ingredients that need cooking.'
-      : meal === 'breakfast'
-      ? 'Cook or assemble the breakfast ingredients.'
-      : 'Cook the main protein and vegetables until done.',
-    'Combine, season to taste, and serve.',
-  ]
-  const importDraft = {
-    title,
-    source: 'voice-assistant',
-    servings: 1,
-    prepMinutes: 10,
-    cookMinutes: meal === 'snack' ? 0 : 15,
-    ingredients,
-    steps,
-    sourceUrl: null,
-    saveRecipe: false,
-    createdAt: Date.now(),
-  }
-  const suggestionText = [
-    `For ${meal === 'snack' ? 'a snack' : meal}, I recommend ${title}.`,
-    `Ingredients: ${ingredients.join(', ')}.`,
-    'I opened this as a starter Build a meal draft. Review and adjust it before saving. Nothing has been saved yet.',
-  ].join(' ')
-  const params = new URLSearchParams()
-  params.set('date', localDate)
-  const category = meal === 'snack' ? 'snacks' : meal
-  params.set('category', category)
-  params.set('recipeImport', '1')
-  params.set('voiceRecipeDraft', encodeUrlJson(importDraft))
-  params.set('t', String(Date.now()))
-  return {
-    action: 'recipe',
-    transcript: raw,
-    localDate,
-    summary: 'Recipe ready in Build a meal',
-    confirmationMessage: 'I can open Build a meal with this request. Nothing has been saved yet.',
-    canConfirm: false,
-    recipe: { text: '', importDraft },
-    appTarget: {
-      title: 'Build a meal',
-      path: `/food/build-meal?${params.toString()}`,
-      buttonLabel: 'Open Build a meal',
-      nativeTarget: {
-        type: 'foodAction',
-        action: 'openBuildMeal',
-        meal: category,
-        recipeDraft: importDraft,
-      },
-    },
-  }
+function buildQuickRecipeDraft(_transcript: string, _localDate: string, _launchContext?: VoiceLaunchContext): VoiceDraft | null {
+  // A complete generated recipe must pass the normal recipe resolver below.
+  return null
 }
 
 function recipeCategoryFromMeal(meal: string) {
@@ -3209,7 +3374,7 @@ function fallbackRecipeIngredientsForMeal(meal: string) {
 }
 
 function stripRecipeListPrefix(line: string) {
-  return cleanText(line, 220)
+  return cleanText(line, 2000)
     .replace(/^[-*•]\s*/, '')
     .replace(/^\d+[\).:-]\s*/, '')
     .trim()
@@ -3220,9 +3385,9 @@ function extractRecipeIngredients(recipeText?: string) {
   const inlineIngredients = String(recipeText).match(
     /ingredients?\s*:\s*([\s\S]+?)(?:\b(?:steps?|method|instructions?|directions?|this is meant|tell me|review|nothing has been saved)\b|$)/i,
   )?.[1]
-  if (inlineIngredients) {
+  if (inlineIngredients && !/[\r\n]/.test(inlineIngredients.trim())) {
     const parts = splitIngredientList(inlineIngredients)
-    if (parts.length > 1) return parts.slice(0, 16)
+    if (parts.length > 1) return parts
   }
   const lines = String(recipeText)
     .split(/\r?\n/)
@@ -3248,7 +3413,6 @@ function extractRecipeIngredients(recipeText?: string) {
   return ingredients
     .map((line) => line.replace(/\s+\([^)]*(?:kcal|calories|protein|carbs|fat)[^)]*\)\s*$/i, '').trim())
     .filter((line) => line.length >= 3 && !/^(optional|to taste)$/i.test(line))
-    .slice(0, 16)
 }
 
 function extractRecipeSteps(recipeText?: string) {
@@ -3273,7 +3437,7 @@ function extractRecipeSteps(recipeText?: string) {
     }
     if (inSteps && line.length >= 3) steps.push(line)
   }
-  return steps.slice(0, 12)
+  return steps
 }
 
 function extractRecipeTitle(recipeText: string | undefined, fallback: string) {
@@ -3286,53 +3450,137 @@ function extractRecipeTitle(recipeText: string | undefined, fallback: string) {
 }
 
 function buildRecipeHandoffDraft(transcript: string, localDate: string, recipeText?: string, targetMeal?: string): VoiceDraft {
-  const quick = recipeText ? null : buildQuickRecipeDraft(`create recipe ${transcript}`, localDate)
-  if (quick) return quick
   const meal = recipeCategoryFromMeal(targetMeal || inferRecommendationMeal(transcript))
-  const mealLabel = meal === 'snacks' ? 'snack' : meal
-  const ingredients = extractRecipeIngredients(recipeText)
-  const steps = extractRecipeSteps(recipeText)
-  const spokenRecipeText = cleanText(recipeText || '', 5000)
-  const importDraft = {
-    title: extractRecipeTitle(recipeText, cleanText(transcript, 100) || `${mealLabel.charAt(0).toUpperCase()}${mealLabel.slice(1)} recipe`),
-    source: 'voice-assistant',
-    servings: 1,
-    prepMinutes: null,
-    cookMinutes: null,
-    ingredients: ingredients.length ? ingredients : fallbackRecipeIngredientsForMeal(meal),
-    steps: steps.length ? steps : ['Prepare the ingredients.', 'Cook until done.', 'Combine, season to taste, and serve.'],
-    sourceUrl: null,
-    saveRecipe: false,
-    createdAt: Date.now(),
-  }
-  const params = new URLSearchParams()
-  params.set('date', localDate)
-  params.set('category', meal)
-  params.set('recipeImport', '1')
-  params.set('voiceRecipeDraft', encodeUrlJson(importDraft))
-  params.set('t', String(Date.now()))
+  let importDraft: any = null
+  try { importDraft = completeVoiceRecipe(recipeText) } catch {}
   return {
     action: 'recipe',
     transcript,
     localDate,
-    summary: recipeText ? 'Meal idea ready in Build a meal' : 'Recipe ready in Build a meal',
-    confirmationMessage: recipeText
-      ? "I used today's diary context where available and created a Build a meal draft. Review it before saving."
-      : 'I can open Build a meal with this request. Nothing has been saved yet.',
+    summary: importDraft ? importDraft.title : 'Recipe details needed',
+    confirmationMessage: importDraft ? 'The recipe instructions are ready. Would you like to save the recipe, or log the servings you ate? Nothing has been saved.' : 'I need a complete recipe with its yield, measured ingredients and actual cooking steps before saving it. Nothing has been saved.',
     canConfirm: false,
-    recipe: { text: spokenRecipeText, importDraft },
-    appTarget: {
-      title: 'Build a meal',
-      path: `/food/build-meal?${params.toString()}`,
-      buttonLabel: 'Open Build a meal',
-      nativeTarget: {
-        type: 'foodAction',
-        action: 'openBuildMeal',
-        meal,
-        recipeDraft: importDraft,
-      },
-    },
+    recipe: { text: String(recipeText || '').trim().slice(0, 16000), ...(importDraft ? { importDraft } : {}) },
+    food: { meal, ...(importDraft ? {mealName:importDraft.title} : {}) },
   }
+}
+
+function completeVoiceRecipe(raw: any) {
+  const text = typeof raw === 'string' ? raw.trim() : ''
+  const parsed = text ? parseAssistantJson(text) : raw
+  if (parsed && typeof parsed === 'object') return validateNativeVoiceImportedRecipe(parsed.recipe || parsed)
+  const servings = text.match(/\b(?:servings?|serves|yield)\s*[:\-]?\s*(\d+(?:\.\d+)?)/i)?.[1]
+  const ingredientLines = extractRecipeIngredients(text)
+  const steps = extractRecipeSteps(text)
+  if (!servings || !ingredientLines.length || !steps.length) throw new Error('Please include the complete recipe yield, measured ingredients and cooking steps.')
+  return validateNativeVoiceImportedRecipe({title:extractRecipeTitle(text,'Recipe'),servings:Number(servings),ingredients:ingredientLines,steps,prepMinutes:null,cookMinutes:null,sourceUrl:null})
+}
+
+// Destination verbs inside a negated clause are not an instruction to log
+// consumption (for example: "save to my library without logging that I ate it").
+function voiceRecipeDestinationIntent(transcript: string) {
+  const intent = transcript.replace(/\b(?:without|do not|don't|don’t|never)\s+(?:(?:also|actually)\s+)?(?:sav(?:e|ing)|log(?:ging)?|record(?:ing)?|eat(?:ing)?|add(?:ing)?)\b[^.!?;,]*(?=[.!?;,]|$)/gi, '')
+  return {
+    wantsLibrary: /\b(?:save|add|keep|store)\b.*\b(?:recipe|recipes|library|favorites?|favourites?|custom foods?)\b/i.test(intent),
+    wantsDiary: /\b(?:log|ate|eaten|add to (?:my )?(?:diary|breakfast|lunch|dinner|snacks?))\b/i.test(intent),
+  }
+}
+
+// An explicitly dictated complete recipe already has its instructions. Do not
+// ask a generator to replace its amounts/yield/steps before making the review.
+// Other recipe requests keep the existing generated-recipe path.
+function parseExplicitVoiceRecipe(transcript: string) {
+  if (!/\b(?:create|make|prepare|save|add)\b/i.test(transcript) || !/\brecipe\b/i.test(transcript)) return null
+  const title = transcript.match(/\brecipe\s+(?:called|named|titled)\s+(.+?)(?=[.!?](?:\s|$)|\n|$)/i)?.[1]?.trim()
+  const yieldText = transcript.match(/\b(?:makes|serves|yields?)\s+(one|two|three|four|five|six|seven|eight|nine|ten|\d+(?:\.\d+)?)\s+servings?\b/i)?.[1]
+  const ingredientText = transcript.match(/\bingredients?\s*(?::|are\b|is\b)\s*([\s\S]+?)(?=[.!?]\s+(?:the\s+)?(?:steps?|method|instructions?)\b|\n(?:steps?|method|instructions?)\b|$)/i)?.[1]
+  const stepText = transcript.match(/\b(?:the\s+)?(?:steps?|method|instructions?)\s*(?::|is\b|are\b)\s*([\s\S]+?)(?=[.!?]\s+(?:please\s+)?(?:save|add|store|keep|log|don't|don’t|do not|without)\b|$)/i)?.[1]
+  if (!title || !yieldText || !ingredientText || !stepText) return null
+  const ingredients = splitIngredientList(ingredientText.replace(/[.!?\s]+$/, ''))
+  const steps = stepText.trim().replace(/[.!?\s]+$/, '').split(/\r?\n/).map(stripRecipeListPrefix).filter(Boolean)
+  try {
+    return validateNativeVoiceImportedRecipe({ title, servings: numberFromWords(yieldText), ingredients, steps, prepMinutes: null, cookMinutes: null, sourceUrl: null })
+  } catch { return null }
+}
+
+function voiceRecipeIngredient(line: string) {
+  const normalized = line.replace(/^(\d+\s+)?(\d+)\/(\d+)\s+/, (_all, whole, numerator, denominator) => {
+    const divisor = Number(denominator)
+    if (!divisor) throw new Error('Please review the recipe ingredient amount.')
+    return `${Number(whole || 0) + Number(numerator) / divisor} `
+  }).replace(/^½\s*/, '0.5 ').replace(/^¼\s*/, '0.25 ').replace(/^¾\s*/, '0.75 ')
+  const ingredient = parseIngredientPhrase(normalized)
+  if (!ingredient || (ingredient.quantity == null && !ingredient.unit) || ingredientNeedsAmountClarification(ingredient)) throw new Error(`Please specify a measured amount for ${cleanText(line,120)}.`)
+  return ingredient
+}
+
+function voiceRecipeEatenServings(transcript: string, yieldServings: number) {
+  if (/\b(?:the )?(?:whole|entire|full)\s+recipe\b/i.test(transcript)) return yieldServings
+  if (/\bhalf\s+(?:of\s+)?(?:the\s+)?recipe\b/i.test(transcript)) return yieldServings / 2
+  const match = transcript.match(/\b(one|two|three|four|five|six|seven|eight|nine|ten|half|\d+(?:\.\d+)?)\s+servings?\b/i)
+  return match ? numberFromWords(match[1]) : null
+}
+
+async function buildVoiceRecipeReviewDraft(rawRecipe: any, transcript: string, localDate: string, country?: string, options: { destination?: 'diary' | 'library'; servingsEaten?: number; meal?: string } = {}): Promise<VoiceDraft> {
+  let recipe: ReturnType<typeof validateNativeVoiceImportedRecipe>
+  try { recipe = completeVoiceRecipe(rawRecipe) } catch (error: any) {
+    return { action:'recipe',transcript,localDate,summary:'Recipe details needed',confirmationMessage:`${cleanText(error?.message,300)} Nothing has been saved.`,canConfirm:false,autoSave:false,recipe:{text:typeof rawRecipe==='string'?rawRecipe:''} }
+  }
+  const meal = recipeCategoryFromMeal(options.meal || inferRecommendationMeal(transcript))
+  const recipeText = [`${recipe.title}`,`Servings: ${recipe.servings}`,'Ingredients:',...recipe.ingredients.map(line=>`- ${line}`),'Steps:',...recipe.steps.map((line,index)=>`${index+1}. ${line}`)].join('\n')
+  let ingredients: any[]
+  try { ingredients = recipe.ingredients.map(voiceRecipeIngredient) } catch (error: any) {
+    return {action:'recipe',transcript,localDate,summary:'Recipe amount needed',confirmationMessage:`${cleanText(error?.message,300)} Nothing has been saved.`,canConfirm:false,autoSave:false,recipe:{text:recipeText,importDraft:recipe}}
+  }
+  const batches: VoiceDraft[] = []
+  for (let offset=0;offset<ingredients.length;offset+=12) {
+    const built = await buildVoiceMealDraft({meal,mealName:recipe.title,ingredients:ingredients.slice(offset,offset+12)},transcript,localDate,country)
+    if (!built?.canConfirm) return {...(built || {action:'recipe',transcript,localDate,summary:'Recipe nutrition needed',confirmationMessage:'Please match every recipe ingredient. Nothing has been saved.',canConfirm:false}),autoSave:false,recipe:{text:recipeText,importDraft:recipe}}
+    batches.push(built)
+  }
+  const items = batches.flatMap(batch=>batch.food?.items || [])
+  const entries = batches.flatMap(batch=>batch.food?.entries || [])
+  const nutrition: any = {}
+  for (const [primary,alias] of [['calories','calories_kcal'],['protein_g','protein'],['carbs_g','carbs'],['fat_g','fat'],['fiber_g','fiber'],['sugar_g','sugar']]) {
+    const values=items.map(item=>item[primary] ?? (primary==='calories'?item.calories_kcal:null))
+    const total=values.some(value=>value==null)?null:values.reduce((sum,value)=>sum+Number(value),0)
+    nutrition[primary]=total;nutrition[alias]=total
+  }
+  const { wantsLibrary, wantsDiary } = voiceRecipeDestinationIntent(transcript)
+  const destination = options.destination || (wantsDiary ? 'diary' : wantsLibrary ? 'library' : undefined)
+  const eaten = options.servingsEaten ?? voiceRecipeEatenServings(transcript,recipe.servings)
+  const food = applyNativeVoiceRecipeMetadata({meal,mealName:recipe.title,draftText:recipe.ingredients.join(', '),items,entries,nutrition},recipe,{servingsEaten:destination==='diary'&&eaten!=null?eaten:recipe.servings})
+  const readyToLog = destination==='diary'&&eaten!=null
+  return {action:readyToLog?'food_build_meal':'recipe',transcript,localDate,summary:readyToLog?`${recipe.title}, ${eaten} of ${recipe.servings} servings, ${Math.round(Number(food.nutrition.calories))} kcal`:recipe.title,confirmationMessage:readyToLog?`I can log ${eaten} of ${recipe.servings} servings of ${recipe.title} for ${meal}, with ${Math.round(Number(food.nutrition.calories))} calories. Would you like me to save that?`:destination==='diary'?`This recipe makes ${recipe.servings} servings. How many servings did you eat? Nothing has been saved.`:destination==='library'?'The complete recipe and its nutrition are ready to save to your recipes. Nothing has been saved yet.':'The complete recipe and its nutrition are ready. Would you like to save the recipe, or log the servings you ate? Nothing has been saved.',canConfirm:readyToLog,autoSave:false,food,recipe:{text:recipeText,importDraft:recipe}}
+}
+
+function isRecipeDestinationContinuation(draft: any, transcript: string) {
+  if (!draft?.recipe?.importDraft) return false
+  if (/\b(?:new|another|different)\s+(?:recipe|meal)|\b(?:create|make|suggest|recommend)\b/i.test(transcript)) return false
+  const refersToRecipe = /\b(?:this|that|the|current|reviewed)\s+(?:recipe|meal)|\b(?:whole|entire|half)\s+(?:of\s+)?(?:the\s+)?recipe|\bservings?\b/i.test(transcript)
+  const choosesLibrary = /\b(?:save|add)\b.*\b(?:recipe|recipes|library|favorites?|favourites?|custom foods?)\b/i.test(transcript)
+  const choosesDiary = refersToRecipe && /\b(?:log|ate|eaten|eat|add|change|adjust|instead|servings?)\b/i.test(transcript)
+  return choosesLibrary || choosesDiary
+}
+
+async function prepareRecipeDestination(request: NextRequest | undefined, userId: string, rawRecipe: any, transcript: string, localDate: string, country?: string, priorDraft?: any): Promise<VoiceDraft> {
+  const { wantsLibrary, wantsDiary } = voiceRecipeDestinationIntent(transcript)
+  const priorDiary = priorDraft?.action === 'food_build_meal' && priorDraft?.food?.nutrition?.__importRecipe
+  const built = await buildVoiceRecipeReviewDraft(rawRecipe, transcript, localDate, country, {
+    ...(wantsLibrary && !wantsDiary ? { destination: 'library' as const } : priorDiary ? { destination: 'diary' as const } : {}),
+    ...(priorDraft?.food?.meal ? { meal: inferMealFromText(transcript, priorDraft.food.meal) } : {}),
+  })
+  if (!wantsLibrary) return built
+  if (wantsDiary) return { ...built, action: 'recipe', canConfirm: false, confirmationMessage: 'Would you like to save the recipe to your saved foods, or log the servings you ate first? Nothing has been saved.' }
+  if (!request || !built.food?.nutrition?.__importRecipe || !built.food.items?.length) return built
+  // These snapshots have just been obtained by the normal food resolver above;
+  // never accept trusted source proofs directly from client or model JSON.
+  const prepared = await prepareNativeVoiceFoodLibraryFromResolved(request, userId, {
+    entity: /\bcustom foods?\b/i.test(transcript) ? 'custom_food' : 'favorite',
+    localDate,
+    label: built.food.mealName || built.summary,
+  }, built.food, { trustedSources: built.food.items.map(item => item.__voiceSourceFood) })
+  return { ...built, action: 'record_action', ...prepared, autoSave: false }
 }
 
 function inferRecommendationMeal(transcript: string, launchContext?: VoiceLaunchContext) {
@@ -3347,74 +3595,7 @@ function inferRecommendationMeal(transcript: string, launchContext?: VoiceLaunch
 }
 
 function buildFoodRecommendationHandoffDraft(transcript: string, localDate: string, launchContext?: VoiceLaunchContext, recipeText?: string): VoiceDraft {
-  const meal = inferRecommendationMeal(recipeText ? `${transcript} ${recipeText}` : transcript, launchContext)
-  if (recipeText) return buildRecipeHandoffDraft(transcript, localDate, recipeText, meal)
-
-  const category = meal === 'snack' ? 'snacks' : meal
-  const lower = cleanText(transcript, 1000).toLowerCase()
-  const highProtein = /\b(protein|high protein|high-protein)\b/.test(lower)
-  const lowerCalorie = /\b(calorie|calories|light|lean)\b/.test(lower)
-  const titlePrefix = `${meal.charAt(0).toUpperCase()}${meal.slice(1)}`
-  const title = `${highProtein ? 'High-protein ' : lowerCalorie ? 'Balanced ' : ''}${titlePrefix} recommendation`
-  const ingredients =
-    meal === 'breakfast'
-      ? highProtein
-        ? ['2 large eggs', '170 g plain Greek yogurt', '1 slice wholegrain toast', '75 g avocado']
-        : ['1 cup rolled oats', '170 g plain Greek yogurt', '100 g berries', '1 tbsp chia seeds']
-      : meal === 'lunch'
-      ? highProtein
-        ? ['150 g chicken breast', '120 g cooked brown rice', '100 g mixed vegetables', '1 tbsp olive oil']
-        : ['100 g chickpeas', '120 g cooked brown rice', '100 g mixed vegetables', '1 tbsp olive oil']
-      : meal === 'snack'
-      ? highProtein
-        ? ['170 g plain Greek yogurt', '1 banana']
-        : ['1 apple', '30 g peanuts']
-      : highProtein
-      ? ['150 g chicken breast', '150 g sweet potato', '100 g broccoli', '1 tbsp olive oil']
-      : ['150 g salmon', '150 g potato', '100 g broccoli', '1 tbsp olive oil']
-  const importDraft = {
-    title,
-    source: 'voice-assistant',
-    servings: 1,
-    prepMinutes: 10,
-    cookMinutes: meal === 'snack' ? 0 : 15,
-    ingredients,
-    steps: [
-      'Use this as a starter meal draft.',
-      'Review the ingredients and adjust amounts to fit your remaining targets.',
-      'Save only after you are happy with the meal.',
-    ],
-    sourceUrl: null,
-    saveRecipe: false,
-    createdAt: Date.now(),
-  }
-  const handoffText = `I opened ${title} in Build a meal. Review the ingredients and adjust amounts before saving. Nothing has been saved yet.`
-  const params = new URLSearchParams()
-  params.set('date', localDate)
-  params.set('category', category)
-  params.set('recipeImport', '1')
-  params.set('voiceRecipeDraft', encodeUrlJson(importDraft))
-  params.set('t', String(Date.now()))
-  return {
-    action: 'recipe',
-    transcript,
-    localDate,
-    summary: `${titlePrefix} idea ready in Build a meal`,
-    confirmationMessage: handoffText,
-    canConfirm: false,
-    recipe: { text: handoffText, importDraft },
-    appTarget: {
-      title: 'Build a meal',
-      path: `/food/build-meal?${params.toString()}`,
-      buttonLabel: 'Open Build a meal',
-      nativeTarget: {
-        type: 'foodAction',
-        action: 'openBuildMeal',
-        meal: category,
-        recipeDraft: importDraft,
-      },
-    },
-  }
+  return buildRecipeHandoffDraft(transcript, localDate, recipeText, inferRecommendationMeal(transcript, launchContext))
 }
 
 function buildFoodRecommendationConversationDraft(
@@ -3572,29 +3753,14 @@ function buildFoodRecommendationConversationDraft(
       ? ['150 g chicken breast', '150 g sweet potato', '100 g broccoli', '1 tbsp olive oil']
       : ['150 g salmon', '150 g potato', '100 g broccoli', '1 tbsp olive oil']
   const ingredients = extractRecipeIngredients(recipeText)
-  const steps = extractRecipeSteps(recipeText)
-  const importDraft = {
+  const suggestion = {
     title: recipeText ? extractRecipeTitle(recipeText, title) : title,
-    source: 'voice-assistant',
-    servings: 1,
-    prepMinutes: 10,
-    cookMinutes: meal === 'snack' ? 0 : 15,
     ingredients: ingredients.length ? ingredients : fallbackIngredients,
-    steps: steps.length
-      ? steps
-      : [
-          'Use this as a starter meal draft.',
-          'Review the ingredients and adjust amounts to fit your remaining targets.',
-          'Save only after you are happy with the meal.',
-        ],
-    sourceUrl: null,
-    saveRecipe: false,
-    createdAt: Date.now(),
   }
   const fallbackText = [
-    `${options?.adjustment ? 'Sure, here is an adjusted option:' : alternative ? 'Another option:' : `For ${meal === 'snack' ? 'a snack' : meal},`} I recommend ${importDraft.title}.`,
+    `${options?.adjustment ? 'Sure, here is an adjusted option:' : alternative ? 'Another option:' : `For ${meal === 'snack' ? 'a snack' : meal},`} I recommend ${suggestion.title}.`,
     formatFoodDiaryAimForMealRecommendation(options?.diarySnapshot ?? null),
-    `Ingredients: ${importDraft.ingredients.join(', ')}.`,
+    `Ingredients: ${suggestion.ingredients.join(', ')}.`,
     'This is meant to fit your remaining daily calories and nutrients. Tell me what you think, or ask for another option or changes.',
   ].filter(Boolean).join(' ')
   const text = recipeText
@@ -3607,7 +3773,7 @@ function buildFoodRecommendationConversationDraft(
     summary: `${titlePrefix} meal recommendation`,
     confirmationMessage: text,
     canConfirm: false,
-    recipe: { text, importDraft: { ...importDraft, category } },
+    recipe: { text, ...(() => { try { return { importDraft: { ...completeVoiceRecipe(recipeText), category } } } catch { return {} } })() },
   }
 }
 
@@ -3641,9 +3807,17 @@ function latestMealRecommendationText(history: VoiceConversationTurn[]) {
   const mealRecommendationPattern =
     /(recommend|ingredients?:|meal|breakfast|lunch|dinner|snack|recomiendo|ingredientes?|comida|desayuno|almuerzo|cena|recommande|ingrédients?|ingredients?|repas|déjeuner|dejeuner|dîner|diner|empfehle|zutaten|mahlzeit|frühstück|fruehstueck|mittagessen|abendessen|препорач|состојки|состоjки|оброк|појадок|ручек|вечера|おすすめ|材料|食事|朝食|昼食|夕食|وجبة|مكونات|أوصي|भोजन|सामग्री|सुझाव)/i
   const nonRecommendationPattern = /\b(would you like me to build|want me to build|build that meal for you|build this meal for you|will not build or save|will not build|not build or save|meal not built)\b/i
-  return [...history]
-    .reverse()
-    .find((turn) => turn.role === 'assistant' && mealRecommendationPattern.test(turn.text) && !nonRecommendationPattern.test(turn.text))?.text
+  const actionResultPattern = /\b(nothing has been saved|not saved|cannot finish|could not (?:save|find|log)|please clarify|supported amount|review (?:it|the|this)|would you like me to save|found .+? (?:favourites|favorites)|(?:meal|food|water|mood|exercise|note) (?:has been )?(?:saved|logged))\b/i
+  for (const turn of [...history].reverse()) {
+    if (turn.role !== 'assistant') continue
+    if (nonRecommendationPattern.test(turn.text)) continue
+    const explicitRecipeEvidence = /(ingredients?:|recommend|recomiendo|recommande|empfehle|zutaten|препорач|состојки|材料|مكونات|أوصي|सामग्री|सुझाव)/i.test(turn.text)
+    // A real app result starts a new task boundary. Older recipe suggestions
+    // must not capture a correction to a failed/current diary entry.
+    if (actionResultPattern.test(turn.text) && !explicitRecipeEvidence) return undefined
+    if (mealRecommendationPattern.test(turn.text)) return turn.text
+  }
+  return undefined
 }
 
 function latestMealBuildOfferText(history: VoiceConversationTurn[]) {
@@ -3761,16 +3935,102 @@ function scoreFoodMatch(queryRaw: string, item: any) {
   return score
 }
 
-function chooseBestFoodMatch(query: string, items: any[]) {
+function voiceSugarVariant(value: unknown) {
+  const text = compactFoodMatchText(value)
+  const variants = [
+    ['granulated', /\b(?:white|granulated)\b|whitegranulated/],
+    ['brown', /\bbrown\b|brownpacked/],
+    ['caster', /\b(?:caster|superfine)\b|castersuperfine/],
+    ['raw', /\b(?:raw|turbinado)\b|rawturbinado/],
+    ['powdered', /\b(?:powdered|icing|confectioner|confectioners)\b/],
+    ['coconut', /\bcoconut\b/], ['maple', /\bmaple\b/],
+  ] as const
+  const found = variants.filter(([, pattern]) => pattern.test(text)).map(([variant]) => variant)
+  return found.length > 1 ? 'ambiguous' : found[0] || null
+}
+
+function voiceOrdinaryIdentityMatches(query: string, item: any) {
+  const normalize = (value: unknown) => singularFoodText(String(value || ''))
+    .replace(/\b(?:yoghurt|yoghurts)\b/g, 'yogurt').replace(/\bnashi\b/g, 'asian pear')
+    .replace(/\bfull cream\b/g, 'whole').replace(/\b(?:skim|skimmed|fat free)\b/g, 'nonfat')
+    .replace(/\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|macadamia)milk\b/g, '$1 milk')
+    .replace(/\bof\b/g, ' ').replace(/\s+/g, ' ').trim()
+  let requested = normalize(query)
+  const candidate = normalize(item?.name)
+  if (!requested || !candidate) return false
+  const sugar = /\bsugar\b/.test(requested)
+  const aliases = Array.isArray(item?.__voiceSourceAliases) ? item.__voiceSourceAliases : Array.isArray(item?.aliases) ? item.aliases : []
+  const sweetenerIdentity = sugar ? `${candidate} ${aliases.map(normalize).join(' ')}` : candidate
+  if (sugar) {
+    const requestedVariant = voiceSugarVariant(requested) || 'granulated'
+    const actualVariant = voiceSugarVariant(sweetenerIdentity)
+    if (actualVariant === 'ambiguous' || (actualVariant && actualVariant !== requestedVariant)) return false
+    if (voiceSugarVariant(requested) && !actualVariant) return false
+    // White and granulated are the same requested sugar form. A custom row's
+    // aliases retain its actual form even when its visible name is just Sugar.
+    requested = requested.replace(/\bwhite\b/g, ' ').replace(/\s+/g, ' ').trim()
+  }
+  if (/\bcoffee\b/.test(requested)) requested = requested.replace(/\bblack\b/g, ' ').replace(/\s+/g, ' ').trim()
+  const available = new Set(`${sweetenerIdentity} ${normalize(item?.brand)}`.split(' ').filter(Boolean))
+  if (!requested.split(' ').filter(Boolean).every(token => available.has(token))) return false
+  const unrequested = (pattern: RegExp) => Array.from(candidate.matchAll(new RegExp(pattern.source, 'g')))
+    .some(match => !new RegExp(`\\b${escapeRegex(match[0])}\\b`).test(requested))
+  if (unrequested(/\b(?:liver|heart|gizzard|giblet|kidney|organ|offal|broth|stock|gravy|sauce|soup|candy|cookie|cake|dessert|pudding|creamer|whitener|bar)\b/)) return false
+  if (/\bskin\b/.test(candidate) && !/\bskin\b/.test(requested) && !/\bmeat\b/.test(candidate)) return false
+  if (/\bmilk\b/.test(requested)) {
+    if (unrequested(/\b(?:babyfood|cereal|oatmeal|porridge|cheese|yogurt|bread|custard|potato|nougat|chicken|egg|pancake|margarine|butter)\b/)) return false
+    if (unrequested(/\b(?:dry|dried|powder|powdered|condensed|evaporated|buttermilk|chocolate|flavored|flavoured|sweetened)\b/)) return false
+    const plant = /\b(?:almond|oat|soy|coconut|rice|cashew|hemp|pea|macadamia)\b/
+    if (plant.test(candidate) && !plant.test(requested)) return false
+    if (/\bwhole\b/.test(requested) && /\b(?:nonfat|lowfat|reduced fat|skim)\b/.test(candidate)) return false
+  }
+  if (/\bcoffee\b/.test(requested)) {
+    if (unrequested(/\b(?:substitute|cereal|chicory|barley)\b/)) return false
+    if (unrequested(/\b(?:instant|decaf|decaffeinated|espresso|cappuccino|latte|mocha|frappuccino|iced|sweetened|vanilla|chocolate|caramel)\b/)) return false
+    if (/\b(?:bean|ground|powder|dry|dried)\b/.test(candidate) && !/\b(?:brewed|prepared|fluid|liquid)\b/.test(candidate) && !/\b(?:bean|ground|powder|dry|dried)\b/.test(requested)) return false
+    if (/\b(?:milk|cream|sugar|honey)\b/.test(candidate) && !/\b(?:milk|cream|sugar|honey)\b/.test(requested)) return false
+  }
+  if (/\b(?:sugar|honey)\b/.test(requested) && unrequested(/\b(?:substitute|blend|syrup|mustard|sauce|drink|beverage)\b/)) return false
+  return true
+}
+
+function compatibleOrdinaryVoiceFood(query: string, item: any, ingredient?: any) {
+  if (!voiceOrdinaryIdentityMatches(ingredient?.name || query, item)) return null
+  if (!ingredient) return hasCoreNutrition(item) ? item : null
+  if (hasCoreNutrition(item) && requestedIngredientBasis(ingredient, item)) return item
+  for (const option of [item, ...(Array.isArray(item?.servingOptions) ? item.servingOptions : [])]) {
+    if (option.source && option.source !== item.source) continue
+    if (option.foodName && !voiceOrdinaryIdentityMatches(ingredient.name || query, { ...item, name: option.foodName })) continue
+    if (option.foodId && String(option.foodId) !== String(item.id)) continue
+    const originalLabel = String(option.serving_size || option.label || '')
+    let servingLabel = originalLabel
+    if (/^(?:ml|millilit(?:er|re)s?|l|lit(?:er|re)s?)$/.test(normalizeFoodAmountUnit(ingredient.unit || ''))
+      && !requestedIngredientBasis(ingredient, { ...item, ...option, name: item.name, serving_size: originalLabel })) {
+      // USDA/FatSecret can record both "cup (8 fl oz)" and "237 g".
+      // Use that stated fluid volume, not an assumed gram/ml density.
+      const volume = originalLabel.match(/(\d+(?:\.\d+)?)\s*(fl\.?\s*oz|fluid ounces?|millilit(?:er|re)s?|ml|lit(?:er|re)s?|l)\b/i)
+      if (volume && Number(volume[1]) > 0) servingLabel = `${volume[1]} ${/^fl|^fluid/i.test(volume[2]) ? 'fl oz' : volume[2]}`
+      else if (typeof option.ml === 'number' && Number.isFinite(option.ml) && option.ml > 0) servingLabel = `${option.ml} ml`
+    }
+    const selected = { ...item, ...option, id: item.id, source: item.source, name: item.name, brand: item.brand,
+      serving_size: servingLabel, selectedServingId: option === item ? item.selectedServingId : option.id, servingOptions: item.servingOptions,
+      ...(servingLabel !== originalLabel ? { __voiceSourceServingLabel: originalLabel } : {}) }
+    if (hasCoreNutrition(selected) && requestedIngredientBasis(ingredient, selected)) return selected
+  }
+  return null
+}
+
+function chooseBestFoodMatch(query: string, items: any[], ingredient?: any) {
   const ranked = items
-    .filter(hasCoreNutrition)
+    .map(item => compatibleOrdinaryVoiceFood(query, item, ingredient))
+    .filter(Boolean)
     .map((item) => ({ item, score: scoreFoodMatch(query, item) }))
     .sort((a, b) => b.score - a.score)
   const best = ranked[0]
   return best && best.score > 12 ? best.item : null
 }
 
-async function findExactCustomPlainFood(lookupQueries: string[]) {
+async function findExactCustomPlainFood(lookupQueries: string[], ingredient?: any) {
   for (const lookupQuery of lookupQueries) {
     const queryName = singularFoodText(lookupQuery)
     if (!queryName) continue
@@ -3778,8 +4038,60 @@ async function findExactCustomPlainFood(lookupQueries: string[]) {
     const exact = customRows
       .map(normalizeFoodItem)
       .filter(Boolean)
-      .find((item) => singularFoodText(item?.name || '') === queryName)
+      .filter((item) => singularFoodText(item?.name || '') === queryName)
+      .map(item => compatibleOrdinaryVoiceFood(lookupQuery, item, ingredient))
+      .find(Boolean)
     if (exact) return exact
+  }
+  return null
+}
+
+async function findOrdinaryVoiceFood(ingredient: any, country: string | undefined, lookupQueries: string[]) {
+  const seenDetails = new Set<string>()
+  for (const external of [false, true]) for (const query of lookupQueries) {
+    try {
+    const url = new URL('https://helfi.ai/api/food-data')
+    url.searchParams.set('q', query)
+    url.searchParams.set('kind', 'single')
+    url.searchParams.set('source', 'auto')
+    // Leave room for the normal provider fallback after gram-only local rows.
+    url.searchParams.set('limit', '50')
+    if (!external) url.searchParams.set('localOnly', '1')
+    if (country) url.searchParams.set('country', country)
+    const response = await searchDiaryFoods(new NextRequest(url))
+    const payload = await response.json().catch(() => ({}))
+    if (!response.ok) continue
+    const candidates = (Array.isArray(payload.items) ? payload.items : [])
+      .filter((item: any) => voiceOrdinaryIdentityMatches(ingredient.name, item))
+      .map((item: any) => ({ item, score: scoreFoodMatch(ingredient.name, item) }))
+      .filter((entry: { item: any; score: number }) => entry.score > 12).sort((a: { item: any; score: number }, b: { item: any; score: number }) => b.score - a.score)
+    // Prefer a usable local/search snapshot before fetching detailed servings.
+    for (const { item } of candidates) {
+      const compatible = compatibleOrdinaryVoiceFood(ingredient.name, item, ingredient)
+      if (compatible) return compatible
+    }
+    for (const { item } of candidates.slice(0, 6)) {
+      // This exact local USDA record has independently verified recorded
+      // portions. Resolve those locally before a broad provider search.
+      if (!external && !(item.source === 'usda' && String(item.id) === '171890')) continue
+      if (!['usda', 'fatsecret', 'custom'].includes(item.source) || !item.id) continue
+      const key = `${item.source}:${item.id}`
+      if (seenDetails.has(key)) continue
+      seenDetails.add(key)
+      const servingUrl = new URL('https://helfi.ai/api/food-data/servings')
+      servingUrl.searchParams.set('source', item.source)
+      servingUrl.searchParams.set('id', String(item.id))
+      const servingResponse = await searchDiaryFoodServings(new NextRequest(servingUrl))
+      const details = await servingResponse.json().catch(() => ({}))
+      if (!servingResponse.ok || details.source && details.source !== item.source) continue
+      const enriched = { ...item, servingOptions: [...(Array.isArray(item.servingOptions) ? item.servingOptions : []), ...(Array.isArray(details.options) ? details.options : [])] }
+      const compatible = compatibleOrdinaryVoiceFood(ingredient.name, enriched, ingredient)
+      if (compatible) return compatible
+    }
+    } catch {
+      // A normal catalog/serving lookup failure cannot justify guessed food.
+      continue
+    }
   }
   return null
 }
@@ -3811,10 +4123,130 @@ function requestedIngredientBasis(ingredient: any, found: any) {
     if (ratio == null) return null
     return { ratio, label: `${physicalAmount} ${physicalUnit}`, estimated: false }
   }
+  if (ingredient.requiresSourceServing || isPreparedVoiceFood(ingredient.name)) {
+    return sourceCountedVoiceServing(ingredient, found)
+  }
   if (unit && !/^(each|pieces?|eggs?|slices?)$/.test(unit)) return null
   const grams = estimateIngredientGrams(ingredient.name, ingredient.quantity, ingredient.unit)
   const ratio = servingRatioFromMeasurement(found, grams, 'g')
   return ratio == null ? null : { ratio, label: `${grams} g estimated`, estimated: true }
+}
+
+function voicePreparedIdentityText(value: unknown) {
+  let text = compactFoodMatchText(value).replace(/\bmc\s*donalds?\b/g, 'mcdonalds').replace(/\bmcnuggets?\b/g, 'nuggets')
+  const brand = voiceRestaurantBrand(value)
+  if (brand) text = text.replace(compactFoodMatchText(brand), ' ')
+  return singularFoodText(text.replace(/\b(?:with|from|small|medium|large|regular|piece|pieces|pack|box|serving)\b/g, ' ').replace(/\b\d+\b/g, ' '))
+}
+
+function voicePreparedIdentityMatches(ingredient: any, item: any) {
+  if (!hasCoreNutrition(item)) return false
+  const brand = voiceRestaurantBrand(ingredient.brand) || ingredient.brand || voiceRestaurantBrand(ingredient.name)
+  const candidateBrand = voiceRestaurantBrand(item.brand) || item.brand || voiceRestaurantBrand(item.name)
+  if (brand && compactFoodMatchText(brand).replace(/\s/g, '') !== compactFoodMatchText(candidateBrand).replace(/\s/g, '')) return false
+  const wantedName = brand ? String(ingredient.name).replace(new RegExp(escapeRegex(brand), 'ig'), ' ') : ingredient.name
+  const wanted = voicePreparedIdentityText(wantedName).split(' ').filter(Boolean)
+  const verifiedAliases = verifiedVoiceMenuAliases.aliases.filter(record => record.country === item.country && compactFoodMatchText(record.brand) === compactFoodMatchText(candidateBrand) && compactFoodMatchText(record.name) === compactFoodMatchText(item.name)).flatMap(record => record.aliases)
+  const labels = [item.name, ...(Array.isArray(item.aliases) ? item.aliases : []), ...verifiedAliases]
+  const variants = ['double', 'triple', 'bacon', 'spicy', 'combo', 'box', 'meal', 'deluxe', 'junior', 'vegan', 'vegetarian', 'crispy', 'grilled']
+  return labels.some(label => {
+    const available = voicePreparedIdentityText(label).split(' ').filter(Boolean)
+    return wanted.length > 0 && wanted.every(token => available.includes(token)) && !variants.some(token => available.includes(token) && !wanted.includes(token))
+  })
+}
+
+function sourceCountedVoiceServing(ingredient: any, found: any) {
+  const count = numberFromWords(ingredient.quantity) || 1
+  const unit = cleanText(ingredient.unit, 30).toLowerCase()
+  if (!['', 'each', 'piece', 'pieces', 'item', 'items', 'serving', 'servings', 'pack', 'packs'].includes(unit)) return null
+  const requestedSize = ingredient.size || cleanText(ingredient.name, 120).match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()
+  const options = [...(Array.isArray(found.servingOptions) ? found.servingOptions : []), found]
+    .filter(option => hasCoreNutrition(option))
+    .filter(option => !option.foodName || voicePreparedIdentityMatches({ ...ingredient, name: found.name }, { ...found, name: option.foodName }))
+  const candidates = options.filter(option => {
+    const label = cleanText(option.serving_size || option.label, 160).toLowerCase()
+    return !requestedSize || new RegExp(`\\b${requestedSize}\\b`).test(label) || new RegExp(`\\b${requestedSize}\\b`).test(String(found.name).toLowerCase())
+  })
+  if (!requestedSize && new Set(candidates.map(option => String(option.serving_size || option.label).match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()).filter(Boolean)).size > 1) return null
+  const isDiscretePieces = /\b(?:nuggets?|mcnuggets?|wings?|tenders?|bites?|strips?)\b/i.test(ingredient.name)
+  let fallback: any = null
+  for (const option of candidates) {
+    const label = cleanText(option.serving_size || option.label, 160)
+    const piece = label.match(/\b(\d+(?:\.\d+)?)\s*[- ]?\s*(?:pieces?|pc\.?|nuggets?|mcnuggets?|wings?|tenders?|bites?|strips?)\b/i)
+    const whole = label.match(/\b(\d+(?:\.\d+)?)\s*(?:items?|burgers?|sandwich(?:es)?|wraps?|hot dogs?|servings?|packs?)\b/i)
+    const nameCount = String(found.name).match(/\b(\d+)\s*[- ]?\s*(?:pieces?|pc\.?)\b/i)
+      || String(found.name).match(/\b(\d+)\s+(?:chicken\s+)?(?:mcnuggets?|nuggets?|wings?|tenders?|bites?|strips?)\b/i)
+      || String(found.name).match(/\b(?:mcnuggets?|nuggets?)\s*\(?\s*(\d+)\s*(?:pc|pieces?)\b/i)
+    const recordedCount = piece ? Number(piece[1]) : whole && isDiscretePieces && nameCount ? Number(whole[1]) * Number(nameCount[1]) : !isDiscretePieces && whole ? Number(whole[1]) : null
+    if (!recordedCount || recordedCount <= 0) continue
+    // Count nutrient values are already for this complete recorded serving.
+    // Never derive pieces from 100 g or multiply both grams and serving counts.
+    const basis = { ratio: count / recordedCount, label: `${count} ${isDiscretePieces ? 'pieces' : 'items'} (${label})`, estimated: false, item: { ...found, ...option, id: found.id, selectedServingId: option.id, source: found.source, name: found.name, servingOptions: found.servingOptions } }
+    if (basis.ratio === 1) return basis
+    if (!fallback) fallback = basis
+  }
+  return fallback
+}
+
+async function findPreparedVoiceFood(ingredient: any, country?: string) {
+  const query = cleanText(`${ingredient.brand && !voiceRestaurantBrand(ingredient.name) ? `${ingredient.brand} ` : ''}${ingredient.name}`, 120)
+  // Exact-country menu records already contain measured, per-item nutrition.
+  // Check this existing cached catalog before scanning USDA or any provider.
+  if (country) {
+    const rows = await getCustomPackagedItems(country).catch(() => [])
+    const menu = rows.filter(row => row.country === country && row.kind === 'FAST_FOOD').map(row => {
+      const options = Array.isArray(row.servingOptions) ? row.servingOptions : []
+      const selected = options[0]
+      return { ...row, source: 'custom', id: `custom:${row.id}`, serving_size: selected?.serving_size || selected?.label, ...pickVoiceSourceNutrition(selected || row), servingOptions: options }
+    }).filter(candidate => voicePreparedIdentityMatches(ingredient, candidate))
+    const exact = menu.find(candidate => requestedIngredientBasis(ingredient, candidate))
+    if (exact) return exact
+  }
+  const lookupQueries = [query]
+  if (/\bnuggets?\b/i.test(query) && voiceRestaurantBrand(query) === "McDonald's" && !/\bmcnuggets?\b/i.test(query)) lookupQueries.push(query.replace(/\bnuggets?\b/i, 'McNuggets'))
+  const seen = new Set<string>()
+  for (const external of [false, true]) for (const lookupQuery of lookupQueries) {
+    // Use the diary's actual product search and serving resolver; this is an
+    // in-process call, not another HTTP request or separate provider pipeline.
+    const url = new URL('https://helfi.ai/api/food-data')
+    url.searchParams.set('q', lookupQuery)
+    url.searchParams.set('kind', 'packaged')
+    url.searchParams.set('source', 'auto')
+    url.searchParams.set('limit', '20')
+    if (!external) url.searchParams.set('localOnly', '1')
+    if (country) url.searchParams.set('country', country)
+    const response = await searchDiaryFoods(new NextRequest(url))
+    const payload = await response.json().catch(() => ({}))
+    const diary = Array.isArray(payload.items) ? payload.items : []
+    const brand = voiceRestaurantBrand(lookupQuery)
+    const localQuery = compactFoodMatchText(lookupQuery).replace(compactFoodMatchText(brand), ' ').replace(/\bwith\b/g, ' ').replace(/\s+/g, ' ').trim()
+    const local = external ? [] : await searchLocalFoods(localQuery, { pageSize: 20, mode: 'prefix-contains', sources: ['usda_foundation', 'usda_sr_legacy', 'usda_branded'] })
+    const candidates = [...diary, ...local].filter(item => voicePreparedIdentityMatches(ingredient, item)).sort((a, b) => {
+      const countryRank = (item: any) => country && item.country === country ? 0 : 1
+      const countRank = (item: any) => sourceCountedVoiceServing(ingredient, item)?.ratio === 1 ? 0 : 1
+      return countryRank(a) - countryRank(b) || countRank(a) - countRank(b)
+    })
+    for (const candidate of candidates) {
+      const key = `${candidate.source}:${candidate.id}`
+      if (seen.has(key)) continue
+      seen.add(key)
+      if (requestedIngredientBasis(ingredient, candidate)) return candidate
+      if (!['usda', 'fatsecret', 'custom'].includes(candidate.source)) continue
+      const servingUrl = new URL('https://helfi.ai/api/food-data/servings')
+      servingUrl.searchParams.set('source', candidate.source)
+      servingUrl.searchParams.set('id', candidate.id)
+      const servingResponse = await searchDiaryFoodServings(new NextRequest(servingUrl))
+      const details = await servingResponse.json().catch(() => ({}))
+      const options = Array.isArray(details.options) ? details.options : []
+      const withServings = { ...candidate, servingOptions: [...(Array.isArray(candidate.servingOptions) ? candidate.servingOptions : []), ...options] }
+      if (requestedIngredientBasis(ingredient, withServings)) return withServings
+    }
+  }
+  return null
+}
+
+function pickVoiceSourceNutrition(item: any) {
+  return { calories: item.calories ?? null, protein_g: item.protein_g ?? null, carbs_g: item.carbs_g ?? null, fat_g: item.fat_g ?? null, fiber_g: item.fiber_g ?? null, sugar_g: item.sugar_g ?? null }
 }
 
 function normalizeFoodItem(item: any): NormalizedFoodItem | null {
@@ -3832,6 +4264,7 @@ function normalizeFoodItem(item: any): NormalizedFoodItem | null {
     fat_g: item.fat_g ?? null,
     fiber_g: item.fiber_g ?? null,
     sugar_g: item.sugar_g ?? null,
+    ...(Array.isArray(item.aliases) ? { __voiceSourceAliases: item.aliases.map((alias: any) => cleanText(alias, 200)).filter(Boolean) } : {}),
   }
 }
 
@@ -3852,9 +4285,28 @@ function normalizeLibraryFoodItem(row: any): NormalizedFoodItem | null {
   }
 }
 
-async function findFoodIngredient(query: string) {
+async function findFoodIngredient(query: string, country?: string, ingredient?: any, trustedItems?: any[]) {
+  if (ingredient?.requiresSourceServing || isPreparedVoiceFood(query)) {
+    const previous = (Array.isArray(trustedItems) ? trustedItems : []).map(item => item?.__voiceSourceFood).find(source => source && voicePreparedIdentityMatches(ingredient || { name: query }, source) && requestedIngredientBasis(ingredient || { name: query, quantity: 1, unit: 'each' }, source))
+    if (previous) return previous
+  }
+  if (ingredient?.requiresSourceServing || isPreparedVoiceFood(query)) return findPreparedVoiceFood(ingredient || { name: query, quantity: 1, unit: 'each', brand: voiceRestaurantBrand(query), requiresSourceServing: true }, country)
+  if (ingredient) {
+    const previous = (Array.isArray(trustedItems) ? trustedItems : []).map(item => item?.__voiceSourceFood)
+      .map(source => source && !(/\b(?:sugar|honey)\b/i.test(query) && source.source === 'custom') ? compatibleOrdinaryVoiceFood(query, source, ingredient) : null).find(Boolean)
+    if (previous) return previous
+  }
   const lookupQueries = buildIngredientLookupQueries(query)
-  const exactCustomMatch = await findExactCustomPlainFood(lookupQueries)
+  if (/\b(?:sugar|honey)\b/i.test(query)) {
+    // Imported custom rows may share the generic name Sugar while representing
+    // different forms. Prefer the normal authoritative USDA source before them.
+    for (const lookupQuery of lookupQueries) {
+      const local = await searchLocalFoods(lookupQuery, { pageSize: 30, mode: 'prefix-contains', sources: ['usda_foundation', 'usda_sr_legacy'] })
+      const authoritative = chooseBestFoodMatch(lookupQuery, local, ingredient)
+      if (authoritative) return authoritative
+    }
+  }
+  const exactCustomMatch = await findExactCustomPlainFood(lookupQueries, ingredient)
   if (exactCustomMatch) return exactCustomMatch
 
   if (compactFoodMatchText(query).includes('egg')) {
@@ -3866,7 +4318,7 @@ async function findFoodIngredient(query: string) {
       take: 12,
       orderBy: { name: 'asc' },
     })
-    const wholeEggMatch = chooseBestFoodMatch(query, wholeEggRows.map(normalizeLibraryFoodItem).filter(Boolean))
+    const wholeEggMatch = chooseBestFoodMatch(query, wholeEggRows.map(normalizeLibraryFoodItem).filter(Boolean), ingredient)
     if (wholeEggMatch) return wholeEggMatch
   }
 
@@ -3876,20 +4328,20 @@ async function findFoodIngredient(query: string) {
       mode: 'prefix-contains',
       sources: ['usda_foundation', 'usda_sr_legacy'],
     })
-    const localMatch = chooseBestFoodMatch(lookupQuery, local)
+    const localMatch = chooseBestFoodMatch(lookupQuery, local, ingredient)
     if (localMatch) return localMatch
   }
 
   for (const lookupQuery of lookupQueries) {
     const custom = await searchCustomFoodMacros(lookupQuery, 12, { allowTypo: true }).catch(() => [])
-    const customMatch = chooseBestFoodMatch(lookupQuery, custom.map(normalizeFoodItem).filter(Boolean))
+    const customMatch = chooseBestFoodMatch(lookupQuery, custom.map(normalizeFoodItem).filter(Boolean), ingredient)
     if (customMatch) return customMatch
   }
 
-  return null
+  return ingredient ? findOrdinaryVoiceFood(ingredient, country, lookupQueries) : null
 }
 
-async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDate: string) {
+async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDate: string, country?: string, trustedItems?: any[]) {
   const parsedIngredients = Array.isArray(parsedFood?.ingredients)
     ? parsedFood.ingredients.map(normalizeIngredientRequest).filter(Boolean)
     : []
@@ -3903,7 +4355,7 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
     return {
       action: 'food_draft' as const, transcript, localDate, summary: 'Meal needs a smaller ingredient list', canConfirm: false, autoSave: false,
       confirmationMessage: `This meal has ${parsedIngredients.length} ingredients. I can prepare up to 12 at a time. Please remove an ingredient or split the request into separate meals. Nothing has been saved.`,
-      food: { meal, mealName, draftText: parsedIngredients.map((entry: any) => entry.display || entry.name).join(', '), entries: parsedIngredients.map((entry: any) => ({ name: entry.display || entry.name, meal })) },
+      food: { meal, mealName, draftText: parsedIngredients.map(voiceFoodDraftPart).join(', '), entries: parsedIngredients.map((entry: any) => ({ name: entry.display || entry.name, meal })) },
     }
   }
   const vagueIngredients = parsedIngredients.filter(ingredientNeedsAmountClarification)
@@ -3918,30 +4370,33 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
       transcript,
       localDate,
       summary: 'Food amount needed',
+      reasonCode: 'food_amount_ambiguous',
       confirmationMessage: `How much ${nameList} should I use? For example, say "30 g ${names[0] || 'peanuts'}" or "one small apple."`,
       canConfirm: false,
       autoSave: false,
       food: {
         meal,
         mealName,
-        draftText: parsedIngredients.map((entry: any) => entry.display || entry.name).join(', '),
+        draftText: parsedIngredients.map(voiceFoodDraftPart).join(', '),
       },
     }
   }
 
   const resolved = await Promise.all(
     parsedIngredients.map(async (ingredient: any) => {
-      const found = await findFoodIngredient(ingredient.name)
-      if (!found) return { ingredient, found: null }
+      const found = await findFoodIngredient(ingredient.name, country || parsedFood.country, ingredient, trustedItems)
+      if (!found) return { ingredient, found: null, reasonCode: 'food_source_unavailable' }
       const basis = requestedIngredientBasis(ingredient, found)
-      const core = basis ? itemCore(found, 0, basis.ratio) : null
-      if (!core || !basis) return { ingredient, found: null }
+      const selected: any = basis && 'item' in basis ? basis.item : found
+      const core = basis ? itemCore(selected, 0, basis.ratio) : null
+      if (!core || !basis) return { ingredient, found: null, reasonCode: 'food_serving_unavailable' }
       return {
         ingredient,
         found,
         core,
         item: {
-          ...found,
+          ...selected,
+          __voiceSourceFood: found,
           name: found.name,
           label: found.name,
           requestedName: ingredient.name,
@@ -3999,28 +4454,40 @@ async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDat
   const ingredientList = entries.map((entry) => entry.name).join(', ')
   const isSingleIngredient = parsedIngredients.length === 1
   const displayName = isSingleIngredient ? entries[0]?.name || items[0]?.name || mealName : mealName
+  const requestedCountry = cleanText(country || parsedFood.country, 4).toUpperCase()
+  const otherMenus = [...new Set(items.map((item: any) => cleanText(item.country, 4).toUpperCase()).filter((sourceCountry: string) => sourceCountry && requestedCountry && sourceCountry !== requestedCountry))]
+  const countryNames: Record<string, string> = { AU: 'Australian', US: 'US', CA: 'Canadian', UK: 'UK', GB: 'UK', NZ: 'New Zealand' }
+  const sourceNote = otherMenus.length ? ` The matching nutrition uses ${otherMenus.map(sourceCountry => countryNames[sourceCountry] || sourceCountry).join(' and ')} menu data.` : ''
 
   return {
     action: (missing.length ? 'food_draft' : 'food_build_meal') as 'food_draft' | 'food_build_meal',
     transcript,
     localDate,
     summary: missing.length ? 'Food details needed' : `${displayName}, ${nutrition.calories} kcal`,
+    ...(missing.length ? { reasonCode: resolved.find(entry => !entry.found)?.reasonCode || 'food_source_unavailable' } : {}),
     confirmationMessage: missing.length
       ? `I cannot finish this meal yet. Please clarify ${missing.join(', ')} with a supported amount or choose a matching food. Nothing has been saved.`
       : isSingleIngredient
-      ? `I found ${displayName} for ${meal}. Review the estimate, then tap Confirm to save it.`
-      : `I found these ingredients for ${meal}: ${ingredientList}. Review the estimates, then tap Confirm to save them.`,
+      ? `I found ${displayName} for ${meal}.${sourceNote} Review the estimate, then tap Confirm to save it.`
+      : `I found these ingredients for ${meal}: ${ingredientList}.${sourceNote} Review the estimates, then tap Confirm to save them.`,
     canConfirm: missing.length === 0,
     autoSave: false,
     food: {
       meal,
       mealName: displayName,
-      draftText: parsedIngredients.map((entry: any) => entry.display || entry.name).join(', '),
+      draftText: parsedIngredients.map(voiceFoodDraftPart).join(', '),
       entries,
       items,
       nutrition,
     },
   }
+}
+
+function voiceFoodDraftPart(ingredient: any) {
+  if (!ingredient.requiresSourceServing && !isPreparedVoiceFood(ingredient.name)) return ingredient.display || ingredient.name
+  const brand = ingredient.brand && !voiceRestaurantBrand(ingredient.name) ? `${ingredient.brand} ` : ''
+  const unit = ingredient.unit && !/^(?:each|pieces?|items?)$/.test(ingredient.unit) ? `${ingredient.unit} ` : ''
+  return `${ingredient.quantity || 1} ${unit}${brand}${ingredient.name}`
 }
 
 function parseAssistantJson(content: string) {
@@ -4075,9 +4542,23 @@ async function runJsonCommandModel(
         'If current section is symptoms or health-image, use safe tracking/handoff behavior only; do not diagnose, treat, or ask the user to show food.',
         'For clear low-risk logging requests, prepare a saveable draft for the user to review before saving. If important details are missing, ask one short follow-up question instead of guessing.',
         'For any logging or save action, if the user states a date, return localDate as an exact YYYY-MM-DD calculated from Today. Otherwise use null. Preserve relative dates such as yesterday in every language. For food_copy_previous, yesterday describes the source meal and localDate must remain null.',
-        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, health_intake_items, recipe, symptom_note, health_question, app_handoff, confirm_draft, reject_draft, unknown.',
+        'Allowed action values: exercise, mood, journal, water, food_copy_previous, food_favorite, food_build_meal, food_draft, health_intake_items, recipe, recipe_import_url, symptom_note, health_question, app_handoff, record_action, preference_action, local_preference_action, notification_action, app_read, support_action, report_action, device_action, confirm_draft, reject_draft, unknown.',
+        `Use app_read for actual saved app information; return appRead:{action:"registered ID",values:{...}} using these schemas: ${JSON.stringify(VOICE_APP_READ_SCHEMAS)}. Never invent a balance, report, hydration total or device connection. This checks information only and cannot claim a save or a live device sync.`,
+        'Use recipe_import_url only when the newest request contains exactly one complete http or https recipe URL and asks to import/use it. The app reviews the normal 10-credit import cost before fetching or importing. A completed import still requires recipe review before any diary or library save.',
+        `Use support_action for support ticket facts or an explicitly requested support message/change; return supportAction:{action:"registered ID",values:{...}} from ${JSON.stringify(VOICE_SUPPORT_ACTION_SCHEMAS)}. Preserve exact user-dictated text. Never send a message merely because someone describes an app problem, never invent subjects/messages/recipients, and never claim email delivery. Read/list are observational; sending, closing, feedback and deletion require an exact review.`,
+        `Use report_action only for an explicit request to generate a weekly report; return reportAction:{action:"reports.weekly.generate",values:{}} from ${JSON.stringify(VOICE_REPORT_ACTION_SCHEMAS)}. Normal account access, consent, profile completion and variable usage charges remain required. A request being accepted is not proof it completed, unlocked or emailed. Use app_read for report status/content instead.`,
+        `Use device_action for these existing phone controls; return deviceAction:{action:"registered ID",values:{...}} from ${JSON.stringify(VOICE_DEVICE_ACTION_SCHEMAS)}. Apple Health source names must be discovered on the actual phone; never invent source IDs. The server only authorizes a review; actual phone execution and readback must prove completion. OS access approvals remain real device UI.`,
+        'Also use record_action to create a saved favorite/custom meal from an existing food entry, or to update/delete an already saved food, drink/water, mood rating, health journal, mood journal, exercise, favorite or custom-food record. This is different from correcting a proposal that has not been saved.',
+        'For record_action return recordAction:{operation:"create"|"update"|"delete",entity:"food"|"water"|"mood"|"journal"|"mood_journal"|"exercise"|"favorite"|"custom_food"|"supplement"|"medication"|"symptom_note",query:"exact words identifying the existing record",localDate:"YYYY-MM-DD",changes:{...},sourceFoodId:null}. Never invent a record ID. The app finds the user-owned record and asks if more than one matches. Use the exact date requested, default Today. The query contains only words naming the EXISTING record; exclude the change instruction, new amounts, and temporal clauses such as I just logged today. For In the coffee I just logged today change the milk to 50 ml, query is coffee and ingredientChanges changes milk; do not query coffee with 50 ml milk.',
+        'Symptom history record_action supports entity symptom_note, operation delete and changes:{} only. Never rewrite or invent a previous symptom analysis. Select the exact owned note and date; ask if ambiguous.',
+        'Record update fields: food name,description,meal,category,localDate,createdAt; water amount,unit,label,category,localDate,createdAt; mood mood,tags,note; journal content; mood_journal title,content,tags,localDate; exercise durationMinutes,distanceKm,caloriesOverride,exerciseTypeId,startTime. For an existing food or water ingredient edit use changes.ingredients (the complete measured replacement ingredient list), OR changes.ingredientChanges:[{match:"exact ingredient name",quantity:50,unit:"ml",replacementName:"only if changing product",remove:false}], optionally changes.ingredientsAdd:[{name:"sugar",quantity:1,unit:"tsp"}]. Removal uses {match:"ingredient name",remove:true}. Do not guess missing ingredient amounts or invent nutrient JSON. A portion-only change uses changes.portionMultiplier relative to the currently eaten portion: half=.5, double=2. Preserve omitted fields. For favorite/custom_food creation use query to identify the existing source food and changes.label for its requested label; never invent nutrient values. Do not use localTime, exercise steps or caloriesKcal in record changes.',
+        'For factual Health Intake administration only, use record_action entity supplement or medication, operation update or delete, query the exact existing name/strength, and changes limited to name,dosage,timing (an array of explicitly stated recorded timing labels). Require explicit recorded/saved-list or Health Intake wording such as remove X from my recorded list or correct the recorded dosage to X. Never infer stopping/starting treatment, recommend a dose, or turn a medication advice question into a record edit. Preserve the exact stated new name, dosage text and timing labels; do not invent values or silently abbreviate/convert dosage text. The app independently checks administrative wording, explicit new values and ambiguous items.',
+        'Use preference_action to change an account setting, profile/health setup field, goal, hydration goal, reminder time, quiet hours, weekly report or coach preference, or a daily check-in rating. Return preferenceAction:{action:"registered action ID",values:{exact requested changes}}. Do not claim completion; all changes require the app review and saved result.',
+        `Registered preference action IDs and exact allowed value fields: ${JSON.stringify(VOICE_PREFERENCE_ACTION_SCHEMAS)}. Convert spoken units to each field's stated unit. Never invent unrequested values. A partial list change such as add/remove an allergy must preserve other existing values; request clarification when the current list is unknown. Never use an arbitrary endpoint or modify consent, credentials, purchases or device permissions.`,
+        'Use local_preference_action for the existing device-only settings: localPreference:{key:"darkMode"|"hapticsEnabled"|"dataAnalytics",value:true|false} or {key:"profileVisibility",value:"private"|"public"|"friends"}. The app will review, authorize and verify the device write. These flags do not prove OS permissions or notification delivery.',
+        `Use notification_action for marking inbox notifications read or deleting selected notifications. Return notificationAction:{action:"registered action ID",values:{...}} using these exact schemas: ${JSON.stringify(VOICE_NOTIFICATION_ACTION_SCHEMAS)}. Never invent IDs; use exact titles from the user's request. Bulk actions review only the currently visible captured entries, not future arrivals.`,
         'For exercise, preserve every value the user stated. Never invent distance, steps, calories, speed, or intensity. If duration is omitted but steps or calories were stated, the app will calculate and clearly label an approximate duration; do not ask for duration in that case. Otherwise use null for omitted values and ask one short clarification only when needed.',
-        'For mood, use mood score 1 very low to 7 very good, plus short tags and a note.',
+        'For mood, use mood score 1 very low to 7 very good, plus short tags and a note. Optional mood.context may contain only explicitly stated intensityPercent 0..100, feelings (short exact stated labels), and energyLevel,sleepQuality,nutrition,supplements,medicationEffect,physicalActivity rated 1..5. A five-point detail is never the seven-point mood score. Do not infer missing ratings or localHour. Preserve unchanged pending mood details when the user changes only one detail.',
         'For journal, make a short title and journal content. If the user says health journal, include journalType "health"; if they say mood journal, include journalType "mood".',
         'For food_copy_previous, only use when the user asks for same breakfast/meal as yesterday or previous day.',
         'For saved/favourite meal requests, return food_favorite when the user asks to add a favorite/favourite/saved meal or food.',
@@ -4085,6 +4566,7 @@ async function runJsonCommandModel(
         'If the user says add ingredients, input a new meal, log salmon, add chicken and rice, or similar, treat that as a food_build_meal request when food names are present.',
         'Use food_draft only when the user gives a vague food request without any usable food names.',
         'For recipes, meal ideas, cooking requests, food recommendations, “what should I eat”, or “what can I make with...” requests, return action recipe and recipeRequest. Preserve all requested constraints such as high protein, low calorie, remaining calories/macros, ingredients, meal time, allergies, dislikes, and servings.',
+        'For an explicit complete recipe, preserve the exact stated title, full yield, measured ingredients and steps in recipe:{title,servings,ingredients,steps,prepMinutes:null,cookMinutes:null,sourceUrl:null}. Keep save-to-library intent in the full recipeRequest. Without logging that I ate it or do not log it means library only, not a second diary destination. Never replace supplied steps or add ingredients.',
         'For Health Intake requests where the user is recording current medications, vitamins, or supplements they already take, return health_intake_items with healthIntake.items. Each item must include type "medication" or "supplement", name, dosage only if stated, and timing only if stated.',
         'For health_intake_items, include only items the user says they currently take. If the user says no, not, none, without, or does not take a medication or supplement, do not include that excluded item in healthIntake.items.',
         'For health_intake_items, do not invent prescription strength, dose, timing, brand, or item type. If the item name or type is unclear, ask one short follow-up question instead of guessing.',
@@ -4237,17 +4719,17 @@ async function buildRecipe(
         'Recommend one practical meal that fits the food diary context, especially remaining calories, macros, fibre, sugar, and nutrients needing attention.',
         'Honor allergies, dislikes, and dietary restrictions from the newest request and recent conversation. Never include restricted foods or ingredients the user says they avoid.',
         'Keep it conversational and useful. Mention why it fits today in plain language.',
-        'Include a meal title, ingredients with amounts, and approximate macros.',
+        'Return only JSON: {"recommendation":"a concise spoken suggestion and why it fits","recipe":{"title":"...","servings":4,"prepMinutes":10,"cookMinutes":20,"ingredients":["every measured full-batch ingredient"],"steps":["real specific cooking instructions"],"sourceUrl":null}}. Choose the real yield and times for your recipe; the example numbers are not defaults. Include every ingredient and actual cooking steps. Do not include invented nutrition or source links.',
         'Do not say you opened, prepared, created, saved, or built a draft.',
         'Do not jump to Build a meal. The user must decide first.',
         'End by inviting natural discussion, such as asking what they think or whether they want another option.',
       ].join(' ')
-    : 'You are Helfi. Create one practical recipe. Use the diary context if helpful. Include servings, ingredients, steps, and approximate macros. Do not save food.'
+    : 'You are Helfi. Create one practical complete recipe using the diary context if helpful and honoring all allergies, dislikes and dietary restrictions. Return only JSON with title, servings (positive recipe yield), prepMinutes, cookMinutes, ingredients (every measured full-batch ingredient as a string), steps (real specific cooking instructions as strings), sourceUrl:null. Use measurable quantities and specify raw/cooked form where relevant. Do not invent a source link or claim anything was saved. Do not include nutrition; the app resolves it from food sources.'
   const wrapped = await chatCompletionWithCost(
     openai,
     {
       model: COMMAND_MODEL,
-      max_tokens: 900,
+      max_tokens: 1800,
       temperature: 0.3,
       messages: [
         {
@@ -4262,8 +4744,16 @@ async function buildRecipe(
     } as any,
     { feature: 'voice-assistant:recipe', userId },
   )
-  const text = cleanText(wrapped.completion.choices?.[0]?.message?.content || '', 5000)
-  return { text, costCents: wrapped.costCents, model: wrapped.completion.model || COMMAND_MODEL, snapshot }
+  const rawText = String(wrapped.completion.choices?.[0]?.message?.content || '').trim().slice(0, 16000)
+  const parsedRecipeResponse = parseAssistantJson(rawText)
+  let importDraft: ReturnType<typeof validateNativeVoiceImportedRecipe> | undefined
+  try { importDraft = completeVoiceRecipe(rawText) } catch {}
+  const text = importDraft && !options?.conversationFirst
+    ? [importDraft.title, `Servings: ${importDraft.servings}`, 'Ingredients:', ...importDraft.ingredients.map(line => `- ${line}`), 'Steps:', ...importDraft.steps.map((line, index) => `${index + 1}. ${line}`)].join('\n')
+    : options?.conversationFirst && typeof parsedRecipeResponse?.recommendation === 'string'
+    ? cleanText(parsedRecipeResponse.recommendation, 1200)
+    : rawText
+  return { text, importDraft, costCents: wrapped.costCents, model: wrapped.completion.model || COMMAND_MODEL, snapshot }
 }
 
 async function buildGeneralHealthAnswer(
@@ -4320,25 +4810,27 @@ async function buildFoodCopyDraft(userId: string, localDate: string, meal: strin
       ],
     },
     orderBy: { createdAt: 'asc' },
-    take: 20,
+    take: 101,
   })
   const entries = rows.map((row) => ({
     name: row.name,
     description: row.description,
     meal: row.meal || row.category,
   }))
-  return { sourceDate, rows, entries }
+  try{
+    if(rows.length>100)throw new Error('This meal has more than one hundred entries. Please choose a smaller meal to copy; nothing has been copied.')
+    if(rows.some(row=>row.userId!==userId||row.localDate!==sourceDate)||new Set(rows.map(row=>row.id)).size!==rows.length)throw new Error('The complete source meal could not be checked. Please reopen it before copying.')
+    const waterIds=rows.map(nativeVoiceFoodCopyWaterId).filter((id):id is string=>Boolean(id))
+    if(new Set(waterIds).size!==waterIds.length){const drink=rows.find(row=>{const id=nativeVoiceFoodCopyWaterId(row);return id&&waterIds.filter(value=>value===id).length>1});throw new Error(`“${cleanText(drink?.name||'This drink',120)}” has multiple linked food entries. Please review it before copying the meal.`)}
+    const waters=waterIds.length?await prisma.waterLog.findMany({where:{id:{in:waterIds},userId}}):[]
+    if(waters.length!==waterIds.length||new Set(waters.map(row=>row.id)).size!==waters.length||waters.some(row=>row.userId!==userId||row.localDate!==sourceDate||!waterIds.includes(row.id))){const drink=rows.find(row=>{const id=nativeVoiceFoodCopyWaterId(row);return id&&!waters.some(water=>water.id===id&&water.userId===userId&&water.localDate===sourceDate)})||rows.find(row=>nativeVoiceFoodCopyWaterId(row));throw new Error(`“${cleanText(drink?.name||'A drink in this meal',120)}” is missing its matching hydration entry. Please review it before copying; nothing has been copied.`)}
+    for(const water of waters){try{nativeVoiceFoodCopyWaterVersion(water)}catch(error:any){throw new Error(`“${cleanText(water.label||rows.find(row=>nativeVoiceFoodCopyWaterId(row)===water.id)?.name||'This drink',120)}” needs review: ${error.message}`)}}
+    return {sourceDate,rows,entries,sourceVersions:rows.map(row=>({id:row.id,version:nativeVoiceFoodCopyVersion(row)})),sourceWaterVersions:waters.map(row=>({id:row.id,version:nativeVoiceFoodCopyWaterVersion(row)})),review:nativeVoiceFoodCopyReview(rows,waters)}
+  }catch(error:any){return {sourceDate,rows:[],entries:[],error:cleanText(error?.message,500)}}
 }
 
 async function buildFavoriteFoodDraft(transcript: string, localDate: string, favorites: VoiceFoodFavorite[]) {
-  let favorite = findRequestedFavorite(transcript, favorites)
-  if (!favorite && /\b(favourites?|favorites?|saved)\b/i.test(transcript)) {
-    const requestedMeal = inferMealFromText(transcript, '')
-    favorite =
-      favorites.find((item) => compactFoodMatchText(item.meal || '').includes(requestedMeal)) ||
-      favorites.find((item) => compactFoodMatchText(item.label || '').includes(requestedMeal)) ||
-      null
-  }
+  const favorite = findRequestedFavorite(transcript, favorites)
   if (!favorite) return null
   const meal = inferTargetMealFromText(transcript, favorite.meal)
   const calories = Math.round(Number((favorite.nutrition as any)?.calories ?? (favorite.total as any)?.calories) || 0)
@@ -4368,8 +4860,12 @@ async function buildFavoriteFoodDraft(transcript: string, localDate: string, fav
 }
 
 async function speak(openai: OpenAI, text: string, userId: string) {
-  const speechText = cleanText(text, 1200)
+  const speechText = String(text || '').replace(/\s+/g, ' ').trim()
   if (!speechText) return { audio: null, costCents: 0 }
+  // Speech API accepts at most 4096 characters. Mini-TTS also enforces 2000
+  // input tokens. Reject a complete reply instead of speaking a clipped review.
+  const tooLongMessage = 'This reply is too long to read aloud in one go. The full review is still on screen. No spoken-reply credits were charged.'
+  if (Array.from(speechText).length > 4096) throw new Error(tooLongMessage)
   await assertAiUsageAllowed({
     feature: 'voice-assistant:tts',
     userId,
@@ -4381,8 +4877,14 @@ async function speak(openai: OpenAI, text: string, userId: string) {
     instructions:
       'Speak like a warm, calm health coach. Sound natural and conversational, with gentle energy and smooth pacing. Avoid a robotic or announcer style.',
     response_format: 'mp3',
-  } as any)
-  const buffer = Buffer.from(await response.arrayBuffer())
+  } as any).catch((error: any) => {
+    const limit = (error?.status === 400 || error?.status === 413) && (/^(?:context_length_exceeded|input_too_long|token_limit_exceeded|string_above_max_length)$/.test(error?.code || '') || /(?:input|text|tokens?).{0,100}(?:too long|exceeds? (?:the )?(?:maximum|limit)|maximum.{0,30}(?:length|tokens?))|maximum.{0,30}(?:input|text|tokens?)/i.test(error?.message || ''))
+    throw new Error(limit ? tooLongMessage : 'The spoken reply could not be created. No spoken-reply credits were charged.')
+  })
+  const buffer = await response.arrayBuffer().then(bytes => Buffer.from(bytes)).catch(() => {
+    throw new Error('The spoken reply could not be received. No spoken-reply credits were charged.')
+  })
+  if (!buffer.length) throw new Error('The spoken reply contained no audio. No spoken-reply credits were charged.')
   const costCents = estimateTextToSpeechCostCents(speechText)
   await logAiUsageEvent({
     feature: 'voice-assistant:tts',
@@ -4486,25 +4988,20 @@ function normalizeMood(value: any) {
     mood: clampNumber(value?.mood, 1, 7, 4),
     tags: Array.isArray(value?.tags) ? value.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 8) : [],
     note: cleanText(value?.note, 600),
+    context:validateNativeVoiceMoodContext(value?.context),
   }
 }
 
 function explicitMoodFromTranscript(transcript: string, launchContext?: VoiceLaunchContext) {
   const raw = cleanText(transcript, 600)
-  const lower = raw.toLowerCase()
-  const numeric = lower.match(/\b(?:mood\s*(?:is|was|as)?\s*)?([1-7])\s*(?:\/|out of\s*)7\b/)
-  if (numeric) return { mood: Number(numeric[1]), tags: [] as string[], note: raw }
-  const hasFeelingEvidence =
-    /\b(?:terrible|awful|low|sad|down|angry|upset|anxious|anxiety|stressed|stress|overwhelmed|calm|great|happy|good|better|excellent|amazing|feel|feeling|felt)\b/.test(lower) ||
-    /(се чувствувам|таж|лошо|анксиозн|стрес|преплавен|лут|вознемирен|смирен|мирно|среќ|добро|подобро|одлично)/i.test(raw) ||
-    /\b(?:me siento|triste|ansioso|ansiosa|estresado|estresada|feliz|bien|mejor|tranquilo|tranquila|je me sens|anxieux|anxieuse|stressé|stressée|heureux|heureuse|mieux|calme|mi sento|stressato|stressata|felice|bene|meglio|me sinto|estressado|estressada|bem|melhor|ich fühle mich|ich fuehle mich|traurig|ängstlich|aengstlich|gestresst|glücklich|gluecklich|gut|besser|ruhig|wütend|wuetend)\b/i.test(raw)
-  if (!hasFeelingEvidence) return null
   return tryParseMoodRequest(raw, launchContext)?.mood || null
 }
 
 function inferNativeWebTarget(parsed: any, transcript: string) {
   const raw = `${cleanText(parsed?.target || parsed?.area || parsed?.appArea || parsed?.summary, 200)} ${transcript}`.toLowerCase()
   const openOnly = /\b(open|show|go to|take me to|use)\b/.test(raw) || /(отвори|покажи|оди\s+до|најди|наjди|прикажи|öffne|offne|zeige|geh\s+zu|gehe\s+zu|finde|benutze)/i.test(raw)
+  const navigationRequest = cleanText(transcript, 1000).toLowerCase().replace(/\bhelp\s+me\b/g, '')
+  const navigationOpenOnly = /\b(open|show|go to|take me to|use)\b/.test(navigationRequest) || /(отвори|покажи|оди\s+до|најди|наjди|прикажи|öffne|offne|zeige|geh\s+zu|gehe\s+zu|finde|benutze)/i.test(navigationRequest)
   const photoAction = hasPhotoActionText(raw)
   const nativeTarget = (title: string, path: string, buttonLabel: string, native: any) => ({
     title,
@@ -4546,6 +5043,15 @@ function inferNativeWebTarget(parsed: any, transcript: string) {
     })
   }
 
+  if (navigationOpenOnly && /\b(?:devices?|wearables?|fitbit|garmin|apple health|huawei health)\b/.test(navigationRequest)) {
+    return nativeTarget('Devices', '/devices', 'Open Devices', { type: 'stack', route: 'Devices' })
+  }
+  if (navigationOpenOnly && /\b(?:support|support tickets?|customer support|contact support)\b/.test(navigationRequest) && !/\bhelp\s*(?:and|&)\s*support\b/.test(navigationRequest)) {
+    return nativeTarget('Support', '/support', 'Open Support', { type: 'stack', route: 'Support' })
+  }
+  if (navigationOpenOnly && /\b(?:help|faq|frequently asked questions)\b/.test(navigationRequest)) {
+    return nativeTarget('Help & Support', '/help', 'Open Help', { type: 'stack', route: 'Help' })
+  }
   if (/\b(dashboard|home)\b/.test(raw) || /(почетна|контролна\s+табла|startseite|übersicht|uebersicht)/i.test(raw)) {
     return nativeTarget('Dashboard', '/dashboard', 'Open Dashboard', { type: 'tab', tab: 'Dashboard' })
   }
@@ -4845,6 +5351,11 @@ function buildQuickToolDraft(transcript: string, localDate: string, launchContex
   const raw = cleanText(transcript, 1200)
   const lower = raw.toLowerCase()
   if (hasSelfHarmRisk(raw)) return buildSelfHarmSupportDraft(raw, localDate)
+  // A simple hello is a conversation turn, never an app mutation or handoff.
+  if (/^(?:hi|hello|hey)(?:[ ,]+helfi)?[.!?]*$/i.test(raw.trim())) {
+    return { action: 'greeting', transcript: raw, localDate, summary: 'Hello from Helfi',
+      confirmationMessage: 'Hi, I’m Helfi. What can I help you with?', canConfirm: false }
+  }
   if (isFoodRecommendationRequest(raw, launchContext)) return null
   const explicitPhotoAction = hasPhotoActionText(raw)
   const explicitJournalDraft = tryParseJournalRequest(raw, launchContext)
@@ -4859,6 +5370,9 @@ function buildQuickToolDraft(transcript: string, localDate: string, launchContex
   if (explicitSymptomTracking) return buildSymptomNotesHandoffDraft(raw, localDate)
   if (explicitJournalDraft && !explicitPhotoAction && !isAdviceStyleHealthQuestion(raw)) return buildQuickJournalDraft(explicitJournalDraft, raw, localDate)
   if (isMedicalSafetyRequest(raw) && !isPlainHealthToolOpenRequest(raw)) return buildMedicalSafetyDraft(raw, localDate)
+  // Explicit recorded mood context can contain ordinary words such as
+  // 'feelings are' or 'energy is'; these are not requests for advice.
+  if (tryParseMoodRequest(raw, launchContext) && !isAdviceStyleHealthQuestion(raw)) return null
   const directTarget = inferNativeWebTarget({}, raw)
   const explicitOpen = /\b(open|show|go to|take me to|use|find)\b/.test(lower) || /(отвори|покажи|оди\s+до|најди|наjди|прикажи|öffne|offne|zeige|geh\s+zu|gehe\s+zu|finde|benutze)/i.test(raw)
   const asksForInsights = directTarget?.title === 'Insights' && (/\b(insight|insights|coach)\b/.test(lower) || /(увид|увиди|коуч|тренер)/i.test(raw))
@@ -4994,6 +5508,133 @@ function buildGenericClarificationDraft(transcript: string, localDate: string): 
   }
 }
 
+function measuredVoiceRecordIngredient(raw: any) {
+  const ingredient = typeof raw === 'string' ? voiceRecipeIngredient(raw) : normalizeIngredientRequest(raw)
+  const quantity = numberFromWords(ingredient?.quantity)
+  if (!ingredient || quantity == null || !Number.isFinite(quantity) || quantity <= 0 || ingredientNeedsAmountClarification(ingredient)) throw new Error('Please give the exact measured amount for each ingredient.')
+  return { ...ingredient, quantity, unit: ingredient.unit || 'each' }
+}
+
+async function prepareVoiceFoodRecordEdit(request: NextRequest, userId: string, raw: any, transcript: string, localDate: string, country?: string) {
+  try {
+    // Bind this explicit spoken reference to the saved drink, not the new
+    // ingredient amount or a model-expanded phrase such as 'I just logged'.
+    const drinkReference = transcript.match(/^\s*(?:in|for)\s+(?:(?:the|my)\s+)?(coffee|tea|hot chocolate|milk|water|juice)\s+(?:that\s+)?i\s+(?:just\s+)?(?:logged|saved|recorded)(?:\s+(?:today|yesterday))?\s*[,;:]/i)
+    if (drinkReference && raw.operation === 'update' && ['food', 'water'].includes(raw.entity)) {
+      raw = { ...raw, id: undefined, query: drinkReference[1], localDate }
+    }
+    const selected = await selectNativeVoiceFoodRecordForEdit(request, userId, { ...raw, localDate: raw.localDate || localDate })
+    if (!selected.selection) return { ...selected, recordAction: { ...raw, ...selected.recordAction, changes: raw.changes } }
+    const selection = selected.selection
+    const changes = raw.changes || {}
+    const source = selection.sourceFood || { items: [], nutrition: {}, meal: selection.row.category, mealName: selection.row.label }
+    if (!source.items?.length && changes.ingredients === undefined) return { ...selected, confirmationMessage: 'This entry has no complete measured ingredient list. Please give the full replacement ingredients and amounts before changing its nutrition.' }
+    const oldNutrition: Record<string, any> = source.nutrition || {}
+    const storedItems = Array.isArray(oldNutrition.__fullMealItems) && oldNutrition.__fullMealItems.length ? oldNutrition.__fullMealItems : source.items
+    let ingredients = changes.ingredients !== undefined ? [] : storedItems.map((item: any) => {
+      const name = cleanText(item.requestedName || item.name || item.label, 200)
+      if (!name) throw new Error('An existing ingredient needs its exact name before I can change this meal.')
+      const requested = cleanText(item.requestedAmount, 500)
+      let parsed: ReturnType<typeof measuredVoiceRecordIngredient> | undefined
+      if (requested) { try { parsed = measuredVoiceRecordIngredient(requested) } catch {} }
+      if (!parsed) parsed = measuredVoiceRecordIngredient(`${cleanText(item.serving_size || item.serving, 120)} ${name}`)
+      const servings = item.servings == null ? 1 : Number(item.servings)
+      if (!Number.isFinite(servings) || servings <= 0) throw new Error('Please review the existing ingredient portions in the app.')
+      return measuredVoiceRecordIngredient({ ...parsed, name, quantity: parsed.quantity * servings, display: `${parsed.quantity * servings} ${parsed.unit} ${name}` })
+    })
+    if (changes.ingredients !== undefined) {
+      if (!Array.isArray(changes.ingredients) || !changes.ingredients.length || changes.ingredientChanges !== undefined || changes.ingredientsAdd !== undefined) throw new Error('Please give either the full ingredient list or the individual changes.')
+      ingredients = changes.ingredients.map(measuredVoiceRecordIngredient)
+    }
+    if (changes.ingredientChanges !== undefined) {
+      if (!Array.isArray(changes.ingredientChanges) || !changes.ingredientChanges.length) throw new Error('Please specify which ingredient to change.')
+      for (const change of changes.ingredientChanges) {
+        if (!change || Object.keys(change).some(key => !['match', 'quantity', 'unit', 'replacementName', 'remove'].includes(key))) throw new Error('Please give a supported measured ingredient change.')
+        const match = compactFoodMatchText(change.match)
+        if (!match) throw new Error('Please name the ingredient to change.')
+        const exact = ingredients.map((ingredient: any, index: number) => compactFoodMatchText(ingredient.name) === match ? index : -1).filter((index: number) => index >= 0)
+        const matches = exact.length ? exact : ingredients.map((ingredient: any, index: number) => compactFoodMatchText(ingredient.name).includes(match) ? index : -1).filter((index: number) => index >= 0)
+        if (matches.length !== 1) throw new Error(matches.length ? 'More than one ingredient matches. Please give its complete name.' : 'I could not find that ingredient in this entry. Please give its exact name.')
+        const index = matches[0]
+        if (change.remove === true) {
+          if (change.quantity !== undefined || change.unit !== undefined || change.replacementName !== undefined) throw new Error('Please choose whether to remove or replace that ingredient.')
+          ingredients.splice(index, 1)
+        } else {
+          if (change.remove !== undefined && change.remove !== false) throw new Error('Please clarify whether to remove that ingredient.')
+          if ((change.quantity === undefined) !== (change.unit === undefined)) throw new Error('Please give both the new ingredient amount and its unit.')
+          const old = ingredients[index]
+          const name = change.replacementName === undefined ? old.name : cleanText(change.replacementName, 200)
+          const quantity = change.quantity === undefined ? old.quantity : change.quantity
+          const unit = change.unit === undefined ? old.unit : change.unit
+          ingredients[index] = measuredVoiceRecordIngredient({ name, quantity, unit, display: `${quantity} ${unit} ${name}` })
+        }
+      }
+    }
+    if (changes.ingredientsAdd !== undefined) {
+      if (!Array.isArray(changes.ingredientsAdd) || !changes.ingredientsAdd.length) throw new Error('Please give the measured ingredients to add.')
+      ingredients.push(...changes.ingredientsAdd.map(measuredVoiceRecordIngredient))
+    }
+    if (!ingredients.length || ingredients.length > 30) throw new Error('Please keep between one and thirty measured ingredients in this entry.')
+    const batches: any[] = []
+    for (let offset = 0; offset < ingredients.length; offset += 12) {
+      const built = await buildVoiceMealDraft({ meal: source.meal, mealName: source.mealName, ingredients: ingredients.slice(offset, offset + 12) }, transcript, localDate, country, storedItems)
+      if (!built?.canConfirm || !built.food) return { canConfirm: false, summary: 'Ingredient details needed', confirmationMessage: built?.confirmationMessage || 'Please resolve every ingredient before changing this entry.' }
+      batches.push(built.food)
+    }
+    const items = batches.flatMap(batch => batch.items)
+    const nutrition: any = { ...batches[0].nutrition }
+    for (const [primary, alias] of [['calories', 'calories_kcal'], ['protein_g', 'protein'], ['carbs_g', 'carbs'], ['fat_g', 'fat'], ['fiber_g', 'fiber'], ['sugar_g', 'sugar']]) {
+      const values = items.map(item => item[primary])
+      nutrition[primary] = values.some(value => value == null) ? null : values.reduce((sum, value) => sum + value, 0)
+      nutrition[alias] = nutrition[primary]
+    }
+    if (oldNutrition.__importRecipe) nutrition.__importRecipe = validateNativeVoiceImportedRecipe({ ...oldNutrition.__importRecipe, ingredients: ingredients.map(voiceFoodDraftPart) })
+    let scale = typeof oldNutrition.__portionScale === 'number' && oldNutrition.__portionScale > 0 ? oldNutrition.__portionScale : 1
+    if (oldNutrition.__portionControlEnabled !== false && ['g', 'oz'].includes(oldNutrition.__portionUnit)) {
+      const weights = items.map(item => String(item.serving_size || '').match(/^(\d+(?:\.\d+)?)\s*(g|grams?|kg|oz|ounces?)$/i))
+      if (weights.some(match => !match)) throw new Error('The changed recipe needs a known whole weight to keep its gram or ounce portion. Please choose servings instead.')
+      const grams = weights.reduce((sum, match) => sum + Number(match![1]) * (/^kg$/i.test(match![2]) ? 1000 : /^(?:oz|ounce)/i.test(match![2]) ? 28.349523125 : 1), 0)
+      const portionGrams = Number(oldNutrition.__portionAmount) * (oldNutrition.__portionUnit === 'oz' ? 28.349523125 : 1)
+      if (!(grams > 0) || !(portionGrams > 0)) throw new Error('Please review the existing recipe portion first.')
+      scale = portionGrams / grams
+    }
+    if (changes.portionMultiplier !== undefined) {
+      const multiplier = changes.portionMultiplier
+      if (typeof multiplier !== 'number' || !Number.isFinite(multiplier) || multiplier <= 0 || multiplier > 1000) throw new Error('Please choose a positive portion multiplier.')
+      scale *= multiplier
+      nutrition.__portionScale = scale
+      nutrition.__portionControlEnabled = oldNutrition.__portionControlEnabled === true || scale !== 1
+      nutrition.__portionUnit = oldNutrition.__portionUnit || 'serving'
+      nutrition.__portionAmount = (Number(oldNutrition.__portionAmount) || 1) * multiplier
+      if (oldNutrition.__nativeRecipeServingsEaten != null) nutrition.__nativeRecipeServingsEaten = oldNutrition.__nativeRecipeServingsEaten * multiplier
+      for (const key of ['calories', 'calories_kcal', 'protein', 'protein_g', 'carbs', 'carbs_g', 'fat', 'fat_g', 'fiber', 'fiber_g', 'sugar', 'sugar_g']) if (nutrition[key] != null) nutrition[key] *= scale
+    }
+    const ordinaryChanges = Object.fromEntries(Object.entries(changes).filter(([key]) => !['ingredients', 'ingredientChanges', 'ingredientsAdd', 'portionMultiplier'].includes(key)))
+    if (selection.command.entity === 'water') {
+      if (changes.portionMultiplier !== undefined && changes.amount === undefined) ordinaryChanges.amount = Number(selection.row.amount) * changes.portionMultiplier
+      const drinkAmount = Number(ordinaryChanges.amount ?? selection.row.amount)
+      const drinkUnit = ordinaryChanges.unit ?? selection.row.unit
+      if (!Number.isFinite(drinkAmount) || drinkAmount <= 0 || !['ml', 'l', 'oz'].includes(String(drinkUnit))) throw new Error('Please choose a positive drink amount and supported unit.')
+      Object.assign(nutrition, { __drinkAmount: drinkAmount, __drinkUnit: drinkUnit, __drinkAmountMl: waterAmountToMl(drinkAmount, drinkUnit as 'ml' | 'l' | 'oz') })
+      const sweet = items.map((item, index) => ({ item, ingredient: ingredients[index] })).filter(({ ingredient }) => /\b(?:sugar|honey)\b/i.test(ingredient.name))
+      const sweetener = sweet.length === 1 ? sweet[0] : null
+      const parsed = sweetener ? parseSweetener(`${sweetener.ingredient.quantity} ${sweetener.ingredient.unit} ${/honey/i.test(sweetener.ingredient.name) ? 'honey' : 'sugar'}`) : null
+      if (sweet.length > 1 || (sweetener && !parsed?.grams)) throw new Error('Please review the exact sweetener amount before changing this drink.')
+      Object.assign(nutrition, { __sweetenerChoice: sweetener ? 'with' : 'free', __sweetenerType: parsed?.type || null, __sweetenerAmount: parsed?.amount ? parsed.amount * scale : null, __sweetenerUnit: parsed?.unit || null, __sweetenerGrams: parsed?.grams ? parsed.grams * scale : 0, __sweetenerCalories: sweetener ? sweetener.item.calories * scale : 0, __sweetenerCarbs: sweetener ? sweetener.item.carbs_g * scale : 0, __sweetenerSugar: sweetener ? (sweetener.item.sugar_g == null ? null : sweetener.item.sugar_g * scale) : 0 })
+      const automaticMeasuredDrinkLabel = oldNutrition.__voiceBuiltMeal === true && /\b\d+(?:\.\d+)?\s*(?:ml|g|tsp|tbsp)\s+(?:(?:whole|skim|full[- ]?fat|low[- ]?fat)\s+)?(?:milk|sugar|honey)\b/i.test(selection.row.label || '')
+      if (ordinaryChanges.label === undefined && automaticMeasuredDrinkLabel) {
+        // Keep a voice-generated measured label consistent with its edited
+        // ingredients. A custom label without measured additives is preserved.
+        ordinaryChanges.label = cleanText(ingredients.map((ingredient: any, index: number) => index === 0 ? ingredient.name : voiceFoodDraftPart(ingredient)).join(' with '), 120)
+      } else if (ordinaryChanges.label === undefined && (oldNutrition.__sweetenerType || /\b(?:with|and)\s+(?:sugar|honey)\b/i.test(selection.row.label || ''))) {
+        const baseLabel = cleanText(selection.row.label, 120).replace(/\s+(?:with|and)\s+(?:sugar|honey)(?:\s*\([^)]*\))?/gi, '').trim() || 'Drink'
+        ordinaryChanges.label = parsed?.type && parsed.type !== 'free' ? `${baseLabel} with ${parsed.type} (${parsed.amount! * scale} ${parsed.unit})` : baseLabel
+      }
+    }
+    return await prepareNativeVoiceResolvedFoodRecordAction(request, userId, selection, { ...batches[0], items, nutrition }, { trustedSources: items.map(item => item.__voiceSourceFood), changes: ordinaryChanges })
+  } catch (error: any) { return { canConfirm: false, summary: 'Review this ingredient change', confirmationMessage: cleanText(error?.message || 'Please review the measured ingredients first.', 400) } }
+}
+
 async function normalizeDraft(
   parsed: any,
   transcript: string,
@@ -5004,12 +5645,101 @@ async function normalizeDraft(
   favorites: VoiceFoodFavorite[],
   launchContext?: VoiceLaunchContext,
   conversationHistory: VoiceConversationTurn[] = [],
+  country?: string,
+  actionRequest?: NextRequest,
+  actionTimeZone?: string | null,
 ): Promise<{ draft: VoiceDraft; aiCostCents: number; usedModel?: string }> {
   const parsedAction = cleanText(parsed?.action, 40).toLowerCase()
   // The request date has already been resolved from explicit speech evidence.
   // A model-proposed date cannot silently replace it.
   if (hasSelfHarmRisk(transcript)) {
     return { aiCostCents: 0, draft: buildSelfHarmSupportDraft(transcript, localDate) }
+  }
+  if (parsedAction === 'app_read') {
+    try {
+      if (!actionRequest) throw new Error('Please open the app to check your information.')
+      const result = await readVoiceAppData(actionRequest, userId, parsed?.appRead, localDate)
+      return { aiCostCents: 0, draft: { action: 'health_question', transcript, localDate, summary: 'Your app information', confirmationMessage: result.message, canConfirm: false, autoSave: false, appRead: result } }
+    } catch (error: any) {
+      return { aiCostCents: 0, draft: { action: 'health_question', transcript, localDate, summary: 'Information could not be verified', confirmationMessage: cleanText(error?.message || 'Please check the normal app screen.', 500), canConfirm: false, autoSave: false, reasonCode: 'app_read_unverified' } }
+    }
+  }
+  if (parsedAction === 'recipe_import_url') {
+    try {
+      if (!actionRequest) throw new Error('Please open the app to import this recipe.')
+      return { aiCostCents: 0, draft: await prepareVoiceRecipeUrlImport(actionRequest, userId, transcript, { localDate, meal: inferMealFromText(transcript, 'uncategorized'), destination: /\b(?:save|library|recipes|favorites?|favourites?)\b/i.test(transcript) ? 'library' : 'diary' }) }
+    } catch (error: any) {
+      return { aiCostCents: 0, draft: { action: 'recipe_import_url', transcript, localDate, summary: 'Recipe link needed', confirmationMessage: cleanText(error?.message || 'Please give a complete public recipe link.', 500), canConfirm: false, autoSave: false } }
+    }
+  }
+  if (parsedAction === 'support_action') {
+    try {
+      if (!actionRequest) throw new Error('Please open Support to review this request.')
+      const input = parsed?.supportAction
+      if (['support.list', 'support.read'].includes(input?.action)) {
+        const facts: any = await readVoiceSupportFacts(actionRequest, userId, input)
+        const message = facts.status === 'needs_selection' ? 'Please identify the exact support ticket.' : facts.ticket ? `Support ticket ${cleanText(facts.ticket.subject, 200)} is ${cleanText(facts.ticket.status, 40)}.${facts.ticket.responses?.length ? ` Latest reply: ${cleanText(facts.ticket.responses[facts.ticket.responses.length - 1]?.message, 1200)}` : ''}` : facts.tickets?.length ? `Your support tickets: ${facts.tickets.map((row: any) => `${cleanText(row.subject, 200)} (${cleanText(row.status, 40)})`).join('; ')}.` : 'The app currently lists no support tickets.'
+        return { aiCostCents: 0, draft: { action: 'health_question', transcript, localDate, summary: 'Support information', confirmationMessage: message, canConfirm: false, autoSave: false } }
+      }
+      return { aiCostCents: 0, draft: await prepareVoiceSupportAction(actionRequest, userId, input, transcript, localDate) }
+    } catch (error: any) {
+      return { aiCostCents: 0, draft: { action: 'support_action', transcript, localDate, summary: 'Support request needs review', confirmationMessage: cleanText(error?.message || 'Please state the exact support request.', 500), canConfirm: false, autoSave: false } }
+    }
+  }
+  if (parsedAction === 'report_action') {
+    try {
+      if (!actionRequest) throw new Error('Please open Insights to review this request.')
+      return { aiCostCents: 0, draft: await prepareVoiceReportAction(actionRequest, userId, parsed?.reportAction, transcript, localDate) }
+    } catch (error: any) {
+      return { aiCostCents: 0, draft: { action: 'report_action', transcript, localDate, summary: 'Report request needs review', confirmationMessage: cleanText(error?.message || 'Please check Insights for report access.', 500), canConfirm: false, autoSave: false } }
+    }
+  }
+  if (parsedAction === 'device_action') {
+    try {
+      if (!actionRequest) throw new Error('Please use the phone app to review this action.')
+      const input = parsed?.deviceAction?.action === 'apple_health.import' ? { ...parsed.deviceAction, values: { ...parsed.deviceAction.values, localDate } } : parsed?.deviceAction
+      const draft = await prepareNativeVoiceDeviceAction(actionRequest, userId, input, localDate)
+      return { aiCostCents: 0, draft: { ...draft, transcript } }
+    } catch (error: any) {
+      return { aiCostCents: 0, draft: { action: 'device_action', transcript, localDate, summary: 'Device action needs review', confirmationMessage: cleanText(error?.message || 'Please review the normal device controls.', 500), canConfirm: false, autoSave: false } }
+    }
+  }
+  if (parsedAction === 'notification_action') {
+    try {
+      if (!actionRequest) throw new Error('Please open your inbox and identify the notification to change.')
+      const prepared = await prepareVoiceNotificationAction(actionRequest, userId, parsed?.notificationAction)
+      return { aiCostCents: 0, draft: { action: 'notification_action', transcript, localDate, summary: prepared.summary, confirmationMessage: `${prepared.summary}. Would you like me to make this change?`, canConfirm: true, autoSave: false, notificationAction: prepared } }
+    } catch (error: any) {
+      return { aiCostCents: 0, draft: { action: 'notification_action', transcript, localDate, summary: 'Choose notifications', confirmationMessage: cleanText(error?.message || 'Please give the exact notification title.', 500), canConfirm: false, autoSave: false, notificationAction: parsed?.notificationAction } }
+    }
+  }
+  if (parsedAction === 'record_action') {
+    const command = parsed?.recordAction ? { ...parsed.recordAction, timeZone: normalizeVoiceTimeZone(actionTimeZone) || undefined } : null
+    if (command?.operation === 'update' && command.entity === 'food' && typeof command.changes?.name === 'string' && command.changes.description === undefined) command.changes = { ...command.changes, description: command.changes.name }
+    if (command?.operation === 'update' && ['favorite', 'custom_food'].includes(command.entity) && typeof command.changes?.label === 'string' && command.changes.description === undefined) command.changes = { ...command.changes, description: command.changes.label }
+    if (isHealthIntakeRecordEntity(command?.entity) && (!isFactualHealthIntakeRecordRequest(transcript) || !hasExplicitHealthIntakeRecordChanges(transcript, command.changes))) return { aiCostCents: 0, draft: { action: 'record_action', transcript, localDate, summary: 'Recorded Health Intake clarification', confirmationMessage: 'Please state the exact correction or removal from your recorded Health Intake list. Medication or supplement treatment advice needs a qualified health professional.', canConfirm: false, autoSave: false } }
+    const hasIngredientEdit = command?.operation === 'update' && ['food', 'water'].includes(command.entity) && ['ingredients', 'ingredientChanges', 'ingredientsAdd', 'portionMultiplier'].some(key => command.changes?.[key] !== undefined)
+    const prepared: any = actionRequest
+      ? hasIngredientEdit ? await prepareVoiceFoodRecordEdit(actionRequest, userId, command, transcript, localDate, country) : await prepareNativeVoiceRecordAction(actionRequest, userId, { ...command, localDate: command?.localDate || localDate })
+      : { canConfirm: false, summary: 'Choose an existing entry', confirmationMessage: 'Please give the exact entry and date to change.' }
+    return { aiCostCents: 0, draft: { action: 'record_action', transcript, localDate, ...prepared, recordAction: prepared.recordAction || { ...parsed?.recordAction, choices: prepared.choices }, autoSave: false } }
+  }
+  if (parsedAction === 'preference_action') {
+    try {
+      if (!actionRequest) throw new Error('Please name the setting and its exact new value.')
+      const prepared = await prepareVoicePreferenceAction(actionRequest, userId, parsed?.preferenceAction, { transcript })
+      return { aiCostCents: 0, draft: { action: 'preference_action', transcript, localDate, summary: prepared.summary, confirmationMessage: `${prepared.summary}. Would you like me to apply that change?`, canConfirm: true, autoSave: false, preferenceAction: prepared } }
+    } catch (error: any) {
+      const path = error instanceof VoicePreferenceActionError ? error.path : undefined
+      return { aiCostCents: 0, draft: { action: 'preference_action', transcript, localDate, summary: 'Setting needs review', confirmationMessage: cleanText(error?.message || 'Please give the setting and exact value to change.', 400), canConfirm: false, autoSave: false, preferenceAction: parsed?.preferenceAction, ...(path ? { appTarget: { title: 'Review setting', path } } : {}) } }
+    }
+  }
+  if (parsedAction === 'local_preference_action') {
+    const pref = parsed?.localPreference
+    const valid = pref && (['darkMode', 'hapticsEnabled', 'dataAnalytics'].includes(pref.key) ? typeof pref.value === 'boolean' : pref.key === 'profileVisibility' && ['private', 'public', 'friends'].includes(pref.value))
+    const labels: Record<string, string> = { darkMode: 'dark mode', hapticsEnabled: 'the device haptics setting', dataAnalytics: 'the device analytics setting', profileVisibility: 'profile visibility on this device' }
+    const summary = valid ? `Set ${labels[pref.key]} ${typeof pref.value === 'boolean' ? pref.value ? 'on' : 'off' : `to ${pref.value}`}` : 'Device setting needs clarification'
+    return { aiCostCents: 0, draft: { action: 'local_preference_action', transcript, localDate, summary, confirmationMessage: valid ? `${summary}. Would you like me to apply that change?` : 'Please name the device setting and its exact value.', canConfirm: Boolean(valid), autoSave: false, ...(valid ? { localPreference: { key: pref.key, value: pref.value } } : {}) } }
   }
   if (isSymptomTrackingRequest(transcript)) {
     return { aiCostCents: 0, draft: buildSymptomNotesHandoffDraft(transcript, localDate, parsedAction === 'symptom_note' ? parsed : undefined) }
@@ -5059,21 +5789,27 @@ async function normalizeDraft(
 
   if (action === 'recipe') {
     const requestText = cleanText(parsed?.recipeRequest || transcript, 1000)
+    const existingRecipe = parseExplicitVoiceRecipe(transcript) || parsed?.recipe?.importDraft || parsed?.recipeDraft || (parsed?.recipe && typeof parsed.recipe === 'object' && Array.isArray(parsed.recipe.ingredients) ? parsed.recipe : null)
+    if (existingRecipe) {
+      return { aiCostCents, draft: await prepareRecipeDestination(actionRequest, userId, existingRecipe, transcript, localDate, country) }
+    }
     const isDiaryRecommendation = isFoodRecommendationRequest(requestText || transcript, launchContext)
     const recipe = await buildRecipe(openai, requestText, userId, localDate, tzOffsetMin, isDiaryRecommendation ? { conversationFirst: true } : undefined)
     aiCostCents += recipe.costCents
     usedModel = recipe.model
     if (isDiaryRecommendation) {
+      const draft = buildFoodRecommendationConversationDraft(requestText, localDate, launchContext, recipe.text, { diarySnapshot: recipe.snapshot || null })
+      if (recipe.importDraft && draft.recipe) draft.recipe.importDraft = recipe.importDraft
       return {
         aiCostCents,
         usedModel,
-        draft: buildFoodRecommendationConversationDraft(requestText, localDate, launchContext, recipe.text, { diarySnapshot: recipe.snapshot || null }),
+        draft,
       }
     }
     return {
       aiCostCents,
       usedModel,
-      draft: buildRecipeHandoffDraft(requestText, localDate, recipe.text),
+      draft: await prepareRecipeDestination(actionRequest, userId, recipe.importDraft || recipe.text, transcript, localDate, country),
     }
   }
 
@@ -5259,7 +5995,8 @@ async function normalizeDraft(
       }
     }
     const mood = normalizeMood(explicitMood)
-    const summary = `Mood ${mood.mood}/7${mood.tags.length ? `, ${mood.tags.join(', ')}` : ''}`
+    const contextLine=nativeVoiceMoodContextSummary(mood.context)
+    const summary = `Mood ${mood.mood}/7${mood.tags.length ? `, ${mood.tags.join(', ')}` : ''}${contextLine?`; ${contextLine}`:''}`
     return {
       aiCostCents,
       draft: {
@@ -5267,7 +6004,7 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary,
-        confirmationMessage: `I can add this mood entry: ${summary}. Review it, then tap Confirm to save.`,
+        confirmationMessage: `I can add this mood entry: ${summary}.${mood.note ? ` Note: "${mood.note}".` : ''} Would you like me to save that?`,
         canConfirm: true,
         autoSave: false,
         mood,
@@ -5295,7 +6032,7 @@ async function normalizeDraft(
     const title = cleanText(journal?.title || 'Voice journal note', 120)
     const tags = Array.isArray(journal?.tags) ? journal.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 8) : []
     const journalTypeRaw = String(journal?.journalType || journal?.type || '').toLowerCase()
-    const journalType = journalTypeRaw === 'health' || /\bhealth journal\b/i.test(transcript) ? 'health' : 'mood'
+    const journalType = journalTypeRaw === 'mood' ? 'mood' : journalTypeRaw === 'health' || /\bhealth journal\b/i.test(transcript) ? 'health' : 'mood'
     const journalLabel = journalType === 'health' ? 'health journal' : 'journal'
     return {
       aiCostCents,
@@ -5314,12 +6051,12 @@ async function normalizeDraft(
 
   if (action === 'water') {
     const water = parsed?.water || {}
-    const parsedWater = tryParseWaterRequest(transcript, localDate, launchContext)
+    const parsedWater = tryParseWaterRequest(transcript, localDate, launchContext, country)
     if (parsedWater) return { aiCostCents, draft: await resolveVoiceDrinkDraft(parsedWater) }
     const amount = Number(water.amount)
     const unit = normalizeWaterUnit(String(water.unit || ''))
     if (unit && amount > 0 && Number.isFinite(amount) && /^(?:water)$/i.test(cleanText(water.label || water.drinkType, 80)) && transcript.replace(/[٠-٩]/g, (digit) => String('٠١٢٣٤٥٦٧٨٩'.indexOf(digit))).includes(String(amount))) {
-      return { aiCostCents, draft: tryParseWaterRequest(`log ${amount} ${unit} water`, localDate)! }
+      return { aiCostCents, draft: tryParseWaterRequest(`log ${amount} ${unit} water`, localDate, launchContext, country)! }
     }
     return { aiCostCents, draft: { action: 'water', transcript, localDate, summary: 'Drink details needed', canConfirm: false, confirmationMessage: 'Please tell me the drink, amount and any milk, sugar or honey. Nothing has been saved.' } }
   }
@@ -5327,6 +6064,7 @@ async function normalizeDraft(
   if (action === 'food_copy_previous') {
     const meal = cleanText(parsed?.food?.meal || 'breakfast', 40).toLowerCase() || 'breakfast'
     const copy = await buildFoodCopyDraft(userId, localDate, meal)
+    if(copy.error)return {aiCostCents,draft:{action:'food_copy_previous',transcript,localDate,summary:'Review the source meal before copying',confirmationMessage:copy.error,canConfirm:false,autoSave:false}}
     if (copy.rows.length === 0) {
       return {
         aiCostCents,
@@ -5348,13 +6086,15 @@ async function normalizeDraft(
         transcript,
         localDate,
         summary: `Copy ${copy.rows.length} ${meal} item${copy.rows.length === 1 ? '' : 's'} from yesterday`,
-        confirmationMessage: `I found ${copy.rows.length} ${meal} item${copy.rows.length === 1 ? '' : 's'} from ${copy.sourceDate}. Review them, then tap Confirm to copy them to today.`,
+        confirmationMessage: `I found ${copy.rows.length} ${meal} item${copy.rows.length === 1 ? '' : 's'} from ${copy.sourceDate}: ${copy.review} Confirm to copy this exact meal to ${localDate}. Nothing has been copied yet.`,
         canConfirm: true,
         autoSave: false,
         food: {
           meal,
           sourceDate: copy.sourceDate,
           sourceLogIds: copy.rows.map((row) => row.id),
+          sourceVersions:copy.sourceVersions,
+          sourceWaterVersions:copy.sourceWaterVersions,
           entries: copy.entries,
         },
       },
@@ -5362,7 +6102,11 @@ async function normalizeDraft(
   }
 
   if (action === 'food_build_meal' || action === 'food_draft') {
-    const builtMeal = await buildVoiceMealDraft(parsed?.food || {}, transcript, localDate)
+    const importedRecipe = parsed?.recipe?.importDraft || parsed?.food?.nutrition?.__importRecipe || parsed?.recipeDraft
+    if (importedRecipe) {
+      return { aiCostCents, draft: await prepareRecipeDestination(actionRequest, userId, importedRecipe, transcript, localDate, country) }
+    }
+    const builtMeal = await buildVoiceMealDraft(parsed?.food || {}, transcript, localDate, country)
     if (builtMeal) {
       return { aiCostCents, draft: builtMeal }
     }
@@ -5440,13 +6184,31 @@ async function buildAiDraftDecisionResponse(
   })
 }
 
+function needsReviewedAppControl(transcript: string, hint?: RealtimeActionHint | null) {
+  if (['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'app_read', 'support_action', 'report_action', 'recipe_import_url', 'device_action'].includes(hint?.action || '')) return true
+  if (/\b(?:apple health|sleep coach|sleep routine|sleep settings|listening settings)\b/i.test(transcript) && /\b(?:import|refresh|update|change|enable|disable|turn|select|set|check|uncheck)\b/i.test(transcript)) return true
+  if (/\b(?:support tickets?|weekly reports?|credit balance|credits available|device connection)\b/i.test(transcript) && /\b(?:check|show|read|list|how|what|generate|create|send|reply|close|end|delete|feedback)\b/i.test(transcript)) return true
+  if (/\b(?:notifications?|inbox)\b/i.test(transcript) && /\b(?:mark|read|delete|remove|clear)\b/i.test(transcript)) return true
+  const settings = /\b(profile|weight goal|daily (?:calorie|water|hydration) goal|hydration goal|water goal|nutrition goal|reminders?|quiet hours|weekly reports?|health setup|allergies|allergy|diet preferences?|dark mode|haptics?|analytics|profile visibility|check[ -]?in)\b/i
+  const changing = /\b(change|edit|update|delete|remove|rename|enable|disable|turn on|turn off|set|reset)\b/i
+  if (settings.test(transcript) && changing.test(transcript)) return true
+  if (/\b(?:save|create|add)\b.*\b(?:as|to|in)\s+(?:my\s+)?(?:favourites?|favorites?|custom foods?|your foods)\b/i.test(transcript)) return true
+  return /\b(change|edit|update|delete|remove|rename)\b/i.test(transcript) && /\b(food|meal|breakfast|lunch|dinner|snack|coffee|tea|water|drink|mood|journal|note|workout|exercise|entry|record|favourites?|favorites?|custom food)\b/i.test(transcript)
+}
+
 export async function POST(request: NextRequest) {
+  const trace = beginVoiceActionTrace(request, 'prepare')
+  return finishVoiceActionTrace(await prepareVoiceAction(request, trace), trace)
+}
+
+async function prepareVoiceAction(request: NextRequest, trace?: { userId?: string }) {
   const consentResponse = await aiConsentRequiredResponse(request)
   if (consentResponse) return consentResponse
 
   try {
     const user = await resolveUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (trace) trace.userId = user.id
 
     const contentType = request.headers.get('content-type') || ''
     let transcript = ''
@@ -5527,7 +6289,8 @@ export async function POST(request: NextRequest) {
     const todayLocalDate = localDateFromRequest(null, tzOffsetMin)
     let editableDraft = confirmationDraft || followUpDraft
     const reviewedFoodEdit = editableDraft && (extractReviewedFoodAddition(editableDraft, transcript) || extractReviewedFoodMealCorrection(editableDraft, transcript))
-    const explicitNewCommand = !reviewedFoodEdit && isExplicitNewVoiceCommand(transcript)
+    const recipeContinuation = isRecipeDestinationContinuation(editableDraft, transcript)
+    const explicitNewCommand = !reviewedFoodEdit && !recipeContinuation && isExplicitNewVoiceCommand(transcript)
     if (explicitNewCommand) {
       editableDraft = null
       confirmationDraft = null
@@ -5537,10 +6300,10 @@ export async function POST(request: NextRequest) {
       ? cleanText(confirmationDraft?.localDate || followUpDraft?.localDate, 20)
       : ''
     if (/^\d{4}-\d{2}-\d{2}$/.test(activeDraftDate)) localDate = activeDraftDate
-    transcript = explicitNewCommand ? transcript : followUpTranscript(followUpDraft, transcript) || transcript
+    transcript = explicitNewCommand || recipeContinuation ? transcript : followUpTranscript(followUpDraft, transcript) || transcript
     if (!transcript) return NextResponse.json({ error: 'No speech found' }, { status: 400 })
     localDate = resolveRequestedActionDate(transcript, transcriptHasDateEvidence(transcript) ? todayLocalDate : localDate)
-    const sealDraft = (draft: VoiceDraft) => sealReviewDraft(user.id, applyDraftTiming(draft, transcript, tzOffsetMin, confirmationDraft || followUpDraft, timeZoneRaw, todayLocalDate))
+    const sealDraft = (draft: VoiceDraft) => sealReviewDraft(user.id, applyDraftTiming(draft, transcript, tzOffsetMin, explicitNewCommand ? undefined : editableDraft, timeZoneRaw, todayLocalDate))
     if (wantsVoiceReply && !aiConsentGranted) {
       return NextResponse.json({ error: 'AI sharing consent is required before spoken replies can be created.' }, { status: 403 })
     }
@@ -5554,15 +6317,6 @@ export async function POST(request: NextRequest) {
         chargedCredits: 0,
         voiceReply: false,
       })
-    }
-
-    const wallet = await new CreditManager(user.id).getWalletStatus()
-    if (!hasPaidVoiceWalletAccess(wallet)) {
-      return voicePaidAccessResponse()
-    }
-    const minimumRequestCredits = SIMPLE_MIN_CREDITS + (wantsVoiceReply ? VOICE_REPLY_MIN_CREDITS : 0)
-    if (wallet.totalAvailableCents < minimumRequestCredits) {
-      return NextResponse.json({ error: 'Insufficient credits', estimatedCost: minimumRequestCredits, availableCredits: wallet.totalAvailableCents }, { status: 402 })
     }
 
     if (confirmationDraft && isConfirmingDraftText(transcript)) {
@@ -5591,7 +6345,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    if (confirmationDraft && isRejectingDraftText(transcript)) {
+    if (editableDraft && isRejectingDraftText(transcript)) {
       const chargeCents = 0
       await logAiUsageEvent({
         feature: 'voice-assistant:reject-command',
@@ -5616,7 +6370,17 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const correctedDraft = editableDraft ? await buildReviewedDraftCorrection(editableDraft, transcript, localDate) : null
+    if (recipeContinuation && editableDraft?.recipe?.importDraft) {
+      const draft = await prepareRecipeDestination(request, user.id, editableDraft.recipe.importDraft, transcript, localDate, user.country || undefined, editableDraft)
+      return NextResponse.json({ success: true, transcript, draft: await sealDraft(draft), audio: null, chargedCredits: 0, voiceReply: false })
+    }
+
+    if (editableDraft && !editableDraft.canConfirm && isConfirmingDraftText(transcript)) {
+      return NextResponse.json({ success: true, transcript, draft: editableDraft, audio: null, chargedCredits: 0, voiceReply: false })
+    }
+
+    const keepsReviewedFoodSource = editableDraft && verifyNativeVoiceDraft(user.id, editableDraft) && !/\b(?:different (?:brand|restaurant|country)|Australian|Canadian|British|American|United Kingdom|menu country)\b/i.test(transcript)
+    const correctedDraft = editableDraft ? await buildReviewedDraftCorrection(editableDraft, transcript, localDate, user.country || undefined, keepsReviewedFoodSource ? editableDraft.food?.items : undefined) : null
     if (correctedDraft) {
       let aiCostCents = transcriptionCostCents
       const chargeCents = 0
@@ -5644,10 +6408,41 @@ export async function POST(request: NextRequest) {
       })
     }
 
+    const verifiedReviewedFollowUp = confirmationDraft && verifyNativeVoiceDraft(user.id, confirmationDraft)
+    const wallet = await new CreditManager(user.id).getWalletStatus()
+    if (!verifiedReviewedFollowUp && !hasPaidVoiceWalletAccess(wallet)) {
+      return voicePaidAccessResponse()
+    }
+    const minimumRequestCredits = SIMPLE_MIN_CREDITS + (wantsVoiceReply ? VOICE_REPLY_MIN_CREDITS : 0)
+    if (!verifiedReviewedFollowUp && wallet.totalAvailableCents < minimumRequestCredits) {
+      return NextResponse.json({ error: 'Insufficient credits', estimatedCost: minimumRequestCredits, availableCredits: wallet.totalAvailableCents }, { status: 402 })
+    }
+
+    if (!editableDraft && /https?:\/\//i.test(transcript) && /\b(?:import|use|save|add|recipe)\b/i.test(transcript)) {
+      const normalized = await normalizeDraft({ action: 'recipe_import_url' }, transcript, localDate, user.id, null as any, tzOffsetMin, [], launchContext, conversationHistory, user.country || undefined, request)
+      // Preparing a link performs no AI import. The normal importer charges its
+      // stated ten credits only after this separate reviewed confirmation.
+      return NextResponse.json({ success: true, transcript, draft: await sealDraft(normalized.draft), audio: null, chargedCredits: 0, voiceReply: false })
+    }
+
+    const explicitUserRecipe = !editableDraft ? parseExplicitVoiceRecipe(transcript) : null
+    if (explicitUserRecipe) {
+      const draft = await prepareRecipeDestination(request, user.id, explicitUserRecipe, transcript, localDate, user.country || undefined)
+      const chargeCents = Math.max(SIMPLE_MIN_CREDITS, transcriptionCostCents)
+      const freshWallet = await new CreditManager(user.id).getWalletStatus()
+      if (freshWallet.totalAvailableCents < chargeCents || !await new CreditManager(user.id).chargeCents(chargeCents)) {
+        return NextResponse.json({ error: 'Insufficient credits', estimatedCost: chargeCents, availableCredits: freshWallet.totalAvailableCents }, { status: 402 })
+      }
+      await logAiUsageEvent({ feature: 'voice-assistant:quick-recipe-command', userId: user.id, endpoint: '/api/native/voice-assistant', model: 'explicit-recipe-router', promptTokens: 0, completionTokens: 0, costCents: chargeCents, success: true, detail: 'Prepared the complete dictated recipe for review without generation or saving' })
+      return NextResponse.json({ success: true, transcript, draft: await sealDraft(draft), audio: null, chargedCredits: chargeCents, voiceReply: false })
+    }
+
     const storedFavorites = await loadStoredFavorites(user.id).catch(() => [])
     const recentFoodFavorites = await loadRecentFoodLibraryFavorites(user.id).catch(() => [])
-    const favorites = mergeFavorites(mergeFavorites(clientFavorites, storedFavorites), recentFoodFavorites)
-    const quickHealthIntakeDraft = tryParseHealthIntakeItemsRequest(transcript, localDate, launchContext)
+    const appControlRequest = ['record_action', 'preference_action', 'local_preference_action', 'notification_action', 'support_action', 'report_action', 'recipe_import_url', 'device_action'].includes(editableDraft?.action || '') || (!editableDraft && needsReviewedAppControl(transcript, realtimeActionHint))
+    const allowsFavoriteShortcut = !appControlRequest && (!editableDraft || /\b(favourites?|favorites?|my saved)\b/i.test(transcript)) && (!realtimeActionHint || realtimeActionHint.action === 'food_favorite' || /\b(favourites?|favorites?|my saved)\b/i.test(transcript))
+    const favorites = allowsFavoriteShortcut ? mergeFavorites(mergeFavorites(clientFavorites, storedFavorites), recentFoodFavorites) : []
+    const quickHealthIntakeDraft = appControlRequest ? null : tryParseHealthIntakeItemsRequest(transcript, localDate, launchContext)
     if (quickHealthIntakeDraft) {
       const draft = quickHealthIntakeDraft
       let aiCostCents = transcriptionCostCents
@@ -5769,8 +6564,11 @@ export async function POST(request: NextRequest) {
       const followUpMealTurn: VoiceConversationTurn = { role: 'assistant', text: followUpMealText }
       conversationHistory = [...conversationHistory, followUpMealTurn].slice(-6)
     }
-    const priorMealRecommendation = latestMealRecommendationText(conversationHistory)
-    const priorMealBuildOffer = latestMealBuildOfferText(conversationHistory)
+    const loggingActionHint = ['food_draft', 'food_build_meal', 'food_favorite', 'water', 'mood', 'exercise', 'journal', 'symptom_note', 'health_intake_items'].includes(realtimeActionHint?.action || '')
+    const namedLoggingRequest = loggingActionHint && !/\b(?:this|that|the)\s+(?:meal|recipe)\b/i.test(transcript) && !isFoodRecommendationRequest(transcript, launchContext)
+    const allowsRecommendationContext = !editableDraft && !explicitNewCommand && !namedLoggingRequest && !appControlRequest
+    const priorMealRecommendation = allowsRecommendationContext ? latestMealRecommendationText(conversationHistory) : undefined
+    const priorMealBuildOffer = allowsRecommendationContext ? latestMealBuildOfferText(conversationHistory) : undefined
     if (priorMealBuildOffer && isRejectingDraftText(transcript)) {
       const draft = buildFoodRecommendationBuildDeclineDraft(transcript, localDate)
       let aiCostCents = transcriptionCostCents
@@ -5915,6 +6713,7 @@ export async function POST(request: NextRequest) {
         diarySnapshot: fallbackSnapshot,
         adjustment: true,
       })
+      if (recipe?.importDraft && draft.recipe) draft.recipe.importDraft = recipe.importDraft
       let aiCostCents = transcriptionCostCents + (recipe?.costCents || 0)
       let chargeCents = Math.max(recipe ? RECIPE_MIN_CREDITS : SIMPLE_MIN_CREDITS, aiCostCents)
       let audio: string | null = null
@@ -5962,6 +6761,7 @@ export async function POST(request: NextRequest) {
       const recipe = aiIntentClient && aiConsentGranted ? await buildRecipe(aiIntentClient, transcript, user.id, localDate, tzOffsetMin, { conversationFirst: true }) : null
       const fallbackSnapshot = recipe?.snapshot || (await buildFoodDiarySnapshot({ userId: user.id, localDate, tzOffsetMin }).catch(() => null))
       const draft = buildFoodRecommendationConversationDraft(transcript, localDate, launchContext, recipe?.text, { diarySnapshot: fallbackSnapshot })
+      if (recipe?.importDraft && draft.recipe) draft.recipe.importDraft = recipe.importDraft
       let aiCostCents = transcriptionCostCents + (recipe?.costCents || 0)
       let chargeCents = Math.max(recipe ? RECIPE_MIN_CREDITS : SIMPLE_MIN_CREDITS, aiCostCents)
       let audio: string | null = null
@@ -6013,6 +6813,7 @@ export async function POST(request: NextRequest) {
         alternativeTo: priorMealRecommendation,
         diarySnapshot: fallbackSnapshot,
       })
+      if (recipe?.importDraft && draft.recipe) draft.recipe.importDraft = recipe.importDraft
       let aiCostCents = transcriptionCostCents + (recipe?.costCents || 0)
       let chargeCents = Math.max(recipe ? RECIPE_MIN_CREDITS : SIMPLE_MIN_CREDITS, aiCostCents)
       let audio: string | null = null
@@ -6058,26 +6859,38 @@ export async function POST(request: NextRequest) {
     }
 
     let fastRealtimeDraft: VoiceDraft | null = null
-    if (realtimeActionHint?.action === 'exercise') {
+    if (appControlRequest) {
+      // Existing-record and preference changes must reach the reviewed action
+      // adapters, never a shortcut that creates a new record instead.
+    } else if (realtimeActionHint?.action === 'exercise') {
       const parsedExercise = tryParseExerciseRequest(transcript, launchContext)
       if (parsedExercise) {
-        fastRealtimeDraft = (await normalizeDraft(parsedExercise, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory)).draft
+        fastRealtimeDraft = (await normalizeDraft(parsedExercise, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory, user.country || undefined, request)).draft
       }
     } else if (realtimeActionHint?.action === 'water') {
-      fastRealtimeDraft = tryParseWaterRequest(transcript, localDate, launchContext)
+      fastRealtimeDraft = tryParseWaterRequest(transcript, localDate, launchContext, user.country || undefined)
     } else if (realtimeActionHint?.action === 'journal') {
       const parsedJournal = tryParseJournalRequest(transcript, launchContext)
       if (parsedJournal) {
-        fastRealtimeDraft = (await normalizeDraft(parsedJournal, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory)).draft
+        fastRealtimeDraft = (await normalizeDraft(parsedJournal, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory, user.country || undefined, request)).draft
       }
     } else if (realtimeActionHint?.action === 'mood') {
       const parsedMood = tryParseMoodRequest(transcript, launchContext)
       if (parsedMood) {
-        fastRealtimeDraft = (await normalizeDraft(parsedMood, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory)).draft
+        fastRealtimeDraft = (await normalizeDraft(parsedMood, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory, user.country || undefined, request)).draft
       }
     } else if (realtimeActionHint?.action === 'food_build_meal' || realtimeActionHint?.action === 'food_draft') {
       const parsedFood = tryParseIngredientMealRequest(transcript) || tryParseDirectFoodRequest(transcript, launchContext)
-      if (parsedFood) fastRealtimeDraft = await buildVoiceMealDraft(parsedFood, transcript, localDate)
+      if (parsedFood) fastRealtimeDraft = await buildVoiceMealDraft(parsedFood, transcript, localDate, user.country || undefined)
+    } else if (!realtimeActionHint && !editableDraft && !wantsVoiceReply) {
+      // Typed food requests use the same measured, source-resolved path as
+      // live voice. A complete explicit meal need not wait for a second model
+      // to rediscover the foods the existing parser has already identified.
+      fastRealtimeDraft = tryParseWaterRequest(transcript, localDate, launchContext, user.country || undefined)
+      if (!fastRealtimeDraft) {
+        const parsedFood = tryParseIngredientMealRequest(transcript) || tryParseDirectFoodRequest(transcript, launchContext)
+        if (parsedFood) fastRealtimeDraft = await buildVoiceMealDraft(parsedFood, transcript, localDate, user.country || undefined)
+      }
     }
 
     if (fastRealtimeDraft) {
@@ -6113,10 +6926,10 @@ export async function POST(request: NextRequest) {
 
     if (aiIntentClient && aiConsentGranted) {
       try {
-        const command = await runJsonCommandModel(aiIntentClient, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft, realtimeActionHint)
+        const command = await runJsonCommandModel(aiIntentClient, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft || followUpDraft, realtimeActionHint)
         const draftDecision = confirmationDraft ? aiDraftDecision(command.parsed) : null
         if (draftDecision) return buildAiDraftDecisionResponse(user.id, transcript, confirmationDraft, draftDecision, command, transcriptionCostCents)
-        const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, aiIntentClient, tzOffsetMin, favorites, launchContext, conversationHistory)
+        const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, aiIntentClient, tzOffsetMin, favorites, launchContext, conversationHistory, user.country || undefined, request, normalizeVoiceTimeZone(timeZoneRaw))
         let draft = normalized.draft
         if (draft.action === 'health_question' && isFoodRecommendationRequest(transcript, launchContext)) {
           const fallbackSnapshot = await buildFoodDiarySnapshot({ userId: user.id, localDate, tzOffsetMin }).catch(() => null)
@@ -6170,9 +6983,11 @@ export async function POST(request: NextRequest) {
         })
       } catch (error) {
         aiFirstAttemptFailed = true
-        console.warn('[native voice assistant] AI-first understanding failed; using local fallback', error)
+        console.warn('[native voice assistant] AI-first understanding failed; using local fallback')
       }
     }
+
+    if (appControlRequest) return NextResponse.json({ success: true, transcript, draft: { action: 'unknown', transcript, localDate, summary: 'Change needs clarification', confirmationMessage: 'I could not prepare that change. Please give the exact setting or existing entry and the change you want. Nothing has been changed.', canConfirm: false }, chargedCredits: 0, audio: null, voiceReply: false })
 
     const favoriteDraft = shouldUseFavoriteFood(transcript, favorites) ? await buildFavoriteFoodDraft(transcript, localDate, favorites) : null
     if (favoriteDraft) {
@@ -6224,7 +7039,7 @@ export async function POST(request: NextRequest) {
       })
     }
 
-    const quickWaterDraft = tryParseWaterRequest(transcript, localDate, launchContext)
+    const quickWaterDraft = tryParseWaterRequest(transcript, localDate, launchContext, user.country || undefined)
     if (quickWaterDraft) {
       const draft = quickWaterDraft
       let aiCostCents = transcriptionCostCents
@@ -6275,7 +7090,7 @@ export async function POST(request: NextRequest) {
     }
 
     const quickMealFood = tryParseIngredientMealRequest(transcript) || tryParseDirectFoodRequest(transcript, launchContext)
-    const quickMealDraft = quickMealFood ? await buildVoiceMealDraft(quickMealFood, transcript, localDate) : null
+    const quickMealDraft = quickMealFood ? await buildVoiceMealDraft(quickMealFood, transcript, localDate, user.country || undefined) : null
     if (quickMealDraft) {
       const draft = quickMealDraft
       let aiCostCents = transcriptionCostCents
@@ -6418,7 +7233,7 @@ export async function POST(request: NextRequest) {
       tryParseExerciseRequest(transcript, launchContext) ||
       tryParseMoodRequest(transcript, launchContext)
     if (quickParsed) {
-      const normalized = await normalizeDraft(quickParsed, transcript, localDate, user.id, null as any, tzOffsetMin, favorites)
+      const normalized = await normalizeDraft(quickParsed, transcript, localDate, user.id, null as any, tzOffsetMin, favorites, launchContext, conversationHistory, user.country || undefined, request)
       const draft = normalized.draft
       let aiCostCents = transcriptionCostCents
       let chargeCents = Math.max(SIMPLE_MIN_CREDITS, aiCostCents)
@@ -6553,10 +7368,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'AI sharing consent is required before this request can be sent to AI.' }, { status: 403 })
     }
 
-    const command = await runJsonCommandModel(openai, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft, realtimeActionHint)
+    const command = await runJsonCommandModel(openai, transcript, localDate, user.id, launchContext, conversationHistory, confirmationDraft || followUpDraft, realtimeActionHint)
     const draftDecision = confirmationDraft ? aiDraftDecision(command.parsed) : null
     if (draftDecision) return buildAiDraftDecisionResponse(user.id, transcript, confirmationDraft, draftDecision, command, transcriptionCostCents)
-    const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin, favorites, launchContext, conversationHistory)
+    const normalized = await normalizeDraft(command.parsed, transcript, localDate, user.id, openai, tzOffsetMin, favorites, launchContext, conversationHistory, user.country || undefined, request, normalizeVoiceTimeZone(timeZoneRaw))
     let draft = normalized.draft
     let aiCostCents = transcriptionCostCents + command.wrapped.costCents + normalized.aiCostCents
     const isRecipe = draft.action === 'recipe'
@@ -6610,7 +7425,7 @@ export async function POST(request: NextRequest) {
         { status: 429 },
       )
     }
-    console.error('[native voice assistant] draft failed', error)
+    console.error('[native voice assistant] draft failed')
     return NextResponse.json({ error: error?.message || 'Voice assistant failed' }, { status: 500 })
   }
 }

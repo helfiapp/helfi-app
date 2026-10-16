@@ -15,6 +15,7 @@ let clockMs = Date.parse('2026-10-15T01:00:00.000Z')
 class AuditDate extends Date {
   constructor(...args) { super(...(args.length ? args : [clockMs])) }
   static now() { return clockMs }
+  static setNow(value) { clockMs = value }
 }
 class SyntheticDuplicate extends Error {
   constructor() { super('synthetic unique constraint'); this.code = 'P2002' }
@@ -38,6 +39,8 @@ function load(relativePath, fixtures = {}) {
   return context
 }
 const tokens = load('lib/native-voice-review-token.ts')
+const moodContext = load('lib/native-voice-mood-context.ts')
+const foodCopy = load('lib/native-voice-food-copy.ts')
 function signed(draft = {}) {
   const result = { canConfirm: true, action: 'water', localDate: '2026-10-15',
     reviewIssuedAt: clockMs, reviewNonce: crypto.randomUUID(),
@@ -53,18 +56,22 @@ function deferred() {
   return { promise, resolve }
 }
 function harness(options = {}) {
-  let state = { tokens: {}, water: [], food: [], symptoms: [] }
+  let state = { tokens: {}, water: [], food: [], symptoms: [], exercise: [], mood: [] }
   let nextId = 0
   let queue = Promise.resolve()
   let foodFailures = options.foodFailures || 0
   let foodAttempts = 0
   let held = false
+  let chunkFailures = options.chunkFailures || 0
   const entered = deferred()
   const release = deferred()
   const effects = []
   const sourceFood = options.sourceFood || []
   function client(getState, inTransaction) {
     const mustBeAtomic = () => assert.equal(inTransaction, true, 'Food/hydration writes must use the transaction client')
+    const boundedIndex = data => {
+      if (Buffer.byteLength(data.identifier) + Buffer.byteLength(data.token) + 16 > 2704) throw new Error('Synthetic PostgreSQL indexed value limit')
+    }
     return {
       user: { findUnique: async () => ({ id: 'synthetic-user' }) },
       verificationToken: {
@@ -78,16 +85,30 @@ function harness(options = {}) {
           return { count: 0 }
         },
         create: async ({ data }) => {
+          boundedIndex(data)
           if (getState().tokens[data.token]) throw new SyntheticDuplicate()
           getState().tokens[data.token] = { ...data }
           return { ...data }
         },
+        createMany: async ({ data }) => {
+          assert.equal(inTransaction, true, 'Receipt chunks must be written in the atomic completion transaction')
+          if (options.ignoreChunkWrites) return { count: data.length }
+          for (const [index, row] of data.entries()) {
+            boundedIndex(row)
+            if (chunkFailures > 0 && index === 1) { chunkFailures--; throw Error('synthetic chunk write failure') }
+            if (getState().tokens[row.token]) throw new SyntheticDuplicate()
+            getState().tokens[row.token] = { ...row }
+          }
+          return { count: data.length }
+        },
         update: async ({ where, data }) => {
           if (options.failReceipt) throw new Error('synthetic receipt failure')
           assert(getState().tokens[where.token], 'Receipt must complete an existing claim')
+          boundedIndex({ ...getState().tokens[where.token], ...data })
           return Object.assign(getState().tokens[where.token], data)
         },
         findUnique: async ({ where }) => getState().tokens[where.token] || null,
+        findMany: async ({ where }) => Object.values(getState().tokens).filter(row => row.identifier.startsWith(where.identifier.startsWith) && row.expires.getTime() > where.expires.gt.getTime()),
       },
       waterLog: { create: async ({ data }) => {
         mustBeAtomic()
@@ -95,7 +116,7 @@ function harness(options = {}) {
         const row = { id: `water-${++nextId}`, ...data }
         getState().water.push(row)
         return row
-      } },
+      },createMany:async({data})=>{mustBeAtomic();for(const row of data)getState().water.push(structuredClone(row));return {count:data.length}} },
       foodLog: {
         create: async ({ data }) => {
           mustBeAtomic()
@@ -108,12 +129,20 @@ function harness(options = {}) {
           getState().food.push(row)
           return row
         },
-        findMany: async () => sourceFood,
+        findMany: async ({where}={}) => [...sourceFood,...getState().food].filter(row=>(!where?.userId||row.userId===where.userId)&&(!where?.localDate||row.localDate===where.localDate)&&(!where?.id?.in||where.id.in.includes(row.id))),
+        createMany:async({data})=>{
+          mustBeAtomic()
+          for(const row of data){foodAttempts++;if(foodFailures>0||foodAttempts===options.failFoodAttempt){foodFailures=Math.max(0,foodFailures-1);throw new Error('synthetic food write failure')}getState().food.push(structuredClone(row))}
+          return {count:data.length}
+        },
       },
       symptomAnalysis: { create: async ({ data }) => {
         if (options.failSymptom) throw new Error('synthetic symptom write failure')
         const row = { id: `symptom-${++nextId}`, ...data }; getState().symptoms.push(row); return row
       } },
+      exerciseType: { findUnique: async () => ({ id: 1, name: 'yoga', met: 3 }) },
+      exerciseEntry: { create: async ({ data }) => { const row = { id: `exercise-${++nextId}`, ...data }; getState().exercise.push(row); return row } },
+      $queryRawUnsafe: async (sql, id, userId, localDate, mood, tags, note, context) => { assert.match(sql, /INSERT INTO MoodEntries/); getState().mood.push({ id, userId, localDate, mood, tags, note, context }); return [] },
       healthGoal: { findFirst: async () => null },
     }
   }
@@ -131,10 +160,26 @@ function harness(options = {}) {
     } finally { finished.resolve() }
   }
   const route = load('app/api/native/voice-assistant/confirm/route.ts', {
+    nativeVoiceFoodCopyVersion:foodCopy.nativeVoiceFoodCopyVersion,nativeVoiceFoodCopyWaterVersion:foodCopy.nativeVoiceFoodCopyWaterVersion,nativeVoiceFoodCopyWaterId:foodCopy.nativeVoiceFoodCopyWaterId,relinkNativeVoiceCopiedDrink:foodCopy.relinkNativeVoiceCopiedDrink,
+    saveNativeVoiceMood: (request,userId,draft)=>moodContext.saveNativeVoiceMood({signal:{aborted:false}},userId,draft,{
+      userId:async()=>options.unauthorized?null:'synthetic-user',
+      call:async(_request,method,body)=>{
+        if(method==='POST'){const row={id:`mood-${++nextId}`,userId,...body};state.mood.push(row);return {success:true,id:row.id}}
+        return {entries:state.mood}
+      },
+    }),
     Prisma: { PrismaClientKnownRequestError: SyntheticDuplicate, JsonNull: null }, prisma,
     getServerSession: async () => options.unauthorized ? null : ({ user: { id: 'synthetic-user' } }),
     getUserIdFromNativeAuth: async () => null, authOptions: {},
     verifyNativeVoiceDraft: tokens.verifyNativeVoiceDraft,
+    estimateVoiceExerciseDurationMinutes: () => null,
+    inferMetAndLabel: ({ durationMinutes }) => ({ durationMinutes, met: 3, label: 'yoga' }),
+    getHealthProfileForUser: async () => ({ weightKg: 70 }),
+    calculateExerciseCalories: () => 100,
+    ensureMoodTables: async () => {},
+    deleteNotificationsByType: async () => {},
+    beginVoiceActionTrace: () => ({}),
+    finishVoiceActionTrace: async (response) => response,
     NextResponse: { json: (body, options) => ({ status: options?.status || 200, body }) },
     triggerBackgroundRegeneration: async (data) => { effects.push(data) },
     deleteSmartCoachNotificationsByCategories: async () => {},
@@ -154,6 +199,81 @@ const checks = []
 async function check(name, callback) { await callback(); checks.push(name) }
 
 async function run() {
+  await check('mood saves only the reviewed note; blank never falls back to an unreviewed command', async () => {
+    for (const note of ['', 'Exact reviewed note']) {
+      const h = harness(), draft = signed({ action: 'mood', transcript: 'Log my mood as five out of seven, command text', mood: { mood: 5, tags: [], note } })
+      assert.equal((await h.send(draft)).status, 200); assert.equal(h.state().mood.length, 1); assert.equal(h.state().mood[0].note, note)
+    }
+  })
+  await check('large Unicode result uses bounded ASCII indexed chunks and replays the exact complete result', async () => {
+    const h = harness(), draft = signed(), result = { kind: 'recipe_import', message: 'Imported for review only', status: 'imported_not_saved', saved: false, nextRecipeDraft: { title: 'Рецепт 🍲', steps: Array.from({ length: 250 }, (_, index) => `${index}: ${crypto.createHash('sha256').update(`synthetic-${index}`).digest('hex')} — млеко 🥛`) } }
+    assert(Buffer.byteLength(JSON.stringify(result)) > 2704)
+    await h.route.markReviewTokenUsed('synthetic-user', draft)
+    await h.route.completeReviewToken('synthetic-user', draft, result)
+    assert.deepEqual(json(await h.route.completedReviewResult('synthetic-user', draft)), result)
+    const rows = Object.values(h.state().tokens)
+    assert(rows.length > 20)
+    assert(rows.every(row => /^[\x00-\x7f]*$/.test(row.identifier) && Buffer.byteLength(row.identifier) + Buffer.byteLength(row.token) + 16 <= 2704))
+    assert(rows.every(row => !row.identifier.includes('млеко')))
+  })
+  await check('missing corrupted foreign expired or extra receipt chunks never prove success', async () => {
+    const result = { kind: 'recipe_import', message: 'Imported for review', content: 'Ж'.repeat(5000) }
+    for (const alter of [
+      rows => { delete rows[Object.keys(rows).find(key => rows[key].identifier.startsWith('native-voice-review-chunk:'))] },
+      rows => { const row = Object.values(rows).find(row => row.identifier.startsWith('native-voice-review-chunk:')); row.identifier = row.identifier.slice(0, -1) + 'X' },
+      rows => { const row = Object.values(rows).find(row => row.identifier.startsWith('native-voice-review-chunk:')); row.token = 'wrong-chunk-token' },
+      rows => { const row = Object.values(rows).find(row => row.identifier.startsWith('native-voice-review-chunk:')); row.expires = new AuditDate(clockMs - 1) },
+      rows => { const row = Object.values(rows).find(row => row.identifier.startsWith('native-voice-review-chunk:')); rows['extra-chunk'] = { ...row, token: 'extra-chunk' } },
+    ]) {
+      const h = harness(), draft = signed(); await h.route.markReviewTokenUsed('synthetic-user', draft); await h.route.completeReviewToken('synthetic-user', draft, result)
+      assert.equal(await h.route.completedReviewResult('different-user', draft), null)
+      alter(h.state().tokens); assert.equal(await h.route.completedReviewResult('synthetic-user', draft), null)
+    }
+  })
+  await check('legacy small JSON receipts remain readable and chunk garbage collection stays owner scoped', async () => {
+    const h = harness(), draft = signed(), digest = h.route.usedReviewTokenDigest(draft.reviewToken)
+    const legacy = { kind: 'water', id: 'legacy-water', message: 'Water saved.' }
+    h.state().tokens[digest] = { token: digest, identifier: `native-voice-review-result:synthetic-user:${JSON.stringify(legacy)}`, expires: new AuditDate(clockMs + 10000) }
+    assert.deepEqual(json(await h.route.completedReviewResult('synthetic-user', draft)), legacy)
+    const ownPrefix = h.route.reviewResultChunkPrefix('synthetic-user'), foreignPrefix = h.route.reviewResultChunkPrefix('other-user')
+    h.state().tokens.oldOwn = { token: 'oldOwn', identifier: `${ownPrefix}old:0:QQ==`, expires: new AuditDate(clockMs - 1) }
+    h.state().tokens.oldForeign = { token: 'oldForeign', identifier: `${foreignPrefix}old:0:QQ==`, expires: new AuditDate(clockMs - 1) }
+    await h.route.markReviewTokenUsed('synthetic-user', signed())
+    assert.equal(h.state().tokens.oldOwn, undefined); assert(h.state().tokens.oldForeign)
+  })
+  await check('a mid-chunk failure rolls back food water and every receipt row together; retry saves once', async () => {
+    const h = harness({ chunkFailures: 1 }), draft = signed()
+    const run = () => h.route.prisma.$transaction(async tx => {
+      await h.route.markReviewTokenUsed('synthetic-user', draft, tx)
+      const result = await h.route.saveWater('synthetic-user', draft, tx)
+      await h.route.completeReviewToken('synthetic-user', draft, { ...result, detail: 'Ж'.repeat(10000) }, tx)
+    })
+    await assert.rejects(run(), /chunk write failure/)
+    assert.equal(h.state().water.length, 0); assert.equal(Object.keys(h.state().tokens).length, 0)
+    await run(); assert.equal(h.state().water.length, 1); assert.equal((await h.route.completedReviewResult('synthetic-user', draft)).kind, 'water')
+  })
+  await check('receipt count and byte limits refuse oversized results before any chunk is published', async () => {
+    const h = harness(), draft = signed(); await h.route.markReviewTokenUsed('synthetic-user', draft)
+    await assert.rejects(h.route.completeReviewToken('synthetic-user', draft, { kind: 'recipe_import', message: 'Imported', detail: 'x'.repeat(8 * 1024 * 1024) }), /too large/)
+    assert.equal(Object.keys(h.state().tokens).length, 1); assert.equal(await h.route.completedReviewResult('synthetic-user', draft), null)
+  })
+  await check('first success requires full stored receipt readback even if the chunk writer reports success', async () => {
+    const h = harness({ ignoreChunkWrites: true })
+    const response = await h.send(signed())
+    assert.equal(response.status, 500); assert.match(response.body.error, /receipt could not be verified/)
+    assert.equal(h.state().water.length, 0); assert.equal(Object.keys(h.state().tokens).length, 0)
+  })
+  await check('signed explicit exercise clock time persists once and absent time keeps normal manual behavior', async () => {
+    const h = harness()
+    const draft = signed({ action: 'exercise', localDate: '2026-06-15', localTime: '19:30', tzOffsetMin: -600, exercise: { exerciseTypeId: 1, exerciseName: 'yoga', durationMinutes: 20 } })
+    const saved = await h.send(draft); const replay = await h.send(draft)
+    assert.equal(saved.status, 200); assert.equal(replay.body.idempotentReplay, true); assert.equal(h.state().exercise.length, 1)
+    assert.equal(h.state().exercise[0].startTime.toISOString(), '2026-06-15T09:30:00.000Z'); assert.equal(h.state().exercise[0].localDate, '2026-06-15')
+    const noTime = harness(); assert.equal((await noTime.send(signed({ action: 'exercise', exercise: { exerciseTypeId: 1, exerciseName: 'yoga', durationMinutes: 20 } }))).status, 200)
+    assert.equal(noTime.state().exercise[0].startTime, null)
+    const invalid = harness(); const bad = signed({ action: 'exercise', localTime: '25:30', tzOffsetMin: -600, exercise: { exerciseTypeId: 1, exerciseName: 'yoga', durationMinutes: 20 } })
+    assert.equal((await invalid.send(bad)).status, 500); assert.equal(invalid.state().exercise.length, 0)
+  })
   await check('plain water saves one hydration row and no food', async () => {
     const h = harness(); const response = await h.send(signed())
     assert.equal(response.status, 200); assert.equal(h.state().water.length, 1); assert.equal(h.state().food.length, 0)
@@ -174,11 +294,12 @@ async function run() {
   await check('coffee with milk and sugar counts all resolved ingredients once', async () => {
     const h = harness()
     const response = await h.send(drink({
-      water: { amount: 300, unit: 'ml', amountMl: 300, drinkType: 'Coffee', label: 'Coffee with milk and sugar', category: 'snacks' },
+      water: { amount: 300, unit: 'ml', amountMl: 300, drinkType: 'Coffee', label: 'Coffee with milk and sugar', category: 'snacks', sweetener: { type: 'sugar', amount: 2, unit: 'tsp', grams: 8 } },
       food: { meal: 'snacks', nutrition: { calories: 64 }, items: [
         foodItem({ name: 'Coffee', calories: 2, protein_g: 0, carbs_g: 0, fat_g: 0, fiber_g: 0, sugar_g: 0 }),
         foodItem({ name: 'Milk', calories: 30, protein_g: 1.6, carbs_g: 2.4, fat_g: 1.6, fiber_g: 0, sugar_g: 2.4 }),
-        foodItem({ name: 'Sugar', calories: 32, protein_g: 0, carbs_g: 8, fat_g: 0, fiber_g: 0, sugar_g: 8 }),
+        foodItem({ name: 'Sugar', serving_size: '8 g', calories: 32, protein_g: 0, carbs_g: 8, fat_g: 0, fiber_g: 0, sugar_g: 8,
+          nutritionCoversServing: true, __voiceSourceFood: { id: 'synthetic-sugar', name: 'Sugar', calories: 400, protein_g: 0, carbs_g: 100, fat_g: 0, fiber_g: 0, sugar_g: 100 } }),
       ] },
     }))
     assert.equal(response.status, 200)
@@ -189,12 +310,14 @@ async function run() {
   await check('water with sugar or honey saves resolved food rather than dropping additions', async () => {
     for (const [type, calories, carbs] of [['sugar', 32, 8], ['honey', 64, 17.3]]) {
       const h = harness()
+      const grams = type === 'sugar' ? 8 : 21
       const draft = signed({
         transcript: `Log 250 ml water with ${type}`,
         water: { amount: 250, unit: 'ml', amountMl: 250, drinkType: 'Water', label: `Water with ${type}`,
-          sweetener: { type }, ingredients: [{ name: 'Water' }, { name: type }] },
+          sweetener: { type, amount: grams, unit: 'g', grams }, ingredients: [{ name: 'Water' }, { name: type }] },
         food: { meal: 'uncategorized', nutrition: { calories }, items: [
-          foodItem({ name: type, calories, protein_g: 0, fat_g: 0, carbs_g: carbs, fiber_g: 0, sugar_g: carbs }),
+          foodItem({ name: type, serving_size: `${grams} g`, calories, protein_g: 0, fat_g: 0, carbs_g: carbs, fiber_g: 0, sugar_g: carbs,
+            nutritionCoversServing: true, __voiceSourceFood: { id: `synthetic-${type}`, name: type, calories: calories * 100 / grams, protein_g: 0, fat_g: 0, carbs_g: carbs * 100 / grams, fiber_g: 0, sugar_g: carbs * 100 / grams } }),
         ] },
       })
       const result = await h.send(draft)
@@ -310,11 +433,12 @@ async function run() {
       food: { meal: 'breakfast', favorite: { label: 'Saved milk', nutrition: { calories: 150 }, items: [foodItem()] } } })
     assert.equal((await h.send(favorite)).status, 200)
     assert.equal(h.state().food[0].createdAt.toISOString(), '2026-10-14T21:30:00.000Z')
-    const copied = harness({ failFoodAttempt: 2, sourceFood: [
-      { id: 'source-a', name: 'First food', meal: 'lunch', category: 'lunch', nutrients: { calories: 100 }, items: [] },
-      { id: 'source-b', name: 'Second food', meal: 'lunch', category: 'lunch', nutrients: { calories: 200 }, items: [] },
-    ] })
-    const copy = signed({ action: 'food_copy_previous', localTime: '12:30', tzOffsetMin: -660, food: { sourceLogIds: ['source-a', 'source-b'] } })
+    const copySources=[
+      { id: 'source-a',userId:'synthetic-user',localDate:'2026-10-14', name: 'First food', meal: 'lunch', category: 'lunch', nutrients: { calories: 100 }, items: [] },
+      { id: 'source-b',userId:'synthetic-user',localDate:'2026-10-14', name: 'Second food', meal: 'lunch', category: 'lunch', nutrients: { calories: 200 }, items: [] },
+    ]
+    const copied = harness({ failFoodAttempt: 2, sourceFood:copySources })
+    const copy = signed({ action: 'food_copy_previous', localTime: '12:30', tzOffsetMin: -660, food: {sourceDate:'2026-10-14',sourceVersions:copySources.map(row=>({id:row.id,version:foodCopy.nativeVoiceFoodCopyVersion(row)})),sourceWaterVersions:[],sourceLogIds: ['source-a', 'source-b'] } })
     assert.equal((await copied.send(copy)).status, 500)
     assert.equal(copied.state().food.length, 0); assert.equal(Object.keys(copied.state().tokens).length, 0)
     assert.equal((await copied.send(copy)).status, 200)

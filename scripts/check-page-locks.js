@@ -104,6 +104,7 @@ function fail(messageLines) {
 function main() {
   // Check even in write mode: a generic lock refresh must not adopt design drift.
   require('./check-dashboard-design-lock').assertDashboardDesignLock();
+  require('./check-insights-design-lock').assertInsightsDesignLock();
   const current = collectFiles();
 
   if (WRITE_MODE) {

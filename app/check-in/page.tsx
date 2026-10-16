@@ -4,6 +4,7 @@ import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname } from 'next/navigation'
 import Link from 'next/link'
 import PageHeader from '@/components/PageHeader'
+import { useSession } from 'next-auth/react'
 
 const LABELS = [
   'Really bad',
@@ -17,6 +18,8 @@ const LABELS = [
 
 type UserIssue = { id: string; name: string; polarity: 'positive' | 'negative' }
 type TodayCache = {
+  account: string
+  localDate: string
   issues: UserIssue[]
   ratings: Record<string, number | null>
   notes: Record<string, string>
@@ -24,7 +27,19 @@ type TodayCache = {
   fetchedAt: number
 }
 
+function deviceCheckinDate(now = new Date()) {
+  if (!Number.isFinite(now.getTime()) || now.getFullYear() < 1 || now.getFullYear() > 9999) return null
+  return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 export default function CheckInPage() {
+  const { data: session, status: sessionStatus } = useSession()
+  const account = sessionStatus === 'authenticated' ? String(session?.user?.id || session?.user?.email || '').trim() : ''
+  const accountRef = useRef(account)
+  const todayLoadedRef = useRef<{ account: string; localDate: string } | null>(null)
+  const saveRequestRef = useRef<object | null>(null)
+  const [todayLocalDate, setTodayLocalDate] = useState<string | null>(null)
+  accountRef.current = account
   const [ratings, setRatings] = useState<Record<string, number | null>>({})
   const [notes, setNotes] = useState<Record<string, string>>({})
   const [na, setNa] = useState<Record<string, boolean>>({})
@@ -38,7 +53,27 @@ export default function CheckInPage() {
   )
 
   useEffect(() => {
-    const CACHE_KEY = 'checkins:today:cache'
+    let active = true
+    todayLoadedRef.current = null
+    saveRequestRef.current = null
+    setTodayLocalDate(null)
+    setIssues([])
+    setRatings({})
+    setNotes({})
+    setNa({})
+    setSaving(false)
+    if (!account) {
+      setLoading(sessionStatus === 'loading')
+      return () => { active = false }
+    }
+    const localDate = deviceCheckinDate()
+    if (!localDate) {
+      setLoading(false)
+      alert('The device date is invalid. Please check its date before loading today’s check-in.')
+      return () => { active = false }
+    }
+    const isCurrent = () => active && accountRef.current === account
+    const CACHE_KEY = `checkins:today:cache:${encodeURIComponent(account)}:${localDate}`
     const CACHE_TTL_MS = 5 * 60_000
     const forceBlank =
       typeof window !== 'undefined' &&
@@ -50,7 +85,7 @@ export default function CheckInPage() {
         const raw = window.sessionStorage.getItem(CACHE_KEY)
         if (!raw) return null
         const parsed = JSON.parse(raw) as TodayCache
-        if (!parsed?.fetchedAt) return null
+        if (!parsed?.fetchedAt || parsed.account !== account || parsed.localDate !== localDate) return null
         return parsed
       } catch {
         return null
@@ -78,11 +113,19 @@ export default function CheckInPage() {
 
     // Load actual issues if API is available
     if (!cacheFresh) setLoading(true)
-    fetch('/api/checkins/today', { cache: 'no-store' as any })
-      .then(r => r.json())
+    fetch(`/api/checkins/today?localDate=${localDate}`, { cache: 'no-store' as any })
+      .then(async r => {
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok) throw new Error(data?.error || 'Could not load check-in.')
+        return data
+      })
       .then((data) => {
+        if (!isCurrent()) return
+        if (deviceCheckinDate() !== localDate) throw new Error('The day changed while loading. Please reload Today before saving.')
         let nextIssues: UserIssue[] = []
         let nextRatings: Record<string, number | null> = {}
+        const nextNotes: Record<string, string> = {}
+        const nextNa: Record<string, boolean> = {}
         if (Array.isArray(data?.issues)) {
           const seen = new Set<string>()
           const unique = [] as UserIssue[]
@@ -92,32 +135,46 @@ export default function CheckInPage() {
           }
           if (unique.length > 0) {
             nextIssues = unique
-            setIssues(unique)
           }
         }
         if (!forceBlank && Array.isArray(data?.ratings)) {
           const map: Record<string, number | null> = {}
-          for (const r of data.ratings) map[r.issueId] = r.value
+          for (const r of data.ratings) {
+            if (!r?.issueId) continue
+            map[r.issueId] = typeof r.value === 'number' ? r.value : null
+            nextNotes[r.issueId] = typeof r.note === 'string' ? r.note : ''
+            nextNa[r.issueId] = r.isNa === true
+          }
           nextRatings = map
-          setRatings(map)
-        } else if (forceBlank) {
-          setRatings({})
-          setNotes({})
-          setNa({})
         }
+        setIssues(nextIssues)
+        setRatings(nextRatings)
+        setNotes(nextNotes)
+        setNa(nextNa)
+        todayLoadedRef.current = { account, localDate }
+        setTodayLocalDate(localDate)
         if (!forceBlank) {
           writeCache({
+            account,
+            localDate,
             issues: nextIssues,
             ratings: nextRatings,
-            notes: {},
-            na: {},
+            notes: nextNotes,
+            na: nextNa,
             fetchedAt: Date.now(),
           })
         }
       })
-      .catch(() => {})
-      .finally(() => setLoading(false))
-  }, [])
+      .catch((error) => { if (isCurrent()) alert(error?.message || 'Could not load check-in. Please reload Today.') })
+      .finally(() => { if (isCurrent()) setLoading(false) })
+    return () => {
+      active = false
+      if (accountRef.current === account) {
+        todayLoadedRef.current = null
+        saveRequestRef.current = null
+      }
+    }
+  }, [account, sessionStatus])
 
   useEffect(() => {
     if (!pendingIdRef.current) return
@@ -140,7 +197,16 @@ export default function CheckInPage() {
   }
 
   const handleSave = async () => {
-    if (saving) return
+    if (saving || saveRequestRef.current) return
+    const loaded = todayLoadedRef.current
+    const localDate = deviceCheckinDate()
+    if (!account || accountRef.current !== account || !localDate || !loaded || loaded.account !== account || loaded.localDate !== localDate || todayLocalDate !== loaded.localDate) {
+      alert('The day or account changed, or today’s check-in has not loaded. Please reload Today and review its ratings before saving.')
+      return
+    }
+    const saveRequest = {}
+    saveRequestRef.current = saveRequest
+    const isCurrent = () => accountRef.current === account && saveRequestRef.current === saveRequest
     setSaving(true)
     try {
       const pendingId =
@@ -155,8 +221,9 @@ export default function CheckInPage() {
       const res = await fetch('/api/checkins/today', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ratings: payload, notificationId: pendingId || undefined }),
+        body: JSON.stringify({ localDate: loaded.localDate, ratings: payload, notificationId: pendingId || undefined }),
       })
+      if (!isCurrent()) return
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
         throw new Error(data?.detail || data?.error || 'Failed to save')
@@ -170,12 +237,14 @@ export default function CheckInPage() {
         }
       } catch {}
       try {
-        const CACHE_KEY = 'checkins:today:cache'
+        const CACHE_KEY = `checkins:today:cache:${encodeURIComponent(account)}:${loaded.localDate}`
         const payloadRatings: Record<string, number | null> = {}
         for (const item of payload) payloadRatings[item.issueId] = item.value
         sessionStorage.setItem(
           CACHE_KEY,
           JSON.stringify({
+            account,
+            localDate: loaded.localDate,
             issues,
             ratings: payloadRatings,
             notes,
@@ -212,11 +281,14 @@ export default function CheckInPage() {
         window.location.assign('/dashboard')
         return
       } catch {}
-      alert('Saved today\'s ratings.')
+      alert(deviceCheckinDate() === loaded.localDate ? 'Saved today\'s ratings.' : `Saved the ratings for ${loaded.localDate}.`)
     } catch (e: any) {
-      alert(e?.message || 'Failed to save. Please try again.')
+      if (isCurrent()) alert(e?.message || 'Failed to save. Please try again.')
     } finally {
-      setSaving(false)
+      if (isCurrent()) {
+        saveRequestRef.current = null
+        setSaving(false)
+      }
     }
   }
 

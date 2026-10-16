@@ -282,7 +282,7 @@ function DetailContent(props: Props & { selected: DataKey }) {
 
   if (selected === 'chats') {
     if (chatState === 'loading') return <Panel tone="#EFF6FF"><Text style={{ color: '#1E3A8A', fontWeight: '800' }}>Checking saved chats…</Text><Text style={{ color: '#1D4ED8', lineHeight: 20, marginTop: 6 }}>Helfi is checking the real saved chat history for this report week.</Text></Panel>
-    if (chatState === 'unavailable') return <Panel tone="#FFFBEB"><Text style={{ color: '#78350F', fontWeight: '800' }}>Saved chats could not be checked</Text><Text style={{ color: '#92400E', lineHeight: 20, marginTop: 6 }}>Helfi is not showing the older generated count as fact. Please try opening this report again later.</Text></Panel>
+    if (chatState === 'unavailable') return <Panel tone="#ECFDF3"><Text style={{ color: '#267245', fontWeight: '800' }}>Saved chats could not be checked</Text><Text style={{ color: '#267245', lineHeight: 20, marginTop: 6 }}>Helfi is not showing the older generated count as fact. Please try opening this report again later.</Text></Panel>
     if (!Number(talkToAiSummary?.userMessageCount || 0)) return <EmptyState label="saved AI chats" />
     const general = Number(talkToAiSummary?.sourceBreakdown?.general?.userMessageCount || 0)
     const food = Number(talkToAiSummary?.sourceBreakdown?.food?.userMessageCount || 0)
@@ -327,12 +327,12 @@ export function WeeklyReportDataExplorer(props: Props) {
   const chatValue = chatState === 'verified' ? numberText(coverage.talkToAiCount || 0) : '—'
   const chatNote = chatState === 'loading' ? 'Checking saved chat history' : chatState === 'unavailable' ? 'Saved chat history is temporarily unavailable' : 'Verified saved prompt counts and chat sources'
   const tiles = useMemo<Tile[]>(() => [
-    { key: 'food', label: LABELS.food, value: numberText(coverage.foodCount), note: 'Meals, energy, macros and top foods', icon: 'pie-chart', background: '#FFF7ED', border: '#FED7AA', accent: '#C2410C' },
+    { key: 'food', label: LABELS.food, value: numberText(coverage.foodCount), note: 'Meals, energy, macros and top foods', icon: 'pie-chart', background: '#ECFDF3', border: '#BFEAD0', accent: '#267245' },
     { key: 'water', label: LABELS.water, value: numberText(coverage.waterCount), note: 'Daily water logs and drink types', icon: 'droplet', background: '#ECFEFF', border: '#A5F3FC', accent: '#0E7490' },
-    { key: 'mood', label: LABELS.mood, value: numberText(coverage.moodCount), note: 'Mood level, trend, tags and notes', icon: 'smile', background: '#FFFBEB', border: '#FDE68A', accent: '#B45309' },
+    { key: 'mood', label: LABELS.mood, value: numberText(coverage.moodCount), note: 'Mood level, trend, tags and notes', icon: 'smile', background: '#ECFDF3', border: '#BFEAD0', accent: '#267245' },
     { key: 'checkins', label: LABELS.checkins, value: numberText(coverage.checkinCount ?? checkins.totalEntries), note: 'Goal ratings, movement and notes', icon: 'check-square', background: '#ECFDF5', border: '#A7F3D0', accent: '#047857' },
     { key: 'symptoms', label: LABELS.symptoms, value: numberText(coverage.symptomCount), note: 'Frequency, unique symptoms and guidance', icon: 'alert-circle', background: '#FFF1F2', border: '#FECDD3', accent: '#BE123C' },
-    { key: 'exercise', label: LABELS.exercise, value: numberText(coverage.exerciseCount ?? exercise.sessions), note: 'Sessions, minutes, distance and activities', icon: 'activity', background: '#F5F3FF', border: '#DDD6FE', accent: '#6D28D9' },
+    { key: 'exercise', label: LABELS.exercise, value: numberText(coverage.exerciseCount ?? exercise.sessions), note: 'Sessions, minutes, distance and activities', icon: 'activity', background: '#ECFDF3', border: '#BFEAD0', accent: '#267245' },
     { key: 'journal', label: LABELS.journal, value: numberText(coverage.journalCount), note: 'Saved notes and weekly highlights', icon: 'book-open', background: '#F0FDFA', border: '#99F6E4', accent: '#0F766E' },
     { key: 'images', label: LABELS.images, value: numberText(coverage.medicalImageCount), note: 'Saved image-note findings and next steps', icon: 'image', background: '#F0F9FF', border: '#BAE6FD', accent: '#0369A1' },
     { key: 'labs', label: LABELS.labs, value: numberText(coverage.labCount), note: 'Latest markers and movement over time', icon: 'bar-chart-2', background: '#EEF2FF', border: '#C7D2FE', accent: '#4338CA' },

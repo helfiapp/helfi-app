@@ -3,9 +3,11 @@
 #import <WebRTC/RTCAudioSession.h>
 #import <WebRTC/RTCAudioSessionConfiguration.h>
 
-@interface HelfiAudioRoute : RCTEventEmitter <RCTBridgeModule>
+@interface HelfiAudioRoute : RCTEventEmitter <RCTBridgeModule, AVAudioPlayerDelegate>
 @property(nonatomic, strong) id routeObserver;
 @property(nonatomic, strong) id interruptionObserver;
+@property(nonatomic, strong) AVAudioPlayer *welcomePlayer;
+@property(nonatomic, copy) NSString *welcomePlaybackId;
 @end
 
 @implementation HelfiAudioRoute
@@ -19,7 +21,84 @@ RCT_EXPORT_MODULE(HelfiAudioRoute)
 
 - (NSArray<NSString *> *)supportedEvents
 {
-  return @[@"HelfiAudioRouteChanged"];
+  return @[@"HelfiAudioRouteChanged", @"HelfiVoiceWelcomePlayback"];
+}
+
+- (void)finishWelcome:(NSString *)status completed:(BOOL)completed
+{
+  NSString *playbackId = self.welcomePlaybackId;
+  AVAudioPlayer *player = self.welcomePlayer;
+  self.welcomePlayer = nil;
+  self.welcomePlaybackId = nil;
+  player.delegate = nil;
+  [player stop];
+  if (playbackId.length > 0) {
+    [self sendEventWithName:@"HelfiVoiceWelcomePlayback"
+                      body:@{@"playbackId": playbackId, @"status": status, @"completed": @(completed)}];
+  }
+  // WebRTC owns AVAudioSession. Stopping this player never changes its category,
+  // mode, activation or audio focus, so microphone and remote audio stay live.
+}
+
+RCT_REMAP_METHOD(playVoiceWelcome,
+                 playVoiceWelcome:(NSString *)uri
+                 playbackId:(NSString *)playbackId
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(RCTPromiseRejectBlock)reject)
+{
+  dispatch_async(dispatch_get_main_queue(), ^{
+    NSURL *url = [NSURL URLWithString:uri];
+    NSString *filePath = url.URLByStandardizingPath.path;
+    NSString *bundlePath = NSBundle.mainBundle.bundlePath;
+    NSString *cachePath = NSSearchPathForDirectoriesInDomains(NSCachesDirectory, NSUserDomainMask, YES).firstObject;
+    BOOL inBundle = [filePath hasPrefix:[bundlePath stringByAppendingString:@"/"]];
+    BOOL inCache = cachePath.length > 0 && [filePath hasPrefix:[cachePath stringByAppendingString:@"/"]];
+    if (!url.isFileURL || (!inBundle && !inCache) || playbackId.length == 0 || playbackId.length > 100) {
+      reject(@"welcome_source_invalid", @"The bundled opening welcome is unavailable.", nil);
+      return;
+    }
+    [self finishWelcome:@"stopped" completed:NO];
+    NSError *error = nil;
+    AVAudioPlayer *player = [[AVAudioPlayer alloc] initWithContentsOfURL:url error:&error];
+    if (!player || ![player prepareToPlay]) {
+      reject(@"welcome_load_failed", @"The opening welcome could not be loaded.", nil);
+      return;
+    }
+    player.delegate = self;
+    player.numberOfLoops = 0;
+    player.volume = 1.0;
+    self.welcomePlayer = player;
+    self.welcomePlaybackId = playbackId;
+    if (![player play]) {
+      [self finishWelcome:@"failed" completed:NO];
+      reject(@"welcome_play_failed", @"The opening welcome could not be played.", nil);
+      return;
+    }
+    [self sendEventWithName:@"HelfiVoiceWelcomePlayback"
+                      body:@{@"playbackId": playbackId, @"status": @"started", @"completed": @NO}];
+    resolve(@YES);
+  });
+}
+
+RCT_REMAP_METHOD(stopVoiceWelcome,
+                 stopVoiceWelcome:(NSString *)playbackId
+                 resolver:(RCTPromiseResolveBlock)resolve
+                 rejecter:(__unused RCTPromiseRejectBlock)reject)
+{
+  dispatch_async(dispatch_get_main_queue(), ^{
+    if ([self.welcomePlaybackId isEqualToString:playbackId]) [self finishWelcome:@"stopped" completed:NO];
+    resolve(@YES);
+  });
+}
+
+- (void)audioPlayerDidFinishPlaying:(AVAudioPlayer *)player successfully:(BOOL)flag
+{
+  if (player == self.welcomePlayer) [self finishWelcome:flag ? @"finished" : @"failed" completed:flag];
+}
+
+- (void)audioPlayerDecodeErrorDidOccur:(AVAudioPlayer *)player error:(__unused NSError *)error
+{
+  if (player == self.welcomePlayer) [self finishWelcome:@"failed" completed:NO];
 }
 
 - (NSString *)currentRouteName
@@ -122,6 +201,7 @@ RCT_REMAP_METHOD(getVoiceAudioState,
       if (!strongSelf) return;
       NSNumber *rawType = notification.userInfo[AVAudioSessionInterruptionTypeKey];
       BOOL interrupted = rawType.unsignedIntegerValue == AVAudioSessionInterruptionTypeBegan;
+      if (interrupted) [strongSelf finishWelcome:@"interrupted" completed:NO];
       if (!interrupted) {
         NSError *error = nil;
         [strongSelf configureVoiceAudio:&error];
@@ -134,6 +214,7 @@ RCT_REMAP_METHOD(getVoiceAudioState,
 
 - (void)stopObserving
 {
+  [self finishWelcome:@"stopped" completed:NO];
   if (self.routeObserver) [NSNotificationCenter.defaultCenter removeObserver:self.routeObserver];
   if (self.interruptionObserver) [NSNotificationCenter.defaultCenter removeObserver:self.interruptionObserver];
   self.routeObserver = nil;

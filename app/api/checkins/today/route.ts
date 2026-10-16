@@ -7,6 +7,13 @@ import { getCheckinUser } from '@/app/api/checkins/_auth'
 
 let checkinTablesEnsured = false
 
+function requestedCheckinDate(value: unknown): string | null {
+  if (value === undefined) return new Date().toISOString().slice(0, 10)
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return null
+  const parsed = new Date(`${value}T12:00:00Z`)
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value ? value : null
+}
+
 async function ensureCheckinTables() {
   if (checkinTablesEnsured) return
   try {
@@ -58,7 +65,9 @@ export async function GET(req: NextRequest) {
 
   await ensureCheckinTables()
 
-  const today = new Date().toISOString().slice(0,10)
+  const params = new URL(req.url).searchParams
+  const today = requestedCheckinDate(params.has('localDate') ? params.get('localDate') : undefined)
+  if (!today) return NextResponse.json({ error: 'Invalid localDate' }, { status: 400 })
 
   try {
     // await prisma.$executeRawUnsafe(`
@@ -195,7 +204,8 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json().catch(() => ({}))
   const ratings = Array.isArray(body?.ratings) ? body.ratings : []
-  const today = new Date().toISOString().slice(0,10)
+  const today = requestedCheckinDate(Object.prototype.hasOwnProperty.call(body || {}, 'localDate') ? body.localDate : undefined)
+  if (!today) return NextResponse.json({ error: 'Invalid localDate' }, { status: 400 })
 
   try {
     // await prisma.$executeRawUnsafe(`
@@ -236,6 +246,14 @@ export async function POST(req: NextRequest) {
       })
 
     if (normalizedRatings.length > 0) {
+      if (Object.prototype.hasOwnProperty.call(body || {}, 'localDate')) {
+        const issueIds = Array.from(new Set(normalizedRatings.map((rating) => rating.issueId)))
+        const placeholders = issueIds.map((_, index) => `$${index + 2}`).join(',')
+        const owned: Array<{ id: string }> = await prisma.$queryRawUnsafe(
+          `SELECT id FROM CheckinIssues WHERE userId = $1 AND id IN (${placeholders})`, user.id, ...issueIds,
+        )
+        if (owned.length !== issueIds.length) return NextResponse.json({ error: 'Check-in issue not found in this account' }, { status: 404 })
+      }
       await prisma.$transaction(async (tx) => {
         const issueIds = normalizedRatings.map((rating) => rating.issueId)
         await tx.$executeRaw(

@@ -79,7 +79,7 @@ if (!/const LIVE_VOICE_ENABLED = true/.test(native) || /process\.env\.EXPO_PUBLI
   failures.push('Talk to Helfi must default permanently to the approved single-screen live voice experience; a missing build flag must never restore the retired recorder UI.')
 }
 
-if (!native.includes('const liveVoiceEnabled = LIVE_VOICE_ENABLED && voiceRecordingSupported') || !/!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview \? \(\s*<View style=\{styles\.noticeBox\}>\s*<Text style=\{styles\.noticeTitle\}>Type-only on iPad<\/Text>/.test(native)) {
+if (!native.includes('const liveVoiceEnabled = LIVE_VOICE_ENABLED && voiceRecordingSupported') || !/\(!liveVoiceEnabled \|\| typedMode\) && !voiceSessionActive && !showingConversationReview \? \(\s*<View style=\{styles\.noticeBox\}>\s*<Text style=\{styles\.noticeTitle\}>\{voiceRecordingSupported \? 'Type a message' : 'Type-only on iPad'\}<\/Text>/.test(native)) {
   failures.push('The iPad must show its usable typed fallback while the iPhone keeps the approved live voice screen.')
 }
 
@@ -142,8 +142,8 @@ if (!/const \[voiceReply,\s*setVoiceReply\]\s*=\s*useState\(true\)/.test(native)
   failures.push('Talk to Helfi must default to spoken replies unless the user explicitly turns speech off.')
 }
 
-if (!/const shouldSpeakReply = !options\?\.suppressSpokenReply && Boolean\(options\?\.audioUri \|\| voiceReply\)/.test(native) || !/form\.append\('voiceReply',\s*shouldSpeakReply \? 'true' : 'false'\)/.test(native) || !/voiceReply:\s*shouldSpeakReply/.test(native)) {
-  failures.push('Microphone requests in Talk to Helfi must speak back even if an old text-only preference exists.')
+if (!/const shouldSpeakReply = !options\?\.suppressSpokenReply && Boolean\(options\?\.audioUri \|\| voiceReply\)/.test(native) || !/form\.append\('voiceReply',\s*'false'\)/.test(native) || !/voiceReply:\s*false/.test(native) || !/if \(shouldSpeakReply && nextDraft\)[\s\S]*?requestVoiceReply\(String\(speechText\)\)/.test(native)) {
+  failures.push('Microphone requests must speak back despite an old text-only preference, using one standalone reply without purchasing unused embedded preparation audio.')
 }
 if (!/suppressSpokenReply:\s*true/.test(native)) {
   failures.push('Realtime live voice app actions must not also play the fallback spoken-reply voice.')
@@ -162,14 +162,11 @@ if (
   failures.push('Talk to Helfi must support continuous voice chat until the user taps Done, which must fully close and stop the session.')
 }
 
-if (
-  !/fetchNativeVoiceTts/.test(native) ||
-  !/native-voice-assistant-tts/.test(native) ||
-  !/VOICE_ACCESS_FALLBACK_API_BASE_URL/.test(native) ||
-  !/voice reply is not configured/.test(native) ||
-  !/Number\(status\) >= 500/.test(native)
-) {
-  failures.push('Spoken replies must use the safe live fallback during local simulator testing.')
+for (const helper of ['fetchNativeVoiceAssistant', 'fetchNativeVoiceTts', 'fetchNativeVoiceConfirm']) {
+  const block = native.match(new RegExp(`async function ${helper}\\([\\s\\S]*?\\n\\}`))?.[0] || ''
+  if (block.split('requestFactory(API_BASE_URL)').length !== 2 || block.split('requestFactory(').length !== 2 || /VOICE_ACCESS_FALLBACK_API_BASE_URL|shouldRetryVoiceAssistantOnLive/.test(block)) {
+    failures.push(`${helper} must send a charged or mutating request once to its configured backend, without retrying against live.`)
+  }
 }
 
 if (!/assertAiUsageAllowed/.test(route) || !/feature:\s*'voice-assistant:transcribe'/.test(route) || !/feature:\s*'voice-assistant:tts'/.test(route) || !/assertAiUsageAllowed/.test(ttsRoute) || !/isAiSafetyError/.test(ttsRoute)) {
@@ -353,7 +350,7 @@ if (!/const draftIsReviewOrHandoff\s*=\s*Boolean\(draft\?\.canConfirm\s*\|\|\s*d
   failures.push('Typed rejection shortcuts must only cancel real review or handoff drafts, so normal conversation replies can continue through Talk to Helfi.')
 }
 
-if (!/discardFooterLabel\s*=\s*primaryFooterIsHandoff\s*\?\s*'Cancel'\s*:\s*"Don't save"/.test(native) || /style=\{styles\.handoffButton\}/.test(native)) {
+if (!/discardFooterLabel\s*=\s*primaryFooterIsHandoff\s*\?\s*'Cancel'\s*:\s*draft\?\.action\s*===\s*'recipe_import_url'\s*\?\s*"Don't import"\s*:\s*\['support_action', 'report_action', 'device_action'\]\.includes\(draft\?\.action \|\| ''\)\s*\?\s*'Cancel'\s*:\s*"Don't save"/.test(native) || /style=\{styles\.handoffButton\}/.test(native)) {
   failures.push('Talk to Helfi handoff drafts must use one clear footer action, with Cancel wording instead of a duplicate in-panel handoff button.')
 }
 
@@ -385,7 +382,7 @@ if (!/cannot diagnose from photos/i.test(healthImageContext)) {
   failures.push('Health-image context must keep the no-diagnosis photo wording.')
 }
 
-if (!/inWaterContext/.test(route) || !/tryParseWaterRequest\(transcript,\s*localDate,\s*launchContext\)/.test(route)) {
+if (!/inWaterContext/.test(route) || !/tryParseWaterRequest\(transcript,\s*localDate,\s*launchContext,\s*country\)/.test(route)) {
   failures.push('Water context must keep short natural water command support.')
 }
 
@@ -405,12 +402,12 @@ if (!/pendingFollowUpDraft/.test(native) || !/followUpTranscript\(pendingFollowU
   failures.push('Native voice assistant must remember follow-up questions such as missing food or water amounts.')
 }
 
-if (!/conversationTurns/.test(native) || !/appendConversationTurns/.test(native) || !/Conversation/.test(native) || !/Helfi/.test(native) || !/slice\(-8\)/.test(native)) {
-  failures.push('Native Talk to Helfi must keep a short in-panel conversation trail for follow-up exchanges.')
+if (!/conversationTurns/.test(native) || !/appendConversationTurns/.test(native) || !/Conversation/.test(native) || !/Helfi/.test(native) || !/MAX_VOICE_CONVERSATION_TURNS\s*=\s*100/.test(native) || !/slice\(-MAX_VOICE_CONVERSATION_TURNS\)/.test(native)) {
+  failures.push('Native Talk to Helfi must keep a bounded 100-turn conversation trail for follow-up exchanges and transcript review.')
 }
 
-if (!/VOICE_CONVERSATION_MEMORY_KEY/.test(native) || !/VOICE_CONVERSATION_MEMORY_TTL_MS\s*=\s*30\s*\*\s*60\s*\*\s*1000/.test(native) || !/loadConversationMemory/.test(native) || !/saveConversationMemory/.test(native) || !/voiceMemoryUserId/.test(native) || !/parsed\?\.userId/.test(native)) {
-  failures.push('Native Talk to Helfi must keep only short time-limited same-device conversation memory for the current signed-in user across panel reopen.')
+if (!/VOICE_CONVERSATION_MEMORY_KEY/.test(native) || !/VOICE_CONVERSATION_MEMORY_TTL_MS\s*=\s*7\s*\*\s*24\s*\*\s*60\s*\*\s*60\s*\*\s*1000/.test(native) || !/loadConversationMemory/.test(native) || !/saveConversationMemory/.test(native) || !/voiceConversationStorageKey\(voiceMemoryUserId\)/.test(native) || !/cleanFavoriteText\(parsed\?\.userId, 120\) !== voiceMemoryUserId/.test(native) || !/Date\.now\(\) - savedAt > VOICE_CONVERSATION_MEMORY_TTL_MS/.test(native) || !/voiceAccountTokenRef\.current !== memoryAccountToken/.test(native)) {
+  failures.push('Native Talk to Helfi must keep bounded seven-day device history scoped to the signed-in account, reject mismatched or expired history, and ignore late reads after account changes.')
 }
 
 if (!/clearConversationMemory/.test(native) || !/AsyncStorage\.removeItem\(VOICE_CONVERSATION_MEMORY_KEY\)/.test(native) || !/New chat/.test(native) || !/setDraft\(null\)/.test(native) || !/stopPlayback\(\)\.catch/.test(native)) {
@@ -434,8 +431,8 @@ if (
   !/Draft currently being reviewed/.test(route) ||
   !/correcting the draft currently being reviewed/.test(route) ||
   !/preserve any details the user did not change/.test(route) ||
-  !/runJsonCommandModel\(aiIntentClient,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft(?:,\s*realtimeActionHint)?\)/.test(route) ||
-  !/runJsonCommandModel\(openai,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft(?:,\s*realtimeActionHint)?\)/.test(route)
+  !/runJsonCommandModel\(aiIntentClient,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft(?:\s*\|\|\s*followUpDraft)?(?:,\s*realtimeActionHint)?\)/.test(route) ||
+  !/runJsonCommandModel\(openai,\s*transcript,\s*localDate,\s*user\.id,\s*launchContext,\s*conversationHistory,\s*confirmationDraft(?:\s*\|\|\s*followUpDraft)?(?:,\s*realtimeActionHint)?\)/.test(route)
 ) {
   failures.push('Native Talk to Helfi must show the reviewed draft to AI so correction requests can revise it safely.')
 }
@@ -553,23 +550,38 @@ if (!/buildQuickRecipeDraft\(transcript,\s*localDate,\s*launchContext\)/.test(ro
   failures.push('Quick recipe shortcuts must receive launch context so Food Diary recommendations can use diary-aware AI.')
 }
 
+const recipeReviewBody = route.slice(route.indexOf('async function buildVoiceRecipeReviewDraft('), route.indexOf('function inferRecommendationMeal('))
 if (
-  !/recipeDraft:\s*importDraft/.test(route) ||
-  !/voiceRecipeDraft/.test(mainNavigator) ||
-  !/voiceRecipeDraft/.test(trackCalories) ||
-  !/recipeDraft:\s*target\.recipeDraft/.test(mainTabs) ||
-  !/recipeDraft:\s*nativeTarget\.recipeDraft/.test(native) ||
-  !/openNativeMealBuilder\(meal,\s*\{[\s\S]*?ingredients:[\s\S]*?steps:/m.test(trackCalories)
+  !/completeVoiceRecipe\(rawRecipe\)/.test(recipeReviewBody) ||
+  !/recipe\.ingredients\.map\(voiceRecipeIngredient\)/.test(recipeReviewBody) ||
+  !/await buildVoiceMealDraft/.test(recipeReviewBody) ||
+  !/if \(!built\?\.canConfirm\) return/.test(recipeReviewBody) ||
+  !/applyNativeVoiceRecipeMetadata/.test(recipeReviewBody) ||
+  !/const readyToLog = destination\s*===\s*'diary'\s*&&\s*eaten\s*!=\s*null/.test(recipeReviewBody) ||
+  !/canConfirm:\s*readyToLog/.test(recipeReviewBody) ||
+  !/autoSave:\s*false/.test(recipeReviewBody) ||
+  !/save the recipe, or log the servings you ate/.test(recipeReviewBody) ||
+  !/How many servings did you eat/.test(recipeReviewBody) ||
+  !/draft: await prepareRecipeDestination\(actionRequest, userId, existingRecipe, transcript, localDate, country\)/.test(route) ||
+  !/const built = await buildVoiceRecipeReviewDraft\(rawRecipe, transcript, localDate, country/.test(recipeReviewBody) ||
+  !/prepareNativeVoiceFoodLibraryFromResolved\(request, userId/.test(recipeReviewBody)
 ) {
-  failures.push('Talk to Helfi recipe recommendations must open the native Build a meal tool with the recipe prefilled.')
+  failures.push('Talk to Helfi recipes must resolve every measured ingredient from food sources, retain complete recipe metadata, ask library versus eaten servings, and require a signed review before logging the chosen portion.')
 }
 
 if (/recipeIngredientNutritionFallback/.test(trackCalories) || !/await buildImportedRecipeItems\(ingredients\)/.test(trackCalories) || !/resolved\.missing\.length/.test(trackCalories) || !/measuredRecipeFood\(food, request\)/.test(trackCalories) || !/openNativeImportRecipe\(meal\)[\s\S]*?applyImportedRecipe\(/.test(trackCalories)) {
   failures.push('Talk to Helfi recipe handoffs must review measured ingredients and resolve real food-library nutrition; unresolved ingredients must not become zero-calorie items.')
 }
 
-if (!/I used today's diary context where available/.test(route)) {
-  failures.push("Diary-aware meal recommendation handoff must clearly say it used today's diary context where available.")
+if (
+  !/buildFoodDiarySnapshot\(\{ userId, localDate, tzOffsetMin \}\)/.test(route) ||
+  !/const diaryLine = formatFoodDiarySnapshotForVoiceRecipe\(snapshot\)/.test(route) ||
+  !/Food diary context is unavailable/.test(route) ||
+  !/content: `\$\{diaryLine\}/.test(route) ||
+  !/Mention why it fits today in plain language/.test(route) ||
+  !/recipe\.snapshot \|\| null/.test(route)
+) {
+  failures.push('Diary-aware meal recommendations must use the signed-in user and requested date, pass actual diary context or its unavailability to the recipe request, and explain why the meal fits without inventing a context claim.')
 }
 
 const routeWithoutWakePhraseLine = route.replace(/Ignore wake phrases[^\n]+Talk to Healthy\.',?\n?/, '')
@@ -967,10 +979,12 @@ if (
 }
 
 for (const [action, handler] of requiredSaveHandlers) {
-  if (!new RegExp(`draft\\.action === '${action}'[\\s\\S]*?${handler}\\(user\\.id, draft(?:, tx)?\\)`).test(confirmRoute)) {
+  const argumentsPattern = action === 'mood' ? 'request, user\\.id, draft' : 'user\\.id, draft(?:, tx)?'
+  if (!new RegExp(`draft\\.action === '${action}'[\\s\\S]*?${handler}\\(${argumentsPattern}\\)`).test(confirmRoute)) {
     failures.push(`Confirm route must keep ${action} save support.`)
   }
 }
+if (!/async function saveMood\(request: NextRequest, userId: string, draft: any\)\s*\{\s*return saveNativeVoiceMood\(request,\s*userId,\s*draft\)/.test(confirmRoute)) failures.push('Mood saving must pass the original authenticated request to the normal mood save/readback adapter.')
 
 if (!/hasSelfHarmRisk\(draft\?\.transcript\)/.test(confirmRoute)) {
   failures.push('Confirm route must keep self-harm save blocking.')
@@ -1088,6 +1102,43 @@ for (const regression of [
   'voice-sign-save-integration-check.cjs',
   'voice-client-integrity-check.cjs',
   'voice-live-protocol-check.cjs',
+  'voice-restaurant-food-integrity-check.cjs',
+  'voice-action-matrix-check.cjs',
+  'voice-action-outcome-check.cjs',
+  'voice-record-actions-check.cjs',
+  'voice-library-save-boundary-check.cjs',
+  'voice-preference-actions-check.cjs',
+  'voice-recipe-metadata-check.cjs',
+  'voice-recipe-integration-check.cjs',
+  'voice-recipe-continuation-check.cjs',
+  'food-native-loading-race-check.cjs',
+  'food-native-exercise-time-check.cjs',
+  'native-checkin-local-date-check.cjs',
+  'web-checkin-local-date-check.cjs',
+  'voice-food-record-edit-check.cjs',
+  'voice-notification-actions-check.cjs',
+  'voice-health-intake-record-check.cjs',
+  'voice-symptom-record-check.cjs',
+  'voice-ordinary-food-lookup-check.cjs',
+  'voice-greeting-check.cjs',
+  'voice-local-welcome-check.cjs',
+  'voice-navigation-parity-check.cjs',
+  'voice-app-reads-check.cjs',
+  'voice-recipe-url-import-check.cjs',
+  'voice-recipe-import-confirm-check.cjs',
+  'voice-support-actions-check.cjs',
+  'voice-spoken-quantities-check.cjs',
+  'voice-report-actions-check.cjs',
+  'voice-native-device-actions-check.cjs',
+  'voice-result-receipt-storage-check.cjs',
+  'voice-food-copy-integrity-check.cjs',
+  'voice-journal-symptom-truthfulness-check.cjs',
+  'voice-exercise-override-roundtrip-check.cjs',
+  'voice-source-drink-normal-save-check.cjs',
+  'voice-drink-metadata-check.cjs',
+  'voice-drink-readback-shape-check.cjs',
+  'voice-mood-context-check.cjs',
+  'voice-tts-boundary-check.cjs',
 ]) {
   execFileSync(process.execPath, [path.join(root, 'scripts', regression)], { cwd: root, stdio: 'inherit' })
 }

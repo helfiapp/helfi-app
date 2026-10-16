@@ -17,6 +17,7 @@ export interface NormalizedFoodItem {
   id: string
   name: string
   brand?: string | null
+  country?: string | null
   serving_size?: string | null
   servingOptions?: any[] | null
   selectedServingId?: string | null

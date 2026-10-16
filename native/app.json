@@ -15,7 +15,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "ai.helfi.app",
-      "buildNumber": "49",
+      "buildNumber": "50",
       "associatedDomains": [
         "applinks:helfi.ai",
         "applinks:www.helfi.ai"
@@ -57,7 +57,8 @@
       "react-native-iap",
       "expo-web-browser",
       "./plugins/with-transparent-ios-app-icon",
-      "./plugins/with-android-release-signing"
+      "./plugins/with-android-release-signing",
+      "./plugins/with-helfi-audio-route"
     ]
   }
 }

@@ -1,0 +1,39 @@
+{
+  "recordedAtUtc": "2026-10-16T15:40:35.661500+00:00",
+  "scope": "Read-only investigation of owner-reported actual iPhone49 McDonalds logging failure; no source repair, release or diary writes",
+  "sourceCommit": "e944997a7897ebd3916f211749350573899b6587",
+  "routeSha256": "a5773c9dbf049415fe5c4e67f3ce52fcf560b4010960d3098495f159ac38abf7",
+  "actualSessionWindowMelbourne": "17 October 2026,02:30\u201302:34 AEDT",
+  "actualEventCounts": {
+    "voice-assistant:realtime-charge-marker": 1,
+    "voice-assistant:realtime-session": 1,
+    "voice-assistant:favorite-command": 3,
+    "voice-assistant:fast-realtime-action": 3,
+    "voice-assistant:food-recommendation-follow-up": 1,
+    "voice-assistant:food-recommendation-adjustment": 1
+  },
+  "actualSaveReceiptCounts": {
+    "queriedAtUtc": "2026-10-16T15:38:24.045Z",
+    "saveReceiptsFromLastHour": 0,
+    "pendingSaveClaimsFromLastHour": 0
+  },
+  "bothRequestedCatalogRecordsExist": true,
+  "catalogRecords": [
+    "McDONALD'S, DOUBLE QUARTER POUNDER with Cheese",
+    "McDONALD'S, Chicken McNUGGETS"
+  ],
+  "catalogSource": "usda_sr_legacy",
+  "actualCloudwatchVoiceExceptionMatches": 0,
+  "confirmedOfflineDefects": [
+    "with-cheese product name split into separate food",
+    "six-nugget pack phrase not parsed into matched item/count; returns canConfirm false",
+    "each/piece fallback treats six nuggets as600g and burger as100g",
+    "food clarification can incorrectly seed meal-recommendation corrections",
+    "voice food lookup narrower than diary search; includes legacy McDonalds records but excludes normal branded/provider route",
+    "success:true logging describes handler completion even for canConfirm:false drafts"
+  ],
+  "inferenceLimit": "Actual server events show favourite/fast-food-draft/recommendation paths, but do not retain transcript, selected food, resolved serving or failure reason. Exact user-to-tool paraphrases and per-turn failure cannot be reconstructed. Existing live UI does not expose retained transcript; reopening voice auto-started a separate short no-speech session around02:38AEDT, ended immediately. Exclude that diagnostic session from owner attempt. No exact favourite false-match is claimed.",
+  "offlineReproduction": "Private actual-source AST extraction with artificial candidate nutrition; no real account data/provider/database/network in reproduction. Confirms parser/measurement/control-flow defects, not actual nutrient values or verbatim live transcript.",
+  "privateEvidenceFolder": "/Users/louieveleski/.config/helfi/private-verification/2026-10-17-voice49-meal-failure",
+  "repairStatus": "Diagnosis complete; source repair and actual corrected meal/save verification not yet performed"
+}

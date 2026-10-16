@@ -2918,7 +2918,7 @@ export function TrackCaloriesScreen() {
         setExerciseCalories(Math.round(numberOrZero(exerciseData?.exerciseCalories)))
       }
 
-      if (!silent && isCurrentRequest()) {
+      if (isCurrentRequest()) {
         setLoading(false)
       }
 
@@ -2972,7 +2972,7 @@ export function TrackCaloriesScreen() {
         Alert.alert('Could not load Food Diary', error?.message || 'Please try again.')
       }
     } finally {
-      if (!silent && requestId === loadRequestIdRef.current) {
+      if (requestId === loadRequestIdRef.current) {
         setLoading(false)
       }
     }
@@ -5717,7 +5717,7 @@ export function TrackCaloriesScreen() {
       setExerciseDistance('')
     }
     setExerciseDistanceUnit('km')
-    setExerciseStartTime(entry.startTime ? String(entry.startTime).slice(11, 16) : '')
+    setExerciseStartTime(entry.startTime ? formatEditorTime(entry.startTime) : '')
     setExerciseCaloriesPreview(Math.round(numberOrZero(entry.calories)))
     setExerciseCaloriesOverride(String(Math.round(numberOrZero(entry.calories))))
     setExerciseOpen(true)
@@ -5807,7 +5807,19 @@ export function TrackCaloriesScreen() {
     }
 
     if (exerciseStartTime.trim()) {
-      body.startTime = `${selectedDate}T${exerciseStartTime}:00`
+      const time = exerciseStartTime.trim()
+      const localStart = new Date(`${selectedDate}T${time}:00`)
+      if (!/^\d{4}-\d{2}-\d{2}$/.test(selectedDate) || !/^([01]\d|2[0-3]):[0-5]\d$/.test(time) || Number.isNaN(localStart.getTime()) || formatLocalDate(localStart) !== selectedDate || formatEditorTime(localStart.toISOString()) !== time) {
+        Alert.alert('Invalid start time', 'Please enter a valid local date and time for this exercise.')
+        return
+      }
+      const previousStart = exerciseEditId == null ? null : exerciseEntries.find((entry) => String(entry.id) === String(exerciseEditId))?.startTime
+      const previousDate = previousStart ? new Date(previousStart) : null
+      // Keep the original instant when an unchanged clock time occurs twice
+      // as daylight saving ends, including its original seconds.
+      body.startTime = previousDate && !Number.isNaN(previousDate.getTime()) && formatLocalDate(previousDate) === selectedDate && formatEditorTime(previousStart) === time
+        ? previousDate.toISOString()
+        : localStart.toISOString()
     }
 
     const override = numberOrZero(exerciseCaloriesOverride)
@@ -6217,6 +6229,18 @@ export function TrackCaloriesScreen() {
             <Pressable
               accessibilityRole="button"
               accessibilityLabel="Talk to Helfi"
+              accessibilityHint="Tap to start voice. Touch and hold to read your recent conversation or type a message without starting the microphone."
+              accessibilityActions={[{ name: 'conversation', label: 'Read recent conversation or type a message' }]}
+              onAccessibilityAction={(event) => {
+                if (event.nativeEvent.actionName === 'conversation') openVoiceAssistant({
+                  source: 'button', mode: 'conversation',
+                  context: { section: 'food', title: 'Food Diary', meal: topAddMeal || 'breakfast', date: selectedDate },
+                })
+              }}
+              onLongPress={() => openVoiceAssistant({
+                source: 'button', mode: 'conversation',
+                context: { section: 'food', title: 'Food Diary', meal: topAddMeal || 'breakfast', date: selectedDate },
+              })}
               onPress={() =>
                 openVoiceAssistant({
                   source: 'button',

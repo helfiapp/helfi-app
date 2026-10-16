@@ -167,6 +167,7 @@ function checkProtectedRegion(opts) {
 
 function main() {
   require('./check-dashboard-design-lock').assertDashboardDesignLock();
+  require('./check-insights-design-lock').assertInsightsDesignLock();
   checkIngredientsCard();
   checkProtectedRegion({
     filePath: path.join(__dirname, '..', 'app', 'food', 'add-ingredient', 'AddIngredientClient.tsx'),

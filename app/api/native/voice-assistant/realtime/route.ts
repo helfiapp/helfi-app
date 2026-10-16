@@ -120,7 +120,7 @@ export async function GET(request: NextRequest) {
       voiceNote: 'ChatGPT app voices such as Juniper are not exposed as API voice names. Helfi is using Marin, the closest warm natural OpenAI API voice.',
     })
   } catch (error) {
-    console.error('[native voice realtime] status failed', error)
+    console.error('[native voice realtime] status failed')
     return NextResponse.json({
       available: false,
       code: 'status_check_failed',
@@ -178,7 +178,7 @@ async function closeUnusedLiveSession(sessionId: string, userId: string) {
   })
 }
 
-function realtimeSessionConfig() {
+function realtimeSessionConfig(bundledWelcome = false) {
   return {
     type: 'realtime',
     model: REALTIME_MODEL,
@@ -193,6 +193,8 @@ function realtimeSessionConfig() {
       'Speak like a polite, discreet butler: warm, calm, capable, and brief. Avoid clipped, robotic, or repetitive phrasing. Avoid list-like responses.',
       'Usually answer in one or two short sentences. Do not repeat the user\'s request or use the same opening phrase every turn. Ask a follow-up only when it is genuinely needed.',
       'For a meal or recipe suggestion, first say only the meal name and one short reason it fits. Do not read the full ingredient list, nutrient breakdown, macros, or cooking steps unless the user asks. Instead ask whether they want the ingredients and nutrients, or the cooking steps.',
+      ...(bundledWelcome ? ['The application plays its own opening welcome recording. Do not generate, repeat or delegate an opening welcome. Wait for the caller to speak. The recording is not a user request or an app action.'] : []),
+      'Only give an opening welcome when the app explicitly requests it. Do not restart a welcome after reconnecting, after a tool result, or while the user is speaking.',
       '# Understanding speech',
       'Understand normal messy speech, pauses, self-corrections, mixed languages, and imperfect grammar. Preserve exact names, quantities, dates, steps, distances, doses, and calories the user states.',
       'If audio is unclear, ask one short clarification. Do not guess, invent details, or create a routine the user did not request.',
@@ -201,6 +203,10 @@ function realtimeSessionConfig() {
       'If the user wants to log, save, add, update, review, open, navigate, track, record, or change anything in the Helfi app, call request_helfi_action before answering.',
       'Do not answer app-action requests from general knowledge. The app tool must prepare the draft, save result, handoff, or clarification first.',
       'App actions include food, favourites/favorites, build meal, water, exercise, walking, running, steps, calories burned, symptoms, health journal, mood, Health Intake medication/supplement drafts, health image notes, insights, and navigation.',
+      'Use record_action for changes or deletion of an already saved diary/library entry, and preference_action for profile, health setup, goals, reminders, quiet hours and check-in settings. Use local_preference_action for device dark mode, haptics, analytics or profile visibility. Use notification_action to mark inbox notifications read or delete reviewed notifications; preserve exact titles and limit bulk requests to the visible notifications captured in the review, keeping later arrivals. Preserve exact names, dates and requested changes in request. These actions require a fresh reviewed proposal and confirmation; never turn an edit into a new log.',
+      'Use app_read to check actual report status/list, Helfi wallet credits, hydration totals/goals or saved Fitbit/Garmin connection status. Never answer these from memory. Use recipe_import_url for a complete recipe link the user asks to import; the app reviews the normal import charge first and returns the imported recipe for a separate save review.',
+      'Use support_action for actual support ticket status or an explicitly requested support message. Never send support messages just because the user mentions a problem. Ask for exact text and review before any message, closing, feedback or deletion; do not claim email delivery.',
+      'Use report_action only if the user explicitly requests weekly report generation. Preserve normal eligibility and credit review; accepted or preparing does not mean generated, unlocked or emailed. Use app_read to check report status or contents.',
       'For exercise logging such as "I did a walk", "I walked 5449 steps", or "I burned 240 calories", call request_helfi_action with action "exercise". Do not invent or suggest a workout routine unless the user explicitly asks for a routine or workout plan.',
       'General questions and natural conversation may be answered directly. Use request_helfi_action with action "general_chat" only when the app brain or the current app context is needed to answer safely.',
       '# Save safety',
@@ -214,6 +220,7 @@ function realtimeSessionConfig() {
       'When the tool returns spokenReply and instruction, base your spoken answer on spokenReply and follow instruction exactly.',
       'If safeToClaimSaved is not true, do not use words like saved, added, created, or logged as if the action already happened.',
       'If the tool returns an open_screen or handoff result, say which app screen is ready.',
+      'Use device_action for the existing Apple Health import, automatic-update and discovered-source controls. The phone must execute and verify these after review. Never claim OS permission or imported activity from authorization alone.',
       '# Health safety',
       'For medical concerns, give only brief general information, help record notes, and suggest a qualified clinician when appropriate. Do not diagnose or tell the user to start, stop, or change treatment.',
     ].join('\n'),
@@ -267,6 +274,15 @@ function realtimeSessionConfig() {
                 'navigate',
                 'general_chat',
                 'delete_conversation',
+                'record_action',
+                'preference_action',
+                'local_preference_action',
+                'notification_action',
+                'app_read',
+                'recipe_import_url',
+                'support_action',
+                'report_action',
+                'device_action',
                 'unknown',
               ],
             },
@@ -283,14 +299,17 @@ function realtimeSessionConfig() {
   }
 }
 
-function liveSessionConfig() {
+function liveSessionConfig(greetOnConnect = false, bundledWelcome = false) {
   const existing = realtimeSessionConfig()
   return {
     model: LIVE_MODEL,
     store: false,
+    ...(greetOnConnect ? { input: [{ type: 'message', role: 'developer', content: [{ type: 'input_text', text: 'Greet the caller now in English with exactly: Hi, I’m Helfi. What can I help you with? Begin once the live microphone conversation connects, then pause and listen. If the caller starts first or interrupts, skip or stop the welcome and listen. This welcome is not an app action: do not delegate it, call tools, log anything, or claim a save. Say this welcome only once.' }] }] } : {}),
     audio: { output: { voice: REALTIME_VOICE } },
     instructions: [
       'You are Talk to Helfi, a warm, calm and concise health tracking assistant.',
+      ...(bundledWelcome ? ['The application plays its own opening welcome recording. Do not generate, repeat or delegate an opening welcome. Wait for the caller to speak. The recording is not a user request or an app action.'] : []),
+      'Only give an opening welcome when a startup developer message explicitly requests it; never greet spontaneously on reconnect or repeat it after a tool result.',
       'Listen naturally while speaking. Let the user finish, including pauses and self-corrections. Ask one short question when speech is unclear.',
       'Delegate every app action, meal/drink request, confirmation, rejection and correction to the backend. Keep exact foods, quantities, dates and times.',
       'You may briefly acknowledge work while it runs, but never say saved, added, created or logged until a completed Helfi tool result has saved=true and safeToClaimSaved=true.',
@@ -362,11 +381,13 @@ export async function POST(request: NextRequest) {
     const guardMs = Date.now() - guardStartedAt
 
     const live = usesLiveProtocol(request)
+    const bundledWelcome = request.headers.get('x-helfi-voice-greeting') === 'bundled-clip'
+    const greetOnConnect = !alreadyPaid && request.headers.get('x-helfi-voice-greeting') === 'new-conversation'
     const model = live ? LIVE_MODEL : REALTIME_MODEL
     const form = new FormData()
     if (!live) {
       form.set('sdp', sdp)
-      form.set('session', JSON.stringify(realtimeSessionConfig()))
+      form.set('session', JSON.stringify(realtimeSessionConfig(bundledWelcome)))
     }
 
     const openAiStartedAt = Date.now()
@@ -381,7 +402,7 @@ export async function POST(request: NextRequest) {
         ...(live ? { 'Content-Type': 'application/json' } : {}),
       },
       signal: abortController.signal,
-      body: live ? JSON.stringify({ session: liveSessionConfig(), transport: { type: 'webrtc', sdp } }) : form,
+      body: live ? JSON.stringify({ session: liveSessionConfig(greetOnConnect, bundledWelcome), transport: { type: 'webrtc', sdp } }) : form,
     })
     const openAiMs = Date.now() - openAiStartedAt
 
@@ -476,7 +497,7 @@ export async function POST(request: NextRequest) {
         { status: 429 },
       )
     }
-    console.error('[native voice realtime] failed', error)
+    console.error('[native voice realtime] failed')
     return NextResponse.json({ error: 'Live voice session failed' }, { status: 500 })
   } finally {
     request.signal?.removeEventListener?.('abort', abortRealtimeRequest)

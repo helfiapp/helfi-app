@@ -1,5 +1,6 @@
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { createLocalVoiceWelcome } from './localVoiceWelcome'
 
 const LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'
 
@@ -19,6 +20,7 @@ type RealtimeSession = {
   stop: () => Promise<void>
   setMicrophoneMuted: (muted: boolean) => void
   promptAssistant: (instruction: string) => void
+  flushTranscript: () => void
 }
 
 function parseRealtimeJson(value: unknown) {
@@ -286,6 +288,7 @@ export async function fetchHelfiRealtimeVoiceStatus(token: string): Promise<{
 export async function startHelfiRealtimeVoiceSession(params: {
   token: string
   billingSessionId: string
+  greetOnConnect?: boolean
   signal?: AbortSignal
   callbacks?: RealtimeCallbacks
 }): Promise<RealtimeSession> {
@@ -303,6 +306,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const audioRouteBridge = requireHelfiAudioRoute()
   const callbacks = params.callbacks || {}
   let voiceProtocol: 'live-v1' | 'realtime' = 'live-v1'
+  let userHasSpoken = false
+  let openingGreetingPending = Boolean(params.greetOnConnect)
   const connectStartedAt = Date.now()
   let nativeAudioConfigured = false
   const reportConnectStage = (stage: string, detail = '') => {
@@ -389,6 +394,9 @@ export async function startHelfiRealtimeVoiceSession(params: {
   let playbackTimer: ReturnType<typeof setInterval> | null = null
   let outputEnergy = 0
   let lastOutputActivityAt = 0
+  let welcomeInputTimer: ReturnType<typeof setInterval> | null = null
+  let previousWelcomeEnergy: { energy: number; duration: number } | null = null
+  let localWelcome: ReturnType<typeof createLocalVoiceWelcome> | null = null
   const liveCaptionFragments: { speaker: 'user' | 'assistant'; delta: string; start_ms: number; end_ms: number }[] = []
   let liveUserText = ''
   let liveAssistantText = ''
@@ -454,6 +462,59 @@ export async function startHelfiRealtimeVoiceSession(params: {
       })
     }, 12000)
   }
+  const stopOpeningWelcome = (reason: string) => {
+    openingGreetingPending = false
+    if (!params.greetOnConnect) return Promise.resolve()
+    if (welcomeInputTimer) clearInterval(welcomeInputTimer)
+    welcomeInputTimer = null
+    return localWelcome?.stop(reason) || Promise.resolve()
+  }
+  // A bundled, verified recording is deterministic; provider startup messages
+  // alone do not guarantee an opening spoken turn. Keep WebRTC's audio session.
+  localWelcome = createLocalVoiceWelcome({
+    playbackId: `welcome-${params.billingSessionId}`.slice(0, 100),
+    isCurrent: () => !stopped && !params.signal?.aborted,
+    assetUri: async () => {
+      const { Asset } = require('expo-asset')
+      const asset = Asset.fromModule(require('../../assets/audio/helfi-welcome.mp3'))
+      await asset.downloadAsync()
+      return asset.localUri || asset.uri || ''
+    },
+    player: audioRouteBridge?.module,
+    listen: listener => audioRouteBridge?.emitter.addListener('HelfiVoiceWelcomePlayback', listener) || { remove: () => {} },
+    onStage: stage => {
+      reportConnectStage(stage)
+      if (stage !== 'welcome-started') {
+        openingGreetingPending = false
+        if (welcomeInputTimer) clearInterval(welcomeInputTimer)
+        welcomeInputTimer = null
+      }
+    },
+    onPlaying: playing => {
+      if (stopped || params.signal?.aborted) return
+      if (playing) { clearSilenceTimer(); emitStatus('speaking') }
+      else if (!assistantAudioPlaying) { emitStatus('live'); armSilenceReminder() }
+    },
+    onComplete: text => {
+      if (stopped || params.signal?.aborted) return
+      callbacks.onAssistantText?.(text)
+      recentAssistantText = text
+      recentAssistantTextAt = Date.now()
+      if (voiceProtocol === 'live-v1') sendRealtimeEvent(dataChannel, { type: 'session.instructions.append', delegation_id: null, content: 'The application has played its opening welcome: Hi, I’m Helfi. What can I help you with? Do not repeat the welcome. Listen to the caller. The recording is not a user request or an app action.' })
+    },
+    onUnavailable: message => { callbacks.onNotice?.(message); armSilenceReminder() },
+  })
+  const observeWelcomeInput = (stats: VoiceMediaStats) => {
+    if (!openingGreetingPending && !localWelcome?.isPlaying()) return
+    const previous = previousWelcomeEnergy
+    previousWelcomeEnergy = { energy: stats.totalAudioEnergy, duration: stats.totalSamplesDuration }
+    const duration = previous ? stats.totalSamplesDuration - previous.duration : 0
+    const inputPower = previous && duration > 0 ? (stats.totalAudioEnergy - previous.energy) / duration : 0
+    if (stats.audioLevel > 0.025 || inputPower > 0.000625) {
+      userHasSpoken = true
+      void stopOpeningWelcome('user-first')
+    }
+  }
   const failReadiness = (message: string) => {
     if (readinessSettled) return
     readinessSettled = true
@@ -478,6 +539,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     const check = async () => {
       if (stopped || microphoneSending) return
       const stats = await readVoiceMediaStats(pc)
+      observeWelcomeInput(stats)
       if (stats.outboundPackets <= 0 || stats.outboundBytes <= 0 || stopped) return
       microphoneSending = true
       console.info('[voice realtime media] first-outbound', safeVoiceStatsText(stats))
@@ -542,6 +604,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     })
   }
   const closeRealtimeConnection = () => {
+    void stopOpeningWelcome('ended')
     clearResponseTimers()
     clearSilenceTimer()
     if (captionTimer) clearTimeout(captionTimer)
@@ -644,7 +707,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
     handledToolCallIds.add(callId)
     clearResponseTimers()
     emitStatus('thinking')
-    Promise.resolve().then(() => {
+    Promise.resolve().then(async () => {
+      await stopOpeningWelcome('tool')
       if (stopped || params.signal?.aborted) return { ok: false, saved: false, safeToClaimSaved: false, message: 'Live voice has stopped.' }
       return callbacks.onActionRequest?.({
       request: cleanText(args.request),
@@ -707,6 +771,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
     liveCaptionFragments.push({ speaker, delta, start_ms: Number(payload.start_ms || 0), end_ms: Number(payload.end_ms || 0) })
     if (liveCaptionFragments.length > 1000) liveCaptionFragments.splice(0, 500)
     if (speaker === 'user') {
+      userHasSpoken = true
+      void stopOpeningWelcome('user-first')
       liveUserText += delta
       clearSilenceTimer()
     } else liveAssistantText += delta
@@ -733,6 +799,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
             const active = stats.outputAudioLevel > 0.005 || stats.outputAudioEnergy - outputEnergy > 0.00001
             outputEnergy = stats.outputAudioEnergy
             if (active) {
+              void stopOpeningWelcome('remote-output')
               lastOutputActivityAt = Date.now()
               assistantAudioPlaying = true
               emitStatus('speaking')
@@ -782,6 +849,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
       return
     }
     if (payload.type === 'input_audio_buffer.speech_started') {
+      userHasSpoken = true
+      void stopOpeningWelcome('user-first')
       clearResponseTimers()
       clearSilenceTimer()
       silenceReminderSent = false
@@ -951,6 +1020,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
         'x-helfi-ai-consent': 'true',
         'x-helfi-voice-session-id': cleanText(params.billingSessionId),
         'x-helfi-voice-protocol': 'live-v1',
+        ...(params.greetOnConnect ? { 'x-helfi-voice-greeting': 'bundled-clip' } : {}),
       },
       signal: params.signal,
       body: String(pc.localDescription?.sdp || offer.sdp || ''),
@@ -1007,7 +1077,18 @@ export async function startHelfiRealtimeVoiceSession(params: {
     throw error
   }
 
+  if (params.greetOnConnect && !userHasSpoken && !stopped && !params.signal?.aborted) {
+    clearSilenceTimer()
+    // Check real local input while asset/native playback is pending as well as
+    // while playing. Caption arrival and remote packet counts are not input.
+    welcomeInputTimer = setInterval(() => {
+      void readVoiceMediaStats(pc).then(stats => { if (!stopped) observeWelcomeInput(stats) })
+    }, 125)
+    void localWelcome.start()
+  }
+
   return {
+    flushTranscript: flushLiveCaptions,
     promptAssistant: (instruction: string) => {
       if (stopped || !cleanText(instruction)) return
       if (voiceProtocol === 'live-v1') {

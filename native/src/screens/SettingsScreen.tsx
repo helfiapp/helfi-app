@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Alert, Appearance, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native'
+import { Alert, Appearance, DeviceEventEmitter, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Feather } from '@expo/vector-icons'
 
@@ -97,7 +97,10 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
 
   useEffect(() => {
     let cancelled = false
+    let revision = 0
     const loadLocalPrefs = async () => {
+      const loadingRevision = ++revision
+      setLocalLoaded(false)
       try {
         const [savedDark, savedHaptics, savedVisibility, savedAnalytics] = await Promise.all([
           AsyncStorage.getItem(STORAGE_KEYS.darkMode),
@@ -106,6 +109,7 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           AsyncStorage.getItem(STORAGE_KEYS.dataAnalytics),
         ])
 
+        if (cancelled || loadingRevision !== revision) return
         if (savedDark !== null) {
           const shouldUseDarkMode = savedDark === 'true'
           setDarkMode(shouldUseDarkMode)
@@ -116,13 +120,16 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
           setProfileVisibility(savedVisibility)
         }
         if (savedAnalytics !== null) setDataAnalytics(savedAnalytics === 'true')
-      } finally {
-        if (!cancelled) setLocalLoaded(true)
+        setLocalLoaded(true)
+      } catch {
+        // Keep the last displayed values if storage cannot be read.
       }
     }
+    const subscription = DeviceEventEmitter.addListener('helfi:device-preference-changed', () => { void loadLocalPrefs() })
     void loadLocalPrefs()
     return () => {
       cancelled = true
+      subscription.remove()
     }
   }, [])
 

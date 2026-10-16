@@ -24,6 +24,12 @@ export function VoiceAssistantIconButton({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel="Talk to Helfi"
+      accessibilityHint="Tap to start voice. Touch and hold to read your recent conversation or type a message without starting the microphone."
+      accessibilityActions={[{ name: 'conversation', label: 'Read recent conversation or type a message' }]}
+      onAccessibilityAction={(event) => {
+        if (event.nativeEvent.actionName === 'conversation') openVoiceAssistant({ source: 'button', context, mode: 'conversation' })
+      }}
+      onLongPress={() => openVoiceAssistant({ source: 'button', context, mode: 'conversation' })}
       onPress={onPress || (() => openVoiceAssistant({ source: 'button', context }))}
       style={({ pressed }) => [
         {

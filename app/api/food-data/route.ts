@@ -586,6 +586,7 @@ export async function GET(request: NextRequest) {
       name: string
       brand?: string | null
       kind?: string | null
+      country?: string | null
       serving_size?: string | null
       servingOptions?: any[] | null
       calories?: number | null
@@ -632,6 +633,7 @@ export async function GET(request: NextRequest) {
             id: `custom:${itemId}`,
             name,
             brand: rawBrand || null,
+            country: rowCountry || null,
             kind: kindValue,
             serving_size: servingLabel,
             servingOptions: options.length > 0 ? options : null,

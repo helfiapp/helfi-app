@@ -55,6 +55,16 @@ export async function POST(request: NextRequest) {
     if (!existing || existing.userId !== user.id) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 })
     }
+
+    // A reviewed voice action identifies one actual account-owned row. It must
+    // never expand that selection into the legacy duplicate sweep below.
+    if ((body as any)?.exactIdOnly === true) {
+      const deleted = await prisma.foodLog.deleteMany({ where: { id, userId: user.id } })
+      if (deleted.count !== 1) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+      const imageUrl = typeof existing.imageUrl === 'string' ? existing.imageUrl : null
+      if (imageUrl) await deleteFoodPhotosIfUnused([imageUrl]).catch(() => {})
+      return NextResponse.json({ success: true, id, deletedCount: 1 })
+    }
     const imageUrlsToCheck = new Set<string>()
     if (typeof existing.imageUrl === 'string' && existing.imageUrl.trim()) {
       imageUrlsToCheck.add(existing.imageUrl.trim())

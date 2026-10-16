@@ -16,18 +16,21 @@ const voiceDurationPath = path.join(root, 'lib/exercise/voice-duration.ts')
 
 // Load the actual pure measurement modules; never invent conversion stubs.
 const measurementModules = new Map()
-const measurementAllowlist = new Set(['lib/native-voice-time.ts', 'native/src/lib/foodUnits.ts', 'lib/food/serving-measurements.ts', 'lib/food/measurement-units.ts', 'lib/food/produce-measurements.ts', 'lib/food/dry-food-measurements.ts', 'lib/food/dairy-semi-solid-measurements.ts'])
+const measurementAllowlist = new Set(['lib/native-voice-food-copy.ts', 'lib/native-voice-mood-context.ts', 'lib/native-voice-spoken-quantities.ts', 'lib/native-voice-recipe-metadata.ts', 'lib/native-voice-time.ts', 'native/src/lib/foodUnits.ts', 'lib/food/serving-measurements.ts', 'lib/food/measurement-units.ts', 'lib/food/produce-measurements.ts', 'lib/food/dry-food-measurements.ts', 'lib/food/dairy-semi-solid-measurements.ts'])
 function loadMeasurementModule(relative) {
   if (!measurementAllowlist.has(relative)) throw new Error(`Unexpected measurement dependency: ${relative}`)
   if (measurementModules.has(relative)) return measurementModules.get(relative)
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(root, relative), 'utf8'), { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText
-  vm.runInNewContext(code, { module, exports: module.exports, require: request => loadMeasurementModule(path.posix.normalize(path.posix.join(path.posix.dirname(relative), request)) + '.ts') }, { filename: relative })
+  vm.runInNewContext(code, { module, exports: module.exports, require: request => request==='crypto'&&relative==='lib/native-voice-food-copy.ts'?require('node:crypto'):loadMeasurementModule(path.posix.normalize(path.posix.join(path.posix.dirname(relative), request)) + '.ts') }, { filename: relative })
   measurementModules.set(relative, module.exports)
   return module.exports
 }
 const actualMeasurements = loadMeasurementModule('lib/food/serving-measurements.ts')
 const actualVoiceTimes = loadMeasurementModule('lib/native-voice-time.ts')
+const actualRecipeMetadata = loadMeasurementModule('lib/native-voice-recipe-metadata.ts')
+const actualMoodContext = loadMeasurementModule('lib/native-voice-mood-context.ts')
+const actualFoodCopy = loadMeasurementModule('lib/native-voice-food-copy.ts')
 
 let source = fs.readFileSync(routePath, 'utf8')
 const realtimeSource = fs.existsSync(realtimeRoutePath) ? fs.readFileSync(realtimeRoutePath, 'utf8') : ''
@@ -95,6 +98,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(normalizeRealtimeActionHint({ action: 'general_chat', needsReview: false })?.action === 'health_question', 'Realtime general chat hints must map to the safe health question path.')
   assert(normalizeRealtimeActionHint({ action: 'health_journal', needsReview: true })?.action === 'journal', 'Realtime health journal hints must map to journal drafts.')
   if (__nativeSourcesAvailable) {
+    assert(__voiceAssistantSource.includes('(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview') && __voiceAssistantSource.includes('testID="talk-to-helfi-message-input"') && __voiceAssistantSource.includes('testID="talk-to-helfi-inline-submit"') && __voiceAssistantSource.includes('onPress={() => sendDraftRequest()}'), 'The iPad fallback and explicit typed mode must expose a message field and submit through the normal app action handler while live voice and transcript review remain distinct.')
+    assert(__voiceAssistantSource.includes("mode?: 'voice' | 'conversation' | 'text'") && __voiceAssistantSource.includes("if (requestedMode === 'conversation') return") && __voiceAssistantSource.includes("if (requestedMode === 'text') { requestMessageInputFocus(); return }"), 'History and typed entry must remain available before paid microphone startup; explicit text entry reveals the measured message section.')
     assert(/conversation\.item\.input_audio_transcription\.completed/.test(__realtimeClientSource), 'Native realtime client must listen for spoken user transcripts.')
     assert(/response\.done/.test(__realtimeClientSource) && /response\.audio_transcript\.done/.test(__realtimeClientSource) && /response\.output_audio_transcript\.done/.test(__realtimeClientSource), 'Native realtime client must listen for completed assistant replies.')
     assert(/response\.audio_transcript\.delta/.test(__realtimeClientSource) && /response\.output_audio_transcript\.delta/.test(__realtimeClientSource) && /response\.output_text\.delta/.test(__realtimeClientSource), 'Native realtime client must track streaming assistant reply text.')
@@ -134,8 +139,9 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__realtimeClientSource.includes("LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'") && __realtimeClientSource.includes('realtimeApiBaseUrl') && __realtimeClientSource.includes('EXPO_PUBLIC_USE_LOCAL_REALTIME'), 'Native realtime voice must fall back to live when local dev has no AI service, unless local realtime testing is explicitly enabled.')
     assert(__realtimeClientSource.includes('function localRealtimeApiBaseUrl') && __realtimeClientSource.includes('process.env.EXPO_PUBLIC_API_BASE_URL') && __realtimeClientSource.includes('return isLocalDevHost && useLocalRealtime ? raw'), 'Native realtime voice must let EXPO_PUBLIC_USE_LOCAL_REALTIME target the local realtime backend without silently falling back to live.')
     assert(__voiceAssistantSource.includes('onTranscript: (text) => {') && __voiceAssistantSource.includes("appendConversationTurns([makeConversationTurn('user', text)])"), 'Native live voice transcripts must appear in the chat review after voice mode.')
-    assert(__voiceAssistantSource.includes('fetchNativeVoiceConfirm') && __voiceAssistantSource.includes('VOICE_ACCESS_FALLBACK_API_BASE_URL'), 'Native reviewed save/confirm must fall back to live when local dev has no usable backend.')
-    assert(__voiceAssistantSource.includes('conversationTurns.length > 0 && !showDraftCard'), 'Native review drafts must keep Save/Discard buttons visible instead of being hidden by the transcript view.')
+    const confirmFetch = __voiceAssistantSource.slice(__voiceAssistantSource.indexOf('async function fetchNativeVoiceConfirm('), __voiceAssistantSource.indexOf('async function playableAudioUri('))
+    assert(confirmFetch.includes('requestFactory(API_BASE_URL)') && confirmFetch.split('requestFactory(').length === 2 && !confirmFetch.includes('VOICE_ACCESS_FALLBACK_API_BASE_URL') && !confirmFetch.includes('shouldRetryVoiceAssistantOnLive'), 'Native reviewed confirmation must send exactly once to the configured backend, preserving its response and never replaying a possible committed save against live.')
+    assert(__voiceAssistantSource.includes('!voiceSessionActive && !showingConversationReview && showDraftCard && draft && (') && __voiceAssistantSource.includes('const primaryFooterDisabled = !draft || busy || confirming || (!draft.canConfirm && !primaryFooterIsHandoff)') && __voiceAssistantSource.includes('accessibilityLabel={primaryFooterLabel}') && __voiceAssistantSource.includes('accessibilityLabel={discardFooterLabel}') && __voiceAssistantSource.includes('onPress={primaryFooterPress}') && __voiceAssistantSource.includes('onPress={rejectDraft}'), 'Typed review drafts must render the reviewed card and Save/Discard controls even when transcript history exists; pending work must disable confirmation.')
     assert(__voiceAssistantSource.includes('sendDraftRequestRef.current({') && __voiceAssistantSource.includes('transcriptOverride: request'), 'Native realtime voice app actions must use the latest draft handler so follow-up commands like save it can see the current review draft.')
   }
   assert(/Do not limit language understanding to the examples below/.test(__routeSource), 'AI command understanding must say examples are not language limits.')
@@ -170,8 +176,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
 	  assert(/findHealthIntakeReviewMatch/.test(__routeSource), 'Health Intake voice drafts must look for safe medication/supplement review matches.')
 	  assert(/enrichHealthIntakeDraftWithCatalogMatches/.test(__routeSource), 'Health Intake voice drafts must attach catalog matches before review signing.')
 	  assert(/HealthIntakeReviewMatch/.test(__routeSource), 'Health Intake catalog hints must use the shared review-match helper.')
-	  assert(__routeSource.indexOf('const quickHealthIntakeDraft = tryParseHealthIntakeItemsRequest') > -1, 'Health Intake quick router must run before favourite matching.')
-	  assert(__routeSource.indexOf('const quickHealthIntakeDraft = tryParseHealthIntakeItemsRequest') < __routeSource.indexOf('const earlyFavoriteDraft'), 'Health Intake wording must be checked before early favourite matching.')
+	  assert(__routeSource.search(/const quickHealthIntakeDraft = (?:appControlRequest \\? null : )?tryParseHealthIntakeItemsRequest/) > -1, 'Health Intake quick router must run before favourite matching.')
+	  assert(__routeSource.search(/const quickHealthIntakeDraft = (?:appControlRequest \\? null : )?tryParseHealthIntakeItemsRequest/) < __routeSource.indexOf('const earlyFavoriteDraft'), 'Health Intake wording must be checked before early favourite matching.')
 
 		  const intakeTranscript = 'I take vitamin D, magnesium glycinate, fish oil, and metformin.'
   const intakeDraft = tryParseHealthIntakeItemsRequest(intakeTranscript, localDate, healthIntakeContext)
@@ -1325,7 +1331,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
 	  const foodDiaryAdviceContext = { section: 'food', title: 'Food Diary' }
   const foodDiaryAdviceDraft = buildFoodRecommendationConversationDraft(calorieRecommendation, localDate, foodDiaryAdviceContext)
   assert(!/uncategorized/i.test(foodDiaryAdviceDraft?.recipe?.text || ''), 'Generic Food Diary meal advice must not say uncategorized.')
-  assert(/Dinner recommendation/i.test(foodDiaryAdviceDraft?.recipe?.importDraft?.title || ''), 'Generic Food Diary meal advice should fall back to a real meal category.')
+  assert(!foodDiaryAdviceDraft?.recipe?.importDraft && !foodDiaryAdviceDraft?.canConfirm, 'A generic conversation-only recommendation must not fabricate a complete saveable recipe.')
 
   const macroRecommendation = 'recommend dinner that fits my remaining carbs and fat'
   assert(isFoodRecommendationRequest(macroRecommendation, dashboardContext), 'Remaining carbs and fat wording must be treated as meal recommendation.')
@@ -1336,8 +1342,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   const remainingProteinDraft = buildFoodRecommendationConversationDraft(remainingProteinRecommendation, localDate, foodContext)
   assert(remainingProteinDraft?.action === 'recipe', 'Remaining calories and protein recommendation must create a meal recommendation reply.')
   assert(!remainingProteinDraft?.appTarget, 'First meal recommendation reply must not immediately open Build a meal.')
-  assert(/High-protein Dinner recommendation/i.test(remainingProteinDraft?.recipe?.importDraft?.title || ''), 'Food recommendation fallback must create a useful high-protein dinner title.')
-  assert((remainingProteinDraft?.recipe?.importDraft?.ingredients || []).includes('150 g chicken breast'), 'Food recommendation fallback must prefill useful starter ingredients.')
+  assert(/High-protein Dinner recommendation/i.test(remainingProteinDraft?.recipe?.text || ''), 'A high-protein dinner suggestion must retain its useful conversational meal title.')
+  assert(!remainingProteinDraft?.recipe?.importDraft && !remainingProteinDraft?.canConfirm, 'A conversational fallback must not turn starter ingredients into an invented complete saveable recipe.')
   assert(/Tell me what you think/i.test(remainingProteinDraft?.confirmationMessage || ''), 'Food recommendation fallback must invite conversation before building.')
 
   const lunchRecommendation = "It's nearly lunchtime. Based on my current calories and macros today, what do you recommend I eat?"
@@ -1370,8 +1376,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(/keeping Sugar lighter/i.test(contextualLunchRecommendationDraft?.recipe?.text || ''), 'Fallback lunch recommendation must mention near-target nutrients when diary context is available.')
   assert(wantsToBuildRecommendedMeal('yes please build that meal'), 'Natural confirmation must be recognized as a Build a meal follow-up.')
   const lunchBuildDraft = buildFoodRecommendationHandoffDraft('yes please build that meal', localDate, foodContext, fallbackLunchRecommendationDraft.recipe.text)
-  assert(lunchBuildDraft?.appTarget?.nativeTarget?.action === 'openBuildMeal', 'Confirmed lunch recommendation must open native Build a meal.')
-  assert(lunchBuildDraft?.appTarget?.nativeTarget?.meal === 'lunch', 'Confirmed lunch recommendation must open Build a meal in Lunch.')
+  assert(!lunchBuildDraft?.appTarget && !lunchBuildDraft?.canConfirm, 'Choosing an incomplete lunch suggestion must request complete recipe details before any save or tool handoff.')
+  assert(!lunchBuildDraft?.recipe?.importDraft, 'An incomplete lunch suggestion cannot invent a recipe yield or cooking steps.')
   assert(wantsAnotherMealRecommendation("I don't really like that, do you have another suggestion?"), 'Natural dislike/another-option wording must be recognized as a meal recommendation follow-up.')
   assert(wantsAnotherMealRecommendation('No me gusta, dame otra opción'), 'Spanish another-option wording must be recognized as a meal recommendation follow-up.')
   assert(wantsAnotherMealRecommendation("Je n'aime pas ça, une autre suggestion ?"), 'French another-option wording must be recognized as a meal recommendation follow-up.')
@@ -1396,8 +1402,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(/Another option/i.test(anotherLunchDraft?.recipe?.text || ''), 'Another meal suggestion must clearly answer as an alternative option.')
   assert(/Chicken quinoa lunch/i.test(anotherLunchDraft?.recipe?.text || ''), 'Another meal suggestion must avoid repeating the first fallback lunch.')
   const anotherLunchBuildDraft = buildFoodRecommendationHandoffDraft('yes please build that meal', localDate, { section: 'food', title: 'Food Diary' }, anotherLunchDraft.recipe.text)
-  assert(anotherLunchBuildDraft?.appTarget?.nativeTarget?.meal === 'lunch', 'Confirmed alternative lunch must keep the lunch context.')
-  assert((anotherLunchBuildDraft?.recipe?.importDraft?.ingredients || []).includes('140 g chicken breast'), 'Confirmed alternative lunch must build the alternative ingredients.')
+  assert(!anotherLunchBuildDraft?.appTarget && !anotherLunchBuildDraft?.canConfirm, 'An incomplete alternative must remain unsaved while the app obtains complete recipe details.')
+  assert(!anotherLunchBuildDraft?.recipe?.importDraft, 'Choosing another conversational suggestion must not fabricate its complete recipe.')
   const vegetarianLunchDraft = buildFoodRecommendationConversationDraft(
     'can you make it vegetarian?',
     localDate,
@@ -1408,9 +1414,9 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(!vegetarianLunchDraft?.appTarget, 'Vegetarian meal tweak must stay conversational and not open Build a meal immediately.')
   assert(/adjusted option/i.test(vegetarianLunchDraft?.recipe?.text || ''), 'Vegetarian meal tweak must clearly answer with an adjusted option.')
   assert(/Vegetarian chickpea lunch/i.test(vegetarianLunchDraft?.recipe?.text || ''), 'Vegetarian meal tweak must create a vegetarian lunch suggestion.')
-  assert((vegetarianLunchDraft?.recipe?.importDraft?.ingredients || []).includes('120 g tofu'), 'Vegetarian meal tweak must include vegetarian starter ingredients.')
+  assert(!vegetarianLunchDraft?.recipe?.importDraft && !vegetarianLunchDraft?.canConfirm, 'A vegetarian conversational adjustment cannot claim a complete source-resolved recipe.')
   const vegetarianBuildDraft = buildFoodRecommendationHandoffDraft('yes please build that meal', localDate, { section: 'food', title: 'Food Diary' }, vegetarianLunchDraft.recipe.text)
-  assert((vegetarianBuildDraft?.recipe?.importDraft?.ingredients || []).includes('120 g tofu'), 'Confirmed vegetarian tweak must build the adjusted ingredients.')
+  assert(!vegetarianBuildDraft?.appTarget && !vegetarianBuildDraft?.canConfirm, 'Choosing an incomplete vegetarian suggestion cannot silently log or prefill an invented recipe.')
   const lowCarbLunchDraft = buildFoodRecommendationConversationDraft(
     'make it less carbs',
     localDate,
@@ -1419,7 +1425,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     { alternativeTo: fallbackLunchRecommendationDraft.recipe.text, adjustment: true },
   )
   assert(/Lower-carb chicken salad lunch/i.test(lowCarbLunchDraft?.recipe?.text || ''), 'Lower-carb meal tweak must create a lower-carb lunch suggestion.')
-  assert((lowCarbLunchDraft?.recipe?.importDraft?.ingredients || []).includes('150 g salad greens'), 'Lower-carb meal tweak must include lower-carb starter ingredients.')
+  assert(!lowCarbLunchDraft?.recipe?.importDraft && !lowCarbLunchDraft?.canConfirm, 'Lower-carb conversational suggestions must not invent recipe metadata or save before complete ingredient resolution.')
   const noChickenLunchDraft = buildFoodRecommendationConversationDraft(
     "I don't eat chicken",
     localDate,
@@ -1548,6 +1554,7 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   )
   const lunchAiText = [
     'High Protein Chicken Rice Bowl',
+    'Servings: 2',
     'Ingredients:',
     '- 140 g chicken breast',
     '- 120 g cooked brown rice',
@@ -1722,9 +1729,9 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
 	  assert(unsafeHealthPhotoReview?.action === 'health_question', 'Health photo review requests must stay in the safer health-question path.')
 
   const genericRecipe = buildQuickRecipeDraft('suggest a quick dinner recipe', localDate, dashboardContext)
-  assert(genericRecipe?.action === 'recipe', 'Generic recipe requests should still open a normal Build a meal recipe draft.')
-  assert(genericRecipe?.appTarget?.nativeTarget?.action === 'openBuildMeal', 'Recipe handoffs must open the native Build a meal tool.')
-  assert(genericRecipe?.appTarget?.nativeTarget?.recipeDraft?.ingredients?.length > 0, 'Recipe handoffs must carry ingredients into the native Build a meal tool.')
+  assert(genericRecipe === null, 'Generic recipe requests must use complete recipe generation rather than a fabricated local shortcut.')
+  const incompleteRecipe = buildRecipeHandoffDraft('suggest a quick dinner recipe', localDate)
+  assert(!incompleteRecipe.canConfirm && !incompleteRecipe.appTarget && !incompleteRecipe.recipe?.importDraft, 'A recipe without yield, measured ingredients and actual steps must ask for details instead of inventing a saveable handoff.')
 
   return failures
 }
@@ -1743,6 +1750,12 @@ const compiled = ts.transpileModule(`${source}\n${appended}`, {
 const sandbox = {
   ...actualMeasurements,
   ...actualVoiceTimes,
+  ...loadMeasurementModule('lib/native-voice-spoken-quantities.ts'),
+  ...actualRecipeMetadata,
+  ...actualFoodCopy,
+  parseNativeVoiceMoodContext: actualMoodContext.parseNativeVoiceMoodContext,
+  validateNativeVoiceMoodContext: actualMoodContext.validateNativeVoiceMoodContext,
+  nativeVoiceMoodContextSummary: actualMoodContext.nativeVoiceMoodContextSummary,
   console,
   URLSearchParams,
   URL,

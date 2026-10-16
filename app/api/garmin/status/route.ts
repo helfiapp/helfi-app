@@ -1,27 +1,35 @@
 import { NextResponse } from 'next/server'
+import type { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
 import { deregisterGarminUser, fetchGarminUserId } from '@/lib/garmin-oauth'
 import { ensureGarminSchema } from '@/lib/garmin-db'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 export const dynamic = 'force-dynamic'
 export const runtime = 'nodejs'
 
-export async function GET() {
+export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
+  const userId = session?.user?.id || await getUserIdFromNativeAuth(request)
 
-  if (!session?.user?.id) {
+  if (!userId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
   const account = await prisma.account.findFirst({
     where: {
-      userId: session.user.id,
+      userId,
       provider: 'garmin',
     },
     select: { providerAccountId: true, access_token: true, userId: true },
   })
+
+  // A voice read must not contact Garmin, attach old webhooks or create tables.
+  if (request && new URL(request.url).searchParams.get('voiceReadOnly') === '1') {
+    return NextResponse.json({ storedConnection: !!account, credentialsPresent: !!account?.access_token, liveVerified: false })
+  }
 
   let tokenValid = true
   if (account) {
@@ -83,15 +91,15 @@ export async function GET() {
       if (matches.length) {
         await prisma.garminWebhookLog.updateMany({
           where: { id: { in: matches } },
-          data: { userId: session.user.id },
+          data: { userId },
         })
       }
     }
 
     const [count, lastWebhook] = await Promise.all([
-      prisma.garminWebhookLog.count({ where: { userId: session.user.id } }),
+      prisma.garminWebhookLog.count({ where: { userId } }),
       prisma.garminWebhookLog.findFirst({
-        where: { userId: session.user.id },
+        where: { userId },
         orderBy: { receivedAt: 'desc' },
         select: { receivedAt: true, dataType: true },
       }),

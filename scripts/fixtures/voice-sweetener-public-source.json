@@ -1,0 +1,189 @@
+{
+  "provenance": "Public Helfi food catalog rows read by primary agent on 2026-10-17. No user records. Values retained verbatim; source selection tests only.",
+  "custom": [
+    {
+      "id": "cml9a75wt009t5wwrq8mthann",
+      "key": "brown packed sugar|SINGLE",
+      "name": "Sugar",
+      "brand": "brown, packed",
+      "kind": "SINGLE",
+      "caloriesPer100g": 368,
+      "proteinPer100g": 8.82,
+      "carbsPer100g": 80.52,
+      "fatPer100g": 0.47,
+      "fiberPer100g": 1.8,
+      "sugarPer100g": 28,
+      "aliases": [
+        "Sugar (brown, packed)",
+        "brown, packed Sugar",
+        "Sugar (brown packed)",
+        "brown packed Sugar",
+        "Sugar (brownpacked)",
+        "brownpacked Sugar"
+      ]
+    },
+    {
+      "id": "cml9a75xf009u5wwrfoszhx6a",
+      "key": "caster superfine sugar|SINGLE",
+      "name": "Sugar",
+      "brand": "caster/superfine",
+      "kind": "SINGLE",
+      "caloriesPer100g": 83,
+      "proteinPer100g": 0.2,
+      "carbsPer100g": 20.73,
+      "fatPer100g": 0.07,
+      "fiberPer100g": 1.9,
+      "sugarPer100g": 0,
+      "aliases": [
+        "Sugar (caster/superfine)",
+        "caster/superfine Sugar",
+        "Sugar (caster superfine)",
+        "caster superfine Sugar",
+        "Sugar (castersuperfine)",
+        "castersuperfine Sugar"
+      ]
+    },
+    {
+      "id": "cml9a7602009v5wwrs1sropci",
+      "key": "raw turbinado sugar|SINGLE",
+      "name": "Sugar",
+      "brand": "raw/turbinado",
+      "kind": "SINGLE",
+      "caloriesPer100g": 94,
+      "proteinPer100g": 2.06,
+      "carbsPer100g": 23.64,
+      "fatPer100g": 0.29,
+      "fiberPer100g": 4.4,
+      "sugarPer100g": 0,
+      "aliases": [
+        "Sugar (raw/turbinado)",
+        "raw/turbinado Sugar",
+        "Sugar (raw turbinado)",
+        "raw turbinado Sugar",
+        "Sugar (rawturbinado)",
+        "rawturbinado Sugar"
+      ]
+    },
+    {
+      "id": "cml9a7618009x5wwr29c59qrr",
+      "key": "white granulated sugar|SINGLE",
+      "name": "Sugar",
+      "brand": "white/granulated",
+      "kind": "SINGLE",
+      "caloriesPer100g": 385,
+      "proteinPer100g": 0,
+      "carbsPer100g": 99.6,
+      "fatPer100g": 0.32,
+      "fiberPer100g": 0,
+      "sugarPer100g": 99.8,
+      "aliases": [
+        "Sugar (white/granulated)",
+        "white/granulated Sugar",
+        "Sugar (white granulated)",
+        "white granulated Sugar",
+        "Sugar (whitegranulated)",
+        "whitegranulated Sugar"
+      ]
+    }
+  ],
+  "usda": [
+    {
+      "id": "cmkmlsucw010ja65f4oc2igmm",
+      "source": "usda_foundation",
+      "fdcId": 334247,
+      "name": "Sugars, granulated",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 385,
+      "proteinG": 0,
+      "carbsG": 99.6,
+      "fatG": 0.32,
+      "fiberG": null,
+      "sugarG": 99.8
+    },
+    {
+      "id": "cmkmlsuma01soa65fmsiy363l",
+      "source": "usda_foundation",
+      "fdcId": 746784,
+      "name": "Sugars, granulated",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 385,
+      "proteinG": 0,
+      "carbsG": 99.6,
+      "fatG": 0.32,
+      "fiberG": null,
+      "sugarG": 99.8
+    },
+    {
+      "id": "cmkmtlxbf010p11apg2sir1ca",
+      "source": "usda_sr_legacy",
+      "fdcId": 168833,
+      "name": "Sugars, brown",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 380,
+      "proteinG": 0.12,
+      "carbsG": 98.09,
+      "fatG": 0,
+      "fiberG": 0,
+      "sugarG": 97.02
+    },
+    {
+      "id": "cmkmtmfvx01n411ap1n5p0a5u",
+      "source": "usda_sr_legacy",
+      "fdcId": 169640,
+      "name": "Honey",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 304,
+      "proteinG": 0.3,
+      "carbsG": 82.4,
+      "fatG": 0,
+      "fiberG": 0.2,
+      "sugarG": 82.12
+    },
+    {
+      "id": "cmkmtmg7h01nj11ap2dgcq85m",
+      "source": "usda_sr_legacy",
+      "fdcId": 169655,
+      "name": "Sugars, granulated",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 387,
+      "proteinG": 0,
+      "carbsG": 99.98,
+      "fatG": 0,
+      "fiberG": 0,
+      "sugarG": 99.8
+    },
+    {
+      "id": "cmkmtmg8401nk11apeg6037up",
+      "source": "usda_sr_legacy",
+      "fdcId": 169656,
+      "name": "Sugars, powdered",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 389,
+      "proteinG": 0,
+      "carbsG": 99.77,
+      "fatG": 0,
+      "fiberG": 0,
+      "sugarG": 97.81
+    },
+    {
+      "id": "cmkmtmg9d01nm11apo8mc9ugx",
+      "source": "usda_sr_legacy",
+      "fdcId": 169658,
+      "name": "Sugars, maple",
+      "brand": null,
+      "servingSize": "100 g",
+      "calories": 354,
+      "proteinG": 0.1,
+      "carbsG": 90.9,
+      "fatG": 0.2,
+      "fiberG": 0,
+      "sugarG": 84.87
+    }
+  ]
+}

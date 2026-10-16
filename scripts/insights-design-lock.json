@@ -1,0 +1,16 @@
+{
+  "approvedBy": "Owner, DESIGN MANAGER chat, 17 October 2026",
+  "approval": "That looks good now. Lock the Insights design in like the dashboard.",
+  "scope": "Full compact native Insights page and Insights-only weekly report explorer. Preserve layout, every issue/report row and matching Helfi green accents. No design change or baseline refresh without explicit owner approval for the exact change.",
+  "releaseStatus": "Approved local design; not released. Existing signed iPhone49 and Android46 exclude this Insights design. Design approval does not authorize release.",
+  "sharedFoundations": "Theme, Screen container, bottom navigation and logo remain protected by the existing Dashboard design lock.",
+  "references": [
+    "/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-insights/matched-top.jpg",
+    "/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-insights/matched-middle.jpg",
+    "/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-insights/matched-bottom.jpg"
+  ],
+  "files": {
+    "native/src/screens/InsightsScreen.tsx": "41daa83f7263ccee4d70cbd389b93c525918725188002cce22e6ad28fb40f4c1",
+    "native/src/components/WeeklyReportDataExplorer.tsx": "1953f3398fe0ee7c8090a6c73e1b39bbe785c297c41c2a3116b024a54a66a355"
+  }
+}

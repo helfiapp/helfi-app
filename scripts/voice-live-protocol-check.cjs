@@ -16,6 +16,7 @@ function sourceWithoutImports(relative) {
 }
 const routeSource = sourceWithoutImports('app/api/native/voice-assistant/realtime/route.ts')
 const nativeSource = sourceWithoutImports('native/src/voice/realtimeVoice.ts')
+const localWelcomeSource = sourceWithoutImports('native/src/voice/localVoiceWelcome.ts')
 const compile = (code) => ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
 const noop = () => {}
 const quiet = { info: noop, warn: noop, error: noop }
@@ -107,6 +108,7 @@ async function routeCase(options = {}) {
   vm.runInContext(compile(routeSource), box, { timeout: 5000 })
   const headers = new Headers({ authorization: 'synthetic-token', 'x-helfi-ai-consent': options.headerConsent === false ? 'false' : 'true', 'x-helfi-voice-session-id': 'synthetic-conversation-123' })
   if (!options.legacy) headers.set('x-helfi-voice-protocol', 'live-v1')
+  if (options.greetOnConnect) headers.set('x-helfi-voice-greeting', options.bundledWelcome ? 'bundled-clip' : 'new-conversation')
   const request = { headers, signal: controller.signal, text: async () => options.emptyOffer ? '' : 'synthetic-complete-offer', nextUrl: new URL('https://offline.invalid/api/native/voice-assistant/realtime') }
   const running = box.exports.POST(request)
   await tick()
@@ -126,6 +128,9 @@ async function checkRoute() {
   assert.equal(body.session.delegation.responses.model, 'gpt-6-luna')
   assert.equal(body.session.delegation.responses.parallel_tool_calls, false)
   assert.ok(body.session.delegation.responses.tools.some((tool) => tool.name === 'request_helfi_action'))
+  const actionTool = body.session.delegation.responses.tools.find(tool => tool.name === 'request_helfi_action')
+  for (const action of ['record_action', 'preference_action', 'local_preference_action', 'notification_action']) assert.ok(actionTool.parameters.properties.action.enum.includes(action), `Live must delegate ${action} through the normal app action tool`)
+  assert.match(body.session.delegation.responses.instructions, /notification_action.*captured.*later arrivals/)
   assert.equal(body.transport.type, 'webrtc')
   assert.equal(body.transport.sdp, 'synthetic-complete-offer')
   assert.equal(live.response.headers.get('x-helfi-voice-protocol'), 'live-v1')
@@ -133,6 +138,25 @@ async function checkRoute() {
   assert.equal(live.charges.length, 1)
   assert.equal(live.charges[0].details.model, 'gpt-live-1')
   assert.equal(live.sockets.length, 0, 'Successful client handoff must keep its Live session open')
+  assert.equal(body.session.input, undefined, 'History/text and ordinary reconnect setup do not seed a welcome')
+  const greeting = await routeCase({ greetOnConnect: true })
+  const greetingConfig = JSON.parse(greeting.providerCalls[0].request.body).session
+  assert.equal(greetingConfig.input.length, 1)
+  assert.equal(greetingConfig.input[0].role, 'developer')
+  assert.equal(greetingConfig.input[0].type, 'message')
+  assert.equal(greetingConfig.input[0].content[0].type, 'input_text')
+  assert.match(greetingConfig.input[0].content[0].text, /Hi, I’m Helfi\. What can I help you with\?/)
+  assert.match(greetingConfig.input[0].content[0].text, /caller starts first or interrupts/)
+  assert.match(greetingConfig.input[0].content[0].text, /do not delegate it, call tools, log anything/)
+  assert.equal(greeting.charges.length, 1, 'Welcome uses the existing session, with no separate charge/action')
+  const bundled = await routeCase({ greetOnConnect: true, bundledWelcome: true })
+  const bundledConfig = JSON.parse(bundled.providerCalls[0].request.body).session
+  assert.equal(bundledConfig.input, undefined, 'Bundled welcome must not request duplicate provider speech')
+  assert.match(bundledConfig.instructions, /application plays its own opening welcome recording/)
+  assert.equal(bundled.charges.length, 1)
+  const reconnect = await routeCase({ greetOnConnect: true, ledger: greeting.ledger })
+  assert.equal(JSON.parse(reconnect.providerCalls[0].request.body).session.input, undefined, 'A previously paid conversation cannot receive another opening welcome')
+  assert.equal(reconnect.debits.length, 0)
   const legacy = await routeCase({ legacy: true })
   assert.equal(legacy.response.status, 200)
   assert.equal(legacy.providerCalls[0].url, 'https://api.openai.com/v1/realtime/calls')
@@ -233,7 +257,14 @@ function nativeHarness(options = {}) {
   const statuses = [], errors = [], notices = [], transcripts = [], assistant = [], actions = [], sent = [], requests = []
   const timers = new Map()
   let sequence = 0, clock = 1000000, trackStops = 0, closes = 0, userSpeech = 0, pc
-  let outputEnergy = 0, outputLevel = 0
+  let outputEnergy = 0, outputLevel = 0, inputLevel = options.inputLevel || 0, inputEnergy = 0, inputDuration = 0
+  const welcomePlays = [], welcomeStops = [], nativeListeners = new Map(), stages = []
+  let assetResolve, playResolve
+  const emitWelcome = (status, extra = {}) => nativeListeners.get('HelfiVoiceWelcomePlayback')?.({ playbackId: welcomePlays.at(-1)?.id, status, ...extra })
+  const bridge = { configureForVoice: async () => 'iPhone speaker', getVoiceAudioState: async () => ({}),
+    playVoiceWelcome: async (uri, id) => { welcomePlays.push({uri,id}); if (options.failedWelcome) throw Error('Synthetic failure'); emitWelcome('started'); if(options.pendingPlay) return new Promise(resolve=>{playResolve=resolve}); return true },
+    stopVoiceWelcome: async id => { welcomeStops.push(id) } }
+  class NativeEventEmitter { addListener(name, listener) { nativeListeners.set(name, listener); return { remove: () => nativeListeners.delete(name) } } }
   const schedule = (fn, delay, repeat) => { const id = ++sequence; timers.set(id, { fn, delay, at: clock + delay, repeat }); return id }
   class ClockDate extends Date { static now() { return clock } }
   const localTrack = { enabled: true, stop: () => { trackStops++ } }
@@ -247,6 +278,7 @@ function nativeHarness(options = {}) {
     getReceivers() { return [{ track: remoteTrack }] }
     getTransceivers() { return [] }
     async getStats() { return [
+      { type: 'media-source', kind: 'audio', audioLevel: inputLevel, totalAudioEnergy: inputEnergy, totalSamplesDuration: inputDuration },
       { type: 'outbound-rtp', kind: 'audio', packetsSent: options.missingMicrophone ? 0 : 10, bytesSent: options.missingMicrophone ? 0 : 100 },
       { type: 'inbound-rtp', kind: 'audio', packetsReceived: 100, bytesReceived: 10000, audioLevel: outputLevel, totalAudioEnergy: outputEnergy },
     ] }
@@ -258,6 +290,7 @@ function nativeHarness(options = {}) {
       this.channel.onopen()
       this.connectionState = 'connected'; this.onconnectionstatechange()
       if (!options.missingSpeaker) this.ontrack({ track: remoteTrack, streams: [] })
+      if (options.userSpeaksFirst) this.channel.onmessage({ data: JSON.stringify(options.legacy ? { type: 'input_audio_buffer.speech_started' } : { type: 'session.input_transcript.delta', event_id: 'first-user', delta: 'Hello, I need help', start_ms: 0, end_ms: 400 }) })
       if (!options.missingSession) this.channel.onmessage({ data: JSON.stringify({ type: options.legacy ? 'session.created' : 'session.started' }) })
     }
   }
@@ -268,19 +301,22 @@ function nativeHarness(options = {}) {
     setInterval: (fn, delay) => schedule(fn, delay, true), clearInterval: (id) => timers.delete(id),
     require: (name) => name === 'react-native-webrtc'
       ? { RTCPeerConnection: Peer, RTCSessionDescription: function(value) { return value }, mediaDevices: { getUserMedia: async () => localStream } }
-      : name === 'react-native-incall-manager' ? { start: noop, stop: noop, setForceSpeakerphoneOn: noop, setSpeakerphoneOn: noop } : { NativeModules: {} },
+      : name === 'react-native-incall-manager' ? { start: noop, stop: noop, setForceSpeakerphoneOn: noop, setSpeakerphoneOn: noop }
+      : name === 'expo-asset' ? { Asset: { fromModule: () => ({localUri: 'file:///synthetic/cache/helfi-welcome.mp3', downloadAsync: () => options.pendingAsset ? new Promise(resolve=>{assetResolve=resolve}) : Promise.resolve()}) } }
+      : name.endsWith('/helfi-welcome.mp3') ? 42
+      : name === 'react-native' ? { NativeModules: options.welcomeBridge ? {HelfiAudioRoute: bridge} : {}, NativeEventEmitter } : (()=>{throw Error('Unexpected native import')})(),
     fetch: async (url, request) => {
       requests.push({ url, request })
       return { ok: true, headers: new Headers(options.legacy ? {} : { 'x-helfi-voice-protocol': 'live-v1' }), text: async () => options.legacy ? 'synthetic-answer-sdp' : JSON.stringify({ session: { id: 'synthetic-live-session' }, transport: { sdp: 'synthetic-answer-sdp' } }) }
     },
   }
   vm.createContext(box)
-  vm.runInContext(compile(`${nativeSource}\nglobalThis.auditEcho = likelyAssistantEcho`), box, { timeout: 5000 })
+  vm.runInContext(compile(`${localWelcomeSource}\n${nativeSource}\nglobalThis.auditEcho = likelyAssistantEcho`), box, { timeout: 5000 })
   const controller = new AbortController()
   const started = box.exports.startHelfiRealtimeVoiceSession({
-    token: 'synthetic-token', billingSessionId: 'synthetic-conversation-123', signal: controller.signal,
+    token: 'synthetic-token', billingSessionId: 'synthetic-conversation-123', signal: controller.signal, greetOnConnect: options.greetOnConnect,
     callbacks: {
-      onStatus: (status) => statuses.push(status), onError: (error) => errors.push(error), onNotice: (notice) => notices.push(notice),
+      onConnectStage: stage => stages.push(stage), onStatus: (status) => statuses.push(status), onError: (error) => errors.push(error), onNotice: (notice) => notices.push(notice),
       onTranscript: (text) => transcripts.push(text), onAssistantText: (text) => assistant.push(text), onUserSpeech: () => { userSpeech++; options.onUserSpeech?.() },
       onActionRequest: async (args) => { actions.push(args); return options.action ? options.action(args) : { ok: true, saved: false, safeToClaimSaved: false, needsReview: true, spokenReply: 'Synthetic review. Would you like me to save that for you?' } },
     },
@@ -297,11 +333,71 @@ function nativeHarness(options = {}) {
     await tick()
   }
   return { box, started, controller, statuses, errors, notices, transcripts, assistant, actions, sent, requests, timers, emit, advance,
+    welcomePlays, welcomeStops, stages, nativeListeners, emitWelcome, asset:()=>assetResolve(), play:()=>playResolve(true),
+    input:(level,energy=0,duration=0)=>{inputLevel=level;inputEnergy=energy;inputDuration=duration},
     output: (energy, level = 0) => { outputEnergy = energy; outputLevel = level },
     peer: () => pc, stoppedTracks: () => trackStops, closes: () => closes, userSpeech: () => userSpeech }
 }
 const toolEvent = (id) => ({ type: 'response.event', event: { type: 'response.output_item.done', item: { type: 'function_call', name: 'request_helfi_action', call_id: id, arguments: JSON.stringify({ request: 'log 250 ml water', action: 'water', needsReview: true }) } } })
 async function checkNative() {
+  for (const legacy of [false,true]) {
+    const welcome = nativeHarness({ greetOnConnect: true, legacy, welcomeBridge:true })
+    const welcomeSession = (await welcome.started).session
+    await tick()
+    assert.ok(welcomeSession)
+    assert.equal(welcome.welcomePlays.length,1)
+    assert.equal(welcome.requests[0].request.headers['x-helfi-voice-greeting'],'bundled-clip')
+    assert.equal(welcome.sent.filter(event=>event.type==='response.create').length,0, 'No delegated provider work for the welcome')
+    assert.equal(welcome.assistant.length,0,'Start is not completion')
+    assert.equal(welcome.statuses.at(-1),'speaking')
+    welcome.emitWelcome('finished',{completed:true})
+    assert.deepEqual(welcome.assistant,['Hi, I’m Helfi. What can I help you with?'])
+    assert.equal(welcome.actions.length,0)
+    assert.equal(welcome.requests.length,1, 'No extra paid/TTS connection')
+    await welcomeSession.stop()
+    assert.equal(welcome.timers.size,0)
+    const firstUser=nativeHarness({greetOnConnect:true,legacy,welcomeBridge:true,userSpeaksFirst:true})
+    const session=(await firstUser.started).session
+    await tick()
+    assert.equal(firstUser.welcomePlays.length,0,'User-first skips clip')
+    await session.stop()
+  }
+  for (const reason of ['input','energy','caption','tool','end','abort','remote']) {
+    const f=nativeHarness({greetOnConnect:true,welcomeBridge:true})
+    const session=(await f.started).session; await tick()
+    if(reason==='input'){f.input(.1);await f.advance(125)}
+    if(reason==='energy'){f.input(0,1,1);await f.advance(125);f.input(0,1.1,2);await f.advance(125)}
+    if(reason==='caption')f.emit({type:'session.input_transcript.delta',delta:'Stop',event_id:'caller'})
+    if(reason==='tool')f.emit(toolEvent('welcome-stop-tool'))
+    if(reason==='end')await session.stop()
+    if(reason==='abort')f.controller.abort()
+    if(reason==='remote'){f.output(.2,.1);await f.advance(250)}
+    await tick()
+    assert(f.welcomeStops.length>0,`Welcome stops on ${reason}`)
+    f.emitWelcome('finished',{completed:true})
+    assert.equal(f.assistant.length,0,`No completed greeting after ${reason}`)
+    await session.stop(); assert.equal(f.timers.size,0)
+  }
+  for (const pending of ['pendingAsset','pendingPlay']) {
+    const f=nativeHarness({greetOnConnect:true,welcomeBridge:true,[pending]:true})
+    const session=(await f.started).session;await tick();await session.stop()
+    if(pending==='pendingAsset')f.asset();else f.play()
+    await tick()
+    assert.equal(f.assistant.length,0)
+    if(pending==='pendingAsset')assert.equal(f.welcomePlays.length,0)
+    else assert(f.welcomeStops.length>0)
+    assert.equal(f.timers.size,0)
+  }
+  for(const options of [{},{welcomeBridge:true,failedWelcome:true}]){
+    const f=nativeHarness({greetOnConnect:true,...options});const session=(await f.started).session;await tick()
+    assert.equal(f.assistant.length,0);assert(f.notices.some(text=>/welcome.*(cannot|could not)|cannot.*welcome/.test(text)))
+    assert(f.statuses.includes('live'));await session.stop();assert.equal(f.timers.size,0)
+  }
+  const stoppedWelcome = nativeHarness({ greetOnConnect: true, legacy: true, missingSession: true })
+  await tick()
+  stoppedWelcome.controller.abort()
+  assert.ok((await stoppedWelcome.started).error)
+  assert.equal(stoppedWelcome.sent.filter(event => event.type === 'response.create').length, 0, 'Stop before readiness cannot play a late welcome')
   const native = nativeHarness()
   const { session, error } = await native.started
   assert.ok(session, error?.message)
@@ -438,6 +534,15 @@ async function checkNative() {
   assert.ok(silent.sent.some(event => event.type === 'session.instructions.append' && event.delegation_id === null))
   await silentSession.stop()
   assert.equal(silent.timers.size, 0)
+  const transcript = nativeHarness()
+  const transcriptSession = (await transcript.started).session
+  transcript.emit({ type: 'session.input_transcript.delta', event_id: 'final-user-words', delta: 'Synthetic last words', start_ms: 0, end_ms: 100 })
+  transcriptSession.flushTranscript()
+  assert.equal(transcript.transcripts[0], 'Synthetic last words', 'User End can retain pending words before stopping the connection')
+  transcriptSession.flushTranscript()
+  assert.equal(transcript.transcripts.length, 1, 'Flushing twice cannot duplicate a saved transcript turn')
+  await transcriptSession.stop()
+  assert.equal(transcript.timers.size, 0)
 }
 async function checkMetering() {
   const source = sourceWithoutImports('lib/cost-meter.ts')
@@ -464,4 +569,5 @@ async function main() {
   if (errors.length) throw new Error(errors.join('\n'))
   console.log('PASS: negotiated Live/legacy config, guarded handshake, safe tools, captions/audio evidence, ICE cancellation and cleanup. No real server/audio result is claimed.')
 }
-main().catch((error) => { console.error(error.message); process.exitCode = 1 })
+module.exports = { checkRoute, checkNative }
+if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1 })

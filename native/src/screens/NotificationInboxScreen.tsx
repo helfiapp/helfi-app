@@ -1,7 +1,8 @@
-import React, { useCallback, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Linking,
   Pressable,
   ScrollView,
@@ -82,6 +83,10 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
     }
   }, [session?.token])
 
+  const inboxLoadRunRef = useRef(0)
+  const inboxAccountRef = useRef('')
+  inboxAccountRef.current = mode === 'signedIn' ? JSON.stringify([session?.user?.id || '', session?.token || '']) : ''
+
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(false)
   const [busy, setBusy] = useState(false)
@@ -101,6 +106,9 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
   )
 
   const loadInbox = useCallback(async () => {
+    const loadRun = ++inboxLoadRunRef.current
+    const account = inboxAccountRef.current
+    const isCurrent = () => inboxLoadRunRef.current === loadRun && inboxAccountRef.current === account
     if (mode !== 'signedIn' || !authHeaders) {
       setItems([])
       setSelectedIds([])
@@ -116,6 +124,7 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
         headers: authHeaders,
       })
       const data: any = await res.json().catch(() => ({}))
+      if (!isCurrent()) return
       if (!res.ok) {
         throw new Error(data?.error || 'Could not load notifications')
       }
@@ -123,20 +132,29 @@ export function NotificationInboxScreen({ navigation }: { navigation: any }) {
       setItems(list)
       setSelectedIds((prev) => prev.filter((id) => list.some((item) => item.id === id)))
     } catch (e: any) {
+      if (!isCurrent()) return
       setError(e?.message || 'Could not load notifications.')
       setItems([])
       setSelectedIds([])
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
-  }, [authHeaders, mode])
+  }, [authHeaders, mode, session?.user?.id])
 
   useFocusEffect(
     useCallback(() => {
       void loadInbox()
-      return () => {}
+      return () => { inboxLoadRunRef.current++ }
     }, [loadInbox]),
   )
+
+  useEffect(() => {
+    let active = true
+    const subscription = DeviceEventEmitter.addListener('helfi:notifications-inbox-changed', () => {
+      if (active) void loadInbox()
+    })
+    return () => { active = false; subscription.remove() }
+  }, [loadInbox])
 
   const markRead = useCallback(
     async (id: string) => {

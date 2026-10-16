@@ -5,6 +5,7 @@ import { fetchFatSecretServingOptions, fetchUsdaServingOptions } from '@/lib/foo
 import { buildCustomFoodServingOptions } from '@/lib/food/custom-serving-options'
 import { hasCoreFoodNutrition } from '@/lib/food/openfoodfacts'
 import { prisma } from '@/lib/prisma'
+import { verifiedUsdaRecordedPortionOptions } from '@/lib/food/usda-recorded-portions'
 
 export async function GET(request: NextRequest) {
   try {
@@ -41,6 +42,15 @@ export async function GET(request: NextRequest) {
     }
 
     if (source === 'usda') {
+      // Exact, cited SR Legacy portions can remain available when the provider
+      // omits them. Keep the original FDC row and its actual per-100g nutrients.
+      if (id === '171890') {
+        const local = await prisma.foodLibraryItem.findFirst({ where: { fdcId: 171890, source: 'usda_sr_legacy' }, select: {
+          fdcId: true, source: true, name: true, servingSize: true, calories: true, proteinG: true, carbsG: true, fatG: true, fiberG: true, sugarG: true,
+        } })
+        const verified = verifiedUsdaRecordedPortionOptions(local)
+        if (verified.length) return NextResponse.json({ success: true, source: 'usda', options: verified })
+      }
       const options = await fetchUsdaServingOptions(id)
       return NextResponse.json({ success: true, source: 'usda', options: options.filter(hasCoreFoodNutrition) })
     }

@@ -13,6 +13,7 @@ import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 import { createWriteGuard, hashPayload } from '@/lib/write-guard'
 import { deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 import { normalizeMealCategory } from '@/lib/food-log-categories'
+import { validateNativeVoiceResolvedFood } from '@/lib/native-voice-resolved-food'
 
 const FOOD_PHOTO_PREFIX = 'food-photos'
 const FOOD_PHOTO_SCOPE = 'food-photo'
@@ -651,6 +652,67 @@ export async function GET(request: NextRequest) {
   }
 }
 
+// This is a separate, source-backed format. Legacy Water/Favorites payloads
+// still pass through the locked sweetener-only normalizer unchanged.
+async function normalizeOwnedSourceBuiltLinkedDrink(userId: string, nutrition: any, items: any) {
+  if (!nutrition || (nutrition.__voiceBuiltMeal !== true && nutrition.__voiceSingleIngredient !== true) ||
+    typeof nutrition.__waterLogId !== 'string' || !nutrition.__waterLogId.trim()) return null
+  const reviewAgain = () => new Error('Please review this source-built drink and its ingredients again before saving.')
+  if (!Array.isArray(items) || !items.length || typeof nutrition.__drinkType !== 'string' || !nutrition.__drinkType.trim()) throw reviewAgain()
+  const water = await prisma.waterLog.findFirst({ where: { id: nutrition.__waterLogId, userId } })
+  if (!water || water.userId !== userId || nutrition.__drinkUnit !== water.unit || nutrition.__drinkAmount !== water.amount || nutrition.__drinkAmountMl !== water.amountMl) throw reviewAgain()
+  const stored = await prisma.foodLog.findFirst({ where: { userId, nutrients: { path: ['__waterLogId'], equals: water.id } } })
+  const storedNutrition: any = stored?.nutrients
+  let storedItems: any = stored?.items
+  if (typeof storedItems === 'string') { try { storedItems = JSON.parse(storedItems) } catch { throw reviewAgain() } }
+  if (stored?.userId !== userId || storedNutrition?.__waterLogId !== water.id ||
+    (storedNutrition.__voiceBuiltMeal !== true && storedNutrition.__voiceSingleIngredient !== true) || !Array.isArray(storedItems) || !storedItems.length) throw reviewAgain()
+  // This caller exception cannot manufacture or replace the reviewed drink
+  // split. Source-resolved ingredient changes use the atomic water handler.
+  if (['__drinkType', '__sweetenerChoice', '__sweetenerType', '__sweetenerAmount', '__sweetenerUnit', '__sweetenerGrams', '__sweetenerCalories', '__sweetenerCarbs', '__sweetenerSugar']
+    .some(key => JSON.stringify(nutrition[key]) !== JSON.stringify(storedNutrition[key]))) throw reviewAgain()
+  try {
+    const sources = storedItems.map((item: any) => item?.__voiceSourceFood)
+    const storedFood = validateNativeVoiceResolvedFood({ items: storedItems, nutrition: storedNutrition }, sources)
+    const fields = [['calories', 'calories_kcal'], ['protein_g', 'protein'], ['carbs_g', 'carbs'], ['fat_g', 'fat'], ['fiber_g', 'fiber'], ['sugar_g', 'sugar']]
+    const serializedValueMatches = (submitted: any, exact: any, index: number) => {
+      if (exact === null) return submitted === null
+      if (typeof submitted !== 'number' || !Number.isFinite(submitted)) return false
+      const rounded = (decimals: number) => Math.round(Number(exact) * 10 ** decimals) / 10 ** decimals
+      return submitted === exact || submitted === rounded(index === 0 ? 0 : 1) || submitted === rounded(index === 0 ? 0 : 3)
+    }
+    // Native editors add neutral portion/measurement metadata and serialize
+    // displayed totals to 1 or 3 decimals. Ingredients remain the source proof.
+    // Do not use this path to resize the consumed drink or its ingredients;
+    // those edits require the normal atomic hydration/food change.
+    if ((nutrition.__portionScale ?? 1) !== (storedNutrition.__portionScale ?? 1) ||
+      items.some((item: any) => (item.servings ?? 1) !== 1)) throw reviewAgain()
+    const preciseItems = items.map((item: any) => {
+      const original = storedItems.find((saved: any) => saved.id === item.id && saved.serving_size === item.serving_size && (saved.servings ?? 1) === (item.servings ?? 1))
+      if (!original) return item
+      const precise = { ...item }
+      for (const [index, names] of fields.entries()) {
+        const exact = names.reduce((value: any, name) => value === undefined ? original[name] : value, undefined) ?? null
+        for (const name of names) {
+          if (Object.prototype.hasOwnProperty.call(item, name) && !serializedValueMatches(item[name], exact, index)) throw reviewAgain()
+          if (Object.prototype.hasOwnProperty.call(original, name)) precise[name] = original[name]
+        }
+      }
+      return precise
+    })
+    validateNativeVoiceResolvedFood({ items: preciseItems, nutrition: storedFood.nutrition }, sources)
+    const preciseNutrition = { ...nutrition }
+    for (const [index, names] of fields.entries()) {
+      const exact = storedFood.nutrition[names[0]]
+      for (const name of names) {
+        if (!serializedValueMatches(nutrition[name], exact, index)) throw reviewAgain()
+        preciseNutrition[name] = Object.prototype.hasOwnProperty.call(storedNutrition, name) ? storedNutrition[name] : exact
+      }
+    }
+    return { nutrition: preciseNutrition, items: preciseItems }
+  } catch { throw reviewAgain() }
+}
+
 // Append a log entry (non-blocking usage recommended)
 export async function POST(request: NextRequest) {
   const startTime = Date.now()
@@ -726,7 +788,8 @@ export async function POST(request: NextRequest) {
       createdAt,
       allowDuplicate,
     } = body || {}
-    const normalizedDrinkPayload = normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
+    const normalizedDrinkPayload = await normalizeOwnedSourceBuiltLinkedDrink(user.id, nutrition, items)
+      || normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
     const safeNutrition = normalizedDrinkPayload.nutrition
     const safeItems = normalizedDrinkPayload.items
 
@@ -1005,7 +1068,8 @@ export async function PUT(request: NextRequest) {
 
     const body = await request.json()
     const { id, name: bodyName, description, nutrition, imageUrl, items, localDate, meal, category, createdAt } = body || {}
-    const normalizedDrinkPayload = normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
+    const normalizedDrinkPayload = await normalizeOwnedSourceBuiltLinkedDrink(user.id, nutrition, items)
+      || normalizeSugarFreeHotChocolatePayload({ description, nutrition, items })
     const safeNutrition = normalizedDrinkPayload.nutrition
     const safeItems = normalizedDrinkPayload.items
 

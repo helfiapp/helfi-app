@@ -13,6 +13,8 @@ import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
 import { createWriteGuard, hashPayload } from '@/lib/write-guard'
 import { getCircuitState, openCircuit } from '@/lib/safety-circuit'
 import { sendWriteSpikeAlertEmail } from '@/lib/admin-alerts'
+import { readNativeVoiceFavoriteLibrary, mutateNativeVoiceFavoriteLibrary, VOICE_DELETED_FAVORITES_NAME, VoiceRecordActionError } from '@/lib/native-voice-record-actions'
+import { readNativeVoiceHealthIntakeRecords, mutateNativeVoiceHealthIntakeRecord } from '@/lib/native-voice-health-intake-record-actions'
 
 const normalizeTimingList = (timing: any) => {
   if (Array.isArray(timing)) {
@@ -427,6 +429,13 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    if (scope === 'voice-food-library') {
+      return NextResponse.json(await readNativeVoiceFavoriteLibrary(prisma, user.id))
+    }
+    if (scope === 'voice-health-intake') {
+      return NextResponse.json(await readNativeVoiceHealthIntakeRecords(prisma, user.id))
+    }
+
     const headerCountry =
       (request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || '').trim().toUpperCase()
     if (headerCountry && !user.country) {
@@ -755,6 +764,13 @@ export async function GET(request: NextRequest) {
       // If diary logs still point to favorite IDs that are missing from the stored favorites list,
       // rebuild those missing favorites from recent logs so user-saved meals do not disappear.
       try {
+        const explicitlyDeletedFavoriteIds = new Set<string>((user.healthGoals || [])
+          .filter((goal: any) => goal.name === VOICE_DELETED_FAVORITES_NAME)
+          .flatMap((goal: any) => {
+            const parsed = JSON.parse(goal.category || '{}')
+            if (!Array.isArray(parsed.ids)) throw new Error('Explicit food library deletion history needs review.')
+            return parsed.ids.map(String)
+          }))
         const favoriteIds = new Set(
           (Array.isArray(favorites) ? favorites : [])
             .map((fav: any) => (typeof fav?.id === 'string' ? String(fav.id).trim() : ''))
@@ -792,7 +808,7 @@ export async function GET(request: NextRequest) {
         for (const log of recentLogs) {
           const nutrients = log?.nutrients && typeof log.nutrients === 'object' ? (log.nutrients as any) : null
           const favoriteId = extractFavoriteIdFromNutrition(nutrients)
-          if (!favoriteId || favoriteIds.has(favoriteId) || existingById.has(favoriteId)) continue
+          if (!favoriteId || explicitlyDeletedFavoriteIds.has(favoriteId) || favoriteIds.has(favoriteId) || existingById.has(favoriteId)) continue
           const label = extractFavoriteLabelFromLog(log?.description || log?.name || '', log?.name || 'Favorite meal')
           const labelKey = normalizeFavoriteLabelKey(label)
           const sourceId = log?.id ? String(log.id).trim() : ''
@@ -1211,6 +1227,28 @@ export async function POST(request: NextRequest) {
     console.time('⏱️ Parse Request Data')
     const data = await request.json()
     console.timeEnd('⏱️ Parse Request Data')
+    if (Object.prototype.hasOwnProperty.call(data || {}, 'voiceHealthIntakeMutation')) {
+      if (Object.keys(data).length !== 1) return NextResponse.json({ error: 'Recorded Health Intake changes must be saved separately.' }, { status: 400 })
+      const mutationUser = await prisma.user.findUnique({ where: { email: userEmail }, select: { id: true } })
+      if (!mutationUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+      try {
+        const result = await mutateNativeVoiceHealthIntakeRecord(prisma, mutationUser.id, data.voiceHealthIntakeMutation)
+        if (result.changed) void triggerBackgroundRegeneration({ userId: mutationUser.id, changeType: result.entity === 'medication' ? 'medications' : 'supplements', timestamp: new Date() }).catch(() => {})
+        return NextResponse.json(result)
+      } catch (error: any) {
+        return NextResponse.json({ error: error?.message || 'Please review the recorded item again.' }, { status: 409 })
+      }
+    }
+    if (Object.prototype.hasOwnProperty.call(data || {}, 'voiceFavoriteMutation')) {
+      if (Object.keys(data).length !== 1) return NextResponse.json({ error: 'Food library review must be saved separately.' }, { status: 400 })
+      try {
+        const mutationUser = await prisma.user.findUnique({ where: { email: userEmail }, select: { id: true } })
+        if (!mutationUser) return NextResponse.json({ error: 'User not found' }, { status: 404 })
+        return NextResponse.json(await mutateNativeVoiceFavoriteLibrary(prisma, mutationUser.id, data.voiceFavoriteMutation))
+      } catch (error: any) {
+        return NextResponse.json({ error: error instanceof VoiceRecordActionError ? error.publicMessage : 'The recipe or food library change could not be confirmed. Please check your library before trying again.' }, { status: 409 })
+      }
+    }
     const manualSync = (data as any)?.manualSync === true || (data as any)?.syncOverride === true
     const incomingHealthSetupUpdatedAtRaw = Number((data as any)?.healthSetupUpdatedAt)
     const incomingHealthSetupUpdatedAt =
@@ -1559,7 +1597,7 @@ export async function POST(request: NextRequest) {
       if (data.exerciseFrequency && data.exerciseFrequency.trim() !== '') {
         updateData.exerciseFrequency = data.exerciseFrequency.trim()
       }
-      if (data.exerciseTypes && Array.isArray(data.exerciseTypes) && data.exerciseTypes.length > 0) {
+      if (Array.isArray(data.exerciseTypes)) {
         updateData.exerciseTypes = data.exerciseTypes.filter((type: any) => type && type.trim() !== '')
       }
       if (data.profileImage !== undefined) {
@@ -1596,8 +1634,11 @@ export async function POST(request: NextRequest) {
         : []
 
       let goalsChanged = false
+      // An empty replacement must come from a loaded, versioned form/review.
+      // Legacy initial-load autosaves without a version still preserve goals.
+      const allowGoalReplacement = hasGoalsPayload && (normalizedGoals.length > 0 || hasIncomingHealthSetupStamp)
 
-      if (hasGoalsPayload && normalizedGoals.length > 0) {
+      if (allowGoalReplacement) {
         console.log('🎯 Processing', normalizedGoals.length, 'health goals')
 
         const existingGoals = await prisma.healthGoal.findMany({
@@ -1698,10 +1739,10 @@ export async function POST(request: NextRequest) {
         console.log('ℹ️ No health goals to update')
       }
 
-      // Persist the canonical selected issue list only when a goals array is provided
-      if (hasGoalsPayload) {
+      // Persist explicit versioned empty selections as well as nonempty lists.
+      if (allowGoalReplacement) {
         const safeGoals = normalizedGoals
-        if (safeGoals.length > 0) {
+        {
           const existingSelected = await prisma.healthGoal.findFirst({
             where: { userId: user.id, name: '__SELECTED_ISSUES__' },
             orderBy: { updatedAt: 'desc' },
@@ -1742,8 +1783,6 @@ export async function POST(request: NextRequest) {
             })
             console.log('📝 Saved __SELECTED_ISSUES__ snapshot:', { count: safeGoals.length, goals: safeGoals })
           }
-        } else {
-          console.log('🔒 Preserved existing __SELECTED_ISSUES__ (empty goals array received)')
         }
       } else {
         console.log('🔒 Preserved existing __SELECTED_ISSUES__ (no goals array provided in this request)')

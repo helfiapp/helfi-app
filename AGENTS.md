@@ -200,6 +200,20 @@ DEPLOYED:
 
 1. Before working on any area, read GUARD_RAILS.md and any other notes for that area so you are fully informed.
 
+## Permanent Design Colour Rule (Owner instruction — 17 October 2026)
+
+- The owner does not want yellow or brown anywhere in Helfi's interface. This applies to all future web, iPhone and Android design work, including buttons, badges, warning panels, icons, charts and highlights. Do not introduce or restore yellow, amber, gold, mustard, tan or brown UI accents.
+- In particular, never use the former yellow background/brown text treatment for `High impact`. The owner also rejected the purple replacement because it did not match the app. Use the existing Helfi green, soft green backgrounds and accessible neutral text for these accents. Do not introduce a new purple accent scheme or spread it across other pages. Preserve the severity words/icons so colour is not the only signal.
+- Give elements serving the same highlight role the same green. In the compact Insights candidate, ready-report text/tick, `High impact` and `Next step` use the same #267245; do not introduce a separate teal shade for the ready message.
+- Apply this rule whenever an area is designed or revised. It does not authorize unrelated functional changes, bypassing a page/design lock, or releasing a design before the owner has reviewed the full page. Include both the top and bottom in design previews.
+
+## Approved Mobile Insights Design (Owner Lock — 17 October 2026)
+
+- The owner approved the complete compact green Insights design, including top/middle/bottom and matching ready-report text/tick. Preserve the compact report panel/countdown, full tracked-issue rows, joined previous reports and existing Helfi green/soft green/neutral accents. No yellow/brown or new purple accents.
+- `scripts/insights-design-lock.json` records the exact approved `InsightsScreen.tsx` and Insights-only `WeeklyReportDataExplorer.tsx`. `scripts/check-insights-design-lock.js` runs during normal page checks, snapshot write mode and protected-region checks. Generic allowances cannot bypass it. Shared foundations remain covered by the Dashboard lock.
+- Do not remove/weaken this check, restore older styling, or change its baseline without new explicit owner approval for the EXACT change. Preserve all report/issue actions, account/credit logic, health setup gating and data. Appearance approval is not a release instruction.
+- Approved screenshots: `/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-insights/matched-top.jpg`, `matched-middle.jpg`, `matched-bottom.jpg`. Exact local hashes are in the dedicated baseline. This Insights design is approved locally and has not been released.
+
 ## Approved Mobile Dashboard Design (Owner Lock — 17 October 2026)
 
 - The owner approved the compact FULL native Dashboard in DESIGN MANAGER and expressly required future agents to leave its design alone. No Claude redesign is wanted for this page.

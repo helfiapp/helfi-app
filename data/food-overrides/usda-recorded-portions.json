@@ -1,0 +1,21 @@
+{
+  "provider": "USDA FoodData Central",
+  "dataset": "SR Legacy April 2018",
+  "downloadUrl": "https://fdc.nal.usda.gov/fdc-datasets/FoodData_Central_sr_legacy_food_csv_2018-04.zip",
+  "downloadSha256": "b80817294b8850530aaedf2e515c02593b1824f763a0ff356e5c2081643e6fd0",
+  "verifiedDate": "2026-10-17",
+  "foodFile": "FoodData_Central_sr_legacy_food_csv_2018-04/food.csv",
+  "portionFile": "FoodData_Central_sr_legacy_food_csv_2018-04/food_portion.csv",
+  "foods": [
+    {
+      "fdcId": 171890,
+      "name": "Beverages, coffee, brewed, prepared with tap water",
+      "source": "usda_sr_legacy",
+      "portions": [
+        { "id": 89518, "amount": 1, "modifier": "fl oz", "grams": 29.6, "fluidOunces": 1 },
+        { "id": 89519, "amount": 6, "modifier": "fl oz", "grams": 178, "fluidOunces": 6 },
+        { "id": 89520, "amount": 1, "modifier": "cup (8 fl oz)", "grams": 237, "fluidOunces": 8 }
+      ]
+    }
+  ]
+}

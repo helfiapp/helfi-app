@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 /**
  * Check Fitbit connection status
@@ -10,8 +11,9 @@ import { prisma } from '@/lib/prisma'
 export async function GET(request: NextRequest) {
   try {
     const session = await getServerSession(authOptions)
+    const userId = session?.user?.id || await getUserIdFromNativeAuth(request)
     
-    if (!session?.user?.id) {
+    if (!userId) {
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -20,10 +22,14 @@ export async function GET(request: NextRequest) {
 
     const fitbitAccount = await prisma.account.findFirst({
       where: {
-        userId: session.user.id,
+        userId,
         provider: 'fitbit',
       },
     })
+
+    if (new URL(request.url).searchParams.get('voiceReadOnly') === '1') {
+      return NextResponse.json({ storedConnection: !!fitbitAccount, liveVerified: false })
+    }
 
     return NextResponse.json({
       connected: !!fitbitAccount,

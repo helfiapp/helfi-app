@@ -306,21 +306,19 @@ function getInsightReason(item: any, fallback: string) {
   return replaceIsoDates(String(item?.reason || item?.summary || fallback))
 }
 
-function Card({ children, tone = 'white', style }: { children: React.ReactNode; tone?: 'white' | 'mint' | 'sky' | 'amber' | 'rose' | 'dark'; style?: any }) {
+function Card({ children, tone = 'white', style }: { children: React.ReactNode; tone?: 'white' | 'mint' | 'sky' | 'rose' | 'dark'; style?: any }) {
   const colors =
     tone === 'mint'
       ? { backgroundColor: '#ECFDF3', borderColor: '#BFEAD0' }
       : tone === 'sky'
         ? { backgroundColor: '#EFF8FF', borderColor: '#BDE3FF' }
-        : tone === 'amber'
-          ? { backgroundColor: '#FFF7E8', borderColor: '#F5D79D' }
           : tone === 'rose'
             ? { backgroundColor: '#FFF1F2', borderColor: '#FECDD3' }
             : tone === 'dark'
               ? { backgroundColor: '#0F172A', borderColor: '#0F172A' }
               : { backgroundColor: theme.colors.card, borderColor: theme.colors.border }
   return (
-    <View style={[{ borderWidth: 1, borderRadius: 18, padding: 14 }, colors, style]}>
+    <View style={[{ borderWidth: 1, borderRadius: 16, padding: 12 }, colors, style]}>
       {children}
     </View>
   )
@@ -338,12 +336,14 @@ function PrimaryButton({ label, onPress, disabled }: { label: string; onPress: (
         opacity: disabled ? 0.55 : pressed ? 0.86 : 1,
         backgroundColor: theme.colors.primary,
         borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
+        minHeight: 44,
+        paddingVertical: 11,
+        paddingHorizontal: 12,
+        justifyContent: 'center',
         alignItems: 'center',
       })}
     >
-      <Text style={{ color: '#FFFFFF', fontWeight: '700' }}>{label}</Text>
+      <Text style={{ color: '#FFFFFF', fontSize: 13, fontWeight: '700' }}>{label}</Text>
     </Pressable>
   )
 }
@@ -362,12 +362,14 @@ function SecondaryButton({ label, onPress, disabled }: { label: string; onPress:
         borderWidth: 1,
         borderColor: theme.colors.border,
         borderRadius: 12,
-        paddingVertical: 12,
-        paddingHorizontal: 14,
+        minHeight: 44,
+        paddingVertical: 11,
+        paddingHorizontal: 12,
+        justifyContent: 'center',
         alignItems: 'center',
       })}
     >
-      <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{label}</Text>
+      <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '700' }}>{label}</Text>
     </Pressable>
   )
 }
@@ -375,13 +377,13 @@ function SecondaryButton({ label, onPress, disabled }: { label: string; onPress:
 function ProgressBar({ percent, color = theme.colors.primary }: { percent: number; color?: string }) {
   const safe = Math.max(0, Math.min(100, Math.round(percent)))
   return (
-    <View style={{ height: 8, backgroundColor: '#E5E7EB', borderRadius: 99, overflow: 'hidden' }}>
+    <View style={{ height: 6, backgroundColor: '#E5E7EB', borderRadius: 99, overflow: 'hidden' }}>
       <View style={{ width: `${safe}%`, height: '100%', backgroundColor: color, borderRadius: 99 }} />
     </View>
   )
 }
 
-function StatCard({ label, value, note, tone = 'white' }: { label: string; value: string; note: string; tone?: 'white' | 'mint' | 'sky' | 'amber' }) {
+function StatCard({ label, value, note, tone = 'white' }: { label: string; value: string; note: string; tone?: 'white' | 'mint' | 'sky' }) {
   return (
     <Card tone={tone} style={{ paddingVertical: 13, paddingHorizontal: 14 }}>
       <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
@@ -405,7 +407,7 @@ function EmptyBox({ message }: { message: string }) {
   )
 }
 
-function InfoItem({ title, body, tone = 'white' }: { title: string; body?: string; tone?: 'white' | 'mint' | 'sky' | 'amber' | 'rose' }) {
+function InfoItem({ title, body, tone = 'white' }: { title: string; body?: string; tone?: 'white' | 'mint' | 'sky' | 'rose' }) {
   return (
     <Card tone={tone} style={{ padding: 12 }}>
       <Text style={{ color: theme.colors.text, fontWeight: '700', fontSize: 15 }}>{replaceIsoDates(title)}</Text>
@@ -423,7 +425,7 @@ function InfoItem({ title, body, tone = 'white' }: { title: string; body?: strin
 }
 
 function issueStatusColors(status?: IssueSummary['status']) {
-  if (status === 'focus') return { backgroundColor: '#FEF3C7', borderColor: '#FCD34D', color: '#92400E' }
+  if (status === 'focus') return { backgroundColor: '#ECFDF3', borderColor: '#BFEAD0', color: '#267245' }
   if (status === 'monitor') return { backgroundColor: '#EFF8FF', borderColor: '#BDE3FF', color: '#075985' }
   if (status === 'on-track') return { backgroundColor: '#ECFDF3', borderColor: '#BFEAD0', color: '#047857' }
   return { backgroundColor: theme.colors.bg, borderColor: '#E5E7EB', color: '#4B5563' }
@@ -1115,7 +1117,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
       label: 'Needs attention',
       title: getInsightName(focusPattern, parsedSummary?.dataWarning ? 'Data needs care' : 'Watch the gaps'),
       body: getInsightReason(focusPattern, parsedSummary?.dataWarning || 'Any missing logs or repeated symptoms will stand out here as the report gets more history.'),
-      tone: 'amber' as const,
+      tone: 'mint' as const,
     },
   ]
 
@@ -1175,7 +1177,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
     return (
       <Screen>
         <ScrollView contentContainerStyle={{ padding: 14, paddingBottom: theme.spacing.xl, gap: 14 }}>
-          <Card tone="amber">
+          <Card tone="mint">
             <Text style={{ color: theme.colors.text, fontSize: theme.fontSize.pageTitle, fontWeight: '700' }}>Complete Health Setup first</Text>
             <Text style={{ color: theme.colors.muted, marginTop: 8, lineHeight: 20 }}>
               Insights unlock after your basic profile and at least one real health goal are finished.
@@ -1191,12 +1193,12 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
   }
 
   const renderLanding = () => (
-    <View style={{ gap: 14 }}>
-      <View>
-        <Text style={{ color: theme.colors.text, fontSize: theme.fontSize.pageTitle, fontWeight: '700' }}>Your health focus areas</Text>
-        <Text style={{ color: theme.colors.muted, marginTop: 5, lineHeight: 20 }}>Start with your tracked issues, then open your deeper weekly report.</Text>
+    <View style={{ gap: 12 }}>
+      <View style={{ gap: 4 }}>
+        <Text style={{ color: theme.colors.text, fontSize: 22, fontWeight: '700' }}>Your health, in focus</Text>
+        <Text style={{ color: theme.colors.muted, fontSize: 13, lineHeight: 18 }}>Your tracked issues and weekly health picture.</Text>
         {lastLoadedAt ? (
-          <Text style={{ color: theme.colors.muted, marginTop: 4, fontSize: 12 }}>Updated {formatDateTimeForLocale(lastLoadedAt)}</Text>
+          <Text style={{ color: theme.colors.muted, fontSize: 11 }}>Updated {formatDateTimeForLocale(lastLoadedAt)}</Text>
         ) : null}
       </View>
 
@@ -1211,88 +1213,74 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
       ) : null}
 
       <Card>
-        <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-          <View style={{ width: 42, height: 42, borderRadius: 21, backgroundColor: '#ECFDF3', alignItems: 'center', justifyContent: 'center' }}>
-            <MaterialCommunityIcons name="chart-line" size={23} color={theme.colors.primary} />
+        <View style={{ flexDirection: 'row', gap: 10, alignItems: 'center' }}>
+          <View style={{ width: 34, height: 34, borderRadius: 11, backgroundColor: '#ECFDF3', alignItems: 'center', justifyContent: 'center' }}>
+            <MaterialCommunityIcons name="chart-line" size={21} color={theme.colors.primary} />
           </View>
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: theme.colors.text, fontSize: theme.fontSize.sectionTitle, fontWeight: '700' }}>7-day health report</Text>
-            <Text style={{ color: theme.colors.muted, marginTop: 5, lineHeight: 20 }}>We build this report automatically every 7 days based on how you use Helfi.</Text>
+          <View style={{ flex: 1, gap: 3 }}>
+            <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>7-day health report</Text>
+            <Text style={{ color: theme.colors.muted, fontSize: 12, lineHeight: 17 }}>A weekly view of your health activity.</Text>
           </View>
         </View>
 
         {!reportAccessActive ? (
-          <Card tone="amber" style={{ marginTop: 14 }}>
-            <Text style={{ color: '#92400E', lineHeight: 20 }}>Weekly reports are off by default. Turn them on to get a full, data-driven report each week.</Text>
+          <Card tone="mint" style={{ marginTop: 10, padding: 10 }}>
+            <Text style={{ color: '#267245', fontSize: 13, lineHeight: 18 }}>Weekly reports are off. Turn them on for a report every 7 days.</Text>
           </Card>
         ) : null}
-
         {reportAccessActive && weeklyStatus?.reportReady ? (
-          <Text style={{ color: '#047857', fontWeight: '600', marginTop: 12 }}>Your latest report is ready to view.</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5, marginTop: 10 }}>
+            <Feather name="check-circle" size={14} color="#267245" />
+            <Text style={{ color: '#267245', fontSize: 12, fontWeight: '600' }}>Your latest report is ready</Text>
+          </View>
         ) : null}
         {reportAccessActive && weeklyStatus?.reportLocked ? (
-          <Text style={{ color: '#B45309', fontWeight: '600', marginTop: 12 }}>Your latest report is ready, but needs a subscription or top-up credits to unlock.</Text>
+          <Text style={{ color: '#267245', fontSize: 13, lineHeight: 18, marginTop: 10 }}>Your report is ready. A subscription or top-up credits are needed to unlock it.</Text>
         ) : null}
         {reportAccessActive && countdown ? (
-          <View style={{ marginTop: 14, gap: 10 }}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-              <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Current cycle progress</Text>
-              <Text style={{ color: theme.colors.primary, fontSize: 13, fontWeight: '700' }}>{countdown.percent}%</Text>
+          <View style={{ marginTop: 10, gap: 7 }}>
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between', gap: 5 }}>
+              <Text style={{ color: theme.colors.muted, fontSize: 12 }}>
+                Next report <Text style={{ color: theme.colors.text, fontWeight: '600' }}>{formatDateForLocale(countdown.dueAtMs)}</Text>
+              </Text>
+              <Text style={{ color: theme.colors.primary, fontSize: 12, fontWeight: '600' }}>Cycle {countdown.percent}%</Text>
             </View>
             <ProgressBar percent={countdown.percent} />
             {(weeklyStatus?.status === 'RUNNING' || countdown.dueNow) ? (
-              <Card tone="mint" style={{ padding: 10 }}>
-                <Text style={{ color: '#047857', lineHeight: 18 }}>Your report is being prepared now. Check back soon.</Text>
-              </Card>
+              <Text style={{ color: '#047857', fontSize: 12, lineHeight: 17 }}>Your report is being prepared now. Check back soon.</Text>
             ) : null}
-            <Text style={{ color: theme.colors.muted }}>
-              Next report due <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{formatDateForLocale(countdown.dueAtMs)}</Text>
-            </Text>
-            <View
-              style={{
-                flexDirection: 'row',
-                flexWrap: 'wrap',
-                gap: 8,
-                borderWidth: 1,
-                borderColor: theme.colors.border,
-                borderRadius: 14,
-                backgroundColor: theme.colors.bg,
-                padding: 10,
-              }}
-            >
+            <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
               {[
-                { label: 'Days', value: countdown.days },
-                { label: 'Hours', value: countdown.hours },
-                { label: 'Mins', value: countdown.minutes },
-                { label: 'Secs', value: countdown.seconds },
+                { label: 'days', value: countdown.days },
+                { label: 'hrs', value: countdown.hours },
+                { label: 'mins', value: countdown.minutes },
+                { label: 'secs', value: countdown.seconds },
               ].map((item) => (
-                <View key={item.label} style={{ flex: 1, minWidth: 64, alignItems: 'center' }}>
-                  <Text style={{ color: theme.colors.text, fontSize: 20, fontWeight: '700' }}>{padTime(item.value)}</Text>
-                  <Text style={{ color: theme.colors.muted, fontSize: 10, fontWeight: '700', textTransform: 'uppercase' }}>{item.label}</Text>
-                </View>
+                <Text key={item.label} style={{ color: theme.colors.muted, fontSize: 12 }}>
+                  <Text style={{ color: theme.colors.text, fontWeight: '700', fontVariant: ['tabular-nums'] }}>{padTime(item.value)}</Text> {item.label}
+                </Text>
               ))}
             </View>
           </View>
         ) : reportAccessActive && displayNextReportDueAt ? (
-          <View style={{ marginTop: 14, gap: 7 }}>
-            <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '700', textTransform: 'uppercase' }}>Current cycle progress</Text>
+          <View style={{ marginTop: 10, gap: 7 }}>
+            <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Next report {formatDateForLocale(displayNextReportDueAt)}</Text>
             <ProgressBar percent={weeklyStatus?.reportReady ? 100 : 60} />
-            <Text style={{ color: theme.colors.muted }}>Next report due {formatDateForLocale(displayNextReportDueAt)}</Text>
           </View>
         ) : null}
 
-        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 16 }}>
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 }}>
           {reportAccessActive ? (
             weeklyStatus?.reportReady || reports.length ? (
-              <View style={{ flexGrow: 1 }}>
+              <View style={{ flex: 1, minWidth: 125 }}>
                 <PrimaryButton label="View report" onPress={() => openReport()} />
               </View>
             ) : weeklyStatus?.reportLocked ? (
-              <View style={{ flexGrow: 1 }}>
+              <View style={{ flex: 1, minWidth: 125 }}>
                 <PrimaryButton label="Unlock report" onPress={() => goToStackScreen('Billing')} />
               </View>
             ) : (
-              <View style={{ flexGrow: 1 }}>
+              <View style={{ flex: 1, minWidth: 125 }}>
                 <SecondaryButton label="Edit Health Setup" onPress={() => goToStackScreen('HealthSetup')} />
               </View>
             )
@@ -1306,17 +1294,17 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
               </View>
             </>
           )}
+          {canManualReport && reportAccessActive ? (
+            <View style={{ flex: 1, minWidth: 125 }}>
+              <SecondaryButton label="Create report now" onPress={createReportNow} disabled={progressActive || weeklyStatus?.status === 'RUNNING'} />
+            </View>
+          ) : null}
         </View>
-
         {canManualReport && reportAccessActive ? (
-          <View style={{ marginTop: 12, gap: 8 }}>
-            <SecondaryButton label="Create report now" onPress={createReportNow} disabled={progressActive || weeklyStatus?.status === 'RUNNING'} />
-            <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Makes a fresh report from your last 7 days.</Text>
-          </View>
+          <Text style={{ color: theme.colors.muted, fontSize: 11, lineHeight: 16, marginTop: 6 }}>Create report now uses your latest 7 days of data.</Text>
         ) : null}
-
         {progressActive ? (
-          <View style={{ marginTop: 12, gap: 5 }}>
+          <View style={{ marginTop: 10, gap: 5 }}>
             <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
               <Text style={{ color: theme.colors.muted, fontSize: 12 }}>{progressStage}</Text>
               <Text style={{ color: theme.colors.muted, fontSize: 12 }}>{progressPercent}%</Text>
@@ -1327,17 +1315,17 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         {busyMessage ? <Text style={{ color: theme.colors.primary, fontWeight: '600', marginTop: 10 }}>{busyMessage}</Text> : null}
       </Card>
 
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10 }}>
+        <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Tracked issues</Text>
+        <Text style={{ color: theme.colors.muted, fontSize: 12 }}>{issues.length} {issues.length === 1 ? 'area' : 'areas'}</Text>
+      </View>
       {issues.length === 0 ? (
         <Card>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>No health issues tracked yet</Text>
-          <Text style={{ color: theme.colors.muted, marginTop: 6, lineHeight: 20 }}>Add issues through Health Intake or Health Tracking so Helfi can generate focused insights for you.</Text>
+          <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>No health issues tracked yet</Text>
+          <Text style={{ color: theme.colors.muted, marginTop: 5, fontSize: 13, lineHeight: 18 }}>Add issues through Health Intake or Health Tracking for focused insights.</Text>
         </Card>
       ) : (
         <Card style={{ padding: 0, overflow: 'hidden' }}>
-          <View style={{ padding: 14, borderBottomWidth: 1, borderBottomColor: theme.colors.border, flexDirection: 'row', justifyContent: 'space-between', gap: 12 }}>
-            <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Tracked issues</Text>
-            <Text style={{ color: theme.colors.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase' }}>Tap to open workspace</Text>
-          </View>
           {issues.map((issue, index) => {
             const colors = issueStatusColors(issue.status)
             const ratingText = issue.currentRating !== null ? `${issue.currentRating}/${issue.ratingScaleMax ?? 6}` : null
@@ -1349,29 +1337,29 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
                 accessibilityLabel={`Open ${issue.name} workspace`}
                 style={({ pressed }) => ({
                   opacity: pressed ? 0.86 : 1,
-                  padding: 14,
+                  padding: 12,
                   borderTopWidth: index === 0 ? 0 : 1,
                   borderTopColor: theme.colors.border,
                   backgroundColor: theme.colors.card,
                 })}
               >
-                <View style={{ flexDirection: 'row', gap: 12, alignItems: 'flex-start' }}>
-                  <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#ECFDF3', alignItems: 'center', justifyContent: 'center' }}>
-                    <Feather name="zap" size={17} color={theme.colors.primary} />
+                <View style={{ flexDirection: 'row', gap: 9, alignItems: 'flex-start' }}>
+                  <View style={{ width: 30, height: 30, borderRadius: 10, backgroundColor: colors.backgroundColor, alignItems: 'center', justifyContent: 'center' }}>
+                    <Feather name="activity" size={16} color={colors.color} />
                   </View>
-                  <View style={{ flex: 1, gap: 6 }}>
+                  <View style={{ flex: 1, gap: 4 }}>
+                    <Text style={{ color: theme.colors.text, fontSize: 15, fontWeight: '700' }}>{issue.name}</Text>
                     <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 7, alignItems: 'center' }}>
-                      <View style={{ borderWidth: 1, borderColor: colors.borderColor, backgroundColor: colors.backgroundColor, borderRadius: 999, paddingVertical: 3, paddingHorizontal: 8 }}>
-                        <Text style={{ color: colors.color, fontSize: 11, fontWeight: '700' }}>{issue.severityLabel || 'Needs data'}</Text>
+                      <View style={{ backgroundColor: colors.backgroundColor, borderRadius: 5, paddingVertical: 3, paddingHorizontal: 6 }}>
+                        <Text style={{ color: colors.color, fontSize: 11, fontWeight: '600' }}>{issue.severityLabel || 'Needs data'}</Text>
                       </View>
-                      {ratingText ? <Text style={{ color: theme.colors.muted, fontSize: 12, fontWeight: '600' }}>{ratingText}</Text> : null}
+                      {ratingText ? <Text style={{ color: theme.colors.muted, fontSize: 12 }}>{ratingText}</Text> : null}
                     </View>
-                    <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>{issue.name}</Text>
-                    <Text style={{ color: theme.colors.muted, lineHeight: 19, fontSize: 13 }}>{issue.highlight || 'Open the workspace to see personalised guidance.'}</Text>
-                    {issue.lastUpdated ? <Text style={{ color: '#9CA3AF', fontSize: 12 }}>Last updated {formatDateForLocale(issue.lastUpdated)}</Text> : null}
-                    {issue.blockers?.length ? <Text style={{ color: '#B45309', fontSize: 12, lineHeight: 17 }}>Next step: {issue.blockers[0]}</Text> : null}
+                    <Text style={{ color: theme.colors.muted, lineHeight: 18, fontSize: 13 }}>{issue.highlight || 'Open the workspace to see personalised guidance.'}</Text>
+                    {issue.blockers?.length ? <Text style={{ color: '#267245', fontSize: 12, lineHeight: 17 }}>Next step: {issue.blockers[0]}</Text> : null}
+                    {issue.lastUpdated ? <Text style={{ color: theme.colors.muted, fontSize: 11 }}>Updated {formatDateForLocale(issue.lastUpdated)}</Text> : null}
                   </View>
-                  <Feather name="chevron-right" size={21} color={theme.colors.muted} />
+                  <Feather name="chevron-right" size={18} color={theme.colors.muted} />
                 </View>
               </Pressable>
             )
@@ -1379,31 +1367,43 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         </Card>
       )}
 
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', gap: 10, marginTop: 2 }}>
+        <Text style={{ color: theme.colors.text, fontSize: 17, fontWeight: '700' }}>Previous reports</Text>
+        {reports.length ? <Text style={{ color: theme.colors.muted, fontSize: 12 }}>Recent {Math.min(reports.length, 6)}</Text> : null}
+      </View>
       {reports.length ? (
-        <Card>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>Previous reports</Text>
-          <View style={{ gap: 10, marginTop: 12 }}>
-            {reports.slice(0, 6).map((item) => (
-              <Pressable
-                key={item.id}
-                onPress={() => openReport(item.id)}
-                accessibilityRole="button"
-                accessibilityLabel={`Open report ${formatDateRange(item.periodStart, item.periodEnd)}`}
-                style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
-              >
-                <Card tone="white" style={{ padding: 12 }}>
-                  <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{formatDateRange(item.periodStart, item.periodEnd)}</Text>
-                  <Text style={{ color: theme.colors.muted, fontSize: 12, marginTop: 3 }}>Generated {formatDateForLocale(item.createdAt)}</Text>
-                </Card>
-              </Pressable>
-            ))}
-          </View>
+        <Card style={{ padding: 0, overflow: 'hidden' }}>
+          {reports.slice(0, 6).map((item, index) => (
+            <Pressable
+              key={item.id}
+              onPress={() => openReport(item.id)}
+              accessibilityRole="button"
+              accessibilityLabel={`Open report ${formatDateRange(item.periodStart, item.periodEnd)}`}
+              style={({ pressed }) => ({
+                opacity: pressed ? 0.85 : 1,
+                minHeight: 64,
+                padding: 12,
+                flexDirection: 'row',
+                alignItems: 'center',
+                gap: 10,
+                borderTopWidth: index === 0 ? 0 : 1,
+                borderTopColor: theme.colors.border,
+              })}
+            >
+              <Feather name="file-text" size={19} color={theme.colors.primary} />
+              <View style={{ flex: 1, gap: 3 }}>
+                <Text style={{ color: theme.colors.text, fontSize: 13, fontWeight: '600' }}>{formatDateRange(item.periodStart, item.periodEnd)}</Text>
+                <Text style={{ color: theme.colors.muted, fontSize: 11 }}>Generated {formatDateForLocale(item.createdAt)}</Text>
+              </View>
+              <Feather name="chevron-right" size={17} color={theme.colors.muted} />
+            </Pressable>
+          ))}
         </Card>
       ) : (
         <Card>
-          <Text style={{ color: theme.colors.text, fontSize: 18, fontWeight: '700' }}>No report yet</Text>
-          <Text style={{ color: theme.colors.muted, marginTop: 6, lineHeight: 20 }}>Your weekly report will appear here once your first 7 days of data are complete.</Text>
-          {displayNextReportDueAt ? <Text style={{ color: theme.colors.muted, marginTop: 10 }}>Next report due: {formatDateForLocale(displayNextReportDueAt)}</Text> : null}
+          <Text style={{ color: theme.colors.text, fontSize: 16, fontWeight: '700' }}>No report yet</Text>
+          <Text style={{ color: theme.colors.muted, marginTop: 5, fontSize: 13, lineHeight: 18 }}>Your first report appears after 7 days of data.</Text>
+          {displayNextReportDueAt ? <Text style={{ color: theme.colors.muted, marginTop: 8, fontSize: 12 }}>Next report due: {formatDateForLocale(displayNextReportDueAt)}</Text> : null}
         </Card>
       )}
     </View>
@@ -1510,7 +1510,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         {waterSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={waterSeries} color="#38BDF8" /> : <EmptyBox message="No water logs this week yet. Add a water entry and this chart will appear." />}
       </ChartDisclosure> : null}
       {hasCalorieChart ? <ChartDisclosure id="calories" eyebrow="Calories" title="Food energy" summary="Daily calories, with the biggest changes highlighted." open={openCharts.calories} onToggle={() => setOpenCharts((prev) => ({ ...prev, calories: !prev.calories }))}>
-        {calorieSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={calorieSeries} color="#F59E0B" /> : <EmptyBox message="No calorie data to chart yet. This appears when food logs include calories." />}
+        {calorieSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={calorieSeries} color="#439A45" /> : <EmptyBox message="No calorie data to chart yet. This appears when food logs include calories." />}
       </ChartDisclosure> : null}
       {hasMoodChart ? <ChartDisclosure id="mood" eyebrow="Mood" title="Mood trend" summary="Average mood per day." open={openCharts.mood} onToggle={() => setOpenCharts((prev) => ({ ...prev, mood: !prev.mood }))}>
         {moodSeries.filter((v) => v > 0).length >= 2 ? <SimpleBarChart labels={labels} values={moodSeries} color="#3B82F6" /> : <EmptyBox message="Not enough mood entries to chart a trend yet. Add a few mood check-ins this week." />}
@@ -1519,7 +1519,7 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
         {symptomSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={symptomSeries} color="#F472B6" /> : <EmptyBox message="No symptom entries to chart yet. If you create symptom notes, this will appear." />}
       </ChartDisclosure> : null}
       {hasExerciseChart ? <ChartDisclosure id="exercise" eyebrow="Exercise" title="Minutes per day" summary="Total minutes logged." open={openCharts.exercise} onToggle={() => setOpenCharts((prev) => ({ ...prev, exercise: !prev.exercise }))}>
-        {exerciseSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={exerciseSeries} color="#6366F1" /> : <EmptyBox message="No exercise entries this week yet. Add a workout to see this chart." />}
+        {exerciseSeries.some((v) => v > 0) ? <SimpleBarChart labels={labels} values={exerciseSeries} color="#439A45" /> : <EmptyBox message="No exercise entries this week yet. Add a workout to see this chart." />}
       </ChartDisclosure> : null}
       {hasFoodChart ? <ChartDisclosure id="foods" eyebrow="Top foods" title="Most common picks" summary="Based on your logged foods." open={openCharts.foods} onToggle={() => setOpenCharts((prev) => ({ ...prev, foods: !prev.foods }))}>
         {topFoods.length ? topFoods.slice(0, 6).map((row: any, idx: number) => <InfoItem key={`food-${idx}`} title={row.name || 'Food'} body={`${row.count ?? 0}`} />) : <EmptyBox message="No food patterns to show yet. Once you log a few meals, your top foods will appear here." />}
@@ -1559,9 +1559,9 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           <Text style={{ color: '#075985', marginTop: 5 }}>Checking the real saved chat history for this report week…</Text>
         </Card>
       ) : chatVerificationState === 'unavailable' ? (
-        <Card tone="amber">
-          <Text style={{ color: '#92400E', fontSize: 18, fontWeight: '700' }}>Saved chats could not be checked</Text>
-          <Text style={{ color: '#92400E', marginTop: 5, lineHeight: 20 }}>Helfi is not showing the older generated count as fact. Please try opening this report again later.</Text>
+        <Card tone="mint">
+          <Text style={{ color: '#267245', fontSize: 18, fontWeight: '700' }}>Saved chats could not be checked</Text>
+          <Text style={{ color: '#267245', marginTop: 5, lineHeight: 20 }}>Helfi is not showing the older generated count as fact. Please try opening this report again later.</Text>
         </Card>
       ) : talkToAiSummary?.userMessageCount ? (
         <Card tone="sky">
@@ -1595,10 +1595,10 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
               {wins.length ? wins.map((item: any, idx: number) => <InfoItem key={`win-${idx}`} title={item.name || 'Win'} body={item.reason || ''} />) : <Text style={{ color: '#047857' }}>Keep logging to highlight real wins here.</Text>}
             </View>
           </Card>
-          <Card tone="amber">
-            <Text style={{ color: '#92400E', fontSize: 18, fontWeight: '700' }}>Areas to work on</Text>
+          <Card tone="mint">
+            <Text style={{ color: '#267245', fontSize: 18, fontWeight: '700' }}>Areas to work on</Text>
             <View style={{ gap: 8, marginTop: 10 }}>
-              {gaps.length ? gaps.map((item: any, idx: number) => <InfoItem key={`gap-${idx}`} title={item.name || 'Gap'} body={item.reason || ''} />) : <Text style={{ color: '#92400E' }}>No big gaps flagged this week.</Text>}
+              {gaps.length ? gaps.map((item: any, idx: number) => <InfoItem key={`gap-${idx}`} title={item.name || 'Gap'} body={item.reason || ''} />) : <Text style={{ color: '#267245' }}>No big gaps flagged this week.</Text>}
             </View>
           </Card>
         </View>
@@ -1704,8 +1704,8 @@ export function InsightsScreen({ navigation }: { navigation: any }) {
           </View>
         </View>
         {parsedSummary?.dataWarning ? (
-          <Card tone="amber">
-            <Text style={{ color: '#92400E', lineHeight: 20 }}>{parsedSummary.dataWarning}</Text>
+          <Card tone="mint">
+            <Text style={{ color: '#267245', lineHeight: 20 }}>{parsedSummary.dataWarning}</Text>
           </Card>
         ) : null}
         <Card>

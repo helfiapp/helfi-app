@@ -8,6 +8,8 @@ import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { CreditManager } from '@/lib/credit-system'
 import { RECIPE_IMPORT_PHOTO_CREDITS, RECIPE_IMPORT_URL_CREDITS } from '@/lib/recipe-import-pricing'
 import { normalizeImageForAi, resolveImageContentType } from '@/lib/ai-image-normalize'
+import { fetchPublicRecipeUrl, validatePublicRecipeUrl } from '@/lib/public-recipe-url'
+import { aiConsentRequiredResponse } from '@/lib/ai-consent'
 
 export const dynamic = 'force-dynamic'
 export const revalidate = 0
@@ -279,16 +281,16 @@ type FetchedRecipePage = {
 const fetchRecipeTextViaMirror = async (url: string): Promise<{ text: string | null; debug: string[] }> => {
   const debug: string[] = []
   try {
+    await validatePublicRecipeUrl(url)
     const normalized = String(url || '').trim().replace(/^https?:\/\//i, '')
     if (!normalized) return { text: null, debug: ['mirror:empty-url'] }
     const mirrorUrl = `https://r.jina.ai/http://${normalized}`
-    const res = await fetch(mirrorUrl, {
-      method: 'GET',
-      redirect: 'follow',
+    const res = await fetchPublicRecipeUrl(mirrorUrl, {
       headers: {
         'user-agent': RECIPE_IMPORT_BROWSER_HEADERS['user-agent'],
         accept: 'text/plain,text/markdown;q=0.9,*/*;q=0.8',
       },
+      maxBytes: 1_200_000,
     })
     debug.push(`mirror-status:${res.status}`)
     if (!res.ok) return { text: null, debug }
@@ -327,9 +329,7 @@ const fetchRecipePage = async (url: string): Promise<FetchedRecipePage> => {
 
   for (const attemptUrl of attempts) {
     try {
-      const res = await fetch(attemptUrl, {
-        method: 'GET',
-        redirect: 'follow',
+      const res = await fetchPublicRecipeUrl(attemptUrl, {
         headers: RECIPE_IMPORT_BROWSER_HEADERS,
       })
       debug.push(`direct:${attemptUrl}:status:${res.status}`)
@@ -486,6 +486,8 @@ const extractRecipeFromText = async ({
 }
 
 export async function POST(request: NextRequest) {
+  const consentResponse = await aiConsentRequiredResponse(request)
+  if (consentResponse) return consentResponse
   try {
     // Auth (session, with JWT fallback)
     let session = await getServerSession(authOptions)
@@ -530,6 +532,9 @@ export async function POST(request: NextRequest) {
       const url = String(body?.url || '').trim()
       if (!url || (!url.startsWith('http://') && !url.startsWith('https://'))) {
         return NextResponse.json({ error: 'Invalid URL' }, { status: 400 })
+      }
+      try { await validatePublicRecipeUrl(url) } catch (error: any) {
+        return NextResponse.json({ error: error?.message || 'Please use a public recipe website.' }, { status: 400 })
       }
       const insufficientCredits = await ensureSufficientCredits(RECIPE_IMPORT_URL_CREDITS, urlCostMessage)
       if (insufficientCredits) return insufficientCredits

@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
@@ -58,6 +58,11 @@ const PERIOD_OPTIONS: Array<{ key: PeriodKey; label: string }> = [
   { key: 'all', label: 'All Time' },
 ]
 
+function deviceCheckinDate(now = new Date()) {
+  if (!Number.isFinite(now.getTime()) || now.getFullYear() < 1 || now.getFullYear() > 9999) return null
+  return `${String(now.getFullYear()).padStart(4, '0')}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`
+}
+
 export function DailyCheckInScreen() {
   const { mode, session } = useAppMode()
   const route = useRoute<RouteProp<MainStackParamList, 'DailyCheckIn'>>()
@@ -72,8 +77,14 @@ export function DailyCheckInScreen() {
       'cache-control': 'no-store',
     }
   }, [mode, session?.token])
+  const todayAccountRef = useRef<string | null>(null)
+  const todayLoadRunRef = useRef(0)
+  const todayLoadedRef = useRef<{ account: string; localDate: string } | null>(null)
+  const todaySaveRef = useRef<object | null>(null)
+  todayAccountRef.current = authHeaders?.Authorization || null
 
   const [loading, setLoading] = useState(true)
+  const [todayLocalDate, setTodayLocalDate] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
   const [issues, setIssues] = useState<CheckInIssue[]>([])
   const [ratings, setRatings] = useState<Record<string, number | null>>({})
@@ -100,19 +111,51 @@ export function DailyCheckInScreen() {
     if (requestedTab === 'today') setActiveTab('today')
   }, [requestedTab])
 
+  useEffect(() => {
+    todayAccountRef.current = authHeaders?.Authorization || null
+    todayLoadRunRef.current += 1
+    todayLoadedRef.current = null
+    todaySaveRef.current = null
+    setIssues([])
+    setTodayLocalDate(null)
+    setRatings({})
+    setNotes({})
+    setNa({})
+    setDetailsOpen({})
+    setSaving(false)
+    setLoading(Boolean(authHeaders))
+  }, [authHeaders])
+
+  useEffect(() => () => {
+    todayAccountRef.current = null
+    todayLoadRunRef.current += 1
+    todayLoadedRef.current = null
+    todaySaveRef.current = null
+  }, [])
+
   const loadToday = useCallback(async () => {
+    const account = authHeaders?.Authorization || null
+    if (todayAccountRef.current !== account) return
+    const run = ++todayLoadRunRef.current
+    todayLoadedRef.current = null
+    setTodayLocalDate(null)
     if (!authHeaders) {
       setLoading(false)
       return
     }
+    const localDate = deviceCheckinDate()
+    const isCurrent = () => todayLoadRunRef.current === run && todayAccountRef.current === account
 
     try {
       setLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/checkins/today`, {
+      if (!localDate) throw new Error('The phone date is invalid. Please check the device date before loading today’s check-in.')
+      const res = await fetch(`${API_BASE_URL}/api/checkins/today?localDate=${localDate}`, {
         headers: authHeaders,
       })
       const data: any = await res.json().catch(() => ({}))
+      if (!isCurrent()) return
       if (!res.ok) throw new Error(String(data?.error || 'Could not load check-in'))
+      if (deviceCheckinDate() !== localDate) throw new Error('The day changed while loading. Please reload Today before saving.')
 
       const nextIssues: CheckInIssue[] = Array.isArray(data?.issues) ? data.issues : []
       const nextRatings: Record<string, number | null> = {}
@@ -139,10 +182,13 @@ export function DailyCheckInScreen() {
         }
       }
       setDetailsOpen(nextDetailsOpen)
+      todayLoadedRef.current = { account: account!, localDate }
+      setTodayLocalDate(localDate)
     } catch (e: any) {
+      if (!isCurrent()) return
       Alert.alert('Could not load check-in', e?.message || 'Please try again.')
     } finally {
-      setLoading(false)
+      if (isCurrent()) setLoading(false)
     }
   }, [authHeaders])
 
@@ -183,6 +229,20 @@ export function DailyCheckInScreen() {
 
   const save = async () => {
     if (!authHeaders) return
+    const account = authHeaders.Authorization
+    const loaded = todayLoadedRef.current
+    const localDate = deviceCheckinDate()
+    if (!localDate || !loaded || loaded.account !== account || todayAccountRef.current !== account || loaded.localDate !== localDate || todayLocalDate !== loaded.localDate) {
+      Alert.alert('Reload today’s check-in', 'The day or account changed, or today’s check-in has not loaded. Reload Today and review its ratings before saving.', [
+        { text: 'Cancel', style: 'cancel' },
+        { text: 'Reload Today', onPress: () => void loadToday() },
+      ])
+      return
+    }
+    if (todaySaveRef.current) return
+    const saveRequest = {}
+    todaySaveRef.current = saveRequest
+    const isCurrent = () => todayAccountRef.current === account && todaySaveRef.current === saveRequest
 
     try {
       setSaving(true)
@@ -199,17 +259,22 @@ export function DailyCheckInScreen() {
           ...authHeaders,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ ratings: payload }),
+        body: JSON.stringify({ localDate: loaded.localDate, ratings: payload }),
       })
 
       const data: any = await res.json().catch(() => ({}))
+      if (!isCurrent()) return
       if (!res.ok) throw new Error(String(data?.error || 'Could not save check-in'))
 
-      Alert.alert('Saved', 'Today\'s check-in is saved.')
+      Alert.alert('Saved', deviceCheckinDate() === loaded.localDate ? 'Today\'s check-in is saved.' : `Your check-in for ${loaded.localDate} is saved.`)
     } catch (e: any) {
+      if (!isCurrent()) return
       Alert.alert('Save failed', e?.message || 'Please try again.')
     } finally {
-      setSaving(false)
+      if (isCurrent()) {
+        todaySaveRef.current = null
+        setSaving(false)
+      }
     }
   }
 

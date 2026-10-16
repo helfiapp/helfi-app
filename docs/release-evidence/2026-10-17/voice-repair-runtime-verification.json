@@ -1,0 +1,305 @@
+{
+  "scope": "Actual signed-in local Helfi app/server testing; no physical microphone claim",
+  "releasedBaseline": {
+    "commit": "e944997a7897ebd3916f211749350573899b6587",
+    "awsJob": "126",
+    "iphoneBuild": "49"
+  },
+  "tests": [
+    {
+      "name": "AU McDonalds counted meal and corrections",
+      "result": "passed",
+      "transport": "Real local Helfi server, signed-in Debug iPhone16e simulator typed conversation",
+      "verified": [
+        "Two source-matched foods, official AU count servings, six->three->six correction retains sources",
+        "1020 calories, 64.4g protein,46.6g carbohydrate,63.6g fat,8.7g sugar, fibre unknown",
+        "Name-only correction and natural typed Yes save it create exactly one disposable entry",
+        "Native Edit meal reopen and existing Chrome web diary readback"
+      ],
+      "disposableId": "cmvb6edu2000ok7xieippj1rm"
+    },
+    {
+      "name": "Mood spoken-number correction retains explicit note",
+      "result": "passed",
+      "transport": "Real local Helfi server, signed-in simulator typed conversation",
+      "verified": [
+        "Five out of seven with explicit disposable note prepares exact review",
+        "Actually make it two out of seven retains note; correction charge zero",
+        "Yes save it creates exactly one mood row score2 date2026-10-17 exactnote",
+        "Native Mood History and live existing Chrome Mood History show same entry and note"
+      ],
+      "disposableId": "751ac608-b8fb-4ffa-a8af-65d8f5677666"
+    },
+    {
+      "name": "Coffee milk sugar actual save and reopen",
+      "result": "passed",
+      "transport": "Actual signed-in Debug simulator typed requests to normal local Helfi server",
+      "verified": [
+        "250ml coffee +50ml whole milk +2teaspoons sugar resolves all3ingredients with verified USDAcoffee recordedportion and granulatedsugar identity",
+        "Correct onlymilk to25ml retains250mlcoffee and8gsugar, correct49kcal, unknownfibre preserved",
+        "Natural Yes saveit produced exactly1WaterLog and1linkedFoodLog; directreadback confirms exactwaterlink and3ingredients",
+        "NativeEditmealreopened49kcal/1.1P9.2C.9F9.2sugar/fibreunknown; no manualsaveused",
+        "After normal Refresh diary, live existing Chrome shows matching total1069 (meal1020 plusdrink49), explicit Other49calories and Water250ml with exactdrinklabel"
+      ],
+      "waterId": "cmvb8dqqe001uk7xi42o5bbz7",
+      "foodId": "cmvb8du5f001wk7xil7mg3mwx",
+      "existingDrinkEditAndUnchangedNativeResave": "Passed after repairs; same water/food IDs and exact sourced nutrition/sweetener preserved. See existingCoffeeEditActualAppTest.",
+      "remainingActualAppCoverage": [
+        "Existing-drink date changes, whole-volume scaling and cancellation were not verified in this runtime batch."
+      ]
+    }
+  ],
+  "updatedAt": "2026-10-16T19:17:58.438102+00:00",
+  "limits": [
+    "No physical microphone recognition or audible greeting proof from typed/synthetic tests",
+    "No new repair deployment/build/install yet",
+    "Only exact disposable test entries were modified; tested water-goal and selected-issue preferences were restored. Official admin UI added 100 virtual test credits; no money charge or subscription change."
+  ],
+  "journalActualAppTest": {
+    "method": "Signed-in native typed Talk to Helfi through real local app server; no direct provider/key scripts",
+    "request": "Write in my health journal: Voice repair test health journal. I took a calm walk today.",
+    "review": "Full note and exact 2026-10-17 date, health journal type; no unsupported title/tags/clock claim",
+    "confirmation": "Yes, save it.",
+    "savedId": "cmvb9zyvo0006cz15n3pn71nb",
+    "savedContent": "Voice repair test health journal. I took a calm walk today.",
+    "savedLocalDate": "2026-10-17",
+    "nativeReopened": true,
+    "existingLiveWebHistoryReadback": true,
+    "databaseReadOnlyExactIdVerified": true,
+    "physicalMicrophoneTest": false
+  },
+  "existingCoffeeEditActualAppTest": {
+    "status": "Passed: voice edit, exact same-ID readback, native reopen and unchanged normal native Save entry preserve all nutrition and sweetener values",
+    "naturalRequest": "In the coffee I just logged today, change the milk to 50 millilitres.",
+    "review": "Source-backed coffee250ml+sugar8g+wholemilk50ml,64.4kcal and all six totals, changed automatic label",
+    "findings": [
+      "Natural temporal record query did not select existing coffee; repaired and actual review retest passed",
+      "Default five-second normal water transaction expired; bounded fifteen-second transaction installed",
+      "Local failed confirmation had retried older production server; removed cross-server mutation retry and actual subsequent error preserved",
+      "Initial resolved-food readback mismatches rolled back all changes. Actual safe diagnostics identified a floating-point precision difference; only post-write readback now accepts differences within eight times Number.EPSILON (relative tolerance, with scale floored at one). Subsequent real voice edit and unchanged native Save entry passed with exact same IDs."
+    ],
+    "waterId": "cmvb8dqqe001uk7xi42o5bbz7",
+    "foodId": "cmvb8du5f001wk7xil7mg3mwx",
+    "physicalMicrophoneTest": false,
+    "voiceEditSavedAfterObservedNumericPrecisionRepair": true,
+    "sameIdsVerified": true,
+    "voiceSavedNutrition": {
+      "calories": 64.36223767993638,
+      "protein": 1.989468521592366,
+      "carbs": 10.40345,
+      "fat": 1.698044753598728,
+      "fiber": null,
+      "sugar": 10.46115
+    },
+    "voiceSavedSweetener": {
+      "grams": 8,
+      "sugar": 7.984,
+      "calories": 30.96
+    },
+    "nativeEditorReopenedThreeIngredientsAndSixNutrients": true,
+    "normalNativeResaveFault": {
+      "request": "Save the reopened coffee without changing fields",
+      "returnedSuccess": true,
+      "sameIds": true,
+      "resultNutrition": {
+        "calories": 64,
+        "protein": 0,
+        "carbs": 10.4,
+        "fat": 0,
+        "fiber": 0,
+        "sugar": 10.5
+      },
+      "sweetenerChoice": "free",
+      "sweetenerCalories": 0,
+      "affectedRecords": "Only disposable test coffee; restored through actual signed-in Helfi voice UI, then ordinary Save entry verified",
+      "repair": "Owned source-format caller validates native serialized/rounded values and canonicalizes sourced totals; legacy protected normalizer remains unchanged",
+      "repairVerifiedThroughActualApp": true
+    },
+    "normalNativeResaveAfterRepair": {
+      "passed": true,
+      "sameWaterId": "cmvb8dqqe001uk7xi42o5bbz7",
+      "sameFoodId": "cmvb8du5f001wk7xil7mg3mwx",
+      "nutrition": {
+        "calories": 64.36223767993638,
+        "protein": 1.989468521592366,
+        "carbs": 10.40345,
+        "fat": 1.698044753598728,
+        "fiber": null,
+        "sugar": 10.46115
+      },
+      "sweetenerChoice": "with",
+      "sweetenerCalories": 30.96,
+      "sweetenerGrams": 8,
+      "sweetenerSugar": 7.984,
+      "hydrationMl": 250,
+      "ingredients": 3,
+      "normalSaveClosedEditor": true
+    },
+    "failedVoiceEditsWrotePartialData": false
+  },
+  "exerciseActualAppTest": {
+    "method": "Signed-in native typed Talk to Helfi / real local app server; normal native diary reopen; exact read-only database readback",
+    "request": "Log twenty minutes of yoga today at 7:30 am.",
+    "correction": "Actually, make it thirty minutes and use 150 calories.",
+    "correctedReview": "Yoga,30minutes,150calories,2026-10-17 at07:30; correction0credits",
+    "confirmation": "Yes, save it.",
+    "id": "cmvba4qr8000hcz15f8qf3u8c",
+    "savedDurationMinutes": 30,
+    "savedCalories": 150,
+    "savedOverride": 150,
+    "savedStartTime": "2026-10-16T20:30:00.000Z",
+    "nativeDiaryTime": "07:30 local Melbourne",
+    "savedIdCount": 1,
+    "reopenedEditorFoundFault": "Fixed: original UTC20:30 shown instead07:30 local; native41 timezone/source tests passed",
+    "physicalMicrophoneTest": false,
+    "nativeEditorClockAfterRepair": "07:30",
+    "normalNativeEditorResaveWithoutChanges": true,
+    "normalNativeResavePreservesExactInstant": "2026-10-16T20:30:00.000Z",
+    "normalNativeResavePreservesDurationCalories": {
+      "durationMinutes": 30,
+      "calories": 150,
+      "caloriesOverride": 150
+    },
+    "actualEditorRoundTripVerified": true
+  },
+  "plainWaterActualAppTest": {
+    "request": "Log 300 millilitres of plain water for today.",
+    "confirmation": "Yes, save it.",
+    "serverReceiptSaved": true,
+    "nativeTodayNewWaterMl": 300,
+    "nativeTotalHydrationMl": 550,
+    "liveWebTodayNewWaterMl": 300,
+    "liveWebTotalHydrationMl": 550,
+    "priorCoffeeHydrationMl": 250,
+    "unchangedCustomGoalMl": 2450,
+    "physicalMicrophoneTest": false
+  },
+  "waterGoalActualAppTest": {
+    "request": "Set my custom daily water target to 2460 millilitres.",
+    "confirmation": "Yes, save it.",
+    "nativeVerifiedSettingReceipt": true,
+    "webAfterRefresh": "Custom goal active /2.46L;550mltoday",
+    "restorationRequest": "Set my custom daily water target back to 2450 millilitres.",
+    "restorationConfirmation": "Yes, save it.",
+    "nativeRestorationVerifiedReceipt": true,
+    "webRestorationAfterRefresh": "Custom goal active /2.45L;550mltoday",
+    "originalCustomGoalPreserved": true
+  },
+  "selectedGoalsActualAppTest": {
+    "status": "Passed add\u2192both normal app screens show six\u2192remove only Energy\u2192restored exact original selected names and all five original goal/check-in IDs",
+    "originalCount": 5,
+    "addedOnly": "Energy",
+    "naturalConfirmation": "Yes, save it.",
+    "nativeExistingSixIssueNamesVerified": true,
+    "liveWebSameSixIssueNamesVerified": true,
+    "originalIdsSnapshotPrivate": true,
+    "removeRequestObservedFault": "Initial singular remove-name string was rejected; bounded semantic Add/Remove normalization repaired it. Actual natural confirmation then restored all five original selected issues and exact goal/check-in IDs.",
+    "existingRatingsModified": false,
+    "restoredOriginalSelection": true,
+    "restoredOriginalGoalIds": true,
+    "restoredOriginalCheckinIssueIds": true,
+    "oldUnselectedEnergyGoalSurvives": true,
+    "oldUnselectedEnergyLinkedHistoryCount": 0,
+    "databaseDirectMutations": false,
+    "knownLegacyBoundary": "Do not change unescaped hidden-goal wildcard in isolation: that would activate a pre-existing cascading deletion branch; no actual historical deletion observed.",
+    "inFlightSnapshotClarification": "The 18:43:50 UTC snapshot was taken during the 16.664-second removal, after check-in issue sync but before selected-marker persistence. It is not a persistent post-add mismatch; completed selected list and check-in issues both restored to five."
+  },
+  "dailyCheckinActualAppTest": {
+    "method": "Actual signed-in native typed Talk to Helfi and real local Helfi server; exact-ID read-only database verification",
+    "request": "For my daily check-in today, rate Stress levels four out of seven and add the note Voice repair test check-in.",
+    "result": "passed",
+    "issue": "Stress",
+    "nativeDisplayedIssue": "Stress levels",
+    "humanRating": "Average",
+    "spokenSevenChoiceRating": 4,
+    "storedValue": 3,
+    "localDate": "2026-10-17",
+    "savedId": "4949c077-73e1-4bc4-b916-96471db8f3b5",
+    "savedNote": "Voice repair test check-in.",
+    "exactNotePunctuationVerified": true,
+    "reviewRequiredBeforeSave": true,
+    "naturalConfirmation": true,
+    "databaseReadOnlyExactIdVerified": true,
+    "physicalMicrophoneTest": false
+  },
+  "recipeLibraryActualAppTest": {
+    "method": "Actual signed-in native typed Talk to Helfi through the real local Helfi server; normal recipe-library save; exact-library read-only verification",
+    "result": "passed",
+    "title": "Voice repair test banana milk",
+    "libraryId": "0615c570-fab2-44cb-a21f-a52fe1566161",
+    "yieldServings": 1,
+    "ingredients": [
+      {
+        "name": "banana",
+        "amount": 100,
+        "unit": "g"
+      },
+      {
+        "name": "whole milk",
+        "amount": 100,
+        "unit": "ml"
+      }
+    ],
+    "calories": 150.8,
+    "steps": [
+      "blend the banana and milk until smooth"
+    ],
+    "fullRecipeReviewVerified": true,
+    "naturalConfirmation": true,
+    "savedToLibraryWithoutLoggingConsumption": true,
+    "foodDiaryCountTodayBefore": 2,
+    "foodDiaryCountTodayAfter": 2,
+    "priorObservedFailure": "First save exceeded the normal five-second transaction limit and exposed a database error. Bounded fifteen-second library transaction and safe public error boundary were installed; fresh reviewed save subsequently passed.",
+    "physicalMicrophoneTest": false,
+    "nativeFavoritesNormalEditorReopened": true,
+    "reopenedNutrition": {
+      "calories": 151,
+      "protein": 4.5,
+      "carbs": 27.7,
+      "fat": 3.6,
+      "fiber": null,
+      "sugar": 17.2
+    }
+  },
+  "testCreditRestorationActualAdminAction": {
+    "method": "Existing official admin user-management UI; no direct database update or provider/key script",
+    "account": "info@sonicweb.com.au",
+    "action": "Add credits",
+    "creditsAdded": 100,
+    "balanceBefore": 7,
+    "balanceAfter": 107,
+    "result": "passed",
+    "virtualServiceCreditsOnly": true,
+    "moneyCharged": false,
+    "subscriptionChanged": false
+  },
+  "welcomeRuntimeTest": {
+    "status": "in progress",
+    "result": "not yet verified",
+    "note": "Actual welcome runtime testing is underway. No passing result or audible/physical microphone claim is recorded."
+  },
+  "welcomeActualAppTest": {
+    "status": "Native playback completed on rebuilt iPhone16e Debug app; no human auditory/physical microphone claim",
+    "text": "Hi, I\u2019m Helfi. What can I help you with?",
+    "protocol": "live-v1",
+    "startedMs": 6453,
+    "finishedMs": 9929,
+    "assetDurationSeconds": 3.456,
+    "observedPlaybackSeconds": 3.476,
+    "outboundPacketsDuringAndAfter": [
+      22,
+      73,
+      122,
+      174,
+      225,
+      278,
+      681
+    ],
+    "afterPlayback": "Ready \u2014 speak now; continuous microphone/outbound media",
+    "afterEnd": "Saved on this device. The microphone is off.",
+    "historyNote": "Adjacent identical assistant welcome was deduplicated against immediately preceding typed Hello reply; native playback completion independently verified",
+    "newProviderTtsRequestForWelcome": false,
+    "physicalSpeechRecognitionVerified": false,
+    "auditoryVerification": false
+  }
+}

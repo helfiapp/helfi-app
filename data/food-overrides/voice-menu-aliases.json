@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "aliases": [
+    {
+      "country": "AU",
+      "brand": "McDonald's",
+      "name": "Quarter Pounder",
+      "aliases": ["Quarter Pounder with Cheese"],
+      "sourceUrl": "https://www.mcdonalds.com/content/dam/sites/au/nfl/nutrition/PDFs/Aus%20Core%20Food%20Menu_January%202026.pdf",
+      "sourcePage": 5,
+      "verifiedDate": "2026-10-17",
+      "basis": "The official standard Quarter Pounder ingredients include sliced cheese. This alias does not cover extra cheese or other modifications."
+    },
+    {
+      "country": "AU",
+      "brand": "McDonald's",
+      "name": "Double Quarter Pounder",
+      "aliases": ["Double Quarter Pounder with Cheese"],
+      "sourceUrl": "https://www.mcdonalds.com/au/en-au/menu/beef/double-quarter-pounder.html",
+      "nutritionSourceUrl": "https://www.mcdonalds.com/content/dam/sites/au/nfl/nutrition/PDFs/Aus%20Core%20Food%20Menu_January%202026.pdf",
+      "sourcePage": 5,
+      "verifiedDate": "2026-10-17",
+      "basis": "The official Australian standard item description and ingredient list include cheese. This alias does not cover extra cheese, missing bun or sauce modifications."
+    }
+  ]
+}

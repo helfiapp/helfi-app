@@ -12,8 +12,12 @@ import { NutrientCards } from '../components/NutrientCards'
 import { hasAiDataSharingPermission, requestAiDataSharingPermission } from '../lib/aiConsent'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
+import { useAppleHealthSync } from '../health/AppleHealthSyncProvider'
+import { isAppleHealthSupportedDevice } from '../health/appleHealth'
 import { theme } from '../ui/theme'
+import { applyReviewedLocalPreference, captureLocalPreferenceReview, validateLocalPreference, type LocalPreference, type LocalPreferenceReview } from './localPreferenceActions'
 import { hasNativeRealtimeVoiceSupport, startHelfiRealtimeVoiceSession } from './realtimeVoice'
+import { applyReviewedNativeDeviceAction, captureNativeDeviceReview, getSleepDeviceEditorState, validateNativeDeviceAction, type NativeDeviceAction, type NativeDeviceIo, type NativeDeviceReview } from './nativeDeviceActions'
 
 export type VoiceAssistantLaunchContext = {
   section?:
@@ -44,6 +48,7 @@ export type VoiceAssistantLaunchContext = {
 }
 
 type OpenVoiceAssistantInput = {
+  mode?: 'voice' | 'conversation' | 'text'
   transcript?: string
   source?: 'siri' | 'button'
   autoSubmit?: boolean
@@ -66,7 +71,14 @@ type VoiceDraft = {
   confirmationMessage: string
   canConfirm: boolean
   autoSave?: boolean
-  recipe?: { text?: string }
+  recipe?: { text?: string; importDraft?: Record<string, unknown> }
+  recipeImport?: { userId: string; url: string; costCredits: number; localDate?: string; meal?: string; destination?: 'diary' | 'library' }
+  supportAction?: { action: 'support.create' | 'support.reply' | 'support.end_chat' | 'support.feedback' | 'support.delete'; userId?: string; ticketId?: string; payload?: Record<string, unknown>; beforeHash?: string }
+  reportAction?: { action: 'reports.weekly.generate'; userId?: string; beforeHash?: string; pricePolicy?: { minimumAvailableCredits: number; chargeMode: 'normal_usage_based' }; periodStart?: string; periodEnd?: string }
+  deviceAction?: NativeDeviceAction
+  requiresDeviceReview?: boolean
+  mood?: { mood?: number; tags?: string[]; note?: string; context?: { intensityPercent?: number; feelings?: string[]; energyLevel?: number; sleepQuality?: number; nutrition?: number; supplements?: number; medicationEffect?: number; physicalActivity?: number; localHour?: number } }
+  journal?: { title?: string; content?: string; tags?: string[]; journalType?: 'mood' | 'health' }
   appTarget?: {
     title?: string
     path?: string
@@ -79,6 +91,7 @@ type VoiceDraft = {
     draftText?: string
     sourceDate?: string
     mealName?: string
+    sourceNote?: string
     nutrition?: { calories?: number; protein?: number; carbs?: number; fat?: number }
   }
   water?: {
@@ -108,6 +121,20 @@ type VoiceDraft = {
 	    }>
 	  }
   reviewToken?: string
+  recordAction?: {
+    operation: 'create' | 'update' | 'delete'
+    entity: 'food' | 'water' | 'mood' | 'journal' | 'mood_journal' | 'exercise' | 'favorite' | 'custom_food' | 'symptom_note' | 'supplement' | 'medication'
+    id: string
+    changes?: Record<string, unknown>
+    localDate?: string
+    beforeHash?: string
+    timeZone?: string
+    ownerId?: string
+    spokenReview?: string
+  }
+  notificationAction?: { action: 'notifications.mark_read' | 'notifications.delete' | 'notifications.mark_all_visible_read' | 'notifications.delete_all_visible'; userId?: string; ids?: string[]; values?: { ids?: string[]; titles?: string[] }; beforeHash?: string; summary?: string; preparedAt?: number }
+  localPreference?: LocalPreference
+  preferenceAction?: { action: string; values: Record<string, unknown>; beforeHash?: string; summary?: string; preparedAt?: number }
 }
 
 type SaveSuccessNotice = {
@@ -134,6 +161,7 @@ type DraftRequestResult = {
   needsReview?: boolean
   action?: string
   reviewPrompt?: string
+  voiceActionRunId?: string
   status?: 'needs_clarification' | 'review_draft' | 'saved' | 'open_screen' | 'safe_refusal' | 'general_answer'
 }
 type RealtimeToolResult = DraftRequestResult & {
@@ -149,6 +177,7 @@ type DraftRequestOptions = {
   realtimeActionHint?: RealtimeActionHint
   suppressSpokenReply?: boolean
   signal?: AbortSignal
+  voiceActionRunId?: string
 }
 type DraftRequestHandler = (options?: DraftRequestOptions) => Promise<DraftRequestResult>
 type RealtimeActionGuard = {
@@ -165,7 +194,8 @@ type VoiceActivityItem = {
 const VoiceAssistantContext = createContext<VoiceAssistantContextValue | null>(null)
 const VOICE_REPLY_KEY = 'helfi_voice_reply_enabled_v1'
 const VOICE_CONVERSATION_MEMORY_KEY = 'helfi_voice_recent_conversation_v1'
-const VOICE_CONVERSATION_MEMORY_TTL_MS = 30 * 60 * 1000
+const VOICE_CONVERSATION_MEMORY_TTL_MS = 7 * 24 * 60 * 60 * 1000
+const MAX_VOICE_CONVERSATION_TURNS = 100
 const FOOD_FAVORITES_KEY = 'helfi_native_food_favorites_v2'
 const MAX_VOICE_FAVORITES = 120
 const VOICE_ASSISTANT_OPENING_EVENT = 'helfi:voice-assistant-opening'
@@ -191,6 +221,121 @@ function newRealtimeBillingSessionId() {
   return `voice_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
 }
 
+function newVoiceActionRunId() {
+  return `action_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 12)}`
+}
+
+function voiceConversationStorageKey(userId: string) {
+  return `${VOICE_CONVERSATION_MEMORY_KEY}:${encodeURIComponent(userId)}`
+}
+
+function traceVoiceAction(voiceActionRunId: string, event: string, action: unknown, status: string, reasonCode: string, startedAt: number) {
+  const safeAction = /^(?:record_action|preference_action|local_preference_action|notification_action|support_action|report_action|device_action|recipe_import_url|app_read|food_favorite|food_draft|food_build_meal|food_copy_previous|water|exercise|journal|symptom_note|mood|health_intake_items|app_handoff|health_question|recipe|general_chat|navigate|delete_conversation)$/.test(String(action)) ? String(action) : 'unknown'
+  console.info('[helfi voice action]', JSON.stringify({ version: 1, voiceActionRunId, event, action: safeAction, status, reasonCode, durationMs: Math.max(0, Date.now() - startedAt) }))
+}
+
+function isConfirmedVoiceSave(data: any, action?: string) {
+  if (data?.success !== true || !data.result || typeof data.result !== 'object') return false
+  const result = data.result
+  const expected = action?.startsWith('food_') ? ['food'] : action === 'device_action' ? ['native_device_action'] : action === 'health_intake_items' ? ['health_intake'] : action === 'journal' ? ['journal', 'health_journal'] : action ? [action] : null
+  if (expected && !expected.includes(result.kind)) return false
+  if (result.kind === 'native_device_action') return isValidNativeDeviceReceipt(result) && result.verified === true
+  if (result.kind === 'notification_action') return ['notifications.mark_read', 'notifications.delete', 'notifications.mark_all_visible_read', 'notifications.delete_all_visible'].includes(result.id) && result.saved === true && ['saved', 'already_set'].includes(result.status) && result.entity === 'notification' && result.operation === (result.id === 'notifications.delete' || result.id === 'notifications.delete_all_visible' ? 'delete' : 'update') && !(result.operation === 'delete' && result.status === 'already_set') && typeof result.message === 'string' && Boolean(result.message.trim()) && Array.isArray(result.ids) && result.ids.length > 0 && result.ids.length <= 1000 && result.ids.every((id: unknown) => typeof id === 'string' && Boolean(id.trim())) && new Set(result.ids).size === result.ids.length
+  if (result.kind === 'record_action') {
+    if (typeof result.id !== 'string' || !result.id.trim() || !['create', 'update', 'delete'].includes(result.operation)) return false
+    if (result.entity === 'symptom_note') return result.operation === 'delete' && result.message === 'Deleted the reviewed symptom note record.'
+    if (result.entity === 'supplement' || result.entity === 'medication') return ['update', 'delete'].includes(result.operation) && result.message === `${result.operation === 'delete' ? 'Removed' : 'Corrected'} the item in your recorded ${result.entity} list.`
+    return ['food', 'water', 'mood', 'journal', 'mood_journal', 'exercise', 'favorite', 'custom_food'].includes(result.entity)
+  }
+  if (result.kind === 'local_preference_action') return ['darkMode', 'hapticsEnabled', 'profileVisibility', 'dataAnalytics'].includes(result.id) && result.operation === 'update' && result.entity === 'device_preferences'
+  if (result.kind === 'preference_action') return typeof result.id === 'string' && Boolean(result.id.trim()) && result.operation === 'update' && ['saved', 'already_set'].includes(result.status)
+  if (result.kind === 'health_intake') return typeof result.path === 'string' && Number.isFinite(result.counts?.supplements) && result.counts.supplements >= 0 && Number.isFinite(result.counts?.medications) && result.counts.medications >= 0
+  if (!['food', 'water', 'exercise', 'mood', 'journal', 'health_journal', 'symptom_note'].includes(result.kind)) return false
+  return (typeof result.id === 'string' && Boolean(result.id.trim())) || (Array.isArray(result.ids) && result.ids.length > 0 && result.ids.every((id: unknown) => typeof id === 'string' && Boolean(id.trim())))
+}
+
+function isValidNativeDeviceReceipt(result: any, draft?: VoiceDraft | null) {
+  if (result?.kind !== 'native_device_action' || !['apple_health.import', 'apple_health.automatic.update', 'apple_health.source.select'].includes(result.id) || (draft && result.id !== draft.deviceAction?.action)) return false
+  const imported = result.id === 'apple_health.import'
+  if (result.entity !== (result.id.startsWith('apple_health.') ? 'apple_health' : 'device_settings') || result.operation !== (imported ? 'import' : 'update')) return false
+  if (imported) {
+    if (typeof result.localDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(result.localDate) || !Number.isFinite(Date.parse(`${result.localDate}T12:00:00Z`)) || new Date(`${result.localDate}T12:00:00Z`).toISOString().slice(0, 10) !== result.localDate || (draft && result.localDate !== draft.deviceAction?.values.localDate)) return false
+    return result.status === 'imported' && result.verified === true && result.message === `Apple Health confirmed the activity import for ${result.localDate}.`
+      || result.status === 'no_data' && result.verified === false && result.message === 'Apple Health did not confirm an import. There may be no available active-energy data or read permission; please check Devices.'
+  }
+  return result.status === 'setting_saved' && result.verified === true && result.message === 'The Apple Health setting was saved and checked on this phone. Health permissions were not changed.'
+}
+
+function nativeDeviceIoForVoice(health: () => ReturnType<typeof useAppleHealthSync>, accountId: () => string | null, isCurrent: () => boolean): NativeDeviceIo {
+  const currentHealth = () => {
+    if (!isCurrent()) throw new Error('This device request stopped. Please check Devices before retrying.')
+    const snapshot = health().getSnapshot()
+    if (!snapshot.ready || snapshot.userId !== accountId()) throw new Error('Apple Health settings are still loading or the account changed. Please wait and review again.')
+    return snapshot
+  }
+  return {
+    getItem: key => AsyncStorage.getItem(key), setItem: (key, value) => AsyncStorage.setItem(key, value), now: () => Date.now(), timeZone: () => nativeVoiceTimeZone() || 'UTC', accountId, isCurrent,
+    sleepEditor: () => getSleepDeviceEditorState(accountId() || ''),
+    health: { supported: isAppleHealthSupportedDevice, snapshot: () => { const value = currentHealth(); return { enabled: value.enabled, source: value.source, busy: value.busy } },
+      setEnabled: async value => { currentHealth(); await health().setEnabled(value) }, setSource: async value => { currentHealth(); await health().setSource(value) },
+      readSources: async date => { currentHealth(); return health().readSources(date) }, refresh: async (manual, date) => { currentHealth(); return health().refresh(manual, date) },
+    },
+  }
+}
+
+function reviewedNativeDevicePrompt(draft: VoiceDraft, review?: NativeDeviceReview | null) {
+  if (!review || review.token !== draft.reviewToken || JSON.stringify(review.action) !== JSON.stringify(draft.deviceAction)) return 'The current phone state has not been reviewed. Please request this device change again.'
+  if (review.sleep) return 'This device control is not available in Talk to Helfi. Please use an existing supported screen.'
+  try {
+    const current = JSON.parse(review.before)
+    return `Current phone source: ${current.source?.sourceName || 'Apple Health totals'}. Automatic foreground updates are ${current.enabled ? 'on' : 'off'}. ${draft.confirmationMessage}`
+  } catch { return 'Please review the current Apple Health settings again before confirming.' }
+}
+
+function isConfirmedRecipeImport(data: any, draft: VoiceDraft | null) {
+  const result = data?.result, next = result?.nextRecipeDraft
+  if (draft?.action !== 'recipe_import_url' || draft.recipeImport?.costCredits !== 10 || data?.success !== true || result?.kind !== 'recipe_import' || result.status !== 'imported_not_saved' || result.saved !== false || result.costCredits !== 10 || typeof result.actionId !== 'string' || !result.actionId.trim() || typeof result.message !== 'string' || !result.message.trim()) return false
+  if (!next || typeof next !== 'object' || typeof next.transcript !== 'string' || typeof next.summary !== 'string' || !next.summary.trim() || typeof next.confirmationMessage !== 'string' || !next.confirmationMessage.trim() || next.localDate !== draft.localDate || next.autoSave === true) return false
+  if (next.action === 'recipe') return next.canConfirm === false && Boolean(next.recipe?.importDraft && typeof next.recipe.importDraft === 'object' && !Array.isArray(next.recipe.importDraft))
+  return next.canConfirm === true && typeof next.reviewToken === 'string' && Boolean(next.reviewToken.trim()) && (next.action === 'food_build_meal' ? Boolean(next.food) : next.action === 'record_action' && next.recordAction?.operation === 'create' && ['favorite', 'custom_food'].includes(next.recordAction?.entity || ''))
+}
+
+function verifiedActionCompletionMessage(data: any, draft: VoiceDraft | null) {
+  const result = data?.result
+  if (data?.success !== true || !result || result.saved === true || typeof result.actionId !== 'string' || !result.actionId.trim()) return ''
+  if (draft?.action === 'support_action' && result.kind === 'support_action' && result.action === draft.supportAction?.action && result.status === 'completed' && typeof result.id === 'string' && result.id.trim()) {
+    if (draft.supportAction?.ticketId && result.id !== draft.supportAction.ticketId) return ''
+    const expected = result.action === 'support.delete' ? 'The selected support ticket was deleted.' : result.action === 'support.end_chat' ? 'The selected support chat was closed. Email delivery is not verified.' : 'The reviewed support action was saved. Email delivery is not verified.'
+    if (result.message !== expected) return ''
+    const messages: Record<string, string> = {
+      'support.create': 'Your reviewed support ticket was created. Email delivery is not verified.',
+      'support.reply': 'Your reviewed reply was added to the selected support ticket. Email delivery is not verified.',
+      'support.feedback': 'Your reviewed feedback was recorded and the selected support ticket was closed. Email delivery is not verified.',
+      'support.end_chat': expected,
+      'support.delete': expected,
+    }
+    return messages[result.action] || ''
+  }
+  if (draft?.action === 'report_action' && draft.reportAction?.action === 'reports.weekly.generate' && result.kind === 'report_action' && result.action === 'reports.weekly.generate' && typeof result.reportId === 'string' && result.reportId.trim() && ['READY', 'RUNNING', 'LOCKED'].includes(result.reportStatus) && result.status === (result.reportStatus === 'RUNNING' ? 'preparing' : 'requested') && result.generated === false && result.unlocked === false && result.emailDeliveryVerified === false) {
+    const expected = result.reportStatus === 'LOCKED' ? 'The report request is recorded, but the report is locked. Please review Billing.' : result.reportStatus === 'RUNNING' ? 'Your report request is recorded and is being prepared.' : 'Your report request is recorded. The report service reports its status as ready.'
+    return result.message === expected ? expected : ''
+  }
+  return ''
+}
+
+function confirmationRequestResult(data: any, draft: VoiceDraft, voiceActionRunId: string): DraftRequestResult {
+  if (draft.action === 'device_action' && data?.success === true && isValidNativeDeviceReceipt(data.result, draft) && data.result.status === 'no_data') return { ok: true, saved: false, needsReview: false, status: 'general_answer', action: draft.action, voiceActionRunId, message: data.result.message }
+  const completionMessage = verifiedActionCompletionMessage(data, draft)
+  if (completionMessage) return { ok: true, saved: false, needsReview: false, status: 'general_answer', action: draft.action, voiceActionRunId, message: completionMessage }
+  if (isConfirmedRecipeImport(data, draft)) {
+    const next = data.result.nextRecipeDraft as VoiceDraft
+    const prompt = next.canConfirm ? spokenReviewPromptForDraft(next) : next.confirmationMessage
+    return { ok: true, saved: false, needsReview: next.canConfirm, status: next.canConfirm ? 'review_draft' : 'needs_clarification', action: next.action, voiceActionRunId, reviewPrompt: `${data.result.message} ${prompt}`, message: `${data.result.message} ${prompt}` }
+  }
+  const saved = isConfirmedVoiceSave(data, draft.action)
+  return { ok: saved, saved, status: saved ? 'saved' : 'general_answer', message: saved ? data.result.message || 'Saved.' : draft.action === 'recipe_import_url' ? 'The recipe import was not verified. Please check before trying again.' : ['support_action', 'report_action', 'device_action'].includes(draft.action) ? 'This action was not verified. Please check its normal screen.' : 'I could not save that.', action: draft.action, voiceActionRunId }
+}
+
 function normalizeLaunchContext(input?: VoiceAssistantLaunchContext | null): VoiceAssistantLaunchContext {
   if (!input || typeof input !== 'object') return DEFAULT_LAUNCH_CONTEXT
   const date = cleanFavoriteText(input.date || '', 20)
@@ -204,7 +349,7 @@ function normalizeLaunchContext(input?: VoiceAssistantLaunchContext | null): Voi
 }
 
 function voiceResultStatusFromDraft(nextDraft: VoiceDraft | null, data?: any): DraftRequestResult['status'] {
-  if (data?.confirmNow) return 'saved'
+  // A request to confirm is not proof that the separate save succeeded.
   if (data?.rejectNow) return 'general_answer'
   if (!nextDraft) return 'general_answer'
   if (nextDraft.canConfirm) return 'review_draft'
@@ -212,6 +357,7 @@ function voiceResultStatusFromDraft(nextDraft: VoiceDraft | null, data?: any): D
   if (/urgent|emergency|clinician|qualified health professional|not medical advice|not diagnose/i.test(nextDraft.confirmationMessage || '')) {
     return 'safe_refusal'
   }
+  if (nextDraft.timingNeedsClarification || ['food_draft', 'water', 'exercise', 'mood', 'journal', 'health_intake_items', 'record_action', 'preference_action', 'local_preference_action', 'notification_action'].includes(nextDraft.action)) return 'needs_clarification'
   if (/what|which|how much|please tell me|try naming/i.test(nextDraft.confirmationMessage || '')) {
     return 'needs_clarification'
   }
@@ -238,11 +384,41 @@ function spokenReplyTextForDraft(nextDraft: VoiceDraft | null) {
   return nextDraft.confirmationMessage || nextDraft.summary || ''
 }
 
-function reviewPromptForDraft(nextDraft: VoiceDraft | null) {
+function voiceFoodSourceNotice(nextDraft: VoiceDraft | null) {
+  const explicit = cleanFavoriteText(nextDraft?.food?.sourceNote || '', 600)
+  if (explicit) return explicit
+  // Older servers include the same warning in the confirmation text only.
+  return cleanFavoriteText(nextDraft?.confirmationMessage?.match(/The matching nutrition uses [^.]+ menu data\./i)?.[0] || '', 600)
+}
+
+function reviewPromptForDraft(nextDraft: VoiceDraft | null, deviceReview?: NativeDeviceReview | null) {
   if (!nextDraft?.canConfirm) return spokenReplyTextForDraft(nextDraft)
+  if (nextDraft.action === 'device_action') return reviewedNativeDevicePrompt(nextDraft, deviceReview)
+  if (nextDraft.action === 'support_action' || nextDraft.action === 'report_action') return nextDraft.confirmationMessage
+  if (nextDraft.action === 'record_action' && ['food', 'water', 'favorite', 'custom_food'].includes(nextDraft.recordAction?.entity || '')) return nextDraft.confirmationMessage
+  if (nextDraft.action === 'recipe_import_url') return `Recipe link: ${nextDraft.recipeImport?.url || ''}. ${nextDraft.confirmationMessage}`
   const date = cleanFavoriteText(nextDraft.localDate || '', 20)
-  let exactSummary = cleanFavoriteText(nextDraft.summary || nextDraft.confirmationMessage || '', 900)
-  if (nextDraft.action === 'exercise' && nextDraft.exercise) {
+  let exactSummary = cleanFavoriteText(nextDraft.summary || nextDraft.confirmationMessage || '', nextDraft.action === 'record_action' || nextDraft.action === 'preference_action' || nextDraft.action === 'local_preference_action' || nextDraft.action === 'notification_action' ? 6000 : 900)
+  if (nextDraft.action === 'mood' && nextDraft.mood) {
+    const context = nextDraft.mood.context
+    const contextLabels = { energyLevel: 'energy', sleepQuality: 'sleep quality', nutrition: 'nutrition', supplements: 'supplements', medicationEffect: 'medication effect', physicalActivity: 'physical activity' } as const
+    exactSummary = [
+      `Mood ${nextDraft.mood.mood}/7`,
+      nextDraft.mood.tags?.length ? `tags: ${nextDraft.mood.tags.map((tag) => cleanFavoriteText(tag, 1000)).join(', ')}` : '',
+      nextDraft.mood.note ? `note: “${cleanFavoriteText(nextDraft.mood.note, 6000)}”` : '',
+      typeof context?.intensityPercent === 'number' ? `intensity: ${context.intensityPercent}%` : '',
+      context?.feelings?.length ? `feelings: ${context.feelings.map(feeling => cleanFavoriteText(feeling, 1000)).join(', ')}` : '',
+      ...Object.entries(contextLabels).map(([key, label]) => typeof context?.[key as keyof typeof contextLabels] === 'number' ? `${label}: ${context[key as keyof typeof contextLabels]}/5` : ''),
+      typeof context?.localHour === 'number' ? `local hour (0–23): ${context.localHour}` : '',
+    ].filter(Boolean).join('; ')
+  } else if (nextDraft.action === 'journal' && nextDraft.journal) {
+    exactSummary = [
+      nextDraft.journal.journalType === 'health' ? 'Health journal' : nextDraft.journal.journalType === 'mood' ? 'Mood journal' : 'Journal',
+      nextDraft.journal.journalType !== 'health' && nextDraft.journal.title ? `title: “${nextDraft.journal.title}”` : '',
+      nextDraft.journal.journalType !== 'health' && nextDraft.journal.tags?.length ? `tags: ${nextDraft.journal.tags.join(', ')}` : '',
+      `note: “${nextDraft.journal.content || ''}”`,
+    ].filter(Boolean).join('; ')
+  } else if (nextDraft.action === 'exercise' && nextDraft.exercise) {
     const exercise = nextDraft.exercise
     exactSummary = [
       cleanFavoriteText(exercise.exerciseName || '', 100) || 'exercise',
@@ -258,14 +434,17 @@ function reviewPromptForDraft(nextDraft: VoiceDraft | null) {
     const items = nextDraft.food.entries?.map((entry) => entry.description ? `${entry.name}, ${entry.description}` : entry.name).filter(Boolean).join('; ')
     exactSummary = [mealLabel(nextDraft.food.meal), items || nextDraft.food.draftText || nextDraft.summary].filter(Boolean).join(': ')
   }
-  const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(nextDraft.localTime || '') ? nextDraft.localTime : ''
+  const time = !(nextDraft.action === 'journal' && nextDraft.journal?.journalType === 'health') && /^([01]\d|2[0-3]):[0-5]\d$/.test(nextDraft.localTime || '') ? nextDraft.localTime : ''
   const datedSummary = [exactSummary, date ? `dated ${date}` : '', time ? `at ${time}` : ''].filter(Boolean).join(', ')
-  return `Here is what I am about to save: ${datedSummary}. Would you like me to save that for you?`
+  const sourceNotice = voiceFoodSourceNotice(nextDraft)
+  return `Here is what I am about to save: ${datedSummary}.${sourceNotice ? ` ${sourceNotice}` : ''} Would you like me to save that for you?`
 }
 
-function spokenReviewPromptForDraft(nextDraft: VoiceDraft | null) {
-  const full = reviewPromptForDraft(nextDraft)
-  if (!nextDraft?.canConfirm || full.length <= 500) return full
+function spokenReviewPromptForDraft(nextDraft: VoiceDraft | null, deviceReview?: NativeDeviceReview | null) {
+  const full = reviewPromptForDraft(nextDraft, deviceReview)
+  if (nextDraft?.canConfirm && nextDraft.action === 'record_action' && nextDraft.recordAction?.operation === 'create' && ['favorite', 'custom_food'].includes(nextDraft.recordAction.entity) && nextDraft.recordAction.spokenReview) return nextDraft.recordAction.spokenReview
+  if (nextDraft?.canConfirm && nextDraft.action === 'recipe_import_url') return nextDraft.confirmationMessage
+  if (!nextDraft?.canConfirm || ['mood', 'journal', 'support_action', 'report_action', 'device_action'].includes(nextDraft.action) || (nextDraft.action === 'record_action' && ['food', 'water', 'favorite', 'custom_food'].includes(nextDraft.recordAction?.entity || '')) || full.length <= 500) return full
   const food = nextDraft.food
   const date = cleanFavoriteText(nextDraft.localDate || '', 20)
   const time = /^([01]\d|2[0-3]):[0-5]\d$/.test(nextDraft.localTime || '') ? nextDraft.localTime : ''
@@ -274,7 +453,8 @@ function spokenReviewPromptForDraft(nextDraft: VoiceDraft | null) {
     ? [mealLabel(food.meal), cleanFavoriteText(food.mealName || '', 90), entries.length ? `${entries.length} food items, starting with ${entries.slice(0, 2).map((entry) => cleanFavoriteText(entry.name, 80)).join(' and ')}` : cleanFavoriteText(food.draftText || nextDraft.summary, 180)].filter(Boolean).join(', ')
     : cleanFavoriteText(nextDraft.summary || nextDraft.confirmationMessage, 220)
   const datedSummary = [summary, date ? `dated ${date}` : '', time ? `at ${time}` : ''].filter(Boolean).join(', ')
-  return `Here is what I am about to save: ${datedSummary}. The full details are in your review. Would you like me to save that for you?`
+  const sourceNotice = voiceFoodSourceNotice(nextDraft)
+  return `Here is what I am about to save: ${datedSummary}. The full details are in your review.${sourceNotice ? ` ${sourceNotice}` : ''} Would you like me to save that for you?`
 }
 
 function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
@@ -292,12 +472,14 @@ function realtimeToolResult(result: DraftRequestResult): RealtimeToolResult {
         : status === 'needs_clarification'
         ? 'I need one detail first.'
         : 'Done.'),
-    needsReview ? 4000 : 500,
+    needsReview ? result.action === 'record_action' ? 400000 : ['support_action', 'report_action', 'mood', 'journal', 'device_action'].includes(result.action || '') ? 24000 : 4000 : 500,
   )
-  const spokenReply = result.action === 'recipe' && !saved
+  const spokenReply = result.action === 'recipe' && !saved && status === 'general_answer'
     ? compactRecipeVoiceReply(defaultSpokenReply)
     : defaultSpokenReply
-  const instruction = saved
+  const instruction = result.action === 'device_action'
+    ? 'Read spokenReply exactly. Only claim the verified activity import or saved phone setting described. Never claim OS permission, sleep listening, or a sleep measurement. If safeToClaimSaved is false, do not claim an import or save.'
+    : saved
     ? 'You may say this was saved because the app confirmed a successful save.'
     : needsReview
     ? 'Read spokenReply exactly, including the exact proposal summary and the exact final question. Then automatically listen for a natural yes, no, or correction. Do not say it was saved, added, created, or logged.'
@@ -596,7 +778,7 @@ function followUpTranscript(draft: VoiceDraft | null, answerRaw: string) {
 function isExplicitNewVoiceCommand(value: unknown, reviewedDraft?: VoiceDraft | null) {
   const text = cleanFavoriteText(value, 1200).toLowerCase()
   if (!text) return false
-  if (reviewedDraft?.canConfirm) {
+  if (reviewedDraft && (reviewedDraft.canConfirm || isPendingFollowUpDraft(reviewedDraft))) {
     const separateEntry = /\b(?:new|another|separate|different)\s+(?:entry|meal|request|command)|\bstart (?:again|over)\b/.test(text)
     const correction = /\b(?:this|that|it|instead|actually|change|correct|replace|remove|without|only|half|double|portion|make (?:the|my) (?:meal|entry))\b/.test(text)
       || /\badd\b.+\bto\s+(?:my\s+)?(?:breakfast|lunch|dinner|snacks?|meal)\b/.test(text)
@@ -618,6 +800,8 @@ function supportsNativeVoiceInput(os: string, isPad: boolean) {
 
 function isPendingFollowUpDraft(draft: VoiceDraft | null) {
   if (!draft || draft.canConfirm) return false
+  if (draft.action === 'recipe' && draft.recipe?.importDraft) return true
+  if (draft.action === 'record_action' || draft.action === 'preference_action' || draft.action === 'local_preference_action' || draft.action === 'notification_action' || draft.action === 'support_action' || draft.action === 'report_action' || draft.action === 'device_action') return !draft.appTarget?.path
   if (draft.timingNeedsClarification && (draft.action === 'water' || Boolean(draft.food?.draftText))) return true
   if (draft.action === 'food_draft' && draft.food?.draftText) return true
   if (
@@ -997,19 +1181,6 @@ function shouldRetryVoiceAccessOnLive(data: any, error?: unknown) {
   return Boolean(usesLocalDevApiBase() && (error || data?.degraded))
 }
 
-function shouldRetryVoiceAssistantOnLive(data: any, error?: unknown, status?: number) {
-  const message = cleanFavoriteText(data?.error || data?.message || error, 180).toLowerCase()
-  return Boolean(
-    usesLocalDevApiBase() &&
-      (error ||
-        data?.degraded ||
-        (Number.isFinite(status) && Number(status) >= 500) ||
-        message.includes('ai service not configured') ||
-        message.includes('voice reply is not configured') ||
-        message.includes('database')),
-  )
-}
-
 async function fetchVoiceAccessStatus(token: string) {
   const headers = buildNativeAuthHeaders(token, { includeCookie: true })
   let firstError: unknown = null
@@ -1039,67 +1210,29 @@ async function fetchVoiceAccessStatus(token: string) {
 async function fetchNativeVoiceAssistant(
   requestFactory: (baseUrl: string) => Promise<Response>,
 ) {
-  let firstError: unknown = null
-  try {
-    const res = await requestFactory(API_BASE_URL)
-    const data: any = await res.json().catch(() => ({}))
-    if (!shouldRetryVoiceAssistantOnLive(data, undefined, res.status)) return { res, data }
-  } catch (error) {
-    firstError = error
-    if (!shouldRetryVoiceAssistantOnLive(null, error)) throw error
-  }
-
-  try {
-    const res = await requestFactory(VOICE_ACCESS_FALLBACK_API_BASE_URL)
-    const data: any = await res.json().catch(() => ({}))
-    return { res, data }
-  } catch (error) {
-    throw firstError || error
-  }
+  // Preparing an AI answer can debit credits before its response arrives.
+  const res = await requestFactory(API_BASE_URL)
+  const data: any = await res.json().catch(() => ({}))
+  return { res, data }
 }
 
 async function fetchNativeVoiceTts(
   requestFactory: (baseUrl: string) => Promise<Response>,
 ) {
-  let firstError: unknown = null
-  try {
-    const res = await requestFactory(API_BASE_URL)
-    const data: any = await res.json().catch(() => ({}))
-    if (!shouldRetryVoiceAssistantOnLive(data, undefined, res.status)) return { res, data }
-  } catch (error) {
-    firstError = error
-    if (!shouldRetryVoiceAssistantOnLive(null, error)) throw error
-  }
-
-  try {
-    const res = await requestFactory(VOICE_ACCESS_FALLBACK_API_BASE_URL)
-    const data: any = await res.json().catch(() => ({}))
-    return { res, data }
-  } catch (error) {
-    throw firstError || error
-  }
+  // A lost spoken-reply response must never trigger a second paid request.
+  const res = await requestFactory(API_BASE_URL)
+  const data: any = await res.json().catch(() => ({}))
+  return { res, data }
 }
 
 async function fetchNativeVoiceConfirm(
   requestFactory: (baseUrl: string) => Promise<Response>,
 ) {
-  let firstError: unknown = null
-  try {
-    const res = await requestFactory(API_BASE_URL)
-    const data: any = await res.json().catch(() => ({}))
-    if (!shouldRetryVoiceAssistantOnLive(data, undefined, res.status)) return { res, data }
-  } catch (error) {
-    firstError = error
-    if (!shouldRetryVoiceAssistantOnLive(null, error)) throw error
-  }
-
-  try {
-    const res = await requestFactory(VOICE_ACCESS_FALLBACK_API_BASE_URL)
-    const data: any = await res.json().catch(() => ({}))
-    return { res, data }
-  } catch (error) {
-    throw firstError || error
-  }
+  // A save may already have committed even when its response fails. Never
+  // replay a mutating confirmation against another backend or app version.
+  const res = await requestFactory(API_BASE_URL)
+  const data: any = await res.json().catch(() => ({}))
+  return { res, data }
 }
 
 async function playableAudioUri(audioUri: string) {
@@ -1168,12 +1301,19 @@ async function loadVoiceFavorites(sessionToken?: string | null, signal?: AbortSi
 
 export function VoiceAssistantProvider({ children }: { children: React.ReactNode }) {
   const { mode, session } = useAppMode()
+  const appleHealthSync = useAppleHealthSync()
+  const appleHealthSyncRef = useRef(appleHealthSync)
+  appleHealthSyncRef.current = appleHealthSync
   const insets = useSafeAreaInsets()
   const [cameraPermission, requestCameraPermission] = useCameraPermissions()
   const [open, setOpen] = useState(false)
   const [transcript, setTranscript] = useState('')
   const [draft, setDraft] = useState<VoiceDraft | null>(null)
   const [conversationTurns, setConversationTurns] = useState<VoiceConversationTurn[]>([])
+  const [conversationReviewOnly, setConversationReviewOnly] = useState(true)
+  const [typedMode, setTypedMode] = useState(false)
+  const [messageFocusRequest, setMessageFocusRequest] = useState(0)
+  const [loadingConversationMemory, setLoadingConversationMemory] = useState(false)
   const [visionChoicesOpen, setVisionChoicesOpen] = useState(false)
   const [pendingFollowUpDraft, setPendingFollowUpDraft] = useState<VoiceDraft | null>(null)
   const [recording, setRecording] = useState<Audio.Recording | null>(null)
@@ -1203,6 +1343,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const [saveError, setSaveError] = useState('')
   const [voiceActivity, setVoiceActivity] = useState<VoiceActivityItem[]>([])
   const autoSubmittedRef = useRef(0)
+  const messageScrollRef = useRef<ScrollView | null>(null)
+  const messageInputRef = useRef<TextInput | null>(null)
+  const messageSectionYRef = useRef<number | null>(null)
+  const pendingMessageFocusRef = useRef<{ accountToken: string; run: number } | null>(null)
   const conversationTurnSeqRef = useRef(0)
   const voiceActivitySeqRef = useRef(0)
   const soundRef = useRef<Audio.Sound | null>(null)
@@ -1213,15 +1357,43 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const realtimeVoiceStopRef = useRef<null | (() => Promise<void>)>(null)
   const realtimeVoiceMuteRef = useRef<null | ((muted: boolean) => void)>(null)
   const realtimeVoicePromptRef = useRef<null | ((instruction: string) => void)>(null)
+  const realtimeVoiceFlushRef = useRef<null | (() => void)>(null)
   const realtimeVoiceAbortRef = useRef<AbortController | null>(null)
   const realtimeActionAbortRef = useRef<AbortController | null>(null)
   const voiceSaveRequestsRef = useRef(0)
+  const localPreferenceReviewRef = useRef<LocalPreferenceReview | null>(null)
+  const nativeDeviceReviewRef = useRef<NativeDeviceReview | null>(null)
   const realtimeVoiceRunRef = useRef(0)
   const realtimeVoiceConnectedRef = useRef(false)
   const voiceAccountTokenRef = useRef('')
   voiceAccountTokenRef.current = mode === 'signedIn' ? session?.token || '' : ''
   const voiceProviderMountedRef = useRef(true)
   const realtimeBillingSessionIdRef = useRef(newRealtimeBillingSessionId())
+  const voiceGreetingConversationRef = useRef('')
+
+  const requestMessageInputFocus = useCallback(() => {
+    pendingMessageFocusRef.current = { accountToken: voiceAccountTokenRef.current, run: realtimeVoiceRunRef.current }
+    setMessageFocusRequest((value) => value + 1)
+  }, [])
+
+  const focusRequestedMessageInput = useCallback(() => {
+    const pending = pendingMessageFocusRef.current
+    if (!pending) return
+    if (!openRef.current || !voiceProviderMountedRef.current || pending.accountToken !== voiceAccountTokenRef.current || pending.run !== realtimeVoiceRunRef.current) {
+      pendingMessageFocusRef.current = null
+      return
+    }
+    if (!typedMode || conversationReviewOnly || voiceSessionActive || loadingConversationMemory || messageSectionYRef.current === null || !messageScrollRef.current || !messageInputRef.current) return
+    pendingMessageFocusRef.current = null
+    messageScrollRef.current.scrollTo({ y: Math.max(0, messageSectionYRef.current - 12), animated: false })
+    messageInputRef.current.focus()
+  }, [conversationReviewOnly, loadingConversationMemory, typedMode, voiceSessionActive])
+
+  useEffect(() => {
+    if (!messageFocusRequest || !open || !typedMode || conversationReviewOnly || loadingConversationMemory || voiceSessionActive) return
+    const frame = requestAnimationFrame(focusRequestedMessageInput)
+    return () => cancelAnimationFrame(frame)
+  }, [conversationReviewOnly, focusRequestedMessageInput, loadingConversationMemory, messageFocusRequest, open, typedMode, voiceSessionActive])
 
   useEffect(() => {
     if (!saveSuccessNotice) return
@@ -1237,6 +1409,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const voiceAccessGrantedAtRef = useRef(0)
   const voiceAccessTokenRef = useRef('')
   const sendDraftRequestRef = useRef<DraftRequestHandler>(async () => ({ ok: false, message: 'Voice action is not ready yet.' }))
+  const openAppTargetRef = useRef<(targetDraft: VoiceDraft) => void>(() => {})
   const openRef = useRef(false)
   const voiceSessionActiveRef = useRef(false)
   const recordingStoppingRef = useRef(false)
@@ -1248,6 +1421,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const voiceRecordingSupported = supportsNativeVoiceInput(Platform.OS, Platform.OS === 'ios' && Platform.isPad)
   const liveVoiceEnabled = LIVE_VOICE_ENABLED && voiceRecordingSupported
   const voiceMemoryUserId = cleanFavoriteText(session?.user?.id || '', 120)
+  const voiceAccountUserIdRef = useRef(voiceMemoryUserId)
+  voiceAccountUserIdRef.current = voiceMemoryUserId
 
   useEffect(() => {
     openRef.current = open
@@ -1302,7 +1477,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [])
 
   const makeConversationTurn = useCallback((role: VoiceConversationTurn['role'], value: unknown): VoiceConversationTurn | null => {
-    const text = cleanFavoriteText(value, 1800)
+    const text = cleanFavoriteText(value, 6000)
     if (!text) return null
     conversationTurnSeqRef.current += 1
     return {
@@ -1315,46 +1490,50 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const saveConversationMemory = useCallback((turns: VoiceConversationTurn[]) => {
     if (!voiceMemoryUserId) return
     AsyncStorage.setItem(
-      VOICE_CONVERSATION_MEMORY_KEY,
+      voiceConversationStorageKey(voiceMemoryUserId),
       JSON.stringify({
         userId: voiceMemoryUserId,
         savedAt: Date.now(),
-        turns: turns.slice(-8).map((turn) => ({
+        turns: turns.slice(-MAX_VOICE_CONVERSATION_TURNS).map((turn) => ({
           id: turn.id,
           role: turn.role,
-          text: cleanFavoriteText(turn.text, 1800),
+          text: cleanFavoriteText(turn.text, 6000),
         })),
       }),
     ).catch(() => {})
   }, [voiceMemoryUserId])
 
   const loadConversationMemory = useCallback(async () => {
-    if (!voiceMemoryUserId) return
+    if (!voiceMemoryUserId) return []
+    const memoryAccountToken = voiceAccountTokenRef.current
+    const memoryRun = realtimeVoiceRunRef.current
     try {
-      const raw = await AsyncStorage.getItem(VOICE_CONVERSATION_MEMORY_KEY)
+      const raw = await AsyncStorage.getItem(voiceConversationStorageKey(voiceMemoryUserId)) || await AsyncStorage.getItem(VOICE_CONVERSATION_MEMORY_KEY)
+      if (voiceAccountTokenRef.current !== memoryAccountToken || realtimeVoiceRunRef.current !== memoryRun || !openRef.current) return []
       const parsed = raw ? JSON.parse(raw) : null
       if (cleanFavoriteText(parsed?.userId, 120) !== voiceMemoryUserId) {
         setConversationTurns([])
-        return
+        return []
       }
       const savedAt = Number(parsed?.savedAt)
       if (!Number.isFinite(savedAt) || Date.now() - savedAt > VOICE_CONVERSATION_MEMORY_TTL_MS) {
-        await AsyncStorage.removeItem(VOICE_CONVERSATION_MEMORY_KEY).catch(() => {})
-        return
+        return []
       }
       const turns = Array.isArray(parsed?.turns)
         ? parsed.turns
             .map((turn: any) => ({
               id: cleanFavoriteText(turn?.id || `${Date.now()}-${Math.random()}`, 80),
               role: turn?.role === 'assistant' ? 'assistant' : 'user',
-              text: cleanFavoriteText(turn?.text, 1800),
+              text: cleanFavoriteText(turn?.text, 6000),
             }))
             .filter((turn: VoiceConversationTurn) => turn.text)
-            .slice(-8)
+            .slice(-MAX_VOICE_CONVERSATION_TURNS)
         : []
       if (turns.length) setConversationTurns(turns)
+      return turns
     } catch {
       // A fresh panel is fine if local memory cannot be read.
+      return []
     }
   }, [voiceMemoryUserId])
 
@@ -1363,7 +1542,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       const nextTurns = turns.filter((turn): turn is VoiceConversationTurn => Boolean(turn))
       if (!nextTurns.length) return
       setConversationTurns((current) => {
-        const updated = [...current, ...nextTurns].slice(-8)
+        const updated = [...current, ...nextTurns].filter((turn, index, all) => index === 0 || turn.role !== all[index - 1].role || turn.text !== all[index - 1].text).slice(-MAX_VOICE_CONVERSATION_TURNS)
         saveConversationMemory(updated)
         return updated
       })
@@ -1428,6 +1607,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     realtimeVoiceStopRef.current = null
     realtimeVoiceMuteRef.current = null
     realtimeVoicePromptRef.current = null
+    realtimeVoiceFlushRef.current = null
     pendingReviewAnswerRef.current = false
     clearReviewSilenceTimer()
     setMicrophoneMuted(false)
@@ -1462,8 +1642,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setTranscript('')
     setChargedCredits(null)
     setVisionChoicesOpen(false)
-    AsyncStorage.removeItem(VOICE_CONVERSATION_MEMORY_KEY).catch(() => {})
-  }, [])
+    if (voiceMemoryUserId) {
+      AsyncStorage.removeItem(voiceConversationStorageKey(voiceMemoryUserId)).catch(() => {})
+      void AsyncStorage.getItem(VOICE_CONVERSATION_MEMORY_KEY).then((raw) => {
+        try { if (raw && JSON.parse(raw)?.userId === voiceMemoryUserId) void AsyncStorage.removeItem(VOICE_CONVERSATION_MEMORY_KEY) } catch {}
+      }).catch(() => {})
+    }
+  }, [voiceMemoryUserId])
 
   const clearConversationMemory = useCallback(() => {
     spokenReplyRunRef.current += 1
@@ -1487,6 +1672,20 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     openRef.current = false
     setOpen(false)
   }, [clearConversationMemory])
+
+  useEffect(() => {
+    openRef.current = false
+    nativeDeviceReviewRef.current = null
+    setOpen(false)
+    setConversationTurns([])
+    setDraft(null)
+    setPendingFollowUpDraft(null)
+    setTranscript('')
+    setConversationReviewOnly(true)
+    setTypedMode(false)
+    setContinuousVoiceSession(false)
+    void stopRealtimeVoiceSession()
+  }, [voiceMemoryUserId, setContinuousVoiceSession, stopRealtimeVoiceSession])
 
   const playAudio = useCallback(
     async (audioUri?: string | null, shouldKeepPlaying: () => boolean = () => true) => {
@@ -1639,12 +1838,21 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [mode, session?.token])
 
   const openVoiceAssistant = useCallback(async (input?: OpenVoiceAssistantInput) => {
+    pendingMessageFocusRef.current = null
+    nativeDeviceReviewRef.current = null
+    messageSectionYRef.current = null
+    realtimeVoiceFlushRef.current?.()
+    const stoppingVoice = stopRealtimeVoiceSession()
+    const requestedMode = input?.mode || (input?.transcript || !voiceRecordingSupported ? 'text' : 'voice')
+    const openingAccountToken = voiceAccountTokenRef.current
+    const openingRun = realtimeVoiceRunRef.current
     Vibration.vibrate()
     DeviceEventEmitter.emit(VOICE_ASSISTANT_OPENING_EVENT)
     setVoiceActivity([])
     addVoiceActivity(voiceRecordingSupported ? 'Opening Talk to Helfi' : 'Ready for your typed request', voiceRecordingSupported ? 'active' : 'done')
     setDraft(null)
-    setConversationTurns([])
+    setConversationReviewOnly(true)
+    setTypedMode(requestedMode === 'text')
     setPendingFollowUpDraft(null)
     setVisionChoicesOpen(false)
     setChargedCredits(null)
@@ -1660,16 +1868,24 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     realtimeBillingSessionIdRef.current = newRealtimeBillingSessionId()
     realtimeAutoStartRef.current = false
     setContinuousVoiceSession(false)
-    setVoiceReplyPreference(true)
+    setVoiceReplyPreference(false)
     setTranscript(input?.transcript || '')
     setLaunchContext(normalizeLaunchContext(input?.context))
     const shouldAutoSubmit = Boolean(input?.autoSubmit && input.transcript)
-    if (!input?.transcript) {
-      void loadConversationMemory()
-    }
     openRef.current = true
     setOpen(true)
+    await stoppingVoice
+    if (!openRef.current || voiceAccountTokenRef.current !== openingAccountToken || realtimeVoiceRunRef.current !== openingRun) return
+    if (!input?.transcript) {
+      setLoadingConversationMemory(true)
+      try { await loadConversationMemory() } finally { setLoadingConversationMemory(false) }
+    }
+    if (!openRef.current || voiceAccountTokenRef.current !== openingAccountToken || realtimeVoiceRunRef.current !== openingRun) return
+    if (requestedMode === 'conversation') return
+    setConversationReviewOnly(false)
     if (shouldAutoSubmit) setAutoSubmitToken((value) => value + 1)
+    if (requestedMode === 'text') { requestMessageInputFocus(); return }
+    setVoiceReplyPreference(true)
     const hasAccess = await ensureVoicePaidAccess()
     if (!hasAccess) {
       openRef.current = false
@@ -1677,7 +1893,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       return
     }
     setVoicePaidAccessGranted(true)
-  }, [addVoiceActivity, ensureVoicePaidAccess, loadConversationMemory, setContinuousVoiceSession, setVoiceReplyPreference, voiceRecordingSupported])
+  }, [addVoiceActivity, ensureVoicePaidAccess, loadConversationMemory, requestMessageInputFocus, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
 
   useEffect(() => {
     if (!open || !voicePaidAccessGranted || !session?.token || !voiceRecordingSupported) return
@@ -1694,6 +1910,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [open, session?.token, voicePaidAccessGranted, voiceRecordingSupported])
 
   const closePanel = useCallback(() => {
+    pendingMessageFocusRef.current = null
+    nativeDeviceReviewRef.current = null
+    realtimeVoiceFlushRef.current?.()
+    if (voiceSaveRequestsRef.current > 0) appendConversationTurns([makeConversationTurn('assistant', 'The last save was not yet confirmed when this conversation ended. Please check the relevant diary or setting before retrying.')])
     openRef.current = false
     spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
@@ -1721,7 +1941,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setConfirming(false)
     stopPlayback().catch(() => {})
     setOpen(false)
-  }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+  }, [appendConversationTurns, clearRealtimeConnectTimeout, clearVoiceTurnTimers, makeConversationTurn, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
   useEffect(() => {
     const subscription = AppState.addEventListener('change', (state) => {
@@ -1798,6 +2018,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         const name = cleanFavoriteText(data?.supplementName || nextDraft?.summary || '', 160)
         const userText = `Showed a ${itemType} bottle label${name ? `: ${name}` : ''}`
         setTranscript(userText)
+        setSaveError('')
         setDraft(nextDraft)
         setPendingFollowUpDraft(isPendingFollowUpDraft(nextDraft) ? nextDraft : null)
         setVisionChoicesOpen(false)
@@ -1946,16 +2167,22 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   )
 
   const saveDraft = useCallback(
-    async (targetDraft: VoiceDraft | null, options?: { automatic?: boolean; signal?: AbortSignal; closeOnSuccess?: boolean }) => {
-      if (!session?.token || !targetDraft?.canConfirm) return null
+    async (targetDraft: VoiceDraft | null, options?: { automatic?: boolean; signal?: AbortSignal; closeOnSuccess?: boolean; voiceActionRunId?: string }) => {
+      if (!session?.token || !targetDraft?.canConfirm || voiceSaveRequestsRef.current > 0) return null
       if (options?.signal?.aborted) return null
+      const voiceActionRunId = options?.voiceActionRunId || newVoiceActionRunId()
+      const startedAt = Date.now()
+      const saveAccountToken = session.token
+      const saveRun = realtimeVoiceRunRef.current
+      const isCurrentDeviceSave = () => !saveSignal?.aborted && openRef.current && voiceProviderMountedRef.current && voiceAccountTokenRef.current === saveAccountToken && voiceAccountUserIdRef.current === voiceMemoryUserId && realtimeVoiceRunRef.current === saveRun
+      traceVoiceAction(voiceActionRunId, 'save_started', targetDraft.action, 'pending', 'awaiting_server', startedAt)
       const saveAbortController = options?.signal ? null : new AbortController()
       if (saveAbortController) {
         draftRequestAbortRef.current?.abort()
         draftRequestAbortRef.current = saveAbortController
       }
       const saveSignal = options?.signal || saveAbortController?.signal
-      const saveDestination = targetDraft.action === 'exercise'
+      const saveDestination = targetDraft.action === 'notification_action' ? 'notification inbox' : targetDraft.action === 'local_preference_action' ? 'device settings' : targetDraft.action === 'exercise'
         ? 'exercise log'
         : targetDraft.action.startsWith('food_')
         ? 'food diary'
@@ -1964,27 +2191,141 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         : targetDraft.action === 'mood'
         ? 'mood history'
         : 'health record'
-      addVoiceActivity(`Saving to your ${saveDestination}`)
+      addVoiceActivity(targetDraft.action === 'recipe_import_url' ? 'Importing recipe for review' : targetDraft.action === 'device_action' ? 'Applying reviewed Apple Health action' : targetDraft.action === 'support_action' ? 'Submitting reviewed support action' : targetDraft.action === 'report_action' ? 'Requesting weekly report' : `Saving to your ${saveDestination}`)
       setConfirming(true)
       voiceSaveRequestsRef.current += 1
+      let saveRequestOutstanding = true
       setSaveError('')
       try {
-        const { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
+        const guardedRecord = targetDraft.action === 'record_action' && ['symptom_note', 'supplement', 'medication'].includes(targetDraft.recordAction?.entity || '')
+        const recipeImport = targetDraft.action === 'recipe_import_url'
+        const separateAction = targetDraft.action === 'support_action' || targetDraft.action === 'report_action'
+        const deviceAction = targetDraft.action === 'device_action'
+        if (deviceAction && (!isCurrentDeviceSave() || !nativeDeviceReviewRef.current || nativeDeviceReviewRef.current.accountId !== voiceMemoryUserId || nativeDeviceReviewRef.current.token !== targetDraft.reviewToken || !['apple_health.import', 'apple_health.automatic.update', 'apple_health.source.select'].includes(targetDraft.deviceAction?.action || ''))) throw new Error('Please review the current Apple Health action again. Nothing has been sent to change it.')
+        if (separateAction && (!isCurrentDeviceSave() || (targetDraft.action === 'support_action' ? targetDraft.supportAction?.userId : targetDraft.reportAction?.userId) !== voiceMemoryUserId)) throw new Error('Please review this action again in the current account. Nothing has been submitted.')
+        if (recipeImport && (!isCurrentDeviceSave() || targetDraft.recipeImport?.userId !== voiceMemoryUserId || targetDraft.recipeImport?.costCredits !== 10)) throw new Error('Please review this recipe import again in the current account. No import has been requested.')
+        if (guardedRecord && (!isCurrentDeviceSave() || (targetDraft.recordAction?.ownerId && targetDraft.recordAction.ownerId !== voiceMemoryUserId))) throw new Error('Please review this recorded change again in the current account. Nothing has been sent to change it.')
+        if (targetDraft.action === 'notification_action' && (!isCurrentDeviceSave() || targetDraft.notificationAction?.userId !== voiceMemoryUserId)) throw new Error('Please review these notifications again in the current account. Nothing has been sent to change them.')
+        let { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
           method: 'POST',
-          headers: buildNativeAuthHeaders(session.token, { json: true }),
+          headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-action-id': voiceActionRunId },
           signal: saveSignal,
           body: JSON.stringify({ draft: targetDraft }),
         }))
         if (saveSignal?.aborted) return null
+        if ((targetDraft.action === 'notification_action' || guardedRecord || recipeImport || separateAction || deviceAction) && !isCurrentDeviceSave()) return null
         if (!res.ok) throw new Error(data?.error || 'Could not save that.')
+        if (deviceAction) {
+          const reviewed = validateNativeDeviceAction(targetDraft.deviceAction)
+          const authorized = validateNativeDeviceAction(data?.authorizedDeviceAction)
+          if (data?.success !== true || data?.deviceActionAuthorized !== true || data?.status !== 'device_authorized' || data?.safeToClaimSaved !== false || JSON.stringify(authorized) !== JSON.stringify(reviewed)) throw new Error('The server did not authorize the exact Apple Health action reviewed. Nothing has been changed by this request.')
+          const snapshot = nativeDeviceReviewRef.current!
+          const io = nativeDeviceIoForVoice(() => appleHealthSyncRef.current, () => voiceAccountUserIdRef.current || null, isCurrentDeviceSave)
+          const receipt = await applyReviewedNativeDeviceAction(snapshot, targetDraft.reviewToken || '', voiceMemoryUserId, authorized, io)
+          if (!isCurrentDeviceSave()) return null
+          if (!isValidNativeDeviceReceipt(receipt, targetDraft)) throw new Error('The phone did not confirm the exact reviewed activity or setting. Please check Devices before retrying.')
+          data = { success: true, result: receipt, voiceActionRunId, idempotentReplay: receipt.idempotentReplay }
+          voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
+          saveRequestOutstanding = false
+          traceVoiceAction(voiceActionRunId, 'device_action_completed', targetDraft.action, receipt.status, receipt.verified ? 'verified_device_receipt' : 'no_import_verified', startedAt)
+          appendConversationTurns([makeConversationTurn('assistant', receipt.message)])
+          if (receipt.verified) {
+            const localDate = receipt.localDate || targetDraft.localDate || todayLocalDate()
+            DeviceEventEmitter.emit('helfi:voice-action-saved', { localDate, source: 'voice-assistant', kind: receipt.kind, entity: receipt.entity })
+            if (receipt.status === 'imported') DeviceEventEmitter.emit('helfi:food-log-changed', { localDate, source: 'voice-assistant', kind: 'exercise' })
+            DeviceEventEmitter.emit('helfi:navigate-native-web-tool', { title: 'Devices', path: '/devices', nativeTarget: { type: 'stack', route: 'Devices' } })
+            setSaveSuccessNotice({ title: receipt.status === 'imported' ? 'Activity imported' : 'Device setting saved', message: receipt.message })
+          }
+          addVoiceActivity(receipt.verified ? 'Apple Health action verified' : 'No activity import confirmed', 'done')
+          setDraft(null)
+          setPendingFollowUpDraft(null)
+          setReviewCorrectionActive(false)
+          setTranscript('')
+          setChargedCredits(null)
+          if (receipt.verified && options?.closeOnSuccess !== false) closePanel()
+          return data
+        }
+        if (separateAction) {
+          const message = verifiedActionCompletionMessage(data, targetDraft)
+          if (!message) throw new Error('The app did not verify the exact reviewed action. Please check its normal screen before retrying; email delivery or report generation is not being claimed.')
+          voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
+          saveRequestOutstanding = false
+          traceVoiceAction(voiceActionRunId, 'action_completed', targetDraft.action, targetDraft.action === 'report_action' ? 'report_requested' : 'action_completed', data.idempotentReplay ? 'replayed_receipt' : 'verified_receipt', startedAt)
+          appendConversationTurns([makeConversationTurn('assistant', message)])
+          const report = targetDraft.action === 'report_action'
+          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', kind: targetDraft.action, action: data.result.action })
+          DeviceEventEmitter.emit('helfi:navigate-native-web-tool', report ? { title: 'Insights', path: '/insights', nativeTarget: { type: 'tab', tab: 'Insights' } } : { title: 'Support', path: '/support', nativeTarget: { type: 'stack', route: 'Support' } })
+          setSaveSuccessNotice({ title: report ? 'Report requested' : 'Support action completed', message })
+          addVoiceActivity(report ? 'Report request verified' : 'Support action verified', 'done')
+          setDraft(null)
+          setPendingFollowUpDraft(null)
+          setReviewCorrectionActive(false)
+          setTranscript('')
+          setChargedCredits(null)
+          if (options?.closeOnSuccess !== false) closePanel()
+          return data
+        }
+        if (recipeImport) {
+          if (!isConfirmedRecipeImport(data, targetDraft)) throw new Error('The app did not verify the recipe import and its next review. Please check the import before trying again; nothing is being reported as saved.')
+          const next = data.result.nextRecipeDraft as VoiceDraft
+          const nextReview = next.canConfirm ? reviewPromptForDraft(next) : next.confirmationMessage
+          traceVoiceAction(voiceActionRunId, 'import_completed', targetDraft.action, 'imported_not_saved', data.idempotentReplay ? 'replayed_import' : 'verified_import', startedAt)
+          appendConversationTurns([makeConversationTurn('assistant', `${data.result.message}${next.recipe?.text ? `\n${next.recipe.text}` : ''}\n${nextReview}`)])
+          setDraft(next)
+          setPendingFollowUpDraft(isPendingFollowUpDraft(next) ? next : null)
+          setReviewCorrectionActive(false)
+          setTranscript('')
+          setChargedCredits(data.result.costCredits)
+          addVoiceActivity('Recipe imported — review before saving', 'done')
+          return data
+        }
+        if (targetDraft.action === 'local_preference_action') {
+          const reviewed = validateLocalPreference(targetDraft.localPreference)
+          const authorized = validateLocalPreference(data?.authorizedPreference)
+          if (data?.success !== true || data?.localPreferenceAuthorized !== true || authorized.key !== reviewed.key || authorized.value !== reviewed.value) throw new Error('The server did not authorize the exact device setting you reviewed. Nothing has been changed on this device.')
+          const snapshot = localPreferenceReviewRef.current
+          if (!snapshot || snapshot.token !== targetDraft.reviewToken) throw new Error('Please review the current device setting again before applying it.')
+          const receipt = await applyReviewedLocalPreference(snapshot, targetDraft.reviewToken || '', voiceMemoryUserId, authorized, isCurrentDeviceSave)
+          data = { success: true, result: receipt, voiceActionRunId, idempotentReplay: receipt.idempotentReplay }
+        }
+        voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
+        saveRequestOutstanding = false
+        if (!isConfirmedVoiceSave(data, targetDraft.action)) throw new Error(targetDraft.action === 'notification_action' ? 'The server did not confirm this inbox change. Some notifications may have changed. Please check your inbox before retrying.' : 'The server did not confirm a saved entry. Please check your diary before retrying.')
+        if (targetDraft.action === 'notification_action') {
+          const reviewed = targetDraft.notificationAction
+          const ids = reviewed?.ids
+          if (!reviewed || !ids?.length || new Set(ids).size !== ids.length || data.result.id !== reviewed.action || data.result.ids.length !== ids.length || data.result.ids.some((id: string) => !ids.includes(id))) throw new Error('The server did not confirm every exact notification you reviewed. Some notifications may have changed. Please check your inbox before retrying.')
+        }
+        if (targetDraft.action === 'record_action' && (
+          data.result.id !== targetDraft.recordAction?.id || data.result.entity !== targetDraft.recordAction?.entity || data.result.operation !== targetDraft.recordAction?.operation
+        )) throw new Error('The server did not confirm the exact change you reviewed. Please check that record before retrying.')
+        if (targetDraft.action === 'local_preference_action' && data.result.id !== targetDraft.localPreference?.key) throw new Error('The device did not confirm the exact setting you reviewed.')
+        if (targetDraft.action === 'preference_action' && data.result.id !== targetDraft.preferenceAction?.action) throw new Error('The server did not confirm the exact setting you reviewed. Please check it before retrying.')
+        traceVoiceAction(voiceActionRunId, 'save_completed', targetDraft.action, 'saved', data?.idempotentReplay ? 'replayed_receipt' : 'confirmed_receipt', startedAt)
+        appendConversationTurns([makeConversationTurn('assistant', data.result.message || 'Your entry was saved.')])
         const resultKind = String(data?.result?.kind || '').toLowerCase()
-        const changedDate = targetDraft.localDate || todayLocalDate()
+        const changedEntity = String(data?.result?.entity || targetDraft.recordAction?.entity || '')
+        const changedDate = targetDraft.recordAction?.localDate || targetDraft.localDate || todayLocalDate()
         const emitSavedRefresh = () => {
+          if ((resultKind === 'notification_action' || guardedRecord) && (voiceAccountTokenRef.current !== saveAccountToken || voiceAccountUserIdRef.current !== voiceMemoryUserId)) return
           DeviceEventEmitter.emit('helfi:voice-action-saved', {
             localDate: changedDate,
             source: 'voice-assistant',
             kind: resultKind,
+            entity: changedEntity,
           })
+          if (resultKind === 'record_action') {
+            const eventName = ['food', 'water', 'exercise', 'favorite', 'custom_food'].includes(changedEntity) ? 'helfi:food-log-changed'
+              : changedEntity === 'mood' ? 'helfi:mood-log-changed'
+              : changedEntity === 'journal' ? 'helfi:health-journal-changed'
+              : changedEntity === 'mood_journal' ? 'helfi:mood-journal-changed'
+              : changedEntity === 'symptom_note' ? 'helfi:symptom-notes-changed'
+              : changedEntity === 'supplement' || changedEntity === 'medication' ? 'helfi:health-intake-changed' : null
+            if (eventName) DeviceEventEmitter.emit(eventName, { localDate: changedDate, source: 'voice-assistant', kind: resultKind, entity: changedEntity })
+          }
+          if (resultKind === 'notification_action') DeviceEventEmitter.emit('helfi:notifications-inbox-changed', { source: 'voice-assistant', kind: resultKind })
+          if (resultKind === 'local_preference_action') DeviceEventEmitter.emit('helfi:device-preference-changed', { key: data.result.id, source: 'voice-assistant' })
+          if (resultKind === 'preference_action') DeviceEventEmitter.emit('helfi:settings-changed', { source: 'voice-assistant', kind: resultKind })
           if (resultKind === 'food' || resultKind === 'exercise' || resultKind === 'water') {
             DeviceEventEmitter.emit('helfi:food-log-changed', {
               localDate: changedDate,
@@ -2030,7 +2371,18 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         }
 
         emitSavedRefresh()
-        if (resultKind === 'food' || resultKind === 'exercise' || resultKind === 'water') {
+        if (resultKind === 'record_action' || resultKind === 'preference_action' || resultKind === 'local_preference_action' || resultKind === 'notification_action') {
+          const target = resultKind === 'notification_action' ? { title: 'Notifications', path: '/notifications', nativeTarget: { type: 'stack', route: 'NotificationsInbox' } }
+            : resultKind === 'preference_action' || resultKind === 'local_preference_action' ? { title: 'Settings', path: '/settings', nativeTarget: { type: 'tab', tab: 'Settings' } }
+            : changedEntity === 'symptom_note' ? { title: 'Symptom Notes', path: '/symptoms', nativeTarget: { type: 'stack', route: 'SymptomNotes', params: { initialTab: 'history', voiceActionNonce: Date.now() } } }
+            : changedEntity === 'supplement' || changedEntity === 'medication' ? { title: 'Health Intake', path: '/onboarding?step=6', nativeTarget: { type: 'stack', route: 'NativeWebTool', params: { title: 'Health Intake', path: `/onboarding?step=6&voiceActionNonce=${Date.now()}` } } }
+            : changedEntity === 'journal' ? { title: 'Health Journal', path: '/health-journal', nativeTarget: { type: 'stack', route: 'HealthJournal', params: { initialTab: 'history', selectedDate: changedDate, voiceActionNonce: Date.now() } } }
+            : changedEntity === 'mood' || changedEntity === 'mood_journal' ? { title: 'Mood Tracker', path: '/mood', nativeTarget: { type: 'stack', route: 'MoodTracker', params: { tab: changedEntity === 'mood' ? 'history' : 'journal' } } }
+            : { title: 'Food Diary', path: '/food', nativeTarget: { type: 'tab', tab: 'Food' } }
+          DeviceEventEmitter.emit('helfi:navigate-native-web-tool', target)
+          setTimeout(emitSavedRefresh, 450)
+          setTimeout(emitSavedRefresh, 1000)
+        } else if (resultKind === 'food' || resultKind === 'exercise' || resultKind === 'water') {
           DeviceEventEmitter.emit('helfi:navigate-native-web-tool', {
             title: 'Food Diary',
             path: '/food',
@@ -2094,7 +2446,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           ? 'Food'
           : resultKind === 'water'
           ? 'Water'
-          : 'Entry'
+          : resultKind === 'record_action' || resultKind === 'preference_action' || resultKind === 'local_preference_action' || resultKind === 'notification_action' ? 'Change' : 'Entry'
         setSaveSuccessNotice({
           title: `${savedLabel} saved`,
           message: resultKind === 'exercise'
@@ -2114,53 +2466,57 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         if (options?.closeOnSuccess !== false) closePanel()
         return data
       } catch (error: any) {
+        if (targetDraft.action === 'local_preference_action') DeviceEventEmitter.emit('helfi:device-preference-changed', { key: targetDraft.localPreference?.key, source: 'voice-assistant' })
+        traceVoiceAction(voiceActionRunId, 'save_completed', targetDraft.action, 'not_confirmed', saveSignal?.aborted ? 'cancelled_check_diary' : 'save_not_confirmed', startedAt)
         if (saveSignal?.aborted || error?.name === 'AbortError') return null
         const message = error?.message || 'Please check your internet connection and try again.'
-        addVoiceActivity('Save failed — ready to retry', 'error')
+        appendConversationTurns([makeConversationTurn('assistant', `${targetDraft.action === 'recipe_import_url' ? 'I could not confirm the recipe import.' : ['support_action', 'report_action', 'device_action'].includes(targetDraft.action) ? 'I could not confirm this action.' : 'I could not confirm the save.'} ${message}`)])
+        addVoiceActivity(['recipe_import_url', 'support_action', 'report_action', 'device_action'].includes(targetDraft.action) ? 'Action not verified — check before retrying' : 'Save failed — ready to retry', 'error')
         setSaveError(message)
-        Alert.alert('Could not save', message)
+        Alert.alert(targetDraft.action === 'recipe_import_url' ? 'Import not verified' : ['support_action', 'report_action', 'device_action'].includes(targetDraft.action) ? 'Action not verified' : 'Could not save', message)
         return null
       } finally {
-        voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
+        if (saveRequestOutstanding) voiceSaveRequestsRef.current = Math.max(0, voiceSaveRequestsRef.current - 1)
         if (saveAbortController && draftRequestAbortRef.current === saveAbortController) {
           draftRequestAbortRef.current = null
         }
         setConfirming(false)
       }
     },
-    [addVoiceActivity, closePanel, session?.token],
+    [addVoiceActivity, appendConversationTurns, closePanel, makeConversationTurn, session?.token, voiceMemoryUserId],
   )
 
   const sendDraftRequest = useCallback(
     async (options?: DraftRequestOptions): Promise<DraftRequestResult> => {
       if (!session?.token) return { ok: false, message: 'Please sign in first.' }
       if (options?.signal?.aborted) return { ok: false, message: 'Live voice has stopped.' }
+      if (voiceSaveRequestsRef.current > 0) return { ok: false, saved: false, status: 'needs_clarification', message: 'Your previous save is still being confirmed. Please wait for its result before changing that entry.' }
+      const voiceActionRunId = options?.voiceActionRunId || newVoiceActionRunId()
+      const startedAt = Date.now()
+      traceVoiceAction(voiceActionRunId, 'request_started', options?.realtimeActionHint?.action, 'pending', 'app_brain', startedAt)
       const rawTypedTranscript = (options?.transcriptOverride ?? transcript).trim()
-      const explicitNewCommand = isExplicitNewVoiceCommand(rawTypedTranscript, draft)
+      const explicitNewCommand = isExplicitNewVoiceCommand(rawTypedTranscript, draft || pendingFollowUpDraft)
       const draftIsReviewOrHandoff = Boolean(draft?.canConfirm || draft?.appTarget?.path) && !explicitNewCommand
       if (!options?.audioUri && draft?.canConfirm && isConfirmingDraftText(rawTypedTranscript)) {
         setTranscript(rawTypedTranscript)
-        const saved = await saveDraft(draft, { signal: options?.signal, closeOnSuccess: !options?.realtimeActionHint?.action })
-        return {
-          ok: Boolean(saved),
-          saved: Boolean(saved),
-          status: saved ? 'saved' : 'general_answer',
-          message: saved?.result?.message || (saved ? 'Saved.' : 'I could not save that.'),
-          action: draft.action,
-        }
+        appendConversationTurns([makeConversationTurn('user', rawTypedTranscript)])
+        const saved = await saveDraft(draft, { signal: options?.signal, closeOnSuccess: !options?.realtimeActionHint?.action, voiceActionRunId })
+        return confirmationRequestResult(saved, draft, voiceActionRunId)
       }
       if (!options?.audioUri && draftIsReviewOrHandoff && draft && isRejectingDraftText(rawTypedTranscript)) {
         setTranscript(rawTypedTranscript)
         setDraft(null)
         setPendingFollowUpDraft(null)
         setChargedCredits(null)
+        appendConversationTurns([makeConversationTurn('user', rawTypedTranscript), makeConversationTurn('assistant', NOT_SAVED_MESSAGE)])
+        traceVoiceAction(voiceActionRunId, 'request_completed', draft.action, 'general_answer', 'user_discarded', startedAt)
         if (voiceReply && !options?.suppressSpokenReply) {
           void requestVoiceReply(NOT_SAVED_MESSAGE)
         }
         Alert.alert('Not saved', NOT_SAVED_MESSAGE)
-        return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: draft.action }
+        return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: draft.action, voiceActionRunId }
       }
-      const nextFollowUpTranscript = options?.audioUri || explicitNewCommand || pendingFollowUpDraft?.action === 'water' || pendingFollowUpDraft?.timingNeedsClarification
+      const nextFollowUpTranscript = options?.audioUri || explicitNewCommand || pendingFollowUpDraft?.action === 'water' || pendingFollowUpDraft?.action === 'food_draft' || pendingFollowUpDraft?.timingNeedsClarification
         ? null
         : followUpTranscript(pendingFollowUpDraft, rawTypedTranscript)
       const typedTranscript = nextFollowUpTranscript || rawTypedTranscript
@@ -2214,7 +2570,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             form.append('localDate', requestLocalDate)
             form.append('tzOffsetMin', String(requestTzOffsetMin))
             if (requestTimeZone) form.append('timeZone', requestTimeZone)
-            form.append('voiceReply', shouldSpeakReply ? 'true' : 'false')
+            form.append('voiceReply', 'false')
             form.append('favorites', JSON.stringify(favorites))
             form.append('launchContext', JSON.stringify(requestContext))
             form.append('conversationHistory', JSON.stringify(requestConversationHistory))
@@ -2224,7 +2580,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             form.append('aiConsentGranted', 'true')
             return fetch(`${baseUrl}/api/native-voice-assistant`, {
               method: 'POST',
-              headers: buildNativeAuthHeaders(session.token),
+              headers: { ...buildNativeAuthHeaders(session.token), 'x-helfi-voice-action-id': voiceActionRunId },
               signal: requestSignal,
               body: form,
             })
@@ -2232,14 +2588,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         } else {
           responseData = await fetchNativeVoiceAssistant((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant`, {
             method: 'POST',
-            headers: buildNativeAuthHeaders(session.token, { json: true }),
+            headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-action-id': voiceActionRunId },
             signal: requestSignal,
             body: JSON.stringify({
               transcript: typedTranscript,
               localDate: requestLocalDate,
               tzOffsetMin: requestTzOffsetMin,
               timeZone: requestTimeZone,
-              voiceReply: shouldSpeakReply,
+              voiceReply: false,
               favorites,
               launchContext: requestContext,
               conversationHistory: requestConversationHistory,
@@ -2258,6 +2614,34 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         }
         setTranscript(String(data?.transcript || typedTranscript || '').trim())
         const nextDraft = data?.draft || null
+        if (!nextDraft && !data?.rejectNow) throw new Error('Helfi returned no completed answer. Nothing is confirmed saved.')
+        if (nextDraft?.action === 'local_preference_action' && nextDraft.canConfirm) {
+          const currentToken = session.token
+          const currentRun = realtimeVoiceRunRef.current
+          const isCurrent = () => !requestSignal?.aborted && openRef.current && voiceProviderMountedRef.current && voiceAccountTokenRef.current === currentToken && voiceAccountUserIdRef.current === voiceMemoryUserId && realtimeVoiceRunRef.current === currentRun
+          const existingReview = localPreferenceReviewRef.current
+          if (!existingReview || existingReview.token !== nextDraft.reviewToken) {
+            localPreferenceReviewRef.current = await captureLocalPreferenceReview(nextDraft.reviewToken || '', voiceMemoryUserId, nextDraft.localPreference, isCurrent)
+          } else {
+            const proposed = validateLocalPreference(nextDraft.localPreference)
+            if (proposed.key !== existingReview.preference.key || proposed.value !== existingReview.preference.value) throw new Error('This device setting review changed. Please request a fresh review.')
+          }
+          if (!isCurrent()) return { ok: false, message: 'This device setting request has stopped.' }
+        }
+        let deviceNeedsFreshConfirmation = false
+        if (nextDraft?.action === 'device_action' && nextDraft.canConfirm && !data?.rejectNow) {
+          const proposed = validateNativeDeviceAction(nextDraft.deviceAction)
+          if (nextDraft.requiresDeviceReview !== true || !['apple_health.import', 'apple_health.automatic.update', 'apple_health.source.select'].includes(proposed.action)) throw new Error('Please use the existing Apple Health controls in Devices. This phone action is not supported here.')
+          const currentToken = session.token, currentRun = realtimeVoiceRunRef.current
+          const isCurrent = () => !requestSignal?.aborted && openRef.current && voiceProviderMountedRef.current && voiceAccountTokenRef.current === currentToken && voiceAccountUserIdRef.current === voiceMemoryUserId && realtimeVoiceRunRef.current === currentRun
+          const existing = nativeDeviceReviewRef.current
+          deviceNeedsFreshConfirmation = Boolean(data?.confirmNow && (!existing || existing.token !== nextDraft.reviewToken || existing.accountId !== voiceMemoryUserId || JSON.stringify(existing.action) !== JSON.stringify(proposed)))
+          if (!existing || existing.token !== nextDraft.reviewToken || existing.accountId !== voiceMemoryUserId) {
+            nativeDeviceReviewRef.current = await captureNativeDeviceReview(nextDraft.reviewToken || '', voiceMemoryUserId, proposed, nativeDeviceIoForVoice(() => appleHealthSyncRef.current, () => voiceAccountUserIdRef.current || null, isCurrent))
+          } else if (JSON.stringify(existing.action) !== JSON.stringify(proposed)) throw new Error('This Apple Health review changed. Please request a fresh review.')
+          if (!isCurrent()) return { ok: false, message: 'This Apple Health request has stopped.' }
+        }
+        traceVoiceAction(voiceActionRunId, 'request_completed', nextDraft?.action, voiceResultStatusFromDraft(nextDraft, data) || 'general_answer', data?.rejectNow ? 'user_discarded' : 'app_response', startedAt)
         if (nextDraft?.canConfirm) {
           addVoiceActivity('Review ready — waiting for your answer', 'done')
         } else if (nextDraft) {
@@ -2272,29 +2656,24 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         } else if (nextDraft?.action === 'journal') {
           setLaunchContext({ section: 'journal', title: 'Health Journal', date: nextDraft.localDate })
         }
+        if (nextDraft && (!nextDraft.reviewToken || nextDraft.reviewToken !== draft?.reviewToken)) setSaveError('')
         setDraft(nextDraft)
         if (nextDraft?.canConfirm || data?.confirmNow || data?.rejectNow) setReviewCorrectionActive(false)
         setPendingFollowUpDraft(isPendingFollowUpDraft(nextDraft) ? nextDraft : null)
         setChargedCredits(Number.isFinite(Number(data?.chargedCredits)) ? Number(data.chargedCredits) : null)
-        const assistantText = nextDraft
-          ? nextDraft?.recipe?.text || nextDraft?.confirmationMessage || nextDraft?.summary || ''
-          : data?.rejectNow
+        const assistantText = data?.rejectNow
           ? NOT_SAVED_MESSAGE
-          : ''
+          : data?.confirmNow && !deviceNeedsFreshConfirmation
+          ? ''
+          : nextDraft?.action === 'device_action' && nextDraft.canConfirm ? reviewPromptForDraft(nextDraft, nativeDeviceReviewRef.current) : nextDraft?.recipe?.text || nextDraft?.confirmationMessage || nextDraft?.summary || ''
         const userText = options?.audioUri ? data?.transcript || typedTranscript : rawTypedTranscript || typedTranscript
         appendConversationTurns([
           makeConversationTurn('user', userText),
-          makeConversationTurn('assistant', assistantText),
+          ...(assistantText ? [makeConversationTurn('assistant', assistantText)] : []),
         ])
-        if (data?.confirmNow && nextDraft?.canConfirm) {
-          const saved = await saveDraft(nextDraft, { signal: requestSignal, closeOnSuccess: !options?.realtimeActionHint?.action })
-          return {
-            ok: Boolean(saved),
-            saved: Boolean(saved),
-            status: saved ? 'saved' : 'general_answer',
-            message: saved?.result?.message || (saved ? 'Saved.' : 'I could not save that.'),
-            action: nextDraft.action,
-          }
+        if (data?.confirmNow && nextDraft?.canConfirm && !deviceNeedsFreshConfirmation) {
+          const saved = await saveDraft(nextDraft, { signal: requestSignal, closeOnSuccess: !options?.realtimeActionHint?.action, voiceActionRunId })
+          return confirmationRequestResult(saved, nextDraft, voiceActionRunId)
         }
         if (data?.rejectNow) {
           setDraft(null)
@@ -2303,33 +2682,39 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             void requestVoiceReply(NOT_SAVED_MESSAGE)
           }
           Alert.alert('Not saved', NOT_SAVED_MESSAGE)
-          return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: nextDraft?.action }
+          return { ok: true, message: NOT_SAVED_MESSAGE, saved: false, status: 'general_answer', action: nextDraft?.action, voiceActionRunId }
         }
         if (shouldSpeakReply && nextDraft) {
-          const speechText = spokenReplyTextForDraft(nextDraft)
+          const speechText = (nextDraft.action === 'device_action' || nextDraft.action === 'journal') && nextDraft.canConfirm ? spokenReviewPromptForDraft(nextDraft, nativeDeviceReviewRef.current) : spokenReplyTextForDraft(nextDraft)
           void requestVoiceReply(String(speechText))
+        }
+        if (nextDraft?.appTarget?.path && !nextDraft.canConfirm && (nextDraft.action === 'app_handoff' || nextDraft.action === 'preference_action' || options?.realtimeActionHint?.action === 'navigate')) {
+          openAppTargetRef.current(nextDraft)
         }
         return {
           ok: true,
           saved: false,
           needsReview: Boolean(nextDraft?.canConfirm),
-          reviewPrompt: nextDraft?.canConfirm ? spokenReviewPromptForDraft(nextDraft) : undefined,
+          reviewPrompt: nextDraft?.canConfirm ? spokenReviewPromptForDraft(nextDraft, nativeDeviceReviewRef.current) : undefined,
           status: voiceResultStatusFromDraft(nextDraft, data),
           action: nextDraft?.action,
+          voiceActionRunId,
           message: assistantText || (nextDraft ? 'Review is ready.' : 'Done.'),
         }
       } catch (error: any) {
+        traceVoiceAction(voiceActionRunId, 'request_completed', options?.realtimeActionHint?.action, 'error', requestSignal?.aborted ? 'cancelled' : 'request_failed', startedAt)
         if (requestSignal?.aborted || error?.name === 'AbortError') {
           return { ok: false, message: 'Live voice has stopped.' }
         }
         const message = error?.message || 'Helfi could not process that request.'
+        appendConversationTurns([makeConversationTurn('user', rawTypedTranscript || typedTranscript), makeConversationTurn('assistant', `I could not complete that request. ${message} Nothing is confirmed saved.`)])
         addVoiceActivity('Request failed — ready to retry', 'error')
         if (options?.continuousVoice && /no speech|nothing heard/i.test(String(message))) {
           resumeVoiceSessionListening(600)
         } else {
           Alert.alert('Try again', message)
         }
-        return { ok: false, message }
+        return { ok: false, message, voiceActionRunId }
       } finally {
         if (draftRequestAbortController && draftRequestAbortRef.current === draftRequestAbortController) {
           draftRequestAbortRef.current = null
@@ -2337,7 +2722,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         setBusy(false)
       }
     },
-    [addVoiceActivity, appendConversationTurns, draft, launchContext, makeConversationTurn, pendingFollowUpDraft, requestConversationHistory, requestVoiceReply, resumeVoiceSessionListening, saveDraft, session?.token, transcript, voiceReply],
+    [addVoiceActivity, appendConversationTurns, draft, launchContext, makeConversationTurn, pendingFollowUpDraft, requestConversationHistory, requestVoiceReply, resumeVoiceSessionListening, saveDraft, session?.token, transcript, voiceReply, voiceMemoryUserId],
   )
 
   useEffect(() => {
@@ -2542,13 +2927,17 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     }
     armRealtimeConnectTimeout(REALTIME_VOICE_SERVER_TIMEOUT_MS)
     try {
+      const billingSessionId = realtimeBillingSessionIdRef.current
+      const greetOnConnect = voiceGreetingConversationRef.current !== billingSessionId
       const realtimeSession = await startHelfiRealtimeVoiceSession({
+        greetOnConnect,
         token: session.token,
-        billingSessionId: realtimeBillingSessionIdRef.current,
+        billingSessionId,
         signal: abortController.signal,
         callbacks: {
           onConnectStage: (stage) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+            if (stage === 'microphone-sending' && greetOnConnect) voiceGreetingConversationRef.current = billingSessionId
             if (stage === 'local-offer-ready') {
               armRealtimeConnectTimeout(REALTIME_VOICE_SERVER_TIMEOUT_MS)
             }
@@ -2756,6 +3145,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               transcriptOverride: request,
               suppressSpokenReply: true,
               signal: actionAbortController.signal,
+              voiceActionRunId: newVoiceActionRunId(),
               realtimeActionHint: {
                 action,
                 needsReview: Boolean(args.needsReview),
@@ -2789,6 +3179,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       realtimeVoiceStopRef.current = realtimeSession.stop
       realtimeVoiceMuteRef.current = realtimeSession.setMicrophoneMuted
       realtimeVoicePromptRef.current = realtimeSession.promptAssistant
+      realtimeVoiceFlushRef.current = realtimeSession.flushTranscript
     } catch (error: any) {
       clearRealtimeConnectTimeout()
       if (realtimeVoiceAbortRef.current === abortController) {
@@ -2804,11 +3195,11 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [addVoiceActivity, appendConversationTurns, checkingRealtimeVoice, clearConversationData, clearRealtimeConnectTimeout, clearReviewSilenceTimer, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
 
   useEffect(() => {
-    if (!liveVoiceEnabled || !open || !voicePaidAccessGranted || realtimeVoiceAvailable !== true || voiceSessionActiveRef.current) return
+    if (!liveVoiceEnabled || typedMode || conversationReviewOnly || !open || !voicePaidAccessGranted || realtimeVoiceAvailable !== true || voiceSessionActiveRef.current) return
     if (realtimeAutoStartRef.current) return
     realtimeAutoStartRef.current = true
     void startVoiceSession()
-  }, [liveVoiceEnabled, open, realtimeVoiceAvailable, startVoiceSession, voicePaidAccessGranted])
+  }, [conversationReviewOnly, liveVoiceEnabled, open, realtimeVoiceAvailable, startVoiceSession, typedMode, voicePaidAccessGranted])
 
   const toggleRealtimeMicrophone = useCallback(() => {
     const nextMuted = !microphoneMuted
@@ -2824,6 +3215,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [addVoiceActivity, startVoiceSession])
 
   const endVoiceSession = useCallback(() => {
+    pendingMessageFocusRef.current = null
+    nativeDeviceReviewRef.current = null
+    messageSectionYRef.current = null
+    realtimeVoiceFlushRef.current?.()
+    if (voiceSaveRequestsRef.current > 0) appendConversationTurns([makeConversationTurn('assistant', 'The last save was not yet confirmed when this conversation ended. Please check the relevant diary or setting before retrying.')])
+    setConversationReviewOnly(true)
+    setTypedMode(false)
     spokenReplyRunRef.current += 1
     realtimeVoiceRunRef.current += 1
     realtimeVoiceConnectedRef.current = false
@@ -2842,7 +3240,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setBusy(false)
     setSpokenReplyStatus('idle')
     stopPlayback().catch(() => {})
-  }, [clearRealtimeConnectTimeout, clearVoiceTurnTimers, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
+  }, [appendConversationTurns, clearRealtimeConnectTimeout, clearVoiceTurnTimers, makeConversationTurn, recording, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
   const closeCameraMode = useCallback(() => {
     setBottleCameraOpen(false)
@@ -2852,10 +3250,15 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [endVoiceSession])
 
   const confirmDraft = useCallback(async () => {
+    if (busy || confirming) return
     await saveDraft(draft)
-  }, [draft, saveDraft])
+  }, [busy, confirming, draft, saveDraft])
 
   const rejectDraft = useCallback(() => {
+    if (voiceSaveRequestsRef.current > 0) {
+      setSaveError('Your save is still being confirmed. Please check its result before making another change.')
+      return
+    }
     openRef.current = false
     addVoiceActivity('Draft discarded — nothing saved', 'done')
     spokenReplyRunRef.current += 1
@@ -2885,10 +3288,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setOpen(false)
   }, [addVoiceActivity, clearVoiceTurnTimers, setContinuousVoiceSession, stopPlayback, stopRealtimeVoiceSession])
 
-	  const openAppTarget = useCallback(() => {
-	    const path = draft?.appTarget?.path
+	  const openAppTarget = useCallback((targetDraft: VoiceDraft | null = draft) => {
+	    const path = targetDraft?.appTarget?.path
 	    if (!path) return
-	    const nativeTarget = draft.appTarget?.nativeTarget || fallbackNativeTargetForAppTarget(draft.appTarget) || null
+	    const nativeTarget = targetDraft.appTarget?.nativeTarget || fallbackNativeTargetForAppTarget(targetDraft.appTarget) || null
     if (nativeTarget?.type === 'voiceAction' && nativeTarget.action === 'openHealthIntakeLiveCamera') {
       setLaunchContext({ section: 'health-intake', title: 'Health Intake' })
       openHealthIntakeCameraMode(nativeTarget.itemType === 'medication' ? 'medication' : 'supplement')
@@ -2900,7 +3303,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
 	      return
 	    }
 	    DeviceEventEmitter.emit('helfi:navigate-native-web-tool', {
-	      title: draft.appTarget?.title || 'Helfi',
+	      title: targetDraft.appTarget?.title || 'Helfi',
 	      path,
       nativeTarget,
     })
@@ -2932,12 +3335,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     closePanel()
 	  }, [closePanel, draft, openHealthIntakeCameraMode])
 
+  openAppTargetRef.current = openAppTarget
+
   const draftIsActionable = Boolean(draft?.canConfirm || draft?.appTarget?.path)
   const showDraftCard = Boolean(draft && draftIsActionable && !reviewCorrectionActive)
   const primaryFooterIsHandoff = Boolean(draft?.appTarget?.path && !draft?.canConfirm)
-  const primaryFooterLabel = primaryFooterIsHandoff ? draft?.appTarget?.buttonLabel || 'Open Helfi tool' : 'Save this'
-  const primaryFooterDisabled = !draft || confirming || (!draft.canConfirm && !primaryFooterIsHandoff)
-  const discardFooterLabel = primaryFooterIsHandoff ? 'Cancel' : "Don't save"
+  const primaryFooterLabel = primaryFooterIsHandoff ? draft?.appTarget?.buttonLabel || 'Open Helfi tool' : draft?.action === 'recipe_import_url' ? 'Import recipe · 10 credits' : draft?.action === 'device_action' ? 'Apply reviewed action' : draft?.action === 'support_action' ? 'Confirm support action' : draft?.action === 'report_action' ? 'Request report' : 'Save this'
+  const primaryFooterDisabled = !draft || busy || confirming || (!draft.canConfirm && !primaryFooterIsHandoff)
+  const discardFooterLabel = primaryFooterIsHandoff ? 'Cancel' : draft?.action === 'recipe_import_url' ? "Don't import" : ['support_action', 'report_action', 'device_action'].includes(draft?.action || '') ? 'Cancel' : "Don't save"
   const primaryFooterPress = useCallback(() => {
     if (primaryFooterIsHandoff) {
       openAppTarget()
@@ -2950,8 +3355,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   const visibleForUser = mode === 'signedIn' && Boolean(session?.token)
   const launchCopy = copyForLaunchContext(launchContext)
   const bottleCameraLabel = bottleCameraItemType === 'medication' ? 'medication' : 'supplement'
-  const showingConversationReview = !voiceSessionActive && conversationTurns.length > 0 && !showDraftCard && !reviewCorrectionActive
-  const showingLiveVoiceExperience = liveVoiceEnabled && !showingConversationReview && !showDraftCard
+  const showingConversationReview = !voiceSessionActive && !typedMode && conversationReviewOnly
+  const showingLiveVoiceExperience = liveVoiceEnabled && !typedMode && !showingConversationReview && !showDraftCard
   const realtimeVoiceUnavailable = realtimeVoiceAvailable === false
   const realtimeVoiceButtonDisabled = !voiceSessionActive && (busy || checkingRealtimeVoice || realtimeVoiceUnavailable || realtimeVoiceStatus === 'connecting')
   const realtimeVoiceButtonLabel = checkingRealtimeVoice
@@ -2963,8 +3368,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     : voiceSessionActive
     ? 'Voice chat is live'
     : 'Start live voice'
-  const restartVoiceSession = useCallback(() => {
-    clearConversationMemory()
+  const restartVoiceSession = useCallback(async () => {
+    if (loadingConversationMemory) return
+    pendingMessageFocusRef.current = null
+    setConversationReviewOnly(false)
+    setTypedMode(false)
+    setVoicePaidAccessGranted(false)
     realtimeBillingSessionIdRef.current = newRealtimeBillingSessionId()
     realtimeAutoStartRef.current = false
     setTranscript('')
@@ -2973,7 +3382,21 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setSpokenReplyStatus('idle')
     setRealtimeVoiceStatus(realtimeVoiceUnavailable ? 'failed' : 'idle')
     setRealtimeVoiceError(realtimeVoiceUnavailable ? LIVE_VOICE_DISABLED_MESSAGE : '')
-  }, [clearConversationMemory, realtimeVoiceUnavailable])
+    const accountToken = voiceAccountTokenRef.current
+    const hasAccess = await ensureVoicePaidAccess()
+    if (!openRef.current || voiceAccountTokenRef.current !== accountToken) return
+    if (!hasAccess) { setConversationReviewOnly(true); return }
+    setVoicePaidAccessGranted(true)
+  }, [ensureVoicePaidAccess, loadingConversationMemory, realtimeVoiceUnavailable])
+
+  const typeVoiceMessage = useCallback(() => {
+    if (loadingConversationMemory) return
+    endVoiceSession()
+    setConversationReviewOnly(false)
+    setTypedMode(true)
+    setVoiceReplyPreference(false)
+    requestMessageInputFocus()
+  }, [endVoiceSession, loadingConversationMemory, requestMessageInputFocus, setVoiceReplyPreference])
 
   return (
     <VoiceAssistantContext.Provider value={value}>
@@ -2988,6 +3411,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   <Text style={styles.subtitle}>{launchCopy.subtitle}</Text>
                 </View>
                 <View style={styles.headerActions}>
+                  {typedMode ? <Pressable accessibilityRole="button" accessibilityLabel="Read voice transcript" onPress={endVoiceSession} style={styles.iconButton}>
+                    <Feather name="file-text" size={20} color={theme.colors.text} />
+                  </Pressable> : null}
                   <Pressable accessibilityRole="button" accessibilityLabel="Delete chat" onPress={deleteChatAndClose} style={styles.deleteChatButton}>
                     <Feather name="trash-2" size={16} color="#B42318" />
                     <Text style={styles.deleteChatText}>Delete chat</Text>
@@ -2999,6 +3425,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               </View> : null}
 
               <ScrollView
+                ref={messageScrollRef}
                 style={styles.scroll}
                 contentContainerStyle={showingLiveVoiceExperience ? styles.liveVoiceContent : [styles.content, styles.contentWithFooterSpace]}
                 keyboardShouldPersistTaps="handled"
@@ -3078,14 +3505,14 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     ) : null}
                     {voiceSessionActive && draft?.canConfirm ? (
                       <View style={styles.voiceReviewFallback}>
-                        <Text style={styles.voiceReviewFallbackTitle}>Ready to save</Text>
+                        <Text style={styles.voiceReviewFallbackTitle}>{draft.action === 'recipe_import_url' ? 'Ready to import · 10 credits' : draft.action === 'device_action' ? 'Ready to apply reviewed action' : draft.action === 'report_action' ? 'Ready to request report' : draft.action === 'support_action' ? 'Ready to confirm support action' : 'Ready to save'}</Text>
                         <Text style={styles.voiceReviewFallbackSummary} numberOfLines={2}>{draft.summary}</Text>
                         <View style={styles.voiceReviewFallbackButtons}>
-                          <Pressable accessibilityRole="button" accessibilityLabel="Don't save" onPress={rejectDraft} style={styles.voiceReviewDiscardButton}>
-                            <Text style={styles.voiceReviewDiscardText}>Don't save</Text>
+                          <Pressable accessibilityRole="button" accessibilityLabel={discardFooterLabel} onPress={rejectDraft} disabled={confirming} style={styles.voiceReviewDiscardButton}>
+                            <Text style={styles.voiceReviewDiscardText}>{discardFooterLabel}</Text>
                           </Pressable>
-                          <Pressable accessibilityRole="button" accessibilityLabel="Save this" onPress={() => void confirmDraft()} disabled={confirming} style={[styles.voiceReviewSaveButton, confirming && styles.confirmDisabled]}>
-                            {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.voiceReviewSaveText}>Save this</Text>}
+                          <Pressable accessibilityRole="button" accessibilityLabel={primaryFooterLabel} onPress={() => void confirmDraft()} disabled={confirming || busy} style={[styles.voiceReviewSaveButton, (confirming || busy) && styles.confirmDisabled]}>
+                            {confirming ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.voiceReviewSaveText}>{primaryFooterLabel}</Text>}
                           </Pressable>
                         </View>
                       </View>
@@ -3115,7 +3542,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                         </View>
                         <Text style={styles.voiceControlLabel}>{microphoneMuted ? 'Unmute' : 'Mute'}</Text>
                       </Pressable>
-                      <Pressable accessibilityRole="button" accessibilityLabel="End voice chat" onPress={() => closePanel()} style={styles.voiceControlItem}>
+                      <Pressable accessibilityRole="button" accessibilityLabel="End voice chat" onPress={endVoiceSession} style={styles.voiceControlItem}>
                         <View style={styles.voiceEndCircle}>
                           <Feather name="x" size={31} color="#FFFFFF" />
                         </View>
@@ -3132,9 +3559,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 ) : showingConversationReview ? (
                   <View style={styles.transcriptReview}>
                     <View style={styles.transcriptReviewHeader}>
-                      <Text style={styles.transcriptReviewTitle}>Voice chat ended</Text>
-                      <Text style={styles.transcriptReviewSubtitle}>Transcript</Text>
+                      <Text style={styles.transcriptReviewTitle}>Recent conversation</Text>
+                      <Text style={styles.transcriptReviewSubtitle}>{loadingConversationMemory ? 'Loading your transcript…' : 'Saved on this device. The microphone is off.'}</Text>
                     </View>
+                    {!loadingConversationMemory && conversationTurns.length === 0 ? <Text style={styles.conversationText}>No recent conversation is saved on this device yet.</Text> : null}
+                    <Pressable accessibilityRole="button" accessibilityLabel="Type a message to Helfi" disabled={loadingConversationMemory} onPress={typeVoiceMessage} style={styles.newChatButton}>
+                      <Text style={styles.newChatText}>Type a message</Text>
+                    </Pressable>
                     {conversationTurns.map((turn) => (
                       <View
                         key={turn.id}
@@ -3150,7 +3581,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview ? (
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview ? (
                 <View style={styles.replyRow}>
                   <Pressable
                     accessibilityRole="button"
@@ -3171,7 +3602,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                 </View>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview && voiceReply ? (
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview && voiceReply ? (
                   <View style={[styles.spokenReplyBox, (spokenReplyStatus === 'failed' || spokenReplyStatus === 'unavailable') && styles.spokenReplyFailed]}>
                     {spokenReplyStatus === 'preparing' ? <ActivityIndicator size="small" color="#226B2C" /> : null}
                     <Feather
@@ -3193,13 +3624,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview ? (
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview ? (
                 <View style={styles.contextBox}>
                   <Text style={styles.contextText}>{launchCopy.opener}</Text>
                 </View>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview && launchCopy.visionLabel ? (
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview && launchCopy.visionLabel ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={launchCopy.visionLabel}
@@ -3211,7 +3642,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </Pressable>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview && visionChoicesOpen ? (
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview && visionChoicesOpen ? (
                   <View style={styles.visionChoiceBox}>
                     {launchContext.section === 'health-intake' ? (
                       <>
@@ -3228,7 +3659,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview && voiceRecordingSupported ? (
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview && voiceRecordingSupported ? (
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={voiceSessionActive ? 'End live voice' : realtimeVoiceButtonLabel}
@@ -3269,10 +3700,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     )}
                   </Pressable>
                 ) : (
-                  !liveVoiceEnabled && !voiceSessionActive && !showingConversationReview ? (
+                  (!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview ? (
                   <View style={styles.noticeBox}>
-                    <Text style={styles.noticeTitle}>Type-only on iPad</Text>
-                    <Text style={styles.noticeText}>Voice input is iPhone only for now. Type your request below.</Text>
+                    <Text style={styles.noticeTitle}>{voiceRecordingSupported ? 'Type a message' : 'Type-only on iPad'}</Text>
+                    <Text style={styles.noticeText}>{voiceRecordingSupported ? 'Type your request below. The microphone is off.' : 'Voice input is iPhone only for now. Type your request below.'}</Text>
                   </View>
                   ) : null
                 )}
@@ -3283,7 +3714,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview && conversationTurns.length > 0 ? (
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview && conversationTurns.length > 0 ? (
                   <View style={styles.conversationBox}>
                     <View style={styles.conversationHeader}>
                       <Text style={styles.label}>Conversation</Text>
@@ -3312,14 +3743,17 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   </View>
                 ) : null}
 
-                {!liveVoiceEnabled && !voiceSessionActive && !showingConversationReview ? (
-                <View style={styles.section}>
+                {(!liveVoiceEnabled || typedMode) && !voiceSessionActive && !showingConversationReview ? (
+                <View style={styles.section} onLayout={(event) => {
+                  messageSectionYRef.current = event.nativeEvent.layout.y
+                  focusRequestedMessageInput()
+                }}>
                   <Text style={styles.label}>Message Helfi</Text>
                   <TextInput
+                    ref={messageInputRef}
                     value={transcript}
                     onChangeText={(value) => {
                       setTranscript(value)
-                      setDraft(null)
 	                    }}
 	                    placeholder={voiceRecordingSupported ? launchCopy.placeholder : 'Type your request here.'}
 	                    accessibilityLabel="Talk to Helfi message"
@@ -3333,8 +3767,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
 	                    accessibilityLabel="Ask Helfi"
 	                    testID="talk-to-helfi-inline-submit"
 	                    onPress={() => sendDraftRequest()}
-	                    disabled={busy || !transcript.trim()}
-	                    style={[styles.secondaryButton, (busy || !transcript.trim()) && styles.secondaryDisabled]}
+	                    disabled={busy || confirming || !transcript.trim()}
+	                    style={[styles.secondaryButton, (busy || confirming || !transcript.trim()) && styles.secondaryDisabled]}
                   >
                     <Text style={styles.secondaryText}>Ask Helfi</Text>
                   </Pressable>
@@ -3345,7 +3779,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                   <View style={styles.section}>
                     <Text style={styles.label}>{draftIsActionable ? "Helfi's plan" : 'Helfi'}</Text>
                     <Text style={styles.summary}>{draft.summary}</Text>
-                    <Text style={styles.message}>{draft.canConfirm ? reviewPromptForDraft(draft) : draft.recipe?.text || draft.confirmationMessage}</Text>
+                    <Text style={styles.message}>{draft.canConfirm ? reviewPromptForDraft(draft, nativeDeviceReviewRef.current) : draft.recipe?.text || draft.confirmationMessage}</Text>
                     {draft.food?.entries?.length ? (
                       <View style={styles.entryList}>
                         {draft.food.entries.map((entry, index) => (
@@ -3390,7 +3824,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     {saveError ? (
                       <View style={styles.liveVoiceErrorBox}>
                         <Feather name="alert-circle" size={18} color="#B42318" />
-                        <Text style={styles.liveVoiceErrorText}>Save failed: {saveError} Your review is still here; try Save this again.</Text>
+                        <Text style={styles.liveVoiceErrorText}>Save not confirmed: {saveError} Please check the relevant app screen for its current status.</Text>
                       </View>
                     ) : null}
                   </View>
@@ -3405,11 +3839,12 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                     </Pressable>
                     <Pressable
                       accessibilityRole="button"
-                      accessibilityLabel="New voice chat"
-                      onPress={restartVoiceSession}
-                      style={styles.confirmButton}
+                      accessibilityLabel={voiceRecordingSupported ? 'Start live voice' : 'Type a message to Helfi'}
+                      onPress={voiceRecordingSupported ? restartVoiceSession : typeVoiceMessage}
+                      disabled={loadingConversationMemory}
+                      style={[styles.confirmButton, loadingConversationMemory && styles.confirmDisabled]}
                     >
-                      <Text style={styles.confirmText}>New chat</Text>
+                      <Text style={styles.confirmText}>{voiceRecordingSupported ? 'Start voice' : 'Type message'}</Text>
                     </Pressable>
                   </>
                 ) : primaryFooterIsHandoff && draftIsActionable ? (
@@ -3450,8 +3885,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                           accessibilityLabel="Ask Helfi"
                           testID="talk-to-helfi-footer-submit"
                           onPress={() => sendDraftRequest()}
-                          disabled={busy || !transcript.trim()}
-                          style={[styles.confirmButton, (busy || !transcript.trim()) && styles.confirmDisabled]}
+                          disabled={busy || confirming || !transcript.trim()}
+                          style={[styles.confirmButton, (busy || confirming || !transcript.trim()) && styles.confirmDisabled]}
                         >
                           {busy ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.confirmText}>Ask Helfi</Text>}
                         </Pressable>

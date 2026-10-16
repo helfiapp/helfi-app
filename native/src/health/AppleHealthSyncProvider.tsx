@@ -27,6 +27,7 @@ const runSync = createAppleHealthSync({
 })
 
 type SyncContext = {
+  getSnapshot: () => { userId:string|null; enabled:boolean; source:AppleHealthSource|null; busy:boolean; ready:boolean }
   enabled: boolean
   busy: boolean
   result: AppleHealthSyncResult | null
@@ -49,12 +50,19 @@ export function AppleHealthSyncProvider({ children }: { children: React.ReactNod
   const [stateUserId, setStateUserId] = useState('')
   const [source, updateSource] = useState<AppleHealthSource | null>(null)
   const preferenceWrites = useRef(Promise.resolve())
-  const current = useRef({ userId: '', token: '', enabled: false, source: null as AppleHealthSource | null, savedSource: null as AppleHealthSource | null, savedSourceHydrated: false, sourceHydrated: false, sourcePending: null as number | null, revision: 0, enabledRevision: 0, sourceRevision: 0 })
+  const current = useRef({ userId: '', token: '', enabled: false, source: null as AppleHealthSource | null, savedSource: null as AppleHealthSource | null, savedSourceHydrated: false, sourceHydrated: false, sourcePending: null as number | null, revision: 0, enabledRevision: 0, sourceRevision: 0, busyCount:0 })
   const userId = mode === 'signedIn' ? session?.user.id || '' : ''
   const token = mode === 'signedIn' ? session?.token || '' : ''
   if (current.current.userId !== userId || current.current.token !== token) {
-    current.current = { userId, token, enabled: false, source: null, savedSource: null, savedSourceHydrated: false, sourceHydrated: false, sourcePending: null, revision: current.current.revision + 1, enabledRevision: 0, sourceRevision: 0 }
+    current.current = { userId, token, enabled: false, source: null, savedSource: null, savedSourceHydrated: false, sourceHydrated: false, sourcePending: null, revision: current.current.revision + 1, enabledRevision: 0, sourceRevision: 0, busyCount:0 }
   }
+
+  const getSnapshot = useCallback(() => {
+    const state=current.current
+    const accountCurrent=Boolean(userId&&token&&state.userId===userId&&state.token===token)
+    const hydrated=accountCurrent&&state.sourceHydrated&&state.savedSourceHydrated&&state.sourcePending===null
+    return {userId:accountCurrent?userId:null,enabled:accountCurrent&&state.enabled,source:accountCurrent?validateAppleHealthSource(state.source):null,busy:accountCurrent&&(state.busyCount||0)>0,ready:hydrated}
+  }, [userId,token])
 
   useEffect(() => {
     let cancelled = false
@@ -149,6 +157,7 @@ export function AppleHealthSyncProvider({ children }: { children: React.ReactNod
     const selectedSource = current.current.source
     const allowed = () => current.current.userId === userId && current.current.token === token && current.current.revision === revision && current.current.sourcePending == null && (manual || current.current.enabled)
     if (!allowed()) return null
+    current.current.busyCount=(current.current.busyCount||0)+1
     setBusy(true)
     try {
       const next = await runSync({ userId, token, localDate, source: selectedSource, manual, allowed })
@@ -162,7 +171,10 @@ export function AppleHealthSyncProvider({ children }: { children: React.ReactNod
       if (manual && allowed()) throw e
       return null
     } finally {
-      if (current.current.userId === userId && current.current.token === token) setBusy(false)
+      if (current.current.userId === userId && current.current.token === token) {
+        current.current.busyCount=Math.max(0,(current.current.busyCount||0)-1)
+        setBusy(current.current.busyCount>0)
+      }
     }
   }, [ready, userId, token, source])
 
@@ -174,7 +186,7 @@ export function AppleHealthSyncProvider({ children }: { children: React.ReactNod
   }, [ready, enabled, refresh])
 
   const sameAccount = stateUserId === userId
-  return <Context.Provider value={{ enabled: sameAccount && enabled, busy: sameAccount && busy, result: sameAccount ? result : null, error: sameAccount ? error : null, source: sameAccount ? source : null, setSource, readSources, setEnabled, refresh }}>{children}</Context.Provider>
+  return <Context.Provider value={{ enabled: sameAccount && enabled, busy: sameAccount && busy, result: sameAccount ? result : null, error: sameAccount ? error : null, source: sameAccount ? source : null, setSource, readSources, setEnabled, refresh, getSnapshot }}>{children}</Context.Provider>
 }
 
 export function useAppleHealthSync() {

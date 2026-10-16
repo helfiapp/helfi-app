@@ -1,0 +1,10 @@
+{
+  "text": "Hi, I\u2019m Helfi. What can I help you with?",
+  "voice": "marin",
+  "model": "gpt-4o-mini-tts",
+  "provenance": "Actual signed-in Helfi UI: Hello with Spoken reply enabled; normal app preparation and standalone TTS routes; copied unchanged from simulator app playback cache. No direct provider script or API key access.",
+  "bytes": 55296,
+  "sha256": "ac836f668809fb129ba6ae60a20ec1a1178624601229aa71ceb032e0eb522df1",
+  "createdAtUtc": "2026-10-16T19:10:18.647215+00:00",
+  "physicalSpeakerAudibilityVerified": false
+}

@@ -14,8 +14,19 @@ import { ensureHealthJournalSchema } from '@/lib/health-journal-db'
 import { deleteNotificationsByType, deleteSmartCoachNotificationsByCategories } from '@/lib/notification-inbox'
 import { triggerBackgroundRegeneration } from '@/lib/insights/regeneration-service'
 import { verifyNativeVoiceDraft } from '@/lib/native-voice-review-token'
+import { beginVoiceActionTrace, finishVoiceActionTrace } from '@/lib/native-voice-action-observability'
+import { executeNativeVoiceRecordAction } from '@/lib/native-voice-record-actions'
+import { executeVoicePreferenceAction } from '@/lib/native-voice-preference-actions'
+import { executeVoiceNotificationAction } from '@/lib/native-voice-notification-actions'
 import { ensureSupplementCatalogSchema } from '@/lib/supplement-catalog-db'
 import { ensureMedicationCatalogSchema } from '@/lib/medication-catalog-db'
+import { applyNativeVoiceRecipeMetadata } from '@/lib/native-voice-recipe-metadata'
+import { executeVoiceRecipeUrlImport } from '@/lib/native-voice-recipe-url-import'
+import { executeVoiceSupportAction } from '@/lib/native-voice-support-actions'
+import { executeVoiceReportAction } from '@/lib/native-voice-report-actions'
+import { authorizeNativeVoiceDeviceAction } from '@/lib/native-voice-device-actions'
+import { saveNativeVoiceMood } from '@/lib/native-voice-mood-context'
+import { nativeVoiceFoodCopyVersion, nativeVoiceFoodCopyWaterVersion, nativeVoiceFoodCopyWaterId, relinkNativeVoiceCopiedDrink } from '@/lib/native-voice-food-copy'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -231,6 +242,9 @@ function makeManualDeviceId() {
 
 const USED_REVIEW_TOKEN_IDENTIFIER_PREFIX = 'native-voice-review-used'
 const COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX = 'native-voice-review-result'
+const REVIEW_RESULT_CHUNK_IDENTIFIER_PREFIX = 'native-voice-review-chunk'
+const REVIEW_RESULT_CHUNK_CHARS = 1024
+const REVIEW_RESULT_MAX_CHUNKS = 10000
 const USED_REVIEW_TOKEN_TTL_MS = 24 * 60 * 60 * 1000
 
 function usedReviewTokenIdentifier(userId: string) {
@@ -239,6 +253,19 @@ function usedReviewTokenIdentifier(userId: string) {
 
 function usedReviewTokenDigest(token: unknown) {
   return crypto.createHash('sha256').update(String(token || '')).digest('base64url')
+}
+
+function reviewResultChunkPrefix(userId: string, digest?: string) {
+  const owner = usedReviewTokenDigest(userId)
+  return `${REVIEW_RESULT_CHUNK_IDENTIFIER_PREFIX}:${owner}:${digest ? `${digest}:` : ''}`
+}
+
+function reviewResultChunkToken(userId: string, digest: string, index: number) {
+  return usedReviewTokenDigest(JSON.stringify(['native-voice-result-chunk-v1', userId, digest, index]))
+}
+
+function isReviewResult(value: any) {
+  return value && typeof value === 'object' && !Array.isArray(value) && typeof value.kind === 'string' && typeof value.message === 'string'
 }
 
 async function markReviewTokenUsed(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
@@ -251,6 +278,7 @@ async function markReviewTokenUsed(userId: string, draft: any, db: Prisma.Transa
         OR: [
           { identifier },
           { identifier: { startsWith: `${COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX}:${userId}:` } },
+          { identifier: { startsWith: reviewResultChunkPrefix(userId) } },
         ],
         expires: { lt: new Date() },
       },
@@ -265,21 +293,66 @@ async function markReviewTokenUsed(userId: string, draft: any, db: Prisma.Transa
   })
 }
 
-async function completeReviewToken(userId: string, draft: any, result: any, db: Prisma.TransactionClient = prisma) {
-  await db.verificationToken.update({
-    where: { token: usedReviewTokenDigest(draft.reviewToken) },
-    data: { identifier: `${COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX}:${userId}:${JSON.stringify(result)}` },
-  })
+async function completeReviewToken(userId: string, draft: any, result: any, db?: Prisma.TransactionClient) {
+  if (!isReviewResult(result)) throw new Error('The action did not return a complete result receipt.')
+  const payload = Buffer.from(JSON.stringify(result), 'utf8')
+  const encoded = payload.toString('base64')
+  const count = Math.ceil(encoded.length / REVIEW_RESULT_CHUNK_CHARS)
+  if (!count || count > REVIEW_RESULT_MAX_CHUNKS) throw new Error('This result is too large to store safely. Please check the app before retrying.')
+  const digest = usedReviewTokenDigest(draft.reviewToken)
+  const prefix = reviewResultChunkPrefix(userId, digest)
+  const marker = { receiptVersion: 2, count, bytes: payload.length, sha256: crypto.createHash('sha256').update(payload).digest('hex') }
+  const persist = async (tx: Prisma.TransactionClient) => {
+    const claim = await tx.verificationToken.findUnique({ where: { token: digest } })
+    if (!claim || claim.identifier !== usedReviewTokenIdentifier(userId) || claim.expires.getTime() <= Date.now()) throw new Error('This save no longer has an active result claim. Please check the app before retrying.')
+    // Both VerificationToken string fields are indexed. Never store the whole
+    // recipe/result in either one: each new ASCII index value stays bounded.
+    const written = await tx.verificationToken.createMany({ data: Array.from({ length: count }, (_, index) => ({
+      token: reviewResultChunkToken(userId, digest, index),
+      identifier: `${prefix}${index}:${encoded.slice(index * REVIEW_RESULT_CHUNK_CHARS, (index + 1) * REVIEW_RESULT_CHUNK_CHARS)}`,
+      expires: claim.expires,
+    })) })
+    if (written.count !== count) throw new Error('The result receipt was not stored completely. Please check the app before retrying.')
+    await tx.verificationToken.update({ where: { token: digest }, data: { identifier: `${COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX}:${userId}:${JSON.stringify(marker)}` } })
+    if (!await completedReviewResult(userId, draft, tx)) throw new Error('The stored result receipt could not be verified. Please check the app before retrying.')
+  }
+  // Food saves already supply their atomic transaction. Other actions have
+  // happened through their normal handlers; publish their receipt atomically.
+  if (db) await persist(db)
+  else await prisma.$transaction(persist, { maxWait: 5000, timeout: 15000 })
 }
 
-async function completedReviewResult(userId: string, draft: any) {
-  const row = await prisma.verificationToken.findUnique({ where: { token: usedReviewTokenDigest(draft.reviewToken) } })
+async function completedReviewResult(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
+  const digest = usedReviewTokenDigest(draft.reviewToken)
+  const row = await db.verificationToken.findUnique({ where: { token: digest } })
   const prefix = `${COMPLETED_REVIEW_TOKEN_IDENTIFIER_PREFIX}:${userId}:`
-  if (!row?.identifier.startsWith(prefix)) return null
+  if (!row?.identifier.startsWith(prefix) || row.expires.getTime() <= Date.now()) return null
   try {
-    const result = JSON.parse(row.identifier.slice(prefix.length))
-    if (typeof result?.kind !== 'string' || typeof result?.message !== 'string') return null
-    return result
+    const marker = JSON.parse(row.identifier.slice(prefix.length))
+    // Keep replay compatibility with receipts written before chunk storage.
+    if (isReviewResult(marker)) return marker
+    if (marker?.receiptVersion !== 2 || !Number.isInteger(marker.count) || marker.count < 1 || marker.count > REVIEW_RESULT_MAX_CHUNKS
+      || !Number.isInteger(marker.bytes) || marker.bytes < 1 || marker.bytes > REVIEW_RESULT_MAX_CHUNKS * REVIEW_RESULT_CHUNK_CHARS * 3 / 4
+      || typeof marker.sha256 !== 'string' || !/^[a-f0-9]{64}$/.test(marker.sha256)) return null
+    const chunkPrefix = reviewResultChunkPrefix(userId, digest)
+    const chunks = await db.verificationToken.findMany({ where: { identifier: { startsWith: chunkPrefix }, expires: { gt: new Date() } },
+      select: { identifier: true, token: true } })
+    if (chunks.length !== marker.count) return null
+    const parts = new Map<number, string>()
+    for (const chunk of chunks) {
+      const match = chunk.identifier.slice(chunkPrefix.length).match(/^(0|[1-9]\d*):([A-Za-z0-9+/]+={0,2})$/)
+      if (!match) return null
+      const index = Number(match[1])
+      const data = match[2]
+      if (index >= marker.count || parts.has(index) || data.length > REVIEW_RESULT_CHUNK_CHARS || (index < marker.count - 1 && data.length !== REVIEW_RESULT_CHUNK_CHARS)
+        || chunk.token !== reviewResultChunkToken(userId, digest, index)) return null
+      parts.set(index, data)
+    }
+    const encoded = Array.from({ length: marker.count }, (_, index) => parts.get(index)).join('')
+    const payload = Buffer.from(encoded, 'base64')
+    if (payload.toString('base64') !== encoded || payload.length !== marker.bytes || crypto.createHash('sha256').update(payload).digest('hex') !== marker.sha256) return null
+    const result = JSON.parse(payload.toString('utf8'))
+    return isReviewResult(result) ? result : null
   } catch { return null }
 }
 
@@ -350,7 +423,7 @@ async function saveExercise(userId: string, draft: any) {
       deviceId: makeManualDeviceId(),
       userId,
       localDate: date,
-      startTime: null,
+      startTime: reviewedTimestamp(draft) || null,
       durationMinutes: inferred.durationMinutes,
       distanceKm,
       source: 'MANUAL',
@@ -365,6 +438,7 @@ async function saveExercise(userId: string, draft: any) {
         steps,
         speedKph,
         spokenCaloriesKcal: spokenCalories,
+        ...(spokenCalories !== null ? { caloriesOverride: spokenCalories } : {}),
         estimatedCaloriesKcal: estimatedCalories,
       },
     },
@@ -373,42 +447,35 @@ async function saveExercise(userId: string, draft: any) {
   return { kind: 'exercise', id: entry.id, message: 'Exercise saved.' }
 }
 
-async function saveMood(userId: string, draft: any) {
-  const moodDraft = draft?.mood || {}
-  const moodRaw = Number(moodDraft.mood)
-  if (!Number.isFinite(moodRaw) || moodRaw < 1 || moodRaw > 7) {
-    throw new Error('Mood value is missing. Continue talking and tell Helfi how you are feeling before saving.')
-  }
-  const mood = Math.round(moodRaw)
-  const tags = Array.isArray(moodDraft.tags)
-    ? moodDraft.tags.map((tag: any) => cleanText(tag, 24)).filter(Boolean).slice(0, 12)
-    : []
-  const note = cleanText(moodDraft.note || draft?.transcript, 600)
-  const date = localDate(draft?.localDate)
-  const id = crypto.randomUUID()
+async function saveMood(request: NextRequest, userId: string, draft: any) {
+  return saveNativeVoiceMood(request,userId,draft)
+}
 
-  await ensureMoodTables()
-  await prisma.$queryRawUnsafe(
-    `INSERT INTO MoodEntries (id, userId, localDate, mood, tags, note, context)
-     VALUES ($1, $2, $3, $4, $5::jsonb, $6, $7::jsonb)`,
-    id,
-    userId,
-    date,
-    mood,
-    JSON.stringify(tags),
-    note,
-    JSON.stringify({ source: 'native_voice_assistant' }),
-  )
-  void deleteNotificationsByType(userId, ['mood_reminder']).catch(() => {})
-  void deleteSmartCoachNotificationsByCategories(userId, ['mood']).catch(() => {})
-  return { kind: 'mood', id, message: 'Mood saved.' }
+function assertJournalSymptomTiming(draft: any, symptom = false) {
+  if (draft?.localTime !== undefined && draft.localTime !== null && draft.localTime !== '') throw new Error('Please review this note without a chosen clock time; that time cannot be saved.')
+  if (!symptom) return
+  let today: string
+  if (draft?.timeZone) {
+    try {
+      const parts = new Intl.DateTimeFormat('en-GB', { timeZone: draft.timeZone, year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(new Date())
+      const part = (type: string) => parts.find(value => value.type === type)?.value
+      today = `${part('year')}-${part('month')}-${part('day')}`
+    } catch { throw new Error('Please review your current local date before saving this symptom note.') }
+  } else {
+    const offset = draft?.tzOffsetMin ?? 0
+    if (typeof offset !== 'number' || !Number.isInteger(offset) || offset < -840 || offset > 840) throw new Error('Please review your current local date before saving this symptom note.')
+    today = new Date(Date.now() - offset * 60 * 1000).toISOString().slice(0, 10)
+  }
+  if (localDate(draft?.localDate) !== today) throw new Error('Symptom Notes cannot save a note under another date. Please review it for today and include when symptoms happened in the note.')
 }
 
 async function saveJournal(userId: string, draft: any) {
+  assertJournalSymptomTiming(draft)
   const journal = draft?.journal || {}
   const title = cleanText(journal.title || 'Voice journal note', 120)
   const content = cleanText(journal.content, 20000)
-  const journalType = String(journal.journalType || journal.type || '').toLowerCase() === 'health' || /\bhealth journal\b/i.test(String(draft?.transcript || ''))
+  const explicitJournalType = String(journal.journalType || journal.type || '').toLowerCase()
+  const journalType = explicitJournalType === 'mood' ? 'mood' : explicitJournalType === 'health' || /\bhealth journal\b/i.test(String(draft?.transcript || ''))
     ? 'health'
     : 'mood'
   const tags = Array.isArray(journal.tags)
@@ -418,7 +485,9 @@ async function saveJournal(userId: string, draft: any) {
   const id = crypto.randomUUID()
 
   if (!title && !content) throw new Error('Journal entry is empty')
+  if (!content) throw new Error('Journal text is missing. Please review the note before saving.')
   if (journalType === 'health') {
+    if (journal.title || Array.isArray(journal.tags) && journal.tags.length) throw new Error('Please review this health journal note as text and date only. Titles and tags cannot be saved in the health journal.')
     await ensureHealthJournalSchema()
     const entry = await prisma.healthJournalEntry.create({
       data: {
@@ -451,6 +520,7 @@ async function saveJournal(userId: string, draft: any) {
 }
 
 async function saveSymptomNote(userId: string, draft: any) {
+  assertJournalSymptomTiming(draft, true)
   const symptom = draft?.symptom && typeof draft.symptom === 'object' ? draft.symptom : {}
   const symptoms = Array.isArray(symptom.symptoms)
     ? symptom.symptoms.map((item: any) => cleanText(item, 80)).filter(Boolean).slice(0, 12)
@@ -459,7 +529,7 @@ async function saveSymptomNote(userId: string, draft: any) {
   if (!safeSymptoms.length) throw new Error('Symptom note is empty')
 
   const duration = cleanText(symptom.duration, 120) || null
-  const notes = cleanText(symptom.notes || draft?.transcript, 1200) || null
+  const notes = cleanText(symptom.notes ?? '', 1200) || null
   const summary = `Symptom note saved: ${safeSymptoms.slice(0, 3).join(', ')}.`
   const analysisData = {
     summary,
@@ -483,6 +553,42 @@ async function saveSymptomNote(userId: string, draft: any) {
   })
 
   return { kind: 'symptom_note', id: created.id, message: 'Symptom note saved.' }
+}
+
+function reviewedDrinkSweetenerMetadata(draft: any) {
+  const sweetener = draft?.water?.sweetener
+  const items = Array.isArray(draft?.food?.items) ? draft.food.items : []
+  const added = items.filter((item: any) => {
+    const name = String(item?.__voiceSourceFood?.name || item?.name || '')
+    return !/\bmilk\b/i.test(name) && /^(?:sugars?\b|honey\b|(?:white|brown|raw|granulated|caster|powdered|turbinado|coconut|maple)\s+.*\bsugar\b)/i.test(name.trim())
+  })
+  if (!added.length) {
+    if (sweetener && sweetener.type !== 'free') throw new Error('Please resolve the added sweetener from its food source before saving.')
+    return { __sweetenerChoice: 'free', __sweetenerType: null, __sweetenerAmount: null, __sweetenerUnit: null,
+      __sweetenerGrams: 0, __sweetenerCalories: 0, __sweetenerCarbs: 0, __sweetenerSugar: 0 }
+  }
+  if (added.length !== 1 || !sweetener || !['sugar', 'honey'].includes(sweetener.type)) throw new Error('Please review one source-resolved added sweetener before saving.')
+  const item = added[0], source = item.__voiceSourceFood
+  const amount = sweetener.amount, unit = sweetener.unit, grams = sweetener.grams
+  const serving = String(item.serving_size || '').match(/^(\d+(?:\.\d+)?)\s*g(?:rams?)?$/i)
+  const servings = item.servings ?? 1
+  const measuredGrams = amount * (unit === 'g' ? 1 : sweetener.type === 'honey' ? unit === 'tbsp' ? 21 : 7 : unit === 'tbsp' ? 12 : 4)
+  if (!source?.id || typeof source.name !== 'string' || !source.name.trim() || item.nutritionCoversServing !== true || typeof amount !== 'number' || !Number.isFinite(amount) || amount <= 0 ||
+    !['g', 'tsp', 'tbsp'].includes(unit) || typeof grams !== 'number' || !Number.isFinite(grams) || grams <= 0 || !serving ||
+    typeof servings !== 'number' || !Number.isFinite(servings) || servings <= 0 || Math.abs(Number(serving[1]) * servings - grams) > 0.00001 || Math.abs(measuredGrams - grams) > 0.00001 ||
+    (/\bhoney\b/i.test(source.name) ? 'honey' : 'sugar') !== sweetener.type) throw new Error('Please review the added sweetener amount and food source before saving.')
+  const calories = reviewedNutrient(item, ['calories', 'calories_kcal'], true)!
+  const carbs = reviewedNutrient(item, ['carbs_g', 'carbs'], true)!
+  const sugar = reviewedNutrient(item, ['sugar_g', 'sugar'], false)
+  const sourceCalories = reviewedNutrient(source, ['calories', 'calories_kcal'], true)!
+  if (sourceCalories <= 0) throw new Error('Please review the sweetener food source before saving.')
+  const ratio = calories / sourceCalories
+  for (const [names, optional] of [[['protein_g', 'protein'], false], [['carbs_g', 'carbs'], false], [['fat_g', 'fat'], false], [['fiber_g', 'fiber'], true], [['sugar_g', 'sugar'], true]] as const) {
+    const actual = reviewedNutrient(item, [...names], !optional), basis = reviewedNutrient(source, [...names], !optional)
+    if ((actual === null) !== (basis === null) || (actual !== null && basis !== null && Math.abs(actual - basis * ratio) > 0.002)) throw new Error('The added sweetener nutrition does not match its reviewed food source.')
+  }
+  return { __sweetenerChoice: 'with', __sweetenerType: sweetener.type, __sweetenerAmount: amount, __sweetenerUnit: unit,
+    __sweetenerGrams: grams, __sweetenerCalories: calories * servings, __sweetenerCarbs: carbs * servings, __sweetenerSugar: sugar === null ? null : sugar * servings }
 }
 
 async function saveWater(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
@@ -513,6 +619,7 @@ async function saveWater(userId: string, draft: any, db: Prisma.TransactionClien
   if (needsFood && (!Array.isArray(draft?.food?.items) || !draft.food.items.length || !draft?.food?.nutrition)) {
     throw new Error('Please review the drink and its complete nutrition before saving.')
   }
+  const sweetenerMetadata = needsFood ? reviewedDrinkSweetenerMetadata(draft) : {}
 
   const created = await db.waterLog.create({
     data: { userId, amount, unit, amountMl, label, category, localDate: date, ...(createdAt ? { createdAt } : {}) },
@@ -527,6 +634,7 @@ async function saveWater(userId: string, draft: any, db: Prisma.TransactionClien
         meal: draft.food.meal || (category === 'other' ? 'uncategorized' : category),
         nutrition: {
           ...draft.food.nutrition,
+          ...sweetenerMetadata,
           __drinkType: drinkType,
           __drinkAmount: amount,
           __drinkUnit: unit,
@@ -542,39 +650,59 @@ async function saveWater(userId: string, draft: any, db: Prisma.TransactionClien
 
 async function copyPreviousFood(userId: string, draft: any, db: Prisma.TransactionClient = prisma) {
   const food = draft?.food || {}
-  const ids = Array.isArray(food.sourceLogIds) ? food.sourceLogIds.map((id: any) => String(id || '').trim()).filter(Boolean) : []
+  const ids = food.sourceLogIds
   const targetDate = localDate(draft?.localDate)
+  const sourceDate=localDate(food.sourceDate)
   const createdAt = reviewedTimestamp(draft)
-  if (ids.length === 0) throw new Error('No food entries to copy')
+  if(!Array.isArray(ids)||!ids.length||ids.length>100||ids.some(id=>typeof id!=='string'||!id)||new Set(ids).size!==ids.length)throw new Error('Please review the complete source meal before copying.')
+  const versions=food.sourceVersions,waterVersions=food.sourceWaterVersions
+  const validVersions=(values:any)=>Array.isArray(values)&&values.every(value=>value&&typeof value.id==='string'&&typeof value.version==='string'&&/^[a-f0-9]{64}$/.test(value.version))&&new Set(values.map(value=>value.id)).size===values.length
+  if(!validVersions(versions)||versions.length!==ids.length||versions.some((value:any)=>!ids.includes(value.id))||!validVersions(waterVersions))throw new Error('The meal needs a fresh review before copying. Nothing has been copied.')
 
   const sourceRows = await db.foodLog.findMany({
-    where: { id: { in: ids }, userId },
+    where: { id: { in: ids }, userId,localDate:sourceDate },
     orderBy: { createdAt: 'asc' },
   })
-  if (sourceRows.length === 0) throw new Error('No matching food entries found')
+  if(sourceRows.length!==ids.length||new Set(sourceRows.map(row=>row.id)).size!==ids.length||sourceRows.some(row=>row.userId!==userId||row.localDate!==sourceDate||!ids.includes(row.id)||versions.find((value:any)=>value.id===row.id)?.version!==nativeVoiceFoodCopyVersion(row)))throw new Error('The source meal changed after review. Please review the complete meal again; nothing has been copied.')
+  const sourceWaterIds=sourceRows.map(nativeVoiceFoodCopyWaterId).filter((id):id is string=>Boolean(id))
+  if(new Set(sourceWaterIds).size!==sourceWaterIds.length||waterVersions.length!==sourceWaterIds.length||waterVersions.some((value:any)=>!sourceWaterIds.includes(value.id)))throw new Error('The source drink links changed or are ambiguous. Please review this meal again.')
+  const sourceWaters=sourceWaterIds.length?await db.waterLog.findMany({where:{id:{in:sourceWaterIds},userId,localDate:sourceDate}}):[]
+  if(sourceWaters.length!==sourceWaterIds.length||new Set(sourceWaters.map(row=>row.id)).size!==sourceWaters.length||sourceWaters.some(row=>row.userId!==userId||row.localDate!==sourceDate||waterVersions.find((value:any)=>value.id===row.id)?.version!==nativeVoiceFoodCopyWaterVersion(row)))throw new Error('A source drink changed or lost its hydration entry. Please review that drink before copying; nothing has been copied.')
 
   const createdIds: string[] = []
+  const expectedFoods:any[]=[],expectedWaters:any[]=[]
+  const copyTime=createdAt||new Date()
+  const allocated=new Set<string>([...ids,...sourceWaterIds])
+  const newId=()=>{const id=crypto.randomUUID();if(allocated.has(id))throw new Error('Please prepare the meal copy again.');allocated.add(id);return id}
   for (const row of sourceRows) {
-    const created = await db.foodLog.create({
-      data: {
-        userId,
-        name: row.name,
-        description: row.description,
-        imageUrl: row.imageUrl,
-        nutrients: row.nutrients ?? Prisma.JsonNull,
-        items: row.items ?? Prisma.JsonNull,
-        localDate: targetDate,
-        ...(createdAt ? { createdAt } : {}),
-        meal: row.meal,
-        category: row.category,
-      },
-    })
-    createdIds.push(created.id)
+    let nutrients:any=row.nutrients??null,items:any=row.items??null
+    const waterId=nativeVoiceFoodCopyWaterId(row),water=waterId?sourceWaters.find(value=>value.id===waterId):null
+    if(water){
+      const copiedWaterId=newId()
+      expectedWaters.push({id:copiedWaterId,userId,amount:water.amount,unit:water.unit,amountMl:water.amountMl,label:water.label,category:water.category,localDate:targetDate,createdAt:copyTime})
+      nutrients=relinkNativeVoiceCopiedDrink(nutrients,water.id,copiedWaterId);items=relinkNativeVoiceCopiedDrink(items,water.id,copiedWaterId)
+      if(nutrients&&typeof nutrients==='object'&&!Array.isArray(nutrients))Object.assign(nutrients,{__waterLogId:copiedWaterId,__drinkAmount:water.amount,__drinkUnit:water.unit,__drinkAmountMl:water.amountMl})
+    }
+    const id=newId()
+    createdIds.push(id)
+    expectedFoods.push({id,userId,name:row.name,description:row.description,imageUrl:row.imageUrl,nutrients,items,localDate:targetDate,createdAt:copyTime,meal:row.meal,category:row.category})
+  }
+  // A meal needs a constant number of database round trips, including drinks.
+  // Batch counts and full readback are required inside the caller's transaction.
+  if(expectedWaters.length){const written=await db.waterLog.createMany({data:expectedWaters});if(written.count!==expectedWaters.length)throw new Error('The app did not confirm every copied hydration entry.')}
+  const written=await db.foodLog.createMany({data:expectedFoods.map(row=>({...row,nutrients:row.nutrients??Prisma.JsonNull,items:row.items??Prisma.JsonNull}))})
+  if(written.count!==expectedFoods.length)throw new Error('The app did not confirm every copied food entry.')
+  const savedFoods=await db.foodLog.findMany({where:{id:{in:createdIds},userId}})
+  if(savedFoods.length!==expectedFoods.length||new Set(savedFoods.map(row=>row.id)).size!==expectedFoods.length||expectedFoods.some(expected=>{const actual=savedFoods.find(row=>row.id===expected.id);return !actual||nativeVoiceFoodCopyVersion(actual)!==nativeVoiceFoodCopyVersion(expected)}))throw new Error('The app could not verify every copied food entry. Please check your diary before retrying.')
+  if(expectedWaters.length){
+    const savedWaters=await db.waterLog.findMany({where:{id:{in:expectedWaters.map(row=>row.id)},userId}})
+    if(savedWaters.length!==expectedWaters.length||new Set(savedWaters.map(row=>row.id)).size!==expectedWaters.length||expectedWaters.some(expected=>{const actual=savedWaters.find(row=>row.id===expected.id);return !actual||nativeVoiceFoodCopyWaterVersion(actual)!==nativeVoiceFoodCopyWaterVersion(expected)}))throw new Error('The app could not verify every copied hydration entry. Please check your diary before retrying.')
   }
 
   return {
     kind: 'food',
     ids: createdIds,
+    ...(expectedWaters.length?{waterIds:expectedWaters.map(row=>row.id)}:{}),
     message: `Copied ${createdIds.length} food item${createdIds.length === 1 ? '' : 's'}.`,
   }
 }
@@ -735,7 +863,7 @@ async function saveBuiltMeal(userId: string, draft: any, db: Prisma.TransactionC
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0, sugar: 0 },
   )
-  const nutrition = {
+  let nutrition: Record<string, any> = {
     calories: Math.max(0, Math.round(Number(totals.calories) || 0)),
     calories_kcal: Math.max(0, Math.round(Number(totals.calories) || 0)),
     protein: Math.max(0, Number(totals.protein) || 0),
@@ -748,23 +876,33 @@ async function saveBuiltMeal(userId: string, draft: any, db: Prisma.TransactionC
     fiber_g: totals.fiber,
     sugar: totals.sugar,
     sugar_g: totals.sugar,
+    ...(!food.nutrition?.__waterLogId && (!isSingleIngredient || food.nutrition?.__importRecipe) ? { __origin: 'meal-builder' } : {}),
     ...(typeof food.nutrition?.__waterLogId === 'string' ? {
       __drinkType: food.nutrition.__drinkType,
       __drinkAmount: food.nutrition.__drinkAmount,
       __drinkUnit: food.nutrition.__drinkUnit,
       __drinkAmountMl: food.nutrition.__drinkAmountMl,
       __waterLogId: food.nutrition.__waterLogId,
+      ...Object.fromEntries(['__sweetenerChoice', '__sweetenerType', '__sweetenerAmount', '__sweetenerUnit', '__sweetenerGrams', '__sweetenerCalories', '__sweetenerCarbs', '__sweetenerSugar']
+        .filter(key => Object.prototype.hasOwnProperty.call(food.nutrition, key)).map(key => [key, food.nutrition[key]])),
     } : {}),
     ...(isSingleIngredient
       ? { __voiceSingleIngredient: true, method: 'single-ingredient' }
       : { __voiceBuiltMeal: true, customMeal: true, method: 'meal-builder' }),
   }
 
+  if (food.nutrition?.__importRecipe) {
+    nutrition = applyNativeVoiceRecipeMetadata({ items: normalizedItems, nutrition }, food.nutrition.__importRecipe, {
+      servingsEaten: food.nutrition.__nativeRecipeServingsEaten,
+      portionControlEnabled: food.nutrition.__portionControlEnabled,
+    }).nutrition
+  }
+
   const created = await db.foodLog.create({
     data: {
       userId,
       name: label,
-      description: normalizedItems.map((item: any) => item.name).join(', '),
+      description: label,
       imageUrl: null,
       nutrients: nutrition,
       items: normalizedItems,
@@ -844,7 +982,7 @@ async function saveHealthIntakeItems(userId: string, draft: any) {
         await prisma.supplementCatalog.createMany({ data: catalogRows, skipDuplicates: true })
       }
     } catch (error) {
-      console.error('[native voice assistant] supplement catalog save skipped', error)
+      console.error('[native voice assistant] supplement catalog save skipped')
     }
     if (savedSupplements > 0) changedTypes.push('supplements')
   }
@@ -906,7 +1044,7 @@ async function saveHealthIntakeItems(userId: string, draft: any) {
         )
       }
     } catch (error) {
-      console.error('[native voice assistant] medication catalog save skipped', error)
+      console.error('[native voice assistant] medication catalog save skipped')
     }
     if (savedMedications > 0) changedTypes.push('medications')
   }
@@ -935,12 +1073,26 @@ async function saveHealthIntakeItems(userId: string, draft: any) {
 }
 
 export async function POST(request: NextRequest) {
+  const trace = beginVoiceActionTrace(request, 'save')
+  return finishVoiceActionTrace(await confirmVoiceAction(request, trace), trace)
+}
+
+async function confirmVoiceAction(request: NextRequest, trace?: { userId?: string; action?: string }) {
   try {
     const user = await resolveUser(request)
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (trace) trace.userId = user.id
 
     const body = await request.json().catch(() => ({} as any))
     const draft = body?.draft || body
+    if (trace && ['exercise', 'mood', 'journal', 'water', 'symptom_note', 'health_intake_items', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'record_action', 'preference_action', 'local_preference_action', 'notification_action', 'recipe_import_url', 'support_action', 'report_action', 'device_action'].includes(draft?.action)) trace.action = draft.action
+    // A completed receipt is an authenticated, read-only recovery by opaque
+    // token. Its own 24-hour expiry applies even after the shorter review ends.
+    // Return only stored data; edited client payload fields never execute here.
+    if (typeof draft?.reviewToken === 'string' && /^v1\.[A-Za-z0-9_-]{43}$/.test(draft.reviewToken)) {
+      const completed = await completedReviewResult(user.id, { reviewToken: draft.reviewToken })
+      if (completed) return NextResponse.json({ success: true, idempotentReplay: true, result: completed })
+    }
     if (hasSelfHarmRisk(draft?.transcript) || hasSelfHarmRisk(draft?.mood?.note) || hasSelfHarmRisk(draft?.journal?.content)) {
       return NextResponse.json({ error: 'This cannot be saved as a normal log. Please contact urgent support if you might hurt yourself.' }, { status: 400 })
     }
@@ -962,7 +1114,22 @@ export async function POST(request: NextRequest) {
       draft.action === 'food_copy_previous' ||
       draft.action === 'food_favorite' ||
       draft.action === 'food_build_meal'
+      || draft.action === 'record_action'
+      || draft.action === 'preference_action'
+      || draft.action === 'local_preference_action'
+      || draft.action === 'notification_action'
+      || draft.action === 'recipe_import_url'
+      || draft.action === 'support_action'
+      || draft.action === 'report_action'
+      || draft.action === 'device_action'
     if (!supportedAction) return NextResponse.json({ error: 'This action is not supported yet.' }, { status: 400 })
+    if (draft.action === 'device_action') return NextResponse.json(await authorizeNativeVoiceDeviceAction(request, user.id, draft))
+    if (draft.action === 'local_preference_action') {
+      const pref = draft.localPreference
+      const valid = pref && (['darkMode', 'hapticsEnabled', 'dataAnalytics'].includes(pref.key) ? typeof pref.value === 'boolean' : pref.key === 'profileVisibility' && ['private', 'public', 'friends'].includes(pref.value))
+      if (!valid) return NextResponse.json({ error: 'Please review a supported device setting.', code: 'device_preference_invalid' }, { status: 400 })
+      return NextResponse.json({ success: true, localPreferenceAuthorized: true, authorizedPreference: { key: pref.key, value: pref.value } })
+    }
     try {
       const atomicFoodAction = ['water', 'food_copy_previous', 'food_favorite', 'food_build_meal'].includes(draft.action)
       if (atomicFoodAction) {
@@ -980,8 +1147,40 @@ export async function POST(request: NextRequest) {
         // Existing non-food handlers retain their own schema/catalog behavior.
         // An interrupted claim stays pending, never evidence of a completed save.
         await markReviewTokenUsed(user.id, draft)
-        if (draft.action === 'exercise') result = await saveExercise(user.id, draft)
-        else if (draft.action === 'mood') result = await saveMood(user.id, draft)
+        if (draft.action === 'recipe_import_url') {
+          result = await executeVoiceRecipeUrlImport(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
+          // Resolve the imported recipe through the normal authenticated review
+          // route. Its source quantities are rechecked; importing never logs food.
+          const nextTranscript = draft.recipeImport.destination === 'library' ? 'Save this recipe to my recipes' : `Log this recipe for ${draft.recipeImport.meal || 'dinner'}`
+          const headers = new Headers(request.headers)
+          headers.set('content-type', 'application/json')
+          headers.delete('content-length')
+          const nextRequest = new NextRequest(new URL('/api/native/voice-assistant', request.url), { method: 'POST', headers, body: JSON.stringify({ transcript: nextTranscript, localDate: draft.localDate, followUpDraft: result.nextRecipeDraft, aiConsentGranted: true, voiceReply: false }) })
+          try {
+            const response = await (await import('@/app/api/native/voice-assistant/route')).POST(nextRequest)
+            const body = await response.json()
+            if (response.ok && body?.draft) result.nextRecipeDraft = body.draft.canConfirm ? body.draft : { ...body.draft, action: 'recipe', canConfirm: false, recipe: body.draft.recipe || result.nextRecipeDraft.recipe }
+          } catch {
+            // Keep the full imported recipe for a later review. Never retry the
+            // charged import automatically if normal food lookup is unavailable.
+          }
+        } else if (draft.action === 'support_action') {
+          result = await executeVoiceSupportAction(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
+        } else if (draft.action === 'report_action') {
+          result = await executeVoiceReportAction(request, user.id, draft, { receiptClaimed: true, actionId: usedReviewTokenDigest(draft.reviewToken) })
+        } else if (draft.action === 'record_action') {
+          const saved = await executeNativeVoiceRecordAction(request, user.id, draft.recordAction)
+          result = { ...saved, kind: 'record_action', entity: draft.recordAction.entity }
+        } else if (draft.action === 'preference_action') {
+          const saved = await executeVoicePreferenceAction(request, user.id, draft.preferenceAction)
+          if (!saved.saved) return NextResponse.json({ error: saved.message, code: `preference_${saved.status}` }, { status: 409 })
+          result = { ...saved, kind: 'preference_action', id: draft.preferenceAction.action, operation: 'update', entity: 'preferences' }
+        } else if (draft.action === 'notification_action') {
+          const saved = await executeVoiceNotificationAction(request, user.id, draft.notificationAction)
+          if (!saved.saved) return NextResponse.json({ error: saved.message, code: `notification_${saved.status}` }, { status: 409 })
+          result = { ...saved, kind: 'notification_action', id: draft.notificationAction.action }
+        } else if (draft.action === 'exercise') result = await saveExercise(user.id, draft)
+        else if (draft.action === 'mood') result = await saveMood(request, user.id, draft)
         else if (draft.action === 'journal') result = await saveJournal(user.id, draft)
         else if (draft.action === 'symptom_note') result = await saveSymptomNote(user.id, draft)
         else if (draft.action === 'health_intake_items') result = await saveHealthIntakeItems(user.id, draft)
@@ -1013,7 +1212,10 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({ success: true, result })
   } catch (error: any) {
-    console.error('[native voice assistant] confirm failed', error)
-    return NextResponse.json({ error: error?.message || 'Could not save this voice action' }, { status: 500 })
+    const databaseCode = /^P\d{4}$/.test(String(error?.code || '')) ? String(error.code) : null
+    const reasonCode = databaseCode === 'P2028' ? 'voice_transaction_timeout' : /^[a-z_]{1,80}$/.test(String(error?.code || '')) ? String(error.code) : 'voice_action_failed'
+    console.error('[native voice assistant] confirm failed', { reasonCode, databaseCode })
+    const message = databaseCode ? 'The save could not be completed. Please check your history before trying again.' : error?.message || 'Could not save this voice action'
+    return NextResponse.json({ error: message, code: reasonCode }, { status: 500 })
   }
 }

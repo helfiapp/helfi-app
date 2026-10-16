@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native'
+import { DeviceEventEmitter, Linking, Pressable, ScrollView, Switch, Text, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 
 import { API_BASE_URL } from '../config'
@@ -44,24 +44,32 @@ export function PrivacySettingsScreen() {
   const [loaded, setLoaded] = useState(false)
 
   useEffect(() => {
+    let cancelled = false
+    let revision = 0
     const load = async () => {
+      const loadingRevision = ++revision
+      setLoaded(false)
       try {
         const [savedVisibility, savedAnalytics] = await Promise.all([
           AsyncStorage.getItem(PROFILE_VISIBILITY_KEY),
           AsyncStorage.getItem(DATA_ANALYTICS_KEY),
         ])
 
+        if (cancelled || loadingRevision !== revision) return
         if (savedVisibility === 'private' || savedVisibility === 'public' || savedVisibility === 'friends') {
           setProfileVisibility(savedVisibility)
         }
         if (savedAnalytics !== null) {
           setDataAnalytics(savedAnalytics === 'true')
         }
-      } finally {
         setLoaded(true)
+      } catch {
+        // Keep the last displayed values if storage cannot be read.
       }
     }
+    const subscription = DeviceEventEmitter.addListener('helfi:device-preference-changed', () => { void load() })
     void load()
+    return () => { cancelled = true; subscription.remove() }
   }, [])
 
   useEffect(() => {

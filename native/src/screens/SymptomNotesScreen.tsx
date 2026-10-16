@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Pressable,
   ScrollView,
   StyleSheet,
@@ -143,6 +144,10 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
   const [chatBusy, setChatBusy] = useState(false)
   const [chatError, setChatError] = useState('')
 
+  const historyLoadRunRef = useRef(0)
+  const historyAccountRef = useRef('')
+  historyAccountRef.current = mode === 'signedIn' ? JSON.stringify([session?.user?.id || '', session?.token || '']) : ''
+
   const [historyItems, setHistoryItems] = useState<SymptomHistoryItem[]>([])
   const [historyLoading, setHistoryLoading] = useState(false)
   const [historyError, setHistoryError] = useState('')
@@ -164,32 +169,48 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
   }, [])
 
   const loadHistory = useCallback(async () => {
+    const loadRun = ++historyLoadRunRef.current
+    const account = historyAccountRef.current
+    const isCurrent = () => historyLoadRunRef.current === loadRun && historyAccountRef.current === account
     if (!authHeaders) return
     setHistoryLoading(true)
     setHistoryError('')
     try {
       const res = await fetch(`${API_BASE_URL}/api/symptoms/history`, { headers: authHeaders })
       const data: any = await res.json().catch(() => ({}))
+      if (!isCurrent()) return
       if (!res.ok) throw new Error(String(data?.error || 'Failed to load history'))
       setHistoryItems(Array.isArray(data?.history) ? data.history : [])
     } catch (e: any) {
+      if (!isCurrent()) return
       setHistoryError(e?.message || 'Failed to load history')
       setHistoryItems([])
     } finally {
-      setHistoryLoading(false)
+      if (isCurrent()) setHistoryLoading(false)
     }
-  }, [authHeaders])
+  }, [authHeaders, session?.user?.id])
 
   useFocusEffect(
     useCallback(() => {
       if (activeTab === 'history') void loadHistory()
-      return () => {}
+      return () => { historyLoadRunRef.current++ }
     }, [activeTab, loadHistory]),
   )
 
   useEffect(() => {
+    let active = true
+    const subscription = DeviceEventEmitter.addListener('helfi:symptom-notes-changed', () => {
+      if (!active) return
+      setActiveTab('history')
+      void loadHistory()
+    })
+    return () => { active = false; historyLoadRunRef.current++; subscription.remove() }
+  }, [loadHistory])
+
+  useEffect(() => {
     const params = route?.params
     if (params?.initialTab === 'history') {
+      void loadHistory()
       setActiveTab('history')
       setError('')
       return
@@ -210,7 +231,7 @@ export function SymptomNotesScreen({ route }: { route?: { params?: SymptomNotesR
     }
     setActiveTab('notes')
     setError('')
-  }, [route?.params?.initialTab, route?.params?.voiceAction, route?.params?.voiceActionNonce])
+  }, [loadHistory, route?.params?.initialTab, route?.params?.voiceAction, route?.params?.voiceActionNonce])
 
   const createNotes = async () => {
     if (!jsonHeaders) {

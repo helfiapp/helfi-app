@@ -1,5 +1,17 @@
 # 🛡️ Helfi Guard Rails (Protected Flows)
 
+## Permanent interface colour rule — owner, 17 October 2026
+
+The owner explicitly rejects yellow and brown anywhere in the app interface. All future agents doing design work on web, iPhone or Android must avoid yellow/amber/gold/mustard/tan/brown buttons, badges, backgrounds, text, borders, chart accents and icons. The former yellow/brown `High impact` badge is specifically forbidden. The owner also rejected the new purple accents as inconsistent with Helfi. Use existing Helfi green, soft green backgrounds and accessible neutral text; do not introduce or spread a new purple accent scheme across pages. Retain meaningful text/icons for status and severity. This new colour instruction supersedes older palette notes that specify yellow (including historical fibre-card colour notes); preserve the nutrient names, values and six-card layout when an approved colour revision reaches that area. Apply this to each area as it is revised; do not use the rule to bypass existing exact-page locks or to release unreviewed designs. Full-page previews must show the bottom as well as the top.
+
+## Approved compact green native Insights — 17 October 2026 (owner hard lock)
+
+The owner approved the full matching-green Insights page and explicitly requested the same protection as Dashboard. Preserve the compact report/countdown/action panel, every complete tracked-issue row, joined previous-report list, and existing Helfi green/soft green/neutral accents. Ready-report text/tick, High impact and Next step all use #267245. No reintroduction of yellow/brown or purple accents. Existing state, report generation/access, issue navigation, account/credit behavior and health-setup gates remain protected.
+
+Dedicated exact baseline: `scripts/insights-design-lock.json`; checker: `scripts/check-insights-design-lock.js`. It protects `native/src/screens/InsightsScreen.tsx` and `native/src/components/WeeklyReportDataExplorer.tsx`; shared theme/Screen/navigation/logo remain protected by the Dashboard lock. Normal page checks, snapshot write mode and protected-region checks run both guards. Generic overrides do not authorize drift or baseline refresh. Do not remove/weaken the guard or change the approved baseline without new explicit owner approval for the exact change.
+
+Approved actual iPhone16e full top/middle/bottom reference and verification: `/Users/louieveleski/.config/helfi/private-verification/2026-10-17-compact-insights/` (`matched-*.jpg`, `matched-verification.json`). Current local source hashes are the approved baseline; this Insights design has not been deployed/distributed. Existing public/store builds exclude it. Approval locks the design; a release still needs the owner's relevant release instruction. Preserve VOICE's ongoing functional repair ownership and unrelated source changes.
+
 ## Approved compact native Dashboard — 17 October 2026 (owner hard lock)
 
 The owner approved the entire compact mobile Dashboard in DESIGN MANAGER and explicitly asked that other agents must not change it. This approval supersedes the earlier pending-review status for this Dashboard only. Do not involve Claude in redesigning this approved page.
@@ -718,6 +730,11 @@ This overwrote real goals (e.g., Libido/Erection Quality/Bowel Movements) with u
 3) Re‑deploy and confirm Health Setup goals stay correct after a refresh.
 
 **Last stable deployment:** `edaf0abf` (2026-02-02)
+
+**History preservation warning (17 October 2026, HEL-471):**
+- Do not correct the normal goal query's `NOT name startsWith '__'` filter in isolation. Actual PostgreSQL/Prisma read-only checks confirmed that its unescaped `__%` pattern currently matches ordinary names too. Correcting that filter would activate the existing removed-goal `deleteMany` branch, and deleting a `HealthGoal` cascades to its linked `HealthLog` history. A future repair must preserve historical records when changing the selected list and test the actual PostgreSQL behavior before enabling deletion. A JavaScript `startsWith` mock does not reproduce this wildcard behavior.
+- A goal absent from `__SELECTED_ISSUES__` can still have an old `HealthGoal` row or history. Temporary add/remove testing must verify the exact candidate against all owned goal rows and check-in issues, rather than checking the selected list alone.
+- Normal goal saving updates check-in issues before the selected-list marker, without one transaction. A snapshot taken while saving can temporarily show different lists. Verify the completed result before reporting a lasting mismatch. The actual HEL-471 test restored the original selection and IDs; no historical deletion was observed. This warning authorizes no changes to deletion, sync, health-setup gating or legacy filters.
 
 ## 3. Water Intake + Exercise Logging (Jan 2026 – Locked)
 
@@ -3469,6 +3486,7 @@ for guidance first.
 - Prefer the current local remembered session over an older per-tab session. Refresh on page load, active-page hourly renewal, return/focus/online; synchronize other-tab login and explicit Logout. Network, timeout and5xx failures retain the current session. Only actual401/403 or explicit Logout clears it. Delayed responses cannot overwrite/clear a newer sign-in or resurrect a signed-out session.
 - `npm run check:admin-session` uses synthetic offline credentials only and verifies long idle renewal, seven-day API expiry, credential/account revocation, stale tabs, outages and delayed responses. Required in prebuild. Only app/admin-panel/page.tsx is approved for page-lock refresh; all other web/native hashes remain unchanged. Previous stable productione05cb394/AWS92; exact new deployment/runtime proof pending.
 
+
 ### Ordinary photo foods must match their saved food identity (10 October 2026)
 
 - Plain scrambled eggs must not inherit frozen egg-mixture nutrition. Match singular/plural egg names in both directions so the existing whole cooked scrambled egg record remains eligible. Reject unrequested frozen/mixture forms.
@@ -3576,3 +3594,26 @@ for guidance first.
 - Actual Android startup test on17October exposed a pre-provider ICE wait failure in the first signed candidate. OpenAI Live media setup must not depend on an unrelated external STUN server. Retain complete candidate gathering with a bounded10-second deadline, and give server negotiation its own timer starting after the local offer is ready. A media timeout before server POST is not a provider rejection, save or charge. Required voice protocol/callback checks cover this boundary; actual app connection proof is still required.
 
 - Silence and unclear-audio reminders are notices, not provider failures. Keep an idle connected session ready, show the useful notice without a red service-error assertion, and preserve exact genuine service failure messages. Late notices after End must be ignored. Required actual-source voice regressions cover the12-second silence path, legacy unclear-audio notice and real-error distinction.
+
+### Voice action coverage and saved results (17 October 2026 repair)
+
+- Voice must execute supported manual app actions through authenticated, fixed app handlers. Navigation is a handoff, never proof of a completed input, edit or save. A missing amount or ambiguous existing record requires a short clarification while retaining the request.
+- Preserve prepared restaurant names, brand, country and verified count servings. Never turn a burger into an assumed100g item or six nuggets into600g. Quantity corrections retain the reviewed source; a name-only correction retains every ingredient and nutrient. Generic favorites such as "For lunch" cannot intercept new meals or pending corrections. AU McDonald's nuggets use the published January2026 count menu; missing fibre stays unknown.
+- Existing-record edits and deletes require exact owned selection, a fresh signed review, stale-state checks and readback. Whole drink updates/deletes and their exact linked calorie entries are atomic; never select links by substring. Specific milk/sugar edits change that ingredient, not the whole drink's nutrition. Favorites use a versioned single-operation mutation and cannot replace unrelated library entries; exact linked-title changes preserve nutrient/portion metadata.
+- Recipes retain actual measured ingredients, yield and complete steps. Saving a recipe to the library does not log eating it. Ask for the eaten servings before diary logging; preserve the full recipe basis and scale consumed nutrition once.
+- Record safe action IDs, outcome/reason and duration separately from vendor usage. Preparing a proposal, opening a screen, authorizing a device change and returning a verified save receipt are distinct outcomes. Logs must not contain transcripts, health/food content, secrets or review tokens.
+- Device preferences stay account-scoped and require current-account checks, exact authorization and storage readback. A setting flag does not prove OS permission, reminder delivery or tracking behavior. Notification bulk actions affect only the reviewed captured IDs, preserving future arrivals.
+- A newer silent Food refresh can supersede its initial foreground load. The latest primary load or failure must release loading; stale account/date/exercise results must remain ignored. Keep the actual-source loading race regression in required checks.
+- Offline source checks do not establish live or microphone success. Record actual app confirmations and reopened saved values separately. Previous released voice baseline remains e944997a/AWS126/iPhone49 until the new repair is independently deployed and installed with exact-source evidence.
+
+### Voice review, receipts and ordinary edit compatibility (17 October 2026 repair)
+
+- Keep completed results out of an indexed identifier. Store a bounded digest/manifest and 1024-character ASCII chunks atomically, then verify every chunk/hash before a successful response. Authenticated same-account receipt recovery may outlive the shorter review window; it returns the stored result only and never executes edited client fields.
+- Never retry a submitted confirmation against another server. A lost response does not prove no write occurred. Preserve the original error and the same review for receipt recovery. Successful replacement reviews clear old error text; failures and the same failed review retain their real error.
+- Save mood details through the normal authenticated mood handler, derive context only from explicit speech, preserve passive context, and read back the exact new ID. Empty notes remain empty. Seven-point mood and five-point detail ratings are separate scales.
+- Read the complete journal note before confirmation. Health journals store content/date only; mood journals also store title/tags. An explicit destination wins over a journal name mentioned inside the note. Unsupported clock times or symptom backdating require clarification before confirmation. Speech replies must never be silently sliced: reject oversized speech before charging, and do not turn a provider token-limit rejection into a speech success.
+- Recipe URL import requires the existing ten-credit review and normal consent/SSRF checks. Imported means ready for review, not saved to a recipe library or food diary. Support/report actions preserve their normal authorization and exact literal content; a queued report request is not a generated/unlocked/emailed report.
+- Copying a meal binds every complete source row and its date/account/content. Missing or changed rows refuse the whole copy. A linked drink creates its own reviewed new hydration row and new links inside the same transaction; copied food must never retain yesterday's hydration ID.
+- Preserve added-sweetener amount and sourced nutrients independently of milk's natural sugar. Whole-drink resizing updates measured labels, ingredients, nutrition and sweetener values exactly once; ingredient-only corrections preserve the others. Verified source-built linked drinks must survive ordinary food edits without the unrelated legacy hot-chocolate repair rewriting their nutrients. Preserve that locked legacy function and its historical behavior.
+- Native device changes use the live same-account Health state and durable verified results. Available Apple Health actions are importing real data, changing automatic updates and selecting a real source. Dormant Sleep helpers are not an advertised/executable app action. A completed permission prompt or empty Health result is never an import receipt.
+- The native Metro configuration watches only the existing locked pure SHA-256 package required by the device receipt helper. Type checks alone cannot prove bundling: verify an actual candidate bundle after dependency/import changes. Do not install a new dependency or broaden the project root to hide an import failure.

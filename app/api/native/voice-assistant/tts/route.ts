@@ -18,9 +18,29 @@ const TTS_MODEL = process.env.HELFI_VOICE_TTS_MODEL || 'gpt-4o-mini-tts'
 const TTS_VOICE = resolveHelfiTtsVoice()
 const VOICE_REPLY_MIN_CREDITS = 2
 const VOICE_PAID_ACCESS_MESSAGE = 'Talk to Helfi needs an active subscription or purchased credits.'
+// https://developers.openai.com/api/reference/resources/audio/subresources/speech/methods/create
+// https://developers.openai.com/api/docs/models/gpt-4o-mini-tts
+// Speech API input limit. The mini-TTS model also enforces its 2000-token
+// limit; a provider rejection is handled below without charging or truncation.
+const TTS_MAX_INPUT_CHARACTERS = 4096
 
-function cleanText(value: unknown, max = 1200) {
-  return String(value || '').replace(/\s+/g, ' ').trim().slice(0, max)
+function cleanText(value: unknown) {
+  return String(value || '').replace(/\s+/g, ' ').trim()
+}
+
+function replyTooLongResponse() {
+  return NextResponse.json({
+    error: 'This reply is too long to read aloud in one go. The full review is still on screen. No spoken-reply credits were charged.',
+    code: 'voice_reply_too_long',
+    chargedCredits: 0,
+  }, { status: 413 })
+}
+
+function isSpeechInputLimitError(error: unknown) {
+  const failure = error as { status?: number; code?: string; param?: string; message?: string }
+  if (failure?.status !== 400 && failure?.status !== 413) return false
+  return /^(?:context_length_exceeded|input_too_long|token_limit_exceeded|string_above_max_length)$/.test(failure.code || '') ||
+    /(?:input|text|tokens?).{0,100}(?:too long|exceeds? (?:the )?(?:maximum|limit)|maximum.{0,30}(?:length|tokens?))|maximum.{0,30}(?:input|text|tokens?)/i.test(failure.message || '')
 }
 
 function hasAiConsentFlag(value: unknown) {
@@ -69,6 +89,7 @@ export async function POST(request: NextRequest) {
     if (!hasAiConsentFlag(body?.aiConsentGranted ?? body?.aiConsent)) {
       return NextResponse.json({ error: 'AI sharing consent is required before spoken replies can be created.' }, { status: 403 })
     }
+    if (Array.from(text).length > TTS_MAX_INPUT_CHARACTERS) return replyTooLongResponse()
 
     if (!process.env.OPENAI_API_KEY) {
       return NextResponse.json({ error: 'Voice reply is not configured' }, { status: 500 })
@@ -97,7 +118,15 @@ export async function POST(request: NextRequest) {
       instructions:
         'Speak like a real, warm health coach in a natural conversational tone. Use gentle energy, smooth pacing, and subtle expression. Avoid sounding robotic, flat, or like an announcer.',
       response_format: 'mp3',
-    } as any)
+    } as any).catch((error: unknown) => {
+      if (isSpeechInputLimitError(error)) return null
+      throw error
+    })
+    if (!response) return replyTooLongResponse()
+    // Finish receiving the audio before billing. A provider stream can fail
+    // after its headers arrive, or return no usable audio at all.
+    const buffer = Buffer.from(await response.arrayBuffer())
+    if (!buffer.length) throw new Error('Voice reply contained no audio')
 
     const charged = await new CreditManager(user.id).chargeCents(chargeCents)
     if (!charged) {
@@ -116,7 +145,6 @@ export async function POST(request: NextRequest) {
       detail: 'charged voice reply credits after draft review',
     })
 
-    const buffer = Buffer.from(await response.arrayBuffer())
     return NextResponse.json({
       success: true,
       audio: `data:audio/mpeg;base64,${buffer.toString('base64')}`,
@@ -129,7 +157,7 @@ export async function POST(request: NextRequest) {
         { status: 429 },
       )
     }
-    console.error('[native voice assistant tts] failed', error)
+    console.error('[native voice assistant tts] failed')
     return NextResponse.json({ error: 'Voice reply failed' }, { status: 500 })
   }
 }

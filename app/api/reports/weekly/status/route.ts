@@ -43,6 +43,27 @@ export async function GET(request: NextRequest) {
     })
   }
 
+  // Voice status is an observation, never a request to enable or reschedule reports.
+  if (new URL(request.url).searchParams.get('voiceReadOnly') === '1') {
+    return NextResponse.json({
+      voiceReadOnly: true,
+      healthSetupComplete: true,
+      reportId: latest?.id ?? null,
+      status: latest?.status ?? null,
+      reportReady: latest?.status === 'READY',
+      reportLocked: latest?.status === 'LOCKED',
+      showPopup: false,
+      summary: null,
+      dataSummary: null,
+      periodStart: latest?.periodStart ?? null,
+      periodEnd: latest?.periodEnd ?? null,
+      nextReportDueAt: state?.nextReportDueAt ?? null,
+      lastReportAt: state?.lastReportAt ?? null,
+      reportsEnabled: state?.reportsEnabled ?? false,
+      reportsEnabledAt: state?.reportsEnabledAt ?? null,
+    })
+  }
+
   // PROTECTED: WEEKLY_STATUS_SELF_HEAL START
   if (!state?.nextReportDueAt) {
     const isOwnerTestAccount = String(session.user.email || '').toLowerCase() === 'info@sonicweb.com.au'
