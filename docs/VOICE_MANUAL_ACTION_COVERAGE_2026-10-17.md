@@ -58,7 +58,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-sign-save-integration-check.cjs` | Composed signed prepare/confirm scenario |
 | `voice-client-integrity-check.cjs` | Native callback integrity suite |
 | `voice-live-protocol-check.cjs` | Route/native/metering protocol surfaces |
-| `voice-restaurant-food-integrity-check.cjs` | 21 groups |
+| `voice-restaurant-food-integrity-check.cjs` | 23 groups |
 | `voice-action-matrix-check.cjs` | 78 cases |
 | `voice-action-outcome-check.cjs` | Actual outcome/receipt boundary suite |
 | `voice-record-actions-check.cjs` | 41 groups |
@@ -187,3 +187,9 @@ Support/Settings27 actual-source groups consume the actual current completion em
 Native52 was signed and Apple-validated but deliberately never uploaded/distributed;53 includes these final functional corrections. Protected Insights same-focused report-request refresh remains a separately prepared, unapplied proposal for exact owner approval; no visual or protected-baseline change was made.
 
 Final53 source verification: complete52-suite guard PASS under UTC/root-only dependency boundary; root/native type checks PASS;292 full/93 native locks and protected regions PASS. Actual-source regression fixture repair seeded new lifetime refs without weakening assertions. Final source is frozen for exact production and signed53 builds.
+
+### Physical53 follow-up and server repair candidate
+
+Native53/eacb13c is actually installed, opened and signed in on the physical iPhone. Its actual Oura preference off/restore test passed with exact original row/other preferences preserved and mounted Devices immediately refreshed. Typed natural Yes was used. The latest READY PDF review selected29April–5May correctly, but native URL verification refused the result. The longer meal/date/colon request above also failed because `for :` entered the product name. Neither failure saved a meal or claimed to open a PDF.
+
+Server repairs now cover the exact failing natural request through actual POST composition (restaurant23 groups), plus trusted public PDF origin through actual normal PDF handler and unchanged native boundary (PDF16 groups). Internal runtime URL reproduces the exact native alert offline; malicious forwarded headers/returned links are rejected. These are offline results until the exact server release and installed53 retests are separately verified. No native source/design/baseline or normal PDF route changes are needed for these two repairs.

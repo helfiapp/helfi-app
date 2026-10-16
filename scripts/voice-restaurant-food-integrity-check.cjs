@@ -60,6 +60,39 @@ function actualMenuRows(){
   return load('lib/food/fast-food-menus.ts').loadFastFoodMenuItems().filter(row=>row.country==='AU'&&row.chain==="McDonald's").map((row,index)=>({...row,id:`source-catalog-${index}`,brand:row.chain,kind:'FAST_FOOD'}))
 }
 async function run(){
+  await check('exact physical53 meal/date/colon preamble cannot become part of a restaurant product',async()=>{
+    menuRows=actualMenuRows()
+    const products="one McDonald's Double Quarter Pounder with Cheese and a pack of six McNuggets"
+    const exact=`Prepare a meal for today: ${products}. Don't save it yet.`
+    const requests=[exact,...['Prepare a meal for today','Prepare a meal today','Prepare a meal for lunch today','Prepare lunch for today','Prepare a meal for yesterday','Prepare a meal for tomorrow','Prepare a meal on 2026-10-18','Prepare a meal for 18 October','Prepare a meal for October 18, 2026','Prepare a meal for two days ago'].flatMap(prefix=>[`${prefix}: ${products}. Don't save it yet.`,`${prefix} ${products}. Don’t save it yet.`])]
+    for(const text of requests){
+      const p=parse(text);assert.equal(p.ingredients.length,2,text)
+      assert.match(p.ingredients[0].name,/^(?:McDonald's )?Double Quarter Pounder with Cheese$/i,text)
+      assert.equal(ctx.numberFromWords(p.ingredients[0].quantity),1,text);assert.equal(ctx.numberFromWords(p.ingredients[1].quantity),6,text)
+      const d=await build(text);assert.equal(d.canConfirm,true,`${text}: ${d.confirmationMessage}`);assert.equal(d.food.nutrition.calories,1020);assert.equal(d.autoSave,false)
+    }
+  })
+  await check('actual POST composes timing, no-save control, parser and AU source resolution for physical53 sentence',async()=>{
+    const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
+    const at=matrix.indexOf('async function run() {');assert(at>0)
+    const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    const rows=actualMenuRows();real.ctx.getCustomPackagedItems=async()=>rows
+    real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
+    real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'})
+    let writes=0;real.ctx.prisma.foodLog.create=async()=>{writes++;throw Error('No save allowed during preparation')}
+    real.ctx.getOpenAIClient=()=>null // no provider is configured in this actual-route fixture
+    const products="one McDonald's Double Quarter Pounder with Cheese and a pack of six McNuggets"
+    for(const[command,date]of [[`Prepare a meal for today: ${products}. Don't save it yet.`,'2026-10-17'],[`Prepare lunch for yesterday ${products}. Don’t save it yet.`,'2026-10-16'],[`Prepare a meal for 2026-10-18: ${products}. Don't save it yet.`,'2026-10-18'],[`Prepare a meal for October 18, 2026: ${products}. Don't save it yet.`,'2026-10-18']]){
+      const response=await real.send(command)
+      assert.equal(response.status,200,JSON.stringify(response));assert.equal(response.body.success,true)
+      const d=response.body.draft;assert.equal(d.canConfirm,true,d.confirmationMessage);assert.equal(d.action,'food_build_meal');assert.equal(d.autoSave,false);assert.equal(d.localDate,date)
+      assert.equal(d.food.items.length,2);assert.equal(d.food.nutrition.calories,1020);assert(d.food.items.every(item=>item.country==='AU'));assert.equal(writes,0)
+    }
+    for(const localized of ['Додај една банана за ручек денес','Agrega una banana para almuerzo hoy']){
+      const p=real.ctx.tryParseIngredientMealRequest(localized)||real.ctx.tryParseDirectFoodRequest(localized,{section:'food',title:'Food Diary'})
+      assert(p);assert.equal(p.meal,'lunch');assert.match(p.ingredients[0].name,/banana/);assert.equal(real.ctx.resolveRequestedActionDate(localized,'2026-10-17'),'2026-10-17')
+    }
+  })
   await check('trailing no-save sentence does not become nugget product punctuation',async()=>{
     const parsed=parse("Prepare a double quarter pounder with cheese and a pack of six nuggets from McDonald's for lunch. Don't save it yet.")
     assert.equal(parsed.ingredients.length,2)

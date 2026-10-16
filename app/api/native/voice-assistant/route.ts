@@ -1073,18 +1073,21 @@ function stripIngredientLookupModifiers(value: unknown) {
 
 function stripVoiceFoodCommandWords(value: string) {
   return cleanText(value, 1200)
-    .replace(/\b(?:on\s+)?\d{4}-\d{2}-\d{2}\b/gi, ' ')
+    .replace(/\b(?:(?:on|for)\s+)?\d{4}-\d{2}-\d{2}\b/gi, ' ')
     .replace(/\b(?:at\s+)?\d{1,2}:\d{2}\s*(?:am|pm)?\b/gi, ' ')
     .replace(/\bat\s+\d{1,2}\s*(?:am|pm)\b/gi, ' ')
-    .replace(/\b(?:on\s+)?(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)(?:,?\s+\d{4})?\b/gi, ' ')
-    .replace(/\b(?:today|yesterday|tomorrow|last night|this morning|this afternoon|tonight)\b/gi, ' ')
+    .replace(/\b(?:(?:on|for)\s+)?(?:\d{1,2}(?:st|nd|rd|th)?\s+(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)|(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)\s+\d{1,2}(?:st|nd|rd|th)?)(?:,?\s+\d{4})?\b/gi, ' ')
+    // Remove the whole timing phrase, including its preposition. Removing only
+    // "today" leaves "for :" attached to the first product in a meal list.
+    .replace(/\b(?:(?:on|for)\s+)?(?:day before yesterday|(?:\d{1,3}|one|two|three|four|five|six|seven|eight|nine|ten)\s+days?\s+ago|today|yesterday|tomorrow|last night|this morning|this afternoon|tonight)\b/gi, ' ')
     .replace(/\b(can you|could you|please|i want to|i need to|i would like to|i'd like to|help me)\b/gi, ' ')
-    .replace(/\b(add|log|logged|lobbed|put|input|record|track|save|create|make|build|enter)\b/gi, ' ')
+    .replace(/\b(add|log|logged|lobbed|put|input|record|track|save|create|make|build|enter|prepare)\b/gi, ' ')
     .replace(/\b(new|a|an|my|this|that)\b/gi, ' ')
     .replace(/\b(food|foods|meal|meals|ingredient|ingredients|entry|diary|log)\b/gi, ' ')
     .replace(/\b(as|for)\s+(?:a\s+|an\s+|my\s+)?(breakfast|lunch|dinner|snacks?|meal)\b/gi, ' ')
     .replace(/\b(to|into|in)\s+(?:my\s+)?(?:food\s+)?(?:diary|log|breakfast|lunch|dinner|snacks?)\b/gi, ' ')
     .replace(/\b(breakfast|lunch|dinner|snacks?)\b/gi, ' ')
+    .replace(/^[\s:;,]+/, '')
     .replace(/\s+/g, ' ')
     .trim()
 }

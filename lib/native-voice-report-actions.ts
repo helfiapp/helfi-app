@@ -5,6 +5,7 @@ import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@
 import { getWeeklyReportState, getWeeklyReportByPeriod, getWeeklyReportById, listWeeklyReports } from '@/lib/weekly-health-report'
 import { CreditManager, CREDIT_COSTS } from '@/lib/credit-system'
 import { signNativeVoiceDraft, verifyNativeVoiceDraft } from '@/lib/native-voice-review-token'
+import { getSiteUrl } from '@/lib/site-url'
 
 export const VOICE_REPORT_ACTION_SCHEMAS = { 'reports.weekly.generate': {}, 'reports.weekly.export_pdf': { reportId: 'optional exact owned report ID', periodStart: 'optional exact YYYY-MM-DD with periodEnd', periodEnd: 'optional exact YYYY-MM-DD with periodStart; omit all selectors for latest owned READY report' } } as const
 export type VoiceReportAccess = { userId:string; email:string|null; aiConsent:boolean; healthSetupComplete:boolean; reportsEnabled:boolean; availableCredits:number; existingReport:{id:string;status:string}|null; periodStart:string;periodEnd:string }
@@ -66,12 +67,27 @@ export type VoiceReportPdfIo = {
   list:(userId:string)=>Promise<PdfReport[]>
   link:(request:NextRequest,reportId:string)=>Promise<{url:string}>
 }
+function pdfPublicOrigin(){
+  try{
+    const url=new URL(getSiteUrl())
+    if(url.protocol!=='https:'||url.username||url.password||url.hash||url.search||url.pathname!=='/'||!['https://helfi.ai','https://www.helfi.ai','https://stg.helfi.ai'].includes(url.origin))throw new Error()
+    return url.origin==='https://www.helfi.ai'?'https://helfi.ai':url.origin
+  }catch{throw new Error('The app could not verify its secure public PDF address. Please use Save as PDF in Insights.')}
+}
+function pdfOriginClass(url:URL){
+  if(url.origin==='https://helfi.ai')return 'canonical_public'
+  if(url.origin==='https://www.helfi.ai')return 'www_public'
+  if(/\.(?:amplifyapp\.com|cloudfront\.net|amazonaws\.com|on\.aws)$/i.test(url.hostname))return 'aws_runtime'
+  return 'other'
+}
 const defaultPdfIo:VoiceReportPdfIo={
   authenticate:getWeeklyReportRequestUser,byId:getWeeklyReportById,byPeriod:getWeeklyReportByPeriod,
   list:userId=>listWeeklyReports(userId,50,'READY'),
   link:async(original,reportId)=>{
     const headers=new Headers(original.headers);headers.set('content-type','application/json');headers.delete('content-length');headers.delete('host')
-    const request=new NextRequest(new URL('/api/reports/weekly/pdf',original.url),{method:'POST',headers,body:JSON.stringify({reportId})})
+    // The deployed Next request may carry an AWS runtime origin. Only the
+    // configured, allowlisted public site may receive a temporary PDF token.
+    const request=new NextRequest(new URL('/api/reports/weekly/pdf',pdfPublicOrigin()),{method:'POST',headers,body:JSON.stringify({reportId})})
     const response=await(await import('@/app/api/reports/weekly/pdf/route')).POST(request)
     const data=await response.json().catch(()=>({}))
     if(!response.ok||typeof data?.url!=='string')throw new Error('The app could not prepare the selected report PDF. Please check Insights.')
@@ -112,16 +128,18 @@ async function pdfAccess(request:NextRequest,userId:string,result:any,io:VoiceRe
   if(result?.kind!=='report_action'||result.action!=='reports.weekly.export_pdf'||result.status!=='pdf_ready'||result.reportStatus!=='READY'||typeof result.actionId!=='string'||!result.actionId||typeof result.reportId!=='string'||!/^[a-f0-9]{64}$/.test(result.sourceVersion))throw new Error('Please review the selected report PDF again.')
   const report=pdfReady(await io.byId(userId,result.reportId),userId)
   if(report.periodStart!==result.periodStart||report.periodEnd!==result.periodEnd||pdfVersion(report)!==result.sourceVersion)throw new Error('The report changed after review. Please review its PDF again.')
+  const publicOrigin=pdfPublicOrigin()
   const link=await io.link(request,report.id);pdfActive(request)
   const after=pdfReady(await io.byId(userId,result.reportId),userId)
   if(pdfVersion(after)!==result.sourceVersion)throw new Error('The report changed while preparing its PDF. Please review it again.')
   try{
     const origin=new URL(request.url),url=new URL(link.url)
-    if(origin.protocol!=='https:'||url.protocol!=='https:'||url.origin!==origin.origin||url.username||url.password||url.hash||url.pathname!=='/api/reports/weekly/pdf'||url.searchParams.getAll('reportId').length!==1||url.searchParams.get('reportId')!==report.id||url.searchParams.getAll('accessToken').length!==1||[...url.searchParams.keys()].some(key=>!['reportId','accessToken'].includes(key)))throw new Error()
+    if(url.protocol!=='https:'||url.origin!==publicOrigin||url.username||url.password||url.hash||url.pathname!=='/api/reports/weekly/pdf'||url.searchParams.getAll('reportId').length!==1||url.searchParams.get('reportId')!==report.id||url.searchParams.getAll('accessToken').length!==1||[...url.searchParams.keys()].some(key=>!['reportId','accessToken'].includes(key)))throw new Error()
     const token=url.searchParams.get('accessToken')||''
     if(!/^[A-Za-z0-9_-]+\.[A-Za-z0-9_-]{43}$/.test(token))throw new Error()
     const payload=JSON.parse(Buffer.from(token.split('.')[0],'base64url').toString('utf8'))
     if(payload.userId!==userId||payload.reportId!==report.id||!Number.isInteger(payload.expiresAt)||payload.expiresAt<=Date.now()||payload.expiresAt>Date.now()+61000)throw new Error()
+    console.info('[native voice PDF]',{event:'report_pdf_link_validated',requestOriginClass:pdfOriginClass(origin),linkOriginClass:pdfOriginClass(url),trustedPublicOriginMatch:true,sameRequestOrigin:url.origin===origin.origin,requestProtocol:origin.protocol==='https:'?'https':origin.protocol==='http:'?'http':'other',linkProtocol:'https',pathMatch:true,queryKeysValid:true,queryCount:2})
     return {url:url.toString(),reportId:report.id,actionId:result.actionId,expiresAt:payload.expiresAt}
   }catch{throw new Error('The app could not verify the temporary PDF link. Please request it again from Insights.')}
 }
