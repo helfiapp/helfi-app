@@ -2479,11 +2479,72 @@ function parseReviewedFoodReplacementParts(raw: string) {
   return null
 }
 
+function reviewedFoodSizeOnly(value: string) {
+  const text = cleanText(value, 180).toLowerCase().replace(/[.!?]+$/g, '').replace(/-/g, ' ').trim()
+  if (!text) return null
+  const words = text.split(/\s+/)
+  if (!words.every(word => /^(?:a|an|the|one|two|three|four|five|six|seven|eight|nine|ten|half|\d+(?:\.\d+)?|g|grams?|kg|ml|size|sized|portions?|servings?|please|or|and|extra|very|small|medium|large|regular|jumbo|tiny|huge|big|bigger|smaller|larger|supersize|mini)$/.test(word))) return null
+  if (!words.some(word => /^(?:size|sized|small|medium|large|regular|jumbo|tiny|huge|big|bigger|smaller|larger|supersize|mini)$/.test(word))) return null
+  const valid = text.match(/^(?:(?:a|an|the|size|sized)\s+)?(small|medium|large|regular)(?:\s+(?:size|sized|portion|serving|one))?(?:\s+please)?$/)
+  return { size: valid?.[1] || null }
+}
+
+async function buildReviewedPreparedFoodSizeCorrection(draft: any, answerRaw: string, localDate: string, country?: string, trustedItems?: any[]): Promise<VoiceDraft | null> {
+  if (!['food_build_meal', 'food_draft'].includes(draft?.action) || !draft?.food) return null
+  const raw = cleanText(answerRaw, 800).replace(/[.!?]+$/g, '').trim()
+  let edit = parseReviewedFoodReplacementParts(raw)
+  if (!edit) {
+    const make = raw.match(/^(?:please\s+)?(?:make|set|resize|adjust)\s+(?:the\s+)?(.+?)\s+((?:extra\s+)?(?:small|medium|large|regular|jumbo|tiny|smaller|larger)(?:\s+(?:size|sized|please))?)$/i)
+    const missing = raw.match(/^(?:please\s+)?(?:change|set|resize|adjust)\s+(?:the\s+)?(.+?)(?:\s+(?:size(?:\s+to)?|to))$/i)
+    if (make) edit = { targetText: make[1], replacementText: make[2] }
+    else if (missing) edit = { targetText: missing[1], replacementText: '' }
+    else if (reviewedFoodSizeOnly(raw)) edit = { targetText: '', replacementText: raw }
+  }
+  if (!edit) return null
+  const requested = edit.replacementText ? reviewedFoodSizeOnly(edit.replacementText) : { size: null }
+  if (!requested) return null // A stated replacement food still uses normal replacement handling.
+  const clarify = (message: string): VoiceDraft => ({ ...draft, action: 'food_draft', localDate, reviewToken: undefined, canConfirm: false, autoSave: false, reasonCode: 'food_size_ambiguous', summary: 'Meal size needs clarification', confirmationMessage: `${message} The original foods and amounts are still in this review. Nothing has been saved.` })
+  if (/\b(?:do not|don't|don’t|never)\s+(?:change|make|set|resize|adjust|replace|swap)\b/i.test(raw)) return clarify('No size change was made. Please say the size you want, or discard this review.')
+  const parts = splitIngredientList(cleanText(draft.food.draftText, 1200))
+  const parsed = parts.map(parseIngredientPhrase)
+  const normalizeTarget = (value: string) => voicePreparedIdentityText(value.replace(/\b(?:the|my|this|that|it|them|size|sizes)\b/gi, ' ')).replace(/\bchip\b/g, 'fry')
+  const targetText = normalizeTarget(edit.targetText), targetWords = targetText.split(' ').filter(Boolean)
+  const targetBrand = voiceRestaurantBrand(edit.targetText)
+  const previousSize = edit.targetText.match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()
+  const targets = parsed.map((ingredient, index) => ({ ingredient, index })).filter(({ ingredient, index }) => {
+    if (!ingredient || !isPreparedVoiceFood(ingredient.name)) return false
+    if (targetBrand && targetBrand !== voiceRestaurantBrand(ingredient.name)) return false
+    if (previousSize && ingredient.name.match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase() !== previousSize) return false
+    const words = normalizeTarget(ingredient.name).split(' ').filter(Boolean)
+    if (targetWords.length) return targetWords.every(word => words.includes(word))
+    return /\b(?:small|medium|large|regular)\b/i.test(ingredient.name) || (Array.isArray(trustedItems?.[index]?.__voiceSourceFood?.servingOptions) && trustedItems![index].__voiceSourceFood.servingOptions.some((option: any) => /\b(?:small|medium|large|regular)\b/i.test(option.serving_size || option.label || '')))
+  })
+  if (targets.length !== 1) return clarify('Please name the exact restaurant food whose size you want to change, and say small, medium, large or regular.')
+  const { ingredient, index } = targets[0]
+  const source = trustedItems?.[index]?.__voiceSourceFood
+  if (trustedItems !== draft.food.items || trustedItems?.length !== parsed.length || !source || !parsed.every((part, i) => {
+    const original = trustedItems[i]?.__voiceSourceFood
+    return part && original && (isPreparedVoiceFood(part.name) ? voicePreparedIdentityMatches(part, original) : Boolean(compatibleOrdinaryVoiceFood(part.name, original, part))) && Boolean(requestedIngredientBasis(part, original))
+  })) return clarify('Please prepare this meal again so I can verify its original foods before changing a size.')
+  const available = [...new Set([source.name, ...(Array.isArray(source.servingOptions) ? source.servingOptions.map((option: any) => option.serving_size || option.label) : [])].map(label => String(label || '').match(/\b(small|medium|large|regular)\b/i)?.[1]?.toLowerCase()).filter(Boolean))]
+  if (!requested.size) return clarify(`Which size should I use for ${source.name}?${available.length ? ` The recorded choices are ${available.join(', ')}.` : ' Please give the exact supported size.'}`)
+  let name = ingredient!.name.replace(/\b(?:small|medium|large|regular)\b/gi, requested.size)
+  if (!/\b(?:small|medium|large|regular)\b/i.test(name)) name = `${requested.size} ${name}`
+  if (source.brand && !voiceRestaurantBrand(name)) name = `${source.brand} ${name}`
+  const next = normalizeIngredientRequest({ ...ingredient, name, brand: source.brand || ingredient!.brand, size: requested.size, requiresSourceServing: true, display: `${ingredient!.quantity || 1} ${ingredient!.unit ? `${ingredient!.unit} ` : ''}${name}` })!
+  if (!available.includes(requested.size) || !voicePreparedIdentityMatches(next, source) || !requestedIngredientBasis(next, source)) return clarify(`That size is not recorded for the reviewed ${source.name}.${available.length ? ` Please choose ${available.join(', ')}.` : ' Please prepare the exact food and supported portion again.'}`)
+  parsed[index] = next
+  const revised = await buildVoiceMealDraft({ meal: draft.food.meal, mealName: draft.food.mealName, ingredients: parsed }, `Correct reviewed food size: ${next.display}`, localDate, country, trustedItems)
+  if (!revised?.canConfirm || revised.food?.items?.some((item: any, i: number) => item.id !== trustedItems[i].id)) return clarify('I could not verify this size using the original food sources. Please review the exact food and portion again.')
+  return revised
+}
+
 function extractReviewedFoodReplacement(draft: any, answerRaw: string) {
   if (!['food_build_meal', 'food_draft'].includes(draft?.action)) return null
   const raw = cleanText(answerRaw, 800)
   const replacement = parseReviewedFoodReplacementParts(raw)
   if (!replacement) return null
+  if (reviewedFoodSizeOnly(replacement.replacementText)) return null
 
   const currentMeal = cleanText(draft?.food?.meal, 40).toLowerCase() || 'snacks'
   const translatedReplacement = cleanText(translateLocalizedFoodRequest(replacement.replacementText, { section: 'food', title: 'Food Diary', meal: currentMeal }), 1000)
@@ -2865,6 +2926,8 @@ async function buildReviewedDraftCorrection(draft: any, answerRaw: string, local
       }
     }
   }
+  const preparedSizeCorrection = await buildReviewedPreparedFoodSizeCorrection(draft, answerRaw, localDate, country, trustedItems)
+  if (preparedSizeCorrection) return preparedSizeCorrection
   const symptomNoteCorrection = buildReviewedSymptomNoteCorrection(draft, answerRaw, localDate)
   if (symptomNoteCorrection) return symptomNoteCorrection
 

@@ -58,7 +58,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-sign-save-integration-check.cjs` | Composed signed prepare/confirm scenario |
 | `voice-client-integrity-check.cjs` | Native callback integrity suite |
 | `voice-live-protocol-check.cjs` | Route/native/metering protocol surfaces |
-| `voice-restaurant-food-integrity-check.cjs` | 29 groups including exact competing products and explicit named sizes |
+| `voice-restaurant-food-integrity-check.cjs` | 30 groups including exact competing products, named sizes and source-pinned pending size corrections |
 | `voice-action-matrix-check.cjs` | 78 cases |
 | `voice-action-outcome-check.cjs` | Actual outcome/receipt boundary suite |
 | `voice-record-actions-check.cjs` | 41 groups |
@@ -222,3 +222,9 @@ Actual full8261public catalog preparation checks exposed plain Whopper selecting
 Final restaurant29 groups also exercise14actual size requests with10public source rows: McDonalds Small219/Medium316/Large389, HungryJacks small254/medium308/large440, KFC regular283/large567. Two large McDonalds portions778; five individual fries are refused as unsourced pieces. A physical100g KFC large chips request retains its actual recorded236.25kcal/100g precision. AUFAST_FOOD chips/fries wording is shared only for that restaurant category, while packaged crisps and other countries stay distinct. Unsized multi-size requests clarify without provider fallback. Root final53guard/types/production rebuild runs after this final source freeze; actual installed54 tests remain separate.
 
 Final54 source freeze verification: complete53-suite guard PASS under UTC/root-only resolution, root/native types PASS,292full/93native/dedicatedDashboard+Insights/protected checks PASS. Exact production build after the final restaurant named-size change exited0. Owner4web/lock/protection build isolation was restored byte-for-byte and checked again. Deployment, signed54binary and physical54runtime are recorded separately after completion.
+
+## Signed54 and live137 actual follow-up
+
+Native54 immutable50da786b was signed, Apple-validated/uploaded, processed VALID, assigned to the existing internal group and actually installed/opened/signed in on the physical iPhone. Exact AWS137 passed all three steps and both domains verified. Typed natural Yes opened the owned READY29Apr–5May actual8-page PDF in the existing in-app viewer; normal Done returned the precise viewer-closed receipt without claiming a saved file. Mixed Whopper/Zinger1033→twoWhoppers1615 and natural discard passed. Water300→450 now reads the exact final450ml confirmation question and natural discard passed. Read-only account check23:00UTC retains food3/water550/mood2 and the original15Oct meal. These remain typed normal-app tests, not physical speech/hearing evidence.
+
+Actual combined McDonalds burger/six-nuggets/large-fries1409 exposed an additional size-correction defect: medium became an unrelated dip1163 rather than1336. The failed review was naturally discarded without saving. A narrow server repair now has an actual POST regression reproducing that failure before the fix and preserving all three source IDs at1409→1336→1239→1409 after it. Full8261-row captured public-catalog POST audit also passes that chain with no supplier fallback or writes. Exact server138 deployment and physical54 retest remain required; native54 source stays unchanged.

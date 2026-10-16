@@ -107,6 +107,45 @@ function capturedSizeMenuRows(){return [
   {"id":"cmlavzzwt05grvpxc40dcwlwd","key":"hungry jack s chips large|FAST_FOOD|au","name":"Chips Large","brand":"Hungry Jack's","country":"AU","kind":"FAST_FOOD","caloriesPer100g":null,"proteinPer100g":null,"carbsPer100g":null,"fatPer100g":null,"fiberPer100g":null,"sugarPer100g":null,"aliases":["Chips Large (Hungry Jack's)","Hungry Jack's Chips Large","Chips Large (Hungry Jack s)","Hungry Jack s Chips Large","Chips Large (HungryJacks)","HungryJacks Chips Large"],"servingOptions":[{"id":"serving-hungry jack s chips large 1 serving","ml":null,"fat_g":20.4,"grams":155,"label":"1 serving (155 g)","carbs_g":58.8,"fiber_g":null,"sugar_g":0.4,"calories":440,"protein_g":5.4,"serving_size":"1 serving (155 g)"}]}
 ]}
 async function run(){
+  await check('actual combined meal size corrections retain the original fries source and never resolve a size adjective as food',async()=>{
+    const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
+    const at=matrix.indexOf('async function run() {');assert(at>0)
+    const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.getCustomPackagedItems=mappedStoredCatalog([...capturedStoredMenuRows(),...capturedSizeMenuRows()])
+    real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
+    real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
+    let providers=0,writes=0,adjectiveLookups=0
+    real.ctx.searchDiaryFoods=real.ctx.searchDiaryFoodServings=async()=>{providers++;throw Error('No provider lookup permitted')}
+    const oldLocal=real.ctx.searchLocalFoods
+    real.ctx.searchLocalFoods=async q=>{if(q==='medium'){adjectiveLookups++;return[{id:'wrong-medium-dip',source:'usda',name:'medium, Dip, salsa con queso, cheese and salsa-medium',serving_size:'100 g',calories:143,protein_g:4,carbs_g:8,fat_g:10,fiber_g:null,sugar_g:0}]}return oldLocal(q)}
+    real.ctx.prisma.foodLog.create=async()=>{writes++;throw Error('No save permitted')}
+    const text='Prepare lunch for today: one McDonald’s Double Quarter Pounder with Cheese, six McNuggets and one large McDonald’s fries. Don’t save it yet.'
+    const initial=(await real.send(text)).body.draft;assert.equal(initial.food.nutrition.calories,1409)
+    const original=JSON.parse(JSON.stringify(initial)),ids=Array.from(initial.food.items.map(item=>item.id))
+    let current=initial
+    for(const[request,calories,size,portionCalories]of [['Change the fries to medium.',1336,'medium',316],['Change the fries to small.',1239,'small',219],['Change the fries to large.',1409,'large',389],['Make the fries medium.',1336,'medium',316]]){
+      const r=await real.send(request,{confirmationDraft:current}),d=r.body?.draft
+      assert.equal(r.status,200,JSON.stringify(r));assert.equal(d.canConfirm,true,d.confirmationMessage);assert.equal(d.food.nutrition.calories,calories);assert.equal(r.charges.length,0)
+      assert.equal(d.food.items.length,3);assert.deepEqual(Array.from(d.food.items.map(item=>item.id)),ids);assert.equal(d.food.items[2].selectedServingId,`serving-mcdonald s fries ${size}`);assert.equal(d.food.items[2].calories,portionCalories);assert.equal(d.food.items[2].estimatedPortion,false)
+      assert.equal(d.food.meal,'lunch');assert.equal(d.food.mealName,initial.food.mealName);assert.equal(d.localDate,initial.localDate);assert.equal(d.autoSave,false)
+      assert.deepEqual(JSON.parse(JSON.stringify(d.food.items.slice(0,2))),original.food.items.slice(0,2))
+      assert.deepEqual(JSON.parse(JSON.stringify(d.food.items[2].__voiceSourceFood)),original.food.items[2].__voiceSourceFood);assert.equal(d.food.items[2].fiber_g,null);assert.equal(d.food.items[2].sugar_g,0)
+      current=d
+    }
+    for(const request of ['Change the fries to jumbo.','Change the fries to medium or small.','Change the fries size.','Change the fries to.','Change the fries to two medium.','Do not change the fries to large.']){
+      const r=await real.send(request,{confirmationDraft:current}),d=r.body?.draft;assert.equal(r.status,200,JSON.stringify(r));assert.equal(d.canConfirm,false,request);assert.deepEqual(JSON.parse(JSON.stringify(d.food)),JSON.parse(JSON.stringify(current.food)));assert.equal(r.charges.length,0)
+    }
+    const ambiguous=(await real.send('Prepare lunch: one large McDonald’s fries and one large Hungry Jack’s chips. Don’t save it yet.')).body.draft
+    const clarification=(await real.send('Change the fries to medium.',{confirmationDraft:ambiguous})).body.draft;assert.equal(clarification.canConfirm,false);assert.deepEqual(JSON.parse(JSON.stringify(clarification.food)),JSON.parse(JSON.stringify(ambiguous.food)))
+    const one=(await real.send('Change the nuggets to one.',{confirmationDraft:current})).body.draft;assert.equal(one.canConfirm,true);assert.equal(one.food.nutrition.calories,1156);assert.equal(one.food.items[1].id,current.food.items[1].id)
+    const missingOption=JSON.parse(JSON.stringify(current));missingOption.food.items[2].__voiceSourceFood.servingOptions=missingOption.food.items[2].__voiceSourceFood.servingOptions.filter(option=>option.label==='Medium')
+    const unavailable=(await real.send('Change the fries to large.',{confirmationDraft:missingOption})).body.draft;assert.equal(unavailable.canConfirm,false);assert.deepEqual(JSON.parse(JSON.stringify(unavailable.food)),missingOption.food)
+    const untrusted={...current,reviewToken:'unverified-review'}
+    const unverified=(await real.send('Change the fries to large.',{confirmationDraft:untrusted})).body.draft;assert.equal(unverified.canConfirm,false);assert.deepEqual(JSON.parse(JSON.stringify(unverified.food)),JSON.parse(JSON.stringify(current.food)))
+    assert.equal(real.ctx.extractReviewedFoodReplacement(current,'Change the fries to medium.'),null)
+    const replacement=await real.send('Replace the fries with 100 g rice.',{confirmationDraft:current});assert.equal(replacement.body.draft.canConfirm,true,replacement.body.draft.confirmationMessage);assert.equal(replacement.body.draft.food.nutrition.calories,1150)
+    assert.equal(adjectiveLookups,0);assert.equal(providers,0);assert.equal(writes,0)
+  })
   await check('actual AU named sizes and regional fries/chips wording use exact portions; missing sizes never default',async()=>{
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const at=matrix.indexOf('async function run() {');assert(at>0)
