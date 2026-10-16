@@ -317,10 +317,19 @@ async function rewritePrivateChatPrompt(userId: string, draft: VoiceDraft): Prom
   }
 }
 
-async function sealReviewDraft(userId: string, draft: VoiceDraft): Promise<VoiceDraft> {
+async function sealReviewDraft(userId: string, draft: VoiceDraft, retainedFoodReview?: VoiceDraft): Promise<VoiceDraft> {
   const preparedDraft = await resolveVoiceDrinkDraft(await rewritePrivateChatPrompt(userId, draft))
-  if (!preparedDraft?.canConfirm) return preparedDraft
-  const enrichedDraft = await enrichHealthIntakeDraftWithCatalogMatches(userId, preparedDraft)
+  // Attest an unchanged food snapshot for a later clarification answer without
+  // authorizing a save. Only the previously signed, same-account review can
+  // supply this proof; an arbitrary unsigned food proposal cannot gain trust.
+  const retainedSizeClarification = preparedDraft?.canConfirm === false && preparedDraft.autoSave === false
+    && preparedDraft.action === 'food_draft' && preparedDraft.reasonCode === 'food_size_ambiguous'
+    && retainedFoodReview && ['food_build_meal', 'food_draft'].includes(retainedFoodReview.action)
+    && (retainedFoodReview.canConfirm === true || (retainedFoodReview.canConfirm === false && retainedFoodReview.autoSave === false && retainedFoodReview.reasonCode === 'food_size_ambiguous'))
+    && verifyNativeVoiceDraft(userId, retainedFoodReview) && Array.isArray(retainedFoodReview.food?.items) && retainedFoodReview.food.items.length > 0
+    && JSON.stringify(preparedDraft.food) === JSON.stringify(retainedFoodReview.food)
+  if (!preparedDraft?.canConfirm && !retainedSizeClarification) return preparedDraft
+  const enrichedDraft = preparedDraft.canConfirm ? await enrichHealthIntakeDraftWithCatalogMatches(userId, preparedDraft) : preparedDraft
   const reviewableDraft = {
     ...enrichedDraft,
     reviewNonce: crypto.randomUUID(),
@@ -2532,10 +2541,28 @@ async function buildReviewedPreparedFoodSizeCorrection(draft: any, answerRaw: st
   if (!/\b(?:small|medium|large|regular)\b/i.test(name)) name = `${requested.size} ${name}`
   if (source.brand && !voiceRestaurantBrand(name)) name = `${source.brand} ${name}`
   const next = normalizeIngredientRequest({ ...ingredient, name, brand: source.brand || ingredient!.brand, size: requested.size, requiresSourceServing: true, display: `${ingredient!.quantity || 1} ${ingredient!.unit ? `${ingredient!.unit} ` : ''}${name}` })!
-  if (!available.includes(requested.size) || !voicePreparedIdentityMatches(next, source) || !requestedIngredientBasis(next, source)) return clarify(`That size is not recorded for the reviewed ${source.name}.${available.length ? ` Please choose ${available.join(', ')}.` : ' Please prepare the exact food and supported portion again.'}`)
+  let selectedSource = source
+  if (!available.includes(requested.size) || !voicePreparedIdentityMatches(next, source) || !requestedIngredientBasis(next, source)) {
+    // Some AU menus store each size in a separate authoritative row. A stated
+    // size change may select that sibling; it must not change chain, country,
+    // product qualifiers, data source, or any other food in this review.
+    if (source.source !== 'custom' || source.kind !== 'FAST_FOOD' || source.country !== 'AU' || !source.brand) return clarify('That size is not recorded in the original food source. Please prepare the exact supported menu item again.')
+    const base = (name: unknown) => compactFoodMatchText(name).replace(/\b(?:small|medium|large|regular)\b/g, ' ').replace(/\s+/g, ' ').trim()
+    const rows = await getCustomPackagedItems(source.country).catch(() => [])
+    const siblings = rows.filter(row => `custom:${row.id}` !== source.id && row.kind === 'FAST_FOOD' && row.country === source.country && compactFoodMatchText(row.brand) === compactFoodMatchText(source.brand) && base(row.name) === base(source.name)).map(row => {
+      const options = Array.isArray(row.servingOptions) ? row.servingOptions : []
+      return { ...row, source: 'custom', id: `custom:${row.id}`, serving_size: options[0]?.serving_size || options[0]?.label, ...pickVoiceSourceNutrition(options[0] || row), servingOptions: options }
+    })
+    const selection = selectPreparedVoiceFood(next, siblings, source.country)
+    if (!selection.item || selection.ambiguous) return clarify(selection.ambiguous ? 'The matching size records disagree. Please choose the exact menu item before changing this review.' : `That size is not recorded for the reviewed ${source.name}. Please choose an exact supported menu size.`)
+    selectedSource = selection.item
+  }
   parsed[index] = next
-  const revised = await buildVoiceMealDraft({ meal: draft.food.meal, mealName: draft.food.mealName, ingredients: parsed }, `Correct reviewed food size: ${next.display}`, localDate, country, trustedItems)
-  if (!revised?.canConfirm || revised.food?.items?.some((item: any, i: number) => item.id !== trustedItems[i].id)) return clarify('I could not verify this size using the original food sources. Please review the exact food and portion again.')
+  const revisedSources = trustedItems.map((item, i) => i === index ? { ...item, __voiceSourceFood: selectedSource } : item)
+  const revised = await buildVoiceMealDraft({ meal: draft.food.meal, mealName: draft.food.mealName, ingredients: parsed }, `Correct reviewed food size: ${next.display}`, localDate, country, revisedSources)
+  if (!revised?.canConfirm || revised.food?.items?.some((item: any, i: number) => item.id !== (i === index ? selectedSource.id : trustedItems[i].id))) return clarify('I could not verify this size using the original food sources. Please review the exact food and portion again.')
+  if (revised.food?.items) revised.food.items = revised.food.items.map((item: any, i: number) => i === index ? item : trustedItems[i])
+  if (revised.food?.entries && draft.food.entries?.length === revised.food.entries.length) revised.food.entries = revised.food.entries.map((entry: any, i: number) => i === index ? entry : draft.food.entries[i])
   return revised
 }
 
@@ -6556,7 +6583,7 @@ async function prepareVoiceAction(request: NextRequest, trace?: { userId?: strin
     transcript = explicitNewCommand || recipeContinuation ? transcript : followUpTranscript(followUpDraft, transcript) || transcript
     if (!transcript) return NextResponse.json({ error: 'No speech found' }, { status: 400 })
     localDate = resolveRequestedActionDate(transcript, transcriptHasDateEvidence(transcript) ? todayLocalDate : localDate)
-    const sealDraft = (draft: VoiceDraft) => sealReviewDraft(user.id, applyDraftTiming(draft, transcript, tzOffsetMin, explicitNewCommand ? undefined : editableDraft, timeZoneRaw, todayLocalDate))
+    const sealDraft = (draft: VoiceDraft, retainedFoodReview?: VoiceDraft) => sealReviewDraft(user.id, applyDraftTiming(draft, transcript, tzOffsetMin, explicitNewCommand ? undefined : editableDraft, timeZoneRaw, todayLocalDate), retainedFoodReview)
     if (wantsVoiceReply && !aiConsentGranted) {
       return NextResponse.json({ error: 'AI sharing consent is required before spoken replies can be created.' }, { status: 403 })
     }
@@ -6654,7 +6681,7 @@ async function prepareVoiceAction(request: NextRequest, trace?: { userId?: strin
       return NextResponse.json({
         success: true,
         transcript,
-        draft: await sealDraft(correctedDraft),
+        draft: await sealDraft(correctedDraft, editableDraft),
         audio,
         chargedCredits: chargeCents,
         voiceReply: Boolean(audio),

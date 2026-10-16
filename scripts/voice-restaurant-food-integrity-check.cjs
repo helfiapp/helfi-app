@@ -107,6 +107,60 @@ function capturedSizeMenuRows(){return [
   {"id":"cmlavzzwt05grvpxc40dcwlwd","key":"hungry jack s chips large|FAST_FOOD|au","name":"Chips Large","brand":"Hungry Jack's","country":"AU","kind":"FAST_FOOD","caloriesPer100g":null,"proteinPer100g":null,"carbsPer100g":null,"fatPer100g":null,"fiberPer100g":null,"sugarPer100g":null,"aliases":["Chips Large (Hungry Jack's)","Hungry Jack's Chips Large","Chips Large (Hungry Jack s)","Hungry Jack s Chips Large","Chips Large (HungryJacks)","HungryJacks Chips Large"],"servingOptions":[{"id":"serving-hungry jack s chips large 1 serving","ml":null,"fat_g":20.4,"grams":155,"label":"1 serving (155 g)","carbs_g":58.8,"fiber_g":null,"sugar_g":0.4,"calories":440,"protein_g":5.4,"serving_size":"1 serving (155 g)"}]}
 ]}
 async function run(){
+  await check('same-brand AU separate-size rows support HJ and KFC correction chains and preserve other foods and counts',async()=>{
+    const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'');const at=matrix.indexOf('async function run() {')
+    const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    const stored=[...capturedOtherRestaurantRows(),...capturedSizeMenuRows()]
+    real.ctx.getCustomPackagedItems=mappedStoredCatalog(stored);real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
+    real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
+    let providers=0,writes=0;real.ctx.searchDiaryFoods=real.ctx.searchDiaryFoodServings=async()=>{providers++;throw Error('Provider forbidden')};real.ctx.prisma.foodLog.create=async()=>{writes++;throw Error('Write forbidden')}
+    for(const[initial,changes]of [['Log one Hungry Jack’s large chips',[['medium',308],['small',254],['large',440]]],['Log one KFC large chips',[['regular',283],['large',567]]]]){
+      let current=(await real.send(initial)).body.draft
+      for(const[size,calories]of changes){const r=await real.send(`Change the chips to ${size}.`,{confirmationDraft:current}),d=r.body?.draft;assert.equal(r.status,200);assert.equal(d.canConfirm,true,d.confirmationMessage);assert.equal(d.food.nutrition.calories,calories);assert.equal(d.food.items[0].brand,current.food.items[0].brand);assert.equal(d.food.items[0].country,'AU');assert.equal(d.food.items[0].fiber_g,null);assert.equal(d.localDate,current.localDate);assert.equal(d.food.meal,current.food.meal);assert.equal(r.charges.length,0);for(const nutrient of ['calories','protein_g','carbs_g','fat_g','fiber_g','sugar_g'])assert.equal(d.food.items[0][nutrient],d.food.items[0].__voiceSourceFood.servingOptions[0][nutrient],nutrient);current=d}
+    }
+    const initial=(await real.send('Prepare lunch: one Hungry Jack’s Whopper and two large Hungry Jack’s chips. Don’t save it yet.')).body.draft
+    const changed=(await real.send('Change the chips to medium.',{confirmationDraft:initial})).body.draft
+    assert.equal(changed.canConfirm,true);assert.equal(changed.food.nutrition.calories,1198);assert.equal(changed.food.items[1].calories,616);assert.deepEqual(JSON.parse(JSON.stringify(changed.food.items[0])),JSON.parse(JSON.stringify(initial.food.items[0])));assert.deepEqual(JSON.parse(JSON.stringify(changed.food.entries[0])),JSON.parse(JSON.stringify(initial.food.entries[0])))
+    const kfc=(await real.send('Log one KFC large chips')).body.draft
+    const regular=stored.find(row=>row.brand==='KFC'&&row.name==='Regular Chips'),large=stored.find(row=>row.brand==='KFC'&&row.name==='Large Chips')
+    const variant=(name,extra={})=>({...JSON.parse(JSON.stringify(regular)),id:'synthetic-'+name,name,...extra})
+    real.ctx.getCustomPackagedItems=mappedStoredCatalog([large,variant('Regular Chips',{brand:"Hungry Jack's"}),variant('Regular Chips',{country:'US'}),variant('Regular Chips',{kind:'PACKAGED'}),variant('Regular Chips Extra Cheese')])
+    assert.equal((await real.send('Change the chips to regular.',{confirmationDraft:kfc})).body.draft.canConfirm,false)
+    real.ctx.getCustomPackagedItems=mappedStoredCatalog([large,regular,{...JSON.parse(JSON.stringify(regular)),id:'conflicting-regular',servingOptions:regular.servingOptions.map(option=>({...option,calories:option.calories+50}))}])
+    assert.equal((await real.send('Change the chips to regular.',{confirmationDraft:kfc})).body.draft.canConfirm,false)
+    for(const country of [undefined,'US']){const foreign=JSON.parse(JSON.stringify(kfc));foreign.food.items[0].__voiceSourceFood.country=country;assert.equal((await real.send('Change the chips to regular.',{confirmationDraft:foreign})).body.draft.canConfirm,false)}
+    assert.equal(providers,0);assert.equal(writes,0)
+  })
+  await check('real HMAC attests only unchanged recoverable false reviews; false, flipped, foreign, stale and tampered reviews cannot save',async()=>{
+    const source=fs.readFileSync(path.join(__dirname,'voice-save-integrity-check.cjs'),'utf8').replace(/^#!.*\n/,'');const end=source.indexOf('async function run() {');assert(end>0)
+    const proof=new Function('require','__dirname',source.slice(0,end)+'\nreturn {tokens,harness,AuditDate}')(require,__dirname);proof.AuditDate.setNow(Date.now())
+    const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'');const at=matrix.indexOf('async function run() {')
+    const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.signNativeVoiceDraft=proof.tokens.signNativeVoiceDraft;real.ctx.verifyNativeVoiceDraft=proof.tokens.verifyNativeVoiceDraft
+    real.ctx.getCustomPackagedItems=mappedStoredCatalog(capturedSizeMenuRows());real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'));real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
+    let providers=0;real.ctx.searchDiaryFoods=async()=>{providers++;throw Error('No provider')}
+    const original=(await real.send('Log one Hungry Jack’s large chips')).body.draft;assert(proof.tokens.verifyNativeVoiceDraft('synthetic-user',original))
+    const pending=(await real.send('Change the chips to jumbo.',{confirmationDraft:original})).body.draft
+    assert.equal(pending.canConfirm,false);assert.equal(pending.autoSave,false);assert.equal(pending.reasonCode,'food_size_ambiguous');assert(proof.tokens.verifyNativeVoiceDraft('synthetic-user',pending));assert.notEqual(pending.reviewNonce,original.reviewNonce);assert.notEqual(pending.reviewToken,original.reviewToken);assert.deepEqual(JSON.parse(JSON.stringify(pending.food)),JSON.parse(JSON.stringify(original.food)))
+    const recovered=await real.send('medium',{followUpDraft:pending});assert.equal(recovered.body.draft.canConfirm,true,recovered.body.draft.confirmationMessage);assert.equal(recovered.body.draft.food.nutrition.calories,308);assert.equal(recovered.charges.length,0);assert(proof.tokens.verifyNativeVoiceDraft('synthetic-user',recovered.body.draft))
+    const h=proof.harness();h.route.verifyNativeVoiceDraft=proof.tokens.verifyNativeVoiceDraft
+    const confirm=draft=>h.route.POST({headers:{get:()=> 'application/json'},json:async()=>({draft})})
+    assert.equal((await confirm(pending)).status,400);assert.equal((await confirm({...pending,canConfirm:true,action:'food_build_meal'})).status,400)
+    const tampered=JSON.parse(JSON.stringify(original));tampered.food.nutrition.calories+=1
+    const foreign={...original,reviewToken:proof.tokens.signNativeVoiceDraft('another-owner',original)}
+    const stale={...original,reviewIssuedAt:Date.now()-31*60*1000};stale.reviewToken=proof.tokens.signNativeVoiceDraft('synthetic-user',stale)
+    for(const invalid of [tampered,foreign,stale,{...original,reviewToken:undefined}]){
+      assert.equal((await confirm(invalid)).status,400)
+      const result=(await real.send('Change the chips to jumbo.',{confirmationDraft:invalid})).body.draft
+      assert.equal(result.canConfirm,false);assert.equal(result.reviewToken,undefined);assert.equal(proof.tokens.verifyNativeVoiceDraft('synthetic-user',result),false)
+    }
+    const alteredFood={...pending,reviewToken:undefined,food:{...pending.food,nutrition:{...pending.food.nutrition,calories:1}}}
+    for(const falseDraft of [alteredFood,{...pending,reviewToken:undefined,reasonCode:'food_source_unavailable'},{...pending,reviewToken:undefined,autoSave:true},{...pending,reviewToken:undefined,action:'record_action'}]){
+      const result=await real.ctx.sealReviewDraft('synthetic-user',falseDraft,original);assert.equal(result.reviewToken,undefined);assert.equal(proof.tokens.verifyNativeVoiceDraft('synthetic-user',result),false)
+    }
+    assert.equal(proof.tokens.verifyNativeVoiceDraft('another-owner',pending),false);assert.equal(h.state().food.length,0);assert.equal(providers,0)
+    assert.equal((await confirm(recovered.body.draft)).status,200);assert.equal(h.state().food.length,1)
+  })
   await check('actual combined meal size corrections retain the original fries source and never resolve a size adjective as food',async()=>{
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const at=matrix.indexOf('async function run() {');assert(at>0)

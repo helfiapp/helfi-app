@@ -58,7 +58,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-sign-save-integration-check.cjs` | Composed signed prepare/confirm scenario |
 | `voice-client-integrity-check.cjs` | Native callback integrity suite |
 | `voice-live-protocol-check.cjs` | Route/native/metering protocol surfaces |
-| `voice-restaurant-food-integrity-check.cjs` | 30 groups including exact competing products, named sizes and source-pinned pending size corrections |
+| `voice-restaurant-food-integrity-check.cjs` | 32 groups including exact competing products, named sizes, separate menu rows and signed clarification recovery |
 | `voice-action-matrix-check.cjs` | 78 cases |
 | `voice-action-outcome-check.cjs` | Actual outcome/receipt boundary suite |
 | `voice-record-actions-check.cjs` | 41 groups |
@@ -228,3 +228,5 @@ Final54 source freeze verification: complete53-suite guard PASS under UTC/root-o
 Native54 immutable50da786b was signed, Apple-validated/uploaded, processed VALID, assigned to the existing internal group and actually installed/opened/signed in on the physical iPhone. Exact AWS137 passed all three steps and both domains verified. Typed natural Yes opened the owned READY29Apr–5May actual8-page PDF in the existing in-app viewer; normal Done returned the precise viewer-closed receipt without claiming a saved file. Mixed Whopper/Zinger1033→twoWhoppers1615 and natural discard passed. Water300→450 now reads the exact final450ml confirmation question and natural discard passed. Read-only account check23:00UTC retains food3/water550/mood2 and the original15Oct meal. These remain typed normal-app tests, not physical speech/hearing evidence.
 
 Actual combined McDonalds burger/six-nuggets/large-fries1409 exposed an additional size-correction defect: medium became an unrelated dip1163 rather than1336. The failed review was naturally discarded without saving. A narrow server repair now has an actual POST regression reproducing that failure before the fix and preserving all three source IDs at1409→1336→1239→1409 after it. Full8261-row captured public-catalog POST audit also passes that chain with no supplier fallback or writes. Exact server138 deployment and physical54 retest remain required; native54 source stays unchanged.
+
+Separate-size follow-up: HJ large440→medium308→small254→large440 and KFC large567→regular283→large567 now pass actual POST against the captured8261-row public catalog with zero supplier fallback/writes. An unsupported size retains an unchanged signed non-savable review; a valid bare size through actual followUpDraft recovers. Real HMAC/normal confirmation tests refuse false/flip/tampered/foreign/expired inputs, reject unsigned trust gain and confirm the recovered complete review exactly once in synthetic storage. Restaurant32 and all53 required UTC/root-only suites/root types/design checks pass; independent review passed. Exact139 build/deployment/physical tests still required.
