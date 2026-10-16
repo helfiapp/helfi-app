@@ -3638,3 +3638,7 @@ After existing identity, consent, safety, paid-access and minimum-credit gates, 
 Device interest reads the actual normal user-data GET envelope `{ data: onboardingData }`; the preference is `data.data.deviceInterest`, not a fabricated top-level value. Regression fixtures must execute the actual GET wrapper and storage assignment, preserve unrelated provider keys and refuse malformed responses. A source mock that copies the adapter's incorrect envelope is not integration evidence.
 
 A completed voice mutation must refresh its existing mounted view through a same-account, read-only completion event. Do not depend on navigating to the route already in focus. Ignore stale, unmounted and other-account reads, and preserve unsaved forms/selection. Approved Dashboard/Insights/MainTabs designs and their dedicated hard-lock baselines remain unchanged.
+
+### Voice preferences must survive existing unsaved forms (17 October 2026)
+
+A verified voice preference completion includes the current account, exact action/values and a stable completion ID. Repeated delayed refresh events must not reapply an older value after a new manual edit. Coach blur auto-save must serialize and preserve a later confirmed voice setting; any older in-flight full save must be repaired and read back before claiming clean. Preserve unrelated dirty fields. Support refreshes only the matching owned ticket/history and retains unsent compose text. Weekly report refresh reads the actual top-level normal preferences envelope without resetting local settings.

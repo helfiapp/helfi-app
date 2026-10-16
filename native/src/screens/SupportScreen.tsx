@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Linking,
   Pressable,
   ScrollView,
@@ -13,6 +14,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import * as ImagePicker from 'expo-image-picker'
 
 import { API_BASE_URL } from '../config'
+import { createVoiceActionReadGuard } from '../voice/voiceActionReadRefresh'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
@@ -187,6 +189,19 @@ export function SupportScreen() {
     return buildNativeAuthHeaders(session.token, { includeCookie: true })
   }, [session?.token])
 
+  const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
+  const voiceReadAccount = mode === 'signedIn' && authHeaders && session?.token ? JSON.stringify([session.user?.id || '', session.token]) : null
+  voiceReadGuardRef.current.setAccount(voiceReadAccount)
+  const completedVoiceReadsRef = useRef(new Set<string>())
+  const selectedTicketRef = useRef<string | null>(null)
+  const ticketSelectionRevisionRef = useRef(0)
+  useEffect(() => {
+    const guard = voiceReadGuardRef.current!
+    guard.mount()
+    return () => guard.unmount()
+  }, [])
+
   const [loading, setLoading] = useState(true)
   const [isLoadingHistory, setIsLoadingHistory] = useState(false)
   const [submittingForm, setSubmittingForm] = useState(false)
@@ -203,6 +218,7 @@ export function SupportScreen() {
 
   const [activeTicket, setActiveTicket] = useState<SupportTicket | null>(null)
   const [ticketHistory, setTicketHistory] = useState<TicketHistoryItem[]>([])
+  selectedTicketRef.current = activeTicket?.id || null
   const [ticketActions, setTicketActions] = useState<TicketHistoryItem | null>(null)
 
   const [chatMessage, setChatMessage] = useState('')
@@ -247,22 +263,58 @@ export function SupportScreen() {
     [authHeaders],
   )
 
-  const loadActiveTicket = useCallback(async () => {
+  const loadActiveTicket = useCallback(async (preserveSelection = false) => {
     if (!authHeaders) return
-    const data = await requestJson(`${API_BASE_URL}/api/support/tickets?activeOnly=1`)
-    setActiveTicket(data?.ticket || null)
-  }, [authHeaders, requestJson])
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'support-ticket')
+    if (!read) return
+    const selectedId = selectedTicketRef.current
+    const selectionRevision = ticketSelectionRevisionRef.current
+    try {
+      const query = preserveSelection && selectedId ? `ticketId=${encodeURIComponent(selectedId)}&activeOnly=0` : 'activeOnly=1'
+      const data = await requestJson(`${API_BASE_URL}/api/support/tickets?${query}`, { signal: read.signal })
+      if (read.isCurrent() && selectionRevision === ticketSelectionRevisionRef.current && selectedTicketRef.current === selectedId) {
+        setActiveTicket(data?.ticket || null)
+      }
+    } catch (error) {
+      if (read.isCurrent()) throw error
+    } finally { read.finish() }
+  }, [authHeaders, requestJson, voiceReadAccount])
 
   const loadTicketHistory = useCallback(async () => {
     if (!authHeaders) return
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'support-history')
+    if (!read) return
     setIsLoadingHistory(true)
     try {
-      const data = await requestJson(`${API_BASE_URL}/api/support/tickets?list=1&activeOnly=0`)
-      setTicketHistory(Array.isArray(data?.tickets) ? data.tickets : [])
+      const data = await requestJson(`${API_BASE_URL}/api/support/tickets?list=1&activeOnly=0`, { signal: read.signal })
+      if (read.isCurrent()) setTicketHistory(Array.isArray(data?.tickets) ? data.tickets : [])
+    } catch (error) {
+      if (read.isCurrent()) throw error
     } finally {
-      setIsLoadingHistory(false)
+      if (read.isCurrent()) setIsLoadingHistory(false)
+      read.finish()
     }
-  }, [authHeaders, requestJson])
+  }, [authHeaders, requestJson, voiceReadAccount])
+
+  useEffect(() => {
+    completedVoiceReadsRef.current.clear()
+    ticketSelectionRevisionRef.current++
+    setActiveTicket(null)
+    setTicketHistory([])
+    setIsLoadingHistory(false)
+  }, [voiceReadAccount])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:voice-action-completed', (payload: any) => {
+      if (!authHeaders || !session?.user?.id || payload?.source !== 'voice-assistant' || payload.accountId !== session.user.id || payload.kind !== 'support_action' || !['support.create', 'support.reply', 'support.end_chat', 'support.feedback', 'support.delete'].includes(payload.action) || typeof payload.completionId !== 'string' || !payload.completionId || typeof payload.ticketId !== 'string' || !payload.ticketId) return
+      if (completedVoiceReadsRef.current.has(payload.completionId)) return
+      completedVoiceReadsRef.current.add(payload.completionId)
+      void Promise.all([loadTicketHistory(), loadActiveTicket(true)]).catch(() => {
+        // Keep the displayed ticket and unsent fields if a refresh cannot complete.
+      })
+    })
+    return () => subscription.remove()
+  }, [authHeaders, session?.user?.id, voiceReadAccount, loadTicketHistory, loadActiveTicket])
 
   useFocusEffect(
     useCallback(() => {
@@ -271,25 +323,29 @@ export function SupportScreen() {
         return
       }
 
+      const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'support-focus')
+      if (!read) return
       let cancelled = false
       const run = async () => {
         try {
           setLoading(true)
           await Promise.all([loadActiveTicket(), loadTicketHistory()])
         } catch (e: any) {
-          if (!cancelled) {
+          if (!cancelled && read.isCurrent()) {
             Alert.alert('Could not load support', e?.message || 'Please try again.')
           }
         } finally {
-          if (!cancelled) setLoading(false)
+          if (!cancelled && read.isCurrent()) setLoading(false)
+          read.finish()
         }
       }
 
       void run()
       return () => {
         cancelled = true
+        read.finish()
       }
-    }, [mode, authHeaders, loadActiveTicket, loadTicketHistory]),
+    }, [mode, authHeaders, voiceReadAccount, loadActiveTicket, loadTicketHistory]),
   )
 
   const conversationItems = useMemo(() => {
@@ -487,18 +543,24 @@ export function SupportScreen() {
 
   const openTicket = useCallback(
     async (ticketId: string) => {
+      const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'support-open-ticket')
+      if (!read) return
+      ticketSelectionRevisionRef.current++
       try {
         const data = await requestJson(
           `${API_BASE_URL}/api/support/tickets?ticketId=${encodeURIComponent(ticketId)}&activeOnly=0`,
+          { signal: read.signal },
         )
+        if (!read.isCurrent()) return
+        ticketSelectionRevisionRef.current++
         setActiveTicket(data?.ticket || null)
         setShowChatView(true)
         setShowPostSubmitChoice(false)
       } catch (e: any) {
-        Alert.alert('Could not open ticket', e?.message || 'Please try again.')
-      }
+        if (read.isCurrent()) Alert.alert('Could not open ticket', e?.message || 'Please try again.')
+      } finally { read.finish() }
     },
-    [requestJson],
+    [requestJson, voiceReadAccount],
   )
 
   const deleteTicket = useCallback(

@@ -58,6 +58,7 @@ function baseBox() {
   const box = { Date: LocalDate, Intl, Promise, AbortController, Math, Boolean, Number, String, Array, JSON,
     setTimeout: () => 1, clearTimeout: noop, AppState: { currentState: 'active' }, console: { info: noop },
     session: { token: 'synthetic-token' }, openRef: { current: true },
+    voiceMemoryUserId: 'synthetic-owner', voiceAccountUserIdRef: { current: 'synthetic-owner' },
     messageScrollRef: { current: null }, messageInputRef: { current: null }, messageSectionYRef: { current: null }, pendingMessageFocusRef: { current: null },
     nativeDeviceReviewRef: { current: null },
     voiceProviderMountedRef: { current: true }, voiceAccountTokenRef: { current: 'synthetic-token' },
@@ -202,6 +203,33 @@ async function actionDuringSubmittedSave() {
   assert.equal(action.signal.aborted, false, 'A correction tool call must not discard an outstanding save response')
   assert.equal(result.safeToClaimSaved, false)
   assert.match(result.message, /still being confirmed/)
+}
+async function verifyPreferenceCompletionEvents() {
+  for (const action of ['weekly_reports.update', 'coach_preferences.update']) for (const scenario of ['valid', 'account-before', 'account-after', 'end-after']) {
+    const box=baseBox(),events=[],timers=[],notices=[],requests=[];let complete
+    const draft={...foodDraft(),action:'preference_action',preferenceAction:{action,userId:'synthetic-owner',values:{enabled:false}}}
+    Object.assign(box,{todayLocalDate:()=>draft.localDate,buildNativeAuthHeaders:()=>({}),DeviceEventEmitter:{emit:(name,payload)=>events.push({name,payload})},setTimeout:run=>timers.push(run),setSaveSuccessNotice:value=>notices.push(value),fetch:async(_url,options)=>{requests.push(JSON.parse(options.body));return new Promise(resolve=>{complete=resolve})},fetchNativeVoiceConfirm:factory=>factory('https://offline.invalid')})
+    evaluate(box,`globalThis.run = ${callback('saveDraft')}`)
+    if(scenario==='account-before')box.voiceAccountUserIdRef.current='other-owner'
+    const pending=box.run(draft,{closeOnSuccess:false,voiceActionRunId:'synthetic-completion-53'})
+    if(scenario!=='account-before'){
+      if(scenario==='account-after')box.voiceAccountUserIdRef.current='other-owner'
+      if(scenario==='end-after')box.realtimeVoiceRunRef.current++
+      complete({res:{ok:true},data:{success:true,result:{kind:'preference_action',id:action,operation:'update',status:'saved',message:'Your setting change is saved and verified.'}}})
+    }
+    assert.equal(Boolean(await pending),scenario==='valid');assert.equal(notices.length,scenario==='valid'?1:0)
+    if(scenario==='valid'){
+      timers.forEach(run=>run())
+      const refresh=events.filter(event=>event.name==='helfi:settings-changed');assert.equal(refresh.length,3)
+      const target=events.find(event=>event.name==='helfi:navigate-native-web-tool').payload.nativeTarget
+      assert.equal(action==='coach_preferences.update'?target.route:target.tab,action==='coach_preferences.update'?'SmartHealthCoach':'Settings')
+      if(action==='coach_preferences.update')assert.equal(target.params.tab,'settings')
+      for(const event of refresh){assert.equal(event.payload.source,'voice-assistant');assert.equal(event.payload.accountId,'synthetic-owner');assert.equal(event.payload.completionId,'synthetic-completion-53');assert.equal(event.payload.action,action);assert.equal(event.payload.kind,'preference_action');assert.deepEqual(JSON.parse(JSON.stringify(event.payload.values)),{enabled:false})}
+      const count=events.length;box.voiceAccountUserIdRef.current='other-owner';timers.forEach(run=>run());assert.equal(events.length,count,'Delayed completion events cannot cross accounts')
+    }else assert.equal(events.length,0)
+    if(scenario==='account-before')assert.equal(requests.length,0)
+  }
+  console.log('PASS same-account exact preference completion fields, stable repeat ID, stale account/end refusal and delayed-event isolation')
 }
 async function verifySaveResult() {
   const box = baseBox()
@@ -462,6 +490,9 @@ async function verifySupportAndReportClient() {
     const outcome = state.box.confirmationRequestResult(data, draft, 'synthetic-action')
     assert.equal(outcome.ok, true); assert.equal(outcome.saved, false); assert.equal(state.box.realtimeToolResult(outcome).safeToClaimSaved, false)
     assert.equal(state.events.filter(([name]) => name === 'helfi:voice-action-saved').length, 0)
+    const completed = state.events.find(([name]) => name === 'helfi:voice-action-completed')[1]
+    assert.equal(completed.accountId, owner); assert.equal(completed.source, 'voice-assistant'); assert.equal(completed.kind, draft.action); assert.equal(completed.action, data.result.action); assert.equal(typeof completed.completionId, 'string'); assert(completed.completionId)
+    if (draft.action === 'support_action') assert.equal(completed.ticketId, data.result.id)
     const target = state.events.find(([name]) => name === 'helfi:navigate-native-web-tool')[1]
     assert.equal(draft.action === 'support_action' ? target.nativeTarget.route : target.nativeTarget.tab, draft.action === 'support_action' ? 'Support' : 'Insights')
     assert.equal(state.notices[0].title, draft.action === 'support_action' ? 'Support action completed' : 'Report requested')
@@ -1295,6 +1326,7 @@ async function main() {
   await speechDuringPreparation(true)
   await actionDuringSubmittedSave()
   await verifySaveResult()
+  await verifyPreferenceCompletionEvents()
   await verifyConfirmBackendIsolation()
   await verifyReviewSaveErrorLifecycle()
   await verifySingleSpokenReplyRequest()

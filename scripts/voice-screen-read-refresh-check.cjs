@@ -29,7 +29,7 @@ function fixture(spec){
  assert(callback&&subscription&&mount&&cache&&focus,spec.file+' must expose actual read/lifetime/event/focus functions')
  const account=JSON.stringify(['synthetic-owner','synthetic-token']),guard=createVoiceActionReadGuard(),requests=[],alerts=[],state={},updates=[];let listener,removed=0
  guard.setAccount(account)
- const box={Promise,JSON,Object,Boolean,Array,Error,AbortController,API_BASE_URL:'https://offline.invalid',mode:'signedIn',session:{user:{id:'synthetic-owner'},token:'synthetic-token'},authHeaders:{Authorization:'Bearer synthetic-token'},voiceReadAccount:account,voiceReadGuardRef:{current:guard},voiceHistoryNeedsRefreshRef:{current:false},activeTab:'history',historyLoaded:true,matchesVoiceActionReadRefresh,
+ const box={Promise,JSON,Object,Boolean,Array,Error,AbortController,API_BASE_URL:'https://offline.invalid',mode:'signedIn',session:{user:{id:'synthetic-owner'},token:'synthetic-token'},authHeaders:{Authorization:'Bearer synthetic-token'},voiceReadAccount:account,voiceReadGuardRef:{current:guard},settingsMountedRef:{current:true},settingsAccountGenerationRef:{current:0},settingsSaveAbortControllersRef:{current:new Set()},voiceHistoryNeedsRefreshRef:{current:false},activeTab:'history',historyLoaded:true,matchesVoiceActionReadRefresh,
   loadToday:()=>{throw Error('Voice history refresh must not reload/reset Today')},Alert:{alert:(...value)=>alerts.push(value)},DeviceEventEmitter:{addListener:(name,callback)=>{assert.equal(name,'helfi:voice-action-completed');listener=callback;return{remove:()=>{removed++;listener=null}}}},
   fetch:(url,options)=>new Promise((resolve,reject)=>requests.push({url,options,resolve,reject})),
  }

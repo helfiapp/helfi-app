@@ -146,6 +146,38 @@ function actualCheckinHandlers(initial){
   return {today:load('app/api/checkins/today/route.ts'),ratings:load('app/api/checkins/ratings/route.ts'),state:()=>data}
 }
 let checks=0
+function actualCoachSettings(initial={}){
+  let stored={enabled:false,time1:'08:00',time2:'11:00',time3:'14:00',timezone:'Australia/Melbourne',timezoneManual:false,frequency:5,focusFood:true,focusSupplements:true,focusLifestyle:true,pricingAcceptedAt:null,...initial},account='synthetic-owner',scheduleFails=false
+  const posted=[],scheduled=[],authSeen=[]
+  const smartSource=ts.createSourceFile('smart-health-coach.ts',fs.readFileSync(path.join(root,'lib/smart-health-coach.ts'),'utf8'),ts.ScriptTarget.Latest,true)
+  let timesDeclaration;function findTimes(node){if(ts.isVariableDeclaration(node)&&node.name.getText(smartSource)==='SMART_COACH_AUTO_CHECK_TIMES')timesDeclaration=node.getText(smartSource);ts.forEachChild(node,findTimes)}findTimes(smartSource);assert(timesDeclaration)
+  const timesBox={};vm.runInNewContext(ts.transpileModule(`const ${timesDeclaration};globalThis.times=SMART_COACH_AUTO_CHECK_TIMES`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,timesBox)
+  const prisma={user:{findUnique:async({where})=>account&&(where.id===account||where.email===account+'@example.invalid')?{id:account,email:account+'@example.invalid'}:null},$executeRawUnsafe:async sql=>{assert(/^(?:CREATE TABLE|ALTER TABLE)/.test(sql.trim()));return 0},$queryRawUnsafe:async(sql,...args)=>{
+    assert.equal(args[0],account);const normalized=sql.replace(/\s+/g,' ').trim()
+    if(normalized.startsWith('SELECT enabled FROM HealthTipSettings'))return[{enabled:stored.enabled}]
+    if(normalized.startsWith('SELECT')&&normalized.includes('FROM HealthTipSettings'))return[copy(stored)]
+    assert(normalized.startsWith('INSERT INTO HealthTipSettings'))
+    const [,enabled,time1,time2,time3,timezone,timezoneManual,frequency,focusFood,focusSupplements,focusLifestyle]=args
+    Object.assign(stored,{enabled,time1,time2,time3,timezone,timezoneManual,frequency,focusFood,focusSupplements,focusLifestyle});return[]
+  }}
+  const box={module:{exports:{}},exports:null,Request,Response,Headers,URL,Date,Intl,console:{error(){},warn(){},log(){}},require:name=>{
+    const dependencies={'next/server':{NextRequest,NextResponse:{json:(body,options)=>response(body,options?.status||200)}},'next-auth':{getServerSession:async()=>account?{user:{email:account+'@example.invalid'}}:null},'@/lib/auth':{authOptions:{}},'@/lib/native-auth':{getUserIdFromNativeAuth:async req=>{authSeen.push({authorization:req.headers.get('authorization'),cookie:req.headers.get('cookie')});return authorized(req)?account:null}},'@/lib/prisma':{prisma},'@/lib/qstash':{scheduleHealthTipWithQStash:async(userId,time,timezone)=>{scheduled.push({userId,time,timezone});return{scheduled:!scheduleFails}}},'@/lib/smart-health-coach':{SMART_COACH_AUTO_CHECK_TIMES:timesBox.times}}
+    if(Object.hasOwn(dependencies,name))return dependencies[name];throw Error('Forbidden normal coach dependency '+name)
+  }};box.exports=box.module.exports
+  vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,'app/api/health-tips/settings/route.ts'),'utf8'),{compilerOptions:{target:ts.ScriptTarget.ES2020,module:ts.ModuleKind.CommonJS}}).outputText,box)
+  const normal=box.module.exports,coach={GET:req=>normal.GET(req),POST:async req=>{posted.push(await req.clone().json());return normal.POST(req)}}
+  const adapterBox={module:{exports:{}},exports:null,Request,Response,Headers,URL,Date,Intl,console,require:name=>name==='next/server'?{NextRequest}:name==='crypto'?require('node:crypto'):name==='@/app/api/health-tips/settings/route'?coach:mocks[name]||(()=>{throw Error('Forbidden coach adapter dependency '+name)})()};adapterBox.exports=adapterBox.module.exports;vm.runInNewContext(code,adapterBox)
+  // Execute the real web GET normalization/sync block. It replaces a stored
+  // non-manual zone with the browser's zone; this is the actual regression path.
+  const web=ts.createSourceFile('health-tips-page.tsx',fs.readFileSync(path.join(root,'app/health-tips/page.tsx'),'utf8'),ts.ScriptTarget.Latest,true,ts.ScriptKind.TSX)
+  let policy;function findPolicy(node){if(ts.isIfStatement(node)&&node.expression.getText(web)==='res.ok'&&node.thenStatement.getText(web).includes('const manual = !!data.timezoneManual'))policy=node.getText(web);ts.forEachChild(node,findPolicy)}findPolicy(web);assert(policy)
+  async function browserRead(browserTimezone='Australia/Melbourne'){
+    const pending=[],seen={},context={res:await normal.GET(request()),browserTimezone,fetch:(url,options)=>{assert.equal(url,'/api/health-tips/settings');pending.push(normal.POST(new NextRequest(new URL(url,request().url),{...options,headers:{...options.headers,authorization:'Bearer synthetic-owner'}})));return pending.at(-1)}}
+    for(const name of ['Enabled','Time1','Time2','Time3','Timezone','TimezoneManual','TimezoneQuery','Frequency'])context['set'+name]=value=>{seen[name]=value}
+    vm.createContext(context);await vm.runInContext(ts.transpileModule(`(async()=>{${policy}})()`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,context);await Promise.all(pending);return{seen,syncs:pending.length}
+  }
+  return{api:adapterBox.module.exports,normal,posted,scheduled,authSeen,browserRead,state:()=>stored,setAccount:value=>{account=value},failSchedules:()=>{scheduleFails=true},prepare:values=>adapterBox.module.exports.prepareVoicePreferenceAction(request(),'synthetic-owner',{action:'coach_preferences.update',values}),execute:d=>adapterBox.module.exports.executeVoicePreferenceAction(request(),'synthetic-owner',d)}
+}
 async function check(name,fn){reset();await fn();checks++;console.log('PASS '+name)}
 async function run(){
   await check('fixed schema covers server-supported manual settings',()=>{assert.equal(Object.keys(api.VOICE_PREFERENCE_ACTION_SCHEMAS).length,13);assert(!('endpoint' in api.VOICE_PREFERENCE_ACTION_SCHEMAS['profile.update']))})
@@ -192,6 +224,32 @@ async function run(){
   await check('weekly preference still invokes normal paid/consent-protected handler',async()=>{const d=await prepare('weekly_reports.update',{enabled:true});assert.equal((await execute(d)).saved,true);assert.equal(writes[0].base,'/api/reports/weekly/preferences');assert.deepEqual(writes[0].body,{enabled:true})})
   await check('new coach pricing acceptance and OS/billing actions cannot be fabricated',async()=>{await assert.rejects(()=>prepare('coach_preferences.update',{enabled:true}),/pricing/);for(const action of ['billing.purchase','health.authorize','notifications.permission','ai_consent.update'])await assert.rejects(()=>prepare(action,{enabled:true}));assert.equal(writes.length,0)})
   await check('existing coach timezone edit preserves enable state without accepting terms',async()=>{state.coach.enabled=true;const d=await prepare('coach_preferences.update',{timezone:'UTC',timezoneManual:true});assert.equal((await execute(d)).saved,true);assert.equal(writes[0].body.enabled,true);assert(!('acceptPricingTerms' in writes[0].body))})
+  await check('timezone-only coach choice includes reviewed manual mode and old incomplete reviews require review again',async()=>{
+    const d=await prepare('coach_preferences.update',{timezone:'Europe/Paris'});assert.equal(d.values.timezoneManual,true);assert.match(d.summary,/manual time zone: on/);assert.equal((await execute(d)).saved,true);assert.equal(writes[0].body.timezoneManual,true);assert.equal(state.coach.timezone,'Europe/Paris')
+    reset();const old=await prepare('coach_preferences.update',{timezone:'Europe/Paris'});delete old.values.timezoneManual;assert.equal((await execute(old)).status,'review_again');assert.equal(writes.length,0)
+  })
+  await check('automatic coach mode is explicit and conflicting zone plus automatic refuses before writing',async()=>{
+    state.coach.timezoneManual=true;const auto=await prepare('coach_preferences.update',{timezoneManual:false});assert.match(auto.summary,/automatic time zone/);assert.equal(auto.values.timezoneManual,false);assert(!('timezone'in auto.values));assert.equal((await execute(auto)).saved,true)
+    const count=writes.length;await assert.rejects(()=>prepare('coach_preferences.update',{timezone:'Europe/Paris',timezoneManual:false}),/either an automatic time zone or a fixed/);assert.equal(writes.length,count)
+  })
+  await check('actual normal settings GET/POST and actual web automatic policy retain explicit voice zone after refresh',async()=>{
+    const before=actualCoachSettings({timezone:'Europe/Paris',timezoneManual:false});const old=await before.browserRead();assert.equal(old.syncs,1);assert.equal(before.state().timezone,'Australia/Melbourne')
+    const f=actualCoachSettings(),d=await f.prepare({timezone:'Europe/Paris'});assert.equal(d.values.timezoneManual,true);assert.equal(f.posted.length,0);assert.equal((await f.execute(d)).saved,true);assert.equal(f.state().enabled,false);assert.equal(f.posted[0].timezoneManual,true);assert(!('acceptPricingTerms'in f.posted[0]))
+    const refresh=await f.browserRead();assert.equal(refresh.syncs,0);assert.equal(refresh.seen.Timezone,'Europe/Paris');assert.equal(f.state().timezone,'Europe/Paris');assert.equal(f.state().timezoneManual,true);assert.equal(f.scheduled.length,0)
+    for(const auth of f.authSeen){assert.equal(auth.authorization,'Bearer synthetic-owner');assert.equal(auth.cookie,'unrelated=preserved')}
+  })
+  await check('actual automatic-mode refresh follows normal policy without promising a fixed zone',async()=>{
+    const f=actualCoachSettings({timezone:'Europe/Paris',timezoneManual:true}),d=await f.prepare({timezoneManual:false});assert.match(d.summary,/automatic time zone/);assert(!d.summary.includes('Europe/Paris'));assert.equal((await f.execute(d)).saved,true);const refreshed=await f.browserRead();assert.equal(refreshed.syncs,1);assert.equal(f.state().timezone,'Australia/Melbourne');assert.equal(f.state().timezoneManual,false)
+    const count=f.posted.length;await assert.rejects(()=>f.prepare({timezone:'UTC',timezoneManual:false}),/either an automatic/);assert.equal(f.posted.length,count)
+  })
+  await check('actual coach pricing, authentication, stale checks and schedule result policy remain authoritative',async()=>{
+    const disabled=actualCoachSettings();await assert.rejects(()=>disabled.prepare({enabled:true,timezone:'UTC'}),/pricing/);assert.equal(disabled.posted.length,0)
+    const direct=await disabled.normal.POST(new NextRequest('https://helfi.ai/api/health-tips/settings',{method:'POST',headers:request().headers,body:JSON.stringify({enabled:true,timezone:'UTC',timezoneManual:true})}));assert.equal(direct.status,400);assert.equal(disabled.state().enabled,false)
+    const f=actualCoachSettings({enabled:true}),d=await f.prepare({timezone:'Europe/Paris'});assert.equal((await f.execute(d)).saved,true);assert(f.scheduled.length>0);assert(f.scheduled.every(item=>item.timezone==='Europe/Paris'));assert(!('acceptPricingTerms'in f.posted[0]))
+    const stale=await f.prepare({timezone:'UTC'});f.state().timezone='Europe/London';assert.equal((await f.execute(stale)).status,'review_again');assert.equal(f.posted.length,1)
+    const notDelivered=await f.prepare({timezone:'Pacific/Auckland'});f.failSchedules();const result=await f.execute(notDelivered);assert.equal(result.saved,true);assert.equal(result.schedulingVerified,false);assert.match(result.message,/delivery was not verified/)
+    f.setAccount(null);await assert.rejects(()=>f.prepare({timezone:'UTC'}));assert.equal(f.posted.length,2)
+  })
   await check('checkin rating resolves exact own issue/date and preserves note',async()=>{const d=await prepare('checkin.rating.update',{date:'2026-10-15',issueName:'Sleep',value:4});assert.equal(d.values.issueId,'own-sleep');assert(!('issueName' in d.values));assert.equal((await execute(d)).saved,true);assert.equal(writes[0].method,'PATCH');assert.equal(writes[0].body.note,'Keep this note')})
   await check('checkin ambiguity and foreign record IDs require clarification',async()=>{state.history.push({...state.history[0],issueId:'second-sleep'});await assert.rejects(()=>prepare('checkin.rating.update',{date:'2026-10-15',issueName:'Sleep',value:4}),/exact existing/);await assert.rejects(()=>prepare('checkin.rating.update',{date:'2026-10-15',issueId:'foreign-id',value:4}),/exact existing/);assert.equal(writes.length,0)})
   await check('the actual Today Stress levels question resolves its stored negative Stress issue before any save',async()=>{

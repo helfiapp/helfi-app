@@ -232,6 +232,12 @@ function validate(action: VoicePreferenceActionName, raw: unknown, before: Recor
     }
   }
   if (action === 'hydration_goal.set' && (!Number.isInteger(result.targetMl) || result.targetMl > 20000)) fail('Please give the water goal in whole millilitres, up to 20000.')
+  if (action === 'coach_preferences.update' && result.timezone !== undefined) {
+    if (result.timezoneManual === false) fail('Please choose either an automatic time zone or a fixed time zone for Smart Health Coach.')
+    // A named zone is a fixed choice. Include its manual flag in the review so
+    // the normal app's automatic browser-zone policy cannot undo that choice.
+    result.timezoneManual = true
+  }
   if (action === 'coach_preferences.update' && result.enabled === true && before.enabled !== true) throw new VoicePreferenceActionError('pricing_confirmation_required', 'Please review and accept Smart Health Coach pricing on its settings screen before enabling it.', 409, '/health-tips')
   expandListChanges(result, before)
   return result
@@ -318,6 +324,7 @@ export async function prepareVoicePreferenceAction(request: NextRequest, userId:
 }
 
 function preferenceSummary(action: VoicePreferenceActionName, values: Record<string, any>, before: Record<string, any>) {
+  if (action === 'coach_preferences.update' && values.timezoneManual === false) return `Use the app's automatic time zone for Smart Health Coach${values.enabled === undefined ? '.' : `; coach alerts: ${values.enabled ? 'on' : 'off'}.`}`
   if (action === 'hydration_goal.reset') return 'Use your automatic daily water goal.'
   if (action === 'hydration_goal.set') return `Set your daily water goal to ${values.targetMl} millilitres.`
   const checkinLabel = ['Really bad', 'Bad', 'Below average', 'Average', 'Above average', 'Good', 'Excellent'][values.value]
@@ -334,6 +341,7 @@ function preferenceSummary(action: VoicePreferenceActionName, values: Record<str
 // its existing confirmation receipt. This adapter never accepts arbitrary URLs.
 export async function executeVoicePreferenceAction(request: NextRequest, userId: string, prepared: PreparedVoicePreferenceAction): Promise<VoicePreferenceExecutionResult> {
   if (!prepared || !userId || prepared.userId !== userId || !Number.isFinite(prepared.preparedAt) || Date.now() - prepared.preparedAt > 30 * 60 * 1000 || prepared.preparedAt > Date.now() + 1000) return {saved:false,status:'review_again',message:'Please review this setting change again before saving.'}
+  if (prepared.action === 'coach_preferences.update' && prepared.values?.timezone !== undefined && prepared.values.timezoneManual === undefined) return {saved:false,status:'review_again',message:'Please review the fixed time zone choice again before saving.'}
   try {
     const before = await read(request, prepared.action, prepared.values)
     const values = validate(prepared.action, prepared.values, before)

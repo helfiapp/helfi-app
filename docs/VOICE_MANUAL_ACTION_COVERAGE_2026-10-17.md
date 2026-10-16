@@ -49,7 +49,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 
 ## Required offline regression coverage
 
-`scripts/assert-native-voice-confirm-guard.js` currently registers **50 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
+`scripts/assert-native-voice-confirm-guard.js` currently registers **52 required suites**. Their synthetic authenticated handlers, storage/transaction fixtures, actual source functions and native callback fixtures test the boundaries without real provider calls, account writes, Health reads or purchases. They supplement actual app testing. Recorded offline counts and current targeted fixture counts are listed separately from runtime evidence; source inspection or registration alone is not a fresh full-run result.
 
 | Required suite (`scripts/`) | Recorded offline count / scope |
 |---|---|
@@ -179,3 +179,11 @@ The device-interest adapter now consumes the real normal GET envelope; its actua
 Known protected-screen limitation: Insights refreshes on normal focus, but generating a report while Insights is already focused can leave the list/status stale until the page is reopened. The approved Insights/MainTabs hard locks have not been changed. PDF opening does not modify stored report data. This is not evidence that all manual app features are universally voice-complete.
 
 Final52 pre-release checks: complete50-suite guard PASS under UTC with native-only dependencies refused; root and native type checks PASS;292 full/93 native locks PASS; protected-region checks PASS. Signed52, deployment and device checks are recorded separately once actually performed.
+
+### Native53 completion and dirty-form protection
+
+Support/Settings27 actual-source groups consume the actual current completion emitter and normal GET envelopes, retain selected ticket and unsent forms, deduplicate repeat completions and ignore delayed/account-switched reads. Coach8 actual-source scenario groups use real normal GET/POST code with synthetic storage/scheduling: confirmed fields survive old blur/in-flight full saves, canonical server settings are read back before clean state, unrelated/newer edits survive and repair failures stay dirty. Named Coach timezones now include the reviewed manual flag; explicit automatic mode remains automatic and conflicting fixed+automatic requests clarify. Preference suite now53 groups. No real Support message/deletion, paid Coach activation or report generation was used for these checks.
+
+Native52 was signed and Apple-validated but deliberately never uploaded/distributed;53 includes these final functional corrections. Protected Insights same-focused report-request refresh remains a separately prepared, unapplied proposal for exact owner approval; no visual or protected-baseline change was made.
+
+Final53 source verification: complete52-suite guard PASS under UTC/root-only dependency boundary; root/native type checks PASS;292 full/93 native locks and protected regions PASS. Actual-source regression fixture repair seeded new lifetime refs without weakening assertions. Final source is frozen for exact production and signed53 builds.

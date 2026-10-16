@@ -137,7 +137,7 @@ type VoiceDraft = {
   }
   notificationAction?: { action: 'notifications.mark_read' | 'notifications.delete' | 'notifications.mark_all_visible_read' | 'notifications.delete_all_visible'; userId?: string; ids?: string[]; values?: { ids?: string[]; titles?: string[] }; beforeHash?: string; summary?: string; preparedAt?: number }
   localPreference?: LocalPreference
-  preferenceAction?: { action: string; values: Record<string, unknown>; beforeHash?: string; summary?: string; preparedAt?: number }
+  preferenceAction?: { action: string; userId?: string; values: Record<string, unknown>; beforeHash?: string; summary?: string; preparedAt?: number }
 }
 
 type SaveSuccessNotice = {
@@ -2212,6 +2212,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         if (separateAction && (!isCurrentDeviceSave() || (targetDraft.action === 'support_action' ? targetDraft.supportAction?.userId : targetDraft.reportAction?.userId) !== voiceMemoryUserId)) throw new Error('Please review this action again in the current account. Nothing has been submitted.')
         if (recipeImport && (!isCurrentDeviceSave() || targetDraft.recipeImport?.userId !== voiceMemoryUserId || targetDraft.recipeImport?.costCredits !== 10)) throw new Error('Please review this recipe import again in the current account. No import has been requested.')
         if (guardedRecord && (!isCurrentDeviceSave() || (targetDraft.recordAction?.ownerId && targetDraft.recordAction.ownerId !== voiceMemoryUserId))) throw new Error('Please review this recorded change again in the current account. Nothing has been sent to change it.')
+        if (targetDraft.action === 'preference_action' && (!isCurrentDeviceSave() || targetDraft.preferenceAction?.userId !== voiceMemoryUserId)) throw new Error('Please review this exact setting change in the current account. Nothing has been submitted.')
         if (targetDraft.action === 'notification_action' && (!isCurrentDeviceSave() || targetDraft.notificationAction?.userId !== voiceMemoryUserId)) throw new Error('Please review these notifications again in the current account. Nothing has been sent to change them.')
         let { res, data } = await fetchNativeVoiceConfirm((baseUrl) => fetch(`${baseUrl}/api/native-voice-assistant-confirm`, {
           method: 'POST',
@@ -2220,6 +2221,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           body: JSON.stringify({ draft: targetDraft }),
         }))
         if (saveSignal?.aborted) return null
+        if (targetDraft.action === 'preference_action' && !isCurrentDeviceSave()) return null
         if ((targetDraft.action === 'notification_action' || guardedRecord || recipeImport || separateAction || additionalAction || deviceAction) && !isCurrentDeviceSave()) return null
         if (!res.ok) throw new Error(data?.error || 'Could not save that.')
         if (deviceAction) {
@@ -2311,7 +2313,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           saveRequestOutstanding = false
           traceVoiceAction(voiceActionRunId, 'report_pdf_completed', targetDraft.action, data.result.status, data.idempotentReplay ? 'replayed_pdf_handoff' : 'verified_pdf_handoff', startedAt)
           appendConversationTurns([makeConversationTurn('assistant', message)])
-          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', kind: targetDraft.action, action: data.result.action })
+          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', accountId: voiceMemoryUserId, completionId: voiceActionRunId, kind: targetDraft.action, action: data.result.action })
           DeviceEventEmitter.emit('helfi:navigate-native-web-tool', { title: 'Insights', path: '/insights', nativeTarget: { type: 'tab', tab: 'Insights' } })
           setSaveSuccessNotice({ title: data.result.openRequestAccepted ? 'PDF opening requested' : 'PDF prepared', message })
           addVoiceActivity(data.result.openRequestAccepted ? 'Phone accepted the PDF opening request' : 'PDF opening not verified', 'done')
@@ -2331,7 +2333,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           traceVoiceAction(voiceActionRunId, 'action_completed', targetDraft.action, targetDraft.action === 'report_action' ? 'report_requested' : 'action_completed', data.idempotentReplay ? 'replayed_receipt' : 'verified_receipt', startedAt)
           appendConversationTurns([makeConversationTurn('assistant', message)])
           const report = targetDraft.action === 'report_action'
-          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', kind: targetDraft.action, action: data.result.action })
+          DeviceEventEmitter.emit('helfi:voice-action-completed', { source: 'voice-assistant', accountId: voiceMemoryUserId, completionId: voiceActionRunId, kind: targetDraft.action, action: data.result.action, ...(targetDraft.action === 'support_action' ? { ticketId: data.result.id } : {}) })
           DeviceEventEmitter.emit('helfi:navigate-native-web-tool', report ? { title: 'Insights', path: '/insights', nativeTarget: { type: 'tab', tab: 'Insights' } } : { title: 'Support', path: '/support', nativeTarget: { type: 'stack', route: 'Support' } })
           setSaveSuccessNotice({ title: report ? 'Report requested' : 'Support action completed', message })
           addVoiceActivity(report ? 'Report request verified' : 'Support action verified', 'done')
@@ -2385,7 +2387,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         const changedEntity = String(data?.result?.entity || targetDraft.recordAction?.entity || '')
         const changedDate = targetDraft.recordAction?.localDate || targetDraft.localDate || todayLocalDate()
         const emitSavedRefresh = () => {
-          if ((resultKind === 'notification_action' || guardedRecord) && (voiceAccountTokenRef.current !== saveAccountToken || voiceAccountUserIdRef.current !== voiceMemoryUserId)) return
+          if (voiceAccountTokenRef.current !== saveAccountToken || voiceAccountUserIdRef.current !== voiceMemoryUserId) return
           DeviceEventEmitter.emit('helfi:voice-action-saved', {
             localDate: changedDate,
             source: 'voice-assistant',
@@ -2403,7 +2405,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
           }
           if (resultKind === 'notification_action') DeviceEventEmitter.emit('helfi:notifications-inbox-changed', { source: 'voice-assistant', kind: resultKind })
           if (resultKind === 'local_preference_action') DeviceEventEmitter.emit('helfi:device-preference-changed', { key: data.result.id, source: 'voice-assistant' })
-          if (resultKind === 'preference_action') DeviceEventEmitter.emit('helfi:settings-changed', { source: 'voice-assistant', kind: resultKind })
+          if (resultKind === 'preference_action') DeviceEventEmitter.emit('helfi:settings-changed', { source: 'voice-assistant', accountId: voiceMemoryUserId, completionId: voiceActionRunId, kind: resultKind, action: targetDraft.preferenceAction?.action, values: targetDraft.preferenceAction?.values })
           if (resultKind === 'food' || resultKind === 'exercise' || resultKind === 'water') {
             DeviceEventEmitter.emit('helfi:food-log-changed', {
               localDate: changedDate,
@@ -2451,6 +2453,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         emitSavedRefresh()
         if (resultKind === 'record_action' || resultKind === 'preference_action' || resultKind === 'local_preference_action' || resultKind === 'notification_action') {
           const target = resultKind === 'notification_action' ? { title: 'Notifications', path: '/notifications', nativeTarget: { type: 'stack', route: 'NotificationsInbox' } }
+            : resultKind === 'preference_action' && targetDraft.preferenceAction?.action === 'coach_preferences.update' ? { title: 'Health Coach', path: '/health-tips?tab=settings', nativeTarget: { type: 'stack', route: 'SmartHealthCoach', params: { tab: 'settings' } } }
             : resultKind === 'preference_action' || resultKind === 'local_preference_action' ? { title: 'Settings', path: '/settings', nativeTarget: { type: 'tab', tab: 'Settings' } }
             : changedEntity === 'symptom_note' ? { title: 'Symptom Notes', path: '/symptoms', nativeTarget: { type: 'stack', route: 'SymptomNotes', params: { initialTab: 'history', voiceActionNonce: Date.now() } } }
             : changedEntity === 'supplement' || changedEntity === 'medication' ? { title: 'Health Intake', path: '/onboarding?step=6', nativeTarget: { type: 'stack', route: 'NativeWebTool', params: { title: 'Health Intake', path: `/onboarding?step=6&voiceActionNonce=${Date.now()}` } } }

@@ -28,6 +28,7 @@ type HealthTipSettings = {
   time2: string
   time3: string
   timezone: string
+  timezoneManual?: boolean
   frequency: number
   focusFood: boolean
   focusSupplements: boolean
@@ -174,6 +175,44 @@ const buildTipBlocks = (body: string): TipBlock[] => {
 const normalizeTipTitle = (title: string) =>
   String(title || '').replace(/^Smart Health Coach:\s*/i, 'Health Coach: ')
 
+function normalizeCoachSettings(data: Partial<HealthTipSettings>): HealthTipSettings {
+  return {
+    enabled: !!data.enabled, time1: String(data.time1 || '11:30'), time2: String(data.time2 || '15:30'), time3: String(data.time3 || '20:30'),
+    timezone: String(data.timezone || 'UTC'), timezoneManual: data.timezoneManual === true,
+    frequency: Math.max(1, Math.min(5, Number(data.frequency) || 1)), focusFood: data.focusFood !== false,
+    focusSupplements: data.focusSupplements !== false, focusLifestyle: data.focusLifestyle !== false,
+  }
+}
+
+function coachSettingsSnapshot(snapshot: string): HealthTipSettings | null {
+  try { return snapshot ? normalizeCoachSettings(JSON.parse(snapshot)) : null } catch { return null }
+}
+
+function mergeCoachSettingsRead(server: HealthTipSettings, current: HealthTipSettings, snapshot: string): HealthTipSettings {
+  const baseline = coachSettingsSnapshot(snapshot)
+  if (!baseline) return server
+  const merged = { ...server }
+  for (const key of Object.keys(current) as Array<keyof HealthTipSettings>) {
+    if (current[key] !== baseline[key]) (merged as any)[key] = current[key]
+  }
+  return merged
+}
+
+function coachVoiceSettingsPatch(payload: any, accountId: string | undefined): Partial<HealthTipSettings> | null {
+  if (!accountId || payload?.accountId !== accountId || payload.source !== 'voice-assistant' || payload.kind !== 'preference_action' || payload.action !== 'coach_preferences.update' || typeof payload.completionId !== 'string' || !payload.completionId || payload.completionId.length > 200) return null
+  const values = payload.values
+  if (!values || typeof values !== 'object' || Array.isArray(values)) return null
+  const keys = Object.keys(values)
+  if (!keys.length || keys.some(key => !['enabled', 'timezone', 'timezoneManual'].includes(key))) return null
+  if (values.enabled !== undefined && typeof values.enabled !== 'boolean') return null
+  if (values.timezoneManual !== undefined && typeof values.timezoneManual !== 'boolean') return null
+  if (values.timezone !== undefined) {
+    if (typeof values.timezone !== 'string' || !values.timezone.trim() || values.timezone.length > 100) return null
+    try { new Intl.DateTimeFormat('en-GB', { timeZone: values.timezone }).format(new Date()) } catch { return null }
+  }
+  return { ...values }
+}
+
 export function SmartHealthCoachScreen({ route }: { route: any; navigation: any }) {
   const { mode, session } = useAppMode()
   const { openVoiceAssistant } = useVoiceAssistant()
@@ -214,6 +253,16 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
 
   const [clearedTipIds, setClearedTipIds] = useState<string[]>([])
 
+  const settingsAccountRef = useRef<string | null>(null)
+  const settingsMountedRef = useRef(true)
+  const settingsAccountGenerationRef = useRef(0)
+  const settingsNeedsRepairRef = useRef(false)
+  const settingsVoiceRevisionRef = useRef(0)
+  const settingsVoicePatchRef = useRef<Partial<HealthTipSettings>>({})
+  const settingsPendingSyncRef = useRef<HealthTipSettings | null>(null)
+  const settingsCompletionIdsRef = useRef<string[]>([])
+  const settingsSaveQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const settingsSaveAbortControllersRef = useRef(new Set<AbortController>())
   const snapshotRef = useRef('')
   const dirtyRef = useRef(false)
   const settingsRef = useRef<HealthTipSettings>({
@@ -235,11 +284,26 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
   const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
   if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
   const voiceReadAccount = mode === 'signedIn' && authHeaders && session?.token ? JSON.stringify([session.user?.id || '', session.token]) : null
+  if (settingsAccountRef.current !== voiceReadAccount) {
+    settingsAccountRef.current = voiceReadAccount
+    settingsAccountGenerationRef.current++
+    settingsSaveAbortControllersRef.current.forEach(controller => controller.abort())
+    settingsSaveAbortControllersRef.current.clear()
+    settingsNeedsRepairRef.current = false
+    settingsVoiceRevisionRef.current++
+    settingsVoicePatchRef.current = {}
+    settingsPendingSyncRef.current = null
+    settingsCompletionIdsRef.current = []
+    settingsSaveQueueRef.current = Promise.resolve()
+    snapshotRef.current = ''
+    dirtyRef.current = false
+  }
   voiceReadGuardRef.current.setAccount(voiceReadAccount)
   useEffect(() => {
     const guard = voiceReadGuardRef.current!
     guard.mount()
-    return () => guard.unmount()
+    settingsMountedRef.current = true
+    return () => { settingsMountedRef.current = false; settingsAccountGenerationRef.current++; settingsSaveAbortControllersRef.current.forEach(controller => controller.abort()); settingsSaveAbortControllersRef.current.clear(); guard.unmount() }
   }, [])
 
   const clearedTipIdsSet = useMemo(() => new Set(clearedTipIds), [clearedTipIds])
@@ -287,17 +351,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
 
   const applySettings = useCallback(
     (data: Partial<HealthTipSettings>, options?: { setSnapshot?: boolean }) => {
-      const next: HealthTipSettings = {
-        enabled: !!data.enabled,
-        time1: String(data.time1 || '11:30'),
-        time2: String(data.time2 || '15:30'),
-        time3: String(data.time3 || '20:30'),
-        timezone: String(data.timezone || 'UTC'),
-        frequency: Math.max(1, Math.min(3, Number(data.frequency) || 1)),
-        focusFood: data.focusFood !== false,
-        focusSupplements: data.focusSupplements !== false,
-        focusLifestyle: data.focusLifestyle !== false,
-      }
+      const next = normalizeCoachSettings(data)
 
       setEnabled(next.enabled)
       setTime1(next.time1)
@@ -371,21 +425,59 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
   }, [activeTab, authHeaders, loadHistoryTips, session?.user?.id])
 
   const loadSettings = useCallback(async () => {
-    if (!authHeaders) return
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'coach-settings')
+    if (!authHeaders || !read) return
     try {
       setLoadingSettings(true)
-      const res = await fetch(`${API_BASE_URL}/api/health-tips/settings`, { headers: authHeaders })
+      // A save submitted before a voice receipt must settle/repair first.
+      await settingsSaveQueueRef.current.catch(() => {})
+      if (!read.isCurrent()) return
+      const res = await fetch(`${API_BASE_URL}/api/health-tips/settings`, { headers: authHeaders, signal: read.signal })
       const data: any = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(data?.error || data?.detail || 'Could not load Health Coach settings')
-      }
-      applySettings(data, { setSnapshot: true })
+      if (!read.isCurrent()) return
+      if (!res.ok) throw new Error(data?.error || data?.detail || 'Could not load Health Coach settings')
+      const server = normalizeCoachSettings(data)
+      const merged = mergeCoachSettingsRead(server, settingsRef.current, snapshotRef.current)
+      const voicePatch = settingsVoicePatchRef.current
+      const voiceVerified = Object.entries(voicePatch).every(([key, value]) => server[key as keyof HealthTipSettings] === value)
+      if (settingsNeedsRepairRef.current && !voiceVerified) Object.assign(merged, voicePatch)
+      if (voiceVerified) { settingsNeedsRepairRef.current = false; settingsVoicePatchRef.current = {} }
+      settingsPendingSyncRef.current = merged
+      applySettings(merged)
+      snapshotRef.current = JSON.stringify(server)
+      dirtyRef.current = JSON.stringify(merged) !== snapshotRef.current
+      setHasUnsavedChanges(dirtyRef.current)
     } catch (e: any) {
-      Alert.alert('Could not load settings', e?.message || 'Please try again.')
+      if (read.isCurrent()) Alert.alert('Could not load settings', e?.message || 'Please try again.')
     } finally {
-      setLoadingSettings(false)
+      if (read.isCurrent()) setLoadingSettings(false)
+      read.finish()
     }
-  }, [authHeaders, applySettings])
+  }, [authHeaders, applySettings, voiceReadAccount])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:settings-changed', payload => {
+      if (!authHeaders || !settingsMountedRef.current || settingsAccountRef.current !== voiceReadAccount) return
+      const patch = coachVoiceSettingsPatch(payload, session?.user?.id)
+      if (!patch) return
+      const completion = `${payload.accountId}:${payload.completionId}`
+      if (settingsCompletionIdsRef.current.includes(completion)) return
+      settingsCompletionIdsRef.current = [...settingsCompletionIdsRef.current, completion].slice(-100)
+      settingsVoiceRevisionRef.current++
+      settingsNeedsRepairRef.current = true
+      settingsVoicePatchRef.current = { ...settingsVoicePatchRef.current, ...patch }
+      const baseline = coachSettingsSnapshot(snapshotRef.current)
+      const merged = { ...settingsRef.current, ...patch }
+      settingsPendingSyncRef.current = merged
+      applySettings(merged)
+      if (baseline) snapshotRef.current = JSON.stringify({ ...baseline, ...patch })
+      dirtyRef.current = Boolean(snapshotRef.current && JSON.stringify(merged) !== snapshotRef.current)
+      setHasUnsavedChanges(dirtyRef.current)
+      // Invalidates an older in-flight GET synchronously, before navigation blur.
+      void loadSettings()
+    })
+    return () => subscription.remove()
+  }, [authHeaders, applySettings, loadSettings, session?.user?.id, voiceReadAccount])
 
   const loadCredits = useCallback(async () => {
     if (!authHeaders) return
@@ -410,48 +502,74 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
 
   const saveSettings = useCallback(
     async (options?: { silent?: boolean; payload?: HealthTipSettings; acceptPricingTerms?: boolean }) => {
-      if (!authHeaders) return false
-      const payload = options?.payload || settingsRef.current
-
-      if (!options?.silent) setSavingSettings(true)
-
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/health-tips/settings`, {
-          method: 'POST',
-          headers: {
-            ...authHeaders,
-            'content-type': 'application/json',
-          },
-          body: JSON.stringify({
-            ...payload,
-            acceptPricingTerms: !!options?.acceptPricingTerms,
-          }),
-        })
-
-        const data: any = await res.json().catch(() => ({}))
-        if (!res.ok) {
-          throw new Error(data?.error || data?.detail || 'Failed to save Health Coach settings')
+      if (!authHeaders || !voiceReadAccount || settingsAccountRef.current !== voiceReadAccount || !settingsMountedRef.current) return false
+      const account = voiceReadAccount
+      const accountGeneration = settingsAccountGenerationRef.current
+      const submitted = { ...(options?.payload || settingsRef.current) }
+      const submittedRevision = settingsVoiceRevisionRef.current
+      const isCurrent = () => settingsMountedRef.current && settingsAccountRef.current === account && settingsAccountGenerationRef.current === accountGeneration
+      const save = async () => {
+        if (!isCurrent()) return false
+        if (!options?.silent) setSavingSettings(true)
+        const controller = new AbortController()
+        settingsSaveAbortControllersRef.current.add(controller)
+        let payload = submittedRevision === settingsVoiceRevisionRef.current ? submitted : { ...settingsRef.current, ...settingsVoicePatchRef.current }
+        try {
+          for (;;) {
+            if (!isCurrent()) return false
+            const revision = settingsVoiceRevisionRef.current
+            const res = await fetch(`${API_BASE_URL}/api/health-tips/settings`, {
+              method: 'POST', headers: { ...authHeaders, 'content-type': 'application/json' }, signal: controller.signal,
+              body: JSON.stringify({ ...payload, acceptPricingTerms: !!options?.acceptPricingTerms }),
+            })
+            const data: any = await res.json().catch(() => ({}))
+            if (!isCurrent()) return false
+            if (!res.ok) throw new Error(data?.error || data?.detail || 'Failed to save Health Coach settings')
+            if (revision !== settingsVoiceRevisionRef.current) {
+              // The old full payload may have reached the server after the voice
+              // change. Repair it in this same serialized save before claiming success.
+              payload = { ...settingsRef.current, ...settingsVoicePatchRef.current }
+              continue
+            }
+            const readback = await fetch(`${API_BASE_URL}/api/health-tips/settings`, { headers: authHeaders, signal: controller.signal })
+            const actual: any = await readback.json().catch(() => ({}))
+            if (!isCurrent()) return false
+            if (!readback.ok) throw new Error(actual?.error || 'Could not confirm the saved Health Coach settings')
+            if (revision !== settingsVoiceRevisionRef.current) {
+              payload = { ...settingsRef.current, ...settingsVoicePatchRef.current }
+              continue
+            }
+            const server = normalizeCoachSettings(actual)
+            if (server.enabled !== payload.enabled || server.timezone !== payload.timezone || server.timezoneManual !== (payload.timezoneManual === true)) throw new Error('The latest Health Coach settings were not confirmed. Please review them before saving again.')
+            // Normal POST canonicalizes schedule/focus fields; use its real GET
+            // result while keeping local edits made after this save began.
+            const merged = mergeCoachSettingsRead(server, settingsRef.current, JSON.stringify(payload))
+            settingsPendingSyncRef.current = merged
+            applySettings(merged)
+            snapshotRef.current = JSON.stringify(server)
+            dirtyRef.current = JSON.stringify(merged) !== snapshotRef.current
+            setHasUnsavedChanges(dirtyRef.current)
+            if (!options?.silent) Alert.alert('Saved', 'Health Coach settings saved.')
+            return true
+          }
+        } catch (e: any) {
+          if (isCurrent()) {
+            dirtyRef.current = true
+            setHasUnsavedChanges(true)
+            if (!options?.silent) Alert.alert('Save failed', e?.message || 'Please try again.')
+            else Alert.alert('Settings need another save', 'Your latest changes could not be confirmed. Please reopen Health Coach settings and save them again.')
+          }
+          return false
+        } finally {
+          settingsSaveAbortControllersRef.current.delete(controller)
+          if (isCurrent() && !options?.silent) setSavingSettings(false)
         }
-
-        snapshotRef.current = JSON.stringify(payload)
-        dirtyRef.current = false
-        setHasUnsavedChanges(false)
-
-        if (!options?.silent) {
-          Alert.alert('Saved', 'Health Coach settings saved.')
-        }
-
-        return true
-      } catch (e: any) {
-        if (!options?.silent) {
-          Alert.alert('Save failed', e?.message || 'Please try again.')
-        }
-        return false
-      } finally {
-        if (!options?.silent) setSavingSettings(false)
       }
+      const queued = settingsSaveQueueRef.current.then(save, save)
+      settingsSaveQueueRef.current = queued
+      return queued
     },
-    [authHeaders]
+    [authHeaders, voiceReadAccount, applySettings]
   )
 
   const loadClearedTips = useCallback(async () => {
@@ -638,18 +756,25 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
   }, [route?.params?.tab])
 
   useEffect(() => {
-    const nextSettings = {
+    let nextSettings: HealthTipSettings = {
       enabled,
       time1,
       time2,
       time3,
       timezone,
+      timezoneManual: !settingsPendingSyncRef.current && timezone !== settingsRef.current.timezone ? true : settingsRef.current.timezoneManual === true,
       frequency,
       focusFood,
       focusSupplements,
       focusLifestyle,
     }
 
+    const pending = settingsPendingSyncRef.current
+    if (pending) {
+      const caughtUp = (Object.keys(pending) as Array<keyof HealthTipSettings>).every(key => nextSettings[key] === pending[key])
+      nextSettings = { ...nextSettings, ...pending }
+      if (caughtUp) settingsPendingSyncRef.current = null
+    }
     settingsRef.current = nextSettings
 
     if (loadingSettings || !snapshotRef.current) return
@@ -686,7 +811,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
       }
 
       return () => {
-        if (!dirtyRef.current) return
+        if (!dirtyRef.current || settingsAccountRef.current !== voiceReadAccount) return
         void saveSettings({ silent: true, payload: settingsRef.current })
       }
     }, [
@@ -700,6 +825,7 @@ export function SmartHealthCoachScreen({ route }: { route: any; navigation: any 
       loadClearedTips,
       loadHistoryTips,
       saveSettings,
+      voiceReadAccount,
     ])
   )
 

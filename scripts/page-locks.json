@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-16T20:51:50.568Z",
+  "generatedAt": "2026-10-16T21:07:09.417Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -269,11 +269,11 @@
     "native/src/screens/ProfilePhotoScreen.tsx": "38099b6f695f29000c5831795dc90a1e3e5a24530b383ee312e6dc846e701296",
     "native/src/screens/ProfileScreen.tsx": "3ba4fb44c669352c26af9ad5adb2c87f822b8818593405f80f87d6862d5870f6",
     "native/src/screens/RemindersScreen.tsx": "ac4e47a4ef3a1528eb3f2920237804f6551d401e9325fbf386a06a3c955760ca",
-    "native/src/screens/SettingsScreen.tsx": "75faceb78f6cbaa9745b9560b43be1dffa66fb6bf45baac0769ef1d8c087764b",
+    "native/src/screens/SettingsScreen.tsx": "7651ca0f554798a3579b7282b0f3df4cd45ae99e99a64b4894df2ec1a81f86a3",
     "native/src/screens/SignupScreen.tsx": "64ccf96092708afaf44bd43fba4fe6592b61e4f79c5df5edf0633bc447cf7099",
     "native/src/screens/SleepCoachScreen.tsx": "70b720195bca7aa08e0edc4e67fd93096d52931191adbeda2e58c83c9da80d98",
-    "native/src/screens/SmartHealthCoachScreen.tsx": "720644c0bc9d92a12542927f72a5e131f1f7959a129ea80aa8c795e810ba7be4",
-    "native/src/screens/SupportScreen.tsx": "ebaed646b59fdcd9919be901bef90b8994b01a143965cc373ddafbcce8472804",
+    "native/src/screens/SmartHealthCoachScreen.tsx": "5ba5306b61bbba7ebdbca5cd1708c71e34a9c37d128abc2ed95ec8db7d40c6ff",
+    "native/src/screens/SupportScreen.tsx": "f9fb6bb6f2f17f053e97a36588fcbb17e9dfdbabcc94a3ae89bc78a077c67ee8",
     "native/src/screens/SymptomNotesScreen.tsx": "a2621b96f114dc76843ec5d9345b37dcee5b8be303bc4c2ba5ef07adebc80d78",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
     "native/src/screens/TrackCaloriesScreen.tsx": "3ae98cb1a24e877fe4c89de38cd015da7b1229f69620b401990d87cbba4ebfb5",
@@ -292,7 +292,7 @@
     "native/src/voice/realtimeVoice.ts": "0e7e3d7474b8e4f560bb2c0c1614cc7393e6f0de32376c53ab73fd0410269e68",
     "native/src/voice/reportPdfActions.ts": "730d4abdc9ce666a4562fce1231c143b57c0a5c1e66ddea48a481a708ad9d5e6",
     "native/src/voice/voiceActionReadRefresh.ts": "4109b5bb3bf669d96731746a728018f2dc284dcc8d19e3c6fe5d822fa85e1ead",
-    "native/src/voice/VoiceAssistant.tsx": "9a731c96ffbbf447336ef4cb7d6ebd27b3226e073c73d072b8adddf6e45e244a",
+    "native/src/voice/VoiceAssistant.tsx": "eb7d6c79f497801f4a700e115c8ad8b3ffac1740ecc5284949df91e80765cfb0",
     "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e"
   }
 }

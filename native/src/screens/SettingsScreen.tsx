@@ -1,9 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { Alert, Appearance, DeviceEventEmitter, Platform, Pressable, ScrollView, Switch, Text, View } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { Feather } from '@expo/vector-icons'
 
 import { API_BASE_URL } from '../config'
+import { createVoiceActionReadGuard } from '../voice/voiceActionReadRefresh'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { hasAiDataSharingPermission, requestAiDataSharingPermission, revokeAiDataSharingPermission } from '../lib/aiConsent'
 import { useFocusEffect } from '@react-navigation/native'
@@ -76,6 +77,19 @@ function LinkRow({
 
 export function SettingsScreen({ navigation }: { navigation: any }) {
   const { mode, session, signOut } = useAppMode()
+
+  const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
+  const voiceReadAccount = mode === 'signedIn' && session?.token ? JSON.stringify([session.user?.id || '', session.token]) : null
+  voiceReadGuardRef.current.setAccount(voiceReadAccount)
+  const completedVoiceReadsRef = useRef(new Set<string>())
+  const weeklyReportsMutationRef = useRef(false)
+  const weeklyRefreshPendingRef = useRef(false)
+  useEffect(() => {
+    const guard = voiceReadGuardRef.current!
+    guard.mount()
+    return () => guard.unmount()
+  }, [])
 
   const [darkMode, setDarkMode] = useState(false)
   const [hapticsEnabled, setHapticsEnabled] = useState(true)
@@ -154,45 +168,51 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
     void AsyncStorage.setItem(STORAGE_KEYS.dataAnalytics, dataAnalytics ? 'true' : 'false')
   }, [dataAnalytics, localLoaded])
 
+  const loadWeeklyPreference = useCallback(async () => {
+    if (mode !== 'signedIn' || !session?.token) return
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'weekly-preference')
+    if (!read) return
+    setWeeklyReportsLoading(true)
+    try {
+      const res = await fetch(`${API_BASE_URL}/api/reports/weekly/preferences`, {
+        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
+        signal: read.signal,
+      })
+      const data = await res.json().catch(() => ({} as any))
+      if (!res.ok || typeof data?.reportsEnabled !== 'boolean') throw new Error('Failed to load')
+      if (read.isCurrent()) {
+        setWeeklyReportsEnabled(data.reportsEnabled)
+        setWeeklyReportsError('')
+      }
+    } catch {
+      if (read.isCurrent()) setWeeklyReportsError('Could not load weekly report setting.')
+    } finally {
+      if (read.isCurrent()) setWeeklyReportsLoading(false)
+      read.finish()
+    }
+  }, [mode, session?.token, voiceReadAccount])
+
   useEffect(() => {
-    let cancelled = false
-
-    const loadWeeklyPreference = async () => {
-      if (mode !== 'signedIn' || !session?.token) {
-        setWeeklyReportsEnabled(false)
-        setWeeklyReportsLoading(false)
-        setWeeklyReportsError('Please sign in to manage weekly reports.')
-        return
-      }
-
-      setWeeklyReportsLoading(true)
-      try {
-        const res = await fetch(`${API_BASE_URL}/api/reports/weekly/preferences`, {
-          headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
-        })
-        const data = await res.json().catch(() => ({} as any))
-        if (!res.ok) {
-          throw new Error(data?.error || 'Failed to load')
-        }
-        if (!cancelled) {
-          setWeeklyReportsEnabled(data?.reportsEnabled ?? false)
-          setWeeklyReportsError('')
-        }
-      } catch {
-        if (!cancelled) {
-          setWeeklyReportsEnabled(false)
-          setWeeklyReportsError('Could not load weekly report setting.')
-        }
-      } finally {
-        if (!cancelled) setWeeklyReportsLoading(false)
-      }
-    }
-
+    completedVoiceReadsRef.current.clear()
+    weeklyReportsMutationRef.current = false
+    weeklyRefreshPendingRef.current = false
+    setWeeklyReportsEnabled(false)
+    setWeeklyReportsSaving(false)
+    setWeeklyReportsLoading(false)
+    setWeeklyReportsError(voiceReadAccount ? '' : 'Please sign in to manage weekly reports.')
     void loadWeeklyPreference()
-    return () => {
-      cancelled = true
-    }
-  }, [mode, session?.token])
+  }, [voiceReadAccount, loadWeeklyPreference])
+
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener('helfi:settings-changed', (payload: any) => {
+      if (!session?.user?.id || !session?.token || payload?.source !== 'voice-assistant' || payload.accountId !== session.user.id || payload.kind !== 'preference_action' || payload.action !== 'weekly_reports.update' || typeof payload.completionId !== 'string' || !payload.completionId) return
+      if (completedVoiceReadsRef.current.has(payload.completionId)) return
+      completedVoiceReadsRef.current.add(payload.completionId)
+      if (weeklyReportsMutationRef.current) { weeklyRefreshPendingRef.current = true; return }
+      void loadWeeklyPreference()
+    })
+    return () => subscription.remove()
+  }, [session?.user?.id, session?.token, voiceReadAccount, loadWeeklyPreference])
 
   const goToStackScreen = (screen: string, params?: any) => {
     const parent = navigation.getParent?.()
@@ -215,19 +235,25 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
       setWeeklyReportsError('Please sign in to manage weekly reports.')
       return
     }
-
-    if (nextValue && !(await requestAiDataSharingPermission())) return
-    if (nextValue) setAiPermission(true)
-    setWeeklyReportsSaving(true)
-    setWeeklyReportsError('')
+    if (weeklyReportsMutationRef.current) return
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'weekly-preference')
+    if (!read) return
+    weeklyReportsMutationRef.current = true
     try {
+      if (nextValue && !(await requestAiDataSharingPermission())) return
+      if (!read.isCurrent()) return
+      if (nextValue) setAiPermission(true)
+      setWeeklyReportsLoading(false)
+      setWeeklyReportsSaving(true)
+      setWeeklyReportsError('')
       const res = await fetch(`${API_BASE_URL}/api/reports/weekly/preferences`, {
         method: 'POST',
         headers: buildNativeAuthHeaders(session.token, { json: true, includeCookie: true }),
         body: JSON.stringify({ enabled: nextValue }),
       })
       const data = await res.json().catch(() => ({} as any))
-      if (!res.ok) {
+      if (!read.isCurrent()) return
+      if (!res.ok || typeof data?.reportsEnabled !== 'boolean') {
         if (res.status === 402) {
           setWeeklyReportsError('Weekly reports need a plan or credits. Please use Billing.')
         } else {
@@ -235,11 +261,19 @@ export function SettingsScreen({ navigation }: { navigation: any }) {
         }
         return
       }
-      setWeeklyReportsEnabled(data?.reportsEnabled ?? nextValue)
+      setWeeklyReportsEnabled(data.reportsEnabled)
     } catch {
-      setWeeklyReportsError('Could not update weekly report setting.')
+      if (read.isCurrent()) setWeeklyReportsError('Could not update weekly report setting.')
     } finally {
-      setWeeklyReportsSaving(false)
+      if (read.isCurrent()) {
+        weeklyReportsMutationRef.current = false
+        setWeeklyReportsLoading(false)
+        setWeeklyReportsSaving(false)
+        const refreshPending = weeklyRefreshPendingRef.current
+        weeklyRefreshPendingRef.current = false
+        read.finish()
+        if (refreshPending) void loadWeeklyPreference()
+      } else { read.finish() }
     }
   }
 
