@@ -178,7 +178,7 @@ async function waitForVoiceIceGathering(pc: any, signal?: AbortSignal) {
       cleanup()
       resolve()
     }
-    const timeout = setTimeout(() => { cleanup(); reject(new Error('The voice media connection took too long. Please try again.')) }, 6000)
+    const timeout = setTimeout(() => { cleanup(); reject(new Error('The voice media connection took too long. Please try again.')) }, 10000)
     pc.onicegatheringstatechange = changed
     signal?.addEventListener?.('abort', abort)
     changed()
@@ -338,9 +338,10 @@ export async function startHelfiRealtimeVoiceSession(params: {
     throw new Error('Live voice session was stopped.')
   }
 
-  const pc = new RTCPeerConnection({
-    iceServers: [{ urls: 'stun:stun.l.google.com:19302' }],
-  })
+  // OpenAI supplies the remote media candidates in its SDP answer. Its Live
+  // WebRTC setup needs no external STUN server; an unreachable extra server can
+  // otherwise hold local candidate gathering open before Helfi is even called.
+  const pc = new RTCPeerConnection({ iceServers: [] })
   let localStream: any
   try {
     localStream = await mediaDevices.getUserMedia({

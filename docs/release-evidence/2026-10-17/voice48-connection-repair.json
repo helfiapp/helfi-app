@@ -1,0 +1,46 @@
+{
+  "recordedAtUtc": "2026-10-16T14:55:21.133617+00:00",
+  "status": "Repaired actual app/server/provider connection verified on private Android46 diagnostic; final signed release pending",
+  "previousCandidateCommit": "152d4374f573d5a3262631ac6e995c0b60da9ba8",
+  "previousIPABuild": 47,
+  "nextIPABuild": 48,
+  "observedFailure": "Actual signed Android45 normal UI timed out during local ICE gathering before server POST.",
+  "repairs": [
+    "OpenAI media setup no longer depends on external Google STUN server",
+    "Complete ICE candidate gathering retains bounded10-second deadline from official Live example",
+    "Server startup timer is reset after local offer becomes ready, independently of local media gathering"
+  ],
+  "officialGuide": "https://developers.openai.com/api/docs/guides/voice-webrtc",
+  "localChecks": [
+    "voice protocol actual-source test PASS including external dependency refusal,8-second valid gathering,10-second timeout cleanup/no provider call",
+    "native callback actual-source test PASS including separate12000/12000/4000 stage timers",
+    "native typecheck PASS",
+    "voice lifecycle check PASS",
+    "286/87 locks PASS"
+  ],
+  "sourceSha256": {
+    "native/src/voice/realtimeVoice.ts": "3131752a61483fae4f0b683f219a8dbdc274a3b82859c233f510c1e7841a5c31",
+    "native/src/voice/VoiceAssistant.tsx": "13b9d37a1dc31d7ea6ed2c8888780251b5f97fdca4423710051cbb810b8a5af5",
+    "scripts/voice-live-protocol-check.cjs": "dcdf462bb565a9933dde5ff41928b38e975d207aa69a5a6023b6a4d1e6859323",
+    "scripts/voice-client-integrity-check.cjs": "6e8bcf7420f4d19036ae8b674f5ed45fd0783d1fe8e0a650c3f8f35d60206c24"
+  },
+  "unapprovedInsightsExcluded": true,
+  "privateAndroid46DiagnosticMustNotBeUploaded": true,
+  "physicalIPhoneInstalled": false,
+  "actualAppConnection": {
+    "passed": true,
+    "platform": "Android emulator, genuine Helfi app UI with local repair",
+    "visibleSignals": [
+      "Ready\u2014speak now",
+      "Conversation link connected",
+      "Helfi voice session ready",
+      "Microphone stream connected\u2014speak now",
+      "Connected\u2014speak now"
+    ],
+    "endedNormally": true,
+    "spokenInputUsed": false,
+    "diarySaveAttempted": false,
+    "scopeLimit": "Does not establish iPhone audio quality or actual spoken save correctness",
+    "reportedBy": "GOOGLE PLAY FIX"
+  }
+}

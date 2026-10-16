@@ -2549,6 +2549,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         callbacks: {
           onConnectStage: (stage) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+            if (stage === 'local-offer-ready') {
+              armRealtimeConnectTimeout(REALTIME_VOICE_SERVER_TIMEOUT_MS)
+            }
             if (stage === 'server-answer-received') {
               armRealtimeConnectTimeout(REALTIME_VOICE_MEDIA_TIMEOUT_MS)
             }

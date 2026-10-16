@@ -65,7 +65,7 @@ function baseBox() {
   box.setContinuousVoiceSession = (active) => { box.voiceSessionActiveRef.current = active }
   return box
 }
-async function startupScenario(change, allowed = true) {
+async function startupScenario(change, allowed = true, onStart) {
   const box = baseBox()
   let resolvePermission
   let starts = 0
@@ -73,8 +73,9 @@ async function startupScenario(change, allowed = true) {
     liveVoiceEnabled: true, voiceRecordingSupported: true, checkingRealtimeVoice: false,
     realtimeVoiceAvailable: true, realtimeVoiceError: '', hasNativeRealtimeVoiceSupport: () => true,
     requestAiDataSharingPermission: () => new Promise((resolve) => { resolvePermission = resolve }),
-    startHelfiRealtimeVoiceSession: async () => {
+    startHelfiRealtimeVoiceSession: async (params) => {
       starts++
+      onStart?.(params)
       return { stop: async () => {}, setMicrophoneMuted: noop, promptAssistant: noop }
     },
   })
@@ -224,6 +225,14 @@ async function main() {
   assert.equal(box.supportsNativeVoiceInput('ios', false), true, 'iPhone voice survives landscape width')
   assert.equal(box.supportsNativeVoiceInput('android', false), true)
   assert.equal(await startupScenario(noop), 1)
+  const stageTimers = []
+  assert.equal(await startupScenario((state) => {
+    state.setTimeout = (_callback, delay) => { stageTimers.push(delay); return stageTimers.length }
+  }, true, ({ callbacks }) => {
+    callbacks.onConnectStage('local-offer-ready')
+    callbacks.onConnectStage('server-answer-received')
+  }), 1)
+  assert.deepEqual(stageTimers, [12000, 12000, 4000], 'Local media gathering, server response and verified media connection need separate startup budgets')
   assert.equal(await startupScenario((state) => { state.openRef.current = false; state.realtimeVoiceRunRef.current++ }), 0, 'Done prevents late startup')
   assert.equal(await startupScenario((state) => { state.AppState.currentState = 'background' }), 0)
   assert.equal(await startupScenario((state) => { state.voiceAccountTokenRef.current = 'another-synthetic-account' }), 0)

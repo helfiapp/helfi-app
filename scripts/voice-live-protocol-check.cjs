@@ -240,7 +240,7 @@ function nativeHarness(options = {}) {
   const remoteTrack = { kind: 'audio', enabled: true, _setVolume: noop, stop: () => { trackStops++ } }
   const localStream = { getTracks: () => [localTrack], getAudioTracks: () => [localTrack] }
   class Peer {
-    constructor() { pc = this; this.connectionState = 'new'; this.iceGatheringState = options.waitIce ? 'gathering' : 'complete'; this.onicegatheringstatechange = noop }
+    constructor(configuration) { pc = this; this.configuration = configuration; this.connectionState = 'new'; this.iceGatheringState = options.waitIce ? 'gathering' : 'complete'; this.onicegatheringstatechange = noop }
     addTrack() {}
     close() { closes++ }
     getSenders() { return [{ track: localTrack }] }
@@ -306,6 +306,7 @@ async function checkNative() {
   const { session, error } = await native.started
   assert.ok(session, error?.message)
   assert.ok(native.statuses.includes('live'))
+  assert.equal(native.peer().configuration.iceServers.length, 0, 'OpenAI media must not wait for an unrelated external STUN service')
   assert.equal(native.requests[0].request.headers['x-helfi-voice-protocol'], 'live-v1')
   assert.equal(native.requests[0].request.body, 'synthetic-complete-offer')
   assert.equal(native.box.auditEcho('no milk', '100 ml coffee with milk', Date.now()), false)
@@ -377,6 +378,8 @@ async function checkNative() {
   const gathering = nativeHarness({ waitIce: true })
   await tick()
   assert.equal(gathering.requests.length, 0, 'Wait for ICE gathering before submitting the full offer')
+  await gathering.advance(8000)
+  assert.equal(gathering.requests.length, 0, 'A valid gathering delay must retain its separate ten-second budget')
   gathering.peer().iceGatheringState = 'complete'
   gathering.peer().onicegatheringstatechange()
   const gathered = await gathering.started
@@ -384,6 +387,14 @@ async function checkNative() {
   assert.equal(gathering.requests[0].request.body, 'synthetic-complete-offer')
   await gathered.session.stop()
   assert.equal(gathering.timers.size, 0)
+  const gatheringTimeout = nativeHarness({ waitIce: true })
+  await tick()
+  await gatheringTimeout.advance(10000)
+  const timedOut = await gatheringTimeout.started
+  assert.match(timedOut.error?.message || '', /media connection took too long/)
+  assert.equal(gatheringTimeout.requests.length, 0)
+  assert.equal(gatheringTimeout.timers.size, 0)
+  assert.ok(gatheringTimeout.stoppedTracks() > 0 && gatheringTimeout.closes() > 0)
   for (const option of ['waitIce', 'missingMicrophone', 'missingSpeaker', 'missingSession']) {
     const waiting = nativeHarness({ [option]: true })
     await tick()
