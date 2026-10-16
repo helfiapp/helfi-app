@@ -93,7 +93,7 @@ Only the recorded disposable test entries and explicitly reviewed reversible set
 | `voice-source-drink-normal-save-check.cjs` | 7 targeted source/normal-handler groups, including actual native Save serialization and single-milk precision |
 | `voice-drink-metadata-check.cjs` | 8 groups |
 | `voice-drink-readback-shape-check.cjs` | 10 targeted groups: serialization/one-bit numeric drift versus material, identity and unknown-value changes; rejected writes roll back |
-| `voice-mood-context-check.cjs` | 9 groups |
+| `voice-mood-context-check.cjs` | 13 groups |
 | `voice-tts-boundary-check.cjs` | 11 current targeted groups, including complete inline replies and zero debit on token/stream/empty-audio failures |
 
 The primary agent owns the final full guard run, compilation, normal UI rechecks and any release. Offline counts must not be added together and presented as actual spoken journeys or successful live writes.
@@ -199,3 +199,9 @@ Server repairs now cover the exact failing natural request through actual POST c
 AWS134/4faec663 was deployed and both domains verified. Actual installed53 retest exposed two further cases: a failed prior meal was misread as an ingredient-addition context because the complete new request contained “with Cheese”, leading to provider fallback and a28second failed response; and production's three public-site settings select the exact master Amplify default origin, so the new PDF origin helper refused it. Neither actual retest is recorded as successful.
 
 The next server repair recognizes complete new meal commands before pending additions and preserves true add/change corrections. Restaurant24 groups now exercise exact smart-apostrophe requests with the retained failed draft, actual public stored food rows through the actual mapper, exact1020/source IDs/no fallback/no save. The full8261public-row mapper was independently read-only checked; no malformed-row cause found. PDF17 groups exercise the actual site-url helper with synthetic copies of the known production public settings, mapping only that exact configured production alias to helfi.ai; other AWS/HTTP/credential-bearing destinations remain refused. Native53 source and all approved designs remain unchanged. Deployment and actual phone retests remain separate evidence.
+
+### Physical53 mood and coffee follow-up
+
+Actual physical53/live134 mood5/7 review and rating correction2/7 worked, then natural typed “No, discard it” returned “No problem. I have not saved anything.” Read-only MoodEntries showed only the original disposable751ac608-b8fb-4ffa-a8af-65d8f5677666 at2/7/date17October. However bare `Note:` incorrectly copied the entire request into the note; no save was confirmed. A narrow server mood-note repair now preserves exactly “Voice review check only.”, removes only separate trailing save-control clauses, keeps quoted literal words and leaves clear rating-only notes empty. Mood13 groups cover actual preparation POST and exact normal-handler synthetic save/readback. Runtime retest remains separate evidence.
+
+Physical53 measured coffee review retained250ml coffee/50mlwholemilk/two teaspoons sugar/64kcal. Natural milk25ml correction retained250ml and8gsugar, producing49kcal. No save was requested in these review tests; cancellation/read-only checks are recorded separately. These remain typed app/server tests, not physical microphone/hearing proof.

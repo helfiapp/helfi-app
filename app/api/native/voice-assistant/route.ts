@@ -2689,10 +2689,9 @@ function buildReviewedMoodCorrection(draft: any, answerRaw: string, localDate: s
     const summary=`Mood ${mood.mood}/7; ${nativeVoiceMoodContextSummary(context)}`
     return {...draft,transcript:raw,localDate,mood,summary,canConfirm:true,autoSave:false,reviewToken:undefined,confirmationMessage:`I can update this mood draft: ${summary}. The mood score, tags and note stay as reviewed. Would you like me to save that?`}
   }
-  const note = extractReviewedNoteCorrectionText(raw.replace(/^(?:no[ ,]+)?actually[ ,:]*/i, ''), 600)
-  if (!note) return null
-
   const explicitNote = explicitVoiceMoodNote(raw)
+  const note = explicitNote ?? extractReviewedNoteCorrectionText(raw.replace(/^(?:no[ ,]+)?actually[ ,:]*/i, ''), 600)
+  if (!note) return null
   const noteOnly = explicitNote !== null && !/\b(?:mood|rating|score)\b/i.test(raw.split(/\bnote\b/i)[0])
   const parsed = tryParseMoodRequest(`log mood: ${note}`, { section: 'mood', title: 'Mood Tracker' })
   const mood = noteOnly ? draft.mood : parsed?.mood
@@ -3159,8 +3158,28 @@ function tryParseExerciseRequest(transcript: string, launchContext?: VoiceLaunch
 }
 
 function explicitVoiceMoodNote(value: string): string | null {
-  const matched = value.match(/\b(?:add|include|with|set|change|update)\s+(?:(?:a|the|my)\s+)?note\s*(?:(?:to|saying|of|as)\s+|:\s*)?(.+)$/i)
-  return matched ? cleanText(matched[1].replace(/[.!]+$/, '').replace(/^["“']|["”']$/g, ''), 600) : null
+  const command = value.match(/\b(?:add|include|with|set|change|update)\s+(?:(?:a|the|my)\s+)?note\s*(?:(?:to|saying|of|as)\s+|:\s*)?(.+)$/i)
+  const matched = command || value.match(/\bnote\s*(?::\s*|saying\s+)(.+)$/i)
+  if (!matched) return null
+  let note = matched[1].trim()
+  // Remove only a separate trailing save-control clause, not literal words
+  // inside a quoted note. Keep the note's own sentence-ending punctuation.
+  const beforeControl = note
+  note = note.replace(/([.!?])\s+(?:please\s+)?(?:do not|don['’]t|dont)\s+save(?:\s+(?:it|this|that))?(?:\s+(?:yet|for now))?[.!?]*$/i, '$1')
+    .replace(/\s+(?:and|but)\s+(?:please\s+)?(?:do not|don['’]t|dont)\s+save(?:\s+(?:it|this|that))?(?:\s+(?:yet|for now))?[.!?]*$/i, '')
+  const quoted = note.match(/^"([\s\S]*)"[.!?]*$/) || note.match(/^“([\s\S]*)”[.!?]*$/) || note.match(/^'([\s\S]*)'[.!?]*$/)
+  if (quoted) return cleanText(quoted[1], 600)
+  return cleanText(command && note === beforeControl ? note.replace(/[.!]+$/, '') : note, 600)
+}
+
+function isRatingOnlyMoodRequest(value: string) {
+  const number = '(?:one|two|three|four|five|six|seven|[1-7])'
+  const score = `${number}\\s*(?:/|out of\\s*|over\\s*)(?:seven|7)`
+  const month = '(?:jan(?:uary)?|feb(?:ruary)?|mar(?:ch)?|apr(?:il)?|may|jun(?:e)?|jul(?:y)?|aug(?:ust)?|sep(?:tember)?|oct(?:ober)?|nov(?:ember)?|dec(?:ember)?)'
+  const date = `(?:(?:for|on)\\s+)?(?:today|yesterday|tomorrow|\\d{4}-\\d{2}-\\d{2}|${month}\\s+\\d{1,2}(?:st|nd|rd|th)?(?:,?\\s+\\d{4})?|\\d{1,2}(?:st|nd|rd|th)?\\s+${month}(?:\\s+\\d{4})?)`
+  const target = `(?:(?:(?:log|record|track|save|add|set|change|update|make)\\s+)?(?:(?:my|the|this)\\s+)?(?:mood(?:\\s+(?:rating|score))?|rating|score)(?:\\s+${date})?\\s*(?:(?:as|is|to|at|of)\\s+)?)?`
+  const control = `(?:please\\s+)?(?:(?:do not|don['’]t|dont)\\s+save(?:\\s+(?:it|this|that))?(?:\\s+(?:yet|for now))?|(?:save|confirm)\\s+(?:it|this|that))`
+  return new RegExp(`^(?:please\\s+)?${target}${score}(?:\\s+${date})?(?:(?:[.!?,;]\\s*|\\s+(?:and|but)\\s+)${control})*[.!?]*$`, 'i').test(cleanText(value, 800))
 }
 
 function moodSpeechEvidence(value: string) {
@@ -3182,7 +3201,7 @@ function tryParseMoodRequest(transcript: string, launchContext?: VoiceLaunchCont
   const spokenContext=parseNativeVoiceMoodContext(raw)
   if(spokenContext.error)return asksToLogMood||inMoodContext?{action:'mood',mood:null,moodContextError:spokenContext.error}:null
   const evidence = moodSpeechEvidence(raw)
-  if (evidence.numeric !== null && (asksToLogMood || inMoodContext || /\b(?:my mood|i feel|i am feeling|rating|score)\b/i.test(raw))) return { action: 'mood', mood: { mood: evidence.numeric, tags: [] as string[], note: explicitVoiceMoodNote(raw) ?? raw,context:spokenContext.context } }
+  if (evidence.numeric !== null && (asksToLogMood || inMoodContext || /\b(?:my mood|i feel|i am feeling|rating|score)\b/i.test(raw))) return { action: 'mood', mood: { mood: evidence.numeric, tags: [] as string[], note: explicitVoiceMoodNote(raw) ?? (isRatingOnlyMoodRequest(raw) ? '' : raw),context:spokenContext.context } }
   if (evidence.ambiguous || evidence.negatedOnly) return { action: 'mood', mood: null }
   const lower = evidence.text.toLowerCase()
   const hasMoodWords =
@@ -3216,7 +3235,7 @@ function tryParseMoodRequest(transcript: string, launchContext?: VoiceLaunchCont
     /\b(calm)\b/.test(lower) || /смирен|мирно/i.test(raw) || /\b(tranquilo|tranquila|calmado|calmada|calme|tranquillo|tranquilla|calmo|calma|tranquilo|tranquila|ruhig)\b/i.test(raw) ? 'calm' : '',
     /\b(great|happy|good|better|excellent|amazing)\b/.test(lower) || /среќ|добро|подобро|одлично/i.test(raw) || /\b(feliz|bien|mejor|excelente|genial|heureux|heureuse|mieux|excellent|felice|bene|meglio|eccellente|benissimo|bem|melhor|ótimo|otimo|glücklich|gluecklich|gut|besser|ausgezeichnet)\b/i.test(raw) ? 'positive' : '',
   ].filter(Boolean)
-  return { action: 'mood', mood: { mood, tags, note: raw,context:spokenContext.context } }
+  return { action: 'mood', mood: { mood, tags, note: explicitVoiceMoodNote(raw) ?? raw,context:spokenContext.context } }
 }
 
 function tryParseJournalRequest(transcript: string, launchContext?: VoiceLaunchContext) {

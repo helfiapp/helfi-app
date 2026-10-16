@@ -3650,3 +3650,7 @@ A verified voice preference completion includes the current account, exact actio
 
 - Retained failed food drafts must not turn a complete fresh meal request into an ingredient addition merely because a product contains `with Cheese`. Cover prior unsavable drafts as well as fresh requests through the actual POST; normal add/change corrections must still work. Use real stored serving-option shapes and prohibit supplier fallback when both exact country menu foods resolve.
 - Existing production public-site settings use the known master Amplify default origin. Only that exact configured production alias may map to canonical helfi.ai for voice PDF creation; other AWS origins, request/forwarded headers and arbitrary destinations must still be refused. Exercise the actual site-url helper and unchanged native opener.
+
+### Voice mood notes must contain only the intended note —17October2026
+
+Recognize explicit bare `Note:`/`note saying` as well as existing note commands, preserve the note's punctuation and literal quoted words, and omit a separate trailing no-save instruction from proposed data. Clear rating-only commands leave the optional note empty; meaningful feeling prose remains intact. Pending score corrections retain the reviewed note/context/date. Exercise actual preparation POST and the normal mood POST/GET with synthetic storage; preparation must write nothing.
