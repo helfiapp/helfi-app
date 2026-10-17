@@ -5,6 +5,7 @@ import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { prisma } from '@/lib/prisma'
 import { authOptions } from '@/lib/auth'
 import { getEmailFooter } from '@/lib/email-footer'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 const getResend = () => {
   if (!isEmailConfigured()) {
@@ -86,7 +87,14 @@ export async function POST(request: NextRequest) {
       } catch {}
     }
 
-    const user = userEmail ? await prisma.user.findUnique({ where: { email: userEmail } }) : null
+    let user = userEmail ? await prisma.user.findUnique({ where: { email: userEmail } }) : null
+    const nativeUserId = await getUserIdFromNativeAuth(request)
+    if (user && nativeUserId && user.id !== nativeUserId) return NextResponse.json({ error: 'Account mismatch' }, { status: 401 })
+    if (!user && nativeUserId) {
+      user = await prisma.user.findUnique({ where: { id: nativeUserId } })
+      if (!user) return NextResponse.json({ error: 'User not found' }, { status: 401 })
+      userEmail = user.email
+    }
 
     const report = await prisma.foodMissingReport.create({
       data: {
@@ -119,9 +127,29 @@ export async function POST(request: NextRequest) {
       console.error('❌ [MISSING FOOD EMAIL] Error:', error)
     })
 
-    return NextResponse.json({ success: true })
+    return NextResponse.json({ success: true, id: report.id })
   } catch (error) {
     console.error('Missing food report failed:', error)
     return NextResponse.json({ error: 'Failed to submit report' }, { status: 500 })
   }
+}
+
+
+/** Exact owned receipt readback. No public or list access to submitted reports. */
+export async function GET(request: NextRequest) {
+  const id = new URL(request.url).searchParams.get('id')
+  if (!id || id.length > 120) return NextResponse.json({ error: 'Exact report ID required' }, { status: 400 })
+  const session = await getServerSession(authOptions)
+  let user = session?.user?.email ? await prisma.user.findUnique({ where: { email: session.user.email } }) : null
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  if (user && nativeUserId && user.id !== nativeUserId) return NextResponse.json({ error: 'Account mismatch' }, { status: 401 })
+  if (!user && nativeUserId) user = await prisma.user.findUnique({ where: { id: nativeUserId } })
+  if (!user) {
+    const token = await getToken({ req: request, secret: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'helfi-secret-key-production-2024' }).catch(() => null)
+    if (token?.email) user = await prisma.user.findUnique({ where: { email: String(token.email) } })
+  }
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const report = await prisma.foodMissingReport.findFirst({ where: { id, userId: user.id }, select: { id: true, userId: true, name: true, brand: true, chain: true, size: true, country: true, kind: true, query: true, source: true, notes: true, status: true, createdAt: true } })
+  if (!report) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  return NextResponse.json({ success: true, report })
 }

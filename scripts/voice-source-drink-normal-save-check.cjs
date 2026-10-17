@@ -47,7 +47,7 @@ function normal(initial, mode = '') {
 function payload(row) { return { id: row.id, name: row.name, description: row.description, nutrition: plain(row.nutrients), items: plain(row.items), localDate: row.localDate, meal: row.meal, category: row.category, allowDuplicate: true } }
 const pureModules = new Map()
 function nativePure(relative) {
-  assert(/^(?:native\/src\/lib\/(?:foodUnits|nutrientValues|mealPortions|mealPortionEditor)|lib\/food\/[a-z-]+)\.ts$/.test(relative), `Non-pure dependency forbidden: ${relative}`)
+  assert(/^(?:native\/src\/lib\/(?:foodUnits|nutrientValues|mealPortions|mealPortionEditor|foodDiaryEntries)|lib\/food\/[a-z-]+)\.ts$/.test(relative), `Non-pure dependency forbidden: ${relative}`)
   if (pureModules.has(relative)) return pureModules.get(relative)
   const module = { exports: {} }, code = ts.transpileModule(fs.readFileSync(path.resolve(__dirname, '..', relative), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText
   vm.runInNewContext(code, { module, exports: module.exports, require: name => { assert(name.startsWith('.')); return nativePure(path.posix.normalize(path.posix.join(path.posix.dirname(relative), name)) + '.ts') } })
@@ -55,7 +55,7 @@ function nativePure(relative) {
 }
 async function nativeEditorSave(row, normalFixture, scale = 1, serializer = 'meal') {
   const file = 'native/src/screens/TrackCaloriesScreen.tsx', source = ts.createSourceFile(file, fs.readFileSync(path.resolve(__dirname, '..', file), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-  const ctx = vm.createContext({ ...nativePure('native/src/lib/foodUnits.ts'), ...nativePure('native/src/lib/nutrientValues.ts'), ...nativePure('native/src/lib/mealPortions.ts'), ...nativePure('native/src/lib/mealPortionEditor.ts') })
+  const ctx = vm.createContext({ ...nativePure('native/src/lib/foodDiaryEntries.ts'), ...nativePure('native/src/lib/foodUnits.ts'), ...nativePure('native/src/lib/nutrientValues.ts'), ...nativePure('native/src/lib/mealPortions.ts'), ...nativePure('native/src/lib/mealPortionEditor.ts') })
   const top = source.statements.filter(n => ts.isFunctionDeclaration(n) && n.name && !/^[A-Z]/.test(n.name.text)).map(n => n.getText(source)).join('\n')
   vm.runInContext(ts.transpileModule(top, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText, ctx)
   const initializers = new Map()

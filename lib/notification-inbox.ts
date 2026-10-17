@@ -201,9 +201,9 @@ export async function consumePendingNotificationOpen(
 
 export async function listInboxNotifications(
   userId: string,
-  options?: { limit?: number; offset?: number; status?: 'unread' | 'read' | 'all' }
+  options?: { limit?: number; offset?: number; status?: 'unread' | 'read' | 'all'; readOnly?: boolean }
 ): Promise<InboxNotification[]> {
-  await ensureNotificationInboxTable()
+  if (!options?.readOnly) await ensureNotificationInboxTable()
   const limit = Math.min(Math.max(Number(options?.limit || 30), 1), 100)
   const offset = Math.max(Number(options?.offset || 0), 0)
   const status = options?.status && options.status !== 'all' ? options.status : null
@@ -228,6 +228,7 @@ export async function listInboxNotifications(
         )
     return rows.map(normalizeInboxRow).filter(Boolean) as InboxNotification[]
   } catch (error) {
+    if (options?.readOnly) throw new Error('Existing notification inbox could not be read.')
     console.warn('[notifications] Failed to list inbox items', error)
     return []
   }

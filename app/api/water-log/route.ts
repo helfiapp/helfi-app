@@ -123,6 +123,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
+  const readOnly = searchParams.get('voiceReadOnly') === '1'
   const localDate = asLocalDate(searchParams.get('localDate'))
   const start = asLocalDate(searchParams.get('start'))
   const end = asLocalDate(searchParams.get('end'))
@@ -139,14 +140,14 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await ensureWaterLogColumns()
+    if (!readOnly) await ensureWaterLogColumns()
     const entries = await prisma.waterLog.findMany({
       where,
       orderBy: { createdAt: 'desc' },
     })
-    return NextResponse.json({ entries })
+    return NextResponse.json({ entries, ...(readOnly ? { readOnly: true } : {}) })
   } catch (error) {
-    if (error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') {
+    if (!readOnly && error instanceof Prisma.PrismaClientKnownRequestError && error.code === 'P2021') {
       try {
         await ensureWaterLogTable()
         const entries = await prisma.waterLog.findMany({

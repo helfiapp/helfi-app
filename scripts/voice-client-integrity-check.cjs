@@ -61,6 +61,10 @@ function baseBox() {
     voiceMemoryUserId: 'synthetic-owner', voiceAccountUserIdRef: { current: 'synthetic-owner' },
     messageScrollRef: { current: null }, messageInputRef: { current: null }, messageSectionYRef: { current: null }, pendingMessageFocusRef: { current: null },
     nativeDeviceReviewRef: { current: null },
+    generalAssistantSessionRef: { current: 'legacy_fixture_session' }, generalAssistantHeardRef: { current: '' }, generalAssistantConfirmationConsumedRef: { current: false }, generalAssistantCompletionIdsRef: { current: [] }, emitGeneralAssistantEffects: () => {},
+    acceptGeneralAssistantResponse: () => { throw Error('Legacy fixture unexpectedly entered general assistant acceptance') },
+    sanitizeGeneralAssistantCommand: () => { throw Error('Legacy fixture unexpectedly entered structured general command parsing') },
+    newGeneralAssistantSessionId: () => { throw Error('Legacy fixture unexpectedly requested a general session reset') },
     voiceProviderMountedRef: { current: true }, voiceAccountTokenRef: { current: 'synthetic-token' },
     voiceSessionActiveRef: { current: false }, realtimeVoiceRunRef: { current: 0 },
     realtimeVoiceConnectedRef: { current: false }, realtimeActionGuardRef: { current: null },
@@ -72,7 +76,7 @@ function baseBox() {
     pendingReviewAnswerRef: { current: true }, voiceSaveRequestsRef: { current: 0 },
     REALTIME_VOICE_SERVER_TIMEOUT_MS: 12000, REALTIME_VOICE_MEDIA_TIMEOUT_MS: 4000,
     Alert: { alert: noop },
-    makeConversationTurn: (role, text) => ({ role, text }),
+    makeConversationTurn: (role, text) => ({ role, text }), todayLocalDate: () => '2026-10-17',
   }
   for (const name of ['addVoiceActivity', 'setMessageFocusRequest', 'requestMessageInputFocus', 'setRealtimeVoiceAvailable', 'setRealtimeVoiceStatus', 'setRealtimeVoiceError', 'setVoiceReplyPreference', 'clearRealtimeConnectTimeout', 'clearReviewSilenceTimer', 'setBusy', 'setDraft', 'setPendingFollowUpDraft', 'setChargedCredits', 'setReviewCorrectionActive', 'setTranscript', 'setLaunchContext', 'appendConversationTurns', 'requestVoiceReply', 'resumeVoiceSessionListening', 'setConfirming', 'setSaveError', 'setSaveSuccessNotice', 'closePanel']) box[name] = noop
   box.setContinuousVoiceSession = (active) => { box.voiceSessionActiveRef.current = active }
@@ -1005,7 +1009,9 @@ async function verifyNativeDeviceHost() {
     f.resolve(); assert.equal(await running, null); assert.equal(f.calls.length, 0); assert.equal(f.writes.length, 0); assert.equal(f.events.length, 0)
   }
   const f = setup(cases[0])
-  const pending = await draftRequest('turn automatic Apple Health on', { draft: f.draft }, false, { ...f.box, fetch: async () => ({}), draft: null, pendingFollowUpDraft: null })
+  // These legacy device preparation fixtures explicitly select the existing
+  // phone-action path; generic typed planning has its own full callback suite.
+  const pending = await draftRequest('turn automatic Apple Health on', { draft: f.draft }, false, { ...f.box, fetch: async () => ({}), draft: null, pendingFollowUpDraft: null, requestOptions: { realtimeActionHint: { action: 'device_action' } } })
   assert.equal(pending.result.needsReview, true); assert(f.box.nativeDeviceReviewRef.current); assert.equal(f.calls.length, 0)
   const fresh = setup(cases[0])
   const reissued = await draftRequest('please apply that change', { confirmNow: true, draft: fresh.draft }, false, { ...fresh.box, fetch: async () => ({}), draft: fresh.draft, pendingFollowUpDraft: null })
@@ -1015,10 +1021,10 @@ async function verifyNativeDeviceHost() {
   const discarded = await draftRequest('please leave that change out', { rejectNow: true, draft: rejected.draft }, false, { ...rejected.box, fetch: async () => ({}), draft: rejected.draft, pendingFollowUpDraft: null })
   assert.equal(discarded.result.saved, false); assert.equal(rejected.calls.length, 0); assert.equal(rejected.box.nativeDeviceReviewRef.current, null, 'A refusal must not discover Health sources or request device access')
   const notReady = setup(cases[0]); notReady.state.ready = false
-  const unavailable = await draftRequest('turn automatic Apple Health on', { draft: notReady.draft }, false, { ...notReady.box, fetch: async () => ({}), draft: null, pendingFollowUpDraft: null })
+  const unavailable = await draftRequest('turn automatic Apple Health on', { draft: notReady.draft }, false, { ...notReady.box, fetch: async () => ({}), draft: null, pendingFollowUpDraft: null, requestOptions: { realtimeActionHint: { action: 'device_action' } } })
   assert.equal(unavailable.result.ok, false); assert(!notReady.drafts.some(draft => draft?.canConfirm)); assert.equal(notReady.calls.length, 0)
   const sleep = setup({ action: 'sleep.settings.update', values: { enabled: true } })
-  const refused = await draftRequest('turn sleep listening on', { draft: sleep.draft }, false, { ...sleep.box, fetch: async () => ({}), draft: null, pendingFollowUpDraft: null })
+  const refused = await draftRequest('turn sleep listening on', { draft: sleep.draft }, false, { ...sleep.box, fetch: async () => ({}), draft: null, pendingFollowUpDraft: null, requestOptions: { realtimeActionHint: { action: 'device_action' } } })
   assert.equal(refused.result.ok, false); assert.equal(sleep.writes.length, 0)
   const malformed = { kind: 'native_device_action', id: 'apple_health.import', entity: 'apple_health', operation: 'import', status: 'imported', verified: true, localDate: date, message: `Apple Health confirmed the activity import for ${date}.` }
   for (const patch of [{ id: 'sleep.settings.update' }, { verified: false }, { operation: 'update' }, { entity: 'device_settings' }, { localDate: '2026-02-30' }, { message: 'OS permission was granted.' }]) assert.equal(f.box.isValidNativeDeviceReceipt({ ...malformed, ...patch }), false)
@@ -1300,7 +1306,9 @@ async function main() {
   assert(journalWritten.length > 6000); assert.equal(journalSpoken, journalWritten)
   assert.equal(box.realtimeToolResult({ ok: true, needsReview: true, status: 'review_draft', action: 'journal', reviewPrompt: journalSpoken }).spokenReply, journalWritten.replace(/\s+/g, ' ').trim(), 'Spoken tool output must retain all journal words and final save question beyond500/4000/6000chars')
   const fallbackJournalSpeech = []
-  await draftRequest('Write my complete journal note', { draft: { ...longJournal, confirmationMessage: 'Short server journal excerpt only.' } }, false, { draft: null, voiceReply: true, allowSpokenReply: true, requestVoiceReply: async value => { fallbackJournalSpeech.push(value) } })
+  // This fixture exercises the existing journal review transport explicitly;
+  // unhinted typed text now belongs to the separate general assistant path.
+  await draftRequest('Write my complete journal note', { draft: { ...longJournal, confirmationMessage: 'Short server journal excerpt only.' } }, false, { draft: null, voiceReply: true, allowSpokenReply: true, requestOptions: { realtimeActionHint: { action: 'journal' } }, requestVoiceReply: async value => { fallbackJournalSpeech.push(value) } })
   assert.equal(fallbackJournalSpeech.length, 1)
   assert.equal(fallbackJournalSpeech[0], journalSpoken, 'Recorded-audio/voice-reply dispatch uses the full actual journal review rather than the short server excerpt')
   assert.equal(box.supportsNativeVoiceInput('ios', true), false, 'iPad stays typed even in a narrow window')
@@ -1344,5 +1352,5 @@ async function main() {
   await verifyLocalPreferences()
   console.log('PASS: actual native voice callbacks preserve correction drafts/date/time, keep natural confirmation live, retain complete concise save questions, use iPad identity, prevent late startup, cancel preparation safely, and confirm only successful saves. Offline mocks only; no real audio or server result is claimed.')
 }
-module.exports = { verifyVoiceGreetingLifecycle }
+module.exports = { verifyVoiceGreetingLifecycle, baseBox, evaluate, callback, draftRequest, noop }
 if (require.main === module) main().catch((error) => { console.error(error.stack || error.message); process.exitCode = 1 })

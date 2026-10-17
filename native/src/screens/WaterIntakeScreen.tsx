@@ -1,7 +1,8 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react'
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import {
   ActivityIndicator,
   Alert,
+  DeviceEventEmitter,
   Modal,
   Pressable,
   ScrollView,
@@ -21,6 +22,7 @@ import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { theme } from '../ui/theme'
+import { createVoiceActionReadGuard } from '../voice/voiceActionReadRefresh'
 
 type WaterEntry = {
   id: string
@@ -286,52 +288,59 @@ export function WaterIntakeScreen() {
     return Math.min(100, Math.round((totalMl / effectiveGoalMl) * 100))
   }, [effectiveGoalMl, totalMl])
 
-  const loadEntries = useCallback(async () => {
-    if (!authHeaders) {
-      setLoading(false)
-      return
-    }
+  const voiceReadGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!voiceReadGuardRef.current) voiceReadGuardRef.current = createVoiceActionReadGuard()
+  const voiceReadAccount = mode === 'signedIn' && authHeaders && session?.token && session.user?.id ? JSON.stringify([session.user.id, session.token, selectedDate]) : null
+  voiceReadGuardRef.current.setAccount(voiceReadAccount)
+  const voiceFocusedRef = useRef(false)
+  const voiceCompletionsRef = useRef<string[]>([])
+  useEffect(() => {
+    voiceReadGuardRef.current!.mount()
+    return () => voiceReadGuardRef.current!.unmount()
+  }, [])
+  useEffect(() => {
+    voiceCompletionsRef.current = []
+    setEntries([]); setGoalTargetMl(null); setGoalRecommendedMl(null); setGoalExerciseBonusMl(0); setGoalSource('auto')
+  }, [voiceReadAccount])
 
+  const loadEntries = useCallback(async () => {
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'water-entries')
+    if (!authHeaders || !read) { if (!authHeaders) setLoading(false); return }
     try {
       setLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/water-log?localDate=${selectedDate}`, {
-        headers: authHeaders,
-      })
+      const res = await fetch(`${API_BASE_URL}/api/water-log?localDate=${selectedDate}&voiceReadOnly=1`, { headers: authHeaders, signal: read.signal })
       const data: any = await res.json().catch(() => ({}))
-      if (!res.ok) throw new Error(String(data?.error || 'Could not load water logs.'))
-      setEntries(Array.isArray(data?.entries) ? data.entries : [])
-      setLoadError(false)
+      if (!read.isCurrent()) return
+      if (!res.ok || data.readOnly !== true || !Array.isArray(data.entries) || data.entries.some((row: any) => row.localDate !== selectedDate || row.userId !== undefined && row.userId !== session?.user?.id)) throw new Error(String(data?.error || 'Could not load water logs.'))
+      setEntries(data.entries); setLoadError(false)
     } catch {
-      setEntries([])
-      setLoadError(true)
+      if (!read.isCurrent()) return
+      setEntries([]); setLoadError(true)
     } finally {
-      setLoading(false)
+      if (read.isCurrent()) setLoading(false)
+      read.finish()
     }
-  }, [authHeaders, selectedDate])
+  }, [authHeaders, selectedDate, voiceReadAccount, session?.user?.id])
 
   const loadGoal = useCallback(async () => {
-    if (!session?.token) return
-
+    const read = voiceReadGuardRef.current!.begin(voiceReadAccount, 'water-goal')
+    if (!session?.token || !read) return
     try {
       setGoalLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/hydration-goal?date=${selectedDate}`, {
-        headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
-      })
+      const res = await fetch(`${API_BASE_URL}/api/hydration-goal?date=${selectedDate}&voiceReadOnly=1`, { headers: buildNativeAuthHeaders(session.token, { includeCookie: true }), signal: read.signal })
       const data: GoalResponse = await res.json().catch(() => ({} as any))
-      if (!res.ok) return
-
-      const target = toNumber((data as any)?.targetMl)
-      const recommended = toNumber((data as any)?.recommendedMl)
-      setGoalTargetMl(target > 0 ? Math.round(target) : null)
-      setGoalRecommendedMl(recommended > 0 ? Math.round(recommended) : null)
-      setGoalSource((data as any)?.source === 'custom' ? 'custom' : 'auto')
+      if (!read.isCurrent() || !res.ok) return
+      const target = toNumber((data as any)?.targetMl), recommended = toNumber((data as any)?.recommendedMl)
+      if (!(target > 0) || !(recommended > 0) || !['auto','custom'].includes((data as any)?.source)) return
+      setGoalTargetMl(Math.round(target)); setGoalRecommendedMl(Math.round(recommended)); setGoalSource((data as any).source)
       setGoalExerciseBonusMl(Math.max(0, Math.round(toNumber((data as any)?.exerciseBonusMl))))
     } catch {
-      // Keep prior goal values if load fails.
+      // Keep prior verified goal values if this read fails.
     } finally {
-      setGoalLoading(false)
+      if (read.isCurrent()) setGoalLoading(false)
+      read.finish()
     }
-  }, [selectedDate, session?.token])
+  }, [selectedDate, session?.token, voiceReadAccount])
 
   const loadAll = useCallback(async () => {
     await Promise.all([loadEntries(), loadGoal()])
@@ -339,10 +348,25 @@ export function WaterIntakeScreen() {
 
   useFocusEffect(
     useCallback(() => {
+      voiceFocusedRef.current = true
       void loadAll()
-      return () => {}
+      return () => { voiceFocusedRef.current = false }
     }, [loadAll]),
   )
+  useEffect(() => {
+    const refresh = (payload: any) => {
+      if (!voiceFocusedRef.current || !voiceReadAccount || payload?.source !== 'voice-assistant' || !session?.user?.id || payload.accountId !== session.user.id || typeof payload.completionId !== 'string' || !payload.completionId || payload.completionId.length > 200) return
+      const preference = payload.kind === 'preference_action' && ['hydration_goal.set','hydration_goal.reset','health_setup.update','goals.update','profile.update'].includes(payload.action)
+      const entity = payload.kind === 'record_action' ? payload.entity : payload.kind
+      const dated = ['water','exercise'].includes(entity) && payload.localDate === selectedDate
+      if (!preference && !dated || voiceCompletionsRef.current.includes(payload.completionId)) return
+      voiceCompletionsRef.current = [...voiceCompletionsRef.current, payload.completionId].slice(-100)
+      void loadAll()
+    }
+    const saved = DeviceEventEmitter.addListener('helfi:voice-action-saved', refresh)
+    const settings = DeviceEventEmitter.addListener('helfi:settings-changed', refresh)
+    return () => { saved.remove(); settings.remove() }
+  }, [loadAll, selectedDate, session?.user?.id, voiceReadAccount])
 
   const addFoodDiaryDrink = async (params: {
     label: string

@@ -11,13 +11,16 @@ import * as nutrients from '../native/src/lib/nutrientValues'
 // recorded inputs. No device, network, account or saved food changes.
 const file = 'native/src/screens/TrackCaloriesScreen.tsx'
 const source = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const diarySource = ts.createSourceFile('foodDiaryEntries.ts', fs.readFileSync('native/src/lib/foodDiaryEntries.ts', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+const movedDiaryHelpers = new Set(['roundTo', 'nullableNumber', 'sanitizeEntryTotals', 'hasNonZeroEntryTotals', 'extractTotalsFromDescriptionText', 'recalculateTotalsFromItems', 'normalizeFoodApiEntry'])
 function actual(name: string) {
+  const actualSource = movedDiaryHelpers.has(name) ? diarySource : source
   let text = ''
   const visit = (node: ts.Node) => {
-    if (ts.isFunctionDeclaration(node) && node.name?.text === name) text = `(${node.getText(source)})`
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) text = `(${node.getText(actualSource).replace(/^export\s+/, '')})`
     ts.forEachChild(node, visit)
   }
-  visit(source); assert.ok(text, name)
+  visit(actualSource); assert.ok(text, name)
   return ts.transpile(text, { target: ts.ScriptTarget.ES2020 })
 }
 const ctx = vm.createContext({ ...nutrients, parseFoodServing, liquidDensity, convertFoodAmount, savedMealPortion })

@@ -4,6 +4,7 @@ import { authOptions } from '@/lib/auth'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { prisma } from '@/lib/prisma'
 import { ensureHealthJournalSchema } from '@/lib/health-journal-db'
+import { nativeAssistantJournalEntryId } from '@/lib/native-assistant-action-id'
 
 export const dynamic = 'force-dynamic'
 
@@ -37,9 +38,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
-  await ensureHealthJournalSchema()
-
   const { searchParams } = new URL(request.url)
+  const readOnly = searchParams.get('voiceReadOnly') === '1'
+  if (!readOnly) await ensureHealthJournalSchema()
   const dateParam = String(searchParams.get('date') || '').trim()
   const monthParam = String(searchParams.get('month') || '').trim()
 
@@ -60,7 +61,7 @@ export async function GET(request: NextRequest) {
       select: { localDate: true },
     })
 
-    return NextResponse.json({ dates: rows.map((row) => row.localDate) })
+    return NextResponse.json({ dates: rows.map((row) => row.localDate), ...(readOnly ? { readOnly: true } : {}) })
   }
 
   const targetDate = isValidDate(dateParam) ? dateParam : buildTodayLocalDate()
@@ -69,7 +70,7 @@ export async function GET(request: NextRequest) {
     orderBy: { createdAt: 'desc' },
   })
 
-  return NextResponse.json({ entries })
+  return NextResponse.json({ entries, ...(readOnly ? { readOnly: true } : {}) })
 }
 
 export async function POST(request: NextRequest) {
@@ -89,13 +90,33 @@ export async function POST(request: NextRequest) {
   const localDateRaw = String(body?.localDate || '').trim()
   const localDate = isValidDate(localDateRaw) ? localDateRaw : buildTodayLocalDate()
 
-  const entry = await prisma.healthJournalEntry.create({
+  // Optional normal client-action identity. Legacy/manual requests keep their
+  // exact create behavior. Same owned action + changed content is a conflict.
+  let actionEntryId: string | undefined
+  if (body?.clientActionId !== undefined) {
+    try { actionEntryId = nativeAssistantJournalEntryId(userId, body.clientActionId) }
+    catch { return NextResponse.json({ error: 'Invalid client action identity' }, { status: 400 }) }
+    const existing = await prisma.healthJournalEntry.findUnique({ where: { id: actionEntryId } })
+    if (existing) {
+      if (existing.userId !== userId || existing.content !== content || existing.localDate !== localDate) return NextResponse.json({ error: 'This saved action has different reviewed content.' }, { status: 409 })
+      return NextResponse.json({ entry: existing, idempotentReplay: true })
+    }
+  }
+
+  let entry
+  try { entry = await prisma.healthJournalEntry.create({
     data: {
+      ...(actionEntryId ? { id: actionEntryId } : {}),
       userId,
       content,
       localDate,
     },
-  })
+  }) } catch (error: any) {
+    if (!actionEntryId || error?.code !== 'P2002') throw error
+    const existing = await prisma.healthJournalEntry.findUnique({ where: { id: actionEntryId } })
+    if (!existing || existing.userId !== userId || existing.content !== content || existing.localDate !== localDate) return NextResponse.json({ error: 'This saved action has different reviewed content.' }, { status: 409 })
+    return NextResponse.json({ entry: existing, idempotentReplay: true })
+  }
 
   return NextResponse.json({ entry })
 }

@@ -351,6 +351,7 @@ export async function GET(request: NextRequest) {
     console.log('Request URL:', request.url)
     console.log('Request headers:', redactRequestHeaders(request.headers))
     const scope = new URL(request.url).searchParams.get('scope')
+    const readOnly = new URL(request.url).searchParams.get('voiceReadOnly') === '1'
     const includeFoodData = scope !== 'health-setup'
     
     // Get NextAuth session - with JWT fallback (same pattern as /api/analyze-food)
@@ -429,16 +430,19 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    if (readOnly && !['health-setup', 'voice-food-library', 'voice-health-intake'].includes(scope || '')) {
+      return NextResponse.json({ error: 'Read-only user data requires an explicit supported scope' }, { status: 400 })
+    }
     if (scope === 'voice-food-library') {
-      return NextResponse.json(await readNativeVoiceFavoriteLibrary(prisma, user.id))
+      return NextResponse.json({ ...await readNativeVoiceFavoriteLibrary(prisma, user.id), ...(readOnly ? { readOnly: true } : {}) })
     }
     if (scope === 'voice-health-intake') {
-      return NextResponse.json(await readNativeVoiceHealthIntakeRecords(prisma, user.id))
+      return NextResponse.json({ ...await readNativeVoiceHealthIntakeRecords(prisma, user.id), ...(readOnly ? { readOnly: true } : {}) })
     }
 
     const headerCountry =
       (request.headers.get('x-vercel-ip-country') || request.headers.get('cf-ipcountry') || '').trim().toUpperCase()
-    if (headerCountry && !user.country) {
+    if (!readOnly && headerCountry && !user.country) {
       try {
         await prisma.user.update({
           where: { id: user.id },
@@ -955,7 +959,8 @@ export async function GET(request: NextRequest) {
           lastName: parsed.lastName || '',
           bio: parsed.bio || '',
           dateOfBirth: parsed.dateOfBirth || '',
-          email: parsed.email || user.email || ''
+          email: parsed.email || user.email || '',
+          ...(readOnly && ['male', 'female', 'other', 'prefer-not-to-say'].includes(parsed.gender) ? { gender: parsed.gender } : {}),
         };
       } else {
         // If no stored profile info, try to extract from user.name
@@ -1171,7 +1176,7 @@ export async function GET(request: NextRequest) {
       hasProfileImage: !!onboardingData.profileImage
     })
 
-    return NextResponse.json({ data: onboardingData })
+    return NextResponse.json({ data: onboardingData, ...(readOnly ? { readOnly: true } : {}) })
   } catch (error) {
     console.error('Error loading user data:', error)
     return NextResponse.json({ error: 'Failed to load data' }, { status: 500 })
@@ -2735,10 +2740,8 @@ export async function POST(request: NextRequest) {
           profileUpdateData.name = `${firstName} ${lastName}`.trim()
         }
         
-        // Handle gender
-        if (profileInfoPayload.gender) {
-          profileUpdateData.gender = profileInfoPayload.gender.toUpperCase() === 'MALE' ? 'MALE' : 'FEMALE'
-        }
+        // Profile gender is a display preference. The separate metabolic gender
+        // changes only through the explicit top-level Health Setup field.
         
         // Update User model with basic profile data
         if (Object.keys(profileUpdateData).length > 0) {

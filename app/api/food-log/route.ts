@@ -458,7 +458,7 @@ export async function GET(request: NextRequest) {
       if (!log || log.userId !== user.id) {
         return NextResponse.json({ error: 'Not found' }, { status: 404 })
       }
-      return NextResponse.json({ success: true, log: withSignedFoodPhoto(log) })
+      return NextResponse.json({ success: true, log: withSignedFoodPhoto(log), ...(searchParams.get('voiceReadOnly') === '1' ? { readOnly: true } : {}) })
     }
 
     if (!dateStr) {
@@ -621,7 +621,7 @@ export async function GET(request: NextRequest) {
       const missingLocalDateIds = uniqueLogs
         .filter((l) => !(typeof l.localDate === 'string' && l.localDate.trim().length > 0))
         .map((l) => l.id as string);
-      if (missingLocalDateIds.length > 0) {
+      if (missingLocalDateIds.length > 0 && searchParams.get('voiceReadOnly') !== '1') {
         prisma.foodLog
           .updateMany({
             where: { id: { in: missingLocalDateIds } },
@@ -636,7 +636,7 @@ export async function GET(request: NextRequest) {
     }
     
     console.log(`✅ GET /api/food-log - Success: Returning ${uniqueLogs.length} entries for date ${validatedDateStr}`);
-    return NextResponse.json({ success: true, logs: uniqueLogs.map(withSignedFoodPhoto) })
+    return NextResponse.json({ success: true, logs: uniqueLogs.map(withSignedFoodPhoto), ...(searchParams.get('voiceReadOnly') === '1' ? { readOnly: true } : {}) })
   } catch (error) {
     console.error('❌ GET /api/food-log - Error:', {
       error,

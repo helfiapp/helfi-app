@@ -289,8 +289,8 @@ export async function ensureReadyWeeklyReportNextDueInFuture(
   })
 }
 
-export async function getWeeklyReportState(userId: string): Promise<WeeklyReportState | null> {
-  await ensureWeeklyReportTables()
+export async function getWeeklyReportState(userId: string, options?: { readOnly?: boolean }): Promise<WeeklyReportState | null> {
+  if (!options?.readOnly) await ensureWeeklyReportTables()
   try {
     const rows: any[] = await prisma.$queryRawUnsafe(
       // If historical duplicates exist (older schema), pick the "most enabled" row deterministically.
@@ -299,6 +299,7 @@ export async function getWeeklyReportState(userId: string): Promise<WeeklyReport
     )
     return normalizeStateRow(rows?.[0])
   } catch (error) {
+    if (options?.readOnly) throw new Error('Existing weekly report state could not be read.')
     console.warn('[weekly-report] Failed to read state', error)
     return null
   }
@@ -511,8 +512,8 @@ export async function getWeeklyReportById(userId: string, reportId: string): Pro
   }
 }
 
-export async function getLatestWeeklyReport(userId: string): Promise<WeeklyReportRecord | null> {
-  await ensureWeeklyReportTables()
+export async function getLatestWeeklyReport(userId: string, options?: { readOnly?: boolean }): Promise<WeeklyReportRecord | null> {
+  if (!options?.readOnly) await ensureWeeklyReportTables()
   try {
     const rows: any[] = await prisma.$queryRawUnsafe(
       'SELECT * FROM WeeklyHealthReports WHERE userId = $1 ORDER BY createdAt DESC LIMIT 1',
@@ -520,6 +521,7 @@ export async function getLatestWeeklyReport(userId: string): Promise<WeeklyRepor
     )
     return normalizeReportRow(rows?.[0])
   } catch (error) {
+    if (options?.readOnly) throw new Error('Existing latest weekly report could not be read.')
     console.warn('[weekly-report] Failed to read latest report', error)
     return null
   }
@@ -545,8 +547,8 @@ export async function getWeeklyReportByPeriod(
   }
 }
 
-export async function listWeeklyReports(userId: string, limit = 8, status?: WeeklyReportStatus): Promise<WeeklyReportRecord[]> {
-  await ensureWeeklyReportTables()
+export async function listWeeklyReports(userId: string, limit = 8, status?: WeeklyReportStatus, options?: { readOnly?: boolean }): Promise<WeeklyReportRecord[]> {
+  if (!options?.readOnly) await ensureWeeklyReportTables()
   try {
     const queryLimit = Math.max(limit * 3, limit)
     const rows: any[] = status
@@ -569,6 +571,7 @@ export async function listWeeklyReports(userId: string, limit = 8, status?: Week
     }
     return Array.from(unique.values()).slice(0, limit)
   } catch (error) {
+    if (options?.readOnly) throw new Error('Existing weekly reports could not be read.')
     console.warn('[weekly-report] Failed to list reports', error)
     return []
   }

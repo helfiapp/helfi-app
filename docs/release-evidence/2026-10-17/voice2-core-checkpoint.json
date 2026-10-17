@@ -1,0 +1,722 @@
+{
+  "kind": "core_integration_offline_checkpoint_not_release",
+  "startedAt": "2026-10-17T00:24:52Z",
+  "reportDueAt": "2026-10-17T01:54:52Z",
+  "evidenceGeneratedAt": "2026-10-17T01:43:38.834Z",
+  "reportedAt": "2026-10-17T01:55:03.386Z",
+  "head": "0fba18f77f743cc8336cca8896998b7013144555",
+  "scope": "Existing normal core functions through one shared assistant; not full321operation parity",
+  "credits": {
+    "helfiUsed": 0,
+    "realProviderCalls": 0,
+    "realHelfiAccountReads": 0,
+    "realHelfiAccountWrites": 0,
+    "keyValuesReadPrintedExportedOrUsedByAgent": false,
+    "notes": "Only synthetic provider/auth/storage/network boundaries. Normal build guards run; no direct provider or billing checks."
+  },
+  "core": {
+    "registered": 58,
+    "ordinaryCoreRegistered": 56,
+    "unavailablePaid": [
+      "symptoms.analyze",
+      "symptoms.follow_up"
+    ],
+    "productionComplete": 0
+  },
+  "proofGate": {
+    "command": "node scripts/check-voice2-offline.cjs",
+    "exitCode": 0,
+    "suites": 35,
+    "checks": [
+      {
+        "script": "scripts/voice2-domain-adapters-check.cjs",
+        "args": [],
+        "sha256": "68baa00e0bb84dc343933f8344758437327108f034ba9e19e721eb6246ee0432"
+      },
+      {
+        "script": "scripts/voice2-general-assistant-check.cjs",
+        "args": [],
+        "sha256": "a46edb6fb83b74a33aa03d37798a988bdbffda26e17bfd2b63672fcd975cf76d"
+      },
+      {
+        "script": "scripts/voice2-runtime-adversarial-check.cjs",
+        "args": [],
+        "sha256": "fa01f474a24284f5c2e9251bfca65a853d0d855a222d8e35ae6d3dc949d20735"
+      },
+      {
+        "script": "scripts/voice2-result-reference-check.cjs",
+        "args": [],
+        "sha256": "6a90aaa2a3eaff3ed7d69d92b1338a1bbc9b8d1113ae86fa5e8eb81090e48e28"
+      },
+      {
+        "script": "scripts/voice2-preflight-retry-check.cjs",
+        "args": [],
+        "sha256": "ee06a2cafcdf752a16801f33996ba503cec64468bfe594f18c0b64bccffd80c6"
+      },
+      {
+        "script": "scripts/voice2-large-receipt-check.cjs",
+        "args": [],
+        "sha256": "c29c79b3597eb88227a94474d20501f3a93cc7e2dca8a94667563bede76db9d4"
+      },
+      {
+        "script": "scripts/voice2-safety-priority-check.cjs",
+        "args": [],
+        "sha256": "128caacfb1c93d64c687b7252a8e1ebf8b4ce1312c3234e2365bb9557b24714b"
+      },
+      {
+        "script": "scripts/voice2-tool-bridge-check.cjs",
+        "args": [],
+        "sha256": "71a78e81496e8b51ec63ca2c17d497ff5ad04ae41f2dfe775c2eeb48138d7319"
+      },
+      {
+        "script": "scripts/voice2-session-store-check.cjs",
+        "args": [],
+        "sha256": "bafc5cb338fd6b27ae82498a6632682a1d79d7c647610bfa98b22acc104ee285"
+      },
+      {
+        "script": "scripts/voice2-core-actions-check.cjs",
+        "args": [],
+        "sha256": "32d2c62f817a8e422c26add2a7f4344a83f2087abdc64ef7575101e752633721"
+      },
+      {
+        "script": "scripts/voice2-current-state-check.cjs",
+        "args": [],
+        "sha256": "79a010ce89a80e2b24e565e7545d4882d8621c5117f3b158d851d2001ba8f20f"
+      },
+      {
+        "script": "scripts/voice2-record-reads-check.cjs",
+        "args": [],
+        "sha256": "99f721434b1b03a29980f90bf6e29ea1775c684e20ffce25cffd2dd9adb025cd"
+      },
+      {
+        "script": "scripts/voice2-read-only-routes-check.cjs",
+        "args": [],
+        "sha256": "a943c3a755ae220455c447842dee6310d43e532f2c19528d941463b61f83a233"
+      },
+      {
+        "script": "scripts/voice2-clinical-actions-check.cjs",
+        "args": [],
+        "sha256": "efbb3cbb6e667e9541b9a8b1806254989f24959feda731bb227145f15a72aced"
+      },
+      {
+        "script": "scripts/voice2-normal-actions-check.cjs",
+        "args": [],
+        "sha256": "003ee0b27cf227aa127696e43214348060262e243a930cfac5531f1f34e9d023"
+      },
+      {
+        "script": "scripts/voice2-host-check.cjs",
+        "args": [],
+        "sha256": "b9b343a6ca6096011107064df87afaaed000275191643e4a0b5f82f65a87ad99"
+      },
+      {
+        "script": "scripts/voice2-app-host-check.cjs",
+        "args": [],
+        "sha256": "58e3bc5301e150c4b12b13b5a5317a873b0f5dedcded48f88f1b457907157596"
+      },
+      {
+        "script": "scripts/voice2-planning-loop-check.cjs",
+        "args": [],
+        "sha256": "09d417b4a36dab4eb42240ca9acbd19546c0f470edb44abc98e588077874c628"
+      },
+      {
+        "script": "scripts/voice2-planner-cost-check.cjs",
+        "args": [],
+        "sha256": "7a8d52dcbc1ca2401b908631f542f967955462ab1a571c51e9b31989da76176e"
+      },
+      {
+        "script": "scripts/voice2-food-actions-check.cjs",
+        "args": [],
+        "sha256": "c40de66fd44b7eb8213b50119f06c87c79e83b6df9144588013b94cfa35a2e8d"
+      },
+      {
+        "script": "scripts/voice2-food-normal-prepare-check.cjs",
+        "args": [],
+        "sha256": "36d7e41f05646c67bfc92853d8e815efcaece2c656797cf56a6471f0f9263043"
+      },
+      {
+        "script": "scripts/voice2-food-normal-save-check.cjs",
+        "args": [],
+        "sha256": "02c0efd8f6420e018046b38df2f2cffe0dc5b224d8b7624d174ff9ebd71d6bc8"
+      },
+      {
+        "script": "scripts/voice2-food-reads-check.cjs",
+        "args": [],
+        "sha256": "a831b3b63e084b19f9f8092aa69d69a13d4e39567a79e93dd8f46f172052c76e"
+      },
+      {
+        "script": "scripts/voice2-mood-journal-recovery-check.cjs",
+        "args": [],
+        "sha256": "6dbb2959e0c23ce2522db76873ba18eea1505c463795287438f1c244faf118ee"
+      },
+      {
+        "script": "scripts/voice2-native-general-check.cjs",
+        "args": [],
+        "sha256": "8ee6661612b66e7dc410d0646cae06268aa7eee4cecfa97910aae783073b9204"
+      },
+      {
+        "script": "scripts/voice2-native-session-check.cjs",
+        "args": [],
+        "sha256": "3f26704d661b0fd437ae573ca07241065423bced4f04c4f91a18ada641b2f650"
+      },
+      {
+        "script": "scripts/voice2-realtime-catalog-check.cjs",
+        "args": [],
+        "sha256": "b1e65c7695cd14e6c49ac751fe939906e11394ab84416808223238e0b8dc1cd1"
+      },
+      {
+        "script": "scripts/voice2-integration-audit-check.cjs",
+        "args": [],
+        "sha256": "d86e8843883ae5620f73a984fea543dc94600e43c30b4a118e5ced7a8feabd78"
+      },
+      {
+        "script": "scripts/voice2-readable-check.cjs",
+        "args": [],
+        "sha256": "37389967d0e72a2ff68bbb179faa8f6b801fd0e8ff080c758fee622729a9c9fb"
+      },
+      {
+        "script": "scripts/voice2-completion-events-check.cjs",
+        "args": [],
+        "sha256": "4770a3ab40c812d49ae956207a2c038716335d1de9981861f812899c7da7b9c9"
+      },
+      {
+        "script": "scripts/voice2-mounted-core-refresh-check.cjs",
+        "args": [],
+        "sha256": "0833009098f6c030b7076dc060c1c27fdb29856b78063646fb25934c267f2c08"
+      },
+      {
+        "script": "scripts/voice2-final-integration-audit-check.cjs",
+        "args": [],
+        "sha256": "0333c8c8775606a5d26a7dfebd1ebeaf3dcd27922d38c0aa3d0c7402ee78a93c"
+      },
+      {
+        "script": "scripts/voice2-core-journey-check.cjs",
+        "args": [],
+        "sha256": "6e6fb203b495dea17e12fd942eef559de22b29f4a2f18e041f7d4cee477ca95b"
+      },
+      {
+        "script": "scripts/voice2-core-catalog.cjs",
+        "args": [],
+        "sha256": "0528fc8732f6126b09dbfaf394ca79598ed90f59df3c069008a802ff97b34579"
+      },
+      {
+        "script": "scripts/check-voice2-operation-coverage.cjs",
+        "args": [
+          "--allow-gaps"
+        ],
+        "sha256": "1ee22a9ae0d3e8b69e9eaa4658b4da691095979ccc689788b5dd8209ceede8ee"
+      }
+    ],
+    "logSha256": "f4dd553c5213dd595e2654dde39e52b435146a3a47ddc3516a7ed0168f722a0e",
+    "summaryLines": [
+      "Voice 2 domain adapters: 13 offline groups passed; actual journal POST/GET and diary GET/helper, synthetic storage/auth only. No providers, live accounts or credits.",
+      "VOICE 2 general assistant: 11 integrated offline groups passed. Actual registry/runtime/domain helper and normal journal handlers; synthetic storage/auth only. No live AI or credits.",
+      "VOICE 2 adversarial runtime: 29 groups passed. No providers, network, credentials or real storage.",
+      "VOICE 2 published result references: 5 actual-source offline groups passed. No providers, live credits or real database.",
+      "Voice2 preflight retry: 9 actual-source offline groups passed. No real account, provider, credits or database writes.",
+      "Voice2 large receipts: 14 actual-source offline groups passed. Single unsupported oversized receipts remain unverified; no live service or effects.",
+      "Voice2 safety priority: 6 actual-source offline groups passed. Existing support wording unchanged; no providers, real accounts, credits or database writes.",
+      "VOICE 2 tool bridge/coverage: 7 offline groups passed. Planner understanding and installed transport remain untested; no providers or credits.",
+      "VOICE 2 durable store: 12 actual-source synthetic transactional groups passed. No real database or account writes.",
+      "Voice 2 core actions: 23 actual-source offline groups passed, 30 fixed operations plus 3 opt-in creation bridges. No live data/providers/credits.",
+      "Voice2 current state: 15 actual-source offline groups passed. No actual accounts, providers, database, credits or app calls.",
+      "Voice2 record reads: 13 actual-source offline groups passed; no real accounts, providers, credits or writes.",
+      "Voice2 Mood Journal recovery: 11 actual-source offline groups passed. No real providers, accounts, credits or database writes.",
+      "Voice 2 read-only routes: 51 actual-source offline groups passed; flagged reads made zero storage/DDL writes. No live account/provider/credits.",
+      "VOICE 2 clinical: 11 actual-source offline groups passed. No real provider, credits, health data or account writes.",
+      "VOICE 2 normal actions: 21 actual-source offline groups passed. No real providers, database or account writes.",
+      "VOICE 2 host: 7 actual-source offline groups passed. Controls/recovery never invoke a planner; no real providers or database.",
+      "VOICE 2 app host: 12 actual-source offline groups passed. App assembly and normal journal are real source; planner/auth/storage are synthetic.",
+      "Voice2 planning loop: 15 actual-source offline groups passed. No providers, actual users, database, credits or deployment.",
+      "VOICE 2 planner cost: 9 actual-source synthetic groups passed. No real model, key, credit or billing call.",
+      "Voice2 food actions: 10 strict structured offline groups passed using actual source/recipe validators. Normal host wiring/runtime/paid generation are separate.",
+      "Voice2 normal food preparation: 9 actual-source offline groups passed. Save/readback is separately tested by the normal host; no provider, account, credit or database calls.",
+      "Voice2 normal food save: 9 actual-source offline groups passed. All accounts, catalog records and storage writes are synthetic.",
+      "Voice2 food reads: 9 actual-source offline groups passed; no real account, provider or storage writes.",
+      "Voice2 Mood Journal recovery: 11 actual-source offline groups passed. No real providers, accounts, credits or database writes.",
+      "Voice 2 native general assistant: 13 actual-source offline groups passed; no app, microphone, provider or credits.",
+      "Voice2 native sessions: 31 actual-source offline groups passed, 0 failed. No app, microphone, provider or credits.",
+      "VOICE 2 realtime registry: 6 actual-source offline groups passed. No actual provider, voice session or credits.",
+      "VOICE 2 readable results: 11 actual-source offline groups passed. No providers or normal handler execution.",
+      "Voice2 completion events: 13 actual-source offline groups passed. Pure descriptors only; no native emitter, provider, account or real storage calls.",
+      "VOICE 2 mounted core refresh: 10 groups passed. Actual callbacks, synthetic hooks/network only; no UI or provider claim.",
+      "VOICE 2 final integration audit: 17 actual-source offline groups passed. No providers, live credits or real database.",
+      "Voice2 core journey:3 cross-domain actual-source offline groups passed. One registry/host/durable session; independent synthetic domain row stores. No current-day calculation, provider, live account, credits or network.",
+      "VOICE 2 offline proof gate passed. This is not a deployment or real-model/native acceptance result."
+    ],
+    "note": "Execution summaries include nested/repeated fixtures; no unique assertion count is asserted."
+  },
+  "additionalChecks": [
+    {
+      "command": "npx tsc --noEmit --incremental false",
+      "exitCode": 0
+    },
+    {
+      "command": "npx tsc --noEmit --incremental false -p native/tsconfig.json",
+      "exitCode": 0
+    },
+    {
+      "command": "npm --prefix native run check:voice-assistant",
+      "exitCode": 0
+    },
+    {
+      "command": "npm run check:page-locks",
+      "exitCode": 0,
+      "lockedFiles": 299
+    },
+    {
+      "command": "npm --prefix native run check:page-locks",
+      "exitCode": 0,
+      "lockedFiles": 100
+    },
+    {
+      "command": "node scripts/protect-regions.js",
+      "exitCode": 0
+    },
+    {
+      "command": "npm --prefix native run check:talk-to-helfi-testflight",
+      "exitCode": 0
+    }
+  ],
+  "designLocks": {
+    "dashboardFiles": 5,
+    "insightsFiles": 2,
+    "bothPassed": true,
+    "baselinesChanged": false
+  },
+  "pageLocks": {
+    "authorisedFunctionalPaths": 12,
+    "snapshotRefreshed": true,
+    "unrelatedWebChangesPreserved": true
+  },
+  "nativeCodeExport": {
+    "kind": "offline_metro_hermes_export_not_signed_app",
+    "platforms": [
+      "android",
+      "ios"
+    ],
+    "files": [
+      {
+        "path": "/tmp/helfi-voice2-core-export/_expo/static/js/android/index-7da734c7fc32ca96919d5f61908bbbfe.hbc",
+        "bytes": 5526970,
+        "sha256": "6a00fa334b58e566b166fac6c4a05736910cea50c1b0d7da3018d7c31378bff3"
+      },
+      {
+        "path": "/tmp/helfi-voice2-core-export/_expo/static/js/ios/index-ca27216378cb4e4e23a8ccd3b45740be.hbc",
+        "bytes": 5520907,
+        "sha256": "a5ccb13e4dc50ad02fb02d217283126312828649fb5b032dce81b8d8d70f90ce"
+      },
+      {
+        "path": "/tmp/helfi-voice2-core-export/metadata.json",
+        "bytes": 5786,
+        "sha256": "c66492d1ec1038b36c0a4e3fe36a6e3a96e5f01f3aef41b9e1fe62909d51fa62"
+      }
+    ],
+    "command": "EXPO_NO_DOTENV=1 EXPO_OFFLINE=1 CI=1 ./node_modules/.bin/expo export --platform ios --platform android --output-dir /tmp/helfi-voice2-core-export --max-workers 2",
+    "exitCode": 0,
+    "signedBuild": false,
+    "installed": false
+  },
+  "serverBuild": {
+    "command": "npm run build",
+    "status": "passed",
+    "exitCode": 0,
+    "initialFailure": "Two existing test loaders looked for extracted diary helpers in the former screen. Loaders now use actual shared source; all74 original assertion expressions preserved.",
+    "allPrebuildChecksPassed": true,
+    "terminalKeyGuardPassed": true,
+    "normalAppBuildLoadedItsConfiguration": true,
+    "providerFeatureRequestsInvoked": false,
+    "buildId": "7quyVvI1TUaIxNyx8u3EF",
+    "logSha256": "47f57a7f233c6260285195e3ddd02f2a92381219164dfe8f54e10276c5515aa7",
+    "compiledRoutes": [
+      {
+        "route": "/api/native/assistant/route",
+        "artifact": ".next/server/app/api/native/assistant/route.js",
+        "sha256": "816c35292b33de3f273902c5cea6f390efdff5af61869971ae80e85f431f3f2e"
+      },
+      {
+        "route": "/api/native/voice-assistant/route",
+        "artifact": ".next/server/app/api/native/voice-assistant/route.js",
+        "sha256": "892aa0a60156259ca49672dfbde0b90beba4f258b197579a870c635f62f105b1"
+      },
+      {
+        "route": "/api/native/voice-assistant/confirm/route",
+        "artifact": ".next/server/app/api/native/voice-assistant/confirm/route.js",
+        "sha256": "c24b08fe2a11d178f52cc4b89584173c5f8981ec88e3fb4071006e204880a470"
+      },
+      {
+        "route": "/api/native/voice-assistant/realtime/route",
+        "artifact": ".next/server/app/api/native/voice-assistant/realtime/route.js",
+        "sha256": "d9097aea39985d10e31624f7ea7f9a07823b1e437266a7716a5a12b4d6ff0cca"
+      },
+      {
+        "route": "/api/native-voice-assistant/route",
+        "artifact": ".next/server/app/api/native-voice-assistant/route.js",
+        "sha256": "243b169468e9887c11654934448dd1d1c73379d0f27f54dffcea9a733d2401e5"
+      },
+      {
+        "route": "/api/native-voice-assistant-confirm/route",
+        "artifact": ".next/server/app/api/native-voice-assistant-confirm/route.js",
+        "sha256": "e3b003d6c0cd59b64c54f2969c46c26a8b2262f6b447061550c107b9cdd73e69"
+      }
+    ],
+    "preExistingSupportIndexRestored": true,
+    "supportIndexOriginalSha256": "e948118e4d63c7de732dcfa32916d72bb21647ceb2f2d796f0b1d2249429510c"
+  },
+  "inventory": {
+    "manualOperations": 321,
+    "domainOperations": 279,
+    "navigationEntries": 42,
+    "sourceSnapshots": 194,
+    "offlineRegisteredOperations": 5,
+    "coreRegisteredOperations": 58,
+    "coreUnavailablePaidOperations": [
+      "symptoms.analyze",
+      "symptoms.follow_up"
+    ],
+    "productionGeneralAssistantOperations": 0,
+    "releaseCoverageGaps": 321,
+    "proofScopes": [
+      {
+        "registered": "food.diary.list",
+        "manual": [
+          "food.diary.list"
+        ],
+        "scope": "Normal read-only saved-food list wired locally; installed behavior not verified."
+      },
+      {
+        "registered": "food.diary.detail",
+        "manual": [
+          "food.diary.detail"
+        ],
+        "scope": "Exact owned source detail only; normal editor opening absent."
+      },
+      {
+        "registered": "food.diary.totals",
+        "manual": [
+          "food.diary.totals"
+        ],
+        "scope": "Stored food nutrients only; excludes remaining-calorie targets/exercise calculation."
+      },
+      {
+        "registered": "journal.health.read",
+        "manual": [
+          "journal.health.list"
+        ],
+        "scope": "Supporting exact-ID readback only; not full journal history list."
+      },
+      {
+        "registered": "journal.health.create",
+        "manual": [
+          "journal.health.create"
+        ],
+        "scope": "Literal text/date owned idempotent normal POST+GET integrated locally; production behavior not verified."
+      }
+    ],
+    "changedSourceHashesExplained": 24,
+    "unchangedSourceSnapshots": 170,
+    "sourceLineReferencesReconciled": 66,
+    "strictFullCoverageExitCode": 1,
+    "strictFullCoverageRefusalExpected": true
+  },
+  "release": {
+    "push": false,
+    "deployment": false,
+    "appUpload": false,
+    "installation": false,
+    "actualPhoneSession": false
+  },
+  "limitations": [
+    "Actual model understanding and live protocol/audio behavior not verified",
+    "Production database and deployed request execution not verified",
+    "Installed native54 and historical AWS139 do not contain this core candidate",
+    "Repeated spoken confirmations require real fresh-speech evidence; on-screen current review remains conservative path",
+    "Oversized combined notes retain literal text and require splitting before any effect; unknown oversized external receipts remain uncertain and are never repeated",
+    "The35suite proof uses synthetic domain row stores; cross-section journey has one durable assistant session and separate domain fixtures"
+  ],
+  "sourceSha256": {
+    "app/affiliate/apply/page.tsx": "34f267d4c37d7fb2e9adc78cfde81f94c434993ad5165fa07b050ddeba58985c",
+    "app/affiliate/page.tsx": "cc6d87ed67e9937d4d3006a98dcd41e87313bac494959ce957d726c1925af0e2",
+    "app/api/account/change-password/route.ts": "b2a28c66eaf8864b2279bd3c10f48688e5381becb3e5dc8c3b62afaa703c4916",
+    "app/api/account/delete/route.ts": "e763e020d18fe97769f1ff0ca0e9b4689de92fcc313d0ff8752f62f37abd8f99",
+    "app/api/affiliate/application/route.ts": "729b6d63cf900c82e4846383d7808e1e0958d421e705c64b284ed3bb99cef4f6",
+    "app/api/affiliate/apply/route.ts": "f175858fe8bc7c0316e5b7f8a5281b6cd7ef0243da1232229547216dc908d3dd",
+    "app/api/affiliate/connect/onboard/route.ts": "db6e3075d58d16bf8435eef140252af97680e04d9558edbccaffe6af10e55151",
+    "app/api/affiliate/me/route.ts": "983b2b1e0c283a9b8cb8e1c9b2115fa54167ff4764acae808cf4a79cf6794a79",
+    "app/api/ai-meal-recommendation/route.ts": "08f09257deedb63be851cbeffa16cb40f13842a62b4efc23321317aeff802e38",
+    "app/api/analyze-food/route.ts": "a6f3ccf8c5915bf795462f5826780da05ff417e8f1c5dcdc6a3263a529dcfb09",
+    "app/api/analyze-interactions/route.ts": "848fb81bccaaf6e2a003ec68b21b3c58b6be0b049cab2421ae286deac076de88",
+    "app/api/analyze-supplement-image/route.ts": "b7394ca18c63f269c7c957c3bd5a866c8724640271e18408a8552fec3cc1ade5",
+    "app/api/analyze-symptoms/chat/route.ts": "a5d423b9f8e463f52424dbeadf8a91e02a8a78d8d838790cf5c650ce7a9860c0",
+    "app/api/analyze-symptoms/route.ts": "72661d73866f1f3da37eacfb3ce7388b890b692864b99fa53c69e57638edfe6b",
+    "app/api/auth/apple/link/authorize/route.ts": "e464455550585c80811fd9008de408bbbb87287790358eafef68bd7c38fa30ca",
+    "app/api/auth/fitbit/authorize/route.ts": "66432ff7dbc2a8df3ca256cbf6612221b882ffc2d0867f1f754cea0064af2416",
+    "app/api/auth/garmin/authorize/route.ts": "a54cd53f16f012584678e75b6d1e3d7305329ff1aac1c1c656fe0f1e58c66cbf",
+    "app/api/auth/signup/route.ts": "a7ffe751f2ca7c4213fe7ddafddc2c6fcf8078e340db2f54ef4d89d3a8d1c6e7",
+    "app/api/barcode/label/route.ts": "831a764cc425df4be69a95ac4a684646cf7243ceed8df55716605e3b03f7ff88",
+    "app/api/barcode/lookup/route.ts": "bf6c4931a07e5e88107866da9d914b2639ce54ef531e62eef064f04dc0595c3e",
+    "app/api/billing/portal/route.ts": "fd9f38f5fd42254206fd5c1b29b88dce95a8eb1584e9a9f888ffdcd5f1c26cba",
+    "app/api/billing/subscription/route.ts": "0897de29c7767803a23ae7c8bc196a5e243b8e687ab5a80b47c30db330b94720",
+    "app/api/chat/threads/route.ts": "a506dfd2111f531aa796acdf80cdd81db4b985f0ece9389d1972f8863f578608",
+    "app/api/chat/voice/route.ts": "89729c2af8a699e989abe12473fb3bd1140e672372502cbf8ffd8931e6c358be",
+    "app/api/checkins/history/route.ts": "a24e8da65b2756068a03bc8a4670b59b4e64dee75908a5660c6d812ec687381f",
+    "app/api/checkins/issues/route.ts": "50897f9a814ae681946dd4c0869379c33a965b40aa99e6e21fc203b8412f6f6b",
+    "app/api/checkins/ratings/route.ts": "1b09e107f056d04c7176dd17f55e78c5cad6a95bfb7d8c9cb7e6caa7ba7ccd7a",
+    "app/api/checkins/settings/route.ts": "a14d2fedbae8ea2f267a0f428f661be8be340386e84d8f7a006aedb7b2b581e3",
+    "app/api/checkins/today/route.ts": "d0ff1a14b42a812492cdf0248e5a6ad79f73bdd11ccdc001c2c964dcf221e572",
+    "app/api/credit/feature-usage-stats/route.ts": "ecf1f874cd372222cebe2de24cd82d3236d423e3e707d98d719545723b411a82",
+    "app/api/credit/status/route.ts": "51d074eb344c87c6355c516c3d0c044f87c6eb53c31a58bdd62d27fbdb28d3c1",
+    "app/api/exercise-entries/[id]/route.ts": "be73e227b7f4d5238014523392d545fd6ad6c45a6cffe88338a81c18d20694e9",
+    "app/api/exercise-entries/route.ts": "89371c01a7a619e94b48b2d24fa0d9ea8996c77d082a2ffd8ad2b93ca08df148",
+    "app/api/exercise-preview/route.ts": "ab7d98bdfc7b6eede2423f2c52ada436cd353c50938140c5e91bf173d98cf8b7",
+    "app/api/exercise-types/route.ts": "b1646c54508c76bfc121245742984316b6dfad080d7887707f995c3a7a6f89dc",
+    "app/api/exercise/sync/route.ts": "f49cc4cb2389e005876f301d745374d8d7983f4de4d55040cbf95ec0f42b90fe",
+    "app/api/export/pdf/route.ts": "4ceae819b2bcae1b3e2f63e5199c85cba7757056eb0347bc67c93fdb25b32f02",
+    "app/api/fitbit/status/route.ts": "d5557f5a9f06e2a025b66f5f6d5507229fea74e750ec68971c0849e6100ec46a",
+    "app/api/food-data/route.ts": "b002b39a2fbdaa911a9bfa5369724b513883d23ecd6fa4df4d99eccdf8d112e6",
+    "app/api/food-data/servings/route.ts": "bd5756bd9ff575d0d9861ba1f770bcf879f493c2e3fa297ef7307be6dfe8b319",
+    "app/api/food-data/size-units/route.ts": "265eac2d7d41af43c8d8d27676519e496ba65e094e0a14df0209fbe1d0af4351",
+    "app/api/food-log/delete-atomic/route.ts": "a288e6b065d938880bfc0f8f0f5ab8cd89e9d53de2f21207b181db304a175855",
+    "app/api/food-log/delete/route.ts": "e2a512b827fc47768dcd67971815caa2992265d9f0a8bbaed2a37c977b06828e",
+    "app/api/food-log/library/route.ts": "af2100a3f1d7c40a897a7b325bc1eccc5f9d4928fbdc84d0dc017e376be4c522",
+    "app/api/food-log/route.ts": "9fc058cd2ae7342158c22c87fff180890d241a4792378b60420c7e2135ac8ec3",
+    "app/api/food-missing/route.ts": "4f6b70ac7c3e98fc52ca2bb77fcda2b5d9f469353d2d78e55b1b2f84f0384613",
+    "app/api/garmin/status/route.ts": "70fa1845062e2b1a58df533fda18b345efdd2bbbd1e26453cdf4a4bbdfb8d942",
+    "app/api/health-journal/[id]/route.ts": "3eca4065d29870d38b814b6af65482bd83141fb238671e71d2d21f6d8b3172db",
+    "app/api/health-journal/extract-media/route.ts": "eca994beeee8c2a519505e606f375db2b0d67dd48f9ee3958535d5d8c77c14f7",
+    "app/api/health-journal/route.ts": "ae93b28e188bf256c11502e34195f73c10d9e907c195722b820e4eb7fc65ec40",
+    "app/api/health-tips/history/route.ts": "a82f256e305f1eaf75e7507314c08b0bc92ad5e44cc6e23e17b3a85b5ee5a3f9",
+    "app/api/health-tips/settings/route.ts": "974c2d20ea75cfb9ee8e101cbf018420b9329f0048ce0a974b14f8ea21879b51",
+    "app/api/health-tips/today/route.ts": "2d4063b1b0715c605dd8dee484c49e84d61c9b3405900a469a9e091c77a82366",
+    "app/api/hydration-goal/route.ts": "be67eef6fe2b9c9cf5b7331a0da67eb56696961be2d99a56689d094fe3ecef88",
+    "app/api/insights/issues/[slug]/sections/[section]/route.ts": "5fdc4686105fd8ed4f2da0afbca6293d4821c02c573259490527c21d7275a067",
+    "app/api/insights/issues/route.ts": "23f49508d7f9aa9683e9c86955fa2810e1221418b8b129e48cb3a7d12c0be894",
+    "app/api/insights/regenerate-targeted/route.ts": "9b2393f7cff5062d54be60b67b793e717338a4be37444166170d35e5d2964eb4",
+    "app/api/interaction-history/[id]/route.ts": "bda21520ab31e458d2988f2c4bdba2183647a32dd0eeb6c87a0cd52f9673298a",
+    "app/api/interaction-history/route.ts": "d169ab91e5fc06efd2c3c9eb27d0dcb5b3a4ecb9ed321f1d3f209b4ae1d15d47",
+    "app/api/medical-images/chat/route.ts": "e6a3ed6c73d7b1cc64277ad8e26c5f6ad198772252a187dbd766bb08ac6df43c",
+    "app/api/medical-images/history/[id]/route.ts": "45f98e0b5a9ee0761baec1a0cd4f6f64baaedc6124911ac0e7ae4482eb5ea240",
+    "app/api/medical-images/history/route.ts": "949db19e0ba27b422a1321200a3fc8ac33e7b0215a4183205f70cff7c8999495",
+    "app/api/medication-catalog-search/route.ts": "9395c1e1391ee70ba39a913f28b2f74d02887af80a20a3dff8b4c67de79400c3",
+    "app/api/mood/context/route.ts": "99552b39cd052ce809937f9965e0903a0158110c9e420fde5bc984bc0116ee34",
+    "app/api/mood/entries/route.ts": "fc0801aeadd7d3a2e4a9c043ff5ca7006501927e0d9f4b25325cfa0b1c708663",
+    "app/api/mood/journal/entries/[id]/route.ts": "27bdfd6f0a511b0a8ce4d3d95e8eec8042df539b2abf439fe9751f9a9470b333",
+    "app/api/mood/journal/entries/route.ts": "b8350d73d97a62be5d320d7867b280ea4520e0502b047a58f950c71de869cd17",
+    "app/api/mood/journal/upload-audio/route.ts": "71a4cf93f46cb80bf1650e76c08074d88b1f144d94ae8525b53f0ad12a9f5cd6",
+    "app/api/mood/journal/upload/route.ts": "47131cf7e4e615e906a2779e71a448e474ccd220a46d4f60c5a8c6d84438898f",
+    "app/api/mood/reminders/route.ts": "e4734a15c9b89e31f155206783026a390999acd67d0f96bcf13cdc1074a38fc0",
+    "app/api/native-auth/login/route.ts": "57c4134a9104361c87c327bce03c2baec5b7755f651bcadbecbb8803070828a3",
+    "app/api/native-billing/catalog/route.ts": "424047387d3225812a6eac76539075e75a24273fee1b6db761989511542fcbef",
+    "app/api/native-billing/history/route.ts": "d1714a2b55c827a1e4cde8f96ca629e7509a3e94be16fb79e215b8593db54f01",
+    "app/api/native-device-oauth-ticket/route.ts": "065fb99d5e7e1a52d5904ac95c377ba7e8cd0218e5cbf7639023645559f5e425",
+    "app/api/native/assistant/route.ts": "7666319c5f6a9e62f76690caf7ab8af4d083d94b9e7779e0d06dce219d4499d4",
+    "app/api/native/voice-assistant/confirm/route.ts": "dd7e59505495788bb4d134da84087336c5caa5dc08859b52140df4fbda599ee8",
+    "app/api/native/voice-assistant/realtime/route.ts": "6a306752590b3c292dcc01fd52a872b1de4ca230faa7817ab1dea2d924cabee2",
+    "app/api/native/voice-assistant/route.ts": "45a527ab758233f78e905a1e12321781c7f419abd0b96fdb6e21f0d271b5fc9c",
+    "app/api/notifications/inbox/route.ts": "ca19907dac9d5ae60a5e06b1d7585479db5ff684d5a38737bfbf25f155923a75",
+    "app/api/notifications/quiet-hours/route.ts": "e7a8c3ce677cae52ce2e01be6f3f4ff1e85790a6a80c0500b3f1c277b77243a2",
+    "app/api/practitioner/account/delete/route.ts": "4197d71c2220bacb3fa5443634c1f02153e97d296ac9ee3a9b86f99066cd0548",
+    "app/api/practitioner/account/route.ts": "d2d967e8da378b132764749b8ec929ecb1833b8d8f1101628bfd41f35e530082",
+    "app/api/practitioner/boost/checkout/route.ts": "8b7dda2f9707e78ecb3b3bf83e8599574ee6fe512154d5b9131de3b0fbe7ac1a",
+    "app/api/practitioner/contact-summary-test/route.ts": "ae20189284823365fb8686187fde0ae0b5e2d2919cfd912c26d64d38ed17580a",
+    "app/api/practitioner/dashboard/route.ts": "f209291bcd8ca53c4bbdc291303f0a8cf8d3a4782feadedc3838c80e7ee95e34",
+    "app/api/practitioner/listings/[id]/route.ts": "8c0486814cf79b4bdac5c06f5df0b4ba63d6694b1339b699def821b0b40ebd16",
+    "app/api/practitioner/listings/[id]/submit/route.ts": "bcb3e2040bf55c3f58c5c3422cac0f904d2472ab092bef79c5db68d0216a5b25",
+    "app/api/practitioner/listings/route.ts": "f4703c68d835fbc9b55e3bf1b351a917413dda340481e469f17227efc17a29a0",
+    "app/api/practitioner/notifications/route.ts": "b20b63b98db52643f11aafce6e843c9dfbbd1f41f877169ef711b85a1bb1c121",
+    "app/api/practitioner/places/autocomplete/route.ts": "b62e4b64fd674268e2580ec2af60525eed5c7d7fa827cc11a7b57e4ede8b4321",
+    "app/api/practitioner/places/details/route.ts": "dc6832f1a0cffff8fe46aaa84d266320bce171ee4f091c98988d89c8e92aefc5",
+    "app/api/practitioner/stats/route.ts": "b2821d3eba00a1f99a197b6934abb7d48c56591ed0904d5306b67b025a8af2e3",
+    "app/api/practitioner/subscription/checkout/route.ts": "da0e560ed029141e741ce142682d24b00fd218e563fc407d8c031fbb490de303",
+    "app/api/practitioner/subscription/portal/route.ts": "c6aab0eaf7e4c2c2b94fb255313cf207228b63f402416e77241548cfa116457b",
+    "app/api/practitioner/subscription/winback/route.ts": "3f6c6a83fbbbcca9e5ebd239b0c30bc5b906b79f20b90c0a65a18c5c7038bd45",
+    "app/api/practitioner/uploads/route.ts": "88be092b1824d06b3de3deaa62f66f6d6eadab95025e80c6538978d572e7d330",
+    "app/api/practitioners/[slug]/route.ts": "0e10a388ecb6dbe45ff32b9715ec8e196e7533060a33f654fc2b6924dcfdef91",
+    "app/api/practitioners/a-z/route.ts": "eb457c907de12975ac81bbea820414f844981124d1a39360d7723a5ccc1a27ff",
+    "app/api/practitioners/categories/route.ts": "409020260ad2776f22850b21a466d721608661a75390e2541029981e8346395c",
+    "app/api/practitioners/geocode/route.ts": "33281aa31fcfff1369a48c23cd2827f96c859c33d65d1506d4e9c7706518f432",
+    "app/api/practitioners/search/route.ts": "47696591e8108594f34bf416ad95eca7b98612ea9fb8a9037dc9cc3dc3591f95",
+    "app/api/recipe-import/route.ts": "251921229c7b6317e6d2e2e1e96de9dd8176db1b933430db54a8f1b569c2040b",
+    "app/api/reports/[id]/process/route.ts": "7feec4de468c26e6ef3151c02d688c0261148347cd4f5d668a2b4d7c09a297af",
+    "app/api/reports/[id]/route.ts": "29116f79559272ae55ec3a003548cdae163960a02218b45da40a4cfe390c6c6e",
+    "app/api/reports/[id]/upload/route.ts": "41e3c9c9a92cf226bd686f1d9206fb13988ebad649ab7e40850068c0b1c9ab6c",
+    "app/api/reports/list/route.ts": "5dc1511c35bbbf9a02e9421c85a0a17a9e8708036f4f0834372e5f8824aa5296",
+    "app/api/reports/presign/route.ts": "258f2124950798273ad38927212aa8e89f8efdfdfe013d864a244a8d2ab56871",
+    "app/api/reports/weekly/chat-activity/route.ts": "14ff33482689cfd291aab676e3d9e0e9898e8a8757fe276d0fbbac0d06f3f475",
+    "app/api/reports/weekly/list/route.ts": "3d308c4a101d98461b0f069a353917b66d0b687d59dd6b65eaf48529eedcf54b",
+    "app/api/reports/weekly/notify/route.ts": "2b1913dba6b83b48c935682e587552c9db53ace04e954f71d5dab00f567b04a5",
+    "app/api/reports/weekly/pdf/route.ts": "92376cc8da5ad992d2e2110619511d4d11893b9322f73f8664359452807ffbfd",
+    "app/api/reports/weekly/preferences/route.ts": "e083ea694f86412cdb49c86d074034ace5c63f11e13c0814702b81999fd44ff1",
+    "app/api/reports/weekly/run/route.ts": "18ce9b9ccfe90984890f5d5f5cc0ef52267fbb9873fdfcedc4bb2138eebee91d",
+    "app/api/reports/weekly/status/route.ts": "d5c427bc7930f0356a3facd67cbf40c685a369f1b5ba72824e74d89507b90057",
+    "app/api/supplement-catalog-search/route.ts": "e10ddddfd7d998a850b0040be61ed297367b27659819a05bf2622fa48f41e21e",
+    "app/api/support/tickets/route.ts": "a9e31f64c1d8fdf6839b156b767a058dadc6f63869343f946a47243362f47f51",
+    "app/api/support/uploads/route.ts": "01c7442f56be97635f0dbf1e75238481864a85e9c17d9897f0f14d316f74f270",
+    "app/api/symptoms/history/[id]/route.ts": "afef845d8b913d8c8b07276223dbba05b108c7e2c3661d0dfc41073ac6979f7a",
+    "app/api/symptoms/history/route.ts": "69d1dc9cfc22c59b0a50ce89de293c20cc7d4003d60a9872ad4f694b83d0eb79",
+    "app/api/test-vision/route.ts": "9f8843f3c3828da4f433f09bdaaa404e35ae9f98287975c54cbc659fa780f37a",
+    "app/api/upload-medication-image/route.ts": "55448bfef4797649759aa7dd8301980f836840ab0ce9098cb24ea28fd1f5f1e3",
+    "app/api/upload-profile-image/route.ts": "8db12cbbaed835cd9a16c8a207f8cc764ba5c1d543b0b5f2541760e64cc38528",
+    "app/api/upload-supplement-image/route.ts": "194cf1a30e1800b1566364a771f7c667e3bae834d64eb9eb7426cd7c9f8194d7",
+    "app/api/user-data/route.ts": "9194b47f8fcdfc7c6ed80bf253a7ffa773b9ad5a02cba538240ee452872633e5",
+    "app/api/water-log/[id]/route.ts": "b5010b5dd5f47f8478c973e64317969512ac1d07df04d30ef86cbc28cc8e2220",
+    "app/api/water-log/route.ts": "fd34ea7ed7e31d635821ce6ac12dda278f2e6d051ed5f86ab3d683fb4874285d",
+    "app/onboarding/page.tsx": "33dcf05c16a8c4bb1d694ca15c4aecc9906f3cbe9a47f343731e94aff1942dea",
+    "app/practitioner/page.tsx": "91820f362b93547fc91145e67f1baff32122bceb019d1a1e353b6c18a624de9e",
+    "components/VoiceChat.tsx": "8a8b2206b3f021002b456eec2852c4bcd4752a185066d3e74843fe64412fba39",
+    "components/reports/LabReportUpload.tsx": "e7661163dabd0a2804f937f3c837d0e80ba2933fbc992b1abe3880d099ec0632",
+    "lib/insights/issue-engine.ts": "cb896ff4914529097f8d618775d45e8782c9a15eecdf36f1fac19e4d85d72032",
+    "lib/native-assistant-action-id.ts": "cc3ffb1387e4d773765a24886d40c38410aa0c27d3054e14bcf37063f2dbb157",
+    "lib/native-assistant-app.ts": "21b3c6196819d8a9fe3ec4a7d5d6bd87674ba5d452827f74dcf69d96c3b291c9",
+    "lib/native-assistant-catalog.ts": "ba5cc8d9e8767872233140235f8f07e609ec1873b7c53f182ee26a558301aa3b",
+    "lib/native-assistant-clinical-actions.ts": "a03bb78b5788cb4938885eeb41d1edfb6fcd5dc88cedde50d989053f11b55bff",
+    "lib/native-assistant-command-tool.ts": "5f5cbf1e3005721a47871697db7767090fa4331c3d250196b05987dd051c323d",
+    "lib/native-assistant-completions.ts": "d57344e0a3a27308f9159f38e31bfbdbc6e0f6cc97c76dfefe526fae9524517b",
+    "lib/native-assistant-core-actions.ts": "cc85b51f7958c8f614be0f4f9f70c4e126c61850f53cde6c39c8b8402a468e08",
+    "lib/native-assistant-current-state.ts": "17f8c2eea328da443eb46367f85b8ea3fd310dff1a021e6b71c0b98f25527060",
+    "lib/native-assistant-domain-adapters.ts": "a1b5f9eb7241dd341360a19f0eabf47f863d2a29e379b0b0d4416f0bd2169e6e",
+    "lib/native-assistant-food-actions.ts": "1c614ed4152217428c9b7be60e761fbe736f1a178e5e2e93e0af99aa27605e86",
+    "lib/native-assistant-food-normal-services.ts": "5213ccc6f5d436207ccbdac2c9a64b57e6dc7deb50a9bfd839999298293cc16d",
+    "lib/native-assistant-food-reads.ts": "98e08886181425ca59447585d9e2f1c40771a315abf5d6d3282dcf1f6e0bab1d",
+    "lib/native-assistant-host.ts": "c18d490ed189a1d9e075183d37d64dd0d5c4bf8dd572f41bdedbdc7c817669d0",
+    "lib/native-assistant-normal-actions.ts": "9ed9cf003b04495036042519607bba519cb8871901f431932476547bbb7ea9ed",
+    "lib/native-assistant-readable.ts": "ceee1e19a5d5266d7c51f30367cf90d4cb8c92a31d828c80856988fd9650a4c4",
+    "lib/native-assistant-record-reads.ts": "0be50a184e7f06e5188489c664606f84dd06762992eaff29e8cd429687b4ee04",
+    "lib/native-assistant-registry.ts": "303945ed74f1d4f47c97cf178a9a1cbca60bb1bf696a26b780f860e9486e08b7",
+    "lib/native-assistant-runtime.ts": "fb6c998fd344c7edef659c86e1cb7fb1104de7139b80cfde51172c0904fd4ca7",
+    "lib/native-assistant-session-store.ts": "6674d58c673e5dcd3fd749eb3c59b5aa3af762693d484e775dda66f1d996cb07",
+    "lib/native-assistant-tool-bridge.ts": "14460a6ef56b96f82a37b952a786c2bb90b825ca2686fded2c0f46cde2c292a1",
+    "lib/native-voice-action-observability.ts": "e84a912b012b4c06a20cc62aadc4c0586fa39280314503b99cfb19682bee561e",
+    "lib/native-voice-additional-actions.ts": "a451c735919342c19f32a7ebf6d51d2583fdcc86298422e4721830893bf824cc",
+    "lib/native-voice-app-reads.ts": "0e9381e086c803a8592be00d0f1628c59cbd6ec429c8d70e45ea0bc792f9fe41",
+    "lib/native-voice-device-actions.ts": "19b9f6db60d15e3bebcb778e032d06405d17c7d098bda1f2de9dddbae9f104cd",
+    "lib/native-voice-drink-label.ts": "cc9778563b2b79c2f96475d70f1dd7c48c320addec23f107a1cdcd322fb3a218",
+    "lib/native-voice-food-copy.ts": "abb2dbb739ee49d8b6c8fec65edb0fa3f4a93e1ef9d5b6b6987ad4ad60bc8866",
+    "lib/native-voice-food-management.ts": "2e389c19607f4f964cd0f9a92ede7f12c6f172f8e1d09b3567d11bc3e941f67c",
+    "lib/native-voice-health-intake-record-actions.ts": "1b27b5742165ad8237f771bb0382f4a7f297f8dc79617d254a7f5eda2f6ac372",
+    "lib/native-voice-history-actions.ts": "69263e0e1a873446955c6f12075d7af219b8a24bddf2e5ff52a6f3430f1c867d",
+    "lib/native-voice-mood-context.ts": "f55dbc1c86714f308efadf4fdde64807a2afbbe182ec90a98783646b5ea60a1c",
+    "lib/native-voice-notification-actions.ts": "84d6e3588722d41902ce6567740138cb66968c6d0530fa6069ddc91706817140",
+    "lib/native-voice-preference-actions.ts": "657de3f0445f046039c4706e50f02c2ef106a2bbd6e3e82b75cd75e0523410c4",
+    "lib/native-voice-prompt-handoff.ts": "7dec01efa3c7c076d5b8a728b96aae2ecff55467eeda287c72639f949a204d46",
+    "lib/native-voice-recipe-metadata.ts": "a49c20099247387d399933740d49c6b15530b3a618549ff0f0eda93254bdf7db",
+    "lib/native-voice-recipe-url-import.ts": "98b76f50528dcf81be373d3f0ccc7812610fafeb5c8eafea6d112a52bd74d02e",
+    "lib/native-voice-record-actions.ts": "2a401cd35fba0b5c7bdeab8dec9936b7bff43e3b241e85d4bc4fd24e257b0b76",
+    "lib/native-voice-report-actions.ts": "67c264fb65bd7d5947d8014ecd3a7262aa77cd5612f56edca994d73416cbc45f",
+    "lib/native-voice-resolved-food.ts": "2b95846e848d3d3a0adf54e7be46eb80156999983bff2594fd9712084135ad25",
+    "lib/native-voice-review-token.ts": "4bb39e030693062db54b35e2800b277e00315532fda445aeb3ef73addb97987e",
+    "lib/native-voice-spoken-quantities.ts": "aa3a8a0d719d9e66ef4b649da158a529afd95f6637e85ce11fe123da6e98a72d",
+    "lib/native-voice-support-actions.ts": "d0c419865ad57e6cb90425611bb80e24f2d4a6863e0bf75d0c7c8e260e67968d",
+    "lib/native-voice-symptom-analysis.ts": "3a5aa2dede2b76357ee304eb6e9753893ef76e75eabb3725e6b6327ccd52bc5a",
+    "lib/native-voice-time.ts": "90bc17d0fa4ee5a556c3da90cdb2befbc042aefd4bded35fb101792b5267c04b",
+    "native/src/config/nativePageRoutes.ts": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f",
+    "native/src/health/AppleHealthSyncProvider.tsx": "2bc3a09645e6e2611035b7a367fb2bc041a504b20a793c13cde46d83b44fca6a",
+    "native/src/health/appleHealthSync.ts": "226036065f9c0c0888d848261432c4c8de98f9dd3e0bd1eb7171fd4c896634ba",
+    "native/src/lib/aiConsent.ts": "cad69ccb3ee5eca072761d138b51344cfcd588e46f99f7d42b35e8ecc36835f6",
+    "native/src/lib/foodDiaryEntries.ts": "c4902331aa8785931afd9f171197895322727f51b02dd0e2fbada99686f8b580",
+    "native/src/lib/inAppPurchase.ts": "b6ec30395a256428c2033d1797873c71c1724ccca33a7bcbbb2072da422b657c",
+    "native/src/lib/nativeSocialAuth.ts": "e4cc62ba9d9258dacc0d9f63d655850b935bae831097303fc20c9be0a2723add",
+    "native/src/navigation/AuthNavigator.tsx": "688915d7a9571e8233d5b69338c190a3611a5d508e6d77b4e186ea851e7b27f4",
+    "native/src/navigation/MainNavigator.tsx": "13e970d64b1c22dc88293cb45ef0fc728472e316a766ea5e8a4193bdca3c064e",
+    "native/src/navigation/MainTabs.tsx": "8f31f311f776bdcdaeb620288aee4b7b1319e8b721936aec559eff2a16e32839",
+    "native/src/navigation/RootNavigator.tsx": "3e133cdb0f9721dc140baa6aafd370fc74c046cb72bfc049fcb890ecd1fd11d0",
+    "native/src/screens/AccountSettingsScreen.tsx": "78f1b46ff4e18c1498e3c171e688ddfbd4ed6803cdc5dfe355d79e1d3bfa1478",
+    "native/src/screens/AddIngredientScreen.tsx": "5da16968c543fd87ac2fed7eae26983352214d05f00ea9c4e244db5b5028d08e",
+    "native/src/screens/BillingScreen.tsx": "6351a51bcd3aa2cc1a5b2a8d13f626333dfc4ca8a9632ec4cf5745c53250cf2d",
+    "native/src/screens/DailyCheckInScreen.tsx": "98e7d5ff8187ec506898f3e7366e49a04b0ba2ba5cf903cf90ee00b1943ea717",
+    "native/src/screens/DashboardScreen.tsx": "c4ceba674f286ed4479066899f5ad29df7f343761f5f995b09b10d6f5cfafa00",
+    "native/src/screens/DevicesScreen.tsx": "6ef949877dea0ab66a7e94f8f513f7df546142f1a2e9afc0363942e913161299",
+    "native/src/screens/FoodDiarySettingsScreen.tsx": "4be27f5bc3ee5651b3b8e66f5c2f4a9d4e27b60dda832cdd32f71286b16ef5f4",
+    "native/src/screens/HealthImageNotesScreen.tsx": "9ab2c75bf822d68774c757b39314653e26f666e36364e959cab8176da2fb1d1d",
+    "native/src/screens/HealthJournalScreen.tsx": "b3b8053441409c692568d6062c1dd9a48985a37be2ea4733ec72f5773fe36b73",
+    "native/src/screens/HealthSetupScreen.tsx": "69e9adaa420a14b38092c4f0329feeb269f03684586bd0cb4ef9ea6837a7b2db",
+    "native/src/screens/HelpScreen.tsx": "d79343411824cc17dd9ade0779186125e348b2a5397d7e9d500d30da48477af4",
+    "native/src/screens/InsightIssueScreen.tsx": "cd05119b977dd53441bbf44699e13b0e7a7f90bf5d46dcf1ce6e23ba1a3edb33",
+    "native/src/screens/InsightsScreen.tsx": "41daa83f7263ccee4d70cbd389b93c525918725188002cce22e6ad28fb40f4c1",
+    "native/src/screens/ListYourPracticeScreen.tsx": "5eedb259e82ab4d1615761e73583fd94238364c9248f9751b2eaaf8e32b60d24",
+    "native/src/screens/ListYourPracticeStartScreen.tsx": "8372074b031b1ec1aa66031e2ba79df027f295ebf08fd7c21506de0d2fb30188",
+    "native/src/screens/LoginScreen.tsx": "a0357b2e57aece49d8404cc0a8119ba47bb2cfbaaa93f3ed4d02210b440a0efe",
+    "native/src/screens/MoodTrackerScreen.tsx": "40ba0294a437dfa452dd335679c3c89f29786f996c6626677da07a3856c020ad",
+    "native/src/screens/MoreScreen.tsx": "76b0cd858bfd5f0ae5434b1a1f61292cb672e70fa3c8174928c6ab6d98ad2c5a",
+    "native/src/screens/NativeWebToolScreen.tsx": "ccf412a66a8891ecac065ef5f094f96b9326002ad439e31465bc83dab21721cc",
+    "native/src/screens/NotificationInboxScreen.tsx": "84539d52f1cfca7ce5976badb596bdca208f857486289e1c38160310838524f9",
+    "native/src/screens/NotificationsAccountSecurityScreen.tsx": "f56b9c2b0f80d6f4cf1614fc0d0b6a3bdb2f33815bdc5ef5f4725b97e012d86f",
+    "native/src/screens/NotificationsAiInsightsScreen.tsx": "8b60b2da1dcade0e284211d141965a2b6561ffde4a7ab34e93dc4bbd4664b419",
+    "native/src/screens/NotificationsQuietHoursScreen.tsx": "9f813459ffc339f83761db26486c34d21c5e84f8a581c27563dd5e398e30f1fb",
+    "native/src/screens/NotificationsScreen.tsx": "5387890153e69b6a47cdf1c5b0688aa9fdec142f7d856518391879b928bb7912",
+    "native/src/screens/PractitionerAZScreen.tsx": "7b98495d427ea82e6373783ca3abd024bb864a3911d881b949d917e7745b9731",
+    "native/src/screens/PractitionerDirectoryScreen.tsx": "e5071526367dd545807ec69abc3b10ee29baac98cf92930c8daac968f4e48e34",
+    "native/src/screens/PractitionerProfileScreen.tsx": "eceb6c7419314159b519b87afc1d767705adbf191fea6343934a7ae8c1c5134a",
+    "native/src/screens/PrivacyScreen.tsx": "fe6d0ac4cabe71a5c7d61f738ec99bc7616d2dc9315035f6a1d167ec320a92fe",
+    "native/src/screens/PrivacySettingsScreen.tsx": "5a2ddefb4092c6f65382d3775f4a41263a14c4d53d42859302d203ebdd683cdb",
+    "native/src/screens/ProfilePhotoScreen.tsx": "38099b6f695f29000c5831795dc90a1e3e5a24530b383ee312e6dc846e701296",
+    "native/src/screens/ProfileScreen.tsx": "5f6c12cced05d941d41c5c0b072d792e0b07493c154528012bef9e5de701f0a6",
+    "native/src/screens/RemindersScreen.tsx": "ac4e47a4ef3a1528eb3f2920237804f6551d401e9325fbf386a06a3c955760ca",
+    "native/src/screens/SettingsScreen.tsx": "7651ca0f554798a3579b7282b0f3df4cd45ae99e99a64b4894df2ec1a81f86a3",
+    "native/src/screens/SignupScreen.tsx": "64ccf96092708afaf44bd43fba4fe6592b61e4f79c5df5edf0633bc447cf7099",
+    "native/src/screens/SmartHealthCoachScreen.tsx": "5ba5306b61bbba7ebdbca5cd1708c71e34a9c37d128abc2ed95ec8db7d40c6ff",
+    "native/src/screens/SupportScreen.tsx": "f9fb6bb6f2f17f053e97a36588fcbb17e9dfdbabcc94a3ae89bc78a077c67ee8",
+    "native/src/screens/SymptomNotesScreen.tsx": "a2621b96f114dc76843ec5d9345b37dcee5b8be303bc4c2ba5ef07adebc80d78",
+    "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
+    "native/src/screens/TrackCaloriesScreen.tsx": "5028c96ceeb5a018cfb5b6bf33e242d4539c290f47d72f02878de5daf7320aff",
+    "native/src/screens/WaterIntakeScreen.tsx": "027fedc4368d04533a3714995fbfbb1d0cfec635ebad670c9eb63594e0da801a",
+    "native/src/voice/VoiceAssistant.tsx": "75acecfe0fe9c267471594167fd76a528f372f2d88801ba87eceeeb818ee9605",
+    "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e",
+    "native/src/voice/additionalVoiceActions.ts": "4638e1b4aea6bd44aa266d56aee827d1d68cbaaea0ed4ff7ee18213b03f6ec7c",
+    "native/src/voice/clinicalVoiceActions.ts": "b6ee1eba3eac91728656cc852ccf06cfe2fb9878b5d94be7ced3574e7b2147a5",
+    "native/src/voice/generalAssistantActions.ts": "571b9a28d6636a19413c70e83cad759615dd14fcf23deea9a86d9e04937a908b",
+    "native/src/voice/generalAssistantEffects.ts": "164188218da9b0a7d05959b6d5964184cf9ac16e8c14a72a77a3450ac35aa5d5",
+    "native/src/voice/generalAssistantSession.ts": "232ec75f8dd3adf3291bf3a16f12a4aa84a8065b61ba01c82622a546e634f2b8",
+    "native/src/voice/localPreferenceActions.ts": "2854ae410707d18ff5dffc8170aa793540349d3bc3bc0da9b1b3982bee327195",
+    "native/src/voice/localVoiceWelcome.ts": "9206670a50b1c89b26d9cd47f339b0cd109dead8303bbd6e858e516703edb80f",
+    "native/src/voice/nativeDeviceActions.ts": "4ae6d7de1e6c4a2d1e9fe8e8d7af26f33592c9d0a399ca729c69391745b80e95",
+    "native/src/voice/profileVoiceRefresh.ts": "90def57e6d629290b234fd95a542744bc188b859e343550af0b1b1cb22ca9560",
+    "native/src/voice/realtimeVoice.ts": "f308c3b890e822f42ff00ee1d8f0f8de6ed73e5654925959eef5f4fa7306424f",
+    "native/src/voice/reportPdfActions.ts": "56d91796e8fcce58fc10b71629ff1a5da3d2f0f046d6fc71da8ba04a527b4ba6",
+    "native/src/voice/voiceActionReadRefresh.ts": "4109b5bb3bf669d96731746a728018f2dc284dcc8d19e3c6fe5d822fa85e1ead",
+    "native/src/voice/voiceCapabilityManifest.ts": "4dcfd38fe04f9e2ee28a5e36f1a1b04c2cd2ddc38849d803ea9f49a8916ec366",
+    "scripts/check-voice2-offline.cjs": "e86baba681664071fab678176a365aa31dfa274cbd9aee0b43a543f23bd977df",
+    "scripts/check-voice2-operation-coverage.cjs": "1ee22a9ae0d3e8b69e9eaa4658b4da691095979ccc689788b5dd8209ceede8ee",
+    "scripts/dashboard-design-lock.json": "6cd006b8eb948a0a778612cd2f7a1f3660c6bae1bf0a135ded14f1ddb9a2d1de",
+    "scripts/food-native-amount-persistence-check.ts": "fcfa8d293277d3f0755eec2ce96c2a62f77041a379300942fb93d526a15f1b1c",
+    "scripts/food-native-recipe-check.ts": "b0e4f7455d90cc122a42012a6a0863d40ed51bbd9301d46e40f4e19dd3f08c98",
+    "scripts/insights-design-lock.json": "04d90bd806de73c24847815eddfb231ab74f6d4b2fe4f2592091c3b7517ea2e6",
+    "scripts/page-locks.json": "7452365b39c5f8e79798b01357c540a0e64179156cbb47d459534fa3fb6d5d8b",
+    "scripts/voice-client-integrity-check.cjs": "34a856af7f16c44b213fb475e9ebc53b391d39b068763e190228ed6aa737df18",
+    "scripts/voice2-app-host-check.cjs": "58e3bc5301e150c4b12b13b5a5317a873b0f5dedcded48f88f1b457907157596",
+    "scripts/voice2-clinical-actions-check.cjs": "efbb3cbb6e667e9541b9a8b1806254989f24959feda731bb227145f15a72aced",
+    "scripts/voice2-completion-events-check.cjs": "4770a3ab40c812d49ae956207a2c038716335d1de9981861f812899c7da7b9c9",
+    "scripts/voice2-core-actions-check.cjs": "32d2c62f817a8e422c26add2a7f4344a83f2087abdc64ef7575101e752633721",
+    "scripts/voice2-core-catalog.cjs": "0528fc8732f6126b09dbfaf394ca79598ed90f59df3c069008a802ff97b34579",
+    "scripts/voice2-core-journey-check.cjs": "6e6fb203b495dea17e12fd942eef559de22b29f4a2f18e041f7d4cee477ca95b",
+    "scripts/voice2-current-state-check.cjs": "79a010ce89a80e2b24e565e7545d4882d8621c5117f3b158d851d2001ba8f20f",
+    "scripts/voice2-domain-adapters-check.cjs": "68baa00e0bb84dc343933f8344758437327108f034ba9e19e721eb6246ee0432",
+    "scripts/voice2-final-integration-audit-check.cjs": "0333c8c8775606a5d26a7dfebd1ebeaf3dcd27922d38c0aa3d0c7402ee78a93c",
+    "scripts/voice2-food-actions-check.cjs": "c40de66fd44b7eb8213b50119f06c87c79e83b6df9144588013b94cfa35a2e8d",
+    "scripts/voice2-food-normal-prepare-check.cjs": "36d7e41f05646c67bfc92853d8e815efcaece2c656797cf56a6471f0f9263043",
+    "scripts/voice2-food-normal-save-check.cjs": "02c0efd8f6420e018046b38df2f2cffe0dc5b224d8b7624d174ff9ebd71d6bc8",
+    "scripts/voice2-food-reads-check.cjs": "a831b3b63e084b19f9f8092aa69d69a13d4e39567a79e93dd8f46f172052c76e",
+    "scripts/voice2-general-assistant-check.cjs": "a46edb6fb83b74a33aa03d37798a988bdbffda26e17bfd2b63672fcd975cf76d",
+    "scripts/voice2-host-check.cjs": "b9b343a6ca6096011107064df87afaaed000275191643e4a0b5f82f65a87ad99",
+    "scripts/voice2-integration-audit-check.cjs": "d86e8843883ae5620f73a984fea543dc94600e43c30b4a118e5ced7a8feabd78",
+    "scripts/voice2-large-receipt-check.cjs": "c29c79b3597eb88227a94474d20501f3a93cc7e2dca8a94667563bede76db9d4",
+    "scripts/voice2-manual-operation-inventory.json": "2224e668de1f7bcceb30680de9bb865016c9be903472d90498a109688531e89a",
+    "scripts/voice2-mood-journal-recovery-check.cjs": "6dbb2959e0c23ce2522db76873ba18eea1505c463795287438f1c244faf118ee",
+    "scripts/voice2-mounted-core-refresh-check.cjs": "0833009098f6c030b7076dc060c1c27fdb29856b78063646fb25934c267f2c08",
+    "scripts/voice2-native-general-check.cjs": "8ee6661612b66e7dc410d0646cae06268aa7eee4cecfa97910aae783073b9204",
+    "scripts/voice2-native-session-check.cjs": "3f26704d661b0fd437ae573ca07241065423bced4f04c4f91a18ada641b2f650",
+    "scripts/voice2-normal-actions-check.cjs": "003ee0b27cf227aa127696e43214348060262e243a930cfac5531f1f34e9d023",
+    "scripts/voice2-planner-cost-check.cjs": "7a8d52dcbc1ca2401b908631f542f967955462ab1a571c51e9b31989da76176e",
+    "scripts/voice2-planning-loop-check.cjs": "09d417b4a36dab4eb42240ca9acbd19546c0f470edb44abc98e588077874c628",
+    "scripts/voice2-preflight-retry-check.cjs": "ee06a2cafcdf752a16801f33996ba503cec64468bfe594f18c0b64bccffd80c6",
+    "scripts/voice2-read-only-routes-check.cjs": "a943c3a755ae220455c447842dee6310d43e532f2c19528d941463b61f83a233",
+    "scripts/voice2-readable-check.cjs": "37389967d0e72a2ff68bbb179faa8f6b801fd0e8ff080c758fee622729a9c9fb",
+    "scripts/voice2-realtime-catalog-check.cjs": "b1e65c7695cd14e6c49ac751fe939906e11394ab84416808223238e0b8dc1cd1",
+    "scripts/voice2-record-reads-check.cjs": "99f721434b1b03a29980f90bf6e29ea1775c684e20ffce25cffd2dd9adb025cd",
+    "scripts/voice2-result-reference-check.cjs": "6a90aaa2a3eaff3ed7d69d92b1338a1bbc9b8d1113ae86fa5e8eb81090e48e28",
+    "scripts/voice2-runtime-adversarial-check.cjs": "fa01f474a24284f5c2e9251bfca65a853d0d855a222d8e35ae6d3dc949d20735",
+    "scripts/voice2-safety-priority-check.cjs": "128caacfb1c93d64c687b7252a8e1ebf8b4ce1312c3234e2365bb9557b24714b",
+    "scripts/voice2-session-store-check.cjs": "bafc5cb338fd6b27ae82498a6632682a1d79d7c647610bfa98b22acc104ee285",
+    "scripts/voice2-tool-bridge-check.cjs": "71a78e81496e8b51ec63ca2c17d497ff5ad04ae41f2dfe775c2eeb48138d7319"
+  },
+  "elapsedSecondsAtReport": 5411
+}

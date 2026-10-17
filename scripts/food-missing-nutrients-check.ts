@@ -16,7 +16,7 @@ function sourceFile(path: string) {
 function expression(source: ts.SourceFile, name: string, unwrapHook = false) {
   let found = ''
   const visit = (node: ts.Node) => {
-    if (ts.isFunctionDeclaration(node) && node.name?.text === name) found = `(${node.getText(source)})`
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) found = `(${node.getText(source).replace(/^export /, '')})`
     if (ts.isVariableDeclaration(node) && node.name.getText(source) === name && node.initializer) {
       const value = unwrapHook && ts.isCallExpression(node.initializer) ? node.initializer.arguments[0] : node.initializer
       found = `(${value.getText(source)})`
@@ -28,10 +28,12 @@ function expression(source: ts.SourceFile, name: string, unwrapHook = false) {
   return ts.transpile(found, { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS })
 }
 function bind(context: vm.Context, source: ts.SourceFile, names: string[]) {
-  for (const name of names) context[name] = vm.runInContext(expression(source, name), context)
+  for (const name of names) context[name] = vm.runInContext(expression(source.fileName === 'native/src/screens/TrackCaloriesScreen.tsx' && movedDiaryHelpers.has(name) ? diaryEntries : source, name), context)
 }
 const plain = (value: any) => JSON.parse(JSON.stringify(value))
 const native = sourceFile('native/src/screens/TrackCaloriesScreen.tsx')
+const diaryEntries = sourceFile('native/src/lib/foodDiaryEntries.ts')
+const movedDiaryHelpers = new Set(['roundTo', 'nullableNumber', 'sanitizeEntryTotals', 'hasNonZeroEntryTotals', 'extractTotalsFromDescriptionText', 'recalculateTotalsFromItems', 'normalizeFoodApiEntry'])
 const ctx = vm.createContext({ ...nativeValues, materializeMealPortion, savedMealPortion, mealPortionScale, portionMealItems, parseFoodServing, liquidDensity, convertFoodAmount, console })
 bind(ctx, native, ['roundTo', 'round1', 'nullableNumber', 'numberOrZero', 'normalizeFavoriteLabel', 'normalizeFavoriteAmountUnit', 'parseServingBaseForFavorite', 'favoriteAmountStateFromRaw', 'favoriteBaseForItem', 'convertFavoriteBaseAmount', 'favoriteAmountFromServings', 'formatFavoriteAmount', 'isOpenMeasurementServing', 'hasServingOptionMacroData', 'normalizeFavoriteServingOptions', 'findSelectedServingId', 'sanitizeEntryTotals', 'hasNonZeroEntryTotals', 'extractTotalsFromDescriptionText', 'recalculateTotalsFromItems', 'normalizeFoodApiEntry', 'buildFavoriteAdjustItems', 'buildFavoriteAdjustItemFromSearchFood', 'calculateFavoriteAdjustTotals', 'buildFallbackFavoriteServingOptions', 'formatMacroAmount', 'formatNutrientGrams', 'formatFavoriteNutrientValue'])
 

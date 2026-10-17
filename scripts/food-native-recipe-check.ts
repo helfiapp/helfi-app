@@ -8,14 +8,17 @@ import * as nutrientValues from '../native/src/lib/nutrientValues'
 import { parseFoodServing, liquidDensity, convertFoodAmount } from '../native/src/lib/foodUnits'
 
 const source = ts.createSourceFile('TrackCaloriesScreen.tsx', fs.readFileSync('native/src/screens/TrackCaloriesScreen.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const diarySource = ts.createSourceFile('foodDiaryEntries.ts', fs.readFileSync('native/src/lib/foodDiaryEntries.ts', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TS)
+const movedDiaryHelpers = new Set(['roundTo', 'nullableNumber', 'sanitizeEntryTotals', 'hasNonZeroEntryTotals', 'extractTotalsFromDescriptionText', 'recalculateTotalsFromItems', 'normalizeFoodApiEntry'])
 function actual(name: string) {
+  const actualSource = movedDiaryHelpers.has(name) ? diarySource : source
   let text = ''
   function visit(node: ts.Node) {
-    if (ts.isFunctionDeclaration(node) && node.name?.text === name) text = `(${node.getText(source)})`
-    if (ts.isVariableDeclaration(node) && node.name.getText(source) === name && node.initializer) text = `(${node.initializer.getText(source)})`
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) text = `(${node.getText(actualSource).replace(/^export\s+/, '')})`
+    if (ts.isVariableDeclaration(node) && node.name.getText(actualSource) === name && node.initializer) text = `(${node.initializer.getText(actualSource)})`
     ts.forEachChild(node, visit)
   }
-  visit(source); assert.ok(text, `Actual ${name} must exist`)
+  visit(actualSource); assert.ok(text, `Actual ${name} must exist`)
   return ts.transpile(text, { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS })
 }
 const foods = [

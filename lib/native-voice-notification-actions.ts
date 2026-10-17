@@ -41,7 +41,9 @@ function requestFor(original: NextRequest, method: 'GET' | 'POST', offset = 0, b
   const headers = new Headers(original.headers)
   headers.delete('host'); headers.delete('content-length'); headers.set('cache-control', 'no-store')
   if (method === 'POST') headers.set('content-type', 'application/json')
-  return new NextRequest(new URL(`/api/notifications/inbox${method === 'GET' ? `?limit=100&offset=${offset}` : ''}`, original.url), { method, headers, signal: original.signal, ...(body ? { body: JSON.stringify(body) } : {}) })
+  const url = new URL(`/api/notifications/inbox${method === 'GET' ? `?limit=100&offset=${offset}` : ''}`, original.url)
+  if (method === 'GET' && original.headers.get('x-helfi-assistant-read-only') === '1') url.searchParams.set('voiceReadOnly', '1')
+  return new NextRequest(url, { method, headers, signal: original.signal, ...(body ? { body: JSON.stringify(body) } : {}) })
 }
 async function json(response: Response) {
   const data = await response.json().catch(() => null)
@@ -52,6 +54,7 @@ async function read(request: NextRequest, userId: string): Promise<ReviewedNotif
   const rows: ReviewedNotification[] = [], seen = new Set<string>()
   for (let offset = 0; offset <= 1000; offset += 100) {
     const data = await json(await inbox.GET(requestFor(request, 'GET', offset)))
+    if (request.headers.get('x-helfi-assistant-read-only') === '1' && data.readOnly !== true) fail('The app did not verify a read-only inbox snapshot.')
     checkActive(request)
     if (!Array.isArray(data.items) || data.items.length > 100) fail('The app returned an invalid notification list.')
     if (rows.length + data.items.length > 1000) fail('Please use the notification screen for this large inbox.')

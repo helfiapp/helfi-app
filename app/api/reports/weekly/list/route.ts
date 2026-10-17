@@ -5,10 +5,11 @@ import { getWeeklyReportRequestUser, isWeeklyReportHealthSetupComplete } from '@
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url)
+  const readOnly = url.searchParams.get('voiceReadOnly') === '1'
   const preview = url.searchParams.get('preview') === '1'
   const enabled = process.env.NEXT_PUBLIC_REPORTS_ENABLED === 'true'
   if (!enabled && !preview) {
-    return NextResponse.json({ enabled: false, reports: [] }, { status: 200 })
+    return NextResponse.json({ enabled: false, reports: [], ...(readOnly ? { readOnly: true } : {}) }, { status: 200 })
   }
 
   const requestUser = await getWeeklyReportRequestUser(request)
@@ -21,7 +22,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'health_setup_required', enabled: false, reports: [] }, { status: 403 })
   }
 
-  const reports = await listWeeklyReports(requestUser.id, 50)
+  let reports
+  if (readOnly) {
+    try { reports = await listWeeklyReports(requestUser.id, 50, undefined, { readOnly: true }) }
+    catch { return NextResponse.json({ error: 'Failed to read existing weekly reports' }, { status: 500 }) }
+  } else reports = await listWeeklyReports(requestUser.id, 50)
 
-  return NextResponse.json({ enabled: true, healthSetupComplete: true, reports, preview }, { status: 200 })
+  return NextResponse.json({ enabled: true, healthSetupComplete: true, reports, preview, ...(readOnly ? { readOnly: true } : {}) }, { status: 200 })
 }

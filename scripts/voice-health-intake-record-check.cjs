@@ -75,7 +75,7 @@ await check('actual authenticated user-data branches isolate selected write and 
  let regens=0
  const context={...api,prisma:{...db,user:{findUnique:async({where})=>({id:where.email==='other@example.invalid'?'other-user':user})}},triggerBackgroundRegeneration:async()=>{regens++},NextResponse:{json:(data,options)=>({data,status:options?.status||200})}}
  vm.createContext(context)
- vm.runInContext(ts.transpileModule(`async function scopedGet(user){const scope='voice-health-intake';${getBranch.getText(ast)}}\nasync function scopedPost(data,userEmail){${postBranch.getText(ast)}}`,{compilerOptions:{module:ts.ModuleKind.None,target:ts.ScriptTarget.ES2020}}).outputText,context)
+ vm.runInContext(ts.transpileModule(`async function scopedGet(user){const scope='voice-health-intake';const readOnly=false;${getBranch.getText(ast)}}\nasync function scopedPost(data,userEmail){${postBranch.getText(ast)}}`,{compilerOptions:{module:ts.ModuleKind.None,target:ts.ScriptTarget.ES2020}}).outputText,context)
  const current=(await context.scopedGet({id:user})).data.records.find(r=>r.id==='supp')
  const mutation={entity:'supplement',operation:'delete',id:'supp',beforeHash:current.version,changes:{}}
  assert.equal((await context.scopedPost({voiceHealthIntakeMutation:mutation},'other@example.invalid')).status,409)

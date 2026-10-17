@@ -1079,6 +1079,18 @@ export async function POST(request: NextRequest) {
   return finishVoiceActionTrace(await confirmVoiceAction(request, trace), trace)
 }
 
+/** Authenticated receipt recovery is read-only. A missing/unfinished claim
+ * never falls through to submission, and edited draft fields are not accepted. */
+export async function GET(request: NextRequest) {
+  const user = await resolveUser(request)
+  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const reviewToken = new URL(request.url).searchParams.get('reviewToken') || ''
+  if (!/^v1\.[A-Za-z0-9_-]{43}$/.test(reviewToken)) return NextResponse.json({ error: 'Invalid receipt identity' }, { status: 400 })
+  const result = await completedReviewResult(user.id, { reviewToken })
+  if (!result) return NextResponse.json({ success: false, status: 'pending', safeToClaimSaved: false }, { status: 202 })
+  return NextResponse.json({ success: true, result, receiptVerified: true })
+}
+
 async function confirmVoiceAction(request: NextRequest, trace?: { userId?: string; action?: string }) {
   try {
     const user = await resolveUser(request)
@@ -1087,6 +1099,7 @@ async function confirmVoiceAction(request: NextRequest, trace?: { userId?: strin
 
     const body = await request.json().catch(() => ({} as any))
     const draft = body?.draft || body
+    if (draft?.action === 'assistant_plan') return (await import('@/lib/native-assistant-app')).handleNativeAssistantConfirmation(request, draft)
     if (trace && ['exercise', 'mood', 'journal', 'water', 'symptom_note', 'health_intake_items', 'food_copy_previous', 'food_favorite', 'food_build_meal', 'record_action', 'preference_action', 'local_preference_action', 'notification_action', 'recipe_import_url', 'support_action', 'report_action', 'additional_action', 'device_action'].includes(draft?.action)) trace.action = draft.action
     // A completed receipt is an authenticated, read-only recovery by opaque
     // token. Its own 24-hour expiry applies even after the shorter review ends.

@@ -19,10 +19,23 @@ export async function GET(request: NextRequest) {
   }
   const session = { user: requestUser }
 
-  let [state, latest] = await Promise.all([
-    getWeeklyReportState(requestUser.id),
-    getLatestWeeklyReport(requestUser.id),
-  ])
+  const readOnly = new URL(request.url).searchParams.get('voiceReadOnly') === '1'
+  let state, latest
+  if (readOnly) {
+    try {
+      ;[state, latest] = await Promise.all([
+        getWeeklyReportState(requestUser.id, { readOnly: true }),
+        getLatestWeeklyReport(requestUser.id, { readOnly: true }),
+      ])
+    } catch {
+      return NextResponse.json({ error: 'Failed to read existing weekly report status' }, { status: 500 })
+    }
+  } else {
+    ;[state, latest] = await Promise.all([
+      getWeeklyReportState(requestUser.id),
+      getLatestWeeklyReport(requestUser.id),
+    ])
+  }
   const healthSetupComplete = await isWeeklyReportHealthSetupComplete(requestUser.id)
   if (!healthSetupComplete) {
     return NextResponse.json({
@@ -40,12 +53,14 @@ export async function GET(request: NextRequest) {
       lastReportAt: state?.lastReportAt ?? null,
       reportsEnabled: false,
       reportsEnabledAt: state?.reportsEnabledAt ?? null,
+      ...(readOnly ? { readOnly: true } : {}),
     })
   }
 
   // Voice status is an observation, never a request to enable or reschedule reports.
-  if (new URL(request.url).searchParams.get('voiceReadOnly') === '1') {
+  if (readOnly) {
     return NextResponse.json({
+      readOnly: true,
       voiceReadOnly: true,
       healthSetupComplete: true,
       reportId: latest?.id ?? null,

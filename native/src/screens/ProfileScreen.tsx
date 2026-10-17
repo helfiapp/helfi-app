@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useState } from 'react'
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
+import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { ActivityIndicator, Alert, DeviceEventEmitter, Pressable, ScrollView, Text, TextInput, View } from 'react-native'
 
 import { useFocusEffect, useNavigation } from '@react-navigation/native'
 
@@ -7,6 +7,8 @@ import { API_BASE_URL } from '../config'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
+import { createVoiceActionReadGuard } from '../voice/voiceActionReadRefresh'
+import { mergeProfileRead, normalizeVoiceProfile, profilePatchMatches, profileVoicePatch } from '../voice/profileVoiceRefresh'
 
 type GenderOption = '' | 'male' | 'female' | 'other' | 'prefer-not-to-say'
 
@@ -34,14 +36,6 @@ const genderLabelByValue: Record<GenderOption, string> = {
   'prefer-not-to-say': 'Prefer not to say',
 }
 
-function normalizeGender(value: any): GenderOption {
-  const v = String(value || '').trim().toLowerCase()
-  if (v === 'male') return 'male'
-  if (v === 'female') return 'female'
-  if (v === 'other') return 'other'
-  if (v === 'prefer-not-to-say') return 'prefer-not-to-say'
-  return ''
-}
 
 function Field({
   label,
@@ -120,84 +114,163 @@ export function ProfileScreen() {
 
   const isDirty = useMemo(() => JSON.stringify(profile) !== initialHash, [profile, initialHash])
 
+  const profileRef = useRef(profile)
+  profileRef.current = profile
+  const baselineRef = useRef<ProfileForm | null>(null)
+  const mountedRef = useRef(false)
+  const focusedRef = useRef(false)
+  const accountRef = useRef<string | null>(null)
+  const generationRef = useRef(0)
+  const saveQueueRef = useRef<Promise<unknown>>(Promise.resolve())
+  const pendingSavesRef = useRef(0)
+  const voicePatchRef = useRef<Partial<ProfileForm>>({})
+  const latestVoicePatchRef = useRef<Partial<ProfileForm>>({})
+  const voiceRevisionRef = useRef(0)
+  const repairAllowedRef = useRef(false)
+  const completionIdsRef = useRef<string[]>([])
+  const failedProfileRef = useRef('')
+  const readGuardRef = useRef<ReturnType<typeof createVoiceActionReadGuard> | null>(null)
+  if (!readGuardRef.current) readGuardRef.current = createVoiceActionReadGuard()
+  const account = mode === 'signedIn' && session?.token && session.user?.id ? JSON.stringify([session.user.id, session.token]) : null
+  if (accountRef.current !== account) {
+    accountRef.current = account; generationRef.current++; saveQueueRef.current = Promise.resolve(); pendingSavesRef.current = 0
+    voicePatchRef.current = {}; latestVoicePatchRef.current = {}; voiceRevisionRef.current++; repairAllowedRef.current = false; completionIdsRef.current = []; baselineRef.current = null; failedProfileRef.current = ''
+  }
+  readGuardRef.current.setAccount(account)
+  useEffect(() => {
+    mountedRef.current = true; readGuardRef.current!.mount()
+    return () => { mountedRef.current = false; generationRef.current++; readGuardRef.current!.unmount() }
+  }, [])
+  useEffect(() => {
+    profileRef.current = emptyProfile; setProfile(emptyProfile); setInitialHash(''); setSaving(false); setGenderMenuOpen(false)
+  }, [account])
+
+  const publish = (next: ProfileForm, baseline: ProfileForm) => {
+    profileRef.current = next; baselineRef.current = baseline
+    setProfile(next); setInitialHash(JSON.stringify(baseline))
+  }
   const loadProfile = async () => {
+    if (!account || !session?.token) {
+      profileRef.current = emptyProfile; baselineRef.current = emptyProfile
+      setProfile(emptyProfile); setInitialHash(JSON.stringify(emptyProfile)); setLoading(false)
+      return
+    }
+    const read = readGuardRef.current!.begin(account, 'profile-read')
+    if (!read) return
     try {
-      if (mode !== 'signedIn' || !session?.token) {
-        setProfile(emptyProfile)
-        setInitialHash(JSON.stringify(emptyProfile))
-        return
-      }
-
       setLoading(true)
-      const res = await fetch(`${API_BASE_URL}/api/user-data?scope=health-setup`, {
-        headers: {
-          authorization: `Bearer ${session.token}`,
-          'cache-control': 'no-store',
-        },
+      await saveQueueRef.current.catch(() => {})
+      if (!read.isCurrent()) return
+      const res = await fetch(`${API_BASE_URL}/api/user-data?scope=health-setup&voiceReadOnly=1`, {
+        headers: { authorization: `Bearer ${session.token}`, 'cache-control': 'no-store' }, signal: read.signal,
       })
-
       const payload: any = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(payload?.error || 'Could not load profile')
-      }
-
-      const data = payload?.data || {}
-      const info = data?.profileInfo || {}
-      const selectedGender = normalizeGender(info?.gender || data?.gender)
-      const next: ProfileForm = {
-        firstName: String(info?.firstName || '').trim(),
-        lastName: String(info?.lastName || '').trim(),
-        bio: String(info?.bio || '').trim(),
-        dateOfBirth: String(info?.dateOfBirth || '').trim(),
-        gender: selectedGender,
-      }
-
-      setProfile(next)
-      setInitialHash(JSON.stringify(next))
+      if (!read.isCurrent()) return
+      if (!res.ok || payload.readOnly !== true) throw new Error(payload?.error || 'Could not load profile')
+      const server = normalizeVoiceProfile(payload)
+      if (!profilePatchMatches(server, voicePatchRef.current)) throw new Error('The latest voice profile change could not be confirmed. Please check Profile again.')
+      voicePatchRef.current = {}; repairAllowedRef.current = false
+      publish(mergeProfileRead(server, profileRef.current, baselineRef.current), server)
       setGenderMenuOpen(false)
     } catch (error: any) {
-      Alert.alert('Could not load profile', error?.message || 'Please try again.')
+      if (read.isCurrent()) Alert.alert('Could not load profile', error?.message || 'Please try again.')
     } finally {
-      setLoading(false)
+      if (read.isCurrent()) setLoading(false)
+      read.finish()
     }
   }
 
   useFocusEffect(
     React.useCallback(() => {
+      focusedRef.current = true
       void loadProfile()
-      return () => {}
-    }, [mode, session?.token]),
+      return () => { focusedRef.current = false }
+    }, [account]),
   )
 
   const saveProfile = async (profileToSave: ProfileForm = profile) => {
-    try {
-      if (mode !== 'signedIn' || !session?.token) return
-
-      setSaving(true)
-      const res = await fetch(`${API_BASE_URL}/api/user-data`, {
-        method: 'POST',
-        headers: {
-          'content-type': 'application/json',
-          authorization: `Bearer ${session.token}`,
-        },
-        body: JSON.stringify({ profileInfo: profileToSave }),
-      })
-
-      const data: any = await res.json().catch(() => ({}))
-      if (!res.ok) {
-        throw new Error(data?.error || 'Could not save profile')
+    if (!account || !session?.token || !mountedRef.current || accountRef.current !== account) return
+    const owner = account, generation = generationRef.current, submitted = { ...profileToSave }, submittedRevision = voiceRevisionRef.current
+    const current = () => mountedRef.current && accountRef.current === owner && generationRef.current === generation
+    pendingSavesRef.current++; setSaving(true)
+    const save = async () => {
+      const ticket = readGuardRef.current!.begin(owner, 'profile-save')
+      if (!ticket || !current()) return
+      const headers = { 'content-type': 'application/json', authorization: `Bearer ${session.token}` }
+      let lastVerifiedServer: ProfileForm | null = null
+      const readback = async () => {
+        const res = await fetch(`${API_BASE_URL}/api/user-data?scope=health-setup&voiceReadOnly=1`, { headers, signal: ticket.signal })
+        const data: any = await res.json().catch(() => ({}))
+        if (!current() || !ticket.isCurrent()) return null
+        if (!res.ok || data.readOnly !== true) throw new Error(data?.error || 'Could not confirm the saved profile')
+        lastVerifiedServer = normalizeVoiceProfile(data)
+        return lastVerifiedServer
       }
-
-      setInitialHash(JSON.stringify(profileToSave))
-    } catch (error: any) {
-      Alert.alert('Save failed', error?.message || 'Please try again.')
-    } finally {
-      setSaving(false)
+      let failure: any = null
+      const sent = { ...submitted, ...(submittedRevision !== voiceRevisionRef.current ? latestVoicePatchRef.current : {}), ...voicePatchRef.current }
+      try {
+        try {
+          const res = await fetch(`${API_BASE_URL}/api/user-data`, { method: 'POST', headers, signal: ticket.signal, body: JSON.stringify({ profileInfo: sent }) })
+          const data: any = await res.json().catch(() => ({}))
+          if (!current() || !ticket.isCurrent()) return
+          if (!res.ok) throw new Error(data?.error || 'Could not save profile')
+        } catch (error) { failure = error }
+        if (!current() || !ticket.isCurrent()) return
+        let server = await readback()
+        if (!server) return
+        for (let attempt = 0; attempt < 4 && !profilePatchMatches(server, voicePatchRef.current); attempt++) {
+          if (!repairAllowedRef.current) throw new Error('The latest voice profile change could not be confirmed.')
+          const revision = voiceRevisionRef.current, patch = { ...voicePatchRef.current }
+          // A previously submitted full manual save may have arrived after the
+          // verified voice write. Repair only the voice fields, never the form.
+          const repair = await fetch(`${API_BASE_URL}/api/user-data`, { method: 'POST', headers, signal: ticket.signal, body: JSON.stringify({ profileInfo: patch }) })
+          const repaired: any = await repair.json().catch(() => ({}))
+          if (!current() || !ticket.isCurrent()) return
+          if (!repair.ok) throw new Error(repaired?.error || 'Could not restore the voice profile change')
+          server = await readback()
+          if (!server) return
+          if (revision !== voiceRevisionRef.current) continue
+        }
+        if (!profilePatchMatches(server, voicePatchRef.current)) throw new Error('The latest voice profile change could not be confirmed.')
+        const expected = normalizeVoiceProfile({ data: { profileInfo: { ...sent, ...voicePatchRef.current } } })
+        if (!failure && !profilePatchMatches(server, expected)) throw new Error('The saved profile did not match the requested changes. Please review it again.')
+        voicePatchRef.current = {}; repairAllowedRef.current = false
+        publish(mergeProfileRead(server, profileRef.current, failure ? baselineRef.current : submitted), server)
+        if (failure) throw failure
+        failedProfileRef.current = ''
+      } catch (error: any) {
+        if (current() && ticket.isCurrent()) {
+          if (lastVerifiedServer) publish({ ...mergeProfileRead(lastVerifiedServer, profileRef.current, baselineRef.current), ...voicePatchRef.current }, lastVerifiedServer)
+          failedProfileRef.current = JSON.stringify(profileRef.current)
+          Alert.alert('Save failed', error?.message || 'Please try again.')
+        }
+      } finally { ticket.finish() }
+    }
+    const queued = saveQueueRef.current.then(save, save)
+    saveQueueRef.current = queued
+    try { await queued } finally {
+      if (current()) { pendingSavesRef.current--; setSaving(pendingSavesRef.current > 0) }
     }
   }
 
   useEffect(() => {
-    if (loading || !isDirty || saving) return
+    const subscription = DeviceEventEmitter.addListener('helfi:settings-changed', payload => {
+      if (!mountedRef.current || !focusedRef.current || accountRef.current !== account) return
+      const patch = profileVoicePatch(payload, session?.user?.id)
+      if (!patch || completionIdsRef.current.includes(payload.completionId)) return
+      completionIdsRef.current = [...completionIdsRef.current, payload.completionId].slice(-100)
+      voiceRevisionRef.current++; voicePatchRef.current = { ...voicePatchRef.current, ...patch }
+      latestVoicePatchRef.current = { ...latestVoicePatchRef.current, ...patch }
+      repairAllowedRef.current = repairAllowedRef.current || pendingSavesRef.current > 0
+      const baseline = baselineRef.current || profileRef.current
+      publish({ ...profileRef.current, ...patch }, { ...baseline, ...patch })
+      void loadProfile()
+    })
+    return () => subscription.remove()
+  }, [account, session?.user?.id])
+
+  useEffect(() => {
+    if (loading || !isDirty || saving || failedProfileRef.current === JSON.stringify(profile)) return
     const timer = setTimeout(() => {
       void saveProfile(profile)
     }, 900)

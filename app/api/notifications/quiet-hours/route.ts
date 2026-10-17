@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
   if (!user) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
+  const readOnly = new URL(req.url).searchParams.get('voiceReadOnly') === '1'
 
   const loadQuietHours = () =>
     prisma.$queryRawUnsafe<
@@ -50,6 +51,7 @@ export async function GET(req: NextRequest) {
   try {
     rows = await loadQuietHours()
   } catch {
+    if (readOnly) return NextResponse.json({ error: 'Failed to read existing quiet hours' }, { status: 500 })
     // Existing installations should use the fast path above. Only run the
     // legacy table setup when this table is genuinely missing.
     await ensureSmartCoachTables()
@@ -62,6 +64,7 @@ export async function GET(req: NextRequest) {
       startTime: '22:00',
       endTime: '07:00',
       timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+      ...(readOnly ? { readOnly: true } : {}),
     })
   }
 
@@ -70,6 +73,7 @@ export async function GET(req: NextRequest) {
     startTime: normalizeTime(rows[0].starttime, '22:00'),
     endTime: normalizeTime(rows[0].endtime, '07:00'),
     timezone: rows[0].timezone || 'UTC',
+    ...(readOnly ? { readOnly: true } : {}),
   })
 }
 

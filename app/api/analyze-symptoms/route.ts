@@ -80,8 +80,8 @@ export async function POST(req: NextRequest) {
       feature: 'symptomAnalysis',
       endpoint: '/api/analyze-symptoms',
       kind: 'analysis',
-    }).catch((error) => {
-      console.error('❌ Failed to log symptom notes call:', error)
+    }).catch(() => {
+      console.error('[symptom-analysis] call logging failed')
     })
 
     // PREMIUM/CREDITS/FREE USE GATING
@@ -255,6 +255,10 @@ JSON rules:
     const resp: any = {
       success: true,
       analysisText,
+      analysisId: null,
+      historySaved: false,
+      chargedCredits: allowViaFreeUse ? 0 : CREDIT_COSTS.SYMPTOM_ANALYSIS,
+      coveredByFreeUse: allowViaFreeUse,
     }
     if (structured && typeof structured === 'object') {
       resp.summary = structured.summary || null
@@ -284,7 +288,7 @@ JSON rules:
             disclaimer: resp.disclaimer ?? null,
           }
 
-      await prisma.symptomAnalysis.create({
+      const saved = await prisma.symptomAnalysis.create({
         data: {
           userId: refreshedUser.id,
           symptoms: symptomsList,
@@ -295,8 +299,10 @@ JSON rules:
           analysisData,
         },
       })
+      resp.analysisId = saved.id
+      resp.historySaved = true
     } catch (historyError) {
-      console.warn('Failed to save symptom notes history:', historyError)
+      console.warn('[symptom-analysis] history save not confirmed')
     }
 
     return NextResponse.json(resp)

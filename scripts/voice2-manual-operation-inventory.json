@@ -1,0 +1,4898 @@
+{
+  "schemaVersion": 1,
+  "snapshotDate": "2026-10-17",
+  "scope": "Reachable registered native screens, direct More/Help/HealthSetup web gateways and their core authenticated workflows. Semantic controls grouped by the same normal action contract; navigation counted separately. Source audit only, not full runtime parity.",
+  "readinessDefinitions": {
+    "existing": "Fixed voice adapter source exists; not proof of general registry integration, installed support or runtime success.",
+    "partial": "Some source exists, but missing integration, fields, receipt, host support or remaining verification is identified.",
+    "missing": "No matching executable voice adapter was identified in this audit."
+  },
+  "kindDefinitions": {
+    "read": "Reads saved/source state; paid GET ambiguity is classified paid instead.",
+    "write": "State change or local host setting; must review and verify.",
+    "paid": "May meter Helfi/provider usage; no calls authorized during offline proof.",
+    "person": "Normal OS/store/picker/OAuth/security/legal/share workflow requires actual user outcome; prepare/resume possible, screen opening not completion."
+  },
+  "counts": {
+    "total": 321,
+    "domain": 279,
+    "navigation": 42,
+    "bySection": {
+      "food": 50,
+      "water": 9,
+      "exercise": 8,
+      "mood": 13,
+      "journal": 7,
+      "symptoms": 4,
+      "health_image": 6,
+      "checkin": 8,
+      "coach": 7,
+      "insights": 13,
+      "profile": 7,
+      "settings": 10,
+      "account": 4,
+      "reminders": 6,
+      "notifications": 9,
+      "billing": 10,
+      "devices": 11,
+      "support": 10,
+      "practitioners": 8,
+      "affiliate": 6,
+      "practitioner_management": 20,
+      "health_setup": 28,
+      "labs": 4,
+      "chat": 9,
+      "navigation": 42,
+      "content": 6,
+      "auth": 6
+    },
+    "byReadiness": {
+      "partial": 76,
+      "existing": 89,
+      "missing": 156
+    },
+    "byKind": {
+      "read": 75,
+      "write": 132,
+      "person": 96,
+      "paid": 18
+    }
+  },
+  "routeInventory": {
+    "stackRegistrationsIncludingTabs": 38,
+    "concreteRouteEntries": 42,
+    "stack": [
+      "Tabs",
+      "Profile",
+      "AccountSettings",
+      "ProfilePhoto",
+      "Billing",
+      "Devices",
+      "Help",
+      "HealthJournal",
+      "SymptomNotes",
+      "HealthImageNotes",
+      "Notifications",
+      "NotificationsInbox",
+      "NotificationsAIInsights",
+      "SmartHealthCoach",
+      "NotificationsQuietHours",
+      "NotificationsAccountSecurity",
+      "PrivacySettings",
+      "Support",
+      "HealthSetup",
+      "Reminders",
+      "DailyCheckIn",
+      "MoodTracker",
+      "TrackCalories",
+      "AddIngredient",
+      "FoodAnalysis",
+      "WaterIntake",
+      "FoodDiarySettings",
+      "Login",
+      "Signup",
+      "Terms",
+      "Privacy",
+      "Practitioners",
+      "PractitionerAZ",
+      "PractitionerProfile",
+      "ListYourPractice",
+      "ListYourPracticeStart",
+      "InsightIssue",
+      "NativeWebTool"
+    ],
+    "tabs": [
+      "Dashboard",
+      "Insights",
+      "Food",
+      "More",
+      "Settings"
+    ],
+    "excludedDormant": [
+      "SleepCoach"
+    ],
+    "aliases": [
+      "Food and TrackCalories and FoodAnalysis share TrackCaloriesScreen"
+    ]
+  },
+  "operations": [
+    {
+      "id": "food.diary.list",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:2690"
+      ],
+      "handler": "GET /api/food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts",
+      "notes": "New helper; main prepare/confirm and complete client receipt integration absent."
+    },
+    {
+      "id": "food.diary.detail",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3940"
+      ],
+      "handler": "host openMealEntryEditor + GET /api/food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.diary.totals",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:2690"
+      ],
+      "handler": "host day aggregation from food/water/exercise/user-data",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts",
+      "notes": "Remaining calories must use targets and exercise too; food-only sum is insufficient."
+    },
+    {
+      "id": "food.diary.create",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:2906"
+      ],
+      "handler": "POST /api/food-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "food.diary.update",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3206"
+      ],
+      "handler": "PUT /api/food-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts",
+      "notes": "Measured/source-resolved corrections only; protected rename implementation unchanged."
+    },
+    {
+      "id": "food.diary.delete",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:2971"
+      ],
+      "handler": "POST /api/food-log/delete + POST /api/food-log/delete-atomic",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "food.diary.duplicate",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3252"
+      ],
+      "handler": "host duplicateEntry -> POST /api/food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.diary.copy_seven_days",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3275"
+      ],
+      "handler": "host copyEntryFor7Days -> POST /api/food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.diary.copy_selected",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3323"
+      ],
+      "handler": "host pasteCopiedItems -> POST /api/food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.diary.copy_meal_today",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3357"
+      ],
+      "handler": "host copyCategoryToToday -> POST /api/food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.diary.combine",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5378"
+      ],
+      "handler": "host saveCombinedMeal -> food-log + favorite storage + delete originals",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts",
+      "notes": "New combine not integrated/fully verified; linked drinks refused."
+    },
+    {
+      "id": "food.view.date",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:6108"
+      ],
+      "handler": "host setSelectedDate",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.view.energy_unit",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:6274"
+      ],
+      "handler": "host setEnergyUnit(kcal|kj)",
+      "readiness": "missing",
+      "notes": "Actual local state; no shared useEnergyUnit context."
+    },
+    {
+      "id": "food.view.meal",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5755"
+      ],
+      "handler": "host runSectionAction / meal controls",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.view.copy_selection",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3345"
+      ],
+      "handler": "host copySelected / selectedIds",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.library.list",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:2626"
+      ],
+      "handler": "GET /api/food-log/library + GET /api/user-data favorites",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.library.detail",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3592"
+      ],
+      "handler": "host openFavoritePreview",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.library.filter",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3382"
+      ],
+      "handler": "host openFavorites / search / category controls",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.library.create",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3392"
+      ],
+      "handler": "POST /api/user-data favorites",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "food.library.update",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3949"
+      ],
+      "handler": "host updateFavoriteFromEditor -> user-data + food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts",
+      "notes": "Measured edit helper still needs final normal-editor compatibility and integration proof."
+    },
+    {
+      "id": "food.library.rename",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3451"
+      ],
+      "handler": "host renameFavoriteItem -> user-data favorites",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts",
+      "notes": "Protected rename region; no changes authorized."
+    },
+    {
+      "id": "food.library.delete",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3473"
+      ],
+      "handler": "POST /api/user-data favorites",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "food.library.log",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3495"
+      ],
+      "handler": "host addFavoriteToDiary -> POST /api/food-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "food.library.portion",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3597"
+      ],
+      "handler": "host openFavoriteAdjust + addFavoriteToDiary",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "food.library.share",
+      "section": "food",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4630"
+      ],
+      "handler": "Share.share exact buildFavoriteShareText",
+      "readiness": "missing",
+      "notes": "Await actual share-sheet destination/result; opening is not sent."
+    },
+    {
+      "id": "food.search",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4305"
+      ],
+      "handler": "GET /api/food-data",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-resolved-food.ts"
+    },
+    {
+      "id": "food.servings",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4387"
+      ],
+      "handler": "GET /api/food-data/servings",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-resolved-food.ts"
+    },
+    {
+      "id": "food.barcode.lookup",
+      "section": "food",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4819"
+      ],
+      "handler": "GET /api/barcode/lookup",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts",
+      "notes": "Normal 3-credit found lookup; review before GET; found does not log."
+    },
+    {
+      "id": "food.barcode.capture",
+      "section": "food",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4849"
+      ],
+      "handler": "CameraView barcode scan / native permission",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.barcode.label",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4944"
+      ],
+      "handler": "POST /api/barcode/label",
+      "readiness": "missing",
+      "notes": "Saves normal extracted barcode nutrition facts; earlier label image analysis is separately metered. Bind selected image and returned facts; never invented nutrients."
+    },
+    {
+      "id": "food.barcode.log",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4857"
+      ],
+      "handler": "host addBarcodeFood -> POST /api/food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "food.photo.select",
+      "section": "food",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4962"
+      ],
+      "handler": "ImagePicker camera/library permission and actual selected asset",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.photo.analyze",
+      "section": "food",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5002"
+      ],
+      "handler": "POST /api/analyze-food",
+      "readiness": "partial",
+      "notes": "Existing photo handoff is not full conversational action receipt."
+    },
+    {
+      "id": "food.missing.submit",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4492"
+      ],
+      "handler": "POST /api/food-missing",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts",
+      "notes": "Accepted report does not claim email delivery or catalog update."
+    },
+    {
+      "id": "recipe.import_url",
+      "section": "food",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3812"
+      ],
+      "handler": "POST /api/recipe-import",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-recipe-url-import.ts"
+    },
+    {
+      "id": "recipe.import_photo",
+      "section": "food",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3888"
+      ],
+      "handler": "POST /api/recipe-import image payload",
+      "readiness": "missing"
+    },
+    {
+      "id": "recipe.photo.select",
+      "section": "food",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3831"
+      ],
+      "handler": "ImagePicker camera/library",
+      "readiness": "missing"
+    },
+    {
+      "id": "recipe.builder.open",
+      "section": "food",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3707"
+      ],
+      "handler": "host openNativeMealBuilder",
+      "readiness": "partial",
+      "notes": "Navigation only; cannot count as save or eaten."
+    },
+    {
+      "id": "recipe.builder.ingredients",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:4221"
+      ],
+      "handler": "host append/remove/replace source-resolved editor items",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-food-management.ts"
+    },
+    {
+      "id": "recipe.builder.metadata",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3782"
+      ],
+      "handler": "host applyImportedRecipe + builder metadata",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-recipe-metadata.ts"
+    },
+    {
+      "id": "recipe.builder.servings_eaten",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3935"
+      ],
+      "handler": "host updateRecipeServingsEaten",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-recipe-metadata.ts"
+    },
+    {
+      "id": "recipe.recommendation.read",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5065"
+      ],
+      "handler": "GET /api/ai-meal-recommendation",
+      "readiness": "missing"
+    },
+    {
+      "id": "recipe.recommendation.generate",
+      "section": "food",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5093"
+      ],
+      "handler": "POST /api/ai-meal-recommendation",
+      "readiness": "partial",
+      "notes": "Must read actual remaining target, allergies/diet and source facts; no composed end-to-end proof."
+    },
+    {
+      "id": "recipe.recommendation.log",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5127"
+      ],
+      "handler": "host addRecommendedToDiary -> food-log",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "recipe.recommendation.save_library",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5197"
+      ],
+      "handler": "host saveRecommendedToFavorites",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "recipe.recommendation.dismiss",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5179"
+      ],
+      "handler": "DELETE /api/ai-meal-recommendation",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.size_units",
+      "section": "food",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/AddIngredientScreen.tsx:1162"
+      ],
+      "handler": "GET /api/food-data/size-units",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.ingredient.log",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/AddIngredientScreen.tsx:1339"
+      ],
+      "handler": "POST /api/food-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "food.manual_label.analyze",
+      "section": "food",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/AddIngredientScreen.tsx:1485"
+      ],
+      "handler": "POST /api/analyze-food manual label facts",
+      "readiness": "missing"
+    },
+    {
+      "id": "water.list",
+      "section": "water",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:311"
+      ],
+      "handler": "GET /api/water-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "water.status",
+      "section": "water",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:330"
+      ],
+      "handler": "GET /api/hydration-goal + water-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "water.create",
+      "section": "water",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:436"
+      ],
+      "handler": "POST /api/water-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "water.drink.create",
+      "section": "water",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:521"
+      ],
+      "handler": "POST /api/water-log + linked POST /api/food-log",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "water.update",
+      "section": "water",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:643"
+      ],
+      "handler": "PATCH /api/water-log/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "water.delete",
+      "section": "water",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:600"
+      ],
+      "handler": "DELETE /api/water-log/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "water.goal.set",
+      "section": "water",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:698"
+      ],
+      "handler": "POST /api/hydration-goal",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "water.goal.reset",
+      "section": "water",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:719"
+      ],
+      "handler": "DELETE /api/hydration-goal",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "water.view.date",
+      "section": "water",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/WaterIntakeScreen.tsx:734"
+      ],
+      "handler": "host selectedDate",
+      "readiness": "missing"
+    },
+    {
+      "id": "exercise.list",
+      "section": "exercise",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:2698"
+      ],
+      "handler": "GET /api/exercise-entries",
+      "readiness": "missing"
+    },
+    {
+      "id": "exercise.types",
+      "section": "exercise",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:2665"
+      ],
+      "handler": "GET /api/exercise-types",
+      "readiness": "missing"
+    },
+    {
+      "id": "exercise.preview",
+      "section": "exercise",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5572"
+      ],
+      "handler": "POST /api/exercise-preview",
+      "readiness": "missing"
+    },
+    {
+      "id": "exercise.create",
+      "section": "exercise",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5646"
+      ],
+      "handler": "POST /api/exercise-entries",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "exercise.update",
+      "section": "exercise",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5647"
+      ],
+      "handler": "PATCH /api/exercise-entries/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "exercise.delete",
+      "section": "exercise",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5685"
+      ],
+      "handler": "DELETE /api/exercise-entries/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "exercise.device.sync",
+      "section": "exercise",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5712"
+      ],
+      "handler": "POST /api/exercise/sync",
+      "readiness": "missing"
+    },
+    {
+      "id": "exercise.apple_health.import",
+      "section": "exercise",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:5730"
+      ],
+      "handler": "host healthSync.importDate",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-device-actions.ts"
+    },
+    {
+      "id": "mood.entries.list",
+      "section": "mood",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:501"
+      ],
+      "handler": "GET /api/mood/entries date range",
+      "readiness": "missing"
+    },
+    {
+      "id": "mood.context.read",
+      "section": "mood",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:548"
+      ],
+      "handler": "GET /api/mood/context",
+      "readiness": "missing"
+    },
+    {
+      "id": "mood.create",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:629"
+      ],
+      "handler": "POST /api/mood/entries",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-mood-context.ts"
+    },
+    {
+      "id": "mood.view.range",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:501"
+      ],
+      "handler": "host history date range / chart controls",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.mood.list",
+      "section": "mood",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:570"
+      ],
+      "handler": "GET /api/mood/journal/entries q/limit",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.mood.create",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:1268"
+      ],
+      "handler": "POST /api/mood/journal/entries",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-record-actions.ts",
+      "notes": "Text works; all manual title/date/tags/prompt/template/media parameters not exposed."
+    },
+    {
+      "id": "journal.mood.update",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:1267"
+      ],
+      "handler": "PUT /api/mood/journal/entries/[id]",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-record-actions.ts",
+      "notes": "Retains existing media; missing full manual metadata editing."
+    },
+    {
+      "id": "journal.mood.delete",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:1343"
+      ],
+      "handler": "DELETE /api/mood/journal/entries/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "journal.mood.select_image",
+      "section": "mood",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:999"
+      ],
+      "handler": "native image selection / POST /api/mood/journal/upload",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.mood.upload_image",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:1005"
+      ],
+      "handler": "POST /api/mood/journal/upload",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.mood.record_audio",
+      "section": "mood",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:1054"
+      ],
+      "handler": "native microphone permission/recording",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.mood.upload_audio",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:1060"
+      ],
+      "handler": "POST /api/mood/journal/upload-audio",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.mood.tags",
+      "section": "mood",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/MoodTrackerScreen.tsx:1231"
+      ],
+      "handler": "host handleAddJournalTag / journal save",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "journal.health.list",
+      "section": "journal",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/HealthJournalScreen.tsx:164"
+      ],
+      "handler": "GET /api/health-journal date",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.health.create",
+      "section": "journal",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/HealthJournalScreen.tsx:385"
+      ],
+      "handler": "POST /api/health-journal",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "journal.health.update",
+      "section": "journal",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/HealthJournalScreen.tsx:410"
+      ],
+      "handler": "PATCH /api/health-journal/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "journal.health.delete",
+      "section": "journal",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/HealthJournalScreen.tsx:434"
+      ],
+      "handler": "DELETE /api/health-journal/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "journal.health.media.select",
+      "section": "journal",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/HealthJournalScreen.tsx:211"
+      ],
+      "handler": "native picker/recording -> extract-media",
+      "readiness": "missing"
+    },
+    {
+      "id": "journal.health.extract_media",
+      "section": "journal",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/HealthJournalScreen.tsx:211"
+      ],
+      "handler": "POST /api/health-journal/extract-media",
+      "readiness": "missing",
+      "notes": "Manual merges extraction summary into text; original files are not persisted as journal attachments."
+    },
+    {
+      "id": "journal.health.view.date",
+      "section": "journal",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/HealthJournalScreen.tsx:164"
+      ],
+      "handler": "host selectedDate",
+      "readiness": "missing"
+    },
+    {
+      "id": "symptoms.history.list",
+      "section": "symptoms",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/SymptomNotesScreen.tsx:179"
+      ],
+      "handler": "GET /api/symptoms/history",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-symptom-analysis.ts"
+    },
+    {
+      "id": "symptoms.analyze",
+      "section": "symptoms",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/SymptomNotesScreen.tsx:254"
+      ],
+      "handler": "POST /api/analyze-symptoms",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-symptom-analysis.ts",
+      "notes": "New helper only; root integration absent; current date selector UTC limitation."
+    },
+    {
+      "id": "symptoms.follow_up",
+      "section": "symptoms",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/SymptomNotesScreen.tsx:283"
+      ],
+      "handler": "POST /api/analyze-symptoms/chat",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-symptom-analysis.ts",
+      "notes": "Exact thread/version and normal gate work still needed; no real calls authorized."
+    },
+    {
+      "id": "symptoms.history.delete",
+      "section": "symptoms",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SymptomNotesScreen.tsx:321"
+      ],
+      "handler": "DELETE /api/symptoms/history/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-record-actions.ts"
+    },
+    {
+      "id": "health_image.history.list",
+      "section": "health_image",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/HealthImageNotesScreen.tsx:151"
+      ],
+      "handler": "GET /api/medical-images/history",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_image.select",
+      "section": "health_image",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/HealthImageNotesScreen.tsx:283"
+      ],
+      "handler": "native camera/library -> actual image payload",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_image.analyze",
+      "section": "health_image",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/HealthImageNotesScreen.tsx:283"
+      ],
+      "handler": "POST /api/test-vision saveToHistory:false",
+      "readiness": "missing",
+      "notes": "Normal precharge + usage remainder; not flat 2 credits."
+    },
+    {
+      "id": "health_image.follow_up",
+      "section": "health_image",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/HealthImageNotesScreen.tsx:313"
+      ],
+      "handler": "POST /api/medical-images/chat",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_image.save",
+      "section": "health_image",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/HealthImageNotesScreen.tsx:346"
+      ],
+      "handler": "POST /api/medical-images/history multipart image+analysis",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_image.delete",
+      "section": "health_image",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/HealthImageNotesScreen.tsx:380"
+      ],
+      "handler": "DELETE /api/medical-images/history/[id]",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-additional-actions.ts"
+    },
+    {
+      "id": "checkin.today",
+      "section": "checkin",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:164"
+      ],
+      "handler": "GET /api/checkins/today localDate",
+      "readiness": "missing"
+    },
+    {
+      "id": "checkin.history",
+      "section": "checkin",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:213"
+      ],
+      "handler": "GET /api/checkins/history",
+      "readiness": "missing"
+    },
+    {
+      "id": "checkin.rating.set",
+      "section": "checkin",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:287"
+      ],
+      "handler": "POST /api/checkins/today",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "checkin.rating.update",
+      "section": "checkin",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:479"
+      ],
+      "handler": "PATCH /api/checkins/ratings",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "checkin.rating.delete",
+      "section": "checkin",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:455"
+      ],
+      "handler": "DELETE /api/checkins/ratings",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "checkin.history.delete",
+      "section": "checkin",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:517"
+      ],
+      "handler": "POST /api/checkins/ratings action=delete-by-issues; reviewed bounded IDs in voice adapter",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-history-actions.ts"
+    },
+    {
+      "id": "checkin.view.date",
+      "section": "checkin",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:455"
+      ],
+      "handler": "host date range/selectedDate",
+      "readiness": "missing"
+    },
+    {
+      "id": "coach.today",
+      "section": "coach",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/SmartHealthCoachScreen.tsx:382"
+      ],
+      "handler": "GET /api/health-tips/today",
+      "readiness": "partial",
+      "notes": "Audit GET generation side effects before registry read exposure."
+    },
+    {
+      "id": "coach.history",
+      "section": "coach",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/SmartHealthCoachScreen.tsx:399"
+      ],
+      "handler": "GET /api/health-tips/history",
+      "readiness": "missing"
+    },
+    {
+      "id": "coach.preferences.read",
+      "section": "coach",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/SmartHealthCoachScreen.tsx:435"
+      ],
+      "handler": "GET /api/health-tips/settings",
+      "readiness": "missing"
+    },
+    {
+      "id": "coach.preferences.update",
+      "section": "coach",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SmartHealthCoachScreen.tsx:521"
+      ],
+      "handler": "POST /api/health-tips/settings",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "coach.enable",
+      "section": "coach",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SmartHealthCoachScreen.tsx:667"
+      ],
+      "handler": "normal enable pricing modal + settings POST",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-preference-actions.ts",
+      "notes": "Existing adapter requires actual normal pricing acceptance."
+    },
+    {
+      "id": "coach.tip.dismiss",
+      "section": "coach",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SmartHealthCoachScreen.tsx:588"
+      ],
+      "handler": "host handleClearTip + local dismissed IDs",
+      "readiness": "missing"
+    },
+    {
+      "id": "coach.history.delete",
+      "section": "coach",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SmartHealthCoachScreen.tsx:625"
+      ],
+      "handler": "DELETE /api/health-tips/history",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-history-actions.ts"
+    },
+    {
+      "id": "reports.status",
+      "section": "insights",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:683"
+      ],
+      "handler": "GET /api/reports/weekly/status?voiceReadOnly=1",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "reports.list",
+      "section": "insights",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:684"
+      ],
+      "handler": "GET /api/reports/weekly/list",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "reports.weekly.read",
+      "section": "insights",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:878"
+      ],
+      "handler": "GET /api/reports/weekly/list exact saved content",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "reports.weekly.request",
+      "section": "insights",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:836"
+      ],
+      "handler": "POST /api/reports/weekly/run",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-report-actions.ts"
+    },
+    {
+      "id": "reports.weekly.preferences",
+      "section": "insights",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:812"
+      ],
+      "handler": "POST /api/reports/weekly/preferences",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "reports.weekly.view",
+      "section": "insights",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:878"
+      ],
+      "handler": "POST /api/reports/weekly/notify",
+      "readiness": "partial",
+      "notes": "Viewing report acknowledges notification; dedicated locked screen cannot be changed under generic approval."
+    },
+    {
+      "id": "reports.weekly.pdf",
+      "section": "insights",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:899"
+      ],
+      "handler": "POST /api/reports/weekly/pdf + native viewer",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-report-actions.ts"
+    },
+    {
+      "id": "reports.weekly.chat_activity",
+      "section": "insights",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:628"
+      ],
+      "handler": "GET /api/reports/weekly/chat-activity",
+      "readiness": "missing"
+    },
+    {
+      "id": "insights.issues.list",
+      "section": "insights",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:685"
+      ],
+      "handler": "GET /api/insights/issues",
+      "readiness": "missing",
+      "notes": "Inspect paid generation/cache effects before exposing as safe read."
+    },
+    {
+      "id": "insights.report.select",
+      "section": "insights",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/InsightsScreen.tsx:878"
+      ],
+      "handler": "host selectedReport + notify",
+      "readiness": "missing",
+      "notes": "Dedicated approved design lock applies."
+    },
+    {
+      "id": "insights.issue.overview",
+      "section": "insights",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/InsightIssueScreen.tsx:74"
+      ],
+      "handler": "host exact issue passed by Insights",
+      "readiness": "missing"
+    },
+    {
+      "id": "insights.issue.section",
+      "section": "insights",
+      "kind": "paid",
+      "sources": [
+        "native/src/screens/InsightIssueScreen.tsx:88"
+      ],
+      "handler": "GET /api/insights/issues/[slug]/sections/[section]",
+      "readiness": "missing",
+      "notes": "GET may generate content; cannot label as free read without normal cost/cache audit."
+    },
+    {
+      "id": "insights.issue.section.select",
+      "section": "insights",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/InsightIssueScreen.tsx:131"
+      ],
+      "handler": "host setSection(overview|supplements|medications|labs|nutrition)",
+      "readiness": "missing"
+    },
+    {
+      "id": "profile.read",
+      "section": "profile",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/ProfileScreen.tsx:164"
+      ],
+      "handler": "GET /api/user-data?scope=health-setup",
+      "readiness": "missing"
+    },
+    {
+      "id": "profile.update",
+      "section": "profile",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/ProfileScreen.tsx:213"
+      ],
+      "handler": "POST /api/user-data profileInfo",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts",
+      "notes": "Display gender distinct from metabolic gender; local patch not released."
+    },
+    {
+      "id": "profile.photo.read",
+      "section": "profile",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/ProfilePhotoScreen.tsx:28"
+      ],
+      "handler": "GET /api/user-data?scope=health-setup",
+      "readiness": "missing"
+    },
+    {
+      "id": "profile.photo.select",
+      "section": "profile",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/ProfilePhotoScreen.tsx:97"
+      ],
+      "handler": "ImagePicker library permission/selection",
+      "readiness": "missing"
+    },
+    {
+      "id": "profile.photo.capture",
+      "section": "profile",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/ProfilePhotoScreen.tsx:119"
+      ],
+      "handler": "ImagePicker camera permission/capture",
+      "readiness": "missing"
+    },
+    {
+      "id": "profile.photo.upload",
+      "section": "profile",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/ProfilePhotoScreen.tsx:75"
+      ],
+      "handler": "POST /api/upload-profile-image",
+      "readiness": "missing"
+    },
+    {
+      "id": "profile.photo.remove",
+      "section": "profile",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/ProfilePhotoScreen.tsx:150"
+      ],
+      "handler": "DELETE /api/upload-profile-image",
+      "readiness": "missing"
+    },
+    {
+      "id": "settings.local.read",
+      "section": "settings",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:120"
+      ],
+      "handler": "AsyncStorage existing local keys",
+      "readiness": "existing",
+      "adapterSource": "native/src/voice/localPreferenceActions.ts"
+    },
+    {
+      "id": "settings.appearance.update",
+      "section": "settings",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:153"
+      ],
+      "handler": "AsyncStorage darkMode + Appearance",
+      "readiness": "existing",
+      "adapterSource": "native/src/voice/localPreferenceActions.ts"
+    },
+    {
+      "id": "settings.haptics.update",
+      "section": "settings",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:158"
+      ],
+      "handler": "AsyncStorage hapticsEnabled",
+      "readiness": "existing",
+      "adapterSource": "native/src/voice/localPreferenceActions.ts"
+    },
+    {
+      "id": "settings.visibility.update",
+      "section": "settings",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:163"
+      ],
+      "handler": "AsyncStorage profileVisibility",
+      "readiness": "existing",
+      "adapterSource": "native/src/voice/localPreferenceActions.ts"
+    },
+    {
+      "id": "settings.analytics.update",
+      "section": "settings",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:168"
+      ],
+      "handler": "AsyncStorage dataAnalytics",
+      "readiness": "existing",
+      "adapterSource": "native/src/voice/localPreferenceActions.ts"
+    },
+    {
+      "id": "settings.ai_consent",
+      "section": "settings",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:404"
+      ],
+      "handler": "normal AI help permission switch/consent flow",
+      "readiness": "missing"
+    },
+    {
+      "id": "account.health_summary.export",
+      "section": "settings",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:464"
+      ],
+      "handler": "GET /api/export/pdf web-session-only",
+      "readiness": "missing",
+      "notes": "Different from weekly report PDF; native shared auth/viewer contract absent."
+    },
+    {
+      "id": "account.sign_out",
+      "section": "settings",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SettingsScreen.tsx:229"
+      ],
+      "handler": "useAppMode.signOut normal confirm",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.settings.read",
+      "section": "settings",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/FoodDiarySettingsScreen.tsx:167"
+      ],
+      "handler": "GET /api/user-data healthCheckSettings",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.settings.update",
+      "section": "settings",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/FoodDiarySettingsScreen.tsx:212"
+      ],
+      "handler": "POST /api/user-data healthCheckSettings",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-preference-actions.ts",
+      "notes": "Check exact adapter field schema against manual threshold/display controls."
+    },
+    {
+      "id": "account.local.read",
+      "section": "account",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/AccountSettingsScreen.tsx:153"
+      ],
+      "handler": "AsyncStorage helfi_native_account_settings_v1",
+      "readiness": "missing"
+    },
+    {
+      "id": "account.local.update",
+      "section": "account",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/AccountSettingsScreen.tsx:132"
+      ],
+      "handler": "AsyncStorage helfi_native_account_settings_v1",
+      "readiness": "missing",
+      "notes": "Name/email here are local display entries; never claim authenticated identity changed."
+    },
+    {
+      "id": "account.password.change",
+      "section": "account",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/AccountSettingsScreen.tsx:219"
+      ],
+      "handler": "POST /api/account/change-password current+new password",
+      "readiness": "missing"
+    },
+    {
+      "id": "account.delete",
+      "section": "account",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/AccountSettingsScreen.tsx:252"
+      ],
+      "handler": "POST /api/account/delete exact DELETE confirmation",
+      "readiness": "missing"
+    },
+    {
+      "id": "reminders.checkin.read",
+      "section": "reminders",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/RemindersScreen.tsx:369"
+      ],
+      "handler": "GET /api/checkins/settings",
+      "readiness": "missing"
+    },
+    {
+      "id": "reminders.checkin.update",
+      "section": "reminders",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/RemindersScreen.tsx:436"
+      ],
+      "handler": "POST /api/checkins/settings",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "reminders.mood.read",
+      "section": "reminders",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/RemindersScreen.tsx:370"
+      ],
+      "handler": "GET /api/mood/reminders",
+      "readiness": "missing"
+    },
+    {
+      "id": "reminders.mood.update",
+      "section": "reminders",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/RemindersScreen.tsx:485"
+      ],
+      "handler": "POST /api/mood/reminders",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "reminders.push.permission",
+      "section": "reminders",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/RemindersScreen.tsx:589"
+      ],
+      "handler": "OS notification request + normal native push registration",
+      "readiness": "missing"
+    },
+    {
+      "id": "reminders.timezone.select",
+      "section": "reminders",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/RemindersScreen.tsx:646"
+      ],
+      "handler": "normal timezone selection saved with reminder settings",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "notifications.quiet_hours.read",
+      "section": "notifications",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/NotificationsQuietHoursScreen.tsx:120"
+      ],
+      "handler": "GET /api/notifications/quiet-hours",
+      "readiness": "missing"
+    },
+    {
+      "id": "notifications.quiet_hours.update",
+      "section": "notifications",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/NotificationsQuietHoursScreen.tsx:182"
+      ],
+      "handler": "POST /api/notifications/quiet-hours",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "notifications.list",
+      "section": "notifications",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/NotificationInboxScreen.tsx:123"
+      ],
+      "handler": "GET /api/notifications/inbox",
+      "readiness": "missing"
+    },
+    {
+      "id": "notifications.mark_read",
+      "section": "notifications",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/NotificationInboxScreen.tsx:162"
+      ],
+      "handler": "POST /api/notifications/inbox",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-notification-actions.ts"
+    },
+    {
+      "id": "notifications.delete",
+      "section": "notifications",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/NotificationInboxScreen.tsx:181"
+      ],
+      "handler": "POST /api/notifications/inbox action=delete_selected",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-notification-actions.ts"
+    },
+    {
+      "id": "notifications.mark_all_visible_read",
+      "section": "notifications",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/NotificationInboxScreen.tsx:422"
+      ],
+      "handler": "POST /api/notifications/inbox reviewed visible IDs",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-notification-actions.ts"
+    },
+    {
+      "id": "notifications.delete_all_visible",
+      "section": "notifications",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/NotificationInboxScreen.tsx:417"
+      ],
+      "handler": "POST /api/notifications/inbox action=delete_all reviewed visible IDs",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-notification-actions.ts"
+    },
+    {
+      "id": "notifications.open",
+      "section": "notifications",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/NotificationInboxScreen.tsx:515"
+      ],
+      "handler": "normal handleOpen target route / URL",
+      "readiness": "missing"
+    },
+    {
+      "id": "notifications.selection",
+      "section": "notifications",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/NotificationInboxScreen.tsx:405"
+      ],
+      "handler": "host selectedIds / handleSelectAll",
+      "readiness": "missing"
+    },
+    {
+      "id": "credit.balance",
+      "section": "billing",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:274"
+      ],
+      "handler": "GET /api/credit/status",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "billing.subscription.read",
+      "section": "billing",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:299"
+      ],
+      "handler": "GET /api/billing/subscription",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.history",
+      "section": "billing",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:320"
+      ],
+      "handler": "GET /api/native-billing/history",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.catalog",
+      "section": "billing",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:338"
+      ],
+      "handler": "GET /api/native-billing/catalog + native store catalog",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.feature_usage",
+      "section": "billing",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:406"
+      ],
+      "handler": "GET /api/credit/feature-usage-stats",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.manage",
+      "section": "billing",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:462"
+      ],
+      "handler": "native subscription store UI or POST /api/billing/portal",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.plan.change",
+      "section": "billing",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:507"
+      ],
+      "handler": "store flow or POST /api/billing/subscription",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.subscription.cancel",
+      "section": "billing",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:582"
+      ],
+      "handler": "store flow or POST /api/billing/subscription action=cancel",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.restore",
+      "section": "billing",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:606"
+      ],
+      "handler": "normal restore native purchases + server verify",
+      "readiness": "missing"
+    },
+    {
+      "id": "billing.purchase",
+      "section": "billing",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/BillingScreen.tsx:447"
+      ],
+      "handler": "normal native store purchase sheet",
+      "readiness": "missing",
+      "notes": "Open store != purchased; require exact normal verified result."
+    },
+    {
+      "id": "devices.status",
+      "section": "devices",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:186"
+      ],
+      "handler": "GET /api/fitbit/status + /api/garmin/status?voiceReadOnly=1",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "devices.fitbit.connect",
+      "section": "devices",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:276"
+      ],
+      "handler": "POST /api/native-device-oauth-ticket -> /api/auth/fitbit/authorize",
+      "readiness": "missing"
+    },
+    {
+      "id": "devices.garmin.connect",
+      "section": "devices",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:276"
+      ],
+      "handler": "POST /api/native-device-oauth-ticket -> /api/auth/garmin/authorize",
+      "readiness": "missing"
+    },
+    {
+      "id": "devices.fitbit.disconnect",
+      "section": "devices",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:306"
+      ],
+      "handler": "DELETE /api/fitbit/status",
+      "readiness": "missing"
+    },
+    {
+      "id": "devices.garmin.disconnect",
+      "section": "devices",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:306"
+      ],
+      "handler": "DELETE /api/garmin/status",
+      "readiness": "missing"
+    },
+    {
+      "id": "devices.interest.update",
+      "section": "devices",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:332"
+      ],
+      "handler": "POST /api/user-data deviceInterest googleFit/oura/polar",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-additional-actions.ts"
+    },
+    {
+      "id": "apple_health.import",
+      "section": "devices",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:386"
+      ],
+      "handler": "healthSync normal OS permission/disclosure + import",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-device-actions.ts"
+    },
+    {
+      "id": "apple_health.source.select",
+      "section": "devices",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:386"
+      ],
+      "handler": "healthSync source picker + exact selection",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-device-actions.ts"
+    },
+    {
+      "id": "apple_health.automatic.update",
+      "section": "devices",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DevicesScreen.tsx:386"
+      ],
+      "handler": "healthSync.setEnabled",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-device-actions.ts"
+    },
+    {
+      "id": "devices.huawei.interest.update",
+      "section": "devices",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DashboardScreen.tsx:988"
+      ],
+      "handler": "POST /api/user-data deviceInterest.huawei",
+      "readiness": "missing",
+      "notes": "Reachable Huawei row exists; current voice additional schema permits only googleFit/oura/polar."
+    },
+    {
+      "id": "dashboard.summary.read",
+      "section": "devices",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/DashboardScreen.tsx:121"
+      ],
+      "handler": "credit/status, native-auth/me, health-setup-status, user-data",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "support.list",
+      "section": "support",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:289"
+      ],
+      "handler": "GET /api/support/tickets?list=1&activeOnly=0",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-support-actions.ts"
+    },
+    {
+      "id": "support.read",
+      "section": "support",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:274"
+      ],
+      "handler": "GET /api/support/tickets ticketId",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-support-actions.ts"
+    },
+    {
+      "id": "support.create",
+      "section": "support",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:485"
+      ],
+      "handler": "POST /api/support/tickets",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-support-actions.ts"
+    },
+    {
+      "id": "support.reply",
+      "section": "support",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:506"
+      ],
+      "handler": "POST /api/support/tickets",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-support-actions.ts"
+    },
+    {
+      "id": "support.end_chat",
+      "section": "support",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:524"
+      ],
+      "handler": "POST /api/support/tickets",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-support-actions.ts"
+    },
+    {
+      "id": "support.delete",
+      "section": "support",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:576"
+      ],
+      "handler": "POST /api/support/tickets",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-support-actions.ts"
+    },
+    {
+      "id": "support.feedback",
+      "section": "support",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:624"
+      ],
+      "handler": "POST /api/support/tickets",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-support-actions.ts"
+    },
+    {
+      "id": "support.attachment.select",
+      "section": "support",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:433"
+      ],
+      "handler": "native attachment picker",
+      "readiness": "missing"
+    },
+    {
+      "id": "support.attachment.upload",
+      "section": "support",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:433"
+      ],
+      "handler": "POST /api/support/uploads",
+      "readiness": "missing"
+    },
+    {
+      "id": "support.attachment.open",
+      "section": "support",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SupportScreen.tsx:745"
+      ],
+      "handler": "Linking.openURL existing attachment URL",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.categories",
+      "section": "practitioners",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/PractitionerDirectoryScreen.tsx:570"
+      ],
+      "handler": "GET /api/practitioners/categories",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.search",
+      "section": "practitioners",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/PractitionerDirectoryScreen.tsx:633"
+      ],
+      "handler": "GET /api/practitioners/search query/category/radius/telehealth/lat/lng",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.geocode",
+      "section": "practitioners",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/PractitionerDirectoryScreen.tsx:661"
+      ],
+      "handler": "GET /api/practitioners/geocode",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.location.current",
+      "section": "practitioners",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/PractitionerDirectoryScreen.tsx:685"
+      ],
+      "handler": "normal geolocation permission -> reverse-geocode",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.search.filters",
+      "section": "practitioners",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/PractitionerDirectoryScreen.tsx:633"
+      ],
+      "handler": "host category/radius/telehealth/location/search controls",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.categories.az",
+      "section": "practitioners",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/PractitionerAZScreen.tsx:29"
+      ],
+      "handler": "GET /api/practitioners/a-z",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.detail",
+      "section": "practitioners",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/PractitionerProfileScreen.tsx:94"
+      ],
+      "handler": "GET /api/practitioners/[slug]",
+      "readiness": "missing"
+    },
+    {
+      "id": "practitioners.contact",
+      "section": "practitioners",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/PractitionerProfileScreen.tsx:59"
+      ],
+      "handler": "normal contact-click + phone/email/website/map OS action",
+      "readiness": "missing"
+    },
+    {
+      "id": "affiliate.application.read",
+      "section": "affiliate",
+      "kind": "read",
+      "sources": [
+        "app/affiliate/apply/page.tsx:29"
+      ],
+      "handler": "GET /api/affiliate/application",
+      "readiness": "missing"
+    },
+    {
+      "id": "affiliate.application.submit",
+      "section": "affiliate",
+      "kind": "person",
+      "sources": [
+        "app/affiliate/apply/page.tsx:51"
+      ],
+      "handler": "POST /api/affiliate/apply + actual application/terms confirmation",
+      "readiness": "missing"
+    },
+    {
+      "id": "affiliate.account.read",
+      "section": "affiliate",
+      "kind": "read",
+      "sources": [
+        "app/affiliate/page.tsx:76"
+      ],
+      "handler": "GET /api/affiliate/me",
+      "readiness": "missing"
+    },
+    {
+      "id": "affiliate.payout.onboard",
+      "section": "affiliate",
+      "kind": "person",
+      "sources": [
+        "app/affiliate/page.tsx:92"
+      ],
+      "handler": "POST /api/affiliate/connect/onboard external onboarding",
+      "readiness": "missing"
+    },
+    {
+      "id": "affiliate.referral.copy",
+      "section": "affiliate",
+      "kind": "write",
+      "sources": [
+        "app/affiliate/page.tsx:177"
+      ],
+      "handler": "host referral URL copy control",
+      "readiness": "missing"
+    },
+    {
+      "id": "affiliate.referral.open",
+      "section": "affiliate",
+      "kind": "person",
+      "sources": [
+        "app/affiliate/page.tsx:180"
+      ],
+      "handler": "normal open fullReferralUrl",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.dashboard",
+      "section": "practitioner_management",
+      "kind": "read",
+      "sources": [
+        "app/practitioner/page.tsx:159"
+      ],
+      "handler": "GET /api/practitioner/dashboard",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.listing.read",
+      "section": "practitioner_management",
+      "kind": "read",
+      "sources": [
+        "app/practitioner/page.tsx:164"
+      ],
+      "handler": "GET /api/practitioner/listings/[id]",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.stats",
+      "section": "practitioner_management",
+      "kind": "read",
+      "sources": [
+        "app/practitioner/page.tsx:316"
+      ],
+      "handler": "GET /api/practitioner/stats",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.notifications.read",
+      "section": "practitioner_management",
+      "kind": "read",
+      "sources": [
+        "app/practitioner/page.tsx:331"
+      ],
+      "handler": "GET /api/practitioner/notifications",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.account.create",
+      "section": "practitioner_management",
+      "kind": "write",
+      "sources": [
+        "app/practitioner/page.tsx:356"
+      ],
+      "handler": "POST /api/practitioner/account",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.notifications.update",
+      "section": "practitioner_management",
+      "kind": "write",
+      "sources": [
+        "app/practitioner/page.tsx:422"
+      ],
+      "handler": "POST /api/practitioner/notifications",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.contact_summary.test",
+      "section": "practitioner_management",
+      "kind": "write",
+      "sources": [
+        "app/practitioner/page.tsx:443"
+      ],
+      "handler": "POST /api/practitioner/contact-summary-test",
+      "readiness": "missing",
+      "notes": "Sends test communication; requires explicit requested send."
+    },
+    {
+      "id": "practice.address.search",
+      "section": "practitioner_management",
+      "kind": "read",
+      "sources": [
+        "app/practitioner/page.tsx:292"
+      ],
+      "handler": "GET /api/practitioner/places/autocomplete",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.address.detail",
+      "section": "practitioner_management",
+      "kind": "read",
+      "sources": [
+        "app/practitioner/page.tsx:214"
+      ],
+      "handler": "GET /api/practitioner/places/details",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.location.current",
+      "section": "practitioner_management",
+      "kind": "person",
+      "sources": [
+        "app/practitioner/page.tsx:679"
+      ],
+      "handler": "normal browser geolocation permission",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.listing.create",
+      "section": "practitioner_management",
+      "kind": "write",
+      "sources": [
+        "app/practitioner/page.tsx:496"
+      ],
+      "handler": "POST /api/practitioner/listings",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.listing.update",
+      "section": "practitioner_management",
+      "kind": "write",
+      "sources": [
+        "app/practitioner/page.tsx:496"
+      ],
+      "handler": "PUT /api/practitioner/listings/[id]",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.listing.submit",
+      "section": "practitioner_management",
+      "kind": "write",
+      "sources": [
+        "app/practitioner/page.tsx:528"
+      ],
+      "handler": "POST /api/practitioner/listings/[id]/submit",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.subscription.start",
+      "section": "practitioner_management",
+      "kind": "person",
+      "sources": [
+        "app/practitioner/page.tsx:545"
+      ],
+      "handler": "POST /api/practitioner/subscription/checkout",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.subscription.manage",
+      "section": "practitioner_management",
+      "kind": "person",
+      "sources": [
+        "app/practitioner/page.tsx:557"
+      ],
+      "handler": "POST /api/practitioner/subscription/portal",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.trial.claim",
+      "section": "practitioner_management",
+      "kind": "write",
+      "sources": [
+        "app/practitioner/page.tsx:571"
+      ],
+      "handler": "POST /api/practitioner/subscription/winback",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.boost.purchase",
+      "section": "practitioner_management",
+      "kind": "person",
+      "sources": [
+        "app/practitioner/page.tsx:586"
+      ],
+      "handler": "POST /api/practitioner/boost/checkout",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.logo.upload",
+      "section": "practitioner_management",
+      "kind": "person",
+      "sources": [
+        "app/practitioner/page.tsx:612"
+      ],
+      "handler": "normal file input + POST /api/practitioner/uploads",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.gallery.upload",
+      "section": "practitioner_management",
+      "kind": "person",
+      "sources": [
+        "app/practitioner/page.tsx:629"
+      ],
+      "handler": "normal file input + POST /api/practitioner/uploads",
+      "readiness": "missing"
+    },
+    {
+      "id": "practice.account.delete",
+      "section": "practitioner_management",
+      "kind": "person",
+      "sources": [
+        "app/practitioner/page.tsx:664"
+      ],
+      "handler": "POST /api/practitioner/account/delete exact normal confirmation",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.read",
+      "section": "health_setup",
+      "kind": "read",
+      "sources": [
+        "app/onboarding/page.tsx:9951"
+      ],
+      "handler": "GET /api/user-data?scope=health-setup",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.profile.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:2256"
+      ],
+      "handler": "POST /api/user-data",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.goals.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:2390"
+      ],
+      "handler": "POST /api/user-data goals/targets",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.body.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:2554"
+      ],
+      "handler": "POST /api/user-data body/activity",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.allergies.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:2636"
+      ],
+      "handler": "POST /api/user-data",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.diet.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:3594"
+      ],
+      "handler": "POST /api/user-data",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.lifestyle.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:3945"
+      ],
+      "handler": "POST /api/user-data",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.issues.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:4492"
+      ],
+      "handler": "POST /api/user-data + POST /api/checkins/issues",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.situations.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:4955"
+      ],
+      "handler": "POST /api/user-data",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-preference-actions.ts"
+    },
+    {
+      "id": "health_setup.supplement.search",
+      "section": "health_setup",
+      "kind": "read",
+      "sources": [
+        "app/onboarding/page.tsx:5242"
+      ],
+      "handler": "GET /api/supplement-catalog-search; /supplement-search",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.supplement.add",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:5669"
+      ],
+      "handler": "POST /api/user-data supplements",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-health-intake-record-actions.ts"
+    },
+    {
+      "id": "health_setup.supplement.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:5781"
+      ],
+      "handler": "POST /api/user-data supplements",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-health-intake-record-actions.ts"
+    },
+    {
+      "id": "health_setup.supplement.delete",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:5781"
+      ],
+      "handler": "POST /api/user-data supplements",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-health-intake-record-actions.ts"
+    },
+    {
+      "id": "health_setup.supplement.photo",
+      "section": "health_setup",
+      "kind": "paid",
+      "sources": [
+        "app/onboarding/page.tsx:5563"
+      ],
+      "handler": "POST /api/upload-supplement-image + /api/analyze-supplement-image",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.medication.search",
+      "section": "health_setup",
+      "kind": "read",
+      "sources": [
+        "app/onboarding/page.tsx:6690"
+      ],
+      "handler": "GET /api/medication-catalog-search; /medication-search",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.medication.add",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:7042"
+      ],
+      "handler": "POST /api/user-data medications",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-health-intake-record-actions.ts"
+    },
+    {
+      "id": "health_setup.medication.update",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:7153"
+      ],
+      "handler": "POST /api/user-data medications",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-health-intake-record-actions.ts"
+    },
+    {
+      "id": "health_setup.medication.delete",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:7153"
+      ],
+      "handler": "POST /api/user-data medications",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-health-intake-record-actions.ts"
+    },
+    {
+      "id": "health_setup.medication.photo",
+      "section": "health_setup",
+      "kind": "paid",
+      "sources": [
+        "app/onboarding/page.tsx:6972"
+      ],
+      "handler": "POST /api/upload-medication-image",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.reports.list",
+      "section": "health_setup",
+      "kind": "read",
+      "sources": [
+        "app/onboarding/page.tsx:7964"
+      ],
+      "handler": "GET /api/reports/list",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-app-reads.ts"
+    },
+    {
+      "id": "health_setup.reports.select",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:8019"
+      ],
+      "handler": "POST /api/user-data bloodResults reportIds",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.reports.delete",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:8110"
+      ],
+      "handler": "DELETE /api/reports/[id]",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.interactions.analyze",
+      "section": "health_setup",
+      "kind": "paid",
+      "sources": [
+        "app/onboarding/page.tsx:8674"
+      ],
+      "handler": "POST /api/analyze-interactions",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.interactions.history",
+      "section": "health_setup",
+      "kind": "read",
+      "sources": [
+        "app/onboarding/page.tsx:8608"
+      ],
+      "handler": "GET /api/interaction-history",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.interactions.delete",
+      "section": "health_setup",
+      "kind": "write",
+      "sources": [
+        "app/onboarding/page.tsx:8813"
+      ],
+      "handler": "DELETE /api/interaction-history/[id]",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.insights.update",
+      "section": "health_setup",
+      "kind": "paid",
+      "sources": [
+        "app/onboarding/page.tsx:920"
+      ],
+      "handler": "POST /api/insights/regenerate-targeted",
+      "readiness": "missing",
+      "notes": "Existing same-state/cooldown/spend safeguards mandatory."
+    },
+    {
+      "id": "health_setup.terms.accept",
+      "section": "health_setup",
+      "kind": "person",
+      "sources": [
+        "app/onboarding/page.tsx:1168"
+      ],
+      "handler": "normal terms checkbox / explicit confirmation",
+      "readiness": "missing"
+    },
+    {
+      "id": "health_setup.apple.link",
+      "section": "health_setup",
+      "kind": "person",
+      "sources": [
+        "app/onboarding/page.tsx:9534"
+      ],
+      "handler": "GET /api/auth/apple/link/authorize OAuth",
+      "readiness": "missing"
+    },
+    {
+      "id": "lab_report.file.select",
+      "section": "labs",
+      "kind": "person",
+      "sources": [
+        "components/reports/LabReportUpload.tsx:22"
+      ],
+      "handler": "normal file input",
+      "readiness": "missing"
+    },
+    {
+      "id": "lab_report.consent",
+      "section": "labs",
+      "kind": "person",
+      "sources": [
+        "components/reports/LabReportUpload.tsx:60"
+      ],
+      "handler": "normal health-data processing consent",
+      "readiness": "missing"
+    },
+    {
+      "id": "lab_report.upload",
+      "section": "labs",
+      "kind": "write",
+      "sources": [
+        "components/reports/LabReportUpload.tsx:169"
+      ],
+      "handler": "POST /api/reports/presign + POST /api/reports/[id]/upload",
+      "readiness": "missing"
+    },
+    {
+      "id": "lab_report.process",
+      "section": "labs",
+      "kind": "paid",
+      "sources": [
+        "components/reports/LabReportUpload.tsx:210"
+      ],
+      "handler": "POST /api/reports/[id]/process",
+      "readiness": "missing"
+    },
+    {
+      "id": "chat.history.list",
+      "section": "chat",
+      "kind": "read",
+      "sources": [
+        "components/VoiceChat.tsx:1173",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "GET /api/chat/threads",
+      "readiness": "missing",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.read",
+      "section": "chat",
+      "kind": "read",
+      "sources": [
+        "components/VoiceChat.tsx:1193",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "GET /api/chat/voice?threadId",
+      "readiness": "missing",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.create",
+      "section": "chat",
+      "kind": "write",
+      "sources": [
+        "components/VoiceChat.tsx:1431",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "POST /api/chat/threads",
+      "readiness": "missing",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.rename",
+      "section": "chat",
+      "kind": "write",
+      "sources": [
+        "components/VoiceChat.tsx:1491",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "PATCH /api/chat/threads",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-additional-actions.ts",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.delete",
+      "section": "chat",
+      "kind": "write",
+      "sources": [
+        "components/VoiceChat.tsx:1459",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "DELETE /api/chat/threads",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-additional-actions.ts",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.delete_selected",
+      "section": "chat",
+      "kind": "write",
+      "sources": [
+        "components/VoiceChat.tsx:1104",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "DELETE /api/chat/threads per exact selected thread",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-additional-actions.ts",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.archive",
+      "section": "chat",
+      "kind": "write",
+      "sources": [
+        "components/VoiceChat.tsx:1542",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "localStorage archivedKey",
+      "readiness": "missing",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.archive_selected",
+      "section": "chat",
+      "kind": "write",
+      "sources": [
+        "components/VoiceChat.tsx:1089",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "localStorage archivedKey",
+      "readiness": "missing",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "chat.history.unarchive",
+      "section": "chat",
+      "kind": "write",
+      "sources": [
+        "components/VoiceChat.tsx:1542",
+        "native/src/screens/InsightsScreen.tsx:922"
+      ],
+      "handler": "localStorage archivedKey",
+      "readiness": "missing",
+      "notes": "Reachable in supported web chat/history gateways; local archive distinct from server deletion."
+    },
+    {
+      "id": "navigation.open.Profile",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:344"
+      ],
+      "handler": "normal navigate(Profile)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.AccountSettings",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:345"
+      ],
+      "handler": "normal navigate(AccountSettings)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.ProfilePhoto",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:350"
+      ],
+      "handler": "normal navigate(ProfilePhoto)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Billing",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:355"
+      ],
+      "handler": "normal navigate(Billing)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Devices",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:364"
+      ],
+      "handler": "normal navigate(Devices)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Help",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:373"
+      ],
+      "handler": "normal navigate(Help)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.HealthJournal",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:382"
+      ],
+      "handler": "normal navigate(HealthJournal)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.SymptomNotes",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:391"
+      ],
+      "handler": "normal navigate(SymptomNotes)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.HealthImageNotes",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:400"
+      ],
+      "handler": "normal navigate(HealthImageNotes)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Notifications",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:409"
+      ],
+      "handler": "normal navigate(Notifications)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.NotificationsInbox",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:419"
+      ],
+      "handler": "normal navigate(NotificationsInbox)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.NotificationsAIInsights",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:428"
+      ],
+      "handler": "normal navigate(NotificationsAIInsights)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.SmartHealthCoach",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:437"
+      ],
+      "handler": "normal navigate(SmartHealthCoach)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.NotificationsQuietHours",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:446"
+      ],
+      "handler": "normal navigate(NotificationsQuietHours)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.NotificationsAccountSecurity",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:455"
+      ],
+      "handler": "normal navigate(NotificationsAccountSecurity)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.PrivacySettings",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:464"
+      ],
+      "handler": "normal navigate(PrivacySettings)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Support",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:473"
+      ],
+      "handler": "normal navigate(Support)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.HealthSetup",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:482"
+      ],
+      "handler": "normal navigate(HealthSetup)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Reminders",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:483"
+      ],
+      "handler": "normal navigate(Reminders)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.DailyCheckIn",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:493"
+      ],
+      "handler": "normal navigate(DailyCheckIn)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.MoodTracker",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:494"
+      ],
+      "handler": "normal navigate(MoodTracker)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.TrackCalories",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:495"
+      ],
+      "handler": "normal navigate(TrackCalories)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.AddIngredient",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:504"
+      ],
+      "handler": "normal navigate(AddIngredient)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.FoodAnalysis",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:511"
+      ],
+      "handler": "normal navigate(FoodAnalysis)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.WaterIntake",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:520"
+      ],
+      "handler": "normal navigate(WaterIntake)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.FoodDiarySettings",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:529"
+      ],
+      "handler": "normal navigate(FoodDiarySettings)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Login",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:538"
+      ],
+      "handler": "normal navigate(Login)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Signup",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:545"
+      ],
+      "handler": "normal navigate(Signup)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Terms",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:552"
+      ],
+      "handler": "normal navigate(Terms)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Privacy",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:559"
+      ],
+      "handler": "normal navigate(Privacy)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Practitioners",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:566"
+      ],
+      "handler": "normal navigate(Practitioners)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.PractitionerAZ",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:575"
+      ],
+      "handler": "normal navigate(PractitionerAZ)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.PractitionerProfile",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:584"
+      ],
+      "handler": "normal navigate(PractitionerProfile)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.ListYourPractice",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:593"
+      ],
+      "handler": "normal navigate(ListYourPractice)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.ListYourPracticeStart",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:602"
+      ],
+      "handler": "normal navigate(ListYourPracticeStart)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.InsightIssue",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:611"
+      ],
+      "handler": "normal navigate(InsightIssue)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.NativeWebTool",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainNavigator.tsx:616"
+      ],
+      "handler": "normal navigate(NativeWebTool)",
+      "readiness": "partial",
+      "notes": "Opens registered destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Dashboard",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainTabs.tsx:119"
+      ],
+      "handler": "normal tab navigate(Dashboard)",
+      "readiness": "partial",
+      "notes": "Opens destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Insights",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainTabs.tsx:127"
+      ],
+      "handler": "normal tab navigate(Insights)",
+      "readiness": "partial",
+      "notes": "Opens destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Food",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainTabs.tsx:134"
+      ],
+      "handler": "normal tab navigate(Food)",
+      "readiness": "partial",
+      "notes": "Opens destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.More",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainTabs.tsx:143"
+      ],
+      "handler": "normal tab navigate(More)",
+      "readiness": "partial",
+      "notes": "Opens destination only; no domain action completion implied."
+    },
+    {
+      "id": "navigation.open.Settings",
+      "section": "navigation",
+      "kind": "person",
+      "sources": [
+        "native/src/navigation/MainTabs.tsx:150"
+      ],
+      "handler": "normal tab navigate(Settings)",
+      "readiness": "partial",
+      "notes": "Opens destination only; no domain action completion implied."
+    },
+    {
+      "id": "content.faq",
+      "section": "content",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/HelpScreen.tsx:101"
+      ],
+      "handler": "NativeWebTool /faq",
+      "readiness": "missing"
+    },
+    {
+      "id": "content.terms",
+      "section": "content",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/TermsScreen.tsx:1"
+      ],
+      "handler": "native static Terms",
+      "readiness": "missing"
+    },
+    {
+      "id": "content.privacy",
+      "section": "content",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/PrivacyScreen.tsx:1"
+      ],
+      "handler": "native static Privacy",
+      "readiness": "missing"
+    },
+    {
+      "id": "content.help",
+      "section": "content",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/HelpScreen.tsx:94"
+      ],
+      "handler": "native support/FAQ/affiliate gateway menu",
+      "readiness": "missing"
+    },
+    {
+      "id": "content.more",
+      "section": "content",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/MoreScreen.tsx:91"
+      ],
+      "handler": "native actual health/account menu",
+      "readiness": "missing"
+    },
+    {
+      "id": "content.notifications_security",
+      "section": "content",
+      "kind": "read",
+      "sources": [
+        "native/src/screens/NotificationsAccountSecurityScreen.tsx:1"
+      ],
+      "handler": "static always-on switches; no mutation available",
+      "readiness": "missing"
+    },
+    {
+      "id": "food.diary.move",
+      "section": "food",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/TrackCaloriesScreen.tsx:3297"
+      ],
+      "handler": "host moveEntryToMeal -> POST /api/food-log then delete original",
+      "readiness": "partial",
+      "adapterSource": "lib/native-voice-record-actions.ts",
+      "notes": "Manual control creates/copies then deletes; do not claim atomic move without matching exact outcome. Generic saved food edit supports category changes but source parity needs explicit proof."
+    },
+    {
+      "id": "checkin.history.delete_all",
+      "section": "checkin",
+      "kind": "write",
+      "sources": [
+        "native/src/screens/DailyCheckInScreen.tsx:540"
+      ],
+      "handler": "POST /api/checkins/ratings action=delete-all; reviewed bounded IDs in voice adapter",
+      "readiness": "existing",
+      "adapterSource": "lib/native-voice-history-actions.ts"
+    },
+    {
+      "id": "auth.sign_in",
+      "section": "auth",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/LoginScreen.tsx:46"
+      ],
+      "handler": "POST /api/native-auth/login + normal session signIn",
+      "readiness": "missing",
+      "notes": "Actual credentials/security/legal or OS approval remains a normal person step; no model-selected password or success from opening."
+    },
+    {
+      "id": "auth.apple.sign_in",
+      "section": "auth",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/LoginScreen.tsx:119"
+      ],
+      "handler": "normal runNativeAppleAuth(signin)",
+      "readiness": "missing",
+      "notes": "Actual credentials/security/legal or OS approval remains a normal person step; no model-selected password or success from opening."
+    },
+    {
+      "id": "auth.password.reset",
+      "section": "auth",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/LoginScreen.tsx:100"
+      ],
+      "handler": "normal password-reset web flow",
+      "readiness": "missing",
+      "notes": "Actual credentials/security/legal or OS approval remains a normal person step; no model-selected password or success from opening."
+    },
+    {
+      "id": "auth.sign_up",
+      "section": "auth",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SignupScreen.tsx:50"
+      ],
+      "handler": "POST /api/auth/signup + normal login",
+      "readiness": "missing",
+      "notes": "Actual credentials/security/legal or OS approval remains a normal person step; no model-selected password or success from opening."
+    },
+    {
+      "id": "auth.apple.sign_up",
+      "section": "auth",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SignupScreen.tsx:102"
+      ],
+      "handler": "normal runNativeAppleAuth(signup)",
+      "readiness": "missing",
+      "notes": "Actual credentials/security/legal or OS approval remains a normal person step; no model-selected password or success from opening."
+    },
+    {
+      "id": "auth.terms.accept",
+      "section": "auth",
+      "kind": "person",
+      "sources": [
+        "native/src/screens/SignupScreen.tsx:269"
+      ],
+      "handler": "normal acceptTerms checkbox / actual owner acceptance",
+      "readiness": "missing",
+      "notes": "Actual credentials/security/legal or OS approval remains a normal person step; no model-selected password or success from opening."
+    }
+  ],
+  "sourceFiles": [
+    {
+      "path": "app/affiliate/apply/page.tsx",
+      "sha256": "34f267d4c37d7fb2e9adc78cfde81f94c434993ad5165fa07b050ddeba58985c"
+    },
+    {
+      "path": "app/affiliate/page.tsx",
+      "sha256": "cc6d87ed67e9937d4d3006a98dcd41e87313bac494959ce957d726c1925af0e2"
+    },
+    {
+      "path": "app/api/account/change-password/route.ts",
+      "sha256": "b2a28c66eaf8864b2279bd3c10f48688e5381becb3e5dc8c3b62afaa703c4916"
+    },
+    {
+      "path": "app/api/account/delete/route.ts",
+      "sha256": "e763e020d18fe97769f1ff0ca0e9b4689de92fcc313d0ff8752f62f37abd8f99"
+    },
+    {
+      "path": "app/api/affiliate/application/route.ts",
+      "sha256": "729b6d63cf900c82e4846383d7808e1e0958d421e705c64b284ed3bb99cef4f6"
+    },
+    {
+      "path": "app/api/affiliate/apply/route.ts",
+      "sha256": "f175858fe8bc7c0316e5b7f8a5281b6cd7ef0243da1232229547216dc908d3dd"
+    },
+    {
+      "path": "app/api/affiliate/connect/onboard/route.ts",
+      "sha256": "db6e3075d58d16bf8435eef140252af97680e04d9558edbccaffe6af10e55151"
+    },
+    {
+      "path": "app/api/affiliate/me/route.ts",
+      "sha256": "983b2b1e0c283a9b8cb8e1c9b2115fa54167ff4764acae808cf4a79cf6794a79"
+    },
+    {
+      "path": "app/api/ai-meal-recommendation/route.ts",
+      "sha256": "08f09257deedb63be851cbeffa16cb40f13842a62b4efc23321317aeff802e38"
+    },
+    {
+      "path": "app/api/analyze-food/route.ts",
+      "sha256": "a6f3ccf8c5915bf795462f5826780da05ff417e8f1c5dcdc6a3263a529dcfb09"
+    },
+    {
+      "path": "app/api/analyze-interactions/route.ts",
+      "sha256": "848fb81bccaaf6e2a003ec68b21b3c58b6be0b049cab2421ae286deac076de88"
+    },
+    {
+      "path": "app/api/analyze-supplement-image/route.ts",
+      "sha256": "b7394ca18c63f269c7c957c3bd5a866c8724640271e18408a8552fec3cc1ade5"
+    },
+    {
+      "path": "app/api/analyze-symptoms/chat/route.ts",
+      "sha256": "a5d423b9f8e463f52424dbeadf8a91e02a8a78d8d838790cf5c650ce7a9860c0"
+    },
+    {
+      "path": "app/api/analyze-symptoms/route.ts",
+      "sha256": "72661d73866f1f3da37eacfb3ce7388b890b692864b99fa53c69e57638edfe6b"
+    },
+    {
+      "path": "app/api/auth/apple/link/authorize/route.ts",
+      "sha256": "e464455550585c80811fd9008de408bbbb87287790358eafef68bd7c38fa30ca"
+    },
+    {
+      "path": "app/api/auth/fitbit/authorize/route.ts",
+      "sha256": "66432ff7dbc2a8df3ca256cbf6612221b882ffc2d0867f1f754cea0064af2416"
+    },
+    {
+      "path": "app/api/auth/garmin/authorize/route.ts",
+      "sha256": "a54cd53f16f012584678e75b6d1e3d7305329ff1aac1c1c656fe0f1e58c66cbf"
+    },
+    {
+      "path": "app/api/auth/signup/route.ts",
+      "sha256": "a7ffe751f2ca7c4213fe7ddafddc2c6fcf8078e340db2f54ef4d89d3a8d1c6e7"
+    },
+    {
+      "path": "app/api/barcode/label/route.ts",
+      "sha256": "831a764cc425df4be69a95ac4a684646cf7243ceed8df55716605e3b03f7ff88"
+    },
+    {
+      "path": "app/api/barcode/lookup/route.ts",
+      "sha256": "bf6c4931a07e5e88107866da9d914b2639ce54ef531e62eef064f04dc0595c3e"
+    },
+    {
+      "path": "app/api/billing/portal/route.ts",
+      "sha256": "fd9f38f5fd42254206fd5c1b29b88dce95a8eb1584e9a9f888ffdcd5f1c26cba"
+    },
+    {
+      "path": "app/api/billing/subscription/route.ts",
+      "sha256": "0897de29c7767803a23ae7c8bc196a5e243b8e687ab5a80b47c30db330b94720"
+    },
+    {
+      "path": "app/api/chat/threads/route.ts",
+      "sha256": "a506dfd2111f531aa796acdf80cdd81db4b985f0ece9389d1972f8863f578608"
+    },
+    {
+      "path": "app/api/chat/voice/route.ts",
+      "sha256": "89729c2af8a699e989abe12473fb3bd1140e672372502cbf8ffd8931e6c358be"
+    },
+    {
+      "path": "app/api/checkins/history/route.ts",
+      "sha256": "a24e8da65b2756068a03bc8a4670b59b4e64dee75908a5660c6d812ec687381f"
+    },
+    {
+      "path": "app/api/checkins/issues/route.ts",
+      "sha256": "50897f9a814ae681946dd4c0869379c33a965b40aa99e6e21fc203b8412f6f6b"
+    },
+    {
+      "path": "app/api/checkins/ratings/route.ts",
+      "sha256": "1b09e107f056d04c7176dd17f55e78c5cad6a95bfb7d8c9cb7e6caa7ba7ccd7a"
+    },
+    {
+      "path": "app/api/checkins/settings/route.ts",
+      "sha256": "a14d2fedbae8ea2f267a0f428f661be8be340386e84d8f7a006aedb7b2b581e3"
+    },
+    {
+      "path": "app/api/checkins/today/route.ts",
+      "sha256": "d0ff1a14b42a812492cdf0248e5a6ad79f73bdd11ccdc001c2c964dcf221e572"
+    },
+    {
+      "path": "app/api/credit/feature-usage-stats/route.ts",
+      "sha256": "ecf1f874cd372222cebe2de24cd82d3236d423e3e707d98d719545723b411a82"
+    },
+    {
+      "path": "app/api/credit/status/route.ts",
+      "sha256": "51d074eb344c87c6355c516c3d0c044f87c6eb53c31a58bdd62d27fbdb28d3c1"
+    },
+    {
+      "path": "app/api/exercise-entries/[id]/route.ts",
+      "sha256": "be73e227b7f4d5238014523392d545fd6ad6c45a6cffe88338a81c18d20694e9"
+    },
+    {
+      "path": "app/api/exercise-entries/route.ts",
+      "sha256": "89371c01a7a619e94b48b2d24fa0d9ea8996c77d082a2ffd8ad2b93ca08df148"
+    },
+    {
+      "path": "app/api/exercise-preview/route.ts",
+      "sha256": "ab7d98bdfc7b6eede2423f2c52ada436cd353c50938140c5e91bf173d98cf8b7"
+    },
+    {
+      "path": "app/api/exercise-types/route.ts",
+      "sha256": "b1646c54508c76bfc121245742984316b6dfad080d7887707f995c3a7a6f89dc"
+    },
+    {
+      "path": "app/api/exercise/sync/route.ts",
+      "sha256": "f49cc4cb2389e005876f301d745374d8d7983f4de4d55040cbf95ec0f42b90fe"
+    },
+    {
+      "path": "app/api/export/pdf/route.ts",
+      "sha256": "4ceae819b2bcae1b3e2f63e5199c85cba7757056eb0347bc67c93fdb25b32f02"
+    },
+    {
+      "path": "app/api/fitbit/status/route.ts",
+      "sha256": "d5557f5a9f06e2a025b66f5f6d5507229fea74e750ec68971c0849e6100ec46a"
+    },
+    {
+      "path": "app/api/food-data/route.ts",
+      "sha256": "b002b39a2fbdaa911a9bfa5369724b513883d23ecd6fa4df4d99eccdf8d112e6"
+    },
+    {
+      "path": "app/api/food-data/servings/route.ts",
+      "sha256": "bd5756bd9ff575d0d9861ba1f770bcf879f493c2e3fa297ef7307be6dfe8b319"
+    },
+    {
+      "path": "app/api/food-data/size-units/route.ts",
+      "sha256": "265eac2d7d41af43c8d8d27676519e496ba65e094e0a14df0209fbe1d0af4351"
+    },
+    {
+      "path": "app/api/food-log/delete-atomic/route.ts",
+      "sha256": "a288e6b065d938880bfc0f8f0f5ab8cd89e9d53de2f21207b181db304a175855"
+    },
+    {
+      "path": "app/api/food-log/delete/route.ts",
+      "sha256": "e2a512b827fc47768dcd67971815caa2992265d9f0a8bbaed2a37c977b06828e"
+    },
+    {
+      "path": "app/api/food-log/library/route.ts",
+      "sha256": "af2100a3f1d7c40a897a7b325bc1eccc5f9d4928fbdc84d0dc017e376be4c522"
+    },
+    {
+      "path": "app/api/food-log/route.ts",
+      "sha256": "9fc058cd2ae7342158c22c87fff180890d241a4792378b60420c7e2135ac8ec3"
+    },
+    {
+      "path": "app/api/food-missing/route.ts",
+      "sha256": "4f6b70ac7c3e98fc52ca2bb77fcda2b5d9f469353d2d78e55b1b2f84f0384613"
+    },
+    {
+      "path": "app/api/garmin/status/route.ts",
+      "sha256": "70fa1845062e2b1a58df533fda18b345efdd2bbbd1e26453cdf4a4bbdfb8d942"
+    },
+    {
+      "path": "app/api/health-journal/[id]/route.ts",
+      "sha256": "3eca4065d29870d38b814b6af65482bd83141fb238671e71d2d21f6d8b3172db"
+    },
+    {
+      "path": "app/api/health-journal/extract-media/route.ts",
+      "sha256": "eca994beeee8c2a519505e606f375db2b0d67dd48f9ee3958535d5d8c77c14f7"
+    },
+    {
+      "path": "app/api/health-journal/route.ts",
+      "sha256": "ae93b28e188bf256c11502e34195f73c10d9e907c195722b820e4eb7fc65ec40"
+    },
+    {
+      "path": "app/api/health-tips/history/route.ts",
+      "sha256": "a82f256e305f1eaf75e7507314c08b0bc92ad5e44cc6e23e17b3a85b5ee5a3f9"
+    },
+    {
+      "path": "app/api/health-tips/settings/route.ts",
+      "sha256": "974c2d20ea75cfb9ee8e101cbf018420b9329f0048ce0a974b14f8ea21879b51"
+    },
+    {
+      "path": "app/api/health-tips/today/route.ts",
+      "sha256": "2d4063b1b0715c605dd8dee484c49e84d61c9b3405900a469a9e091c77a82366"
+    },
+    {
+      "path": "app/api/hydration-goal/route.ts",
+      "sha256": "be67eef6fe2b9c9cf5b7331a0da67eb56696961be2d99a56689d094fe3ecef88"
+    },
+    {
+      "path": "app/api/insights/issues/[slug]/sections/[section]/route.ts",
+      "sha256": "5fdc4686105fd8ed4f2da0afbca6293d4821c02c573259490527c21d7275a067"
+    },
+    {
+      "path": "app/api/insights/issues/route.ts",
+      "sha256": "23f49508d7f9aa9683e9c86955fa2810e1221418b8b129e48cb3a7d12c0be894"
+    },
+    {
+      "path": "app/api/insights/regenerate-targeted/route.ts",
+      "sha256": "9b2393f7cff5062d54be60b67b793e717338a4be37444166170d35e5d2964eb4"
+    },
+    {
+      "path": "app/api/interaction-history/[id]/route.ts",
+      "sha256": "bda21520ab31e458d2988f2c4bdba2183647a32dd0eeb6c87a0cd52f9673298a"
+    },
+    {
+      "path": "app/api/interaction-history/route.ts",
+      "sha256": "d169ab91e5fc06efd2c3c9eb27d0dcb5b3a4ecb9ed321f1d3f209b4ae1d15d47"
+    },
+    {
+      "path": "app/api/medical-images/chat/route.ts",
+      "sha256": "e6a3ed6c73d7b1cc64277ad8e26c5f6ad198772252a187dbd766bb08ac6df43c"
+    },
+    {
+      "path": "app/api/medical-images/history/[id]/route.ts",
+      "sha256": "45f98e0b5a9ee0761baec1a0cd4f6f64baaedc6124911ac0e7ae4482eb5ea240"
+    },
+    {
+      "path": "app/api/medical-images/history/route.ts",
+      "sha256": "949db19e0ba27b422a1321200a3fc8ac33e7b0215a4183205f70cff7c8999495"
+    },
+    {
+      "path": "app/api/medication-catalog-search/route.ts",
+      "sha256": "9395c1e1391ee70ba39a913f28b2f74d02887af80a20a3dff8b4c67de79400c3"
+    },
+    {
+      "path": "app/api/mood/context/route.ts",
+      "sha256": "99552b39cd052ce809937f9965e0903a0158110c9e420fde5bc984bc0116ee34"
+    },
+    {
+      "path": "app/api/mood/entries/route.ts",
+      "sha256": "fc0801aeadd7d3a2e4a9c043ff5ca7006501927e0d9f4b25325cfa0b1c708663"
+    },
+    {
+      "path": "app/api/mood/journal/entries/[id]/route.ts",
+      "sha256": "27bdfd6f0a511b0a8ce4d3d95e8eec8042df539b2abf439fe9751f9a9470b333"
+    },
+    {
+      "path": "app/api/mood/journal/entries/route.ts",
+      "sha256": "b8350d73d97a62be5d320d7867b280ea4520e0502b047a58f950c71de869cd17"
+    },
+    {
+      "path": "app/api/mood/journal/upload-audio/route.ts",
+      "sha256": "71a4cf93f46cb80bf1650e76c08074d88b1f144d94ae8525b53f0ad12a9f5cd6"
+    },
+    {
+      "path": "app/api/mood/journal/upload/route.ts",
+      "sha256": "47131cf7e4e615e906a2779e71a448e474ccd220a46d4f60c5a8c6d84438898f"
+    },
+    {
+      "path": "app/api/mood/reminders/route.ts",
+      "sha256": "e4734a15c9b89e31f155206783026a390999acd67d0f96bcf13cdc1074a38fc0"
+    },
+    {
+      "path": "app/api/native-auth/login/route.ts",
+      "sha256": "57c4134a9104361c87c327bce03c2baec5b7755f651bcadbecbb8803070828a3"
+    },
+    {
+      "path": "app/api/native-billing/catalog/route.ts",
+      "sha256": "424047387d3225812a6eac76539075e75a24273fee1b6db761989511542fcbef"
+    },
+    {
+      "path": "app/api/native-billing/history/route.ts",
+      "sha256": "d1714a2b55c827a1e4cde8f96ca629e7509a3e94be16fb79e215b8593db54f01"
+    },
+    {
+      "path": "app/api/native-device-oauth-ticket/route.ts",
+      "sha256": "065fb99d5e7e1a52d5904ac95c377ba7e8cd0218e5cbf7639023645559f5e425"
+    },
+    {
+      "path": "app/api/notifications/inbox/route.ts",
+      "sha256": "ca19907dac9d5ae60a5e06b1d7585479db5ff684d5a38737bfbf25f155923a75"
+    },
+    {
+      "path": "app/api/notifications/quiet-hours/route.ts",
+      "sha256": "e7a8c3ce677cae52ce2e01be6f3f4ff1e85790a6a80c0500b3f1c277b77243a2"
+    },
+    {
+      "path": "app/api/practitioner/account/delete/route.ts",
+      "sha256": "4197d71c2220bacb3fa5443634c1f02153e97d296ac9ee3a9b86f99066cd0548"
+    },
+    {
+      "path": "app/api/practitioner/account/route.ts",
+      "sha256": "d2d967e8da378b132764749b8ec929ecb1833b8d8f1101628bfd41f35e530082"
+    },
+    {
+      "path": "app/api/practitioner/boost/checkout/route.ts",
+      "sha256": "8b7dda2f9707e78ecb3b3bf83e8599574ee6fe512154d5b9131de3b0fbe7ac1a"
+    },
+    {
+      "path": "app/api/practitioner/contact-summary-test/route.ts",
+      "sha256": "ae20189284823365fb8686187fde0ae0b5e2d2919cfd912c26d64d38ed17580a"
+    },
+    {
+      "path": "app/api/practitioner/dashboard/route.ts",
+      "sha256": "f209291bcd8ca53c4bbdc291303f0a8cf8d3a4782feadedc3838c80e7ee95e34"
+    },
+    {
+      "path": "app/api/practitioner/listings/[id]/route.ts",
+      "sha256": "8c0486814cf79b4bdac5c06f5df0b4ba63d6694b1339b699def821b0b40ebd16"
+    },
+    {
+      "path": "app/api/practitioner/listings/[id]/submit/route.ts",
+      "sha256": "bcb3e2040bf55c3f58c5c3422cac0f904d2472ab092bef79c5db68d0216a5b25"
+    },
+    {
+      "path": "app/api/practitioner/listings/route.ts",
+      "sha256": "f4703c68d835fbc9b55e3bf1b351a917413dda340481e469f17227efc17a29a0"
+    },
+    {
+      "path": "app/api/practitioner/notifications/route.ts",
+      "sha256": "b20b63b98db52643f11aafce6e843c9dfbbd1f41f877169ef711b85a1bb1c121"
+    },
+    {
+      "path": "app/api/practitioner/places/autocomplete/route.ts",
+      "sha256": "b62e4b64fd674268e2580ec2af60525eed5c7d7fa827cc11a7b57e4ede8b4321"
+    },
+    {
+      "path": "app/api/practitioner/places/details/route.ts",
+      "sha256": "dc6832f1a0cffff8fe46aaa84d266320bce171ee4f091c98988d89c8e92aefc5"
+    },
+    {
+      "path": "app/api/practitioner/stats/route.ts",
+      "sha256": "b2821d3eba00a1f99a197b6934abb7d48c56591ed0904d5306b67b025a8af2e3"
+    },
+    {
+      "path": "app/api/practitioner/subscription/checkout/route.ts",
+      "sha256": "da0e560ed029141e741ce142682d24b00fd218e563fc407d8c031fbb490de303"
+    },
+    {
+      "path": "app/api/practitioner/subscription/portal/route.ts",
+      "sha256": "c6aab0eaf7e4c2c2b94fb255313cf207228b63f402416e77241548cfa116457b"
+    },
+    {
+      "path": "app/api/practitioner/subscription/winback/route.ts",
+      "sha256": "3f6c6a83fbbbcca9e5ebd239b0c30bc5b906b79f20b90c0a65a18c5c7038bd45"
+    },
+    {
+      "path": "app/api/practitioner/uploads/route.ts",
+      "sha256": "88be092b1824d06b3de3deaa62f66f6d6eadab95025e80c6538978d572e7d330"
+    },
+    {
+      "path": "app/api/practitioners/[slug]/route.ts",
+      "sha256": "0e10a388ecb6dbe45ff32b9715ec8e196e7533060a33f654fc2b6924dcfdef91"
+    },
+    {
+      "path": "app/api/practitioners/a-z/route.ts",
+      "sha256": "eb457c907de12975ac81bbea820414f844981124d1a39360d7723a5ccc1a27ff"
+    },
+    {
+      "path": "app/api/practitioners/categories/route.ts",
+      "sha256": "409020260ad2776f22850b21a466d721608661a75390e2541029981e8346395c"
+    },
+    {
+      "path": "app/api/practitioners/geocode/route.ts",
+      "sha256": "33281aa31fcfff1369a48c23cd2827f96c859c33d65d1506d4e9c7706518f432"
+    },
+    {
+      "path": "app/api/practitioners/search/route.ts",
+      "sha256": "47696591e8108594f34bf416ad95eca7b98612ea9fb8a9037dc9cc3dc3591f95"
+    },
+    {
+      "path": "app/api/recipe-import/route.ts",
+      "sha256": "251921229c7b6317e6d2e2e1e96de9dd8176db1b933430db54a8f1b569c2040b"
+    },
+    {
+      "path": "app/api/reports/[id]/process/route.ts",
+      "sha256": "7feec4de468c26e6ef3151c02d688c0261148347cd4f5d668a2b4d7c09a297af"
+    },
+    {
+      "path": "app/api/reports/[id]/route.ts",
+      "sha256": "29116f79559272ae55ec3a003548cdae163960a02218b45da40a4cfe390c6c6e"
+    },
+    {
+      "path": "app/api/reports/[id]/upload/route.ts",
+      "sha256": "41e3c9c9a92cf226bd686f1d9206fb13988ebad649ab7e40850068c0b1c9ab6c"
+    },
+    {
+      "path": "app/api/reports/list/route.ts",
+      "sha256": "5dc1511c35bbbf9a02e9421c85a0a17a9e8708036f4f0834372e5f8824aa5296"
+    },
+    {
+      "path": "app/api/reports/presign/route.ts",
+      "sha256": "258f2124950798273ad38927212aa8e89f8efdfdfe013d864a244a8d2ab56871"
+    },
+    {
+      "path": "app/api/reports/weekly/chat-activity/route.ts",
+      "sha256": "14ff33482689cfd291aab676e3d9e0e9898e8a8757fe276d0fbbac0d06f3f475"
+    },
+    {
+      "path": "app/api/reports/weekly/list/route.ts",
+      "sha256": "3d308c4a101d98461b0f069a353917b66d0b687d59dd6b65eaf48529eedcf54b"
+    },
+    {
+      "path": "app/api/reports/weekly/notify/route.ts",
+      "sha256": "2b1913dba6b83b48c935682e587552c9db53ace04e954f71d5dab00f567b04a5"
+    },
+    {
+      "path": "app/api/reports/weekly/pdf/route.ts",
+      "sha256": "92376cc8da5ad992d2e2110619511d4d11893b9322f73f8664359452807ffbfd"
+    },
+    {
+      "path": "app/api/reports/weekly/preferences/route.ts",
+      "sha256": "e083ea694f86412cdb49c86d074034ace5c63f11e13c0814702b81999fd44ff1"
+    },
+    {
+      "path": "app/api/reports/weekly/run/route.ts",
+      "sha256": "18ce9b9ccfe90984890f5d5f5cc0ef52267fbb9873fdfcedc4bb2138eebee91d"
+    },
+    {
+      "path": "app/api/reports/weekly/status/route.ts",
+      "sha256": "d5c427bc7930f0356a3facd67cbf40c685a369f1b5ba72824e74d89507b90057"
+    },
+    {
+      "path": "app/api/supplement-catalog-search/route.ts",
+      "sha256": "e10ddddfd7d998a850b0040be61ed297367b27659819a05bf2622fa48f41e21e"
+    },
+    {
+      "path": "app/api/support/tickets/route.ts",
+      "sha256": "a9e31f64c1d8fdf6839b156b767a058dadc6f63869343f946a47243362f47f51"
+    },
+    {
+      "path": "app/api/support/uploads/route.ts",
+      "sha256": "01c7442f56be97635f0dbf1e75238481864a85e9c17d9897f0f14d316f74f270"
+    },
+    {
+      "path": "app/api/symptoms/history/[id]/route.ts",
+      "sha256": "afef845d8b913d8c8b07276223dbba05b108c7e2c3661d0dfc41073ac6979f7a"
+    },
+    {
+      "path": "app/api/symptoms/history/route.ts",
+      "sha256": "69d1dc9cfc22c59b0a50ce89de293c20cc7d4003d60a9872ad4f694b83d0eb79"
+    },
+    {
+      "path": "app/api/test-vision/route.ts",
+      "sha256": "9f8843f3c3828da4f433f09bdaaa404e35ae9f98287975c54cbc659fa780f37a"
+    },
+    {
+      "path": "app/api/upload-medication-image/route.ts",
+      "sha256": "55448bfef4797649759aa7dd8301980f836840ab0ce9098cb24ea28fd1f5f1e3"
+    },
+    {
+      "path": "app/api/upload-profile-image/route.ts",
+      "sha256": "8db12cbbaed835cd9a16c8a207f8cc764ba5c1d543b0b5f2541760e64cc38528"
+    },
+    {
+      "path": "app/api/upload-supplement-image/route.ts",
+      "sha256": "194cf1a30e1800b1566364a771f7c667e3bae834d64eb9eb7426cd7c9f8194d7"
+    },
+    {
+      "path": "app/api/user-data/route.ts",
+      "sha256": "9194b47f8fcdfc7c6ed80bf253a7ffa773b9ad5a02cba538240ee452872633e5"
+    },
+    {
+      "path": "app/api/water-log/[id]/route.ts",
+      "sha256": "b5010b5dd5f47f8478c973e64317969512ac1d07df04d30ef86cbc28cc8e2220"
+    },
+    {
+      "path": "app/api/water-log/route.ts",
+      "sha256": "fd34ea7ed7e31d635821ce6ac12dda278f2e6d051ed5f86ab3d683fb4874285d"
+    },
+    {
+      "path": "app/onboarding/page.tsx",
+      "sha256": "33dcf05c16a8c4bb1d694ca15c4aecc9906f3cbe9a47f343731e94aff1942dea"
+    },
+    {
+      "path": "app/practitioner/page.tsx",
+      "sha256": "91820f362b93547fc91145e67f1baff32122bceb019d1a1e353b6c18a624de9e"
+    },
+    {
+      "path": "components/VoiceChat.tsx",
+      "sha256": "8a8b2206b3f021002b456eec2852c4bcd4752a185066d3e74843fe64412fba39"
+    },
+    {
+      "path": "components/reports/LabReportUpload.tsx",
+      "sha256": "e7661163dabd0a2804f937f3c837d0e80ba2933fbc992b1abe3880d099ec0632"
+    },
+    {
+      "path": "lib/insights/issue-engine.ts",
+      "sha256": "cb896ff4914529097f8d618775d45e8782c9a15eecdf36f1fac19e4d85d72032"
+    },
+    {
+      "path": "lib/native-voice-additional-actions.ts",
+      "sha256": "a451c735919342c19f32a7ebf6d51d2583fdcc86298422e4721830893bf824cc"
+    },
+    {
+      "path": "lib/native-voice-app-reads.ts",
+      "sha256": "0e9381e086c803a8592be00d0f1628c59cbd6ec429c8d70e45ea0bc792f9fe41"
+    },
+    {
+      "path": "lib/native-voice-device-actions.ts",
+      "sha256": "19b9f6db60d15e3bebcb778e032d06405d17c7d098bda1f2de9dddbae9f104cd"
+    },
+    {
+      "path": "lib/native-voice-food-management.ts",
+      "sha256": "2e389c19607f4f964cd0f9a92ede7f12c6f172f8e1d09b3567d11bc3e941f67c"
+    },
+    {
+      "path": "lib/native-voice-health-intake-record-actions.ts",
+      "sha256": "1b27b5742165ad8237f771bb0382f4a7f297f8dc79617d254a7f5eda2f6ac372"
+    },
+    {
+      "path": "lib/native-voice-history-actions.ts",
+      "sha256": "69263e0e1a873446955c6f12075d7af219b8a24bddf2e5ff52a6f3430f1c867d"
+    },
+    {
+      "path": "lib/native-voice-mood-context.ts",
+      "sha256": "f55dbc1c86714f308efadf4fdde64807a2afbbe182ec90a98783646b5ea60a1c"
+    },
+    {
+      "path": "lib/native-voice-notification-actions.ts",
+      "sha256": "84d6e3588722d41902ce6567740138cb66968c6d0530fa6069ddc91706817140"
+    },
+    {
+      "path": "lib/native-voice-preference-actions.ts",
+      "sha256": "657de3f0445f046039c4706e50f02c2ef106a2bbd6e3e82b75cd75e0523410c4"
+    },
+    {
+      "path": "lib/native-voice-recipe-metadata.ts",
+      "sha256": "a49c20099247387d399933740d49c6b15530b3a618549ff0f0eda93254bdf7db"
+    },
+    {
+      "path": "lib/native-voice-recipe-url-import.ts",
+      "sha256": "98b76f50528dcf81be373d3f0ccc7812610fafeb5c8eafea6d112a52bd74d02e"
+    },
+    {
+      "path": "lib/native-voice-record-actions.ts",
+      "sha256": "2a401cd35fba0b5c7bdeab8dec9936b7bff43e3b241e85d4bc4fd24e257b0b76"
+    },
+    {
+      "path": "lib/native-voice-report-actions.ts",
+      "sha256": "67c264fb65bd7d5947d8014ecd3a7262aa77cd5612f56edca994d73416cbc45f"
+    },
+    {
+      "path": "lib/native-voice-resolved-food.ts",
+      "sha256": "2b95846e848d3d3a0adf54e7be46eb80156999983bff2594fd9712084135ad25"
+    },
+    {
+      "path": "lib/native-voice-support-actions.ts",
+      "sha256": "d0c419865ad57e6cb90425611bb80e24f2d4a6863e0bf75d0c7c8e260e67968d"
+    },
+    {
+      "path": "lib/native-voice-symptom-analysis.ts",
+      "sha256": "3a5aa2dede2b76357ee304eb6e9753893ef76e75eabb3725e6b6327ccd52bc5a"
+    },
+    {
+      "path": "native/src/config/nativePageRoutes.ts",
+      "sha256": "36444fb0a7bffa2a2bfad7133f6bf7e659c05dc36cff2e8675dbc5c00bfcc40f"
+    },
+    {
+      "path": "native/src/health/AppleHealthSyncProvider.tsx",
+      "sha256": "2bc3a09645e6e2611035b7a367fb2bc041a504b20a793c13cde46d83b44fca6a"
+    },
+    {
+      "path": "native/src/health/appleHealthSync.ts",
+      "sha256": "226036065f9c0c0888d848261432c4c8de98f9dd3e0bd1eb7171fd4c896634ba"
+    },
+    {
+      "path": "native/src/lib/aiConsent.ts",
+      "sha256": "cad69ccb3ee5eca072761d138b51344cfcd588e46f99f7d42b35e8ecc36835f6"
+    },
+    {
+      "path": "native/src/lib/inAppPurchase.ts",
+      "sha256": "b6ec30395a256428c2033d1797873c71c1724ccca33a7bcbbb2072da422b657c"
+    },
+    {
+      "path": "native/src/lib/nativeSocialAuth.ts",
+      "sha256": "e4cc62ba9d9258dacc0d9f63d655850b935bae831097303fc20c9be0a2723add"
+    },
+    {
+      "path": "native/src/navigation/AuthNavigator.tsx",
+      "sha256": "688915d7a9571e8233d5b69338c190a3611a5d508e6d77b4e186ea851e7b27f4"
+    },
+    {
+      "path": "native/src/navigation/MainNavigator.tsx",
+      "sha256": "13e970d64b1c22dc88293cb45ef0fc728472e316a766ea5e8a4193bdca3c064e"
+    },
+    {
+      "path": "native/src/navigation/MainTabs.tsx",
+      "sha256": "8f31f311f776bdcdaeb620288aee4b7b1319e8b721936aec559eff2a16e32839"
+    },
+    {
+      "path": "native/src/navigation/RootNavigator.tsx",
+      "sha256": "3e133cdb0f9721dc140baa6aafd370fc74c046cb72bfc049fcb890ecd1fd11d0"
+    },
+    {
+      "path": "native/src/screens/AccountSettingsScreen.tsx",
+      "sha256": "78f1b46ff4e18c1498e3c171e688ddfbd4ed6803cdc5dfe355d79e1d3bfa1478"
+    },
+    {
+      "path": "native/src/screens/AddIngredientScreen.tsx",
+      "sha256": "5da16968c543fd87ac2fed7eae26983352214d05f00ea9c4e244db5b5028d08e"
+    },
+    {
+      "path": "native/src/screens/BillingScreen.tsx",
+      "sha256": "6351a51bcd3aa2cc1a5b2a8d13f626333dfc4ca8a9632ec4cf5745c53250cf2d"
+    },
+    {
+      "path": "native/src/screens/DailyCheckInScreen.tsx",
+      "sha256": "98e7d5ff8187ec506898f3e7366e49a04b0ba2ba5cf903cf90ee00b1943ea717"
+    },
+    {
+      "path": "native/src/screens/DashboardScreen.tsx",
+      "sha256": "c4ceba674f286ed4479066899f5ad29df7f343761f5f995b09b10d6f5cfafa00"
+    },
+    {
+      "path": "native/src/screens/DevicesScreen.tsx",
+      "sha256": "6ef949877dea0ab66a7e94f8f513f7df546142f1a2e9afc0363942e913161299"
+    },
+    {
+      "path": "native/src/screens/FoodDiarySettingsScreen.tsx",
+      "sha256": "4be27f5bc3ee5651b3b8e66f5c2f4a9d4e27b60dda832cdd32f71286b16ef5f4"
+    },
+    {
+      "path": "native/src/screens/HealthImageNotesScreen.tsx",
+      "sha256": "9ab2c75bf822d68774c757b39314653e26f666e36364e959cab8176da2fb1d1d"
+    },
+    {
+      "path": "native/src/screens/HealthJournalScreen.tsx",
+      "sha256": "b3b8053441409c692568d6062c1dd9a48985a37be2ea4733ec72f5773fe36b73"
+    },
+    {
+      "path": "native/src/screens/HealthSetupScreen.tsx",
+      "sha256": "69e9adaa420a14b38092c4f0329feeb269f03684586bd0cb4ef9ea6837a7b2db"
+    },
+    {
+      "path": "native/src/screens/HelpScreen.tsx",
+      "sha256": "d79343411824cc17dd9ade0779186125e348b2a5397d7e9d500d30da48477af4"
+    },
+    {
+      "path": "native/src/screens/InsightIssueScreen.tsx",
+      "sha256": "cd05119b977dd53441bbf44699e13b0e7a7f90bf5d46dcf1ce6e23ba1a3edb33"
+    },
+    {
+      "path": "native/src/screens/InsightsScreen.tsx",
+      "sha256": "41daa83f7263ccee4d70cbd389b93c525918725188002cce22e6ad28fb40f4c1"
+    },
+    {
+      "path": "native/src/screens/ListYourPracticeScreen.tsx",
+      "sha256": "5eedb259e82ab4d1615761e73583fd94238364c9248f9751b2eaaf8e32b60d24"
+    },
+    {
+      "path": "native/src/screens/ListYourPracticeStartScreen.tsx",
+      "sha256": "8372074b031b1ec1aa66031e2ba79df027f295ebf08fd7c21506de0d2fb30188"
+    },
+    {
+      "path": "native/src/screens/LoginScreen.tsx",
+      "sha256": "a0357b2e57aece49d8404cc0a8119ba47bb2cfbaaa93f3ed4d02210b440a0efe"
+    },
+    {
+      "path": "native/src/screens/MoodTrackerScreen.tsx",
+      "sha256": "40ba0294a437dfa452dd335679c3c89f29786f996c6626677da07a3856c020ad"
+    },
+    {
+      "path": "native/src/screens/MoreScreen.tsx",
+      "sha256": "76b0cd858bfd5f0ae5434b1a1f61292cb672e70fa3c8174928c6ab6d98ad2c5a"
+    },
+    {
+      "path": "native/src/screens/NativeWebToolScreen.tsx",
+      "sha256": "ccf412a66a8891ecac065ef5f094f96b9326002ad439e31465bc83dab21721cc"
+    },
+    {
+      "path": "native/src/screens/NotificationInboxScreen.tsx",
+      "sha256": "84539d52f1cfca7ce5976badb596bdca208f857486289e1c38160310838524f9"
+    },
+    {
+      "path": "native/src/screens/NotificationsAccountSecurityScreen.tsx",
+      "sha256": "f56b9c2b0f80d6f4cf1614fc0d0b6a3bdb2f33815bdc5ef5f4725b97e012d86f"
+    },
+    {
+      "path": "native/src/screens/NotificationsAiInsightsScreen.tsx",
+      "sha256": "8b60b2da1dcade0e284211d141965a2b6561ffde4a7ab34e93dc4bbd4664b419"
+    },
+    {
+      "path": "native/src/screens/NotificationsQuietHoursScreen.tsx",
+      "sha256": "9f813459ffc339f83761db26486c34d21c5e84f8a581c27563dd5e398e30f1fb"
+    },
+    {
+      "path": "native/src/screens/NotificationsScreen.tsx",
+      "sha256": "5387890153e69b6a47cdf1c5b0688aa9fdec142f7d856518391879b928bb7912"
+    },
+    {
+      "path": "native/src/screens/PractitionerAZScreen.tsx",
+      "sha256": "7b98495d427ea82e6373783ca3abd024bb864a3911d881b949d917e7745b9731"
+    },
+    {
+      "path": "native/src/screens/PractitionerDirectoryScreen.tsx",
+      "sha256": "e5071526367dd545807ec69abc3b10ee29baac98cf92930c8daac968f4e48e34"
+    },
+    {
+      "path": "native/src/screens/PractitionerProfileScreen.tsx",
+      "sha256": "eceb6c7419314159b519b87afc1d767705adbf191fea6343934a7ae8c1c5134a"
+    },
+    {
+      "path": "native/src/screens/PrivacyScreen.tsx",
+      "sha256": "fe6d0ac4cabe71a5c7d61f738ec99bc7616d2dc9315035f6a1d167ec320a92fe"
+    },
+    {
+      "path": "native/src/screens/PrivacySettingsScreen.tsx",
+      "sha256": "5a2ddefb4092c6f65382d3775f4a41263a14c4d53d42859302d203ebdd683cdb"
+    },
+    {
+      "path": "native/src/screens/ProfilePhotoScreen.tsx",
+      "sha256": "38099b6f695f29000c5831795dc90a1e3e5a24530b383ee312e6dc846e701296"
+    },
+    {
+      "path": "native/src/screens/ProfileScreen.tsx",
+      "sha256": "5f6c12cced05d941d41c5c0b072d792e0b07493c154528012bef9e5de701f0a6"
+    },
+    {
+      "path": "native/src/screens/RemindersScreen.tsx",
+      "sha256": "ac4e47a4ef3a1528eb3f2920237804f6551d401e9325fbf386a06a3c955760ca"
+    },
+    {
+      "path": "native/src/screens/SettingsScreen.tsx",
+      "sha256": "7651ca0f554798a3579b7282b0f3df4cd45ae99e99a64b4894df2ec1a81f86a3"
+    },
+    {
+      "path": "native/src/screens/SignupScreen.tsx",
+      "sha256": "64ccf96092708afaf44bd43fba4fe6592b61e4f79c5df5edf0633bc447cf7099"
+    },
+    {
+      "path": "native/src/screens/SmartHealthCoachScreen.tsx",
+      "sha256": "5ba5306b61bbba7ebdbca5cd1708c71e34a9c37d128abc2ed95ec8db7d40c6ff"
+    },
+    {
+      "path": "native/src/screens/SupportScreen.tsx",
+      "sha256": "f9fb6bb6f2f17f053e97a36588fcbb17e9dfdbabcc94a3ae89bc78a077c67ee8"
+    },
+    {
+      "path": "native/src/screens/SymptomNotesScreen.tsx",
+      "sha256": "a2621b96f114dc76843ec5d9345b37dcee5b8be303bc4c2ba5ef07adebc80d78"
+    },
+    {
+      "path": "native/src/screens/TermsScreen.tsx",
+      "sha256": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1"
+    },
+    {
+      "path": "native/src/screens/TrackCaloriesScreen.tsx",
+      "sha256": "5028c96ceeb5a018cfb5b6bf33e242d4539c290f47d72f02878de5daf7320aff"
+    },
+    {
+      "path": "native/src/screens/WaterIntakeScreen.tsx",
+      "sha256": "027fedc4368d04533a3714995fbfbb1d0cfec635ebad670c9eb63594e0da801a"
+    },
+    {
+      "path": "native/src/voice/localPreferenceActions.ts",
+      "sha256": "2854ae410707d18ff5dffc8170aa793540349d3bc3bc0da9b1b3982bee327195"
+    }
+  ],
+  "sourceReconciliations": [
+    {
+      "date": "2026-10-17",
+      "scope": "Owner-authorized bounded offline CORE proof; exact194-source freeze confirmed by parent. No deployment, provider/account calls or production-readiness promotion.",
+      "sourceCount": 194,
+      "changedCount": 24,
+      "unchangedCount": 170,
+      "operationCount": 321,
+      "productionGeneralAssistantOperations": 0,
+      "readinessAndKindsUnchanged": true,
+      "files": [
+        {
+          "path": "app/api/checkins/history/route.ts",
+          "previousSha256": "53038cb99a79479ff8d7f9aef9b9976b382a3f89e83723a322bcd8388602880a",
+          "sha256": "a24e8da65b2756068a03bc8a4670b59b4e64dee75908a5660c6d812ec687381f",
+          "reason": "Opt-in voiceReadOnly GET skips schema creation and returns its explicit read-only marker; ordinary history behavior remains."
+        },
+        {
+          "path": "app/api/checkins/settings/route.ts",
+          "previousSha256": "457607b4d4c9fc6dcb6f5bea517031154e3f455e35bf1a1479cf5f362085d0c6",
+          "sha256": "a14d2fedbae8ea2f267a0f428f661be8be340386e84d8f7a006aedb7b2b581e3",
+          "reason": "Opt-in voiceReadOnly GET reads saved check-in settings without schema/default writes and marks the result; ordinary settings behavior remains."
+        },
+        {
+          "path": "app/api/checkins/today/route.ts",
+          "previousSha256": "3c41bd762e9621ca843509b42cacb07a2f6dcd758c3ffcb70f0f81d9e4a60a57",
+          "sha256": "d0ff1a14b42a812492cdf0248e5a6ad79f73bdd11ccdc001c2c964dcf221e572",
+          "reason": "Opt-in voiceReadOnly GET skips DDL, duplicate cleanup and goal-to-issue synchronization; returns only actual saved issues/ratings with a marker."
+        },
+        {
+          "path": "app/api/credit/status/route.ts",
+          "previousSha256": "b35820705b79758d3a52e7c1a9fd6f175b4d597df8bac1a4334183f565392bfd",
+          "sha256": "51d074eb344c87c6355c516c3d0c044f87c6eb53c31a58bdd62d27fbdb28d3c1",
+          "reason": "Opt-in read-only credit request is explicitly refused before wallet reset or billing side effects; no read-only balance parity is claimed."
+        },
+        {
+          "path": "app/api/exercise-types/route.ts",
+          "previousSha256": "17e313cd116e4793f004ee152d9a11ce298a49f621bf31c5d02a489338eb3ccb",
+          "sha256": "b1646c54508c76bfc121245742984316b6dfad080d7887707f995c3a7a6f89dc",
+          "reason": "Normal GET accepts existing native authentication, rejects mismatched web/native accounts and supports explicit read-only proof."
+        },
+        {
+          "path": "app/api/food-log/route.ts",
+          "previousSha256": "e484916f1d7da3a116b28018e1428c4ff9e22cc6c09080e98f54f10323c1df89",
+          "sha256": "9fc058cd2ae7342158c22c87fff180890d241a4792378b60420c7e2135ac8ec3",
+          "reason": "Opt-in voiceReadOnly GET preserves legacy missing dates instead of writing date repairs and returns a read-only marker; normal default repair behavior is retained."
+        },
+        {
+          "path": "app/api/health-journal/route.ts",
+          "previousSha256": "e8fda622361524a7e9571bc7bfcbf44b94fd052e9d5ed43d6fc9e499a18cbec8",
+          "sha256": "ae93b28e188bf256c11502e34195f73c10d9e907c195722b820e4eb7fc65ec40",
+          "reason": "Opt-in GET skips schema creation; optional normal client action identity derives an owned deterministic entry ID, detects changed content and recovers duplicate inserts without repeating a saved action."
+        },
+        {
+          "path": "app/api/mood/entries/route.ts",
+          "previousSha256": "bbafbccd1db076d71de6550413eb85012326bed809e72a1bc4e305168bc5eac0",
+          "sha256": "fc0801aeadd7d3a2e4a9c043ff5ca7006501927e0d9f4b25325cfa0b1c708663",
+          "reason": "Opt-in voiceReadOnly GET bypasses schema/legacy cleanup writes and marks actual owned saved mood data."
+        },
+        {
+          "path": "app/api/mood/journal/entries/route.ts",
+          "previousSha256": "286bb07cf753d027979a8535a93ca691ece864f376d26943403094a2ee86f010",
+          "sha256": "b8350d73d97a62be5d320d7867b280ea4520e0502b047a58f950c71de869cd17",
+          "reason": "Opt-in GET skips schema creation. Optional text-only clientActionId POST adds owner-bound deterministic IDs, exact metadata replay/conflicts and concurrent unique-insert recovery; legacy/manual creation remains random-ID behavior."
+        },
+        {
+          "path": "app/api/mood/reminders/route.ts",
+          "previousSha256": "2144cea297b13048071fd7bdff10cd75421c47eb3eebe01e5d0201c7418db7f6",
+          "sha256": "e4734a15c9b89e31f155206783026a390999acd67d0f96bcf13cdc1074a38fc0",
+          "reason": "Opt-in voiceReadOnly GET reads saved reminder settings without DDL/default writes and marks the result; normal reminder mutation behavior remains."
+        },
+        {
+          "path": "app/api/notifications/inbox/route.ts",
+          "previousSha256": "c5128e12dd6e03b663db58677733f457d39db4337a7959d1476bf7eab61e5a00",
+          "sha256": "ca19907dac9d5ae60a5e06b1d7585479db5ff684d5a38737bfbf25f155923a75",
+          "reason": "Opt-in GET delegates to the audited read-only inbox service without ensure/repair writes and requires real saved list data."
+        },
+        {
+          "path": "app/api/notifications/quiet-hours/route.ts",
+          "previousSha256": "d05286a4bce488cdf479253008969aceb07a08ab802574efc492c15f16dd50b2",
+          "sha256": "e7a8c3ce677cae52ce2e01be6f3f4ff1e85790a6a80c0500b3f1c277b77243a2",
+          "reason": "Opt-in voiceReadOnly GET bypasses table/default creation and marks the actual saved quiet-hours result."
+        },
+        {
+          "path": "app/api/reports/weekly/list/route.ts",
+          "previousSha256": "a45d1de6432dab93b5e9f65cb6cca16f8efce90aa3eeb7430763d5da3c2c3e3a",
+          "sha256": "3d308c4a101d98461b0f069a353917b66d0b687d59dd6b65eaf48529eedcf54b",
+          "reason": "Opt-in GET uses read-only weekly service options, skips table creation and fails closed on storage errors; no report generation is invoked."
+        },
+        {
+          "path": "app/api/reports/weekly/status/route.ts",
+          "previousSha256": "de13e822469fea63149ca05ef2a682aa98d626b2f61f81067d219acd0d189588",
+          "sha256": "d5c427bc7930f0356a3facd67cbf40c685a369f1b5ba72824e74d89507b90057",
+          "reason": "Opt-in GET uses read-only weekly service options, skips schema/default side effects and fails closed instead of inventing report status."
+        },
+        {
+          "path": "app/api/user-data/route.ts",
+          "previousSha256": "825614add70f74d2e7c6260ebaa7980b3aa936f7089b33d97a76a045ee1948e5",
+          "sha256": "9194b47f8fcdfc7c6ed80bf253a7ffa773b9ad5a02cba538240ee452872633e5",
+          "reason": "Explicit read-only health-setup/food-library/intake scopes skip country/default/storage repairs and return markers; saved profile display gender is preserved separately from metabolic fields."
+        },
+        {
+          "path": "app/api/water-log/route.ts",
+          "previousSha256": "7c53be53c6c7f677dbe8b6c3ff75924e6814b31d13703b12c273aaea6561350e",
+          "sha256": "fd34ea7ed7e31d635821ce6ac12dda278f2e6d051ed5f86ab3d683fb4874285d",
+          "reason": "Opt-in voiceReadOnly GET skips schema/legacy repair/duplicate cleanup writes and returns actual owned hydration rows with a marker."
+        },
+        {
+          "path": "lib/native-voice-app-reads.ts",
+          "previousSha256": "83e495d6c1f7df80e312dcc10c131ea738137b4b33183cd4e7e4ce27884efd4c",
+          "sha256": "0e9381e086c803a8592be00d0f1628c59cbd6ec429c8d70e45ea0bc792f9fe41",
+          "reason": "Propagates server-owned read-only opt-in only to audited fixed GET routes and requires their markers; unsupported credit reads fail before wallet work."
+        },
+        {
+          "path": "lib/native-voice-notification-actions.ts",
+          "previousSha256": "022fd0b4fb28b8bafbc306587a196c99fbac697d0d9d3a09c9003852fe07d2c8",
+          "sha256": "84d6e3588722d41902ce6567740138cb66968c6d0530fa6069ddc91706817140",
+          "reason": "For server-owned read-only requests, preparation forwards the fixed opt-in GET and requires its audited marker; mutation contracts remain."
+        },
+        {
+          "path": "lib/native-voice-preference-actions.ts",
+          "previousSha256": "0a97bea7f44f0e43fcf237225236d3012f10839c58a1a0ee406ae616cc735014",
+          "sha256": "657de3f0445f046039c4706e50f02c2ef106a2bbd6e3e82b75cd75e0523410c4",
+          "reason": "For server-owned read-only requests, setting preparation forwards opt-in fixed GETs, uses audited service paths and requires proof instead of triggering schema/default writes."
+        },
+        {
+          "path": "lib/native-voice-record-actions.ts",
+          "previousSha256": "9b4f90a72ed451f6c5d329ec24ff247efacfb820b334053e20d7796ca90e624a",
+          "sha256": "2a401cd35fba0b5c7bdeab8dec9936b7bff43e3b241e85d4bc4fd24e257b0b76",
+          "reason": "For server-owned read-only requests, fixed owned record GET construction forwards voiceReadOnly and requires the marker before returning data; existing mutations are retained."
+        },
+        {
+          "path": "lib/native-voice-symptom-analysis.ts",
+          "previousSha256": "4238481d65c35ae9cdce3702a485ba7ed8aa88ea79a4e1f7fd71d816d7ae7b3b",
+          "sha256": "3a5aa2dede2b76357ee304eb6e9753893ef76e75eabb3725e6b6327ccd52bc5a",
+          "reason": "Authorized structured registry bridge adds readStructuredVoiceSymptomHistory and prepareStructuredVoiceSymptomAction with trusted local date/time zone, real DST boundaries and no fake utterance. Legacy signatures remain; paid execution assembly stays disabled."
+        },
+        {
+          "path": "native/src/screens/ProfileScreen.tsx",
+          "previousSha256": "3ba4fb44c669352c26af9ad5adb2c87f822b8818593405f80f87d6862d5870f6",
+          "sha256": "5f6c12cced05d941d41c5c0b072d792e0b07493c154528012bef9e5de701f0a6",
+          "reason": "Authorized functional refresh adds owner-bound cancellable reads, exact verified profile patch merging, serialized manual/voice saves and narrow stale-save repair. JSX and styling are unchanged."
+        },
+        {
+          "path": "native/src/screens/TrackCaloriesScreen.tsx",
+          "previousSha256": "3ae98cb1a24e877fe4c89de38cd015da7b1229f69620b401990d87cbba4ebfb5",
+          "sha256": "5028c96ceeb5a018cfb5b6bf33e242d4539c290f47d72f02878de5daf7320aff",
+          "reason": "Moves seven existing pure food-normalization helpers byte-identically into foodDiaryEntries.ts and imports the same implementation for assistant/current-day reads. All JSX and normal helper semantics remain unchanged."
+        },
+        {
+          "path": "native/src/screens/WaterIntakeScreen.tsx",
+          "previousSha256": "1b3aae043fcb347c0198b6aa25e6b4caad76d6105911d632b55fdd61fbd0c2f9",
+          "sha256": "027fedc4368d04533a3714995fbfbb1d0cfec635ebad670c9eb63594e0da801a",
+          "reason": "Authorized functional refresh adds owner/date-bound cancellable water/goal reads and deduplicated verified completion refresh, preserving actual goal values and manual controls. JSX and styling are unchanged."
+        }
+      ],
+      "sourceReferenceUpdates": [
+        {
+          "operation": "food.diary.list",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:2874",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:2690",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.detail",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4124",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3940",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.totals",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:2874",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:2690",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.create",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3090",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:2906",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.update",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3390",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3206",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.delete",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3155",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:2971",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.duplicate",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3436",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3252",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.copy_seven_days",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3459",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3275",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.copy_selected",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3507",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3323",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.copy_meal_today",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3541",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3357",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.diary.combine",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5562",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5378",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.view.date",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:6292",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:6108",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.view.energy_unit",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:6458",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:6274",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.view.meal",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5939",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5755",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.view.copy_selection",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3529",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3345",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.list",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:2810",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:2626",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.detail",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3776",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3592",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.filter",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3566",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3382",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.create",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3576",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3392",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.update",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4133",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3949",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.rename",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3635",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3451",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.delete",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3657",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3473",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.log",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3679",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3495",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.portion",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3781",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3597",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.library.share",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4814",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4630",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.search",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4489",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4305",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.servings",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4571",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4387",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.barcode.lookup",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5003",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4819",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.barcode.capture",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5033",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4849",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.barcode.label",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5128",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4944",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.barcode.log",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5041",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4857",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.photo.select",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5146",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4962",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.photo.analyze",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5186",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5002",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "food.missing.submit",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4676",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4492",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.import_url",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3996",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3812",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.import_photo",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4072",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3888",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.photo.select",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4015",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3831",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.builder.open",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3891",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3707",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.builder.ingredients",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4405",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:4221",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.builder.metadata",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3966",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3782",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.builder.servings_eaten",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:4119",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3935",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.recommendation.read",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5249",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5065",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.recommendation.generate",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5277",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5093",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.recommendation.log",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5311",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5127",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.recommendation.save_library",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5381",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5197",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "recipe.recommendation.dismiss",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5363",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5179",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "water.list",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:297",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:311",
+          "basis": "Reviewed same normal fetch action; new functional read-only/serialization code changed the old line."
+        },
+        {
+          "operation": "water.status",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:317",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:330",
+          "basis": "Reviewed same normal fetch action; new functional read-only/serialization code changed the old line."
+        },
+        {
+          "operation": "water.create",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:412",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:436",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "water.drink.create",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:497",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:521",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "water.update",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:619",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:643",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "water.delete",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:576",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:600",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "water.goal.set",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:674",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:698",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "water.goal.reset",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:695",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:719",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "water.view.date",
+          "previous": "native/src/screens/WaterIntakeScreen.tsx:710",
+          "current": "native/src/screens/WaterIntakeScreen.tsx:734",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.list",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:2882",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:2698",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.types",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:2849",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:2665",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.preview",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5756",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5572",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.create",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5830",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5646",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.update",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5831",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5647",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.delete",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5869",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5685",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.device.sync",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5896",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5712",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "exercise.apple_health.import",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:5914",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:5730",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        },
+        {
+          "operation": "profile.read",
+          "previous": "native/src/screens/ProfileScreen.tsx:132",
+          "current": "native/src/screens/ProfileScreen.tsx:164",
+          "basis": "Reviewed same normal fetch action; new functional read-only/serialization code changed the old line."
+        },
+        {
+          "operation": "profile.update",
+          "previous": "native/src/screens/ProfileScreen.tsx:177",
+          "current": "native/src/screens/ProfileScreen.tsx:213",
+          "basis": "Reviewed same normal fetch action; new functional read-only/serialization code changed the old line."
+        },
+        {
+          "operation": "food.diary.move",
+          "previous": "native/src/screens/TrackCaloriesScreen.tsx:3481",
+          "current": "native/src/screens/TrackCaloriesScreen.tsx:3297",
+          "basis": "Same byte-identical source line mapped from the original audit-matching HEAD file."
+        }
+      ],
+      "additionalIntegrationEvidence": [
+        {
+          "path": "native/src/voice/VoiceAssistant.tsx",
+          "previousSha256": null,
+          "sha256": "75acecfe0fe9c267471594167fd76a528f372f2d88801ba87eceeeb818ee9605",
+          "basis": "This voice host was not one of the original194 manual-source snapshots; no prior inventory hash is invented. The parent separately owns its exact native page-lock snapshot.",
+          "reason": "Final authorized general-assistant host uses actual current day with explicit selectedLocalDate, emits validated completion descriptors on accepted save/recovery responses, and bypasses legacy conversation-deletion matching for structured assistant commands.",
+          "proof": "voice2-final-integration-audit-check.cjs:9 groups; four literal delete-conversation dictations dispatch unchanged structured journal commands with zero local conversation clearing."
+        }
+      ]
+    }
+  ],
+  "releaseCandidateReconciliation": {
+    "date": "2026-10-17",
+    "scope": "Core55 exact candidate excludes pending owner web food and earlier standalone phrase fix. Operation IDs, kinds and readiness unchanged.",
+    "updatedSourceSnapshots": []
+  }
+}

@@ -60,11 +60,19 @@ async function get(request: NextRequest, path: string, handler: (request: NextRe
   active(request)
   const headers = new Headers(request.headers)
   headers.delete('host'); headers.delete('content-length'); headers.set('cache-control', 'no-store')
-  const response = await handler(new NextRequest(new URL(path, request.url), { method: 'GET', headers, signal: request.signal }))
+  const url = new URL(path, request.url)
+  const readOnly = request.headers.get('x-helfi-assistant-read-only') === '1'
+  if (readOnly) {
+    const supported = ['/api/reports/weekly/status', '/api/reports/weekly/list', '/api/reports/list', '/api/hydration-goal', '/api/water-log', '/api/fitbit/status', '/api/garmin/status']
+    if (!supported.includes(url.pathname)) throw new VoiceAppReadError('read_only_not_supported', 'This information needs a supported read-only app service. No wallet reset or other action was requested.', 409)
+    url.searchParams.set('voiceReadOnly', '1')
+  }
+  const response = await handler(new NextRequest(url, { method: 'GET', headers, signal: request.signal }))
   active(request)
   const data = await response.json().catch(() => null)
   active(request)
   if (!response.ok || !data || typeof data !== 'object' || Array.isArray(data) || data.error) throw new VoiceAppReadError('normal_handler_failed', response.status === 401 ? 'Please sign in again to check that information.' : response.status === 403 ? 'The app has not granted access to that information. Please check its normal screen.' : 'The app could not verify that information. Please try its normal screen.', response.ok ? 409 : response.status)
+  if (readOnly && ['/api/reports/weekly/status', '/api/reports/weekly/list', '/api/water-log'].includes(url.pathname) && data.readOnly !== true) fail('The app did not verify a read-only information snapshot.')
   return data
 }
 export async function readVoiceAppData(request: NextRequest, userId: string, input: VoiceAppReadInput, localDate: string): Promise<VoiceAppReadResult> {

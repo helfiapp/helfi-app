@@ -102,10 +102,10 @@ export async function readNativeVoiceFavoriteLibrary(db: any, userId: string) {
   return { favorites: parsedList(primary?.category, 'favorites'), deletedFavoriteIds: parsedList(tombstones?.category, 'ids'),
     voiceLibraryVersion: hash({ userId, id: primary?.id || null, category: primary?.category || null }) }
 }
-export async function mutateNativeVoiceFavoriteLibrary(db: any, userId: string, mutation: any) {
+export async function mutateNativeVoiceFavoriteLibrary(db: any, userId: string, mutation: any, transaction?: any) {
   const command = cleanCommand({ ...mutation, localDate: mutation.localDate || '2000-01-01' })
   if (!isLibrary(command.entity) || !command.id || !/^[a-f0-9]{64}$/.test(String(mutation.expectedVersion || ''))) throw new VoiceRecordActionError('review_required')
-  return db.$transaction(async (tx: any) => {
+  const mutate = async (tx: any) => {
     await tx.$executeRawUnsafe('SELECT pg_advisory_xact_lock(hashtext($1))', `native-voice-favorites:${userId}`)
     const state = await readNativeVoiceFavoriteLibrary(tx, userId)
     if (state.voiceLibraryVersion !== mutation.expectedVersion) throw new VoiceRecordActionError('library_changed')
@@ -154,7 +154,10 @@ export async function mutateNativeVoiceFavoriteLibrary(db: any, userId: string, 
       await tx.healthGoal.upsert({ where: { id }, create: { id, userId, name: VOICE_DELETED_FAVORITES_NAME, category: JSON.stringify({ ids }), currentRating: 0 }, update: { category: JSON.stringify({ ids }) } })
     }
     return { success: true, id: command.id, operation: command.operation, renamedIds }
-  }, { maxWait: 5000, timeout: 15000 })
+  }
+  // An existing voice receipt transaction can make a combined food/library
+  // action atomic. Ordinary callers keep the original transaction and checks.
+  return transaction ? mutate(transaction) : db.$transaction(mutate, { maxWait: 5000, timeout: 15000 })
 }
 
 /** Only fixed same-app handlers are callable. Never accepts a URL, method or
@@ -182,6 +185,7 @@ export async function invokeNativeVoiceRecordRoute(original: NextRequest, call: 
     else if (entity === 'mood' || entity === 'mood_journal') { url.searchParams.set('start', localDate); url.searchParams.set('end', localDate); url.searchParams.set('limit', '100') }
     else if (!isLibrary(entity) && entity !== 'symptom_note') url.searchParams.set('date', localDate)
     if (isLibrary(entity)) url.searchParams.set('scope', 'voice-food-library')
+    if (original.headers.get('x-helfi-assistant-read-only') === '1') url.searchParams.set('voiceReadOnly', '1')
   }
   const headers = new Headers(original.headers)
   headers.delete('content-length')
@@ -242,6 +246,7 @@ export async function invokeNativeVoiceRecordRoute(original: NextRequest, call: 
     else throw new Error('Unsupported food library operation.')
   }
   const data = await response.json().catch(() => ({}))
+  if (method === 'GET' && original.headers.get('x-helfi-assistant-read-only') === '1' && entity !== 'exercise' && entity !== 'symptom_note' && data?.readOnly !== true) throw new Error('The app did not verify a read-only record snapshot.')
   if (entity === 'symptom_note' && (data?.success !== true || (method === 'GET' && !Array.isArray(data.history)))) throw new Error(text(data?.error || 'The app did not verify this symptom-history action.', 300))
   if (!response.ok) {
     const error: Error & { code?: string } = new Error(text(data?.error || `The app could not complete this action (${response.status}).`, 300))

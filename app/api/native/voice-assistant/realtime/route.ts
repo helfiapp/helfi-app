@@ -8,6 +8,10 @@ import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 import { CreditManager } from '@/lib/credit-system'
 import { logAiUsageEvent } from '@/lib/ai-usage-logger'
 import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
+import { createNativeAssistantApp } from '@/lib/native-assistant-app'
+import { normalizeVoiceTimeZone } from '@/lib/native-voice-time'
+import { validateAssistantValue } from '@/lib/native-assistant-registry'
+import { nativeAssistantCommandTool, nativeAssistantCommandInstructions, type AssistantGeneralSessionConfig } from '@/lib/native-assistant-command-tool'
 import { exactChatGptVoiceAvailable, resolveHelfiRealtimeVoice } from '@/lib/openai-voice-config'
 
 export const runtime = 'nodejs'
@@ -178,8 +182,8 @@ async function closeUnusedLiveSession(sessionId: string, userId: string) {
   })
 }
 
-function realtimeSessionConfig(bundledWelcome = false) {
-  return {
+function realtimeSessionConfig(bundledWelcome = false, general?: AssistantGeneralSessionConfig) {
+  const config = {
     type: 'realtime',
     model: REALTIME_MODEL,
     reasoning: {
@@ -299,10 +303,11 @@ function realtimeSessionConfig(bundledWelcome = false) {
     ],
     tool_choice: 'auto',
   }
+  return general ? { ...config, instructions: nativeAssistantCommandInstructions(general, bundledWelcome), tools: [nativeAssistantCommandTool(general)] } : config
 }
 
-function liveSessionConfig(greetOnConnect = false, bundledWelcome = false) {
-  const existing = realtimeSessionConfig()
+function liveSessionConfig(greetOnConnect = false, bundledWelcome = false, general?: AssistantGeneralSessionConfig) {
+  const existing = realtimeSessionConfig(bundledWelcome, general)
   return {
     model: LIVE_MODEL,
     store: false,
@@ -328,10 +333,24 @@ function liveSessionConfig(greetOnConnect = false, bundledWelcome = false) {
         tools: existing.tools.map((tool) => ({ ...tool, strict: false })),
         tool_choice: 'auto',
         parallel_tool_calls: false,
-        max_output_tokens: 2048,
+        max_output_tokens: general ? 10000 : 2048,
       },
     },
   }
+}
+
+async function generalAssistantSessionConfig(request: NextRequest, actorId: string): Promise<AssistantGeneralSessionConfig | undefined> {
+  if (!(request.headers.get('x-helfi-voice-capabilities') || '').split(',').map(value => value.trim()).includes('general-assistant-v1')) return undefined
+  const sessionId = request.headers.get('x-helfi-assistant-session-id') || '', localDate = request.headers.get('x-helfi-assistant-local-date') || ''
+  const timeZone = normalizeVoiceTimeZone(request.headers.get('x-helfi-assistant-time-zone'))
+  if (!/^[A-Za-z0-9_-]{1,120}$/.test(sessionId) || !timeZone) throw new Error('Please use the current signed-in assistant conversation and device time zone.')
+  validateAssistantValue({ type: 'string', maxLength: 10, format: 'date' }, localDate)
+  const context = { actorId, localDate, signal: request.signal, capabilities: (request.headers.get('x-helfi-voice-capabilities') || '').split(',').map(value => value.trim()) }
+  const { host } = createNativeAssistantApp(request, timeZone)
+  // Exactly one owned read; no planner or paid domain operation is invoked.
+  const snapshot = await host.snapshot(context, sessionId)
+  if (request.signal?.aborted) throw new Error('This voice request stopped before session configuration.')
+  return { sessionId, localDate, timeZone, actions: host.discover(context), snapshot }
 }
 
 export async function POST(request: NextRequest) {
@@ -367,6 +386,7 @@ export async function POST(request: NextRequest) {
 
     if (!sdp.trim()) return NextResponse.json({ error: 'Missing realtime session offer' }, { status: 400 })
 
+    const general = await generalAssistantSessionConfig(request, user.id)
     const chargeCents = Math.max(1, REALTIME_SESSION_MIN_CREDITS)
     const billingRunId = realtimeBillingRunId(user.id, request.headers.get('x-helfi-voice-session-id'))
     const alreadyPaid = await existingRealtimeCharge(user.id, billingRunId)
@@ -389,7 +409,7 @@ export async function POST(request: NextRequest) {
     const form = new FormData()
     if (!live) {
       form.set('sdp', sdp)
-      form.set('session', JSON.stringify(realtimeSessionConfig(bundledWelcome)))
+      form.set('session', JSON.stringify(realtimeSessionConfig(bundledWelcome, general)))
     }
 
     const openAiStartedAt = Date.now()
@@ -404,7 +424,7 @@ export async function POST(request: NextRequest) {
         ...(live ? { 'Content-Type': 'application/json' } : {}),
       },
       signal: abortController.signal,
-      body: live ? JSON.stringify({ session: liveSessionConfig(greetOnConnect, bundledWelcome), transport: { type: 'webrtc', sdp } }) : form,
+      body: live ? JSON.stringify({ session: liveSessionConfig(greetOnConnect, bundledWelcome, general), transport: { type: 'webrtc', sdp } }) : form,
     })
     const openAiMs = Date.now() - openAiStartedAt
 

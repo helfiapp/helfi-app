@@ -101,13 +101,14 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
+  const readOnly = searchParams.get('voiceReadOnly') === '1'
   const start = asLocalDate(searchParams.get('start'))
   const end = asLocalDate(searchParams.get('end'))
   const limit = clampInt(searchParams.get('limit'), 1, 100, 20)
   const q = String(searchParams.get('q') ?? '').trim()
 
   try {
-    await ensureMoodTables()
+    if (!readOnly) await ensureMoodTables()
     let rows: any[] = []
     if (start && end) {
       rows = await prisma.$queryRawUnsafe(
@@ -146,7 +147,7 @@ export async function GET(req: NextRequest) {
       images: mapSignedMedia(entry.images),
       audio: mapSignedMedia(entry.audio),
     }))
-    return NextResponse.json({ entries })
+    return NextResponse.json({ entries, ...(readOnly ? { readOnly: true } : {}) })
   } catch (e) {
     console.error('mood journal get error', e)
     return NextResponse.json({ error: 'Failed to load journal entries' }, { status: 500 })
@@ -171,10 +172,29 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Entry is empty' }, { status: 400 })
   }
 
+  let actionEntryId: string | undefined
+  if (body?.clientActionId !== undefined) {
+    const session = await getServerSession(authOptions), native = await getUserIdFromNativeAuth(req), web = (session?.user as { id?: string } | undefined)?.id
+    if (session?.user?.email && !web || web && native && web !== native || (web || native) !== user.id) return NextResponse.json({ error: 'Please use the same signed-in account for this journal entry.' }, { status: 401 })
+    try { actionEntryId = (await import('@/lib/native-assistant-action-id')).nativeAssistantMoodJournalEntryId(user.id, body.clientActionId) }
+    catch { return NextResponse.json({ error: 'Invalid client action identity' }, { status: 400 }) }
+    if (images.length || audio.length || typeof body.localDate !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(body.localDate) || !Number.isFinite(Date.parse(`${body.localDate}T12:00:00Z`)) || new Date(`${body.localDate}T12:00:00Z`).toISOString().slice(0,10) !== body.localDate) return NextResponse.json({ error: 'Please review one exact dated text journal entry without media.' }, { status: 400 })
+    const fields = { title,content,prompt,template }
+    if (Object.keys(body).some(key => !['clientActionId','localDate','title','content','prompt','template','tags','images','audio'].includes(key)) || Object.entries(fields).some(([key,value]) => body[key] !== undefined && body[key] !== value) || body.tags !== undefined && JSON.stringify(body.tags) !== JSON.stringify(tags) || ['images','audio'].some(key => body[key] !== undefined && (!Array.isArray(body[key]) || body[key].length))) return NextResponse.json({ error:'Please review the exact supported journal fields without truncation or media.' },{status:400})
+  }
+  const sameReviewedEntry = (entry: any) => entry?.userId === user.id && entry.localDate === localDate && entry.title === title && entry.content === content && entry.prompt === prompt && entry.template === template && JSON.stringify(coerceMediaList(entry.tags)) === JSON.stringify(tags) && coerceMediaList(entry.images).length === 0 && coerceMediaList(entry.audio).length === 0
+  const existingAction = async () => {
+    const rows: any[] = await prisma.$queryRawUnsafe(`SELECT id, userId AS "userId", localDate AS "localDate", title, content, images, tags, audio, prompt, template FROM MoodJournalEntries WHERE id = $1`, actionEntryId)
+    return rows[0] || null
+  }
   try {
     await ensureMoodTables()
-    const id = crypto.randomUUID()
-    await prisma.$queryRawUnsafe(
+    if (actionEntryId) {
+      const existing = await existingAction()
+      if (existing) return sameReviewedEntry(existing) ? NextResponse.json({ success:true,id:actionEntryId,idempotentReplay:true }) : NextResponse.json({ error:'This saved action has different reviewed content.' },{status:409})
+    }
+    const id = actionEntryId || crypto.randomUUID()
+    try { await prisma.$queryRawUnsafe(
       `INSERT INTO MoodJournalEntries (id, userId, localDate, title, content, images, tags, audio, prompt, template)
        VALUES ($1, $2, $3, $4, $5, $6::jsonb, $7::jsonb, $8::jsonb, $9, $10)`,
       id,
@@ -187,7 +207,13 @@ export async function POST(req: NextRequest) {
       JSON.stringify(audio),
       prompt,
       template,
-    )
+    ) } catch (error: any) {
+      const duplicate = error?.code === 'P2002' || error?.code === '23505' || error?.code === 'P2010' && error?.meta?.code === '23505'
+      if (!actionEntryId || !duplicate) throw error
+      const existing = await existingAction()
+      if (!sameReviewedEntry(existing)) return NextResponse.json({ error:'This saved action has different reviewed content.' },{status:409})
+      return NextResponse.json({ success:true,id:actionEntryId,idempotentReplay:true })
+    }
     return NextResponse.json({ success: true, id })
   } catch (e) {
     console.error('mood journal save error', e)

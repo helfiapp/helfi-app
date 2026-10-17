@@ -2,10 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
+import { getUserIdFromNativeAuth } from '@/lib/native-auth'
 
 export async function GET(request: NextRequest) {
   const session = await getServerSession(authOptions)
-  if (!session?.user?.id) {
+  const nativeUserId = await getUserIdFromNativeAuth(request)
+  const sessionUserId = session?.user?.id
+  if (session?.user?.email && !sessionUserId || sessionUserId && nativeUserId && sessionUserId !== nativeUserId || !sessionUserId && !nativeUserId) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
 
@@ -61,5 +64,5 @@ export async function GET(request: NextRequest) {
     })
   }
 
-  return NextResponse.json({ items: ordered, limit, offset })
+  return NextResponse.json({ items: ordered, limit, offset, ...(searchParams.get('voiceReadOnly') === '1' ? { readOnly: true } : {}) })
 }

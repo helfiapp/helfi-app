@@ -51,10 +51,14 @@ export async function GET(req: NextRequest) {
     if (!thread) {
       return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
     }
-    const messages = await listMessages(threadId, 60)
-    return NextResponse.json({ threadId, messages }, { status: 200 })
+    const messageIds = url.searchParams.getAll('messageId')
+    if (messageIds.length > 2 || new Set(messageIds).size !== messageIds.length || messageIds.some(id => !id || id.length > 200)) return NextResponse.json({ error: 'Invalid message selection' }, { status: 400 })
+    const messages = messageIds.length
+      ? await prisma.$queryRawUnsafe<Array<{ id: string; role: string; content: string; createdAt: Date }>>('SELECT "id","role","content","createdAt" FROM "SymptomChatMessage" WHERE "threadId" = $1 AND "id" = ANY($2::text[]) ORDER BY "createdAt" ASC', threadId, messageIds)
+      : await listMessages(threadId, 60)
+    return NextResponse.json({ threadId, messages, context: thread.context }, { status: 200 })
   } catch (error) {
-    console.error('[symptom-chat.GET] error', error)
+    console.error('[symptom-chat.GET] failed')
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }
@@ -112,6 +116,7 @@ export async function POST(req: NextRequest) {
     const requestedThreadId = typeof body?.threadId === 'string' ? body.threadId.trim() : ''
     let threadId = requestedThreadId
     let thread = threadId ? await getThread(userId, threadId) : null
+    if (requestedThreadId && !thread) return NextResponse.json({ error: 'Thread not found' }, { status: 404 })
 
     if (!thread) {
       const title = buildTitle(question)
@@ -207,7 +212,7 @@ export async function POST(req: NextRequest) {
       { role: 'user' as const, content: question },
     ]
 
-    await appendMessage(threadId, 'user', question)
+    const userMessageId = await appendMessage(threadId, 'user', question)
 
     if (wantsStream) {
       const model = 'gpt-5.6-sol'
@@ -254,11 +259,11 @@ export async function POST(req: NextRequest) {
 
       const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
       const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
-      await appendMessage(threadId, 'assistant', text)
+      const assistantMessageId = await appendMessage(threadId, 'assistant', text)
       await updateThreadCost(userId, threadId, wrapped.costCents, allowViaFreeUse)
       const enc = new TextEncoder()
       const chunks = text.match(/[\s\S]{1,200}/g) || ['']
-      const costPayload = JSON.stringify({ costCents: wrapped.costCents, covered: allowViaFreeUse })
+      const costPayload = JSON.stringify({ costCents: wrapped.costCents, covered: allowViaFreeUse, responseGenerated: Boolean(textRaw.trim()), historySaved: true, messageIds: { user: userMessageId, assistant: assistantMessageId } })
       const stream = new ReadableStream({
         start(controller) {
           for (const chunk of chunks) {
@@ -322,12 +327,12 @@ export async function POST(req: NextRequest) {
 
       const textRaw = wrapped.completion.choices?.[0]?.message?.content || ''
       const text = textRaw.trim() ? textRaw : EMPTY_RESPONSE_FALLBACK
-      await appendMessage(threadId, 'assistant', text)
+      const assistantMessageId = await appendMessage(threadId, 'assistant', text)
       await updateThreadCost(userId, threadId, wrapped.costCents, allowViaFreeUse)
-      return NextResponse.json({ assistant: text, costCents: wrapped.costCents, covered: allowViaFreeUse, threadId })
+      return NextResponse.json({ assistant: text, costCents: wrapped.costCents, covered: allowViaFreeUse, responseGenerated: Boolean(textRaw.trim()), threadId, historySaved: true, messageIds: { user: userMessageId, assistant: assistantMessageId } })
     }
   } catch (error) {
-    console.error('[symptom-chat.POST] error', error)
+    console.error('[symptom-chat.POST] failed')
     return NextResponse.json({ error: 'server_error' }, { status: 500 })
   }
 }

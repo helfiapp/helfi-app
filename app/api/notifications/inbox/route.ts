@@ -42,6 +42,14 @@ export async function GET(request: NextRequest) {
   const statusParam = searchParams.get('status')
   const status = statusParam === 'read' || statusParam === 'unread' ? statusParam : 'all'
 
+  if (searchParams.get('voiceReadOnly') === '1') {
+    try {
+      const items = await listInboxNotifications(userId, { limit, offset, status, readOnly: true })
+      return NextResponse.json({ items, readOnly: true })
+    } catch {
+      return NextResponse.json({ error: 'Failed to read existing notifications' }, { status: 500 })
+    }
+  }
   const items = await listInboxNotifications(userId, { limit, offset, status })
   return NextResponse.json({ items })
 }

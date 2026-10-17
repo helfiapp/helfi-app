@@ -17,9 +17,9 @@ function load(file) {
   if (file === screenPath) text += '\nexport const __test = { normalizeFoodApiEntry, normalizeFavoriteMeal, favoriteStorageRecord, buildFavoriteAdjustItems, buildFavoritesListItemFromEntry, buildFavoritesListItemFromFavorite, calculateFavoriteAdjustTotals, favoriteAdjustPersistenceFields, normalizeFavoriteServingOptions, favoriteBaseForItem, cloneFavoriteItems, nullableNumber, portionMealItems, recipePortionRatio, suggestMealName, servingLookupForFavoriteAdjustItem, searchQueryForFavoriteAdjustItem, hasServingOptionMacroData, buildFavoriteAdjustItemFromSearchFood, favoriteAmountUnitOptions, updateFavoriteAdjustItemUnit, updateFavoriteAdjustItemAmount };'
   const js = ts.transpileModule(text, { compilerOptions: { module: ts.ModuleKind.CommonJS, jsx: ts.JsxEmit.React, target: ts.ScriptTarget.ES2020 } }).outputText
   const localRequire = (name) => {
-    if (name.includes('/lib/')) {
+    if (name.includes('/lib/') || /^\.\/(?:mealPortions|nutrientValues)$/.test(name)) {
       const candidate = path.resolve(path.dirname(file), name + '.ts')
-      if (/\/(mealPortions|mealPortionEditor|foodUnits|foodIdentity|nutrientValues|plainFoodSearch|recipeNutrition)\.ts$/.test(candidate)) return load(candidate)
+      if (/\/(mealPortions|mealPortionEditor|foodUnits|foodIdentity|nutrientValues|plainFoodSearch|recipeNutrition|foodDiaryEntries)\.ts$/.test(candidate)) return load(candidate)
     }
     if (name === 'react-native') return { Platform: { OS: 'ios' } }
     if (name.endsWith('/ui/theme')) return { theme: { colors: {}, radius: {} }, getThemeColors: () => ({}) }

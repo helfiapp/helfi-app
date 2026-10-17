@@ -57,7 +57,8 @@ export async function GET(req: NextRequest) {
   const user = await getMoodReminderUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await ensureMoodTables()
+  const readOnly = new URL(req.url).searchParams.get('voiceReadOnly') === '1'
+  if (!readOnly) await ensureMoodTables()
   const now = new Date()
   const hasSubscription = isSubscriptionActive(user.subscription, now)
   const hasPurchasedCredits = (user.creditTopUps || []).some(
@@ -85,6 +86,7 @@ export async function GET(req: NextRequest) {
     frequency: Math.min(Math.max(1, row?.frequency ?? 1), maxFrequency),
     maxFrequency,
     isPaidUser,
+    ...(readOnly ? { readOnly: true } : {}),
   })
 }
 

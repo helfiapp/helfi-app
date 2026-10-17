@@ -63,6 +63,28 @@ export async function GET(req: NextRequest) {
   const user = await getCheckinUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const readOnlyParams = new URL(req.url).searchParams
+  if (readOnlyParams.get('voiceReadOnly') === '1') {
+    const localDate = requestedCheckinDate(readOnlyParams.has('localDate') ? readOnlyParams.get('localDate') : undefined)
+    if (!localDate) return NextResponse.json({ error: 'Invalid localDate' }, { status: 400 })
+    try {
+      // Read existing owned rows only. The ordinary GET below still performs
+      // its legacy setup/sync; assistant discovery must not create those rows.
+      const issues: any[] = await prisma.$queryRawUnsafe(`SELECT id, name, polarity FROM CheckinIssues WHERE userId = $1`, user.id)
+      const allRatings: any[] = await prisma.$queryRawUnsafe(`
+        SELECT issueId AS "issueId", value, note, isNa AS "isNa", timestamp
+        FROM CheckinRatings
+        WHERE userId = $1 AND date = $2
+        ORDER BY timestamp DESC
+      `, user.id, localDate)
+      const latest = new Map<string, any>()
+      for (const rating of allRatings) if (!latest.has(rating.issueId)) latest.set(rating.issueId, rating)
+      return NextResponse.json({ issues, ratings: Array.from(latest.values()), readOnly: true })
+    } catch {
+      return NextResponse.json({ error: 'Failed to read existing check-ins' }, { status: 500 })
+    }
+  }
+
   await ensureCheckinTables()
 
   const params = new URL(req.url).searchParams

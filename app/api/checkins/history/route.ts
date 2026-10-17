@@ -43,7 +43,8 @@ export async function GET(req: NextRequest) {
   const user = await getCheckinUser(req)
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  await ensureCheckinTables()
+  const readOnly = new URL(req.url).searchParams.get('voiceReadOnly') === '1'
+  if (!readOnly) await ensureCheckinTables()
 
   const { searchParams } = new URL(req.url)
   const start = searchParams.get('start') || '1970-01-01'
@@ -60,7 +61,7 @@ export async function GET(req: NextRequest) {
     )
     console.info('[checkins history] loaded', { userId: user.id, start, end, count: rows.length })
     return NextResponse.json(
-      { history: rows },
+      { history: rows, ...(readOnly ? { readOnly: true } : {}) },
       { headers: { 'Cache-Control': 'private, no-store, max-age=0' } },
     )
   } catch (e) {

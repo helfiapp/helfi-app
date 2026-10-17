@@ -32,14 +32,15 @@ let interestWrite,interestReadField,interestGetReturn
 function visit(n){
  if(ts.isIfStatement(n)&&n.expression.getText(userAst).includes('(data as any).deviceInterest'))interestWrite=n
  if(ts.isPropertyAssignment(n)&&n.name.getText(userAst)==='deviceInterest'&&n.initializer.getText(userAst)==='deviceInterestData')interestReadField=n
- if(ts.isReturnStatement(n)&&n.expression&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(userAst)==='NextResponse.json'&&n.expression.arguments[0]?.getText(userAst)==='{ data: onboardingData }')interestGetReturn=n
+ if(ts.isReturnStatement(n)&&n.expression&&ts.isCallExpression(n.expression)&&n.expression.expression.getText(userAst)==='NextResponse.json'&&ts.isObjectLiteralExpression(n.expression.arguments[0])&&n.expression.arguments[0].properties.some(p=>ts.isPropertyAssignment(p)&&p.name.getText(userAst)==='data'&&p.initializer.getText(userAst)==='onboardingData'))interestGetReturn=n
  ts.forEachChild(n,visit)
 }visit(userAst);assert(interestWrite);assert(interestReadField);assert(interestGetReturn)
 const readStart=userRaw.indexOf('    let deviceInterestData: any = {}'),readEnd=userRaw.indexOf('\n    //',readStart+1);assert(readStart>0&&readEnd>readStart)
 const interestBox=vm.createContext({prisma,actor,NextResponse:server.NextResponse,console:{error(){},log(){}}})
 // Preserve the actual normal GET field assignment AND its response statement;
 // a handwritten top-level response here previously concealed an envelope bug.
-vm.runInContext(compile(`async function GET(request){const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});user.healthGoals=[{...await prisma.healthGoal.findFirst({where:{userId:user.id}}),name:'__DEVICE_INTEREST__'}];${userRaw.slice(readStart,readEnd)};const onboardingData={${interestReadField.getText(userAst)}};${interestGetReturn.getText(userAst)}} async function POST(request){const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});const data=await request.json();try{${interestWrite.getText(userAst)};return NextResponse.json({success:true})}catch{return NextResponse.json({error:'save_failed'},{status:500})}};globalThis.routes={GET,POST}`),interestBox)
+// Run the unchanged default branch of the additive read-only response marker.
+vm.runInContext(compile(`async function GET(request){const readOnly=false;const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});user.healthGoals=[{...await prisma.healthGoal.findFirst({where:{userId:user.id}}),name:'__DEVICE_INTEREST__'}];${userRaw.slice(readStart,readEnd)};const onboardingData={${interestReadField.getText(userAst)}};${interestGetReturn.getText(userAst)}} async function POST(request){const user={id:actor()};if(!user.id)return NextResponse.json({error:'Unauthorized'},{status:401});const data=await request.json();try{${interestWrite.getText(userAst)};return NextResponse.json({success:true})}catch{return NextResponse.json({error:'save_failed'},{status:500})}};globalThis.routes={GET,POST}`),interestBox)
 const review=load('lib/native-voice-review-token.ts',{crypto})
 const instrument=(route,method)=>(...args)=>{calls.push({method,url:args[0].url,headers:new Headers(args[0].headers)});return route[method](...args)}
 const userRoutes={GET:instrument(interestBox.routes,'GET'),POST:instrument(interestBox.routes,'POST')}

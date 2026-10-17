@@ -14,7 +14,7 @@ import * as checkinToday from '@/app/api/checkins/today/route'
 // Fixed semantic actions only. Never accept endpoint, method, owner IDs,
 // authentication, syncOverride, consent, or arbitrary storage keys from a model.
 export const VOICE_PREFERENCE_ACTION_SCHEMAS = {
-  'profile.update': { firstName: 'text', lastName: 'text', bio: 'text', dateOfBirth: 'YYYY-MM-DD', gender: ['male', 'female'] },
+  'profile.update': { firstName: 'text', lastName: 'text', bio: 'text', dateOfBirth: 'YYYY-MM-DD', gender: ['male', 'female', 'other', 'prefer-not-to-say'] },
   'health_setup.update': { gender: ['male', 'female'], weight: 'kg number', height: 'cm number', birthdate: 'YYYY-MM-DD', bodyType: ['ectomorph', 'mesomorph', 'endomorph'], exerciseFrequency: 'text', exerciseTypes: 'explicit replacement text list', exerciseTypesAdd: 'add exact exercise type names', exerciseTypesRemove: 'remove exact existing exercise type names', goals: 'explicit replacement selected health issue text list', goalsAdd: 'add selected health issue names', goalsRemove: 'remove exact selected health issue names', dietTypes: 'explicit replacement diet list', dietTypesAdd: 'add diet preferences', dietTypesRemove: 'remove exact existing diet preferences', allergies: 'explicit replacement allergy list', allergiesAdd: 'add allergy names', allergiesRemove: 'remove exact existing allergy names', diabetesType: ['', 'type1', 'type2', 'prediabetes'], healthSituations: { healthIssues: 'text', healthProblems: 'text', additionalInfo: 'text', skipped: 'boolean' }, healthCheckSettings: { enabled: 'boolean', frequency: ['always', 'high', 'never'], dailyCap: 'positive integer or null', thresholds: { sugar: 'positive number or null', carbs: 'positive number or null', fat: 'positive number or null' } } },
   'goals.update': { goalChoice: ['lose weight', 'gain weight', 'maintain weight', 'tone up', 'get shredded'], goalIntensity: ['mild', 'standard', 'aggressive'], goalTargetWeightKg: 'positive number', goalTargetWeightUnit: ['kg', 'lb'], goalPaceKgPerWeek: 'positive number', goalCalorieTarget: 'positive number', goalMacroMode: ['auto', 'manual'], goalMacroSplit: { proteinPct: 'fraction 0..1', carbPct: 'fraction 0..1', fatPct: 'fraction 0..1' }, goalFiberTarget: 'positive number', goalSugarMax: 'positive number' },
   'hydration_goal.set': { targetMl: 'positive integer millilitres' },
@@ -59,7 +59,13 @@ function requestFor(original: NextRequest, path: string, method = 'GET', body?: 
   headers.delete('content-length'); headers.delete('host')
   headers.set('cache-control', 'no-store')
   if (body !== undefined) headers.set('content-type', 'application/json')
-  return new NextRequest(new URL(path, original.url), { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) })
+  const url = new URL(path, original.url)
+  if (method === 'GET' && original.headers.get('x-helfi-assistant-read-only') === '1') {
+    const supported = ['/api/user-data', '/api/hydration-goal', '/api/checkins/settings', '/api/mood/reminders', '/api/notifications/quiet-hours', '/api/checkins/history', '/api/checkins/today']
+    if (!supported.includes(url.pathname) || url.pathname === '/api/user-data' && url.searchParams.get('scope') !== 'health-setup') throw new VoicePreferenceActionError('read_only_not_supported', 'This setting needs its supported read-only app service before it can be reviewed.', 409)
+    url.searchParams.set('voiceReadOnly', '1')
+  }
+  return new NextRequest(url, { method, headers, ...(body !== undefined ? { body: JSON.stringify(body) } : {}) })
 }
 
 async function json(response: Response) {
@@ -145,9 +151,10 @@ async function read(original: NextRequest, action: VoicePreferenceActionName, va
   const path = action === 'checkin.rating.update' ? `${route.path}?start=${encodeURIComponent(values.date)}&end=${encodeURIComponent(values.date)}`
     : action === 'checkin.rating.set' || action === 'checkin.rating.delete' ? `${route.path}?localDate=${encodeURIComponent(calendarDate(values.date))}` : route.path
   const payload = await json(await route.api.GET(requestFor(original, path)))
+  if (original.headers.get('x-helfi-assistant-read-only') === '1' && action !== 'hydration_goal.set' && action !== 'hydration_goal.reset' && payload.readOnly !== true) fail('The app did not verify a read-only setting snapshot.')
   if (['profile.update', 'health_setup.update', 'goals.update'].includes(action)) {
     const data = object(payload.data)
-    return { ...data, profileInfo: { ...(data.profileInfo || {}), gender: data.gender } }
+    return { ...data, profileInfo: { ...(data.profileInfo || {}) } }
   }
   if (action === 'checkin.rating.update') {
     const history = (Array.isArray(payload.history) ? payload.history : []).filter((entry: any) => entry.date === values.date)
@@ -181,7 +188,7 @@ function validate(action: VoicePreferenceActionName, raw: unknown, before: Recor
       const n = positive(value, 4); if (!Number.isInteger(n) || n > Number(before.maxFrequency || 1)) fail('That reminder frequency is not available for this account.'); result[key] = n
     } else if (['firstName', 'lastName', 'bio', 'exerciseFrequency', 'issueName', 'issueId', 'note'].includes(key)) result[key] = text(value, key === 'note' || key === 'bio' ? 2000 : 160)
     else if (['dateOfBirth', 'birthdate', 'date'].includes(key)) result[key] = key === 'date' && action.startsWith('checkin.rating.') ? calendarDate(value) : date(value)
-    else if (key === 'gender') result[key] = choice(value, ['male', 'female'])
+    else if (key === 'gender') result[key] = choice(value, action === 'profile.update' ? ['male', 'female', 'other', 'prefer-not-to-say'] : ['male', 'female'])
     else if (key === 'bodyType') result[key] = choice(value, ['ectomorph', 'mesomorph', 'endomorph'])
     else if (key === 'diabetesType') result[key] = choice(value, ['', 'type1', 'type2', 'prediabetes'])
     else if (/^(?:exerciseTypes|goals|dietTypes|allergies)(?:Add|Remove)?$/.test(key)) {
@@ -275,9 +282,8 @@ function scope(action: VoicePreferenceActionName, before: Record<string, any>) {
 function payloadFor(action: VoicePreferenceActionName, values: Record<string, any>, before: Record<string, any>) {
   if (action === 'profile.update') {
     const result: any = { profileInfo: { ...object(before.profileInfo || {}), ...values } }
-    if ('gender' in values) result.gender = values.gender
     if ('dateOfBirth' in values) result.birthdate = values.dateOfBirth
-    if ('gender' in values || 'dateOfBirth' in values) result.healthSetupUpdatedAt = Number(before.healthSetupUpdatedAt) > 0 ? Number(before.healthSetupUpdatedAt) : Date.now()
+    if ('dateOfBirth' in values) result.healthSetupUpdatedAt = Number(before.healthSetupUpdatedAt) > 0 ? Number(before.healthSetupUpdatedAt) : Date.now()
     return result
   }
   if (action === 'health_setup.update' || action === 'goals.update') {

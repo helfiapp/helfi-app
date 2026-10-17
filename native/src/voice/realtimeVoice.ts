@@ -1,3 +1,5 @@
+import { validatedVoiceCapability, type VoiceCapabilityRequest } from './voiceCapabilityManifest'
+import { sanitizeGeneralAssistantCommand, type GeneralAssistantCommand } from './generalAssistantActions'
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { createLocalVoiceWelcome } from './localVoiceWelcome'
@@ -11,9 +13,11 @@ type RealtimeCallbacks = {
   onNotice?: (message: string) => void
   onAudioRoute?: (route: string) => void
   onTranscript?: (text: string) => void
+  /** Actual human transcript evidence, separate from display caption batches. */
+  onHumanTranscript?: (text: string) => void
   onAssistantText?: (text: string) => void
   onUserSpeech?: () => void
-  onActionRequest?: (args: { request?: string; action?: string; needsReview?: boolean }) => Promise<unknown> | unknown
+  onActionRequest?: (args: { request?: string; action?: string; needsReview?: boolean; capability?: VoiceCapabilityRequest; assistantCommand?: GeneralAssistantCommand }) => Promise<unknown> | unknown
 }
 
 type RealtimeSession = {
@@ -288,6 +292,9 @@ export async function fetchHelfiRealtimeVoiceStatus(token: string): Promise<{
 export async function startHelfiRealtimeVoiceSession(params: {
   token: string
   billingSessionId: string
+  assistantSessionId?: string
+  localDate?: string
+  timeZone?: string
   greetOnConnect?: boolean
   signal?: AbortSignal
   callbacks?: RealtimeCallbacks
@@ -295,6 +302,14 @@ export async function startHelfiRealtimeVoiceSession(params: {
   if (params.signal?.aborted) {
     throw new Error('Live voice session was stopped.')
   }
+  const generalHeaders: Record<string, string> = {}
+  try {
+    const day = params.localDate || '', zone = params.timeZone || ''
+    if (/^[A-Za-z0-9_-]{1,120}$/.test(params.assistantSessionId || '') && /^\d{4}-\d{2}-\d{2}$/.test(day) && new Date(`${day}T12:00:00Z`).toISOString().slice(0,10) === day && zone && zone.length <= 100) {
+      const timeZone = new Intl.DateTimeFormat('en-GB', { timeZone: zone }).resolvedOptions().timeZone
+      Object.assign(generalHeaders, { 'x-helfi-voice-capabilities': 'general-assistant-v1,symptom-analysis-v1', 'x-helfi-assistant-session-id': params.assistantSessionId!, 'x-helfi-assistant-local-date': day, 'x-helfi-assistant-time-zone': timeZone })
+    }
+  } catch { /* Invalid optional context retains the installed legacy handshake. */ }
 
   const rtc = requireWebRtc()
   if (!rtc?.RTCPeerConnection || !rtc?.mediaDevices || !rtc?.RTCSessionDescription) {
@@ -399,6 +414,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
   let localWelcome: ReturnType<typeof createLocalVoiceWelcome> | null = null
   const liveCaptionFragments: { speaker: 'user' | 'assistant'; delta: string; start_ms: number; end_ms: number }[] = []
   let liveUserText = ''
+  let humanCommandText = ''
+  let humanCommandTooLarge = false
   let liveAssistantText = ''
   const seenLiveEvents = new Set<string>()
   let silenceReminderSent = false
@@ -710,10 +727,24 @@ export async function startHelfiRealtimeVoiceSession(params: {
     Promise.resolve().then(async () => {
       await stopOpeningWelcome('tool')
       if (stopped || params.signal?.aborted) return { ok: false, saved: false, safeToClaimSaved: false, message: 'Live voice has stopped.' }
+      const assistantCommand = args.action === 'assistant_plan' ? sanitizeGeneralAssistantCommand(args.assistantCommand) : null
+      if (args.action === 'assistant_plan' && (!assistantCommand || Object.keys(args).some(key => !['action', 'request', 'needsReview', 'assistantCommand'].includes(key)) || args.request !== undefined && (typeof args.request !== 'string' || args.request.length > 20000) || args.needsReview !== undefined && typeof args.needsReview !== 'boolean')) {
+        return { ok: false, saved: false, safeToClaimSaved: false, message: 'The assistant action needs valid structured details. Nothing was submitted.' }
+      }
+      if (args.action === 'assistant_plan') {
+        // Display batches may have flushed many times during one utterance.
+        // Consume only the separate actual-caption snapshot, never model text.
+        const actualHumanText = humanCommandText.trim(), oversized = humanCommandTooLarge
+        humanCommandText = ''; humanCommandTooLarge = false
+        if (oversized) return { ok: false, saved: false, safeToClaimSaved: false, message: 'Please split that long request into smaller parts. Nothing was submitted.' }
+        callbacks.onHumanTranscript?.(actualHumanText)
+      }
       return callbacks.onActionRequest?.({
-      request: cleanText(args.request),
+      request: args.action === 'assistant_plan' ? args.request || '' : cleanText(args.request),
       action: cleanText(args.action),
       needsReview: Boolean(args.needsReview),
+      ...(args.action === 'capability_action' ? { capability: validatedVoiceCapability(args.capability) || undefined } : {}),
+      ...(assistantCommand ? { assistantCommand } : {}),
       })
     })
       .then((result) => {
@@ -774,6 +805,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
       userHasSpoken = true
       void stopOpeningWelcome('user-first')
       liveUserText += delta
+      if (humanCommandText.length + delta.length > 20000) humanCommandTooLarge = true
+      else if (!humanCommandTooLarge) humanCommandText += delta
       clearSilenceTimer()
     } else liveAssistantText += delta
     // This groups captions for display only, never for consent or app execution.
@@ -855,6 +888,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
       clearSilenceTimer()
       silenceReminderSent = false
       assistantAudioPlaying = false
+      humanCommandText = ''; humanCommandTooLarge = false
       callbacks.onUserSpeech?.()
       emitStatus('hearing')
       return
@@ -879,6 +913,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
         emitStatus('live')
         return
       }
+      humanCommandText = transcript.length <= 20000 ? transcript : ''; humanCommandTooLarge = transcript.length > 20000
+      callbacks.onHumanTranscript?.(transcript)
       callbacks.onTranscript?.(transcript)
       emitStatus('thinking')
       return
@@ -1016,6 +1052,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
       method: 'POST',
       headers: {
         ...buildNativeAuthHeaders(params.token),
+        ...generalHeaders,
         'content-type': 'application/sdp',
         'x-helfi-ai-consent': 'true',
         'x-helfi-voice-session-id': cleanText(params.billingSessionId),

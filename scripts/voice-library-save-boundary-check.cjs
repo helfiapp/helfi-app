@@ -26,7 +26,7 @@ const library = load('lib/native-voice-record-actions.ts')
 const PublicError = vm.runInContext('VoiceRecordActionError', library)
 const pureModules = new Map()
 function nativePure(relative) {
-  assert(/^(?:native\/src\/lib\/(?:foodUnits|nutrientValues|mealPortions)|lib\/food\/[a-z-]+)\.ts$/.test(relative), `Non-pure native dependency forbidden: ${relative}`)
+  assert(/^(?:native\/src\/lib\/(?:foodUnits|nutrientValues|mealPortions|foodDiaryEntries)|lib\/food\/[a-z-]+)\.ts$/.test(relative), `Non-pure native dependency forbidden: ${relative}`)
   if (pureModules.has(relative)) return pureModules.get(relative)
   const module = { exports: {} }
   const code = ts.transpileModule(fs.readFileSync(path.join(root, relative), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText
@@ -35,7 +35,7 @@ function nativePure(relative) {
 }
 const nativeSource = ts.createSourceFile('TrackCaloriesScreen.tsx', fs.readFileSync(path.join(root, 'native/src/screens/TrackCaloriesScreen.tsx'), 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
 const nativeFunctions = nativeSource.statements.filter(node => ts.isFunctionDeclaration(node) && node.name && !/^[A-Z]/.test(node.name.text)).map(node => node.getText(nativeSource)).join('\n')
-const native = vm.createContext({ ...nativePure('native/src/lib/foodUnits.ts'), ...nativePure('native/src/lib/nutrientValues.ts'), ...nativePure('native/src/lib/mealPortions.ts') })
+const native = vm.createContext({ ...nativePure('native/src/lib/foodDiaryEntries.ts'), ...nativePure('native/src/lib/foodUnits.ts'), ...nativePure('native/src/lib/nutrientValues.ts'), ...nativePure('native/src/lib/mealPortions.ts') })
 vm.runInContext(ts.transpileModule(nativeFunctions, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.None } }).outputText, native)
 const recipe = {
   label: 'Voice repair test library recipe', meal: 'dinner',

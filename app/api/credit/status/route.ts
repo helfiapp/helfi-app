@@ -136,6 +136,10 @@ export async function GET(_req: NextRequest) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
+    if (url.searchParams.get('voiceReadOnly') === '1') {
+      return NextResponse.json({ error: 'A read-only wallet status is not available.', code: 'read_only_wallet_unavailable' }, { status: 501 })
+    }
+
     if (featureParam) {
       logServerCall({
         feature: featureParam,

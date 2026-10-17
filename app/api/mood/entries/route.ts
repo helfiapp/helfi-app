@@ -161,6 +161,7 @@ export async function GET(req: NextRequest) {
   if (!user) return NextResponse.json({ error: 'User not found' }, { status: 404 })
 
   const { searchParams } = new URL(req.url)
+  const readOnly = searchParams.get('voiceReadOnly') === '1'
   const start = searchParams.get('start')
   const end = searchParams.get('end')
   const period = (searchParams.get('period') || '').toLowerCase()
@@ -190,7 +191,7 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    await ensureMoodTables()
+    if (!readOnly) await ensureMoodTables()
     const rows: any[] = await prisma.$queryRawUnsafe(
       `SELECT id, localDate AS "localDate", timestamp, mood, tags, note, context
        FROM MoodEntries
@@ -200,7 +201,7 @@ export async function GET(req: NextRequest) {
       startLocalDate,
       endLocalDate,
     )
-    return NextResponse.json({ range: { start: startLocalDate, end: endLocalDate }, entries: rows })
+    return NextResponse.json({ range: { start: startLocalDate, end: endLocalDate }, entries: rows, ...(readOnly ? { readOnly: true } : {}) })
   } catch (e) {
     console.error('mood entries get error', e)
     return NextResponse.json({ error: 'Failed to load entries' }, { status: 500 })
