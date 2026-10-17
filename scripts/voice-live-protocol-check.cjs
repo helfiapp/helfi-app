@@ -17,6 +17,10 @@ function sourceWithoutImports(relative) {
 const routeSource = sourceWithoutImports('app/api/native/voice-assistant/realtime/route.ts')
 const nativeSource = sourceWithoutImports('native/src/voice/realtimeVoice.ts')
 const localWelcomeSource = sourceWithoutImports('native/src/voice/localVoiceWelcome.ts')
+const liveUsageSource = sourceWithoutImports('native/src/voice/liveVoiceUsage.ts')
+const liveToolTurnSource = sourceWithoutImports('native/src/voice/liveVoiceToolTurn.ts')
+const voiceJobsSource = sourceWithoutImports('native/src/voice/voiceSessionJobs.ts')
+const generalAssistantSource = sourceWithoutImports('native/src/voice/generalAssistantActions.ts')
 const compile = (code) => ts.transpileModule(code, { compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.CommonJS } }).outputText
 const noop = () => {}
 const quiet = { info: noop, warn: noop, error: noop }
@@ -27,238 +31,103 @@ class NextResponse extends Response {
   }
 }
 async function routeCase(options = {}) {
-  const providerCalls = []
-  const charges = []
-  const debits = []
-  const logs = []
-  const claimQueries = []
-  const sockets = []
-  const socketTimers = new Map()
-  const ledger = options.ledger || []
-  let timerSequence = 0
+  const starts = [], snapshots = [], discoveries = [], wallets = [], auth = []
   const controller = new AbortController()
   if (options.alreadyAborted) controller.abort()
+  // Synthetic presence only. No local settings or real credential is read.
   const env = { HELFI_VOICE_REALTIME_ENABLED: 'true', OPENAI_API_KEY: 'synthetic-offline-placeholder', ...(options.env || {}) }
-  class MockWebSocket extends EventTarget {
-    constructor(url, init) {
-      super()
-      this.url = url
-      this.init = init
-      this.sent = []
-      this.closes = 0
-      this.acknowledged = false
-      sockets.push(this)
-      queueMicrotask(() => this.dispatchEvent(new Event(options.cleanupError ? 'error' : 'open')))
-    }
-    send(text) {
-      const event = JSON.parse(text)
-      this.sent.push(event)
-      if (event.type === 'session.close' && !options.cleanupNoAck) {
-        queueMicrotask(() => {
-          const reply = new Event('message')
-          reply.data = JSON.stringify({ type: 'session.closed' })
-          this.acknowledged = true
-          this.dispatchEvent(reply)
-        })
-      }
-    }
-    close() { this.closes++; this.dispatchEvent(new Event('close')) }
-  }
   class CreditManager {
     constructor(userId) { this.userId = userId }
-    async getWalletStatus() { return options.wallet || { plan: 'synthetic-paid', totalAvailableCents: 100 } }
-    async chargeCentsOnce(amount, details) {
-      charges.push({ amount, details })
-      if (options.chargeFailure) return { success: false, charged: false, reused: false }
-      const prior = ledger.find((entry) => entry.userId === this.userId && entry.runId === details.runId && entry.feature === details.feature && entry.success && entry.errorMessage !== 'insufficient_credits')
-      if (prior || options.reused) return { success: true, charged: false, reused: true }
-      debits.push(amount)
-      ledger.push({ userId: this.userId, runId: details.runId, feature: details.feature, createdAt: new Date(), success: true, errorMessage: null })
-      if (options.abortDuringCharge) controller.abort()
-      return { success: true, charged: true, reused: false }
-    }
+    async getWalletStatus() { wallets.push(this.userId); return options.wallet || { plan: 'synthetic-paid', totalAvailableCents: 100 } }
+    async chargeCents() { throw Error('Route cannot make an unmetered flat charge') }
+    async chargeCentsOnce() { throw Error('Route cannot revive a flat session charge') }
   }
+  const answer = { session: { id: 'synthetic-provider-session' }, transport: { sdp: 'synthetic-answer-sdp' }, helfiSession: { id: 'owned-financial-session', reservedCredits: 10 }, delegation: 'server' }
+  const actions = [{ id: 'water.read', kind: 'read', description: 'Read owned water', input: { type: 'object', properties: {}, required: [] } }]
   const box = {
-    exports: {}, process: { env }, NextResponse, crypto, AbortController, FormData, Date, Promise, console: quiet,
+    exports: {}, process: { env }, NextResponse, crypto, AbortController, FormData, Buffer, Date, Intl, Promise, console: quiet,
     resolveHelfiRealtimeVoice: () => 'marin', exactChatGptVoiceAvailable: () => false,
     aiConsentRequiredResponse: async () => options.deniedConsent ? NextResponse.json({ error: 'Synthetic consent denied' }, { status: 403 }) : null,
-    getUserIdFromNativeAuth: async () => options.unauthorized ? null : 'synthetic-user', getServerSession: async () => null,
-    authOptions: {}, prisma: {
-      user: { findUnique: async () => ({ id: 'synthetic-user' }) },
-      aIUsageEvent: { findFirst: async (query) => {
-        claimQueries.push(query)
-        const { where } = query
-        return ledger.find((entry) => entry.userId === where.userId && entry.runId === where.runId && entry.feature === where.feature && entry.createdAt >= where.createdAt.gte) || null
-      } },
-    }, CreditManager,
-    WebSocket: MockWebSocket,
-    setTimeout: (fn, delay) => { const id = ++timerSequence; socketTimers.set(id, { fn, delay }); return id },
-    clearTimeout: (id) => socketTimers.delete(id),
-    assertAiUsageAllowed: async () => { if (options.safety) throw { syntheticSafety: true } },
-    isAiSafetyError: (error) => Boolean(error.syntheticSafety), logAiUsageEvent: async (event) => { logs.push(event) },
-    fetch: async (url, request) => {
-      providerCalls.push({ url, request })
-      if (options.abortDuringProvider) controller.abort()
-      if (options.providerThrow) throw new Error('Synthetic network failure')
-      const body = options.providerBody ?? (options.legacy ? 'synthetic-answer-sdp' : JSON.stringify({ session: { id: 'synthetic-live-session' }, transport: { sdp: 'synthetic-answer-sdp' } }))
-      return { ok: !options.providerBad, status: options.providerBad ? 503 : 200, text: async () => body }
+    getUserIdFromNativeAuth: async () => { auth.push('native'); return options.unauthorized ? null : 'synthetic-user' },
+    getServerSession: async () => { auth.push('web'); return options.web ? { user: { id: 'synthetic-user' } } : null },
+    authOptions: {}, prisma: { user: { findUnique: async () => options.missingWebUser ? null : ({ id: 'synthetic-user' }) } }, CreditManager,
+    createNativeAssistantApp: (_request, timeZone) => ({ host: {
+      snapshot: async (context, sessionId) => {
+        snapshots.push({ context, sessionId, timeZone })
+        assert.equal(context.actorId, 'synthetic-user')
+        if (options.foreignSession) throw Error('Synthetic owned conversation mismatch')
+        if (options.abortDuringSnapshot) controller.abort()
+        return { id: sessionId, actorId: context.actorId, revision: 7, steps: [] }
+      },
+      discover: context => { discoveries.push(context); return actions },
+    } }),
+    startMeteredLiveVoiceSession: async input => {
+      starts.push(input)
+      if (options.safety) throw { syntheticSafety: true }
+      if (options.startThrow) throw Error('Synthetic monitor unavailable')
+      if (options.startRefused) return NextResponse.json({ code: 'voice_budget_unavailable' }, { status: 402 })
+      return NextResponse.json(answer, { headers: { 'x-helfi-voice-protocol': 'live-v1', 'x-helfi-charged-credits': '0' } })
     },
+    isAiSafetyError: error => Boolean(error?.syntheticSafety),
+    fetch: () => { throw Error('Route must delegate all paid allocation to the metered startup') },
   }
   vm.createContext(box)
-  vm.runInContext(compile(routeSource), box, { timeout: 5000 })
-  const headers = new Headers({ authorization: 'synthetic-token', 'x-helfi-ai-consent': options.headerConsent === false ? 'false' : 'true', 'x-helfi-voice-session-id': 'synthetic-conversation-123' })
-  if (!options.legacy) headers.set('x-helfi-voice-protocol', 'live-v1')
-  if (options.greetOnConnect) headers.set('x-helfi-voice-greeting', options.bundledWelcome ? 'bundled-clip' : 'new-conversation')
-  const request = { headers, signal: controller.signal, text: async () => options.emptyOffer ? '' : 'synthetic-complete-offer', nextUrl: new URL('https://offline.invalid/api/native/voice-assistant/realtime') }
-  const running = box.exports.POST(request)
-  await tick()
-  if (options.cleanupNoAck) {
-    for (const { fn } of [...socketTimers.values()]) fn()
-  }
-  const response = await running
-  return { response, text: await response.text(), providerCalls, charges, debits, logs, claimQueries, ledger, sockets, socketTimers }
+  vm.runInContext(compile(sourceWithoutImports('lib/native-assistant-registry.ts') + '\n' + sourceWithoutImports('lib/native-voice-time.ts') + '\n' + routeSource), box, { timeout: 5000 })
+  const headers = new Headers({ authorization: 'synthetic-token', 'x-helfi-ai-consent': 'true', 'x-helfi-voice-protocol': 'live-v1', 'x-helfi-voice-metering': 'server-v1', 'x-helfi-voice-capabilities': 'general-assistant-v1,symptom-analysis-v1', 'x-helfi-assistant-session-id': 'owned-app-conversation', 'x-helfi-assistant-local-date': '2026-10-18', 'x-helfi-assistant-time-zone': 'Australia/Melbourne', 'x-helfi-voice-attempt-id': 'synthetic-attempt-12345' })
+  for (const [name,value] of Object.entries(options.headers || {})) value === null ? headers.delete(name) : headers.set(name,value)
+  if (options.legacy) headers.delete('x-helfi-voice-protocol')
+  if (options.bundledWelcome) headers.set('x-helfi-voice-greeting','bundled-clip')
+  const request = { headers, signal: controller.signal, text: async () => options.offer === undefined ? 'synthetic-complete-offer' : options.offer, nextUrl: new URL('https://offline.invalid/api/native/voice-assistant/realtime' + (options.readiness ? '?readiness=1' : '')) }
+  const response = await box.exports[options.method || 'POST'](request)
+  return { response, body: await response.json(), starts, snapshots, discoveries, wallets, auth, request }
 }
 async function checkRoute() {
   const live = await routeCase()
-  assert.equal(live.response.status, 200)
-  assert.equal(live.providerCalls[0].url, 'https://api.openai.com/v1/live/sessions')
-  const body = JSON.parse(live.providerCalls[0].request.body)
-  assert.equal(body.session.model, 'gpt-live-1')
-  assert.equal(body.session.store, false)
-  assert.equal(body.session.delegation.responses.model, 'gpt-6-luna')
-  assert.equal(body.session.delegation.responses.parallel_tool_calls, false)
-  assert.ok(body.session.delegation.responses.tools.some((tool) => tool.name === 'request_helfi_action'))
-  const actionTool = body.session.delegation.responses.tools.find(tool => tool.name === 'request_helfi_action')
-  for (const action of ['record_action', 'preference_action', 'local_preference_action', 'notification_action']) assert.ok(actionTool.parameters.properties.action.enum.includes(action), `Live must delegate ${action} through the normal app action tool`)
-  assert.match(body.session.delegation.responses.instructions, /notification_action.*captured.*later arrivals/)
-  assert.equal(body.transport.type, 'webrtc')
-  assert.equal(body.transport.sdp, 'synthetic-complete-offer')
-  assert.equal(live.response.headers.get('x-helfi-voice-protocol'), 'live-v1')
-  assert.equal(JSON.parse(live.text).transport.sdp, 'synthetic-answer-sdp')
-  assert.equal(live.charges.length, 1)
-  assert.equal(live.charges[0].details.model, 'gpt-live-1')
-  assert.equal(live.sockets.length, 0, 'Successful client handoff must keep its Live session open')
-  assert.equal(body.session.input, undefined, 'History/text and ordinary reconnect setup do not seed a welcome')
-  const greeting = await routeCase({ greetOnConnect: true })
-  const greetingConfig = JSON.parse(greeting.providerCalls[0].request.body).session
-  assert.equal(greetingConfig.input.length, 1)
-  assert.equal(greetingConfig.input[0].role, 'developer')
-  assert.equal(greetingConfig.input[0].type, 'message')
-  assert.equal(greetingConfig.input[0].content[0].type, 'input_text')
-  assert.match(greetingConfig.input[0].content[0].text, /Hi, I’m Helfi\. What can I help you with\?/)
-  assert.match(greetingConfig.input[0].content[0].text, /caller starts first or interrupts/)
-  assert.match(greetingConfig.input[0].content[0].text, /do not delegate it, call tools, log anything/)
-  assert.equal(greeting.charges.length, 1, 'Welcome uses the existing session, with no separate charge/action')
-  const bundled = await routeCase({ greetOnConnect: true, bundledWelcome: true })
-  const bundledConfig = JSON.parse(bundled.providerCalls[0].request.body).session
-  assert.equal(bundledConfig.input, undefined, 'Bundled welcome must not request duplicate provider speech')
-  assert.match(bundledConfig.instructions, /application plays its own opening welcome recording/)
-  assert.equal(bundled.charges.length, 1)
-  const reconnect = await routeCase({ greetOnConnect: true, ledger: greeting.ledger })
-  assert.equal(JSON.parse(reconnect.providerCalls[0].request.body).session.input, undefined, 'A previously paid conversation cannot receive another opening welcome')
-  assert.equal(reconnect.debits.length, 0)
-  const legacy = await routeCase({ legacy: true })
-  assert.equal(legacy.response.status, 200)
-  assert.equal(legacy.providerCalls[0].url, 'https://api.openai.com/v1/realtime/calls')
-  assert.equal(JSON.parse(legacy.providerCalls[0].request.body.get('session')).model, 'gpt-realtime-2.1')
-  assert.equal(legacy.providerCalls[0].request.body.get('sdp'), 'synthetic-complete-offer')
-  assert.equal(legacy.text, 'synthetic-answer-sdp')
-  assert.equal(legacy.response.headers.get('x-helfi-voice-protocol'), 'realtime')
-  assert.equal(legacy.sockets.length, 0)
-  const cases = [
-    [{ unauthorized: true }, 401, false], [{ deniedConsent: true }, 403, false],
-    [{ headerConsent: false }, 403, false], [{ emptyOffer: true }, 400, false],
-    [{ wallet: { totalAvailableCents: 100, topUps: [] } }, 402, false],
-    [{ wallet: { plan: 'synthetic-paid', totalAvailableCents: 9 } }, 402, false],
-    [{ safety: true }, 429, false], [{ env: { HELFI_VOICE_REALTIME_ENABLED: 'false' } }, 503, false],
-    [{ env: { OPENAI_API_KEY: '' } }, 500, false], [{ providerBad: true }, 502, true],
-    [{ providerThrow: true }, 500, true], [{ providerBody: '{}' }, 502, true],
-    [{ providerBody: 'invalid synthetic JSON' }, 500, true], [{ abortDuringProvider: true }, 499, true],
+  assert.equal(live.response.status, 200, JSON.stringify(live.body))
+  assert.equal(live.starts.length,1); assert.equal(live.snapshots.length,1); assert.equal(live.discoveries.length,1)
+  const input = live.starts[0]
+  assert.equal(input.request,live.request); assert.equal(input.userId,'synthetic-user'); assert.equal(input.sdp,'synthetic-complete-offer')
+  assert.equal(input.general.sessionId,'owned-app-conversation'); assert.equal(input.general.localDate,'2026-10-18'); assert.equal(input.general.timeZone,'Australia/Melbourne')
+  assert.equal(input.general.snapshot.actorId,input.userId); assert.equal(input.general.snapshot.revision,7)
+  assert.equal(input.general.actions[0].id,'water.read')
+  assert.equal(input.frontend.model,'gpt-live-1'); assert.equal(input.frontend.store,false); assert.equal(input.frontend.audio.output.voice,'marin')
+  assert.equal(input.frontend.delegation.type,'client'); assert.equal(input.frontend.delegation.responses,undefined,'A client cannot launch an unreserved Responses backend')
+  assert.equal(input.frontend.input,undefined,'No provider-generated paid opening welcome')
+  assert.equal(live.wallets.length,0,'Funding/credit authority belongs to actual metered startup, not a second flat route charge')
+  assert.equal(live.body.delegation,'server'); assert.equal(live.body.helfiSession.id,'owned-financial-session'); assert.equal(live.response.headers.get('x-helfi-charged-credits'),'0')
+  const bundled=await routeCase({bundledWelcome:true})
+  assert.match(bundled.starts[0].frontend.instructions,/application plays its own opening welcome recording/)
+  assert.equal(bundled.starts[0].frontend.input,undefined)
+  const cases=[
+    [{deniedConsent:true},403], [{unauthorized:true},401], [{alreadyAborted:true},499],
+    [{headers:{'x-helfi-ai-consent':'false'}},403], [{headers:{'x-helfi-ai-consent':null}},403],
+    [{env:{HELFI_VOICE_REALTIME_ENABLED:'false'}},503], [{env:{OPENAI_API_KEY:''}},503],
+    [{offer:''},400], [{offer:'   '},400], [{offer:'x'.repeat(160001)},400], [{offer:'💚'.repeat(40001)},400],
+    [{legacy:true},426], [{headers:{'x-helfi-voice-protocol':'realtime'}},426],
+    [{headers:{'x-helfi-voice-metering':null}},426], [{headers:{'x-helfi-voice-metering':'client-v1'}},426],
+    [{headers:{'x-helfi-voice-capabilities':'legacy-only'}},400],
+    [{headers:{'x-helfi-assistant-session-id':'foreign/unsafe'}},503], [{headers:{'x-helfi-assistant-session-id':''}},503],
+    [{headers:{'x-helfi-assistant-time-zone':'Invalid/Zone'}},503], [{headers:{'x-helfi-assistant-local-date':'2026-02-30'}},503],
+    [{foreignSession:true},503], [{abortDuringSnapshot:true},503],
   ]
-  for (const [options, status, providerExpected] of cases) {
-    const result = await routeCase(options)
-    assert.equal(result.response.status, status, JSON.stringify(options))
-    assert.equal(result.providerCalls.length, Number(providerExpected), JSON.stringify(options))
-    assert.equal(result.charges.length, 0, `Failure must not charge: ${JSON.stringify(options)}`)
-    assert.equal(result.debits.length, 0)
-    assert.equal(result.socketTimers.size, 0)
-  }
-  const reused = await routeCase({ reused: true })
-  assert.equal(reused.response.headers.get('x-helfi-charged-credits'), '0')
-  assert.equal(reused.logs[0].costCents, 0)
-  const failedCharge = await routeCase({ chargeFailure: true })
-  assert.equal(failedCharge.response.status, 402)
-  assert.equal(failedCharge.logs.length, 0)
-  assert.equal(failedCharge.debits.length, 0)
-  const cancelled = await routeCase({ alreadyAborted: true })
-  assert.equal(cancelled.response.status, 499)
-  assert.equal(cancelled.charges.length, 0)
-  assert.equal(cancelled.providerCalls.length, 0, 'An already-cancelled request must not create a provider session')
-  function assertClosed(result, expectedId = 'synthetic-live-session') {
-    assert.equal(result.sockets.length, 1, 'An allocated Live session that was not handed off needs cleanup')
-    const socket = result.sockets[0]
-    assert.equal(socket.url, `wss://api.openai.com/v1/live/sessions/${encodeURIComponent(expectedId)}/attach`)
-    assert.equal(socket.init.headers.Authorization, 'Bearer synthetic-offline-placeholder')
-    assert.ok(socket.init.headers['OpenAI-Safety-Identifier'])
-    assert.equal(socket.sent.length, 1)
-    assert.equal(socket.sent[0].type, 'session.close')
-    assert.equal(socket.acknowledged, true, 'Cleanup requires a session.closed acknowledgement')
-    assert.equal(socket.closes, 1)
-    assert.equal(result.socketTimers.size, 0)
-  }
-  assertClosed(failedCharge)
-  const afterProviderCancel = await routeCase({ abortDuringProvider: true })
-  assert.equal(afterProviderCancel.charges.length, 0)
-  assertClosed(afterProviderCancel)
-  const missingSdp = await routeCase({ providerBody: JSON.stringify({ session: { id: 'synthetic/orphan id' }, transport: {} }) })
-  assert.equal(missingSdp.response.status, 502)
-  assert.equal(missingSdp.debits.length, 0)
-  assertClosed(missingSdp, 'synthetic/orphan id')
-  for (const failure of ['cleanupNoAck', 'cleanupError']) {
-    const result = await routeCase({ chargeFailure: true, [failure]: true })
-    assert.equal(result.response.status, 402)
-    assert.equal(result.socketTimers.size, 0, 'Failed cleanup must also release its timeout')
-    assert.equal(result.sockets[0].acknowledged, false)
-    assert.equal(result.sockets[0].closes, 1)
-  }
-  const duringCharge = await routeCase({ abortDuringCharge: true })
-  assert.equal(duringCharge.response.status, 499)
-  assert.equal(duringCharge.debits.length, 1)
-  assert.equal(duringCharge.ledger.length, 1, 'Cancellation must retain the successful retry claim')
-  assertClosed(duringCharge)
-  const emptyWallet = { totalAvailableCents: 0, topUps: [], additionalCreditsCents: 0 }
-  const retry = await routeCase({ ledger: duringCharge.ledger, wallet: emptyWallet })
-  assert.equal(retry.response.status, 200, 'A paid conversation can reconnect with a zero wallet')
-  assert.equal(retry.debits.length, 0, 'An already-paid retry must not debit again')
-  assert.equal(retry.charges.length, 1, 'The final atomic charge authority must still run')
-  assert.equal(retry.response.headers.get('x-helfi-charged-credits'), '0')
-  assert.equal(retry.sockets.length, 0)
-  const query = retry.claimQueries[0]
-  assert.equal(query.where.userId, 'synthetic-user')
-  assert.equal(query.where.runId, duringCharge.ledger[0].runId)
-  assert.equal(query.where.feature, 'voice-assistant:realtime-charge-marker')
-  assert.ok(Math.abs(query.where.createdAt.gte.getTime() - (Date.now() - 2 * 60 * 60 * 1000)) < 2000)
-  const base = duringCharge.ledger[0]
-  for (const changes of [
-    { userId: 'another-synthetic-user' }, { runId: 'another-conversation' },
-    { feature: 'another-feature' }, { createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000 - 5000) },
-    { success: false }, { errorMessage: 'insufficient_credits' },
-  ]) {
-    const denied = await routeCase({ ledger: [{ ...base, ...changes }], wallet: emptyWallet })
-    assert.equal(denied.response.status, 402, `Out-of-scope/invalid claim cannot bypass paid access: ${JSON.stringify(changes)}`)
-    assert.equal(denied.providerCalls.length, 0)
-    assert.equal(denied.charges.length, 0)
-  }
-  const finalAuthority = await routeCase({ ledger: duringCharge.ledger, wallet: emptyWallet, chargeFailure: true })
-  assert.equal(finalAuthority.response.status, 402, 'A preliminary claim lookup cannot override final atomic charge failure')
-  assertClosed(finalAuthority)
+  for(const[options,status]of cases){const result=await routeCase(options);assert.equal(result.response.status,status,JSON.stringify(options));assert.equal(result.starts.length,0,'Denied preflight must not allocate provider/funding: '+JSON.stringify(options));assert.equal(result.wallets.length,0)}
+  const denied=await routeCase({deniedConsent:true});assert.equal(denied.auth.length,0);assert.equal(denied.snapshots.length,0)
+  const web=await routeCase({unauthorized:true,web:true});assert.equal(web.response.status,200);assert.equal(web.starts[0].userId,'synthetic-user')
+  assert.equal((await routeCase({unauthorized:true,web:true,missingWebUser:true})).response.status,401)
+  for(const[options,status]of [[{safety:true},429],[{startThrow:true},503],[{startRefused:true},402]]){const result=await routeCase(options);assert.equal(result.response.status,status);assert.equal(result.starts.length,1)}
+  for(const legacy of[false,true]){const ready=await routeCase({method:'GET',readiness:true,legacy});assert.equal(ready.body.ready,true);assert.equal(ready.body.model,'gpt-live-1');assert.equal(ready.body.protocol,'live-v1');assert.deepEqual(ready.body.supportedProtocols,['live-v1']);assert.equal(ready.body.metering,'server-v1');assert.equal(ready.starts.length,0);assert.equal(ready.auth.length,0)}
+  assert.equal((await routeCase({method:'GET',readiness:true,env:{HELFI_VOICE_REALTIME_ENABLED:'false'}})).body.ready,false)
+  assert.equal((await routeCase({method:'GET',readiness:true,env:{OPENAI_API_KEY:''}})).body.ready,false)
+  const available=await routeCase({method:'GET'});assert.equal(available.body.available,true);assert.equal(available.body.protocol,'live-v1');assert.equal(available.starts.length,0)
+  assert.equal((await routeCase({method:'GET',unauthorized:true})).response.status,401)
+  assert.equal((await routeCase({method:'GET',wallet:{totalAvailableCents:100,topUps:[]}})).response.status,402)
 }
 function nativeHarness(options = {}) {
   const statuses = [], errors = [], notices = [], transcripts = [], assistant = [], actions = [], sent = [], requests = []
   const timers = new Map()
   let sequence = 0, clock = 1000000, trackStops = 0, closes = 0, userSpeech = 0, pc
   let outputEnergy = 0, outputLevel = 0, inputLevel = options.inputLevel || 0, inputEnergy = 0, inputDuration = 0
-  const welcomePlays = [], welcomeStops = [], nativeListeners = new Map(), stages = []
+  const welcomePlays = [], welcomeStops = [], nativeListeners = new Map(), stages = [], jobs = [], jobResults = [], humans = [], usage = []
   let assetResolve, playResolve
   const emitWelcome = (status, extra = {}) => nativeListeners.get('HelfiVoiceWelcomePlayback')?.({ playbackId: welcomePlays.at(-1)?.id, status, ...extra })
   const bridge = { configureForVoice: async () => 'iPhone speaker', getVoiceAudioState: async () => ({}),
@@ -282,7 +151,10 @@ function nativeHarness(options = {}) {
       { type: 'outbound-rtp', kind: 'audio', packetsSent: options.missingMicrophone ? 0 : 10, bytesSent: options.missingMicrophone ? 0 : 100 },
       { type: 'inbound-rtp', kind: 'audio', packetsReceived: 100, bytesReceived: 10000, audioLevel: outputLevel, totalAudioEnergy: outputEnergy },
     ] }
-    createDataChannel() { this.channel = { readyState: 'open', send: (data) => sent.push(JSON.parse(data)), close: noop }; return this.channel }
+    createDataChannel() { this.channel = { readyState: 'open', send: (data) => {
+      const event = JSON.parse(data); sent.push(event)
+      if (event.type === 'session.close' && !options.missingFinalUsage) queueMicrotask(() => this.channel.onmessage?.({ data: JSON.stringify({ type: 'session.closed', usage: { seconds: 15 } }) }))
+    }, close: noop }; return this.channel }
     async createOffer() { return { sdp: 'synthetic-initial-offer' } }
     async setLocalDescription() { this.localDescription = { sdp: 'synthetic-complete-offer' } }
     async setRemoteDescription(answer) {
@@ -295,7 +167,7 @@ function nativeHarness(options = {}) {
     }
   }
   const box = {
-    exports: {}, process: { env: {} }, __DEV__: false, API_BASE_URL: 'https://offline.invalid', console: quiet,
+    exports: {}, process: { env: {} }, __DEV__: false, API_BASE_URL: 'https://offline.invalid', console: { ...quiet, info: (...args) => { if(args[0] === '[voice realtime usage]') usage.push(JSON.parse(args[1])) } },
     Date: ClockDate, Promise, Map, Set, Error, AbortController, buildNativeAuthHeaders: () => ({ authorization: 'synthetic-token' }),
     setTimeout: (fn, delay) => schedule(fn, delay, false), clearTimeout: (id) => timers.delete(id),
     setInterval: (fn, delay) => schedule(fn, delay, true), clearInterval: (id) => timers.delete(id),
@@ -307,21 +179,31 @@ function nativeHarness(options = {}) {
       : name === 'react-native' ? { NativeModules: options.welcomeBridge ? {HelfiAudioRoute: bridge} : {}, NativeEventEmitter } : (()=>{throw Error('Unexpected native import')})(),
     fetch: async (url, request) => {
       requests.push({ url, request })
-      return { ok: true, headers: new Headers(options.legacy ? {} : { 'x-helfi-voice-protocol': 'live-v1' }), text: async () => options.legacy ? 'synthetic-answer-sdp' : JSON.stringify({ session: { id: 'synthetic-live-session' }, transport: { sdp: 'synthetic-answer-sdp' } }) }
+      if (String(url).includes('/voice-assistant/session')) {
+        if (request.method === 'POST') { const body = JSON.parse(request.body); jobResults.push(body); const index = jobs.findIndex(job => job.callId === body.callId); if(index >= 0) jobs.splice(index,1); return {ok:true,json:async()=>({ok:true})} }
+        return {ok:true,json:async()=>({sessionId:'synthetic-financial-session',state:'ready',jobs:JSON.parse(JSON.stringify(jobs))})}
+      }
+      return { ok: true, headers: new Headers(options.legacy ? {} : { 'x-helfi-voice-protocol': 'live-v1' }), text: async () => options.legacy ? 'synthetic-answer-sdp' : JSON.stringify({ session: { id: 'synthetic-live-session' }, transport: { sdp: 'synthetic-answer-sdp' }, ...(options.serverMetered ? {delegation:'server',helfiSession:{id:options.missingFinancialSession?'':'synthetic-financial-session'}} : {}) }) }
     },
   }
   vm.createContext(box)
-  vm.runInContext(compile(`${localWelcomeSource}\n${nativeSource}\nglobalThis.auditEcho = likelyAssistantEcho`), box, { timeout: 5000 })
+  vm.runInContext(compile(`${localWelcomeSource}\n${liveUsageSource}\n${liveToolTurnSource}\n${voiceJobsSource}\n${generalAssistantSource}\n${nativeSource}\nglobalThis.auditEcho = likelyAssistantEcho`), box, { timeout: 5000 })
   const controller = new AbortController()
   const started = box.exports.startHelfiRealtimeVoiceSession({
     token: 'synthetic-token', billingSessionId: 'synthetic-conversation-123', signal: controller.signal, greetOnConnect: options.greetOnConnect,
+    ...(options.serverMetered ? {assistantSessionId:'owned-app-conversation',localDate:'2026-10-18',timeZone:'Australia/Melbourne'} : {}),
     callbacks: {
       onConnectStage: stage => stages.push(stage), onStatus: (status) => statuses.push(status), onError: (error) => errors.push(error), onNotice: (notice) => notices.push(notice),
-      onTranscript: (text) => transcripts.push(text), onAssistantText: (text) => assistant.push(text), onUserSpeech: () => { userSpeech++; options.onUserSpeech?.() },
+      onTranscript: (text) => transcripts.push(text), onHumanTranscript: text => humans.push(text), onAssistantText: (text) => assistant.push(text), onUserSpeech: () => { userSpeech++; options.onUserSpeech?.() },
       onActionRequest: async (args) => { actions.push(args); return options.action ? options.action(args) : { ok: true, saved: false, safeToClaimSaved: false, needsReview: true, spokenReply: 'Synthetic review. Would you like me to save that for you?' } },
     },
   }).then((session) => ({ session }), (error) => ({ error }))
-  const emit = (payload) => pc.channel.onmessage?.({ data: JSON.stringify(payload) })
+  const emit = (payload) => {
+    const responseId = payload.event?.response_id
+    if (payload.type === 'response.event' && payload.event?.item?.type === 'function_call' && !options.manualToolLifecycle) pc.channel.onmessage?.({ data: JSON.stringify({ type: 'response.event', event: { type: 'response.created', response: { id: responseId } } }) })
+    pc.channel.onmessage?.({ data: JSON.stringify(payload) })
+    if (payload.type === 'response.event' && payload.event?.item?.type === 'function_call' && !options.manualToolLifecycle) pc.channel.onmessage?.({ data: JSON.stringify({ type: 'response.event', event: { type: 'response.completed', response: { id: responseId, output: [] } } }) })
+  }
   const advance = async (duration) => {
     clock += duration
     for (const [id, timer] of [...timers]) {
@@ -333,12 +215,12 @@ function nativeHarness(options = {}) {
     await tick()
   }
   return { box, started, controller, statuses, errors, notices, transcripts, assistant, actions, sent, requests, timers, emit, advance,
-    welcomePlays, welcomeStops, stages, nativeListeners, emitWelcome, asset:()=>assetResolve(), play:()=>playResolve(true),
+    welcomePlays, welcomeStops, stages, nativeListeners, emitWelcome, jobs, jobResults, humans, usage, asset:()=>assetResolve(), play:()=>playResolve(true),
     input:(level,energy=0,duration=0)=>{inputLevel=level;inputEnergy=energy;inputDuration=duration},
     output: (energy, level = 0) => { outputEnergy = energy; outputLevel = level },
     peer: () => pc, stoppedTracks: () => trackStops, closes: () => closes, userSpeech: () => userSpeech }
 }
-const toolEvent = (id) => ({ type: 'response.event', event: { type: 'response.output_item.done', item: { type: 'function_call', name: 'request_helfi_action', call_id: id, arguments: JSON.stringify({ request: 'log 250 ml water', action: 'water', needsReview: true }) } } })
+const toolEvent = (id) => ({ type: 'response.event', event: { type: 'response.output_item.done', response_id: `synthetic-response-${id}`, item: { type: 'function_call', name: 'request_helfi_action', call_id: id, arguments: JSON.stringify({ request: 'log 250 ml water', action: 'water', needsReview: true }) } } })
 async function checkNative() {
   for (const legacy of [false,true]) {
     const welcome = nativeHarness({ greetOnConnect: true, legacy, welcomeBridge:true })
@@ -362,12 +244,54 @@ async function checkNative() {
     assert.equal(firstUser.welcomePlays.length,0,'User-first skips clip')
     await session.stop()
   }
-  for (const reason of ['input','energy','caption','tool','end','abort','remote']) {
-    const f=nativeHarness({greetOnConnect:true,welcomeBridge:true})
+  for (const legacy of [false,true]) {
+    const noise=nativeHarness({greetOnConnect:true,legacy,welcomeBridge:true,inputLevel:.1})
+    const session=(await noise.started).session;await tick()
+    assert.equal(noise.welcomePlays.length,1,'A microphone startup spike without human text must not skip the welcome')
+    noise.input(0,1,1);await noise.advance(250);noise.input(.2,1.1,2);await noise.advance(250)
+    assert.equal(noise.welcomeStops.length,0,'Raw microphone level/energy never establishes caller speech')
+    if(!legacy){noise.emit({type:'session.input_transcript.delta',delta:' ',event_id:'whitespace'});await tick();assert.equal(noise.welcomeStops.length,0,'Whitespace alone is not recognized caller words')}
+    noise.emitWelcome('finished',{completed:true});noise.emitWelcome('finished',{completed:true})
+    assert.deepEqual(noise.assistant,['Hi, I’m Helfi. What can I help you with?'],'Duplicate completion cannot repeat the welcome transcript')
+    assert.equal(noise.actions.length,0);assert.equal(noise.requests.length,1)
+    await session.stop();assert.equal(noise.timers.size,0)
+  }
+  for (const fragments of [['Hi, I’m Helfi. What can I help you with?'], ['Hi, ', 'I’m Helfi. ', 'What can I help you with?']]) {
+    const echo=nativeHarness({greetOnConnect:true,welcomeBridge:true})
+    const session=(await echo.started).session;await tick()
+    for(let i=0;i<fragments.length;i++)echo.emit({type:'session.input_transcript.delta',delta:fragments[i],event_id:'welcome-echo-'+i})
+    await tick()
+    assert.equal(echo.welcomeStops.length,0,'The exact playing recording cannot interrupt itself through whole or fragmented captions')
+    assert(!echo.stages.includes('welcome-user-first'),'The recording cannot falsely consume a genuine-caller-first decision')
+    session.flushTranscript()
+    assert.deepEqual(echo.transcripts,[fragments.join('')],'Ambiguous matching text remains visible; no caller text is discarded')
+    echo.emitWelcome('finished',{completed:true})
+    assert.deepEqual(echo.assistant,['Hi, I’m Helfi. What can I help you with?'])
+    echo.emit({type:'session.input_transcript.delta',delta:'Hi, log 250 ml water',event_id:'after-welcome'})
+    session.flushTranscript()
+    assert.equal(echo.transcripts.at(-1),'Hi, log 250 ml water','Normal later caller words are untouched')
+    assert.equal(echo.actions.length,0)
+    await session.stop();assert.equal(echo.timers.size,0)
+  }
+  const caller=nativeHarness({greetOnConnect:true,welcomeBridge:true})
+  const callerSession=(await caller.started).session;await tick()
+  caller.emit({type:'session.input_transcript.delta',delta:'Hi, ',event_id:'caller-prefix'})
+  assert.equal(caller.welcomeStops.length,0,'An ambiguous prefix only defers interruption')
+  caller.emit({type:'session.input_transcript.delta',delta:'log 250 ml water',event_id:'caller-command'})
+  await tick()
+  assert.equal(caller.welcomeStops.length,1,'The first word differing from the recording interrupts it')
+  assert(caller.stages.includes('welcome-user-first'))
+  callerSession.flushTranscript()
+  assert.deepEqual(caller.transcripts,['Hi, log 250 ml water'],'A genuine overlapping request is retained verbatim')
+  caller.emitWelcome('finished',{completed:true})
+  assert.equal(caller.assistant.length,0,'Interrupted playback never claims a finished welcome')
+  await callerSession.stop();assert.equal(caller.timers.size,0)
+  for (const reason of ['speech','caption','recognized','tool','end','abort','remote']) {
+    const f=nativeHarness({greetOnConnect:true,welcomeBridge:true,legacy:reason==='recognized'})
     const session=(await f.started).session; await tick()
-    if(reason==='input'){f.input(.1);await f.advance(125)}
-    if(reason==='energy'){f.input(0,1,1);await f.advance(125);f.input(0,1.1,2);await f.advance(125)}
+    if(reason==='speech')f.emit({type:'input_audio_buffer.speech_started'})
     if(reason==='caption')f.emit({type:'session.input_transcript.delta',delta:'Stop',event_id:'caller'})
+    if(reason==='recognized')f.emit({type:'conversation.item.input_audio_transcription.completed',transcript:'Stop'})
     if(reason==='tool')f.emit(toolEvent('welcome-stop-tool'))
     if(reason==='end')await session.stop()
     if(reason==='abort')f.controller.abort()
@@ -392,6 +316,23 @@ async function checkNative() {
     const f=nativeHarness({greetOnConnect:true,...options});const session=(await f.started).session;await tick()
     assert.equal(f.assistant.length,0);assert(f.notices.some(text=>/welcome.*(cannot|could not)|cannot.*welcome/.test(text)))
     assert(f.statuses.includes('live'));await session.stop();assert.equal(f.timers.size,0)
+  }
+  for(const outcome of ['failed','interrupted']){
+    const first=nativeHarness({greetOnConnect:true,welcomeBridge:true,failedWelcome:outcome==='failed'})
+    const firstSession=(await first.started).session;await tick()
+    if(outcome==='interrupted')first.emitWelcome('interrupted',{completed:false})
+    await tick();assert.equal(first.assistant.length,0,'Unsuccessful welcome must not claim completion')
+    first.emitWelcome('finished',{completed:true});assert.equal(first.assistant.length,0,'Late finish after failure/interruption stays ignored')
+    await firstSession.stop();assert.equal(first.timers.size,0)
+    // The parent controls the consumed marker. The transport must honor a
+    // retry for the same billing identity when playback never completed.
+    const retry=nativeHarness({greetOnConnect:true,welcomeBridge:true})
+    const retrySession=(await retry.started).session;await tick()
+    assert.equal(retry.welcomePlays.length,1,`A ${outcome} welcome can retry`)
+    retry.emitWelcome('finished',{completed:true});retry.emitWelcome('finished',{completed:true})
+    assert.deepEqual(retry.assistant,['Hi, I’m Helfi. What can I help you with?'])
+    assert.equal(retry.actions.length,0);assert.equal(retry.requests.length,1)
+    await retrySession.stop();assert.equal(retry.timers.size,0)
   }
   const stoppedWelcome = nativeHarness({ greetOnConnect: true, legacy: true, missingSession: true })
   await tick()
@@ -431,7 +372,7 @@ async function checkNative() {
   assert.equal(result.item.call_id, 'call-1')
   assert.equal(JSON.parse(result.item.output).safeToClaimSaved, false)
   assert.ok(native.sent.some((item) => item.type === 'response.create'))
-  native.emit({ type: 'response.event', event: { type: 'response.failed' } })
+  native.emit({ type: 'response.event', event: { type: 'response.failed', response: { id: 'synthetic-response-call-1' } } })
   assert.ok(native.errors.at(-1).includes('Nothing is confirmed saved'))
   session.promptAssistant('Synthetic clarification')
   assert.ok(native.sent.some((item) => item.type === 'session.instructions.append'))
@@ -544,6 +485,37 @@ async function checkNative() {
   await transcriptSession.stop()
   assert.equal(transcript.timers.size, 0)
 }
+async function checkProtectedNative() {
+  const job={callId:'server-call-one',actualHumanText:'Please read my water.',args:{request:'Read my water.',action:'assistant_plan',needsReview:false,assistantCommand:{type:'plan',steps:[{id:'water',operation:'water.read',values:{}}]}}}
+  const f=nativeHarness({serverMetered:true,action:()=>({ok:true,saved:true,safeToClaimSaved:true,message:'Untrusted native claim',assistantContext:{id:'owned-app-conversation',actorId:'synthetic-user',revision:7}})})
+  const {session,error}=await f.started;assert(session,error?.message)
+  assert.equal(f.requests[0].request.headers['x-helfi-voice-metering'],'server-v1')
+  assert.equal(f.requests[0].request.headers['x-helfi-assistant-session-id'],'owned-app-conversation')
+  assert.match(f.requests[0].request.headers['x-helfi-voice-attempt-id'],/^[A-Za-z0-9_-]{12,100}$/)
+  f.emit(toolEvent('unsolicited-channel-tool'));await tick()
+  assert.equal(f.actions.length,0,'Protected sessions never run direct data-channel model tool calls')
+  assert.equal(f.sent.filter(event=>event.type==='response.item.create'||event.type==='response.create').length,0)
+  f.jobs.push(job);await f.advance(0)
+  assert.equal(f.actions.length,1);assert.equal(f.actions[0].assistantCommand.steps[0].operation,'water.read')
+  assert.deepEqual(f.humans,[job.actualHumanText],'Only immutable owned server-caption evidence reaches the app action host')
+  assert.equal(f.jobResults.length,1);assert.equal(f.jobResults[0].sessionId,'synthetic-financial-session')
+  assert.deepEqual(Object.keys(f.jobResults[0].result).sort(),['assistantContext','ok'])
+  assert.equal(f.jobResults[0].result.saved,undefined,'Client saved=true is never delivered as canonical save proof')
+  assert.equal(f.jobResults[0].result.message,undefined)
+  f.jobs.push(job);await f.advance(750);assert.equal(f.actions.length,1,'A repeated immutable job does not repeat an app effect')
+  await session.stop();assert.equal(f.timers.size,0)
+  assert.equal(f.sent.filter(event=>event.type==='session.close').length,1)
+  const final=f.usage.at(-1);assert.equal(final.finalUsageReceived,true);assert.equal(final.providerSeconds,15)
+  assert.equal(final.backendUsdAtStandardRates,null);assert.equal(final.finalComplete,false,'Native voice receipt cannot certify server backend settlement')
+  assert.equal(final.invoiceConfirmed,false)
+  f.jobs.push({...job,callId:'late-job'});await f.advance(10000);assert.equal(f.actions.length,1)
+  const missing=nativeHarness({serverMetered:true,missingFinalUsage:true}),open=await missing.started
+  assert(open.session);const closing=open.session.stop();await missing.advance(2500);await closing
+  const unknown=missing.usage.at(-1);assert.equal(unknown.finalUsageReceived,false);assert.equal(unknown.finalComplete,false);assert.equal(unknown.costIncomplete,true);assert.equal(unknown.totalUsdAtStandardRates,null)
+  assert.equal(missing.timers.size,0);assert(missing.stoppedTracks()>0)
+  const invalid=nativeHarness({serverMetered:true,missingFinancialSession:true}),denied=await invalid.started
+  assert.match(denied.error?.message||'',/spending monitor returned no session/);assert.equal(invalid.actions.length,0);assert.equal(invalid.timers.size,0);assert(invalid.stoppedTracks()>0)
+}
 async function checkMetering() {
   const source = sourceWithoutImports('lib/cost-meter.ts')
   function meter(env = {}) {
@@ -562,12 +534,12 @@ async function checkMetering() {
 }
 async function main() {
   const errors = []
-  for (const [name, check] of [['route', checkRoute], ['native', checkNative], ['model metering', checkMetering]]) {
+  for (const [name, check] of [['route', checkRoute], ['native', checkNative], ['protected native', checkProtectedNative], ['model metering', checkMetering]]) {
     try { await check(); console.log(`PASS: ${name} Live protocol checks (offline mocks).`) }
     catch (error) { errors.push(`${name}: ${error.stack || error.message}`) }
   }
   if (errors.length) throw new Error(errors.join('\n'))
-  console.log('PASS: negotiated Live/legacy config, guarded handshake, safe tools, captions/audio evidence, ICE cancellation and cleanup. No real server/audio result is claimed.')
+  console.log('PASS: protected Live startup boundary, compatibility transports, safe tools, captions/audio evidence, ICE cancellation and cleanup. Financial startup/worker execution is separately tested; no real server/audio result is claimed.')
 }
 module.exports = { checkRoute, checkNative }
 if (require.main === module) main().catch((error) => { console.error(error.message); process.exitCode = 1 })

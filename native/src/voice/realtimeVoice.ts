@@ -2,7 +2,10 @@ import { validatedVoiceCapability, type VoiceCapabilityRequest } from './voiceCa
 import { sanitizeGeneralAssistantCommand, type GeneralAssistantCommand } from './generalAssistantActions'
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
-import { createLocalVoiceWelcome } from './localVoiceWelcome'
+import { createLocalVoiceWelcome, LOCAL_VOICE_WELCOME_TEXT } from './localVoiceWelcome'
+import { createLiveVoiceUsageTracker } from './liveVoiceUsage'
+import { createLiveVoiceToolTurn } from './liveVoiceToolTurn'
+import { startVoiceSessionJobs } from './voiceSessionJobs'
 
 const LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'
 
@@ -320,9 +323,11 @@ export async function startHelfiRealtimeVoiceSession(params: {
   const inCallManager = requireInCallManager()
   const audioRouteBridge = requireHelfiAudioRoute()
   const callbacks = params.callbacks || {}
+  const liveUsage = createLiveVoiceUsageTracker({ voiceModel: 'gpt-live-1', backendModel: 'gpt-6-luna' })
   let voiceProtocol: 'live-v1' | 'realtime' = 'live-v1'
+  let meteredSessionId = ''
+  let voiceJobs: ReturnType<typeof startVoiceSessionJobs> | null = null
   let userHasSpoken = false
-  let openingGreetingPending = Boolean(params.greetOnConnect)
   const connectStartedAt = Date.now()
   let nativeAudioConfigured = false
   const reportConnectStage = (stage: string, detail = '') => {
@@ -394,6 +399,9 @@ export async function startHelfiRealtimeVoiceSession(params: {
   let dataChannel: any = null
   let audioRouteSubscription: any = null
   let stopped = false
+  let liveCloseSent = false
+  let gracefulClosePromise: Promise<void> | null = null
+  let finishGracefulClose: (() => void) | null = null
   let dataChannelOpen = false
   let peerConnected = false
   let sessionReady = false
@@ -409,9 +417,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
   let playbackTimer: ReturnType<typeof setInterval> | null = null
   let outputEnergy = 0
   let lastOutputActivityAt = 0
-  let welcomeInputTimer: ReturnType<typeof setInterval> | null = null
-  let previousWelcomeEnergy: { energy: number; duration: number } | null = null
   let localWelcome: ReturnType<typeof createLocalVoiceWelcome> | null = null
+  let welcomeCaptionCandidate = ''
   const liveCaptionFragments: { speaker: 'user' | 'assistant'; delta: string; start_ms: number; end_ms: number }[] = []
   let liveUserText = ''
   let humanCommandText = ''
@@ -480,11 +487,19 @@ export async function startHelfiRealtimeVoiceSession(params: {
     }, 12000)
   }
   const stopOpeningWelcome = (reason: string) => {
-    openingGreetingPending = false
+    welcomeCaptionCandidate = ''
     if (!params.greetOnConnect) return Promise.resolve()
-    if (welcomeInputTimer) clearInterval(welcomeInputTimer)
-    welcomeInputTimer = null
     return localWelcome?.stop(reason) || Promise.resolve()
+  }
+  const callerCaptionInterruptsWelcome = (text: string) => {
+    if (!localWelcome?.isPlaying()) return true
+    // A microphone can pick up the exact bundled clip. Defer interruption
+    // while its captions match that clip's prefix. Preserve all caller text;
+    // the first differing word still interrupts normally ("Hi, log water").
+    welcomeCaptionCandidate = (welcomeCaptionCandidate + text).slice(0, LOCAL_VOICE_WELCOME_TEXT.length * 2)
+    const normalize = (value: string) => value.toLowerCase().replace(/[^a-z0-9]/g, '')
+    const candidate = normalize(welcomeCaptionCandidate)
+    return !candidate || !normalize(LOCAL_VOICE_WELCOME_TEXT).startsWith(candidate)
   }
   // A bundled, verified recording is deterministic; provider startup messages
   // alone do not guarantee an opening spoken turn. Keep WebRTC's audio session.
@@ -501,13 +516,9 @@ export async function startHelfiRealtimeVoiceSession(params: {
     listen: listener => audioRouteBridge?.emitter.addListener('HelfiVoiceWelcomePlayback', listener) || { remove: () => {} },
     onStage: stage => {
       reportConnectStage(stage)
-      if (stage !== 'welcome-started') {
-        openingGreetingPending = false
-        if (welcomeInputTimer) clearInterval(welcomeInputTimer)
-        welcomeInputTimer = null
-      }
     },
     onPlaying: playing => {
+      welcomeCaptionCandidate = ''
       if (stopped || params.signal?.aborted) return
       if (playing) { clearSilenceTimer(); emitStatus('speaking') }
       else if (!assistantAudioPlaying) { emitStatus('live'); armSilenceReminder() }
@@ -521,17 +532,6 @@ export async function startHelfiRealtimeVoiceSession(params: {
     },
     onUnavailable: message => { callbacks.onNotice?.(message); armSilenceReminder() },
   })
-  const observeWelcomeInput = (stats: VoiceMediaStats) => {
-    if (!openingGreetingPending && !localWelcome?.isPlaying()) return
-    const previous = previousWelcomeEnergy
-    previousWelcomeEnergy = { energy: stats.totalAudioEnergy, duration: stats.totalSamplesDuration }
-    const duration = previous ? stats.totalSamplesDuration - previous.duration : 0
-    const inputPower = previous && duration > 0 ? (stats.totalAudioEnergy - previous.energy) / duration : 0
-    if (stats.audioLevel > 0.025 || inputPower > 0.000625) {
-      userHasSpoken = true
-      void stopOpeningWelcome('user-first')
-    }
-  }
   const failReadiness = (message: string) => {
     if (readinessSettled) return
     readinessSettled = true
@@ -556,7 +556,6 @@ export async function startHelfiRealtimeVoiceSession(params: {
     const check = async () => {
       if (stopped || microphoneSending) return
       const stats = await readVoiceMediaStats(pc)
-      observeWelcomeInput(stats)
       if (stats.outboundPackets <= 0 || stats.outboundBytes <= 0 || stopped) return
       microphoneSending = true
       console.info('[voice realtime media] first-outbound', safeVoiceStatsText(stats))
@@ -621,6 +620,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     })
   }
   const closeRealtimeConnection = () => {
+    voiceJobs?.stop()
     void stopOpeningWelcome('ended')
     clearResponseTimers()
     clearSilenceTimer()
@@ -647,15 +647,18 @@ export async function startHelfiRealtimeVoiceSession(params: {
     }
     audioRouteSubscription = null
     if (dataChannel?.readyState === 'open') {
-      if (voiceProtocol === 'live-v1') {
+      if (voiceProtocol === 'live-v1' && !liveCloseSent) {
+        liveCloseSent = true
         sendRealtimeEvent(dataChannel, { type: 'session.close' })
-      } else {
+      } else if (voiceProtocol !== 'live-v1') {
         sendRealtimeEvent(dataChannel, { type: 'response.cancel' })
         sendRealtimeEvent(dataChannel, { type: 'output_audio_buffer.clear' })
         sendRealtimeEvent(dataChannel, { type: 'input_audio_buffer.clear' })
       }
     }
     stopped = true
+    liveToolTurn.stop()
+    voiceJobs?.stop()
     try {
       if (dataChannel) {
         dataChannel.onopen = null
@@ -682,9 +685,37 @@ export async function startHelfiRealtimeVoiceSession(params: {
       // The audio route may already be released.
     }
   }
+  const stopWithFinalUsage = () => {
+    if (gracefulClosePromise) return gracefulClosePromise
+    if (stopped || voiceProtocol !== 'live-v1' || dataChannel?.readyState !== 'open' || !sessionReady) {
+      closeRealtimeConnection()
+      return Promise.resolve()
+    }
+    // End microphone/speaker use immediately. Retain only the data channel for
+    // a bounded final usage receipt; no late app action is allowed to run.
+    stopped = true
+    liveToolTurn.stop()
+    voiceJobs?.stop()
+    void stopOpeningWelcome('ended')
+    stopTracks()
+    gracefulClosePromise = new Promise<void>(resolve => {
+      const finish = () => {
+        clearTimeout(timeout)
+        finishGracefulClose = null
+        console.info('[voice realtime usage]', JSON.stringify(liveUsage.summary()))
+        closeRealtimeConnection()
+        resolve()
+      }
+      const timeout = setTimeout(finish, 2500)
+      finishGracefulClose = finish
+      liveCloseSent = true
+      sendRealtimeEvent(dataChannel, { type: 'session.close' })
+    })
+    return gracefulClosePromise
+  }
   const onAbort = () => {
     failReadiness('Live voice session was stopped.')
-    closeRealtimeConnection()
+    void stopWithFinalUsage()
     callbacks.onStatus?.('closed')
   }
   params.signal?.addEventListener?.('abort', onAbort)
@@ -716,15 +747,16 @@ export async function startHelfiRealtimeVoiceSession(params: {
     callbacks.onAssistantText?.(text)
   }
 
-  const handleToolCall = (toolCall: any) => {
-    if (!toolCall || toolCall.name !== 'request_helfi_action') return false
+  const executeToolCall = (toolCall: any) => {
+    if (voiceProtocol === 'live-v1') flushLiveCaptions()
+    if (!toolCall || toolCall.name !== 'request_helfi_action') return Promise.resolve({ ok: false, saved: false, safeToClaimSaved: false, message: 'That voice action is unavailable.' })
     const args = parseRealtimeJson(toolCall.arguments) || {}
     const callId = cleanText(toolCall.call_id)
-    if (!callId || handledToolCallIds.has(callId)) return true
+    if (!callId || handledToolCallIds.has(callId)) return Promise.resolve({ ok: false, saved: false, safeToClaimSaved: false, message: 'That voice action has already been handled.' })
     handledToolCallIds.add(callId)
     clearResponseTimers()
     emitStatus('thinking')
-    Promise.resolve().then(async () => {
+    return Promise.resolve().then(async () => {
       await stopOpeningWelcome('tool')
       if (stopped || params.signal?.aborted) return { ok: false, saved: false, safeToClaimSaved: false, message: 'Live voice has stopped.' }
       const assistantCommand = args.action === 'assistant_plan' ? sanitizeGeneralAssistantCommand(args.assistantCommand) : null
@@ -747,7 +779,23 @@ export async function startHelfiRealtimeVoiceSession(params: {
       ...(assistantCommand ? { assistantCommand } : {}),
       })
     })
-      .then((result) => {
+  }
+  const liveToolTurn = createLiveVoiceToolTurn({
+    isCurrent: () => !stopped && !params.signal?.aborted,
+    executeToolCall,
+    send: event => {
+      if (dataChannel?.readyState !== 'open') return false
+      sendRealtimeEvent(dataChannel, event)
+      return true
+    },
+    onError: message => { callbacks.onError?.(message); emitStatus('failed') },
+  })
+  const handleToolCall = (toolCall: any) => {
+    if (meteredSessionId) return false
+    if (!toolCall || toolCall.name !== 'request_helfi_action') return false
+    const callId = cleanText(toolCall.call_id)
+    if (!callId || handledToolCallIds.has(callId)) return true
+    executeToolCall(toolCall).then((result) => {
         if (stopped) return
         sendRealtimeEvent(dataChannel, {
           type: voiceProtocol === 'live-v1' ? 'response.item.create' : 'conversation.item.create',
@@ -802,8 +850,12 @@ export async function startHelfiRealtimeVoiceSession(params: {
     liveCaptionFragments.push({ speaker, delta, start_ms: Number(payload.start_ms || 0), end_ms: Number(payload.end_ms || 0) })
     if (liveCaptionFragments.length > 1000) liveCaptionFragments.splice(0, 500)
     if (speaker === 'user') {
-      userHasSpoken = true
-      void stopOpeningWelcome('user-first')
+      // Microphone levels include startup noise and the speaker's own clip.
+      // Only a real speech event or recognized caller words interrupt it.
+      if (delta.trim() && callerCaptionInterruptsWelcome(delta)) {
+        userHasSpoken = true
+        void stopOpeningWelcome('user-first')
+      }
       liveUserText += delta
       if (humanCommandText.length + delta.length > 20000) humanCommandTooLarge = true
       else if (!humanCommandTooLarge) humanCommandText += delta
@@ -814,11 +866,19 @@ export async function startHelfiRealtimeVoiceSession(params: {
     captionTimer = setTimeout(flushLiveCaptions, 1000)
   }
   dataChannel.onmessage = (event: any) => {
-    if (stopped) return
     const payload = parseRealtimeJson(event?.data)
     if (!payload?.type) return
+    if (voiceProtocol === 'live-v1') liveUsage.record(payload)
+    if (stopped) {
+      if (payload.type === 'session.closed') finishGracefulClose?.()
+      return
+    }
     console.info(`[voice realtime event] ${cleanText(payload.type)} ${Date.now() - connectStartedAt}ms`)
     if (voiceProtocol === 'live-v1') {
+      if (payload.type === 'response.event') console.info('[voice realtime response]', cleanText(payload.event?.type), payload.event?.item?.type === 'function_call' ? 'function-call' : '')
+      // Metered calls execute only the immutable jobs verified by our server.
+      // A direct media-channel tool event must never become a second action.
+      if (!meteredSessionId && liveToolTurn.handleEvent(payload)) return
       if (payload.type === 'session.started') {
         if (sessionReady) return
         sessionReady = true
@@ -850,16 +910,14 @@ export async function startHelfiRealtimeVoiceSession(params: {
       }
       if (payload.type === 'response.event') {
         const nested = payload.event
-        if (nested?.type === 'response.output_item.done' && nested.item?.type === 'function_call') {
-          flushLiveCaptions()
-          handleToolCall(nested.item)
-        } else if (nested?.type === 'response.failed' || nested?.type === 'response.incomplete') {
+        if (nested?.type === 'response.failed' || nested?.type === 'response.incomplete') {
           callbacks.onError?.('Helfi could not complete that app request. Nothing is confirmed saved. Please check your diary before retrying.')
           emitStatus('live')
         }
         return
       }
       if (payload.type === 'session.closed') {
+        console.info('[voice realtime usage]', JSON.stringify(liveUsage.summary()))
         closeRealtimeConnection()
         callbacks.onStatus?.('closed')
         return
@@ -912,6 +970,10 @@ export async function startHelfiRealtimeVoiceSession(params: {
         sendRealtimeEvent(dataChannel, { type: 'output_audio_buffer.clear' })
         emitStatus('live')
         return
+      }
+      if (transcript && callerCaptionInterruptsWelcome(transcript)) {
+        userHasSpoken = true
+        void stopOpeningWelcome('user-first')
       }
       humanCommandText = transcript.length <= 20000 ? transcript : ''; humanCommandTooLarge = transcript.length > 20000
       callbacks.onHumanTranscript?.(transcript)
@@ -1057,6 +1119,8 @@ export async function startHelfiRealtimeVoiceSession(params: {
         'x-helfi-ai-consent': 'true',
         'x-helfi-voice-session-id': cleanText(params.billingSessionId),
         'x-helfi-voice-protocol': 'live-v1',
+        'x-helfi-voice-metering': 'server-v1',
+        'x-helfi-voice-attempt-id': `attempt_${Date.now()}_${Math.random().toString(36).slice(2, 14)}`,
         ...(params.greetOnConnect ? { 'x-helfi-voice-greeting': 'bundled-clip' } : {}),
       },
       signal: params.signal,
@@ -1084,6 +1148,12 @@ export async function startHelfiRealtimeVoiceSession(params: {
         throw new Error('The voice service returned an incomplete connection.')
       }
       answerSdp = result.transport.sdp
+      liveUsage.markAllocated()
+      if (result.delegation === 'server') {
+        if (!/^[A-Za-z0-9_-]{1,200}$/.test(result.helfiSession?.id || '')) throw new Error('The voice spending monitor returned no session.')
+        meteredSessionId = result.helfiSession.id
+        liveUsage.markBackendExternallyMetered()
+      }
     }
 
     if (stopped) {
@@ -1108,6 +1178,19 @@ export async function startHelfiRealtimeVoiceSession(params: {
       params.signal?.removeEventListener?.('abort', onAbort)
       throw new Error(readinessError)
     }
+    if (meteredSessionId && !stopped) {
+      voiceJobs = startVoiceSessionJobs({ baseUrl: realtimeApiBaseUrl(), sessionId: meteredSessionId, token: params.token,
+        isCurrent: () => !stopped && !params.signal?.aborted,
+        onJob: async job => {
+          if (stopped || params.signal?.aborted) return { ok: false, saved: false, safeToClaimSaved: false }
+          humanCommandText = job.actualHumanText
+          humanCommandTooLarge = false
+          return executeToolCall({ type: 'function_call', name: 'request_helfi_action', call_id: job.callId, arguments: JSON.stringify(job.args) })
+        },
+        onError: message => { callbacks.onError?.(message); void stopWithFinalUsage(); callbacks.onStatus?.('failed') },
+        onClosed: () => { void stopWithFinalUsage(); callbacks.onStatus?.('closed') },
+      })
+    }
   } catch (error) {
     closeRealtimeConnection()
     params.signal?.removeEventListener?.('abort', onAbort)
@@ -1116,11 +1199,6 @@ export async function startHelfiRealtimeVoiceSession(params: {
 
   if (params.greetOnConnect && !userHasSpoken && !stopped && !params.signal?.aborted) {
     clearSilenceTimer()
-    // Check real local input while asset/native playback is pending as well as
-    // while playing. Caption arrival and remote packet counts are not input.
-    welcomeInputTimer = setInterval(() => {
-      void readVoiceMediaStats(pc).then(stats => { if (!stopped) observeWelcomeInput(stats) })
-    }, 125)
     void localWelcome.start()
   }
 
@@ -1152,7 +1230,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
     stop: async () => {
       params.signal?.removeEventListener?.('abort', onAbort)
       callbacks.onStatus?.('closed')
-      closeRealtimeConnection()
+      await stopWithFinalUsage()
     },
   }
 }

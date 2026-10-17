@@ -94,6 +94,8 @@ model User {
   foodAnalysisFeedback FoodAnalysisFeedback[]
   foodAnalysisJobs FoodAnalysisJob[]
   nativePurchaseClaims NativePurchaseClaim[]
+  voiceFundingLots VoiceFundingLot[]
+  voiceBillingSessions VoiceBillingSession[]
   medicalImageAnalyses MedicalImageAnalysis[]
   foodMissingReports  FoodMissingReport[]
   barcodeCorrections  BarcodeUserCorrection[]
@@ -1535,4 +1537,115 @@ model NativePurchaseClaim {
 
   @@unique([platform, purchaseId])
   @@index([userId])
+}
+
+// Actual settled revenue or an explicitly funded, expiring project test budget.
+// No legacy wallet/catalog amount is automatically treated as revenue proof.
+model VoiceFundingLot {
+  id String @id @default(cuid())
+  userId String
+  kind String
+  sourceKey String @unique
+  revenueEvidenceKey String? @unique
+  sourceBucket String
+  sourceId String
+  cycleStartedAt DateTime?
+  creditsIssued Int @default(0)
+  committedCredits Int @default(0)
+  netUsdMicros BigInt @default(0)
+  providerBudgetCostUnits BigInt
+  spentCostUnits BigInt @default(0)
+  heldCostUnits BigInt @default(0)
+  proof Json
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  allocations VoiceSessionAllocation[]
+  operatorSessions VoiceBillingSession[]
+  @@index([userId, sourceBucket, sourceId])
+}
+
+model VoiceBillingSession {
+  id String @id @default(cuid())
+  userId String
+  billingRunId String
+  mode String
+  state String @default("OPEN")
+  operatorFundingId String?
+  reservedCredits Int
+  chargedCredits Int @default(0)
+  refundedCredits Int @default(0)
+  forfeitedCredits Int @default(0)
+  rateNetUsdMicros BigInt @default(0)
+  rateCredits Int @default(0)
+  marginBps Int @default(5000)
+  providerBudgetCostUnits BigInt
+  spentCostUnits BigInt @default(0)
+  heldCostUnits BigInt @default(0)
+  finalUsageConfirmed Boolean @default(false)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  closedAt DateTime?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  operatorFunding VoiceFundingLot? @relation(fields: [operatorFundingId], references: [id])
+  allocations VoiceSessionAllocation[]
+  reservations VoiceCostReservation[]
+  runtime VoiceSessionRuntime?
+  @@unique([userId, billingRunId])
+  @@index([state, expiresAt])
+}
+
+model VoiceSessionAllocation {
+  id String @id @default(cuid())
+  sessionId String
+  fundingLotId String?
+  bucket String
+  sourceId String
+  cycleStartedAt DateTime?
+  reservedCredits Int
+  chargedCredits Int @default(0)
+  refundedCredits Int @default(0)
+  forfeitedCredits Int @default(0)
+  session VoiceBillingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  fundingLot VoiceFundingLot? @relation(fields: [fundingLotId], references: [id])
+  @@index([sessionId])
+}
+
+model VoiceCostReservation {
+  id String @id @default(cuid())
+  sessionId String
+  key String
+  kind String
+  state String @default("PENDING")
+  providerSessionId String? @unique
+  maxCostUnits BigInt
+  observedCostUnits BigInt @default(0)
+  actualCostUnits BigInt?
+  receiptDigest String?
+  usage Json?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  session VoiceBillingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@unique([sessionId, key])
+}
+
+model VoiceSessionRuntime {
+  id String @id @default(cuid())
+  sessionId String @unique
+  userId String
+  providerSessionId String?
+  state String @default("allocating")
+  expiresAt DateTime
+  leaseTokenHash String?
+  leaseExpiresAt DateTime?
+  lastHeartbeatAt DateTime?
+  configuration Json
+  transcript Json
+  toolJobs Json
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  session VoiceBillingSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  @@index([state, expiresAt])
 }

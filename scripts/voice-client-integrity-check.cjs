@@ -109,7 +109,7 @@ async function verifyVoiceGreetingLifecycle() {
   Object.assign(box, {
     liveVoiceEnabled: true, voiceRecordingSupported: true, checkingRealtimeVoice: false, realtimeVoiceAvailable: true, realtimeVoiceError: '',
     hasNativeRealtimeVoiceSupport: () => true, requestAiDataSharingPermission: async () => true,
-    startHelfiRealtimeVoiceSession: async params => { starts.push(params); params.callbacks.onConnectStage('microphone-sending'); params.callbacks.onStatus('live'); return { stop: async () => {}, setMicrophoneMuted: noop, promptAssistant: noop, flushTranscript: noop } },
+    startHelfiRealtimeVoiceSession: async params => { starts.push(params); params.callbacks.onConnectStage('microphone-sending'); params.callbacks.onConnectStage('welcome-started'); params.callbacks.onConnectStage('welcome-finished'); params.callbacks.onStatus('live'); return { stop: async () => {}, setMicrophoneMuted: noop, promptAssistant: noop, flushTranscript: noop } },
   })
   evaluate(box, `globalThis.start = ${callback('startVoiceSession')}`)
   await box.start()
@@ -123,10 +123,21 @@ async function verifyVoiceGreetingLifecycle() {
   await box.start()
   assert.equal(starts.length, 3, 'End/Close cannot schedule a later greeting')
   const failedBox = baseBox(), attempts = []
-  Object.assign(failedBox, { liveVoiceEnabled: true, voiceRecordingSupported: true, checkingRealtimeVoice: false, realtimeVoiceAvailable: true, realtimeVoiceError: '', hasNativeRealtimeVoiceSupport: () => true, requestAiDataSharingPermission: async () => true, startHelfiRealtimeVoiceSession: async params => { attempts.push(params.greetOnConnect); if (attempts.length === 1) throw Error('Synthetic pre-connection failure'); params.callbacks.onConnectStage('microphone-sending'); return { stop: async () => {}, setMicrophoneMuted: noop, promptAssistant: noop, flushTranscript: noop } } })
+  Object.assign(failedBox, { liveVoiceEnabled: true, voiceRecordingSupported: true, checkingRealtimeVoice: false, realtimeVoiceAvailable: true, realtimeVoiceError: '', hasNativeRealtimeVoiceSupport: () => true, requestAiDataSharingPermission: async () => true, startHelfiRealtimeVoiceSession: async params => { attempts.push(params.greetOnConnect); if (attempts.length === 1) throw Error('Synthetic pre-connection failure'); params.callbacks.onConnectStage('microphone-sending'); if (attempts.length === 2) { params.callbacks.onConnectStage('welcome-started'); params.callbacks.onConnectStage('welcome-interrupted') } else params.callbacks.onConnectStage('welcome-finished'); return { stop: async () => {}, setMicrophoneMuted: noop, promptAssistant: noop, flushTranscript: noop } } })
   evaluate(failedBox, `globalThis.start = ${callback('startVoiceSession')}`)
-  await failedBox.start(); await failedBox.start(); await failedBox.start()
-  assert.deepEqual(attempts, [true, true, false], 'Failure before actual readiness must not consume the first welcome; a later connection retry cannot repeat a completed connection welcome')
+  await failedBox.start(); await failedBox.start(); await failedBox.start(); await failedBox.start()
+  assert.deepEqual(attempts, [true, true, true, false], 'A connection or interrupted playback cannot consume the welcome; only completed playback suppresses a retry')
+  const staleBox = baseBox(), callbacks = []
+  Object.assign(staleBox, { liveVoiceEnabled: true, voiceRecordingSupported: true, checkingRealtimeVoice: false, realtimeVoiceAvailable: true, realtimeVoiceError: '', hasNativeRealtimeVoiceSupport: () => true, requestAiDataSharingPermission: async () => true, startHelfiRealtimeVoiceSession: async params => { callbacks.push(params.callbacks); params.callbacks.onConnectStage('microphone-sending'); return { stop: async () => {}, setMicrophoneMuted: noop, promptAssistant: noop, flushTranscript: noop } } })
+  evaluate(staleBox, `globalThis.start = ${callback('startVoiceSession')}`)
+  await staleBox.start()
+  assert.equal(staleBox.voiceGreetingConversationRef.current, '', 'Microphone readiness alone never consumes the welcome')
+  staleBox.realtimeVoiceRunRef.current += 1
+  callbacks[0].onConnectStage('welcome-finished')
+  assert.equal(staleBox.voiceGreetingConversationRef.current, '', 'A late finish from a stopped run cannot consume the next welcome')
+  await staleBox.start()
+  callbacks[1].onConnectStage('welcome-user-first')
+  assert.equal(staleBox.voiceGreetingConversationRef.current, staleBox.realtimeBillingSessionIdRef.current, 'Verified genuine caller interruption suppresses a later redundant greeting')
 }
 async function draftRequest(text, response, realtime = true, overrides = {}) {
   const box = baseBox()

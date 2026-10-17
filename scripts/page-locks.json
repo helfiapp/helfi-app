@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T01:20:52.527Z",
+  "generatedAt": "2026-10-17T16:32:00.036Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -291,15 +291,18 @@
     "native/src/voice/generalAssistantActions.ts": "571b9a28d6636a19413c70e83cad759615dd14fcf23deea9a86d9e04937a908b",
     "native/src/voice/generalAssistantEffects.ts": "164188218da9b0a7d05959b6d5964184cf9ac16e8c14a72a77a3450ac35aa5d5",
     "native/src/voice/generalAssistantSession.ts": "232ec75f8dd3adf3291bf3a16f12a4aa84a8065b61ba01c82622a546e634f2b8",
+    "native/src/voice/liveVoiceToolTurn.ts": "375f89701c0fe6ae990f9081d0ae41fe04b510bed7bc96b25f3ec262815cb8d7",
+    "native/src/voice/liveVoiceUsage.ts": "6156eb3ac927940c56a8d7323a07c09faf1332a4c00f517839046d185ad7d0ee",
     "native/src/voice/localPreferenceActions.ts": "2854ae410707d18ff5dffc8170aa793540349d3bc3bc0da9b1b3982bee327195",
     "native/src/voice/localVoiceWelcome.ts": "9206670a50b1c89b26d9cd47f339b0cd109dead8303bbd6e858e516703edb80f",
     "native/src/voice/nativeDeviceActions.ts": "4ae6d7de1e6c4a2d1e9fe8e8d7af26f33592c9d0a399ca729c69391745b80e95",
     "native/src/voice/profileVoiceRefresh.ts": "90def57e6d629290b234fd95a542744bc188b859e343550af0b1b1cb22ca9560",
-    "native/src/voice/realtimeVoice.ts": "f308c3b890e822f42ff00ee1d8f0f8de6ed73e5654925959eef5f4fa7306424f",
+    "native/src/voice/realtimeVoice.ts": "30cb17ac763dd8e9a3a3b5c44e2058a75593a316408acc08dbdb6e1c831e94dc",
     "native/src/voice/reportPdfActions.ts": "56d91796e8fcce58fc10b71629ff1a5da3d2f0f046d6fc71da8ba04a527b4ba6",
     "native/src/voice/voiceActionReadRefresh.ts": "4109b5bb3bf669d96731746a728018f2dc284dcc8d19e3c6fe5d822fa85e1ead",
-    "native/src/voice/VoiceAssistant.tsx": "75acecfe0fe9c267471594167fd76a528f372f2d88801ba87eceeeb818ee9605",
+    "native/src/voice/VoiceAssistant.tsx": "a4283dc878e8799184691acfb04368e4971cbf695bbb3ddddb9e52ff948b6d7a",
     "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e",
-    "native/src/voice/voiceCapabilityManifest.ts": "4dcfd38fe04f9e2ee28a5e36f1a1b04c2cd2ddc38849d803ea9f49a8916ec366"
+    "native/src/voice/voiceCapabilityManifest.ts": "4dcfd38fe04f9e2ee28a5e36f1a1b04c2cd2ddc38849d803ea9f49a8916ec366",
+    "native/src/voice/voiceSessionJobs.ts": "5ac3a1f73dfea10a08c789e081dc725b731af58c3b78b749342f88fecb753f54"
   }
 }

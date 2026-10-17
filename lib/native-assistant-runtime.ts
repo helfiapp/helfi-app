@@ -198,7 +198,33 @@ export function createAssistantRuntime(options: AssistantRuntimeOptions) {
           // never reaches this branch until its exact result is recovered.
           const retained = session.steps.filter(item => item.status === 'completed')
           const requiredPrevious = new Set<string>(), existingIds = new Set(retained.map(item => item.id))
-          command.steps.forEach(item => references(item?.values, ref => { if (existingIds.has(ref.$from)) requiredPrevious.add(ref.$from) }))
+          // Planner step names belong to one new plan. They are not durable
+          // action/replay identities, and ordinary later plans may reuse them.
+          const localIds = new Set<string>()
+          command.steps.forEach(step => {
+            keys(step, ['id', 'operation', 'values'])
+            if (!/^[A-Za-z0-9_-]{1,80}$/.test(step.id) || localIds.has(step.id) || !step.values || typeof step.values !== 'object' || Array.isArray(step.values)) return fail('invalid_plan', 'Each action needs its own name and fields.')
+            localIds.add(step.id)
+          })
+          const reservedIds = new Set([...existingIds, ...localIds]), scopedIds = new Map<string, string>()
+          command.steps.forEach(step => {
+            let id = step.id, attempt = 0
+            if (existingIds.has(id)) {
+              do { id = `step_${digest({ actorId: context.actorId, sessionId, revision: session.revision, localId: step.id, attempt: attempt++ }).slice(0, 40)}` } while (reservedIds.has(id))
+            }
+            scopedIds.set(step.id, id); reservedIds.add(id)
+          })
+          const scopeValues = (value: any): any => {
+            if (reference(value)) {
+              if (existingIds.has(value.$from) && localIds.has(value.$from)) return fail('invalid_reference', 'That result name refers to both an earlier result and a new action. Please choose an unambiguous result.')
+              return { ...copy(value), $from: scopedIds.get(value.$from) ?? value.$from }
+            }
+            if (Array.isArray(value)) return value.map(scopeValues)
+            if (value && typeof value === 'object') return Object.fromEntries(Object.entries(value).map(([key, item]) => [key, scopeValues(item)]))
+            return value
+          }
+          const planned = command.steps.map(step => ({ ...copy(step), id: scopedIds.get(step.id)!, values: scopeValues(step.values) as AssistantArguments }))
+          planned.forEach(item => references(item.values, ref => { if (existingIds.has(ref.$from)) requiredPrevious.add(ref.$from) }))
           let previous = retained.map(item => { const compact = { ...item, values: {} }; delete compact.prepared; delete compact.reviewDigest; delete compact.reviewedAt; return compact })
           const prunePrevious = () => {
             const removable = previous.findIndex(item => !requiredPrevious.has(item.id))
@@ -207,7 +233,7 @@ export function createAssistantRuntime(options: AssistantRuntimeOptions) {
           }
           while (previous.length + command.steps.length > 20) prunePrevious()
           const ids = new Set(previous.map(item => item.id))
-          const added = command.steps.map(step => {
+          const added = planned.map(step => {
             keys(step, ['id', 'operation', 'values'])
             if (!/^[A-Za-z0-9_-]{1,80}$/.test(step.id) || ids.has(step.id) || !step.values || typeof step.values !== 'object' || Array.isArray(step.values)) return fail('invalid_plan', 'Each action needs its own name and fields.')
             const op = operation(context, step.operation)

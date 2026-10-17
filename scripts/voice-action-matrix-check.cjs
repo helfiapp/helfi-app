@@ -9,6 +9,15 @@ const vm = require('node:vm')
 const crypto = require('node:crypto')
 const ts = require('typescript')
 const root = path.resolve(__dirname, '..')
+// A private VM clock lets relative-day suites freeze their own test date.
+// Extracted consumers retain the process time until they explicitly opt in;
+// no caller can change the process Date or another extracted fixture's clock.
+let fixtureNow = null
+class FixtureDate extends Date {
+  constructor(...args) { super(...(args.length ? args : [fixtureNow ?? Date.now()])) }
+  static now() { return fixtureNow ?? Date.now() }
+  static setNow(value) { assert(Number.isFinite(value)); fixtureNow = value }
+}
 const allowed = new Set(['lib/native-voice-food-copy.ts', 'lib/native-voice-mood-context.ts', 'lib/native-voice-spoken-quantities.ts', 'lib/native-voice-time.ts', 'lib/exercise/voice-duration.ts', 'native/src/lib/foodUnits.ts', 'lib/food/serving-measurements.ts', 'lib/food/measurement-units.ts', 'lib/food/produce-measurements.ts', 'lib/food/dry-food-measurements.ts', 'lib/food/dairy-semi-solid-measurements.ts'])
 const modules = new Map()
 function actual(relative) {
@@ -17,7 +26,7 @@ function actual(relative) {
   const module = { exports: {} }
   const requireLocal = (name) => name==='crypto'&&relative==='lib/native-voice-food-copy.ts'?crypto:actual(path.posix.normalize(path.posix.join(path.posix.dirname(relative), name)) + '.ts')
   const code = ts.transpileModule(fs.readFileSync(path.join(root, relative), 'utf8'), { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText
-  vm.runInNewContext(code, { module, exports: module.exports, require: requireLocal, Intl, Date }, { filename: relative })
+  vm.runInNewContext(code, { module, exports: module.exports, require: requireLocal, Intl, Date: FixtureDate }, { filename: relative })
   modules.set(relative, module.exports)
   return module.exports
 }
@@ -32,7 +41,7 @@ let charges = []
 const ctx = vm.createContext({
   ...actual('lib/native-voice-mood-context.ts'),
   ...actual('lib/native-voice-food-copy.ts'),
-  process: { env: Object.freeze({}) }, Date, Intl, URL, URLSearchParams, Buffer, crypto, NextRequest: Request,
+  process: { env: Object.freeze({}) }, Date: FixtureDate, Intl, URL, URLSearchParams, Buffer, crypto, NextRequest: Request,
   console: { log() {}, warn() {}, error() {} },
   fetch() { throw Error('Network forbidden') }, OpenAI: class { constructor() { throw Error('Provider client forbidden') } },
   ...actual('lib/food/serving-measurements.ts'), ...actual('lib/native-voice-time.ts'), ...actual('lib/exercise/voice-duration.ts'), ...actual('lib/native-voice-spoken-quantities.ts'),
@@ -76,6 +85,7 @@ function proposal(result, action, canConfirm = true) {
   return result.body.draft
 }
 async function run() {
+  FixtureDate.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
   const actions = [
     ['natural positive mood', 'I am feeling good today', 'mood', (d) => assert(d.mood.mood >= 5)],
     ['natural sad mood', 'I feel sad today', 'mood', (d) => assert(d.mood.mood <= 3)],

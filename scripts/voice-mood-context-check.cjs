@@ -61,7 +61,8 @@ async function main(){
   await check('actual preparation POST returns exact bare note date and review without executing a mood save',async()=>{
     const fixtureSource=fs.readFileSync(path.join(root,'scripts/voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const boundary=fixtureSource.indexOf('async function run() {');assert(boundary>0,'Use only the existing offline route fixture declarations')
-    const prepare=new Function('require','__dirname',fixtureSource.slice(0,boundary)+'\nreturn {send}')(require,__dirname)
+    const prepare=new Function('require','__dirname',fixtureSource.slice(0,boundary)+'\nreturn {send,ctx}')(require,__dirname)
+    prepare.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
     for(const[text,note]of [["Log my mood as five out of seven for today. Note: Voice review check only. Don't save it yet.",'Voice review check only.'],['Log my mood as five out of seven for today. Note: "save it". Don’t save it yet.','save it'],["Log my mood as five out of seven for today. Don't save it yet.",'']]){
       const response=await prepare.send(text,{launchContext:{section:'mood',title:'Mood Tracker'}})
       assert.equal(response.status,200);assert.equal(response.body.draft.action,'mood');assert.equal(response.body.draft.mood.mood,5);assert.equal(response.body.draft.mood.note,note);assert.equal(response.body.draft.localDate,date);assert.equal(response.body.draft.autoSave,false);assert.equal(response.body.confirmNow,undefined);assert.equal(response.body.draft.canConfirm,true)

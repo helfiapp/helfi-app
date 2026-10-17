@@ -38,6 +38,11 @@ const voiceAssistantSource = fs.existsSync(voiceAssistantPath) ? fs.readFileSync
 const realtimeClientSource = fs.existsSync(realtimeClientPath) ? fs.readFileSync(realtimeClientPath, 'utf8') : ''
 const audioRouteSource = fs.existsSync(audioRoutePath) ? fs.readFileSync(audioRoutePath, 'utf8') : ''
 const creditSystemSource = fs.existsSync(creditSystemPath) ? fs.readFileSync(creditSystemPath, 'utf8') : ''
+const commandToolSource = fs.readFileSync(path.join(root, 'lib/native-assistant-command-tool.ts'), 'utf8')
+const meteredStartupSource = fs.readFileSync(path.join(root, 'lib/voice-session-start.ts'), 'utf8')
+const financialLedgerSource = fs.readFileSync(path.join(root, 'lib/voice-session-ledger.ts'), 'utf8')
+const voiceWorkerSource = fs.readFileSync(path.join(root, 'services/voice-session-worker/index.mjs'), 'utf8')
+const coreActionSource = fs.readFileSync(path.join(root, 'lib/native-assistant-core-actions.ts'), 'utf8')
 let voiceDurationSource = fs.readFileSync(voiceDurationPath, 'utf8')
 voiceDurationSource = voiceDurationSource.replace(/^export\s+/gm, '')
 source = source
@@ -77,21 +82,21 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
   assert(isRejectingDraftText('откажи'), 'Macedonian cancel must reject a reviewed draft.')
   assert(isRejectingDraftText('не зачувувај'), 'Macedonian do-not-save must reject a reviewed draft.')
   assert(/any language, mixed languages, messy dictation/.test(__routeSource), 'AI command understanding must explicitly support any-language messy speech.')
-  assert(__realtimeRouteSource.includes('transcription: {') && __realtimeRouteSource.includes('model: REALTIME_TRANSCRIPTION_MODEL'), 'Realtime voice must request input transcripts for the chat review after voice mode.')
-  assert(!__realtimeRouteSource.includes("language: 'en'"), 'Realtime voice transcripts must not force an English-only hint because Talk to Helfi supports messy and mixed-language speech.')
-  assert(__realtimeRouteSource.includes("output_modalities: ['audio']"), 'Realtime voice must explicitly request spoken assistant replies.')
-  assert(__realtimeRouteSource.includes("|| 'gpt-realtime-2.1'"), 'Realtime voice must default to the current documented OpenAI realtime model.')
-  assert(__realtimeRouteSource.includes("reasoning: {") && __realtimeRouteSource.includes("effort: 'low'"), 'Realtime voice must use low reasoning effort for faster natural turn-taking.')
-  assert(__realtimeRouteSource.includes("type: 'semantic_vad'") && __realtimeRouteSource.includes("eagerness: 'high'") && __realtimeRouteSource.includes('interrupt_response: true'), 'Realtime voice turn-taking must use fast semantic VAD with natural interruption support.')
-  assert(__realtimeRouteSource.includes("noise_reduction: {") && __realtimeRouteSource.includes("type: 'near_field'") && __realtimeRouteSource.includes('Avoid clipped, robotic, or repetitive phrasing'), 'Realtime voice must reduce close-microphone noise and explicitly request warm, natural speech.')
-  assert(__realtimeRouteSource.includes('Do not read the full ingredient list, nutrient breakdown, macros, or cooking steps unless the user asks'), 'Realtime meal suggestions must offer details instead of reading every ingredient and nutrient aloud.')
-  assert(__realtimeRouteSource.includes('HELFI_VOICE_REALTIME_ENABLED') && __realtimeRouteSource.includes('live_voice_paused'), 'Realtime voice backend must stay behind an explicit server-side enable flag.')
-  assert(__realtimeRouteSource.includes('abortController') && __realtimeRouteSource.includes('live_voice_cancelled') && __realtimeRouteSource.includes('request.signal?.aborted'), 'Realtime voice backend must cancel aborted startup requests before charging.')
-  assert(/call request_helfi_action before answering/.test(__realtimeRouteSource), 'Realtime voice must call the app action tool before answering app-action requests.')
-  assert(/Do not answer app-action requests from general knowledge/.test(__realtimeRouteSource), 'Realtime voice must not answer app actions as generic chat.')
-  assert(/walking, running, steps, calories burned/.test(__realtimeRouteSource), 'Realtime voice must treat exercise steps/calories as app actions.')
-  assert(/Do not invent or suggest a workout routine unless the user explicitly asks/.test(__realtimeRouteSource), 'Realtime voice must not turn exercise logging into invented workout routines.')
-  assert(__realtimeRouteSource.includes("'health_image_note'") && __realtimeRouteSource.includes("'insights'") && __realtimeRouteSource.includes("'navigate'"), 'Realtime voice tool schema must keep app handoff action names available.')
+  assert(__realtimeClientSource.includes('session.input_transcript.delta') && __voiceWorkerSource.includes('session.input_transcript.delta') && __voiceWorkerSource.includes('actualHumanText'), 'Live voice must retain actual human transcripts in both display and the server-owned action evidence.')
+  assert(!__realtimeRouteSource.includes("language: 'en'"), 'Live voice must preserve mixed-language speech without forcing an English-only transcription hint.')
+  assert(__realtimeRouteSource.includes('audio: { output: { voice: REALTIME_VOICE } }') && __realtimeClientSource.includes('enableRemoteAudioTrack'), 'Live voice must configure spoken output and enable its actual returned audio tracks.')
+  assert(__realtimeRouteSource.includes("const LIVE_MODEL = 'gpt-live-1'") && !__realtimeRouteSource.includes('HELFI_VOICE_LIVE_MODEL ||'), 'Live voice must use the fixed model supported by the measured spending policy.')
+  assert(__realtimeRouteSource.includes("delegation: { type: 'client' }") && __meteredStartupSource.includes("backendModel: 'gpt-6-luna'") && __voiceWorkerSource.includes("value.backendModel !== 'gpt-6-luna'"), 'The server monitor must own the fixed priced Luna backend; Live cannot launch an unrestricted Responses delegate.')
+  assert(__realtimeRouteSource.includes('Listen naturally while speaking. Let the user finish, including pauses and self-corrections.') && __realtimeClientSource.includes('stopOpeningWelcome'), 'Live voice must support natural turn-taking and stop its opening recording when the caller takes over.')
+  assert(__realtimeClientSource.includes('noiseSuppression: true') && __realtimeClientSource.includes('echoCancellation: true') && __realtimeRouteSource.includes('warm, calm and concise'), 'Live voice must preserve microphone noise control and request warm, natural speech.')
+  assert(__realtimeRouteSource.includes('Keep meal suggestions brief: name and one reason, then offer ingredients/nutrients or cooking steps.'), 'Live meal suggestions must offer details instead of reading every ingredient and nutrient aloud.')
+  assert(__realtimeRouteSource.includes('HELFI_VOICE_REALTIME_ENABLED') && __realtimeRouteSource.includes('live_voice_paused'), 'Live voice backend must stay behind an explicit server-side enable flag.')
+  assert(__realtimeRouteSource.includes('live_voice_cancelled') && __realtimeRouteSource.includes('request.signal.aborted') && __meteredStartupSource.includes('request.signal.addEventListener') && __meteredStartupSource.includes('voice_cancelled'), 'Live startup must reject cancellation before allocation and retain independent covered cleanup after allocation.')
+  assert(__commandToolSource.includes('Use request_helfi_action with action assistant_plan and structured assistantCommand for every app action or factual owned-data request.'), 'Live voice must use the shared registered action tool for app requests and owned information.')
+  assert(__commandToolSource.includes('Read actual current data first when needed; never invent totals, targets, nutrition, stored records or successful outcomes.'), 'Live voice must use actual app data rather than answer owned requests from generic knowledge.')
+  assert(__coreActionSource.includes("id: 'exercise.create'") && __coreActionSource.includes('steps: number(') && __coreActionSource.includes('caloriesKcal: number('), 'The shared registry must retain measured exercise steps and calories as real app-action fields.')
+  assert(__commandToolSource.includes('Choose and combine only the registered operations below.') && __commandToolSource.includes('Never choose endpoints, accounts or arbitrary database fields.'), 'Voice planning cannot invent exercise routines or app actions outside the registered contracts.')
+  assert(__commandToolSource.includes('enum: config.actions.map(action => action.id)') && __routeSource.includes("'health_image_note'") && __routeSource.includes("'insights'") && __routeSource.includes("'navigate'"), 'The structured tool must use discovered operation IDs while existing native app handoff handlers stay available.')
   assert(normalizeRealtimeActionHint({ action: 'health_image_note', needsReview: false })?.action === 'app_handoff', 'Realtime health image note hints must map to the safe app handoff path.')
   assert(normalizeRealtimeActionHint({ action: 'insights', needsReview: false })?.action === 'app_handoff', 'Realtime insights hints must map to the safe app handoff path.')
   assert(normalizeRealtimeActionHint({ action: 'navigate', needsReview: false })?.action === 'app_handoff', 'Realtime navigation hints must map to the safe app handoff path.')
@@ -123,7 +128,8 @@ async function __runNativeVoiceCommandBehaviorAssertions() {
     assert(__realtimeClientSource.includes("payload.type === 'error'") && __realtimeClientSource.includes('realtimeErrorMessage(payload)'), 'Native realtime must surface voice-service errors instead of silently waiting forever.')
     assert(__realtimeClientSource.includes('payload.response.output.filter') && __realtimeClientSource.includes('toolCalls.some(handleToolCall)'), 'Native realtime must recover completed action tool calls from the final response event.')
     assert(__realtimeClientSource.includes("'x-helfi-voice-session-id': cleanText(params.billingSessionId)") && __voiceAssistantSource.includes('realtimeBillingSessionIdRef'), 'Native realtime retries must keep one billing session ID for the same voice conversation.')
-    assert(__realtimeRouteSource.includes('.chargeCentsOnce(chargeCents') && __realtimeRouteSource.includes('voice-assistant:realtime-charge-marker') && __creditSystemSource.includes('async chargeCentsOnce') && __creditSystemSource.includes('pg_advisory_xact_lock(hashtext(\${this.userId}))') && __creditSystemSource.includes('chargeCentsInTransaction(costCents, tx)') && __creditSystemSource.includes('tx.aIUsageEvent.create'), 'Realtime billing retries must atomically save a persistent marker so the same conversation is charged at most once.')
+    assert(__realtimeRouteSource.includes('startMeteredLiveVoiceSession') && !__realtimeRouteSource.includes('realtime-charge-marker') && __meteredStartupSource.includes('if (!financial.newlyCreated)') && __meteredStartupSource.includes('await sendVoiceWatchdog(job)') && __meteredStartupSource.includes('await dispatchVoiceSessionWorker(job)') && __financialLedgerSource.includes('reserveVoiceCreditsInTransaction') && __financialLedgerSource.includes('voiceCreditsForCumulativeCost') && __financialLedgerSource.includes("state: 'UNCERTAIN', finalUsageConfirmed: false"), 'Live attempts require one durable covered allocation and ready independent monitor; unknown usage cannot release holds or masquerade as a flat paid reconnect.')
+    assert(__creditSystemSource.includes('async chargeCentsOnce') && __creditSystemSource.includes('pg_advisory_xact_lock(hashtext(\${this.userId}))') && __creditSystemSource.includes('chargeCentsInTransaction(costCents, tx)') && __creditSystemSource.includes('tx.aIUsageEvent.create'), 'Existing shared credit claims must retain their atomic wallet lock and durable receipt.')
     assert(__realtimeClientSource.includes('requireHelfiAudioRoute') && __realtimeClientSource.includes('HelfiAudioRouteChanged') && __realtimeClientSource.includes('onAudioRoute'), 'Native realtime must use the iPhone audio-route bridge and show route changes.')
     assert(__audioRouteSource.includes('RTCAudioSession.sharedInstance') && __audioRouteSource.includes('lockForConfiguration') && __audioRouteSource.includes('setWebRTCConfiguration') && __audioRouteSource.includes('AVAudioSessionCategoryOptionDefaultToSpeaker') && __audioRouteSource.includes('AVAudioSessionCategoryOptionAllowBluetoothHFP') && __audioRouteSource.includes('AVAudioSessionInterruptionNotification'), 'The iPhone audio bridge must use the WebRTC audio controller, default to the speaker, preserve Bluetooth microphone routing, and detect interruptions.')
     assert(__voiceAssistantSource.includes('realtimeVoiceAbortRef') && __voiceAssistantSource.includes('abortController?.abort()'), 'Native live voice Done/Close must abort connecting realtime sessions before they finish.')
@@ -1776,6 +1782,11 @@ const sandbox = {
   createNativeVoicePromptHandoff: async () => ({ token: 'test-private-token' }),
   __routeSource: source,
   __realtimeRouteSource: realtimeSource,
+  __commandToolSource: commandToolSource,
+  __meteredStartupSource: meteredStartupSource,
+  __financialLedgerSource: financialLedgerSource,
+  __voiceWorkerSource: voiceWorkerSource,
+  __coreActionSource: coreActionSource,
   __creditSystemSource: creditSystemSource,
   __nativeSourcesAvailable: Boolean(voiceAssistantSource && realtimeClientSource),
   __realtimeClientSource: realtimeClientSource,

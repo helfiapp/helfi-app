@@ -110,6 +110,7 @@ async function run(){
   await check('same-brand AU separate-size rows support HJ and KFC correction chains and preserve other foods and counts',async()=>{
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'');const at=matrix.indexOf('async function run() {')
     const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
     const stored=[...capturedOtherRestaurantRows(),...capturedSizeMenuRows()]
     real.ctx.getCustomPackagedItems=mappedStoredCatalog(stored);real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
     real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
@@ -133,9 +134,11 @@ async function run(){
   })
   await check('real HMAC attests only unchanged recoverable false reviews; false, flipped, foreign, stale and tampered reviews cannot save',async()=>{
     const source=fs.readFileSync(path.join(__dirname,'voice-save-integrity-check.cjs'),'utf8').replace(/^#!.*\n/,'');const end=source.indexOf('async function run() {');assert(end>0)
-    const proof=new Function('require','__dirname',source.slice(0,end)+'\nreturn {tokens,harness,AuditDate}')(require,__dirname);proof.AuditDate.setNow(Date.now())
+    const proof=new Function('require','__dirname',source.slice(0,end)+'\nreturn {tokens,harness,AuditDate}')(require,__dirname)
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'');const at=matrix.indexOf('async function run() {')
     const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
+    proof.AuditDate.setNow(real.ctx.Date.now())
     real.ctx.signNativeVoiceDraft=proof.tokens.signNativeVoiceDraft;real.ctx.verifyNativeVoiceDraft=proof.tokens.verifyNativeVoiceDraft
     real.ctx.getCustomPackagedItems=mappedStoredCatalog(capturedSizeMenuRows());real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'));real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
     let providers=0;real.ctx.searchDiaryFoods=async()=>{providers++;throw Error('No provider')}
@@ -148,7 +151,7 @@ async function run(){
     assert.equal((await confirm(pending)).status,400);assert.equal((await confirm({...pending,canConfirm:true,action:'food_build_meal'})).status,400)
     const tampered=JSON.parse(JSON.stringify(original));tampered.food.nutrition.calories+=1
     const foreign={...original,reviewToken:proof.tokens.signNativeVoiceDraft('another-owner',original)}
-    const stale={...original,reviewIssuedAt:Date.now()-31*60*1000};stale.reviewToken=proof.tokens.signNativeVoiceDraft('synthetic-user',stale)
+    const stale={...original,reviewIssuedAt:proof.AuditDate.now()-31*60*1000};stale.reviewToken=proof.tokens.signNativeVoiceDraft('synthetic-user',stale)
     for(const invalid of [tampered,foreign,stale,{...original,reviewToken:undefined}]){
       assert.equal((await confirm(invalid)).status,400)
       const result=(await real.send('Change the chips to jumbo.',{confirmationDraft:invalid})).body.draft
@@ -165,6 +168,7 @@ async function run(){
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const at=matrix.indexOf('async function run() {');assert(at>0)
     const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
     real.ctx.getCustomPackagedItems=mappedStoredCatalog([...capturedStoredMenuRows(),...capturedSizeMenuRows()])
     real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
     real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
@@ -204,6 +208,7 @@ async function run(){
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const at=matrix.indexOf('async function run() {');assert(at>0)
     const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
     real.ctx.getCustomPackagedItems=mappedStoredCatalog(capturedSizeMenuRows())
     real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
     real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
@@ -239,6 +244,7 @@ async function run(){
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const at=matrix.indexOf('async function run() {');assert(at>0)
     const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
     real.ctx.getCustomPackagedItems=mappedStoredCatalog([...capturedOtherRestaurantRows(),...capturedStoredMenuRows()])
     real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
     real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'});real.ctx.getOpenAIClient=()=>null
@@ -315,6 +321,7 @@ async function run(){
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const at=matrix.indexOf('async function run() {');assert(at>0)
     const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
     const rows=actualMenuRows();real.ctx.getCustomPackagedItems=async()=>rows
     real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
     real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'})
@@ -336,6 +343,7 @@ async function run(){
     const matrix=fs.readFileSync(path.join(__dirname,'voice-action-matrix-check.cjs'),'utf8').replace(/^#!.*\n/,'')
     const at=matrix.indexOf('async function run() {');assert(at>0)
     const real=new Function('require','__dirname',matrix.slice(0,at)+'\nreturn {ctx,send}')(require,__dirname)
+    real.ctx.Date.setNow(Date.parse('2026-10-17T01:00:00.000Z'))
     real.ctx.getCustomPackagedItems=mappedStoredCatalog(capturedStoredMenuRows())
     real.ctx.verifiedVoiceMenuAliases=JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8'))
     real.ctx.prisma.user.findUnique=async()=>({id:'synthetic-user',country:'AU'})

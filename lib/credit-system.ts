@@ -19,6 +19,15 @@ export const CREDIT_COSTS = {
 
 export type FeatureType = keyof typeof CREDIT_COSTS;
 
+// Exact original buckets for a voice precharge. The durable voice ledger owns
+// idempotency and must hold the normal per-user advisory transaction lock.
+export type VoiceCreditAllocation = {
+  bucket: 'monthly' | 'additional' | 'topup';
+  sourceId: string;
+  cycleStartedAt: string | null;
+  credits: number;
+};
+
 const CREDIT_CHARGE_TRANSACTION_OPTIONS = {
   maxWait: 10000,
   timeout: 20000,
@@ -202,7 +211,12 @@ export class CreditManager {
   }
 
   async getWalletStatus() {
-    await this.ensureMonthlyReset();
+    // A stale status read must not reset usage after a concurrent paid voice
+    // reservation. Use the same lock as every actual wallet charge.
+    await prisma.$transaction(async (tx) => {
+      await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${this.userId}))`;
+      await this.ensureMonthlyReset(new Date(), tx);
+    }, CREDIT_CHARGE_TRANSACTION_OPTIONS);
     const user = await prisma.user.findUnique({
       where: { id: this.userId },
       include: { subscription: true },
@@ -274,7 +288,7 @@ export class CreditManager {
    * Consumes monthly allowance first, then earliest-expiring top-ups (FIFO).
    * Returns true if the charge succeeded, false if insufficient funds.
    */
-  private async chargeCentsInTransaction(costCents: number, tx: any): Promise<boolean> {
+  private async chargeCentsInTransaction(costCents: number, tx: any, voiceReceipt?: VoiceCreditAllocation[]): Promise<boolean> {
     await this.ensureMonthlyReset(new Date(), tx);
 
     const user = await tx.user.findUnique({
@@ -321,6 +335,7 @@ export class CreditManager {
         where: { id: this.userId },
         data: { walletMonthlyUsedCents: (monthlyUsedCents + fromMonthly) as any },
       });
+      voiceReceipt?.push({ bucket: 'monthly', sourceId: user.subscription.id, cycleStartedAt: user.walletMonthlyResetAt?.toISOString() || null, credits: fromMonthly });
       toCharge -= fromMonthly;
     }
 
@@ -337,6 +352,7 @@ export class CreditManager {
           },
         },
       });
+      voiceReceipt?.push({ bucket: 'additional', sourceId: this.userId, cycleStartedAt: null, credits: fromAdditional });
       toCharge -= fromAdditional;
     }
 
@@ -351,6 +367,7 @@ export class CreditManager {
         where: { id: tu.id },
         data: { usedCents: tu.usedCents + consume },
       });
+      voiceReceipt?.push({ bucket: 'topup', sourceId: tu.id, cycleStartedAt: null, credits: consume });
       toCharge -= consume;
       if (toCharge <= 0) break;
     }
@@ -374,6 +391,45 @@ export class CreditManager {
   async chargeFoodJobInTransaction(costCents: number, tx: any): Promise<boolean> {
     if (costCents <= 0) return true;
     return this.chargeCentsInTransaction(costCents, tx);
+  }
+
+  async reserveVoiceCreditsInTransaction(credits: number, tx: any): Promise<VoiceCreditAllocation[] | null> {
+    if (!Number.isSafeInteger(credits) || credits <= 0) throw new Error('Invalid voice credit reservation');
+    const allocations: VoiceCreditAllocation[] = [];
+    return await this.chargeCentsInTransaction(credits, tx, allocations) ? allocations : null;
+  }
+
+  async refundVoiceCreditsInTransaction(allocations: VoiceCreditAllocation[], tx: any): Promise<{ refundedCredits: number; forfeitedCredits: number }> {
+    await this.ensureMonthlyReset(new Date(), tx);
+    let refundedCredits = 0, forfeitedCredits = 0;
+    for (const allocation of allocations) {
+      const credits = allocation.credits;
+      if (!Number.isSafeInteger(credits) || credits < 0) throw new Error('Invalid voice credit refund');
+      if (!credits) continue;
+      if (allocation.bucket === 'monthly') {
+        const user = await tx.user.findUnique({ where: { id: this.userId }, include: { subscription: true } });
+        const cycle = user?.walletMonthlyResetAt?.toISOString() || null;
+        if (cycle !== allocation.cycleStartedAt || user?.subscription?.id !== allocation.sourceId) {
+          // An old month's unused reservation must not become next month's
+          // allowance or non-expiring additional credits.
+          forfeitedCredits += credits;
+          continue;
+        }
+        if (user.walletMonthlyUsedCents < credits) throw new Error('Voice monthly refund exceeds original bucket');
+        await tx.user.update({ where: { id: this.userId }, data: { walletMonthlyUsedCents: { decrement: credits } } });
+      } else if (allocation.bucket === 'additional') {
+        if (allocation.sourceId !== this.userId) throw new Error('Voice additional refund account mismatch');
+        await tx.user.update({ where: { id: this.userId }, data: { additionalCredits: { increment: credits } } });
+      } else if (allocation.bucket === 'topup') {
+        const topup = await tx.creditTopUp.findUnique({ where: { id: allocation.sourceId } });
+        if (!topup || topup.userId !== this.userId || topup.usedCents < credits) throw new Error('Voice top-up refund exceeds original bucket');
+        // Refund the same row even after expiry; its original expiry remains
+        // unchanged and the refund cannot resurrect spendable credit.
+        await tx.creditTopUp.update({ where: { id: topup.id }, data: { usedCents: { decrement: credits } } });
+      } else throw new Error('Unknown voice refund bucket');
+      refundedCredits += credits;
+    }
+    return { refundedCredits, forfeitedCredits };
   }
 
   async chargeCentsOnce(costCents: number, options: {

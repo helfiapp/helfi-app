@@ -1481,12 +1481,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [])
 
   const resumeVoiceSessionListening = useCallback((delayMs = 450) => {
+    if (liveVoiceEnabled) return
     if (!voiceSessionActiveRef.current || !openRef.current || !voiceRecordingSupported) return
     setTimeout(() => {
       if (!voiceSessionActiveRef.current || !openRef.current || recordingStoppingRef.current) return
       void startRecordingRef.current()
     }, delayMs)
-  }, [voiceRecordingSupported])
+  }, [liveVoiceEnabled, voiceRecordingSupported])
 
   const clearVoiceTurnTimers = useCallback(() => {
     if (voiceTurnMaxTimerRef.current) {
@@ -3149,7 +3150,9 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         callbacks: {
           onConnectStage: (stage) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
-            if (stage === 'microphone-sending' && greetOnConnect) voiceGreetingConversationRef.current = billingSessionId
+            // Connecting the microphone is not proof that the welcome played.
+            // Failed or interrupted playback must remain eligible on retry.
+            if (greetOnConnect && (stage === 'welcome-finished' || stage === 'welcome-user-first')) voiceGreetingConversationRef.current = billingSessionId
             if (stage === 'local-offer-ready') {
               armRealtimeConnectTimeout(REALTIME_VOICE_SERVER_TIMEOUT_MS)
             }
@@ -3639,18 +3642,17 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         <>
           <Modal visible={open} animationType="fade" presentationStyle="fullScreen" onRequestClose={() => closePanel()}>
             <View style={[styles.panel, showingLiveVoiceExperience && styles.liveVoicePanel]}>
-              {!showingLiveVoiceExperience ? <View style={styles.header}>
-                <View>
-                  <Text style={styles.title}>{launchCopy.title}</Text>
-                  <Text style={styles.subtitle}>{launchCopy.subtitle}</Text>
+              {!showingLiveVoiceExperience ? <View style={[styles.header, { paddingTop: Math.max(insets.top, 12) + 12, paddingLeft: Math.max(insets.left, 16), paddingRight: Math.max(insets.right, 16) }]}>
+                <View style={styles.headerCopy}>
+                  <Text style={styles.title} numberOfLines={1}>{launchCopy.title}</Text>
+                  <Text style={styles.subtitle} numberOfLines={2}>{launchCopy.subtitle}</Text>
                 </View>
                 <View style={styles.headerActions}>
                   {typedMode ? <Pressable accessibilityRole="button" accessibilityLabel="Read voice transcript" onPress={endVoiceSession} style={styles.iconButton}>
                     <Feather name="file-text" size={20} color={theme.colors.text} />
                   </Pressable> : null}
-                  <Pressable accessibilityRole="button" accessibilityLabel="Delete chat" onPress={deleteChatAndClose} style={styles.deleteChatButton}>
-                    <Feather name="trash-2" size={16} color="#B42318" />
-                    <Text style={styles.deleteChatText}>Delete chat</Text>
+                  <Pressable accessibilityRole="button" accessibilityLabel="Delete chat" accessibilityHint="Clear the saved conversation on this device" onPress={deleteChatAndClose} style={styles.deleteChatButton}>
+                    <Feather name="trash-2" size={20} color="#B42318" />
                   </Pressable>
                   <Pressable accessibilityRole="button" accessibilityLabel="Close" onPress={() => closePanel()} style={styles.iconButton}>
                     <Feather name="x" size={22} color={theme.colors.text} />
@@ -4311,20 +4313,19 @@ const styles = StyleSheet.create({
   liveVoicePanel: { backgroundColor: '#FFFFFF' },
   scroll: { flex: 1 },
   header: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
     paddingBottom: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
     borderBottomColor: '#DCE8DF',
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
+    gap: 12,
     backgroundColor: '#FFFFFF',
   },
-  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  deleteChatButton: { minHeight: 42, paddingHorizontal: 10, borderRadius: 21, flexDirection: 'row', alignItems: 'center', gap: 6, backgroundColor: '#FFF1F0' },
-  deleteChatText: { color: '#B42318', fontSize: 13, fontWeight: '700' },
-  title: { fontSize: 24, fontWeight: '700', color: theme.colors.text },
+  headerCopy: { flex: 1, minWidth: 0 },
+  headerActions: { flexDirection: 'row', alignItems: 'center', gap: 8, flexShrink: 0 },
+  deleteChatButton: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center', backgroundColor: '#FFF1F0' },
+  title: { fontSize: 22, fontWeight: '700', color: theme.colors.text },
   subtitle: { marginTop: 4, color: theme.colors.muted, fontWeight: '700' },
   iconButton: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: '#EFF5F1' },
   liveCameraPanel: { flex: 1, backgroundColor: '#07110A' },

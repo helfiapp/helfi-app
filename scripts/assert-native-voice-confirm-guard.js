@@ -209,12 +209,13 @@ if (
   !/const REALTIME_VOICE_SERVER_TIMEOUT_MS = 12000/.test(native) ||
   !/const REALTIME_VOICE_MEDIA_TIMEOUT_MS = 4000/.test(native) ||
   !/armRealtimeConnectTimeout\(REALTIME_VOICE_MEDIA_TIMEOUT_MS\)/.test(native) ||
-  !/eagerness:\s*'high'/.test(realtimeRoute) ||
   !/preferredRegion = 'syd1'/.test(realtimeRoute) ||
   !/Promise\.all\(\[resolveUser\(request\), request\.text\(\)\]\)/.test(realtimeRoute) ||
-  !/typeof waitUntil === 'function'/.test(realtimeRoute)
+  !/startMeteredLiveVoiceSession\(/.test(realtimeRoute) ||
+  !/metering: 'server-v1'/.test(realtimeRoute) ||
+  !/supportedProtocols: \['live-v1'\]/.test(realtimeRoute)
 ) {
-  failures.push('Talk to Helfi must use fast turn-taking, the Australian voice region, parallel request preparation, background logging, and stage-aware connection limits.')
+  failures.push('Talk to Helfi must retain the Australian region, parallel preflight and stage-aware media limits while requiring server-controlled Live spending protection.')
 }
 
 if (!/Live activity/.test(native) || !/Understanding your request/.test(native) || !/Review ready — waiting for your answer/.test(native) || !/Saving to your/.test(native)) {
@@ -282,7 +283,7 @@ if (
   !/instruction/.test(native) ||
   !/function realtimeToolResult/.test(native) ||
   !/sendDraftRequestRef\.current\([\s\S]*?\)\.then\(realtimeToolResult\)/.test(native) ||
-  !/safeToClaimSaved is not true/.test(fs.readFileSync(path.join(root, 'app/api/native/voice-assistant/realtime/route.ts'), 'utf8'))
+  !/Only say saved when saved=true and safeToClaimSaved=true/.test(fs.readFileSync(path.join(root, 'lib/native-assistant-command-tool.ts'), 'utf8'))
 ) {
   failures.push('Realtime voice tool results must carry an explicit safe spoken reply and saved/not-saved instruction.')
 }
@@ -314,18 +315,46 @@ if (
   failures.push('Realtime voice must verify outgoing microphone packets and handle hearing, spoken silence recovery, service errors, and completed tool calls.')
 }
 
+const voiceMeteredStartup = fs.readFileSync(path.join(root, 'lib/voice-session-start.ts'), 'utf8')
+const voiceFinancialLedger = fs.readFileSync(path.join(root, 'lib/voice-session-ledger.ts'), 'utf8')
+const voiceFinancialPolicy = fs.readFileSync(path.join(root, 'lib/voice-cost-policy.ts'), 'utf8')
+const voiceSessionWorker = fs.readFileSync(path.join(root, 'services/voice-session-worker/index.mjs'), 'utf8')
 if (
   !/billingSessionId:\s*string/.test(realtime) ||
-  !/'x-helfi-voice-session-id': cleanText\(params\.billingSessionId\)/.test(realtime) ||
+  !/'x-helfi-voice-metering': 'server-v1'/.test(realtime) ||
+  !/'x-helfi-voice-attempt-id':/.test(realtime) ||
   !/realtimeBillingSessionIdRef/.test(native) ||
-  !/\.chargeCentsOnce\(chargeCents/.test(realtimeRoute) ||
-  !/voice-assistant:realtime-charge-marker/.test(realtimeRoute) ||
+  !/request\.headers\.get\('x-helfi-voice-metering'\) !== 'server-v1'/.test(realtimeRoute) ||
+  /chargeCents|realtime-charge-marker|delegation:\s*\{\s*type:\s*'responses'/.test(realtimeRoute) ||
+  !/openVoiceBillingSession\(/.test(voiceMeteredStartup) ||
+  !/if \(!financial\.newlyCreated\)/.test(voiceMeteredStartup) ||
+  !/reserveVoiceSessionCost\(/.test(voiceMeteredStartup) ||
+  !/bindVoiceProviderConnection\(/.test(voiceMeteredStartup) ||
+  !/await sendVoiceWatchdog\(job\)/.test(voiceMeteredStartup) ||
+  voiceMeteredStartup.indexOf('await sendVoiceWatchdog(job)') > voiceMeteredStartup.indexOf('allocationAttempted = true') ||
+  !/await dispatchVoiceSessionWorker\(job\)/.test(voiceMeteredStartup) ||
+  !/current\?\.state === 'ready'/.test(voiceMeteredStartup) ||
+  !/voice_monitor_not_ready/.test(voiceMeteredStartup) ||
+  !/reserveVoiceCreditsInTransaction/.test(voiceFinancialLedger) ||
+  !/pg_advisory_xact_lock\(hashtext\(\$\{userId\}\)\)/.test(voiceFinancialLedger) ||
+  !/!input\.finalUsageConfirmed \|\| holds\.some/.test(voiceFinancialLedger) ||
+  !/state: 'UNCERTAIN', finalUsageConfirmed: false/.test(voiceFinancialLedger) ||
+  !/VOICE_TARGET_NET_MARGIN_BPS/.test(voiceFinancialPolicy) ||
+  !/voiceCreditsForCumulativeCost/.test(voiceFinancialLedger) ||
+  !/control\('reserve'/.test(voiceSessionWorker) ||
+  voiceSessionWorker.indexOf("control('reserve'") > voiceSessionWorker.indexOf('await io.respond(') ||
+  !/control\('settle'/.test(voiceSessionWorker) ||
+  !/control\('heartbeat'/.test(voiceSessionWorker) ||
+  !/control\('schedule-watchdog'/.test(voiceSessionWorker) ||
+  !/config\.deadlineMs - CLOSE_BUFFER_MS/.test(voiceSessionWorker) ||
+  !/!meteredSessionId && liveToolTurn\.handleEvent\(payload\)/.test(realtime) ||
+  !/voiceJobs = startVoiceSessionJobs\(/.test(realtime) ||
   !/async chargeCentsOnce/.test(creditSystem) ||
   !/pg_advisory_xact_lock\(hashtext\(\$\{this\.userId\}\)\)/.test(creditSystem) ||
   !/chargeCentsInTransaction\(costCents, tx\)/.test(creditSystem) ||
   !/tx\.aIUsageEvent\.create/.test(creditSystem)
 ) {
-  failures.push('Realtime connection retries must atomically reuse one persistent billing claim instead of charging the user again.')
+  failures.push('Protected Live voice requires durable covered funds, unique connection claims, reserved provider work, an independent ready monitor/watchdog, receipt-based settlement and immutable owned app jobs. Unknown final costs must retain financial holds.')
 }
 
 if (
@@ -1102,6 +1131,16 @@ for (const regression of [
   'voice-sign-save-integration-check.cjs',
   'voice-client-integrity-check.cjs',
   'voice-live-protocol-check.cjs',
+  'voice-cost-policy-check.cjs',
+  'voice-session-ledger-check.cjs',
+  'voice-session-control-check.cjs',
+  'voice-session-control-routes-check.cjs',
+  'voice-session-worker-check.cjs',
+  'voice-session-jobs-check.cjs',
+  'voice-live-usage-check.cjs',
+  'voice-live-tool-turn-check.cjs',
+  'voice2-plan-id-scope-check.cjs',
+  'voice-session-start-check.cjs',
   'voice-restaurant-food-integrity-check.cjs',
   'voice-action-matrix-check.cjs',
   'voice-action-outcome-check.cjs',
