@@ -1,3 +1,10 @@
+## Voice meal clarification and recorded counts (17 October 2026)
+
+- A missing food source or recorded portion in the general assistant is a typed `missing_fields` continuation, not a fatal retry response. Keep every original ingredient, amount, meal, date and recipe step/yield in the same owned plan. A correction must create a fresh complete review; never save a partial meal or submit an unconfirmed correction.
+- Structured meal preparation requires recorded portions. Ordinary counts must resolve the exact source's counted serving or retrieve its normal serving details before any review. Never convert an estimated gram weight into a measured count, select an ambiguous size by row order, combine unrelated source IDs, or replace unknown nutrients with zero.
+- Equivalent punctuation/case/spacing catalog searches run once per local/external phase. Preserve distinct queries, local-first results and no provider fallback after a usable local hit. General assistant outcomes retain safe action IDs and duration without speech, food names, quantities, auth or signed tokens.
+- Required offline regressions: `voice2-food-clarification-check.cjs`, `voice-recorded-counted-serving-check.cjs`, `voice-food-lookup-dedup-check.cjs`, plus normal preparation/save and existing outcome checks. These tests do not prove live speech quality or real-meal source coverage. No Helfi credits or direct AI calls are authorized for agent testing.
+
 # 🛡️ Helfi Guard Rails (Protected Flows)
 
 ## General assistant core — 17 October 2026 (local integration)

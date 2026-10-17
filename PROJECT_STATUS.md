@@ -1,3 +1,9 @@
+## Voice meal failure investigation — 17 October 2026 evening
+
+Owner's recent test correlated with production request `ee1fe86a-b151-4f5a-a14a-42c916b22d2e`, 10:40:45–10:41:07 UTC: 21,695.66 ms, normal food-provider searches matching the screenshot's eggs and coffee. Existing general pipeline omitted action outcome tracing, so the logs do not contain the complete transcript, original quantities or stage-by-stage timings. Sanitized evidence is private under `2026-10-17-voice-meal-failure`.
+
+Fresh independent review reproduced the typed-error boundary failure and recorded-count rejection using actual route bodies. Local repairs preserve the complete meal as a continuing clarification, resolve counted source portions, avoid duplicate equivalent searches, and add safe general outcome tracing. Mixed-food component guidance is shared across typed/live planning. No individual food phrase alias was added, no nutrition guessed, and no provider/credit request was made by agents. Exact release/verification remains to be recorded; current phone still build55. Dashboard/Insights and Design Manager's unreviewed Check-In/reminder candidate remain separate.
+
 ## 17 October 2026 — Final iPhone49 truthful silence guidance
 
 Actual signed Android46 long connection showed session.started, complete media readiness, acknowledged silence guidance and continuing usage updates; zero provider error events. Its red service-error activity was a local12-second silence reminder misclassified through onError. Native49 separates notices from genuine errors, keeps a silent connected session ready, retains useful genuine failure messages and ignores notices after End. Transport/model/actions/credit behavior and the approved Dashboard are unchanged. Actual-source notice/error/state regressions, native types, full production build and286/87locks pass.

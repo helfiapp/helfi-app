@@ -6,9 +6,21 @@ import { AssistantContractError, AssistantNotSubmittedError, validateAssistantVa
 import { validateNativeVoiceResolvedFood } from './native-voice-resolved-food'
 import { validateNativeVoiceImportedRecipe, type NativeVoiceImportedRecipe } from './native-voice-recipe-metadata'
 export type AssistantFoodOperationId = 'food.diary.create' | 'recipe.library.create' | 'food.recipe.log'
-export type AssistantMeasuredIngredient = { name: string; quantity: number; unit: string; brand?: string; country?: string; display: string }
+export type AssistantMeasuredIngredient = { name: string; quantity: number; unit: string; size?: 'small' | 'medium' | 'large' | 'extra large' | 'regular'; brand?: string; country?: string; display: string }
 export type AssistantFoodValues = { name: string; meal: string; localDate: string; destination: 'diary' | 'library'; ingredients: AssistantMeasuredIngredient[]; recipe?: NativeVoiceImportedRecipe; servingsEaten?: number; budgetSourceVersion?: string; country?: string }
 export type AssistantFoodPreparation = { actorId: string; localDate: string; destination: 'diary' | 'library'; normalDraft: any; trustedSources: any[]; cost: AssistantCost }
+/** A missing source or recorded portion is a continuing conversation, never a
+ * failed save. Keep the complete requested meal in the runtime until corrected. */
+export function assistantFoodNeedsDetails(values: AssistantFoodValues, indices: number[], reason: 'source' | 'portion'): AssistantContractError {
+  const selected = [...new Set(indices)].filter(index => Number.isInteger(index) && index >= 0 && index < values.ingredients.length)
+  if (!selected.length) throw new Error('The food clarification did not identify a requested ingredient.')
+  const names = selected.map(index => values.ingredients[index].name).join(', ')
+  const question = reason === 'portion'
+    ? `What size or measured amount did you have for ${names}? I need a portion recorded for that food, such as its weight or a listed serving.`
+    : `I couldn't match ${names} to a food record. Can you describe how it was prepared and the amount of each ingredient?`
+  const root = values.recipe ? 'recipe.ingredients' : 'ingredients'
+  return new AssistantContractError('missing_fields', `${question} I've kept the rest of your meal. Nothing has been saved.`, selected.map(index => `${root}.${index}`))
+}
 export type AssistantFoodServices = {
   authenticate(context: AssistantContext): Promise<string | null>
   /** Must only resolve existing normal food-source records here. No generation,
@@ -34,7 +46,7 @@ const str = (maxLength: number, minLength = 1): AssistantField => ({ type: 'stri
 const positive = (maximum: number): AssistantField => ({ type: 'number', minimum: 0.000001, maximum })
 const obj = (properties: Record<string, AssistantField>, required: string[] = []): Extract<AssistantField, { type: 'object' }> => ({ type: 'object', properties, required })
 const meal: AssistantField = { type: 'string', maxLength: 20, enum: ['breakfast', 'lunch', 'dinner', 'snacks', 'other', 'uncategorized'] }
-const measured = obj({ name: str(200), quantity: positive(100000), unit: { type: 'string', maxLength: 8, enum: ['g','kg','ml','l','oz','lb','cup','tbsp','tsp','each','serving'] }, brand: str(120), country: str(2) }, ['name','quantity','unit'])
+const measured = obj({ name: str(200), quantity: positive(100000), unit: { type: 'string', maxLength: 8, enum: ['g','kg','ml','l','oz','lb','cup','tbsp','tsp','each','serving'] }, size: { type: 'string', maxLength: 11, enum: ['small','medium','large','extra large','regular'] }, brand: str(120), country: str(2) }, ['name','quantity','unit'])
 const ingredients: AssistantField = { type: 'array', items: measured, minItems: 1, maxItems: 30 }
 const recipe = obj({ title: str(120), yieldServings: positive(1000), ingredients, steps: { type: 'array', items: str(2000), minItems: 1, maxItems: 100 }, prepMinutes: { type: 'number', minimum: 0, maximum: 10080 }, cookMinutes: { type: 'number', minimum: 0, maximum: 10080 } }, ['title','yieldServings','ingredients','steps'])
 const shared = { localDate: { type: 'string', maxLength: 10, format: 'date' } as AssistantField, budgetSourceVersion: str(64) }
@@ -49,7 +61,7 @@ function normalize(operation: AssistantFoodOperationId, input: Record<string, As
   const requests: AssistantMeasuredIngredient[] = source.map((entry: any) => {
     const name = entry.name.trim(), brand = entry.brand?.trim(), country = entry.country?.toUpperCase()
     if (!name || entry.brand !== undefined && !brand || country && !/^[A-Z]{2}$/.test(country)) fail('Please provide exact food names, brands and two-letter countries.')
-    return { name, quantity: entry.quantity, unit: entry.unit, ...(brand ? { brand } : {}), ...(country ? { country } : {}), display: `${entry.quantity} ${entry.unit} ${name}` }
+    return { name, quantity: entry.quantity, unit: entry.unit, ...(entry.size ? { size: entry.size } : {}), ...(brand ? { brand } : {}), ...(country ? { country } : {}), display: `${entry.quantity} ${entry.unit} ${entry.size ? `${entry.size} ` : ''}${name}` }
   })
   const countries = [...new Set(requests.flatMap(entry => entry.country ? [entry.country] : []))]
   if (countries.length > 1) fail('Please resolve the meal from one exact country catalog before combining its foods.')
@@ -68,7 +80,7 @@ export function validateAssistantFoodServiceValues(operation: unknown, raw: unkn
   if (Object.keys(source).some(key => !allowed.includes(key)) || !Array.isArray(source.ingredients)) fail('That structured meal contains unsupported fields.')
   const measuredInputs = source.ingredients.map((entry: any) => {
     record(entry)
-    if (Object.keys(entry).some(key => !['name','quantity','unit','brand','country','display'].includes(key))) fail('That ingredient contains unsupported fields.')
+    if (Object.keys(entry).some(key => !['name','quantity','unit','size','brand','country','display'].includes(key))) fail('That ingredient contains unsupported fields.')
     return Object.fromEntries(Object.entries(entry).filter(([key]) => key !== 'display'))
   })
   const recipeInput = source.recipe ? { title: source.recipe.title, yieldServings: source.recipe.servings, ingredients: measuredInputs, steps: source.recipe.steps, ...(source.recipe.prepMinutes !== null ? { prepMinutes: source.recipe.prepMinutes } : {}), ...(source.recipe.cookMinutes !== null ? { cookMinutes: source.recipe.cookMinutes } : {}) } : undefined
@@ -87,6 +99,10 @@ function validateNormal(prepared: AssistantFoodPreparation, values: AssistantFoo
   for (let i = 0; i < food.items.length; i++) {
     const item = food.items[i], requested = values.ingredients[i], source = record(item.__voiceSourceFood)
     if (item.requestedName !== requested.name || item.requestedAmount !== requested.display || item.estimatedPortion === true) fail('An ingredient needs its exact measured source portion before saving.')
+    if (requested.size && ['each', 'serving'].includes(requested.unit)) {
+      const sizeOf = (value: unknown) => String(value || '').toLowerCase().replace(/[^a-z]+/g, ' ').match(/\b(extra large|small|medium|large|regular)\b/)?.[1]
+      if ((sizeOf(source.serving_size) || sizeOf(source.name)) !== requested.size) fail('The resolved source does not match the requested serving size.')
+    }
     const normalizeName = (name: string) => name.toLowerCase().replace(/[^a-z0-9]/g, '')
     if (requested.brand && normalizeName(String(source.brand || '')) !== normalizeName(requested.brand) && !normalizeName(String(source.name)).includes(normalizeName(requested.brand))) fail('The resolved source does not match the requested brand.')
     if (requested.country && source.country && String(source.country).toUpperCase() !== requested.country) fail('The resolved source comes from another requested country catalog.')

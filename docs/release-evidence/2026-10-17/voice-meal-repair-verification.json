@@ -1,0 +1,69 @@
+{
+  "scope": "Server-only repair for general assistant meal source/portion clarification",
+  "baseline": "b69696ec12c23d87f4a59b870e9e1ba067a576d4",
+  "ownerIssue": "HEL-471",
+  "changes": [
+    "Typed recoverable food source/portion continuation preserving complete meal",
+    "Recorded ordinary counted-serving selection with normal serving lookup before refusing",
+    "Deduplicated equivalent punctuation/case/spacing food lookups",
+    "One-food-per-ingredient and missing-component amount planning guidance",
+    "Safe general action timing and outcome correlation",
+    "Explicit recorded food-size field supports the actual continuing correction and invalidates stale reviews"
+  ],
+  "tests": {
+    "clarificationGroups": 8,
+    "countedServingGroups": 14,
+    "normalPrepareGroups": 9,
+    "normalSaveGroups": 9,
+    "appHostGroups": 12,
+    "plannerCostGroups": 10,
+    "pageLocks": 299,
+    "nativePageLocks": 100,
+    "fullOfflineGate": "passed: final38-suite gate, including14 count/size and8 clarification groups",
+    "normalProductionBuild": "passed: npm run build on final isolated release source",
+    "rootTypeChecking": "passed as part of final Next production build",
+    "normalGuardAndProtectedRegions": "passed in final normal prebuild"
+  },
+  "limits": [
+    "Actual paid speech and model understanding were not replayed",
+    "No newly uploaded or installed native version",
+    "No new semantic food alias or inferred milk amount/nutrition",
+    "Source search/verified alternate candidate selection remains a capability limitation; no claim all food names resolve"
+  ],
+  "creditsSpentByAgents": 0,
+  "sourceHashes": {
+    "lib/native-assistant-command-tool.ts": "acf33f9bc1b5440ff4a6da163ad3d96fc266cb43539de7bcab18a864d7338d5f",
+    "lib/native-assistant-food-actions.ts": "3078bc36d1e9316a081bb6c99cb54890107befe1eba4f08388731fe338557ba3",
+    "lib/native-assistant-food-normal-services.ts": "87c3f0426accdd13bca1752ea5d7830a6a2b987b0945ba909bfff014f31e8601",
+    "lib/native-voice-action-observability.ts": "320237724ad4d1f5e42669b240cb08d628b7ad41e211bda3baef774f97ab708b",
+    "scripts/check-voice2-offline.cjs": "468e9d9be80329a6ce70f0d1a526b2be23f23e0dfe21601b4f47bd5e0ec46a5e",
+    "scripts/voice-action-outcome-check.cjs": "a47b98618e3f943ca3954be6693bf9cd37f3d31543561ea1803a8ed948fdc77e",
+    "scripts/voice2-app-host-check.cjs": "618a0cc09a97313a218c26bb34cc2fc8f9fbedb0529e042b9a43062a60f6be73",
+    "scripts/voice2-food-normal-prepare-check.cjs": "b1bf684b74ef3a1438962bc1670ebb86e609250c06eab809d1d2f6c4ffbd285c",
+    "scripts/voice2-food-normal-save-check.cjs": "20c126176930b801449ed8fdc36f1935e52fc38da1ebeabaf2d92d8568da3cc7",
+    "scripts/voice2-planner-cost-check.cjs": "3b8011f34a6d3d01e3e923e8a1328dd9ee9463283710386d52c18a7c6067dbd1",
+    "scripts/voice2-food-clarification-check.cjs": "4135488dcccc014be1454f544dbc3ce549e332ff7da663e4d28bcd2fa623b8b3",
+    "scripts/voice-recorded-counted-serving-check.cjs": "bbd48f4edfec908cc9071f4b3594d98594ca7b347f93d3525f0b09dade78370a",
+    "scripts/voice-food-lookup-dedup-check.cjs": "b76c6214db8e51ee434b21ab606f90210d705526e59af7bf5ad1139c91c96ec6",
+    "app/api/native/voice-assistant/route.ts": "0a9caa47bdf704bcfe3d496f8bf9abe935b711d07c120567a514f9168ce53012",
+    "scripts/assert-native-voice-confirm-guard.js": "227fff0eea22d6de36f8e8367b4c473b74720bcc5e01442629130ee792dc79e1",
+    "GUARD_RAILS.md": "4e644c38c97bcc922a9883d731e6a54e429860f0d9cae3a539e4ff69224ffbcb",
+    "PROJECT_STATUS.md": "e87581800500c01ae4b90b0e76459b71109227843f9ccc65ad83ccaaecf31789"
+  },
+  "releaseStatus": "prepared; no deployment claimed",
+  "productionLog": {
+    "requestId": "ee1fe86a-b151-4f5a-a14a-42c916b22d2e",
+    "startUtc": "2026-10-17T10:40:45.334Z",
+    "endUtc": "2026-10-17T10:41:07.030Z",
+    "durationMs": 21695.66,
+    "foodSearches": 4,
+    "limitation": "No complete transcript, original quantities or per-stage timings were logged by the old general pipeline."
+  },
+  "manualReadOnlyCheck": {
+    "normalCatalogAndAmountScreenObserved": true,
+    "creditsUnchanged": true,
+    "foodWrites": 0,
+    "aiActions": 0,
+    "limitation": "Normal manual lookup only; no spoken/model-understanding verification."
+  }
+}

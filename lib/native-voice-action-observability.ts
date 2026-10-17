@@ -26,7 +26,25 @@ export function voiceActionOutcome(data: any, httpStatus: number, phase: VoiceAc
   const rawCode = data?.code || draftCode
   const code = typeof rawCode === 'string' && /^[a-z_]{1,80}$/.test(rawCode) ? rawCode : undefined
   if (httpStatus >= 400 || data?.success === false) {
-    return { action: safeAction, status: 'failed', reasonCode: code || `http_${httpStatus}`, success: false }
+    const generalCode = new Set(['missing_fields', 'invalid_input', 'unauthorized', 'stale_review', 'stopped', 'assistant_request_failed', 'assistant_storage_busy', 'assistant_storage_invalid', 'assistant_lease_lost', 'request_stopped', 'request_failed'])
+    return { action: safeAction, status: 'failed', reasonCode: (safeAction === 'assistant_plan' && code && !generalCode.has(code) ? undefined : code) || `http_${httpStatus}`, success: false }
+  }
+  if (safeAction === 'assistant_plan') {
+    // A completed plan may contain reads or several independently verified
+    // writes. Its aggregate trace must never claim that something was saved.
+    if (data?.success !== true) return { action: safeAction, status: 'failed', reasonCode: 'assistant_state_unverified', success: false }
+    const view = data.assistant
+    if (view === null || view === undefined) return { action: safeAction, status: 'answered', reasonCode: 'assistant_reply_returned', success: true }
+    if (!Array.isArray(view.steps) || !['active', 'completed', 'stopped'].includes(view.status) || view.steps.some((step: any) => !step || !['pending', 'needs_details', 'review', 'executing', 'awaiting_person', 'completed', 'uncertain', 'cancelled'].includes(step.status))) return { action: safeAction, status: 'failed', reasonCode: 'assistant_state_unverified', success: false }
+    const active = view.steps.find((step: any) => !['completed', 'cancelled'].includes(step.status))
+    if (active?.status === 'needs_details') return { action: safeAction, status: 'needs_clarification', reasonCode: 'assistant_details_needed', success: true }
+    if (active?.status === 'review') return { action: safeAction, status: 'needs_review', reasonCode: 'review_ready_not_saved', success: true }
+    if (['uncertain', 'executing'].includes(active?.status)) return { action: safeAction, status: 'verification_pending', reasonCode: 'assistant_result_unverified', success: false }
+    if (active?.status === 'awaiting_person') return { action: safeAction, status: 'person_action_needed', reasonCode: 'assistant_person_step_pending', success: true }
+    if (active?.status === 'pending') return { action: safeAction, status: 'in_progress', reasonCode: 'assistant_step_pending', success: true }
+    if (view.status === 'stopped') return { action: safeAction, status: 'stopped', reasonCode: 'assistant_stopped', success: true }
+    if (view.status === 'completed' && view.steps.length && view.steps.every((step: any) => step.status === 'completed')) return { action: safeAction, status: 'answered', reasonCode: 'assistant_results_returned', success: true }
+    return { action: safeAction, status: 'failed', reasonCode: 'assistant_state_unverified', success: false }
   }
   if (phase === 'prepare' && data?.success === true && data?.draft?.reasonCode === 'no_pending_review' && data.draft.action === 'unknown' && data.draft.canConfirm === false && data.draft.autoSave === false) return { action: 'unknown', status: 'answered', reasonCode: 'no_pending_review', success: true }
   if (phase === 'save' && data?.localPreferenceAuthorized === true) return { action: 'local_preference_action', status: 'device_change_authorized', reasonCode: 'device_write_not_yet_verified', success: true }

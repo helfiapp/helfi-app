@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { AssistantContext, AssistantReceipt } from './native-assistant-registry'
+import { AssistantContractError, AssistantContext, AssistantReceipt } from './native-assistant-registry'
 import { AssistantFoodServices, AssistantFoodValues } from './native-assistant-food-actions'
 import { invokeNativeVoiceRecordRoute } from './native-voice-record-actions'
 import { verifyNativeVoiceDraft } from './native-voice-review-token'
@@ -53,6 +53,11 @@ export function createNativeAssistantFoodNormalServices(options: {
       const normal = await import('@/app/api/native/voice-assistant/route')
       const response = await normal.POST(request('/api/native/voice-assistant','POST',{ structuredFood: { operation, values }, aiConsentGranted: true })), data = await response.json().catch(() => null)
       await authorize(context)
+      const root = values.recipe ? 'recipe.ingredients' : 'ingredients'
+      const allowedFields = new Set(values.ingredients.map((_item, index) => `${root}.${index}`))
+      if (response.status === 422 && data?.code === 'missing_fields' && typeof data.error === 'string' && data.error.length > 0 && data.error.length <= 10000 && Array.isArray(data.fields) && data.fields.length > 0 && data.fields.length <= values.ingredients.length && data.fields.every((field: unknown) => typeof field === 'string' && allowedFields.has(field))) {
+        throw new AssistantContractError('missing_fields', data.error, [...new Set<string>(data.fields)])
+      }
       if (!response.ok || data?.success !== true || data.chargedCredits !== 0 || !data.preparation || !verifyNativeVoiceDraft(context.actorId, data.preparation.normalDraft)) throw new Error(data?.error || 'The normal food builder could not prepare this exact source review.')
       return data.preparation
     },
