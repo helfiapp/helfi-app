@@ -25,6 +25,7 @@ import { sanitizeGeneralAssistantCommand, type GeneralAssistantCommand } from '.
 import { acceptGeneralAssistantResponse, newGeneralAssistantSessionId } from './generalAssistantSession'
 import { generalAssistantCompletionEvents } from './generalAssistantEffects'
 import { readOwnedVoiceResult } from './voiceOwnedResultRecovery'
+import { VOICE_CREDITS_CHANGED, watchVoiceCreditSettlement } from './voiceCreditSettlement'
 import { hasNativeRealtimeVoiceSupport, startHelfiRealtimeVoiceSession } from './realtimeVoice'
 import { applyReviewedNativeDeviceAction, captureNativeDeviceReview, getSleepDeviceEditorState, validateNativeDeviceAction, type NativeDeviceAction, type NativeDeviceIo, type NativeDeviceReview } from './nativeDeviceActions'
 
@@ -1460,6 +1461,35 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [voiceMemoryUserId, session?.token])
   voiceAccountUserIdRef.current = voiceMemoryUserId
 
+  const voiceCreditObserversRef = useRef(new Map<string, { run: number; observer: ReturnType<typeof watchVoiceCreditSettlement> }>())
+  const voiceCreditSessionIdsRef = useRef<string[]>([])
+  const finishVoiceCreditObservers = useCallback((run?: number) => {
+    for (const entry of voiceCreditObserversRef.current.values()) if (run === undefined || entry.run === run) entry.observer.afterStop()
+  }, [])
+  const observeVoiceCredits = useCallback((sessionId: string, accountId: string, token: string, run: number) => {
+    const isCurrent = () => voiceProviderMountedRef.current && voiceAccountUserIdRef.current === accountId && voiceAccountTokenRef.current === token
+    if (!isCurrent() || voiceCreditSessionIdsRef.current.includes(sessionId)) return
+    voiceCreditSessionIdsRef.current = [...voiceCreditSessionIdsRef.current, sessionId].slice(-100)
+    try {
+      const observer = watchVoiceCreditSettlement({ accountId, sessionId, isCurrent,
+        request: async signal => {
+          const response = await fetch(`${API_BASE_URL}/api/native/voice-assistant/session?sessionId=${encodeURIComponent(sessionId)}`, { signal, headers: buildNativeAuthHeaders(token) })
+          if (!response.ok) throw new Error('Credit verification is pending')
+          return response.json()
+        },
+        onChange: event => { if (isCurrent()) DeviceEventEmitter.emit(VOICE_CREDITS_CHANGED, event) },
+        onFinished: () => { voiceCreditObserversRef.current.delete(sessionId) },
+      })
+      voiceCreditObserversRef.current.set(sessionId, { run, observer })
+      if (realtimeVoiceRunRef.current !== run || !voiceSessionActiveRef.current) observer.afterStop()
+    } catch { /* Credit display observation cannot interrupt voice setup. */ }
+  }, [])
+  useEffect(() => () => {
+    for (const entry of voiceCreditObserversRef.current.values()) entry.observer.cancel()
+    voiceCreditObserversRef.current.clear()
+    voiceCreditSessionIdsRef.current = []
+  }, [mode, voiceMemoryUserId, session?.token])
+
   useEffect(() => {
     openRef.current = open
   }, [open])
@@ -1623,6 +1653,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
   }, [])
 
   const stopRealtimeVoiceSession = useCallback(async () => {
+    finishVoiceCreditObservers()
     realtimeVoiceRunRef.current += 1
     realtimeVoiceConnectedRef.current = false
     realtimeActionGuardRef.current = null
@@ -1660,7 +1691,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       staysActiveInBackground: false,
       shouldDuckAndroid: true,
     }).catch(() => {})
-  }, [clearRealtimeConnectTimeout, clearReviewSilenceTimer])
+  }, [clearRealtimeConnectTimeout, clearReviewSilenceTimer, finishVoiceCreditObservers])
 
   useEffect(() => {
     voiceProviderMountedRef.current = true
@@ -3148,6 +3179,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     setRealtimeVoiceError('')
     const failSlowConnection = () => {
       if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
+      finishVoiceCreditObservers(realtimeRunId)
       realtimeVoiceRunRef.current += 1
       realtimeVoiceConnectedRef.current = false
       realtimeVoiceAbortRef.current?.abort()
@@ -3175,6 +3207,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         timeZone: nativeVoiceTimeZone() || undefined,
         signal: abortController.signal,
         callbacks: {
+          onMeteredSession: sessionId => observeVoiceCredits(sessionId, voiceMemoryUserId, startupAccountToken, realtimeRunId),
           onConnectStage: (stage) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             // Connecting the microphone is not proof that the welcome played.
@@ -3273,6 +3306,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               return
             }
             if (status === 'closed' || status === 'disconnected') {
+              finishVoiceCreditObservers(realtimeRunId)
               clearRealtimeConnectTimeout()
               realtimeVoiceConnectedRef.current = false
               realtimeVoiceRunRef.current += 1
@@ -3291,6 +3325,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               return
             }
             if (status === 'failed') {
+              finishVoiceCreditObservers(realtimeRunId)
               clearRealtimeConnectTimeout()
               realtimeVoiceConnectedRef.current = false
               realtimeVoiceRunRef.current += 1
@@ -3470,6 +3505,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       realtimeVoicePromptRef.current = realtimeSession.promptAssistant
       realtimeVoiceFlushRef.current = realtimeSession.flushTranscript
     } catch (error: any) {
+      finishVoiceCreditObservers(realtimeRunId)
       clearRealtimeConnectTimeout()
       if (realtimeVoiceAbortRef.current === abortController) {
         realtimeVoiceAbortRef.current = null
@@ -3481,7 +3517,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       const reason = cleanFavoriteText(error?.message || '', 260)
       setRealtimeVoiceError(reason || 'Live voice could not start. Check your internet, microphone, speaker, or Bluetooth connection, then tap Try again.')
     }
-  }, [addVoiceActivity, appendConversationTurns, checkingRealtimeVoice, clearConversationData, clearRealtimeConnectTimeout, clearReviewSilenceTimer, makeConversationTurn, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceRecordingSupported])
+  }, [addVoiceActivity, appendConversationTurns, checkingRealtimeVoice, clearConversationData, clearRealtimeConnectTimeout, clearReviewSilenceTimer, finishVoiceCreditObservers, makeConversationTurn, observeVoiceCredits, realtimeVoiceAvailable, realtimeVoiceError, session?.token, setContinuousVoiceSession, setVoiceReplyPreference, stopRealtimeVoiceSession, voiceMemoryUserId, voiceRecordingSupported])
 
   useEffect(() => {
     if (!liveVoiceEnabled || typedMode || conversationReviewOnly || !open || !voicePaidAccessGranted || realtimeVoiceAvailable !== true || voiceSessionActiveRef.current) return

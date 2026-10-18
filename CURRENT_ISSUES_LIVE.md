@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS144 / ba89d5ba1ece6869ef8a94a29597b7c74004bb23
+- Date/time: 18 October 2026, verified before07:28 UTC.
+- What changed: Lean structured normal-handler transport with consent/safety parity, complete-fragment bounded caption settling/ownership, and truthful stop acknowledgement. BUILD/DEPLOY/VERIFY succeeded; both domains200 through CloudFront with matching new ETagtiqjflsoj51z15. Worker59ff35dc989f1065963f2df83c91975295007f4721d305af84762685654a3925 applied/canonical verified.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; signed58 built/Apple validated, but not uploaded/distributed/installed. Physical phone last verified55. Packaged Release58 simulator is logged in.
+- What to quickly test: Actual meal follow-up preserved coffee1cup/milk30ml, corrected eggs100g, displayed211.466kcal review and accepted spokenNo without saving; whole final words stayed in their request. Actual Health Journal launch freshly read water0/2450mL and today journal0. Later journal-draft instruction was incorrectly refused without an app command;58 remains held pending generic review/draft semantic correction. Mounted Food credit value also needs a settlement-aware refresh, without changing food data or approved designs. Six calls closed/settled60credits/US$0.713459560000 incl service allowance;0open/uncertain/unsettled. Customer50%profit still unproven without verified retained proceeds/deductions.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS143 / c322235a94915366975a3c6f250bbc8bcdd1a53c
 - Date/time: 18 October 2026, verified after06:54 UTC.
 - What changed: Generic lost-response reconciliation and owned read-only review restoration, with no automatic command replay. BUILD/DEPLOY/VERIFY succeeded; both domains HTTP200 through CloudFront with matching new ETag1t8x67ytx11z15. Dedicated worker archive dbc4d31e604c87719bcb1a631afd5e417110dc60d1b162a1396685e7d62eb7d1 applied and canonical verification passed.

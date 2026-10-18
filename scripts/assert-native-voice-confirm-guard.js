@@ -1143,6 +1143,8 @@ for (const regression of [
   'voice-worker-transport-recovery-check.cjs',
   'voice-general-transport-check.cjs',
   'voice-structured-route-check.cjs',
+  'voice-review-intent-check.cjs',
+  'voice-credit-settlement-check.cjs',
   'voice-live-usage-check.cjs',
   'voice-live-tool-turn-check.cjs',
   'voice2-plan-id-scope-check.cjs',

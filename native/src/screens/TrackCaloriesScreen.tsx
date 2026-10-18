@@ -46,6 +46,8 @@ import { EntryActionsButton, EntryActionsMenu } from '../ui/EntryActionsMenu'
 import { getThemeColors, theme as sharedTheme } from '../ui/theme'
 import { useVoiceAssistant } from '../voice/VoiceAssistant'
 import { VoiceAssistantIconButton } from '../voice/VoiceAssistantIconButton'
+import { createVoiceActionReadGuard } from '../voice/voiceActionReadRefresh'
+import { VOICE_CREDITS_CHANGED, matchesVoiceCreditChange, walletCreditBalance } from '../voice/voiceCreditSettlement'
 
 // This diary uses fixed light surfaces. Keep Android text and its editors on
 // the same palette; iOS retains its original adaptive colours.
@@ -1691,6 +1693,40 @@ export function TrackCaloriesScreen() {
   const [exerciseCalories, setExerciseCalories] = useState(0)
   const [creditsRemaining, setCreditsRemaining] = useState<number | null>(null)
   const [creditsPercentUsed, setCreditsPercentUsed] = useState(0)
+  const creditReadGuardRef = useRef(createVoiceActionReadGuard())
+  const creditAccountId = mode === 'signedIn' ? session?.user?.id : undefined
+  const creditReadIdentity = creditAccountId && session?.token ? `${creditAccountId}:${session.token}` : null
+  creditReadGuardRef.current.setAccount(creditReadIdentity)
+  useEffect(() => {
+    creditReadGuardRef.current.mount()
+    return () => creditReadGuardRef.current.unmount()
+  }, [])
+  useEffect(() => {
+    setCreditsRemaining(null)
+    setCreditsPercentUsed(0)
+  }, [creditAccountId])
+  const refreshCreditBalance = useCallback(async () => {
+    if (!session?.token) return
+    const ticket = creditReadGuardRef.current.begin(creditReadIdentity, 'credits')
+    if (!ticket) return
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/credit/status`, {
+        headers: buildNativeAuthHeaders(session.token), signal: ticket.signal,
+      })
+      if (!response.ok) return
+      const value = walletCreditBalance(await response.json())
+      if (!ticket.isCurrent() || !value) return
+      setCreditsRemaining(value.remaining)
+      if (value.percentUsed !== undefined) setCreditsPercentUsed(value.percentUsed)
+    } catch { /* A failed refresh leaves the last verified balance visible. */ }
+    finally { ticket.finish() }
+  }, [creditReadIdentity, session?.token])
+  useEffect(() => {
+    const subscription = DeviceEventEmitter.addListener(VOICE_CREDITS_CHANGED, (payload: unknown) => {
+      if (matchesVoiceCreditChange(payload, creditAccountId)) void refreshCreditBalance()
+    })
+    return () => subscription.remove()
+  }, [creditAccountId, refreshCreditBalance])
   const [foodAnalysisUsageCount, setFoodAnalysisUsageCount] = useState(0)
   const [foodAnalysisUsageLabel, setFoodAnalysisUsageLabel] = useState<'monthly' | 'total'>('monthly')
   const [foodAnalysisCostPerUse, setFoodAnalysisCostPerUse] = useState(10)
@@ -2698,9 +2734,7 @@ export function TrackCaloriesScreen() {
       const exercisePromise = fetch(`${API_BASE_URL}/api/exercise-entries?date=${selectedDate}`, {
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
-      const creditPromise = fetch(`${API_BASE_URL}/api/credit/status`, {
-        headers: buildNativeAuthHeaders(session.token),
-      })
+      const creditPromise = refreshCreditBalance()
       const featureUsagePromise = fetch(`${API_BASE_URL}/api/credit/feature-usage?feature=foodAnalysis`, {
         headers: buildNativeAuthHeaders(session.token, { includeCookie: true }),
       })
@@ -2738,23 +2772,11 @@ export function TrackCaloriesScreen() {
         setLoading(false)
       }
 
-      const [creditRes, featureUsageRes, userDataRes] = await Promise.all([
+      const [, featureUsageRes, userDataRes] = await Promise.all([
         creditPromise,
         featureUsagePromise,
         userDataPromise,
       ])
-
-      const creditData: any = await creditRes.json().catch(() => ({}))
-      if (!isCurrentRequest()) return
-      if (creditRes.ok) {
-        const total = Number(creditData?.credits?.total)
-        setCreditsRemaining(Number.isFinite(total) ? Math.max(0, Math.round(total)) : null)
-        const percent = Number(creditData?.percentUsed)
-        setCreditsPercentUsed(Number.isFinite(percent) ? clamp(percent, 0, 100) : 0)
-      } else {
-        setCreditsRemaining(null)
-        setCreditsPercentUsed(0)
-      }
 
       const featureUsageData: any = await featureUsageRes.json().catch(() => ({}))
       if (!isCurrentRequest()) return
@@ -2792,7 +2814,7 @@ export function TrackCaloriesScreen() {
         setLoading(false)
       }
     }
-  }, [authHeaders, selectedDate, session?.token])
+  }, [authHeaders, selectedDate, session?.token, refreshCreditBalance])
 
   useEffect(() => {
     void loadFavorites()

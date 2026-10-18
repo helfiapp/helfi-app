@@ -22,6 +22,8 @@ type RealtimeCallbacks = {
   onUserSpeech?: () => void
   onActionRequest?: (args: { request?: string; action?: string; needsReview?: boolean; capability?: VoiceCapabilityRequest; assistantCommand?: GeneralAssistantCommand }) => Promise<unknown> | unknown
   onActionRecovery?: (recovery: VoiceJobRecovery) => Promise<void> | void
+  /** Server-owned billing identity, available before the media handshake. */
+  onMeteredSession?: (sessionId: string) => void
 }
 
 type RealtimeSession = {
@@ -1153,6 +1155,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
       if (result.delegation === 'server') {
         if (!/^[A-Za-z0-9_-]{1,200}$/.test(result.helfiSession?.id || '')) throw new Error('The voice spending monitor returned no session.')
         meteredSessionId = result.helfiSession.id
+        try { callbacks.onMeteredSession?.(meteredSessionId) } catch { /* A display refresh must not restart an allocated call. */ }
         liveUsage.markBackendExternallyMetered()
       }
     }

@@ -9,28 +9,48 @@ const vm = require('node:vm')
 const ts = require('typescript')
 const file = path.resolve(__dirname, '../native/src/screens/TrackCaloriesScreen.tsx')
 const ast = ts.createSourceFile(file, fs.readFileSync(file, 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
-let callback
+let callback, creditCallback
 function visit(node) {
   if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'loadAll') callback = node.initializer
+  if (ts.isVariableDeclaration(node) && node.name.getText(ast) === 'refreshCreditBalance') creditCallback = node.initializer
   ts.forEachChild(node, visit)
 }
 visit(ast)
 assert(callback && ts.isCallExpression(callback), 'Actual loadAll callback must exist')
+assert(creditCallback && ts.isCallExpression(creditCallback), 'Actual guarded credit callback must exist')
 const printer = ts.createPrinter()
 const expression = printer.printNode(ts.EmitHint.Expression, callback, ast)
-const code = ts.transpileModule(`globalThis.makeLoadAll = (selectedDate, session, authHeaders) => ${expression}`, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText
+const creditExpression = printer.printNode(ts.EmitHint.Expression, creditCallback, ast)
+const code = ts.transpileModule(`globalThis.makeLoadAll = (selectedDate, session, authHeaders) => {
+  const creditReadIdentity = session?.token ? 'synthetic-account:' + session.token : null;
+  creditReadGuardRef.current.setAccount(creditReadIdentity);
+  const refreshCreditBalance = ${creditExpression};
+  return ${expression};
+}`, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText
+function pure(relative) {
+  const exports = {}
+  const source = fs.readFileSync(path.resolve(__dirname, '..', relative), 'utf8')
+  const compiled = ts.transpileModule(source, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText
+  new Function('exports', 'require', compiled)(exports, (id) => { throw Error('Unexpected pure import ' + id) })
+  return exports
+}
+const { createVoiceActionReadGuard } = pure('native/src/voice/voiceActionReadRefresh.ts')
+const { walletCreditBalance } = pure('native/src/voice/voiceCreditSettlement.ts')
 const tick = async () => { for (let index = 0; index < 16; index++) await Promise.resolve() }
 const response = (body, ok = true) => ({ ok, json: async () => body })
 function harness(initialLoading = false) {
   const state = { loading: initialLoading, entries: [], waterEntries: [], exerciseEntries: ['new-health-import'], exerciseCalories: 900 }
   const loadingEvents = []
   const alerts = []
+  const creditReadGuardRef = { current: createVoiceActionReadGuard() }
+  creditReadGuardRef.current.mount()
   let activeBatch
   const setters = {}
   for (const name of ['Loading', 'Entries', 'WaterEntries', 'ExerciseEntries', 'ExerciseCalories', 'CreditsRemaining', 'CreditsPercentUsed', 'FoodAnalysisUsageCount', 'FoodAnalysisCostPerUse', 'FoodAnalysisUsageLabel', 'DailyTargets', 'Favorites']) {
     setters[`set${name}`] = (value) => { state[name[0].toLowerCase() + name.slice(1)] = value; if (name === 'Loading') loadingEvents.push(value) }
   }
   const context = vm.createContext({ ...setters, Date, URLSearchParams, API_BASE_URL: 'https://helfi.invalid', useCallback: (fn) => fn,
+    creditReadGuardRef, walletCreditBalance,
     loadRequestIdRef: { current: 0 }, healthExerciseRevisionRef: { current: 0 },
     buildNativeAuthHeaders: (token) => ({ authorization: `Bearer ${token}` }),
     normalizeFoodApiEntry: (entry) => ({ ...entry }), normalizeFavoriteList: (items) => items,
@@ -49,6 +69,7 @@ function harness(initialLoading = false) {
     activeBatch = batch
     const load = context.makeLoadAll(date, authenticated ? { token } : null, authenticated ? { authorization: `Bearer ${token}` } : null)
     batch.promise = load(silent ? { silent: true } : undefined)
+    if (authenticated) assert.equal(batch.requests.filter((request) => !['/api/food-log', '/api/water-log', '/api/exercise-entries'].includes(request.path)).length, 3, 'Credits, feature usage and user data remain separate supporting requests')
     activeBatch = null
     return batch
   }
@@ -143,6 +164,14 @@ async function run() {
     const h = harness(true); const load = h.start({ silent: true })
     h.primary(load); await tick(); assert.equal(h.state.loading, false)
     h.secondary(load, true); await load.promise; assert.equal(h.state.loading, false); assert.equal(h.alerts.length, 0)
+  })
+  await check('failed supporting credit refresh preserves the previously verified wallet while other supporting requests finish', async () => {
+    const h = harness(true); const initial = h.start()
+    h.primary(initial); h.secondary(initial); await initial.promise
+    assert.equal(h.state.creditsRemaining, 100); assert.equal(h.state.creditsPercentUsed, 10)
+    const refresh = h.start({ silent: true }); h.primary(refresh); h.secondary(refresh, true); await refresh.promise
+    assert.equal(h.state.creditsRemaining, 100); assert.equal(h.state.creditsPercentUsed, 10)
+    assert.equal(h.state.loading, false); assert.equal(h.alerts.length, 0); assert.deepEqual(h.state.dailyTargets, { calories: 2000 })
   })
   await check('unauthenticated foreground exit clears initial loading and makes no requests', async () => {
     const h = harness(true); const load = h.start({ authenticated: false }); await load.promise

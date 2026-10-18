@@ -78,7 +78,7 @@ function baseBox() {
     Alert: { alert: noop },
     makeConversationTurn: (role, text) => ({ role, text }), todayLocalDate: () => '2026-10-17',
   }
-  for (const name of ['addVoiceActivity', 'setMessageFocusRequest', 'requestMessageInputFocus', 'setRealtimeVoiceAvailable', 'setRealtimeVoiceStatus', 'setRealtimeVoiceError', 'setVoiceReplyPreference', 'clearRealtimeConnectTimeout', 'clearReviewSilenceTimer', 'setBusy', 'setDraft', 'setPendingFollowUpDraft', 'setChargedCredits', 'setReviewCorrectionActive', 'setTranscript', 'setLaunchContext', 'appendConversationTurns', 'requestVoiceReply', 'resumeVoiceSessionListening', 'setConfirming', 'setSaveError', 'setSaveSuccessNotice', 'closePanel']) box[name] = noop
+  for (const name of ['addVoiceActivity', 'setMessageFocusRequest', 'requestMessageInputFocus', 'setRealtimeVoiceAvailable', 'setRealtimeVoiceStatus', 'setRealtimeVoiceError', 'setVoiceReplyPreference', 'clearRealtimeConnectTimeout', 'clearReviewSilenceTimer', 'finishVoiceCreditObservers', 'observeVoiceCredits', 'setBusy', 'setDraft', 'setPendingFollowUpDraft', 'setChargedCredits', 'setReviewCorrectionActive', 'setTranscript', 'setLaunchContext', 'appendConversationTurns', 'requestVoiceReply', 'resumeVoiceSessionListening', 'setConfirming', 'setSaveError', 'setSaveSuccessNotice', 'closePanel']) box[name] = noop
   box.setContinuousVoiceSession = (active) => { box.voiceSessionActiveRef.current = active }
   return box
 }
