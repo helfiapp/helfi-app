@@ -54,12 +54,13 @@ const usageDisplayList = [
   { label: 'Health image notes', key: 'medicalImageAnalysis', credits: 2 },
   { label: 'Insights generation', key: 'insightsGeneration', credits: 7 },
   { label: 'Talk to Helfi chat', key: 'chatLight', credits: 10 },
-  { label: 'Talk to Helfi voice action', key: 'talkToHealthyVoice', credits: 3 },
-  { label: 'Talk to Helfi spoken reply', key: 'talkToHealthySpokenReply', credits: 2 },
 ]
 
-const creditCostDisplayList = [
+const creditCostDisplayList: { label: string; key: string; credits?: number; costLabel?: string }[] = [
   ...usageDisplayList,
+  { label: 'Recorded voice request', key: 'talkToHealthyVoice', credits: 3, costLabel: 'from 3 credits' },
+  { label: 'Recorded spoken reply', key: 'talkToHealthySpokenReply', credits: 2, costLabel: 'from 2 credits' },
+  { label: 'Live voice', key: 'liveVoice', costLabel: 'Varies by call' },
   { label: 'AI recommended meal', key: 'aiMealRecommendation', credits: 10 },
   { label: 'Recipe import (URL)', key: 'recipeImportUrl', credits: 10 },
   { label: 'Recipe import (photo)', key: 'recipeImportPhoto', credits: 15 },
@@ -978,7 +979,7 @@ export function BillingScreen() {
 
         <View style={{ marginTop: 14, backgroundColor: theme.colors.card, borderRadius: theme.radius.lg, borderWidth: 1, borderColor: theme.colors.border, padding: 16 }}>
           <Text style={{ fontSize: 20, fontWeight: '700', color: theme.colors.text }}>AI feature credit costs</Text>
-          <Text style={{ marginTop: 6, color: theme.colors.muted }}>Each AI action deducts credits from your wallet.</Text>
+          <Text style={{ marginTop: 6, color: theme.colors.muted }}>Each AI action deducts credits from your wallet. Live voice reserves credits before connecting. Your final charge is based on call usage. Unused reserved credits are returned after the costs are confirmed, while those credits remain valid.</Text>
           <View style={{ marginTop: 12, gap: 8 }}>
             {creditCostDisplayList.map((item) => (
               <View
@@ -995,7 +996,7 @@ export function BillingScreen() {
                 }}
               >
                 <Text style={{ color: theme.colors.text, fontWeight: '700' }}>{item.label}</Text>
-                <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>{item.credits} credits</Text>
+                <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>{item.costLabel || `${item.credits} credits`}</Text>
               </View>
             ))}
           </View>

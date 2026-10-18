@@ -214,9 +214,14 @@ export function createVoiceSessionWorker(dependencies = {}) {
         return { call, args }
       })
       const results = new Map()
+      let resultNotVerified = false
       // The normal app has one owned action lane. Finish each queued call
       // before creating the next baseline, then return all outputs together.
       for (const { call, args } of parsed) {
+        if (resultNotVerified) {
+          results.set(call.call_id, { ok: false, saved: false, safeToClaimSaved: false, status: 'not_submitted', message: 'This action was not submitted because an earlier result in the same voice turn could not be verified.' })
+          continue
+        }
         const queued = await control('enqueue-tool', { callId: call.call_id, args, delegationId, actualHumanText })
         if (!id(queued.jobId)) fail('tool_queue_unconfirmed')
         while (!results.has(call.call_id) && !closing && io.now() < config.deadlineMs - CLOSE_BUFFER_MS) {
@@ -228,6 +233,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
               const result = row.result ?? { ok: false, saved: false, safeToClaimSaved: false, message: 'No verified app result was returned.' }
               if (results.has(row.callId) && JSON.stringify(results.get(row.callId)) !== JSON.stringify(result)) fail('conflicting_tool_result')
               results.set(row.callId, result)
+              if (result.transportRecovery?.status === 'result_not_verified') resultNotVerified = true
             }
           }
           if (!results.has(call.call_id)) await io.sleep(250)
@@ -282,6 +288,16 @@ export function createVoiceSessionWorker(dependencies = {}) {
           const returned = await toolResults(calls, delegationId, actualHumanText)
           input.push(...returned)
           const canonical = returned.map(item => { try { return JSON.parse(item.output) } catch { return null } }).filter(Boolean)
+          const unknown = canonical.find(result => result.transportRecovery?.status === 'result_not_verified')
+          if (unknown) {
+            // An unverified app effect ends this delegation. Asking the model
+            // to continue could silently repeat it under a new tool call ID.
+            // Retain canonical outputs for the next genuine human turn only.
+            const reply = typeof unknown.spokenReply === 'string' && unknown.spokenReply ? unknown.spokenReply : typeof unknown.message === 'string' && unknown.message ? unknown.message : 'Helfi could not verify the result. Please check the normal screen before repeating the request.'
+            backendHistory.splice(0, backendHistory.length, ...input, { role: 'assistant', content: reply })
+            sendContext(delegationId, reply)
+            return
+          }
           lastVerifiedSpeech = canonical.map(result => typeof result.spokenReply === 'string' ? result.spokenReply : typeof result.message === 'string' ? result.message : '').filter(Boolean).join('\n') || lastVerifiedSpeech
           continue
         }

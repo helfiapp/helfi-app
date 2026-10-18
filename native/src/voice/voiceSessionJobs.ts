@@ -1,7 +1,8 @@
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 
 type SessionJob = { callId: string; args: { request?: string; action?: string; needsReview?: boolean; assistantCommand?: unknown }; actualHumanText: string }
-type JobIo = { baseUrl: string; sessionId: string; token: string; isCurrent: () => boolean; onJob: (job: SessionJob) => Promise<unknown>; onError: (message: string) => void; onClosed?: () => void }
+export type VoiceJobRecovery = { transportRecovery: { status: 'verified_owned_result' | 'result_not_verified' }; assistantContext?: { id: string; actorId: string; revision: number } }
+type JobIo = { baseUrl: string; sessionId: string; token: string; isCurrent: () => boolean; onJob: (job: SessionJob) => Promise<unknown>; onRecovery?: (recovery: VoiceJobRecovery) => Promise<void> | void; onError: (message: string) => void; onClosed?: () => void }
 
 /** The server holds the spending authority. This client only delivers an
  * immutable owned app job through the existing review/confirmation host. */
@@ -27,6 +28,17 @@ export function startVoiceSessionJobs(io: JobIo) {
       return result
     } finally { clearTimeout(timeout); if (network === controller) network = null }
   }
+  const deliver = async (callId: string, payload: unknown) => {
+    const reply = await request('POST', { sessionId: io.sessionId, callId, result: payload })
+    deliveries.delete(callId)
+    if (!current() || !reply.recovery) return
+    const recovery = reply.recovery as VoiceJobRecovery, status = recovery.transportRecovery?.status, pointer = recovery.assistantContext
+    if (status !== 'verified_owned_result' && status !== 'result_not_verified') return
+    if (status === 'verified_owned_result' && (!pointer || !/^[A-Za-z0-9_-]{1,120}$/.test(pointer.id) || !/^[A-Za-z0-9_-]{1,120}$/.test(pointer.actorId) || !Number.isSafeInteger(pointer.revision) || pointer.revision < 1)) return
+    // An optional read-only UI restoration is never a reason to execute the
+    // immutable action again or tear down its healthy paid voice session.
+    try { await io.onRecovery?.({ transportRecovery: { status }, ...(status === 'verified_owned_result' ? { assistantContext: pointer } : {}) }) } catch {}
+  }
   const poll = async () => {
     if (!current()) { stop(); return }
     if (++polls > 1000 || Date.now() >= expiresAt) { fail(); return }
@@ -43,8 +55,7 @@ export function startVoiceSessionJobs(io: JobIo) {
         if (identities.has(raw.callId) && identities.get(raw.callId) !== identity) { fail(); return }
         if (handled.has(raw.callId)) {
           if (deliveries.has(raw.callId)) {
-            await request('POST', { sessionId: io.sessionId, callId: raw.callId, result: deliveries.get(raw.callId) })
-            deliveries.delete(raw.callId)
+            await deliver(raw.callId, deliveries.get(raw.callId))
           }
           continue
         }
@@ -66,8 +77,7 @@ export function startVoiceSessionJobs(io: JobIo) {
           ? { ok: evidence?.ok === true, assistantContext: { id: pointer.id, actorId: pointer.actorId, revision: pointer.revision } }
           : { ok: false, saved: false, safeToClaimSaved: false }
         deliveries.set(raw.callId, payload)
-        await request('POST', { sessionId: io.sessionId, callId: raw.callId, result: payload })
-        deliveries.delete(raw.callId)
+        await deliver(raw.callId, payload)
         if (!current()) return
       }
       failures = 0

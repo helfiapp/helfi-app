@@ -24,6 +24,7 @@ import { verifiedClinicalVoiceResult, type ClinicalVoiceAction } from './clinica
 import { sanitizeGeneralAssistantCommand, type GeneralAssistantCommand } from './generalAssistantActions'
 import { acceptGeneralAssistantResponse, newGeneralAssistantSessionId } from './generalAssistantSession'
 import { generalAssistantCompletionEvents } from './generalAssistantEffects'
+import { readOwnedVoiceResult } from './voiceOwnedResultRecovery'
 import { hasNativeRealtimeVoiceSupport, startHelfiRealtimeVoiceSession } from './realtimeVoice'
 import { applyReviewedNativeDeviceAction, captureNativeDeviceReview, getSleepDeviceEditorState, validateNativeDeviceAction, type NativeDeviceAction, type NativeDeviceIo, type NativeDeviceReview } from './nativeDeviceActions'
 
@@ -2916,6 +2917,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
         if (requestSignal?.aborted || error?.name === 'AbortError') {
           return { ok: false, message: 'Live voice has stopped.' }
         }
+        if (usingGeneralAssistant && options?.suppressSpokenReply && options?.realtimeActionHint?.assistantCommand) {
+          // The server checks the existing owned result after this failed
+          // delivery. Never suggest a blind retry or interrupt that check
+          // with an alert while a save could already have happened.
+          addVoiceActivity('Checking the existing result')
+          return { ok: false, saved: false, message: 'The reply was interrupted. Helfi is checking the existing result.', voiceActionRunId }
+        }
         const message = error?.message || 'Helfi could not process that request.'
         appendConversationTurns([makeConversationTurn('user', rawTypedTranscript || typedTranscript), makeConversationTurn('assistant', `I could not complete that request. ${message} Nothing is confirmed saved.`)])
         addVoiceActivity('Request failed — ready to retry', 'error')
@@ -3192,6 +3200,31 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return
             setRealtimeVoiceError('')
             addVoiceActivity(cleanFavoriteText(message, 260) || 'Ready — speak when you are ready', 'done')
+          },
+          onActionRecovery: async (recovery) => {
+            const accountToken = session?.token, accountId = voiceMemoryUserId, sessionId = generalAssistantSessionRef.current
+            const timeZone = nativeVoiceTimeZone()
+            const isCurrent = () => Boolean(accountToken && realtimeVoiceRunRef.current === realtimeRunId && voiceSessionActiveRef.current && openRef.current && voiceProviderMountedRef.current && voiceAccountTokenRef.current === accountToken && voiceAccountUserIdRef.current === accountId && generalAssistantSessionRef.current === sessionId)
+            if (!isCurrent()) return
+            if (recovery.transportRecovery.status === 'verified_owned_result' && recovery.assistantContext && accountToken && timeZone) {
+              const data = await readOwnedVoiceResult({ baseUrl: API_BASE_URL, token: accountToken, accountId, sessionId, pointer: recovery.assistantContext, localDate: todayLocalDate(), timeZone, signal: realtimeVoiceAbortRef.current?.signal, isCurrent })
+              if (!isCurrent()) return
+              const accepted = data && acceptGeneralAssistantResponse(data, accountId, sessionId)
+              if (accepted) {
+                setDraft(accepted.draft)
+                setSaveError('')
+                setReviewCorrectionActive(false)
+                pendingReviewAnswerRef.current = Boolean(accepted.needsReview)
+                appendConversationTurns([makeConversationTurn('assistant', accepted.message)])
+                emitGeneralAssistantEffects(data.assistant)
+                addVoiceActivity(accepted.needsReview ? 'Review recovered — ready for your decision' : 'Existing result verified', 'done')
+                return
+              }
+            }
+            if (!isCurrent()) return
+            const message = 'The result could not be verified. Check its normal screen before repeating a change.'
+            appendConversationTurns([makeConversationTurn('assistant', message)])
+            addVoiceActivity(message, 'done')
           },
           onAudioRoute: (route) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current) return

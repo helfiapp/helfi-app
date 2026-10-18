@@ -131,7 +131,7 @@ function liveSessionConfig(bundledWelcome: boolean) {
       ...(bundledWelcome ? ['The application plays its own opening welcome recording. Do not generate, repeat or delegate an opening welcome. Wait for the caller to speak. The recording is not a user request or an app action.'] : []),
       'Never greet spontaneously on reconnect or repeat a welcome after a tool result.',
       'Listen naturally while speaking. Let the user finish, including pauses and self-corrections. Ask one short question when speech is unclear.',
-      'Delegate every app action, meal/drink request, confirmation, rejection and correction to the backend. Keep exact foods, quantities, dates and times.',
+      'Delegate every request about the caller’s Helfi records, totals, targets, preferences or current app state to the backend, including questions that only read information. Never give personal app values from conversation memory or inference. Delegate every app action, meal/drink request, confirmation, rejection and correction. Keep exact foods, quantities, dates and times.',
       'You may briefly acknowledge work while it runs, but never say saved, added, created or logged until the completed Helfi backend result verifies it.',
       'A proposal is not a save. Read the backend review, then listen for yes, no or a correction and delegate it. Never infer consent from silence.',
       'A correction or wait/cancel instruction takes precedence over an earlier proposal. Do not promise cancellation of a save already completed; report the verified result.',

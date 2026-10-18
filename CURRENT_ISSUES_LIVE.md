@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — https://helfi.ai and https://www.helfi.ai
+- Date/time: 18 October 2026, verified AWS job142 after06:14 UTC.
+- What changed: Protected voice cost reservations, separate operator test budget, server-controlled monitor and continuing shutdown watchdog. Exact source20860bbbfbc72abe6a4ec7e75f61b90b0c133351; BUILD/DEPLOY/VERIFY succeeded. Both domains HTTP200 through CloudFront, matching new ETag ksqpsee3qb1z15. Only the isolated voice ledger migration was applied; unrelated pending migrations/design work excluded.
+- Where to see it (page/link): Native Talk to Helfi uses https://helfi.ai. Signed iPhone56 uploaded to Apple, not distributed/installed; physical phone last verified55.
+- What to quickly test: Actual simulator water answer observed, but no fresh normal-handler read proven. Meal app-action HTTP failed with iOS-1017; normal owned revision unchanged and no food/water writes in the call window. Two operator calls settled US$0.188329986667 including fixed service allowance,20credits, zero unresolved holds. Hold phone distribution pending response-loss recovery and meaningful app tests. Customer50%margin is not proven without verified purchase proceeds/deductions; operator allowance is an expense.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS111 / c6d89ad49b9ea7e605980bd0bf7b01cd99370ce8
 - Date/time: 12 October 2026, verified 10:36 Melbourne.
 - What changed: Removed the duplicate DMARC policy that invalidated email authentication and added a plain-text partner to the password-reset email. AWS SES remains the live provider; Resend remains available as rollback.

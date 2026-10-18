@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-17T16:32:00.036Z",
+  "generatedAt": "2026-10-18T06:44:50.606Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -239,7 +239,7 @@
     "native/src/screens/AccountSettingsScreen.tsx": "78f1b46ff4e18c1498e3c171e688ddfbd4ed6803cdc5dfe355d79e1d3bfa1478",
     "native/src/screens/AddIngredientScreen.tsx": "5da16968c543fd87ac2fed7eae26983352214d05f00ea9c4e244db5b5028d08e",
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
-    "native/src/screens/BillingScreen.tsx": "6351a51bcd3aa2cc1a5b2a8d13f626333dfc4ca8a9632ec4cf5745c53250cf2d",
+    "native/src/screens/BillingScreen.tsx": "4af68df2092f9669fb9b4d4f0b8ddc02564d84d4a9c2a67b08c1cd40889692b4",
     "native/src/screens/DailyCheckInScreen.tsx": "98e7d5ff8187ec506898f3e7366e49a04b0ba2ba5cf903cf90ee00b1943ea717",
     "native/src/screens/DashboardScreen.tsx": "c4ceba674f286ed4479066899f5ad29df7f343761f5f995b09b10d6f5cfafa00",
     "native/src/screens/DevicesScreen.tsx": "6ef949877dea0ab66a7e94f8f513f7df546142f1a2e9afc0363942e913161299",
@@ -297,12 +297,13 @@
     "native/src/voice/localVoiceWelcome.ts": "9206670a50b1c89b26d9cd47f339b0cd109dead8303bbd6e858e516703edb80f",
     "native/src/voice/nativeDeviceActions.ts": "4ae6d7de1e6c4a2d1e9fe8e8d7af26f33592c9d0a399ca729c69391745b80e95",
     "native/src/voice/profileVoiceRefresh.ts": "90def57e6d629290b234fd95a542744bc188b859e343550af0b1b1cb22ca9560",
-    "native/src/voice/realtimeVoice.ts": "30cb17ac763dd8e9a3a3b5c44e2058a75593a316408acc08dbdb6e1c831e94dc",
+    "native/src/voice/realtimeVoice.ts": "7901dae87884ba85a0e868e0b7d2d8b34d266bf82b6d5878715858cb4e68a926",
     "native/src/voice/reportPdfActions.ts": "56d91796e8fcce58fc10b71629ff1a5da3d2f0f046d6fc71da8ba04a527b4ba6",
     "native/src/voice/voiceActionReadRefresh.ts": "4109b5bb3bf669d96731746a728018f2dc284dcc8d19e3c6fe5d822fa85e1ead",
-    "native/src/voice/VoiceAssistant.tsx": "a4283dc878e8799184691acfb04368e4971cbf695bbb3ddddb9e52ff948b6d7a",
+    "native/src/voice/VoiceAssistant.tsx": "f6b6fb43b5e789a049832246c7acc461c25fdf63054f7c171e782eab019b29e9",
     "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e",
     "native/src/voice/voiceCapabilityManifest.ts": "4dcfd38fe04f9e2ee28a5e36f1a1b04c2cd2ddc38849d803ea9f49a8916ec366",
-    "native/src/voice/voiceSessionJobs.ts": "5ac3a1f73dfea10a08c789e081dc725b731af58c3b78b749342f88fecb753f54"
+    "native/src/voice/voiceOwnedResultRecovery.ts": "7b6f01026475880aecc30bb1fcb593f849d0cb9f2ae18b26ba9ec380bc995ee5",
+    "native/src/voice/voiceSessionJobs.ts": "eccd402cb3eb695261996cfdf1113b47251c694449f3cc957a7ae63cf51ef063"
   }
 }

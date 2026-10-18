@@ -1112,8 +1112,8 @@ if (!/isPlainHealthToolOpenRequest/.test(route) || !/isSymptomTrackingRequest\(r
   failures.push('Talk to Helfi navigation requests with medical advice wording must hit safety handling before app handoff.')
 }
 
-if (!/Talk to Helfi voice action/.test(creditCosts) || !/Talk to Helfi spoken reply/.test(creditCosts) || !/Talk to Helfi voice action/.test(billingScreen) || !/Talk to Helfi spoken reply/.test(billingScreen)) {
-  failures.push('Billing displays must list Talk to Helfi voice and spoken reply credit costs.')
+if (!/Talk to Helfi voice action/.test(creditCosts) || !/Talk to Helfi spoken reply/.test(creditCosts) || !/Recorded voice request/.test(billingScreen) || !/Recorded spoken reply/.test(billingScreen) || !/from 3 credits/.test(billingScreen) || !/from 2 credits/.test(billingScreen) || !/label: 'Live voice', key: 'liveVoice', costLabel: 'Varies by call'/.test(billingScreen)) {
+  failures.push('Billing must distinguish recorded voice minimum costs from variable live call costs.')
 }
 
 if (failures.length) {
@@ -1137,6 +1137,9 @@ for (const regression of [
   'voice-session-control-routes-check.cjs',
   'voice-session-worker-check.cjs',
   'voice-session-jobs-check.cjs',
+  'voice-owned-result-recovery-check.cjs',
+  'voice-transport-recovery-check.cjs',
+  'voice-worker-transport-recovery-check.cjs',
   'voice-live-usage-check.cjs',
   'voice-live-tool-turn-check.cjs',
   'voice2-plan-id-scope-check.cjs',

@@ -107,12 +107,31 @@ function backendReceiptsVerified(financial: Row, receipts: Row[]): boolean {
   } catch { return false }
 }
 const baselineFor = (session: any, turns: any[]) => ({ revision: session?.revision ?? 0, userTurns: turns.filter(turn => turn.role === 'user').length, stepIds: session?.steps.map((step: any) => step.id) ?? [], pending: session?.steps.find((step: any) => !['completed', 'cancelled'].includes(step.status)) ? ((step: any) => ({ id: step.id, status: step.status, reviewId: step.reviewId ?? null, actionId: step.actionId ?? null }))(session.steps.find((step: any) => !['completed', 'cancelled'].includes(step.status))) : null })
+const lostTransportResult = (value: any) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === 3 && value.ok === false && value.saved === false && value.safeToClaimSaved === false
+const unverifiedTransportResult = (): Row => {
+  const message = 'Helfi could not verify the result of that request. Please check the normal screen before repeating it. I cannot confirm whether anything was saved.'
+  return { ok: false, saved: false, safeToClaimSaved: false, needsReview: false, status: 'needs_clarification', action: 'assistant_plan', message, spokenReply: message, transportRecovery: { status: 'result_not_verified' } }
+}
 
 /** Native JSON supplies a version pointer only. Every statement below comes
  * from the authenticated owned normal host and durable action receipts. */
 export function deriveVoiceToolResultFromOwnedState(input: { userId: string; configuration: Row; job: Row; evidence: any; session: any; view: any; turns: any[] }): Row {
   const { userId, configuration: config, job, evidence, session, view } = input, command = job.args.assistantCommand, baseline = job.baseline
-  const pointer = evidence?.assistantContext
+  const recovery = lostTransportResult(evidence)
+  if (recovery) {
+    const identity = { callId: job.callId, args: job.args, delegationId: job.delegationId, actualHumanText: job.actualHumanText }
+    if (job.identity !== digest(identity) || session && (session.actorId !== userId || session.id !== config.assistantSessionId) || view && (view.actorId !== userId || view.id !== config.assistantSessionId) || input.turns.some(turn => turn.actorId !== userId || turn.sessionId !== config.assistantSessionId)) fail('voice_tool_result_not_verified', 409)
+    // No execution or retry: an unchanged/missing owned session cannot prove
+    // whether an HTTP request reached the normal handler. End only this job.
+    if (!session && !view) return unverifiedTransportResult()
+    if (!session || !view || view.revision !== session.revision) fail('voice_tool_result_not_verified', 409)
+    if (session.revision === baseline.revision) {
+      if (digest(baselineFor(session, input.turns)) !== digest(baseline)) fail('voice_tool_result_not_verified', 409)
+      return unverifiedTransportResult()
+    }
+    if (command.type !== 'plan' && digest(session.steps.map((step: any) => step.id)) !== digest(baseline.stepIds)) fail('voice_tool_result_not_verified', 409)
+  }
+  const pointer = recovery ? { actorId: userId, id: config.assistantSessionId, revision: session.revision } : evidence?.assistantContext
   if (!session || !view || session.actorId !== userId || view.actorId !== userId || session.id !== config.assistantSessionId || view.id !== config.assistantSessionId || !pointer || pointer.actorId !== userId || pointer.id !== config.assistantSessionId || pointer.revision !== session.revision || view.revision !== session.revision || session.revision <= baseline.revision) fail('voice_tool_result_not_verified', 409)
   let target: any = null
   if (command.type === 'plan') {
@@ -130,6 +149,14 @@ export function deriveVoiceToolResultFromOwnedState(input: { userId: string; con
     target = session.steps.find((step: any) => step.id === command.stepId)
     if (baseline.pending?.id !== command.stepId || !target || !['review', 'needs_details', 'pending'].includes(target.status) || Object.entries(command.values).some(([key, value]) => digest(target.values[key]) !== digest(value))) fail('voice_tool_result_not_verified', 409)
   } else if (!['advance', 'stop'].includes(command.type)) fail('voice_tool_result_not_verified', 409)
+  if (recovery && command.type === 'stop') {
+    if (session.status !== 'stopped' || session.steps.some((step: any) => ['pending', 'needs_details', 'review'].includes(step.status)) || baseline.pending && ['pending', 'needs_details', 'review'].includes(baseline.pending.status) && session.steps.find((step: any) => step.id === baseline.pending.id)?.status !== 'cancelled') fail('voice_tool_result_not_verified', 409)
+    if (session.steps.some((step: any) => !['completed', 'cancelled'].includes(step.status))) return unverifiedTransportResult()
+  }
+  // An advance has no immutable value/review/action identity of its own.
+  // Preserve the dialogue, but do not attribute another transition to it.
+  if (recovery && command.type === 'advance') return unverifiedTransportResult()
+  if (recovery && (target ? ['pending', 'executing'].includes(target.status) : (session.currentStepIds ?? []).some((id: string) => ['pending', 'executing'].includes(session.steps.find((step: any) => step.id === id)?.status)))) return unverifiedTransportResult()
   const projectedTarget = target && view.steps.find((step: any) => step.id === target.id)
   const saved = Boolean(target?.status === 'completed' && projectedTarget?.kind === 'write' && target.actionId && projectedTarget.completionId === target.actionId && projectedTarget.completion?.verified === true && projectedTarget.completion.actorId === userId)
   const current = new Set(view.currentStepIds ?? []), pending = view.steps.find((step: any) => current.has(step.id) && !['completed', 'cancelled'].includes(step.status))
@@ -140,7 +167,7 @@ export function deriveVoiceToolResultFromOwnedState(input: { userId: string; con
   // The full exact text appears once, rather than repeating a long note in
   // message, values, result and review.summary. Stable owned control IDs are
   // enough for the next reviewed confirm/correct/recover command.
-  return { ok: true, saved, safeToClaimSaved: saved, needsReview: pending?.status === 'review', status: pending?.status === 'review' ? 'review_draft' : saved ? 'saved' : pending ? 'needs_clarification' : 'general_answer', action: 'assistant_plan', spokenReply: message, assistantState, assistantRevision: session.revision }
+  return { ok: true, saved, safeToClaimSaved: saved, needsReview: pending?.status === 'review', status: pending?.status === 'review' ? 'review_draft' : saved ? 'saved' : pending ? 'needs_clarification' : 'general_answer', action: 'assistant_plan', spokenReply: message, assistantState, assistantRevision: session.revision, ...(recovery ? { transportRecovery: { status: 'verified_owned_result' }, assistantContext: pointer } : {}) }
 }
 
 export function createVoiceSessionControl(deps: VoiceSessionControlDependencies) {
@@ -327,12 +354,16 @@ export function createVoiceSessionControl(deps: VoiceSessionControlDependencies)
       return owned(userId, body.sessionId, async (row, save) => {
         if (now() >= new Date(row.expiresAt).getTime() || !['attaching', 'ready'].includes(row.state)) fail('voice_session_not_active', 409)
         const config = configuration(row, now()), jobs = jobState(row.toolJobs), job = jobs.jobs.find(item => item.callId === body.callId) ?? fail('voice_tool_not_found', 404)
+        const accepted = (result: Row) => ({ accepted: true, ...(result.transportRecovery ? { recovery: { transportRecovery: clone(result.transportRecovery), ...(result.assistantContext ? { assistantContext: clone(result.assistantContext) } : {}) } } : {}) })
         // Recheck even a duplicate: a changed normal saved record must never
         // turn an old client response into newly verified completion.
         const result = await deps.deriveToolResult({ request, userId, configuration: config, job, evidence: body.result })
         bounded(result, RESULT_BYTES, RESULT_NODES)
-        if (job.status === 'completed') { if (digest(result) !== digest(job.result)) fail('voice_tool_result_conflict', 409); return { accepted: true } }
-        job.status = 'completed'; job.result = clone(result); bounded(jobs, MAX_JOB_BYTES); await save({ toolJobs: jobs }); return { accepted: true }
+        // An acknowledged uncertain delivery is immutable. A late app result
+        // must be checked through the normal screen, never execute this job again.
+        if (job.status === 'completed' && job.result?.transportRecovery?.status === 'result_not_verified' && lostTransportResult(body.result)) return accepted(job.result)
+        if (job.status === 'completed') { if (digest(result) !== digest(job.result)) fail('voice_tool_result_conflict', 409); return accepted(result) }
+        job.status = 'completed'; job.result = clone(result); bounded(jobs, MAX_JOB_BYTES); await save({ toolJobs: jobs }); return accepted(result)
       })
     },
   })

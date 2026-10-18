@@ -5,7 +5,7 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { createLocalVoiceWelcome, LOCAL_VOICE_WELCOME_TEXT } from './localVoiceWelcome'
 import { createLiveVoiceUsageTracker } from './liveVoiceUsage'
 import { createLiveVoiceToolTurn } from './liveVoiceToolTurn'
-import { startVoiceSessionJobs } from './voiceSessionJobs'
+import { startVoiceSessionJobs, type VoiceJobRecovery } from './voiceSessionJobs'
 
 const LIVE_REALTIME_API_BASE_URL = 'https://helfi.ai'
 
@@ -21,6 +21,7 @@ type RealtimeCallbacks = {
   onAssistantText?: (text: string) => void
   onUserSpeech?: () => void
   onActionRequest?: (args: { request?: string; action?: string; needsReview?: boolean; capability?: VoiceCapabilityRequest; assistantCommand?: GeneralAssistantCommand }) => Promise<unknown> | unknown
+  onActionRecovery?: (recovery: VoiceJobRecovery) => Promise<void> | void
 }
 
 type RealtimeSession = {
@@ -1187,6 +1188,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
           humanCommandTooLarge = false
           return executeToolCall({ type: 'function_call', name: 'request_helfi_action', call_id: job.callId, arguments: JSON.stringify(job.args) })
         },
+        onRecovery: recovery => { if (!stopped && !params.signal?.aborted) return callbacks.onActionRecovery?.(recovery) },
         onError: message => { callbacks.onError?.(message); void stopWithFinalUsage(); callbacks.onStatus?.('failed') },
         onClosed: () => { void stopWithFinalUsage(); callbacks.onStatus?.('closed') },
       })

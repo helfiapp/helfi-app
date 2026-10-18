@@ -94,6 +94,29 @@ function draftForView(actorId: string, localDate: string, timeZone: string, sess
   return { success: true, draft, assistant: view, chargedCredits: 0, audio: null, voiceReply: false }
 }
 
+/** Restore only an already-owned, exact version after a lost action reply.
+ * This path never plans, prepares, confirms or repeats an app command. */
+export async function readNativeAssistantSnapshot(request: NextRequest) {
+  try {
+    const actorId = await authenticatedActor(request)
+    if (!actorId) return NextResponse.json({ error: 'Please sign in to the same Helfi account.' }, { status: 401 })
+    const params = new URL(request.url).searchParams
+    const names = ['sessionId', 'localDate', 'timeZone', 'revision']
+    if ([...params.keys()].some(key => !names.includes(key)) || names.some(key => params.getAll(key).length !== 1)) throw new Error('Please use the current assistant result.')
+    const sessionId = params.get('sessionId') || '', localDate = params.get('localDate') || '', timeZone = normalizeVoiceTimeZone(params.get('timeZone'))
+    const revisionText = params.get('revision') || ''
+    if (!/^[A-Za-z0-9_-]{1,120}$/.test(sessionId) || !/^[1-9]\d{0,12}$/.test(revisionText) || !timeZone) throw new Error('Please use the current assistant result.')
+    validateAssistantValue({ type: 'string', maxLength: 10, format: 'date' }, localDate)
+    const context: AssistantContext = { actorId, localDate, capabilities: (request.headers.get('x-helfi-voice-capabilities') || '').split(',').map(item => item.trim()), signal: request.signal }
+    const { host } = createNativeAssistantApp(request, timeZone)
+    const view = await host.snapshot(context, sessionId)
+    if (!view || view.actorId !== actorId || view.revision !== Number(revisionText) || request.signal.aborted) return NextResponse.json({ error: 'The assistant result has changed. Please check its normal screen.' }, { status: 409 })
+    return NextResponse.json(draftForView(actorId, localDate, timeZone, sessionId, { session: view }), { headers: { 'cache-control': 'no-store' } })
+  } catch {
+    return NextResponse.json({ error: 'The existing assistant result could not be read. Please check its normal screen.' }, { status: 400, headers: { 'cache-control': 'no-store' } })
+  }
+}
+
 /** No client can request a provider, select an account or skip a review.
  * The existing voice route alone supplies its normal billed planner. */
 export async function handleNativeAssistantRequest(request: NextRequest, planner?: AssistantPlanner, policy: { decision?: 'confirm' | 'decline'; safetyMessage?: string } = {}) {
