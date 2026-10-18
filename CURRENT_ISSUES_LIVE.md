@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS143 / c322235a94915366975a3c6f250bbc8bcdd1a53c
+- Date/time: 18 October 2026, verified after06:54 UTC.
+- What changed: Generic lost-response reconciliation and owned read-only review restoration, with no automatic command replay. BUILD/DEPLOY/VERIFY succeeded; both domains HTTP200 through CloudFront with matching new ETag1t8x67ytx11z15. Dedicated worker archive dbc4d31e604c87719bcb1a631afd5e417110dc60d1b162a1396685e7d62eb7d1 applied and canonical verification passed.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; native Talk to Helfi. Signed57 passed Apple validation but was not uploaded/distributed/installed. Physical phone last verified55.
+- What to quickly test: Actual fresh simulator legacy action POST failed474ms/iOS-1017; recovery preserved a healthy call with no replay. Subsequent LOCAL lean/direct native transport against the existing live normal handler reached a meal portion clarification in8082ms and kept the rest unsaved. That local transport is not in signed57. A trailing-word caption-boundary fault remains under repair. Four operator calls settled40credits/US$0.432314648333 including fixed service allocation;0open/uncertain/unsettled. Customer50%margin is not established by operator expenses or assumed purchase proceeds. Hold phone distribution pending corrected exact artifact and meaningful speech/action checks.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — https://helfi.ai and https://www.helfi.ai
 - Date/time: 18 October 2026, verified AWS job142 after06:14 UTC.
 - What changed: Protected voice cost reservations, separate operator test budget, server-controlled monitor and continuing shutdown watchdog. Exact source20860bbbfbc72abe6a4ec7e75f61b90b0c133351; BUILD/DEPLOY/VERIFY succeeded. Both domains HTTP200 through CloudFront, matching new ETag ksqpsee3qb1z15. Only the isolated voice ledger migration was applied; unrelated pending migrations/design work excluded.

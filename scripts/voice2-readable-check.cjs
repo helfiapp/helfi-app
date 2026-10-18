@@ -98,6 +98,13 @@ async function run(){
   assert(format({status:'completed',steps:[prior,current]}).includes('Earlier saved note'))
   assert.equal(format({currentStepIds:['current'],steps:[{...prior,status:'review',review:{summary:'The current active review stays visible.'}},current]}),'The current active review stays visible.')
  })
+ await check('stop acknowledges stopping instead of repeating a retained completed read or save',()=>{
+  const retained={id:'retained',operation:'hydration.status',kind:'read',status:'completed',result:{message:'Old water answer must not be repeated.'}}
+  assert.equal(format({status:'stopped',currentStepIds:['retained'],steps:[retained]}),'This request has stopped.')
+  assert.equal(format({status:'stopped',steps:[{...retained,kind:'write',result:{message:'Old saved result.'}}]}),'This request has stopped.')
+  assert.equal(format({status:'completed',currentStepIds:['retained'],steps:[retained]}),retained.result.message)
+  assert(format({status:'stopped',steps:[{id:'pending',operation:'journal.health.create',kind:'write',status:'uncertain'},retained]}).includes('has not been confirmed'))
+ })
  console.log(`VOICE 2 readable results: ${groups} actual-source offline groups passed. No providers or normal handler execution.`)
 }
 if(require.main===module)run().catch(error=>{console.error(error);process.exitCode=1})

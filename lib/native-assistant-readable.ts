@@ -109,7 +109,11 @@ export function formatNativeAssistantView(view: AssistantReadableView | null, qu
     return join(['The saved result has not been confirmed. I will check the existing result before another save is considered.',active.operation.startsWith('symptoms.')&&generated.generated===true&&generated.saved===false?clinical(generated.analysis):''])
   }
   if(active?.status==='awaiting_person') return 'Please complete the requested step on your device, then check its result.'
+  // Stopping retains historical completed steps for receipts, but they are not
+  // a fresh answer to the stop command. Uncertain/executing outcomes above
+  // still explain that their saved result has not been confirmed.
+  if(view.status==='stopped') return 'This request has stopped.'
   const current=view.currentStepIds===undefined?null:new Set(view.currentStepIds)
   const results=view.steps.filter(step=>step.status==='completed'&&(!current||step.id!==undefined&&current.has(step.id))).map(resultText).filter(Boolean)
-  return results.join('\n\n') || (view.status==='stopped'?'This request has stopped.':'Please continue with your request.')
+  return results.join('\n\n') || 'Please continue with your request.'
 }

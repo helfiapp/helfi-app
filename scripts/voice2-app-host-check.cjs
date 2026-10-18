@@ -7,7 +7,7 @@ const storage=require('./voice2-session-store-check.cjs'),clinicalFixture=requir
 class Req extends Request{}
 const json=(body,init={})=>new Response(JSON.stringify(body),{status:init.status||200,headers:{'content-type':'application/json',...Object.fromEntries(new Headers(init.headers))}})
 function setup(){
- base.AuditDate.setNow(Date.UTC(2026,9,17,1));const db=storage.database(),entries=[];let actor='owner',webActor='owner',postCalls=0,readCalls=0,losePost=false,plannerCalls=0,providerCalls=0,domainPrepares=0,meteredCalls=0,customPlan=null
+ base.AuditDate.setNow(Date.UTC(2026,9,17,1));const db=storage.database(),entries=[];let actor='owner',webActor='owner',postCalls=0,readCalls=0,losePost=false,plannerCalls=0,providerCalls=0,domainPrepares=0,meteredCalls=0,customPlan=null,consentGranted=true
  db.db.healthJournalEntry={findUnique:async({where})=>clone(entries.find(row=>row.id===where.id)||null),findMany:async({where})=>clone(entries.filter(row=>row.userId===where.userId&&row.localDate===where.localDate)),create:async({data})=>{if(entries.some(row=>row.id===data.id)){const error=Error('Synthetic duplicate');error.code='P2002';throw error}const row={id:data.id||'manual-'+entries.length,...clone(data),createdAt:'2026-10-17T01:00:00.000Z'};entries.push(row);return clone(row)}}
  const modules=new Map(),allowed=new Set(['native-assistant-app','native-assistant-registry','native-assistant-runtime','native-assistant-tool-bridge','native-assistant-session-store','native-assistant-host','native-assistant-catalog','native-assistant-domain-adapters','native-assistant-core-actions','native-assistant-action-id','native-assistant-readable','native-assistant-food-actions','native-voice-resolved-food','native-voice-recipe-metadata','native-assistant-completions','generalAssistantEffects'])
  const forbidden=label=>(()=>{throw Error('Forbidden offline boundary: '+label)})
@@ -25,6 +25,9 @@ function setup(){
   if(name==='@/lib/health-journal-db')return{ensureHealthJournalSchema:async()=>{}}
   if(name==='@/lib/native-assistant-action-id')return load('native-assistant-action-id')
   if(name==='@/lib/native-assistant-app')return load('native-assistant-app')
+  if(name==='@/lib/ai-consent')return{aiConsentRequiredResponse:async()=>consentGranted?null:json({error:'Synthetic AI consent required',code:'ai_consent_required'},{status:403})}
+  if(name==='@/lib/native-voice-action-observability')return{beginVoiceActionTrace:(...values)=>observability.beginVoiceActionTrace(...values),finishVoiceActionTrace:(...values)=>observability.finishVoiceActionTrace(...values)}
+  if(name==='@/lib/native-voice-structured-safety')return base.load('lib/native-voice-structured-safety.ts')
   if(name==='@/app/api/health-journal/route')return{GET:async request=>{readCalls++;return journal.GET(request)},POST:async request=>{postCalls++;const result=await journal.POST(request);if(losePost)throw Error('Synthetic lost committed journal response');return result}}
   if(name==='./native-assistant-normal-actions')return{createNativeAssistantNormalActions:()=>({dependencies:coreDependencies,recover:forbidden('unused normal recover')})}
   if(name==='./native-assistant-current-state')return{createCurrentStateNormalServices:()=>({}),createNativeAssistantCurrentStateOperation:()=>stateOperation}
@@ -52,7 +55,7 @@ function setup(){
  const observability=base.load('lib/native-voice-action-observability.ts',{crypto,Date:base.AuditDate,Headers,Response,NextResponse:{json},console:{info:(...values)=>traces.push(values)},logAiUsageEvent:async event=>traceEvents.push(event)})
  const voice=base.load('app/api/native/voice-assistant/route.ts',{NextRequest:Req,NextResponse:{json},Headers,URL,Intl,URLSearchParams,resolveHelfiTtsVoice:()=> 'synthetic',aiConsentRequiredResponse:async()=>null,getServerSession:async()=>webActor?{user:{id:webActor}}:null,getUserIdFromNativeAuth:async()=>actor,authOptions:{},prisma:db.db,handleNativeAssistantRequest:app.handleNativeAssistantRequest,CreditManager:class{constructor(){providerCalls++;throw Error('Control attempted paid wallet/planner')}},chatCompletionWithCost:()=>{providerCalls++;throw Error('Provider forbidden')},assertAiUsageAllowed:()=>{throw Error('Provider forbidden')},beginVoiceActionTrace:observability.beginVoiceActionTrace,finishVoiceActionTrace:observability.finishVoiceActionTrace})
  voice.prepareVoiceAction=()=>{legacyCalls++;throw Error('General request entered legacy phrase routing')}
- return{app,route,voice,load,body,request,planner,entries,db,journal,traces,traceEvents,counts:()=>({postCalls,readCalls,plannerCalls,providerCalls,domainPrepares,meteredCalls,legacyCalls}),plan:value=>{customPlan=value},lose:value=>{losePost=value},actor:(native,web=native)=>{actor=native;webActor=web},provider:()=>{providerCalls++}}
+ return{app,route,voice,load,body,request,planner,entries,db,journal,traces,traceEvents,counts:()=>({postCalls,readCalls,plannerCalls,providerCalls,domainPrepares,meteredCalls,legacyCalls}),plan:value=>{customPlan=value},lose:value=>{losePost=value},consent:value=>{consentGranted=Boolean(value)},actor:(native,web=native)=>{actor=native;webActor=web},provider:()=>{providerCalls++}}
 }
 let groups=0
 async function check(name,run){await run();groups++;console.log('PASS '+name)}

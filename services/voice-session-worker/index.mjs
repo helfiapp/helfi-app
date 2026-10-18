@@ -21,6 +21,69 @@ const units = value => typeof value === 'string' && /^\d{1,30}$/.test(value) ? B
 const fail = code => { throw new Error(code) }
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+/** Live has no transcript-done event. These are bounded application heuristics,
+ * never evidence of an exact word boundary or guaranteed complete turn.
+ * https://developers.openai.com/api/docs/guides/live-conversations#transcript-deltas */
+export function createVoiceTranscriptBoundary(io) {
+  const records = [], turns = []
+  const GAP_MS = 500, TAIL_MS = 1500, MIN_WAIT_MS = 1500, QUIET_MS = 1000, MAX_WAIT_MS = 4500
+  let sealedOffset = -1, sealedEnd = -1
+  const add = row => {
+    const assistantBetween = records.some(item => item.speaker === 'assistant' && item.start_ms >= sealedEnd && item.end_ms <= row.start_ms)
+    const late = row.speaker === 'user' && sealedOffset >= 0 && (row.end_ms <= sealedOffset || row.start_ms < sealedEnd || row.start_ms <= sealedEnd + GAP_MS && !assistantBetween)
+    records.push({ ...row, receivedAt: io.now(), owner: late ? 'late_unassigned' : null })
+  }
+  const register = (id, offset) => { turns.push({ id, offset, receivedAt: io.now() }) }
+  const select = turn => {
+    const index = turns.indexOf(turn), previous = turns[index - 1]?.offset ?? -1, next = turns[index + 1]
+    const available = records.filter(row => row.speaker === 'user' && row.owner === null)
+    const selected = available.filter(row => row.start_ms <= turn.offset && row.end_ms > previous)
+    let ambiguous = selected.some(row => row.start_ms <= previous)
+    let end = selected.length ? Math.max(...selected.map(row => row.end_ms)) : turn.offset
+    if (selected.length) {
+      for (const row of available.filter(row => row.start_ms > turn.offset).sort((a, b) => a.start_ms - b.start_ms || a.end_ms - b.end_ms)) {
+        if (row.start_ms > end + GAP_MS) break
+        if (row.start_ms > turn.offset + TAIL_MS) ambiguous = true
+        if (records.some(item => item.speaker === 'assistant' && item.start_ms >= end && item.end_ms <= row.start_ms)) break
+        // Approximate timestamps cannot safely divide a nearby caption between
+        // two already queued human delegations. Keep the entire span unsent.
+        if (next && row.start_ms <= next.offset) ambiguous = true
+        selected.push(row); end = Math.max(end, row.end_ms)
+      }
+    }
+    if (next && selected.some(row => row.end_ms >= next.offset)) ambiguous = true
+    return { selected, end, ambiguous }
+  }
+  const settle = async (id, deadlineMs) => {
+    const turn = turns.find(item => item.id === id)
+    if (!turn) return { ok: false, reason: 'transcript_missing' }
+    const limit = Math.min(io.now() + MAX_WAIT_MS, deadlineMs)
+    let fingerprint = '', stableAt = io.now(), current
+    while (io.isActive() && io.now() < limit) {
+      current = select(turn)
+      const next = JSON.stringify([current.selected.map(row => records.indexOf(row)), current.ambiguous])
+      if (next !== fingerprint) { fingerprint = next; stableAt = Math.max(turn.receivedAt, ...current.selected.map(row => row.receivedAt)) }
+      if (current.selected.length && io.now() >= turn.receivedAt + MIN_WAIT_MS && io.now() >= stableAt + QUIET_MS) break
+      await io.sleep(Math.min(100, Math.max(1, limit - io.now())))
+    }
+    if (!io.isActive()) return { ok: false, reason: 'transcript_stopped' }
+    current = select(turn)
+    if (JSON.stringify([current.selected.map(row => records.indexOf(row)), current.ambiguous]) !== fingerprint) stableAt = io.now()
+    const stable = current.selected.length && io.now() >= turn.receivedAt + MIN_WAIT_MS && io.now() >= stableAt + QUIET_MS
+    const ok = Boolean(stable && !current.ambiguous)
+    for (const row of current.selected) row.owner = ok ? id : 'ambiguous_unassigned'
+    sealedOffset = Math.max(sealedOffset, turn.offset)
+    sealedEnd = Math.max(sealedEnd, ...current.selected.map(row => row.end_ms))
+    if (!ok) return { ok: false, reason: current.ambiguous ? 'transcript_ownership_ambiguous' : 'transcript_not_settled' }
+    // Preserve exact delivery order, spaces and repeated words, including
+    // complete fragments whose approximate interval crosses the offset.
+    const actualHumanText = records.filter(row => row.owner === id).map(row => row.text).join('').trim()
+    const snapshot = records.filter(row => row.speaker === 'assistant' ? row.start_ms <= current.end : row.owner !== null && !['late_unassigned', 'ambiguous_unassigned'].includes(row.owner)).map(({ speaker, text, start_ms, end_ms }) => ({ speaker, text, start_ms, end_ms }))
+    return actualHumanText ? { ok: true, actualHumanText, snapshot } : { ok: false, reason: 'transcript_missing' }
+  }
+  return { add, register, settle }
+}
+
 export function validateWorkerJob(value, allowOrigin = origin => origin === 'https://helfi.ai') {
   if (!value || typeof value !== 'object' || !id(value.sessionId) || typeof value.controlToken !== 'string' || value.controlToken.length < 16 || value.controlToken.length > 5000 || /[\r\n\0]/.test(value.controlToken)) fail('invalid_worker_job')
   let url
@@ -183,6 +246,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
     const backendHistory = [...config.initialInput]
     let previousDelegationOffset = -1
     let chain = Promise.resolve()
+    const transcriptBoundary = createVoiceTranscriptBoundary({ now: io.now, sleep: io.sleep, isActive: () => !closing })
     const requestClose = reason => {
       if (closing) return
       closing = true; closeReason = reason; controller.abort()
@@ -201,7 +265,6 @@ export function createVoiceSessionWorker(dependencies = {}) {
       const summary = bytes(content) <= 500 ? content : 'The app result is ready. Please read the full result shown in Helfi.'
       connection.send({ type: 'session.commentary.append', event_id: `result_${++sequence}`, delegation_id: delegationId, content: summary })
     }
-    const captionSnapshot = offset => fragments.filter(row => row.end_ms <= offset).map(row => ({ speaker: row.speaker, text: row.text, start_ms: row.start_ms, end_ms: row.end_ms }))
     const toolResults = async (calls, delegationId, actualHumanText) => {
       if (!calls.length || calls.length > 20) fail('backend_tool_limit')
       const parsed = calls.map(call => {
@@ -245,11 +308,9 @@ export function createVoiceSessionWorker(dependencies = {}) {
     }
     const runDelegation = async (delegationId, previousOffset, offset) => {
       if (closing || !ready) return
-      // Live client delegations contain metadata, never the actual utterance.
-      // Allow pending real captions to arrive without fabricating a turn event.
-      await io.sleep(250)
-      const snapshot = captionSnapshot(offset), actualHumanText = snapshot.filter(row => row.speaker === 'user' && row.end_ms > previousOffset).map(row => row.text).join('').trim()
-      if (!actualHumanText) { sendContext(delegationId, 'Please finish saying the request before I submit it.'); return }
+      const transcript = await transcriptBoundary.settle(delegationId, config.deadlineMs - CLOSE_BUFFER_MS)
+      if (!transcript.ok) { sendContext(delegationId, 'I could not safely capture the complete request. Please finish saying the full request before I submit it. No app command was submitted for this turn.'); return }
+      const { snapshot, actualHumanText } = transcript
       const input = [...backendHistory, { role: 'user', content: JSON.stringify({ delegationId, actualHumanText, actualVoiceTranscriptFragments: snapshot }) }]
       let lastVerifiedSpeech = ''
       for (let continuation = 0; continuation < 20 && !closing; continuation++) {
@@ -328,7 +389,8 @@ export function createVoiceSessionWorker(dependencies = {}) {
         if (BigInt(Math.ceil(Math.max(15, latestSeconds) * 1000)) * 50000n + BigInt(CLOSE_BUFFER_MS) * 50000n >= config.voiceReserve) requestClose('voice_budget_limit')
       } else if (['session.input_transcript.delta', 'session.output_transcript.delta'].includes(event?.type)) {
         if (typeof event.delta !== 'string' || !Number.isFinite(event.start_ms) || !Number.isFinite(event.end_ms) || event.start_ms < 0 || event.end_ms < event.start_ms) { requestClose('invalid_transcript'); return }
-        fragments.push({ speaker: event.type === 'session.input_transcript.delta' ? 'user' : 'assistant', text: event.delta, start_ms: event.start_ms, end_ms: event.end_ms })
+        const fragment = { speaker: event.type === 'session.input_transcript.delta' ? 'user' : 'assistant', text: event.delta, start_ms: event.start_ms, end_ms: event.end_ms }
+        fragments.push(fragment); transcriptBoundary.add(fragment)
         if (bytes(fragments) > config.maxInputBytes) requestClose('transcript_limit')
       } else if (event?.type === 'session.delegation.created' && event.delegation?.target === 'client') {
         const delegationId = event.delegation.id
@@ -336,6 +398,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
         if (!Number.isFinite(event.offset_ms) || event.offset_ms < 0 || event.offset_ms < previousDelegationOffset) { requestClose('invalid_delegation_timing'); return }
         if (delegations.size >= MAX_DELEGATIONS) { requestClose('delegation_limit'); return }
         delegations.add(delegationId)
+        transcriptBoundary.register(delegationId, event.offset_ms)
         const previousOffset = previousDelegationOffset
         previousDelegationOffset = event.offset_ms
         if (ready) chain = chain.then(() => runDelegation(delegationId, previousOffset, event.offset_ms)).catch(() => { requestClose('delegation_failed') })

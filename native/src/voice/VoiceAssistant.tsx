@@ -2681,6 +2681,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       traceVoiceAction(voiceActionRunId, 'request_started', options?.realtimeActionHint?.action, 'pending', 'app_brain', startedAt)
       const rawTypedTranscript = (options?.transcriptOverride ?? transcript).trim()
       const usingGeneralAssistant = !options?.audioUri && (Boolean(options?.realtimeActionHint?.assistantCommand) || !options?.realtimeActionHint?.action && (!draft || draft.action === 'assistant_plan'))
+      const structuredAssistantCommand = usingGeneralAssistant ? options?.realtimeActionHint?.assistantCommand : null
       const generalRequestAccountToken = session.token
       const generalRequestAccountId = voiceMemoryUserId
       const generalRequestRun = realtimeVoiceRunRef.current
@@ -2689,13 +2690,13 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       if (!isCurrentGeneralRequest()) return { ok: false, saved: false, message: 'This assistant request has stopped.' }
       const explicitNewCommand = usingGeneralAssistant ? false : isExplicitNewVoiceCommand(rawTypedTranscript, draft || pendingFollowUpDraft)
       const draftIsReviewOrHandoff = Boolean(draft?.canConfirm || draft?.appTarget?.path) && !explicitNewCommand
-      if (!options?.audioUri && draft?.canConfirm && isConfirmingDraftText(rawTypedTranscript)) {
+      if (!structuredAssistantCommand && !options?.audioUri && draft?.canConfirm && isConfirmingDraftText(rawTypedTranscript)) {
         setTranscript(rawTypedTranscript)
         appendConversationTurns([makeConversationTurn('user', rawTypedTranscript)])
         const saved = await saveDraft(draft, { signal: options?.signal, closeOnSuccess: !options?.realtimeActionHint?.action, voiceActionRunId })
         return confirmationRequestResult(saved, draft, voiceActionRunId, voiceMemoryUserId)
       }
-      if (!options?.audioUri && draftIsReviewOrHandoff && draft && isRejectingDraftText(rawTypedTranscript)) {
+      if (!structuredAssistantCommand && !options?.audioUri && draftIsReviewOrHandoff && draft && isRejectingDraftText(rawTypedTranscript)) {
         if (draft.action === 'assistant_plan' && draft.assistantPlan?.reviewId) {
           try {
             const { res, data } = await fetchNativeVoiceAssistant(baseUrl => fetch(`${baseUrl}/api/native/assistant`, {
@@ -2750,7 +2751,10 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
       if (!draftIsReviewOrHandoff) setDraft(null)
       setChargedCredits(null)
       try {
-        const favorites = await loadVoiceFavorites(session.token, requestSignal)
+        // The general host already owns its plan and reads actual app records.
+        // Legacy favorite/history/draft snapshots are unrelated to this
+        // command and can exceed the phone/server request limits.
+        const favorites = usingGeneralAssistant ? [] : await loadVoiceFavorites(session.token, requestSignal)
         if (requestSignal?.aborted || !isCurrentGeneralRequest()) return { ok: false, message: 'Live voice has stopped.' }
         const requestContext = normalizeLaunchContext(launchContext)
         const requestLocalDate = usingGeneralAssistant ? todayLocalDate() : (!explicitNewCommand && (draft?.canConfirm ? draft.localDate : pendingFollowUpDraft?.localDate)) || requestContext.date || todayLocalDate()
@@ -2765,7 +2769,22 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             : null
           : null
         let responseData: { res: Response; data: any }
-        if (options?.audioUri) {
+        if (usingGeneralAssistant) {
+          responseData = await fetchNativeVoiceAssistant(baseUrl => fetch(`${baseUrl}${structuredAssistantCommand ? '/api/native/assistant' : '/api/native-voice-assistant'}`, {
+            method: 'POST',
+            headers: { ...buildNativeAuthHeaders(session.token, { json: true }), 'x-helfi-voice-capabilities': 'report-pdf-v1,report-pdf-inline-v1,additional-actions-v1,symptom-analysis-v1,food-management-v1,manual-action-catalog-v1,general-assistant-v1', 'x-helfi-voice-action-id': voiceActionRunId },
+            signal: requestSignal,
+            body: JSON.stringify(structuredAssistantCommand ? {
+              sessionId: generalAssistantSessionRef.current, localDate: requestLocalDate,
+              ...(requestContext.date ? { selectedLocalDate: requestContext.date } : {}),
+              timeZone: requestTimeZone, text: typedTranscript, channel: 'realtime', command: structuredAssistantCommand, aiConsentGranted: true,
+            } : {
+              assistantSessionId: generalAssistantSessionRef.current, localDate: requestLocalDate,
+              ...(requestContext.date ? { selectedLocalDate: requestContext.date } : {}),
+              timeZone: requestTimeZone, transcript: typedTranscript, aiConsentGranted: true,
+            }),
+          }))
+        } else if (options?.audioUri) {
           const audioUri = options.audioUri
           responseData = await fetchNativeVoiceAssistant((baseUrl) => {
             const form = new FormData()
