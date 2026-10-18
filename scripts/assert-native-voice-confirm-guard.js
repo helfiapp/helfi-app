@@ -1136,6 +1136,7 @@ for (const regression of [
   'voice-session-control-check.cjs',
   'voice-session-control-routes-check.cjs',
   'voice-session-worker-check.cjs',
+  'voice-worker-result-state-check.cjs',
   'voice-transcript-boundary-check.cjs',
   'voice-session-jobs-check.cjs',
   'voice-owned-result-recovery-check.cjs',

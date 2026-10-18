@@ -1,3 +1,10 @@
+## Voice verification checkpoint — 18 October 2026, 08:06 UTC
+
+- Server c9a57b4 / AWS145 is verified on both live domains. Release59 was signed and passed Apple validation but is held, unuploaded and undistributed; physical iPhone last verified55. Do not claim it is ready on the phone.
+- The packaged simulator prepares the correct unsaved journal review and quietly refreshes settled voice credits. Its speaking model falsely described that review as a saved draft. The separate Yes caption produced no second app job; exact worker arrival/delegation timing was not persisted. Normal Health Journal History confirms no entry was saved. Repair trusted result-state propagation before another release.
+- Eight closed real-app test calls booked US$0.918289288333 /80operator test credits, with no outstanding holds. The last was an unintended microphone reopening stopped immediately,15billable seconds,US$0.0625 and no backend request. The US$1 shared allowance has US$0.081710711667 left; a requested increase is pending. Test expenses do not establish customer profit. Actual retained purchase proceeds still require proof before a customer50% margin can be claimed.
+- Design Manager is coordinated and idle. Preserve the active47-file isolation manifest and approved Dashboard/Insights sources. Do not restore pending design changes into this release.
+
 # Voice checkpoint — 18 October 2026
 
 AWS144/ba89d5ba1ece6869ef8a94a29597b7c74004bb23 is verified live with BUILD/DEPLOY/VERIFY succeeded, both domains200/CloudFront/new matching ETagtiqjflsoj51z15. Worker59ff35dc989f1065963f2df83c91975295007f4721d305af84762685654a3925 applied/canonical verified. Signed58 passed strict signature/manifest/Health/push and Apple validation but is NOT uploaded/distributed/installed. Phone last verified55; packaged Release58 simulator logged in.

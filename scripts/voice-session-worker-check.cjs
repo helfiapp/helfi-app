@@ -109,6 +109,7 @@ async function main(){
   await check('independent server clock deadline closes waits final usage and retains cumulative snapshots correctly',async()=>{
     const f=fixture({onReady:({emit})=>{emit({type:'session.usage.updated',usage:{seconds:12}});emit({type:'session.usage.updated',usage:{seconds:15}})}})
     assert.equal((await f.worker.monitor(f.job)).status,'closed');assert.equal(f.sent.filter(e=>e.type==='session.close').length,1);assert.equal(f.completion().seconds,30);assert.equal(f.completion().durationMs,30000);assert(f.controlCalls.some(row=>row.command==='heartbeat'));assert(f.controlCalls.some(row=>row.command==='schedule-watchdog'));assert.equal(f.completion().infrastructureAllocationPolicyVersion,'service-overhead-v1')
+    assert.equal(f.completion().reason,'reserved_deadline','A provider close acknowledgement must not erase the app deadline that caused it');assert.equal(f.completion().finalUsageConfirmed,true)
   })
   await check('client delegation uses actual captions reserves every bounded Luna request and settles exact reported counters',async()=>{
     const f=fixture({onReady:({transcript,delegate})=>{transcript();delegate();delegate()}});await f.worker.monitor(f.job)
@@ -132,7 +133,7 @@ async function main(){
   })
   await check('actual owned native tool lane returns all results and speaks canonical app truth',async()=>{
     const f=fixture({tool:true,pendingTools:true,onReady:({transcript,delegate})=>{transcript();delegate()}});await f.worker.monitor(f.job)
-    assert.equal(f.queued.length,1);assert.equal(f.queued[0].callId,'exact-tool-call');assert.equal(f.queued[0].actualHumanText,'How much water today?');assert.equal(f.providerCalls.length,2);assert(f.providerCalls[1].input.some(item=>item.type==='function_call_output'&&item.call_id==='exact-tool-call'));const spoken=f.sent.find(e=>e.type==='session.commentary.append');assert.equal(spoken.content,'Actual normal water read: 0 mL, goal 2450 mL.');assert.equal(f.settled.length,2)
+    assert.equal(f.queued.length,1);assert.equal(f.queued[0].callId,'exact-tool-call');assert.equal(f.queued[0].actualHumanText,'How much water today?');assert.equal(f.providerCalls.length,2);assert(f.providerCalls[1].input.some(item=>item.type==='function_call_output'&&item.call_id==='exact-tool-call'));const spoken=f.sent.find(e=>e.type==='session.commentary.append');assert.equal(JSON.parse(spoken.content).speech,'Actual normal water read: 0 mL, goal 2450 mL.');assert.equal(JSON.parse(spoken.content).safeToClaimSaved,false);assert.equal(f.settled.length,2)
   })
   await check('foreign tool result cannot become an answer or repeat an app action',async()=>{const f=fixture({tool:true,foreignTool:true,onReady:({transcript,delegate})=>{transcript();delegate()}});await f.worker.monitor(f.job);assert.equal(f.queued.length,1);assert.equal(f.providerCalls.length,1);assert.equal(f.sent.filter(e=>e.type==='session.commentary.append').length,0)})
   await check('next delegation receives only new actual human text rather than reusing an older Yes',async()=>{
@@ -227,7 +228,7 @@ async function main(){
     })
     await a.worker.monitor(a.job);assert.equal(toolCount,multiple?3:2,JSON.stringify(a.callbacks.map(row=>({command:row.command,error:row.error}))));assert.equal(a.backend.length,4);assert.equal(app.counts().postCalls,1);assert.equal(app.entries.length,1);assert.equal(app.entries[0].content,literal)
     assert.equal(a.backend[1].input.filter(row=>row.type==='function_call_output').length,multiple?2:1,'All native outputs reach one continuation')
-    const spoken=a.sent.filter(row=>row.type==='session.commentary.append');assert.equal(spoken.length,2);assert(spoken[1].content.includes(literal));assert(!spoken[1].content.includes('invented model wording'))
+    const spoken=a.sent.filter(row=>row.type==='session.commentary.append');assert.equal(spoken.length,2);assert(JSON.parse(spoken[1].content).speech.includes(literal));assert(!JSON.parse(spoken[1].content).speech.includes('invented model wording'));assert.equal(JSON.parse(spoken[1].content).safeToClaimSaved,true)
     assert.equal(a.f.bill.state,'CLOSED');assert.equal(a.f.bill.reservations.filter(row=>row.kind==='backend').length,4);assert(a.f.bill.reservations.every(row=>row.state==='SETTLED'))
    }
   })

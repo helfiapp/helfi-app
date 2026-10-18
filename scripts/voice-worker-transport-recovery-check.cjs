@@ -59,7 +59,7 @@ async function main(){
     assert.equal(f.requests.length,1);assert.equal(f.callbacks.filter(row=>row.command==='reserve').length,1)
     assert.equal(f.callbacks.filter(row=>row.command==='settle').length,1);assert.equal(f.queued.length,1)
     assert.deepEqual(f.observations,[{backend:1,reserves:1,enqueues:1,closed:false}])
-    assert.equal(f.sent.find(row=>row.type==='session.commentary.append').content,unknownMessage)
+    const context=JSON.parse(f.sent.find(row=>row.type==='session.commentary.append').content);assert.equal(context.type,'helfi_app_result');assert.equal(context.unverified,true);assert.equal(context.safeToClaimSaved,false);assert.match(context.speech,/unverified|could not verify/i)
     assert.equal(f.result.financialFinalizationConfirmed,true)
   })
   await check('several returned calls enqueue only through the first unknown result and no further backend request',async()=>{
@@ -67,7 +67,7 @@ async function main(){
       const f=await fixture(workerModule,{callCount:3,unknownIndex})
       assert.equal(f.queued.length,unknownIndex+1);assert.equal(f.requests.length,1)
       assert.equal(f.callbacks.filter(row=>row.command==='reserve').length,1)
-      assert.equal(f.sent.find(row=>row.type==='session.commentary.append').content,unknownMessage)
+      const context=JSON.parse(f.sent.find(row=>row.type==='session.commentary.append').content);assert.equal(context.type,'helfi_app_result');assert.equal(context.unverified,true);assert.equal(context.safeToClaimSaved,false);assert.match(context.speech,/unverified|could not verify/i)
       assert.equal(f.observations[0].closed,false)
     }
   })
@@ -87,7 +87,7 @@ async function main(){
     assert(input.some(row=>row.role==='assistant'&&row.content===unknownMessage))
     const speech=f.sent.filter(row=>row.type==='session.commentary.append')
     assert.equal(speech.length,2);assert.equal(speech[1].delegation_id,'delegation-2')
-    assert.equal(speech[1].content,'A new genuine human turn was processed.')
+    assert.equal(JSON.parse(speech[1].content).speech,'A new genuine human turn was processed.');assert.equal(JSON.parse(speech[1].content).unverified,true,'A no-tool model answer cannot clear an earlier uncertain app result')
   })
   console.log(`Voice worker transport recovery: ${groups} actual-source offline groups passed. No provider, AWS, auth, account, database or spend.`)
 }

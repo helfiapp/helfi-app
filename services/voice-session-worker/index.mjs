@@ -21,6 +21,56 @@ const units = value => typeof value === 'string' && /^\d{1,30}$/.test(value) ? B
 const fail = code => { throw new Error(code) }
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+/** Facts come from canonical app receipts, never from backend prose. Keep these
+ * facts intact even when a long literal result must be read in the normal UI. */
+export function buildLiveVoiceResultContext(speech, results = [], prior = {}) {
+  const rows = Array.isArray(results) ? results.filter(row => row && typeof row === 'object' && !Array.isArray(row)) : []
+  let needsReview = typeof prior.needsReview === 'boolean' ? prior.needsReview : null, unverified = prior.unverified === true || !Array.isArray(results) || rows.length !== results.length
+  let saved = false, safeToClaimSaved = false, needsDetails = prior.needsDetails === true, awaitingPerson = prior.awaitingPerson === true
+  for (const row of rows) {
+    const current = row.assistantState?.currentStepIds
+    const steps = Array.isArray(row.assistantState?.steps) ? row.assistantState.steps.filter(step => !Array.isArray(current) || current.includes(step.id)) : []
+    const review = row.needsReview === true || steps.some(step => step.status === 'review')
+    const unknown = row.ok !== true || row.transportRecovery?.status === 'result_not_verified' || row.saved === true && row.safeToClaimSaved !== true || ['uncertain', 'executing', 'verification_pending'].includes(row.status) || steps.some(step => ['uncertain', 'executing'].includes(step.status))
+    if (row.ok === true && (typeof row.needsReview === 'boolean' || Array.isArray(row.assistantState?.steps))) needsReview = review
+    else if (review) needsReview = true
+    if (row.ok === true && Array.isArray(row.assistantState?.steps)) unverified = unknown
+    else unverified ||= unknown
+    saved ||= row.saved === true
+    safeToClaimSaved ||= row.ok === true && row.saved === true && row.safeToClaimSaved === true
+    const details = row.status === 'needs_clarification' || steps.some(step => step.status === 'needs_details')
+    const person = row.status === 'awaiting_person' || steps.some(step => step.status === 'awaiting_person')
+    if (row.ok === true && Array.isArray(row.assistantState?.steps)) { needsDetails = details; awaitingPerson = person }
+    else { needsDetails ||= details; awaitingPerson ||= person }
+  }
+  // Several tool outputs may include a verified save plus a later unknown
+  // result/review. No aggregate completion claim can erase either fact.
+  if (rows.some(row => row.ok !== true || row.transportRecovery?.status === 'result_not_verified' || row.saved === true && row.safeToClaimSaved !== true) || !Array.isArray(results) || rows.length !== results.length) unverified = true
+  const status = unverified ? saved && safeToClaimSaved ? 'partial_saved_result_unverified' : 'result_unverified'
+    : needsReview ? saved && safeToClaimSaved ? 'saved_and_review_pending' : 'review_pending'
+    : awaitingPerson ? saved && safeToClaimSaved ? 'saved_and_person_pending' : 'awaiting_person'
+    : saved && safeToClaimSaved ? 'saved_verified' : needsDetails ? 'needs_details' : needsReview === null ? 'review_state_unknown' : 'answered'
+  const instruction = unverified ? 'State uncertainty; never infer completion. Delegate the next reply before repeating an action.'
+    : needsReview ? 'This review is unsaved. Read speech, ask for a decision, and delegate the reply. Do not claim a saved draft.'
+    : awaitingPerson ? 'A person action is still pending. Only earlier receipt-backed work is saved. Delegate replies.'
+    : saved && safeToClaimSaved ? 'Only the receipt-backed save is verified. Read speech; do not invent other completed work.'
+    : needsReview === null ? 'Review state is unknown. No new save is verified. Delegate app requests and every decision.'
+    : 'Read speech as information, not a verified save. Delegate app requests and decisions.'
+  const envelope = { type: 'helfi_app_result', saved, safeToClaimSaved, needsReview, unverified, status, instruction, speech: typeof speech === 'string' ? speech : '' }
+  let content = JSON.stringify(envelope)
+  if (bytes(content) > 500) {
+    const fullTextInApp = needsReview === true || awaitingPerson || needsDetails || rows.some(row => row.assistantState && Array.isArray(row.assistantState.steps) || row.needsReview === true)
+    const fallback = unverified ? saved && safeToClaimSaved ? 'A save is verified; another result is unverified. Check the full results in Helfi before repeating anything.' : 'The result is unverified. Check Helfi before repeating any change.'
+      : needsReview ? saved && safeToClaimSaved ? 'An earlier save is verified; the new review is unsaved. Read the full review in Helfi before deciding.' : 'Your unsaved review is ready. Read the complete review in Helfi before deciding. It has not been saved.'
+      : awaitingPerson ? saved && safeToClaimSaved ? 'An earlier save is verified; a person action remains pending. Read the full result in Helfi.' : 'A person action is still pending. Read its full details in Helfi; it is not a completed app save.'
+      : saved && safeToClaimSaved ? 'A save is verified. Read the complete saved result in Helfi.'
+      : fullTextInApp ? 'Read the complete result in Helfi. No new save is verified.' : 'Please ask for a shorter reply. No app save is verified.'
+    content = JSON.stringify({ ...envelope, speech: fallback, fullTextInApp })
+  }
+  if (bytes(content) > 500) fail('live_result_context_exceeds_reserve')
+  return { content, state: { needsReview, unverified, needsDetails, awaitingPerson } }
+}
+
 /** Live has no transcript-done event. These are bounded application heuristics,
  * never evidence of an exact word boundary or guaranteed complete turn.
  * https://developers.openai.com/api/docs/guides/live-conversations#transcript-deltas */
@@ -244,6 +294,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
     // Keep the exact server-returned tool state (including fresh review IDs)
     // across human turns. Every subsequent full request is bounded again.
     const backendHistory = [...config.initialInput]
+    let liveResultState = { needsReview: null, unverified: false }
     let previousDelegationOffset = -1
     let chain = Promise.resolve()
     const transcriptBoundary = createVoiceTranscriptBoundary({ now: io.now, sleep: io.sleep, isActive: () => !closing })
@@ -258,12 +309,13 @@ export function createVoiceSessionWorker(dependencies = {}) {
       if (result?.allowed === false || result?.stopRequested === true) { requestClose('financial_or_control_stop'); fail('control_denied') }
       return result
     }
-    const sendContext = (delegationId, content) => {
+    const sendContext = (delegationId, speech, results = []) => {
       if (closing || !connection) return
       // Conservatively <=500 UTF-8 bytes, hence <=500 textual tokens. Preserve
       // full verified outputs in app state, never truncate saved literal data.
-      const summary = bytes(content) <= 500 ? content : 'The app result is ready. Please read the full result shown in Helfi.'
-      connection.send({ type: 'session.commentary.append', event_id: `result_${++sequence}`, delegation_id: delegationId, content: summary })
+      const wrapped = buildLiveVoiceResultContext(speech, results, liveResultState)
+      liveResultState = wrapped.state
+      connection.send({ type: 'session.commentary.append', event_id: `result_${++sequence}`, delegation_id: delegationId, content: wrapped.content })
     }
     const toolResults = async (calls, delegationId, actualHumanText) => {
       if (!calls.length || calls.length > 20) fail('backend_tool_limit')
@@ -313,6 +365,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
       const { snapshot, actualHumanText } = transcript
       const input = [...backendHistory, { role: 'user', content: JSON.stringify({ delegationId, actualHumanText, actualVoiceTranscriptFragments: snapshot }) }]
       let lastVerifiedSpeech = ''
+      const canonicalResults = []
       for (let continuation = 0; continuation < 20 && !closing; continuation++) {
         if (backendCalls >= MAX_BACKEND_CALLS || io.now() >= config.deadlineMs - CLOSE_BUFFER_MS) { requestClose('backend_or_duration_limit'); return }
         const body = { model: config.backendModel, service_tier: 'default', store: false, instructions: config.instructions,
@@ -349,6 +402,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
           const returned = await toolResults(calls, delegationId, actualHumanText)
           input.push(...returned)
           const canonical = returned.map(item => { try { return JSON.parse(item.output) } catch { return null } }).filter(Boolean)
+          canonicalResults.push(...canonical)
           const unknown = canonical.find(result => result.transportRecovery?.status === 'result_not_verified')
           if (unknown) {
             // An unverified app effect ends this delegation. Asking the model
@@ -356,7 +410,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
             // Retain canonical outputs for the next genuine human turn only.
             const reply = typeof unknown.spokenReply === 'string' && unknown.spokenReply ? unknown.spokenReply : typeof unknown.message === 'string' && unknown.message ? unknown.message : 'Helfi could not verify the result. Please check the normal screen before repeating the request.'
             backendHistory.splice(0, backendHistory.length, ...input, { role: 'assistant', content: reply })
-            sendContext(delegationId, reply)
+            sendContext(delegationId, reply, canonicalResults)
             return
           }
           lastVerifiedSpeech = canonical.map(result => typeof result.spokenReply === 'string' ? result.spokenReply : typeof result.message === 'string' ? result.message : '').filter(Boolean).join('\n') || lastVerifiedSpeech
@@ -365,7 +419,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
         const answer = response.output.filter(item => item?.type === 'message' && item.role === 'assistant').flatMap(item => Array.isArray(item.content) ? item.content.filter(part => part?.type === 'output_text' && typeof part.text === 'string').map(part => part.text) : []).join('\n')
         const reply = lastVerifiedSpeech || answer.trim() || 'Please check the result shown in Helfi. No additional save is confirmed.'
         backendHistory.splice(0, backendHistory.length, ...input, { role: 'assistant', content: reply })
-        sendContext(delegationId, reply)
+        sendContext(delegationId, reply, canonicalResults)
         return
       }
     }
@@ -434,7 +488,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
       try { connection?.close() } catch {}
       const complete = {
         finalUsageConfirmed: Boolean(final), backendUsageConfirmed: !backendUnknown && pendingBackend.size === 0,
-        seconds: final?.usage.seconds ?? null, reason: final?.reason || closeReason || 'finalization_unconfirmed',
+        seconds: final?.usage.seconds ?? null, reason: closeReason || final?.reason || 'finalization_unconfirmed',
         voiceHoldKey: config.voiceHoldKey, infrastructureHoldKey: config.infrastructureHoldKey,
         backendResponseIds: [...seenResponses], receiptDigest: digest(final || { sessionId: job.sessionId, outcome: 'unconfirmed' }),
         durationMs: final ? Math.ceil(final.usage.seconds * 1000) : null,

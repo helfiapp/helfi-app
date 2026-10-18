@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE, AWS Amplify145, exact source c9a57b4ab6ffb3cf53c4c9b86857aa4f3b6bb745.
+- Date/time: 18 October 2026; all BUILD/DEPLOY/VERIFY steps and both CloudFront domains verified before the Release59 call.
+- What changed: Generic preparation of unsaved reviews across registered writes; local native voice-cost settlement observer and credit value refresh included in the same source. Packaged59 remains held and has not been uploaded or installed on the owner's phone.
+- Where to see it (page/link): https://helfi.ai ; https://www.helfi.ai ; voice server through the existing native app.
+- What to quickly test: Call7 prepared the exact journal review in337ms, and the packaged simulator quietly refreshed857 to847 credits. Live incorrectly called that review a saved draft; no journal save occurred. That spoken-result fault is being repaired before distribution. Eight closed test calls total US$0.918289288333 and80test credits, including one brief unintended reopening stopped immediately. No open/uncertain/unsettled sessions. Customer50% margin remains unverified.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS144 / ba89d5ba1ece6869ef8a94a29597b7c74004bb23
 - Date/time: 18 October 2026, verified before07:28 UTC.
 - What changed: Lean structured normal-handler transport with consent/safety parity, complete-fragment bounded caption settling/ownership, and truthful stop acknowledgement. BUILD/DEPLOY/VERIFY succeeded; both domains200 through CloudFront with matching new ETagtiqjflsoj51z15. Worker59ff35dc989f1065963f2df83c91975295007f4721d305af84762685654a3925 applied/canonical verified.
