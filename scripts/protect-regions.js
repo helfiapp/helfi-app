@@ -468,4 +468,7 @@ function main() {
   console.log('✅ Guard Rails: Protected regions verified.');
 }
 
+// Prevent hidden-tab session heartbeats from returning in future releases.
+require('child_process').execFileSync(process.execPath, [path.join(__dirname, 'auth-idle-session-check.cjs')], { stdio: 'inherit' });
+
 main();

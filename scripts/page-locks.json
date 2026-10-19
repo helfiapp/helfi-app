@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T03:12:58.520Z",
+  "generatedAt": "2026-10-19T11:33:59.265Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -192,7 +192,7 @@
     "components/practitioner/DirectoryMap.tsx": "584fb5291e1f5526db957c1c6e5cd8ebe16a4ed0ca9a1e524320d7c55fb3f407",
     "components/PractitionerRecommendations.tsx": "cafc97e772951bc0c9bc918b70ec3afcc23bf84c9aa22187b592ab2514f356b3",
     "components/providers/AiConsentProvider.tsx": "0c8d878cc80f27d7eb0534bba19181b89ec9813f9e5f0866c6af5cfbb9264496",
-    "components/providers/AuthProvider.tsx": "c74601029ea5f49daaf3a04cfd684ba7a715105840c033c8355da2da9dce655e",
+    "components/providers/AuthProvider.tsx": "1d5d04877fc2ed8648ca22000ca55eac315443eb6a3b32758c15dd8219679be6",
     "components/providers/UserDataProvider.tsx": "30c6fa6b0016cab7c9b667248c26a7792cf34e440544c127812a1211f5e14457",
     "components/reports/ConsentGate.tsx": "e24784c6295270453f70f2eedade5e696976a0965613e60f40c1844b36132313",
     "components/reports/LabReportUpload.tsx": "e7661163dabd0a2804f937f3c837d0e80ba2933fbc992b1abe3880d099ec0632",

@@ -1,3 +1,9 @@
+## Hidden browser session checks — 19 October 2026
+
+Owner-approved scope: `components/providers/AuthProvider.tsx` pauses the existing 15-minute session timer while the document is hidden. Preserve the existing disabled focus refresh, offline behaviour, remembered sessions, server checks and AI consent. Returning to a visible tab must not add an immediate session fetch. `scripts/auth-idle-session-check.cjs` exercises the actual provider and installed NextAuth client offline and runs through the protected-region build gate. Cross-tab session broadcasts remain supported and can still cause reads; this change does not promise elimination of all database traffic. Do not reintroduce hidden periodic polling without the owner's approval and a cost estimate.
+
+The owner requires a cost estimate and explicit approval before potentially chargeable checks, builds, deployments or tests. Current approval is one idle-check deployment and essential verification only, US$0.50 maximum; no AI/voice calls, extra deployments or other work, then stop. Other local candidates must remain excluded from this release.
+
 ## Exact food source readback across JSON storage — 19 October 2026
 
 - Actual call16 saved one reviewed meal but failed its final check because three unused coffee serving-option nutrients changed by one floating-point step during storage. The normal receipt, owned row, date, meal, selected source/portion, amounts and all eaten nutrients matched. Never repeat a save to repair this readback failure; recover its existing normal receipt through GET only.
