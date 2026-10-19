@@ -28,7 +28,7 @@ function load(relativePath, fixtures = {}) {
     .map((item) => printer.printNode(ts.EmitHint.Unspecified, item, ast)).join('\n').replace(/^export\s+/gm, '')
   const context = {
     process: { env: Object.freeze({ NODE_ENV: 'test' }) },
-    console: { log() {}, warn() {}, error() {} }, crypto, Buffer, Date: AuditDate, AbortController, setTimeout, clearTimeout,
+    console: { log() {}, warn() {}, error() {} }, crypto, Buffer, Date: AuditDate, ...require('./voice-recorded-source-fixture.cjs'), AbortController, setTimeout, clearTimeout,
     fetch() { throw new Error('Network forbidden in offline voice checks') },
     ...fixtures,
   }

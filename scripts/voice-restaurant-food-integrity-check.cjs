@@ -27,7 +27,7 @@ const option = (id,label,calories=100)=>({id,label,serving_size:label,...nutriti
 const item = (id,name,brand,options)=>({id,name,brand,source:'custom',kind:'FAST_FOOD',...nutrition,serving_size:options?.[0]?.label||'100 g',servingOptions:options||[]})
 let candidates = [], locals = [], servingReplies = {}, requests=[], diaryReply=null, menuRows=[]
 class Request { constructor(url){this.url=String(url)} }
-const ctx = vm.createContext({ ...measurement('lib/native-voice-spoken-quantities.ts'), ...measurement('lib/food/serving-measurements.ts'), URL, console, AbortController, setTimeout, clearTimeout, NextRequest:Request,
+const ctx = vm.createContext({ ...measurement('lib/native-voice-spoken-quantities.ts'), ...measurement('lib/food/serving-measurements.ts'), URL, console, ...require('./voice-recorded-source-fixture.cjs'), AbortController, setTimeout, clearTimeout, NextRequest:Request,
   verifiedVoiceMenuAliases:JSON.parse(fs.readFileSync(path.join(root,'data/food-overrides/voice-menu-aliases.json'),'utf8')),
   getCustomPackagedItems:async()=>menuRows,
   searchDiaryFoods:async req=>{const url=new URL(req.url);requests.push({kind:'search',q:url.searchParams.get('q'),country:url.searchParams.get('country'),localOnly:url.searchParams.get('localOnly')});return {json:async()=>({items:diaryReply?diaryReply(url):candidates})}},

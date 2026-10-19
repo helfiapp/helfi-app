@@ -20,7 +20,7 @@ function harness(options = {}) {
   const forbidden = label => () => { throw Error(`Forbidden offline effect: ${label}`) }
   const ctx = vm.createContext({
     process: { env: Object.freeze({}) }, console: { log() {}, warn() {}, error() {} },
-    Date, Intl, URL, URLSearchParams, Buffer, crypto, AbortController, setTimeout, clearTimeout,
+    Date, Intl, URL, URLSearchParams, Buffer, crypto, ...require('./voice-recorded-source-fixture.cjs'), AbortController, setTimeout, clearTimeout,
     resolveHelfiTtsVoice: () => 'marin',
     aiConsentRequiredResponse: async () => options.deniedConsent ? { status: 403, body: { error: 'Synthetic consent denied' } } : null,
     getServerSession: async () => options.unauthorized ? null : { user: { id: options.userId || 'synthetic-user-a' } },

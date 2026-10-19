@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS149 / a5b46618b05d5666368eddaaee36de278f2118aa.
+- Date/time: 19 October 2026, verified02:02:53UTC.
+- What changed: Source-preserving food clarification, bounded ordinary lookups, pause for fresh human responses, bounded receipt-only shutdown drain and strict closed-session collateral checks. Worker7d4e1fc47f01d2c8b8c4f75fcf9115c3e8c7bb76d12fa41bdeef0876d3dff6ea applied and independently verified. BUILD/DEPLOY/VERIFY all succeeded.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai both200/CloudFront, matching new ETag51btasvxg41z15/bodySHAfe4be84173bd74bd67cc06879d65aec4c812a5fb6a230df101871faa1b10c1fb.
+- What to quickly test: Actual call12 FAILED food acceptance: unsuitable egg alternatives and unresolved recorded coffee cup; no food save. Both owned jobs remain clarification, no confirmation job. All call12 costs settled (115seconds,US$0.148551668333,10testcredits). Total12calls bookedUS$1.430907971667 plus priorcall11US$0.011477625held. Native60 validated/uploaded, NOT distributed; physical phone last55. Hold phone release pending actual food-source repair/proof. Customer50% profit remains unverified. Mac speaker muted; no audible test sign-off.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS148 /55cec8aebae6f176d568294a4c6f990225f71a1a.
 - Date/time: 19 October 2026, verified01:15:57UTC.
 - What changed: Owned pending-review routing, signed metered semantic decisions, exact review fences and publication-race protection. Worker16e56bb31ebd13c7f601f97b4edd87e22c6657cdd5d9012ae169b805ff0b82f0 applied and verified; all AWS steps succeeded.

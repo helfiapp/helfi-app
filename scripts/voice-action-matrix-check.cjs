@@ -41,7 +41,7 @@ let charges = []
 const ctx = vm.createContext({
   ...actual('lib/native-voice-mood-context.ts'),
   ...actual('lib/native-voice-food-copy.ts'),
-  process: { env: Object.freeze({}) }, Date: FixtureDate, Intl, URL, URLSearchParams, Buffer, crypto, AbortController, setTimeout, clearTimeout, NextRequest: Request,
+  process: { env: Object.freeze({}) }, Date: FixtureDate, Intl, URL, URLSearchParams, Buffer, crypto, ...require('./voice-recorded-source-fixture.cjs'), AbortController, setTimeout, clearTimeout, NextRequest: Request,
   console: { log() {}, warn() {}, error() {} },
   fetch() { throw Error('Network forbidden') }, OpenAI: class { constructor() { throw Error('Provider client forbidden') } },
   ...actual('lib/food/serving-measurements.ts'), ...actual('lib/native-voice-time.ts'), ...actual('lib/exercise/voice-duration.ts'), ...actual('lib/native-voice-spoken-quantities.ts'),

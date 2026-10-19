@@ -73,7 +73,7 @@ function pure(relative) {
 const routeSource = ts.createSourceFile('route.ts', fs.readFileSync(path.join(root, 'app/api/native/voice-assistant/route.ts'), 'utf8'), ts.ScriptTarget.Latest, true)
 const printer = ts.createPrinter()
 const route = routeSource.statements.filter(node => !ts.isImportDeclaration(node)).map(node => printer.printNode(ts.EmitHint.Unspecified, node, routeSource)).join('\n').replace(/^export\s+/gm, '')
-const ctx = vm.createContext({ process: { env: Object.freeze({}) }, Date, URL, console, AbortController, setTimeout, clearTimeout, resolveHelfiTtsVoice: () => 'synthetic', ...moduleScope.exports, ...pure('native/src/lib/foodUnits.ts'),
+const ctx = vm.createContext({ process: { env: Object.freeze({}) }, Date, URL, console, ...require('./voice-recorded-source-fixture.cjs'), AbortController, setTimeout, clearTimeout, resolveHelfiTtsVoice: () => 'synthetic', ...moduleScope.exports, ...pure('native/src/lib/foodUnits.ts'),
   fetch() { throw Error('Network forbidden') }, OpenAI: class { constructor() { throw Error('Provider forbidden') } } })
 vm.runInContext(ts.transpileModule(route, { compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 } }).outputText, ctx)
 check('actual water reader understands spoken liquid quantities with existing country cup sizes', () => {

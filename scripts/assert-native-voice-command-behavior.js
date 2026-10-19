@@ -1766,7 +1766,7 @@ const sandbox = {
   URLSearchParams,
   URL,
   Date,
-  AbortController,
+  ...require('./voice-recorded-source-fixture.cjs'), AbortController,
   setTimeout,
   clearTimeout,
   Math,

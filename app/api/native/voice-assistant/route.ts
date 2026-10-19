@@ -16,6 +16,8 @@ import { GET as searchDiaryFoods } from '@/app/api/food-data/route'
 import { GET as searchDiaryFoodServings } from '@/app/api/food-data/servings/route'
 import { searchCustomFoodMacros, getCustomPackagedItems } from '@/lib/food/custom-foods'
 import verifiedVoiceMenuAliases from '@/data/food-overrides/voice-menu-aliases.json'
+import verifiedUsdaRecordedPortions from '@/data/food-overrides/usda-recorded-portions.json'
+import { verifiedUsdaRecordedPortionOptions } from '@/lib/food/usda-recorded-portions'
 import { applyNativeVoiceRecipeMetadata, validateNativeVoiceImportedRecipe } from '@/lib/native-voice-recipe-metadata'
 import { signNativeVoiceDraft, verifyNativeVoiceDraft } from '@/lib/native-voice-review-token'
 import { assertAiUsageAllowed, isAiSafetyError } from '@/lib/ai-safety'
@@ -4113,7 +4115,7 @@ function voiceOrdinaryIdentityMatches(query: string, item: any) {
   if (!requested.split(' ').filter(Boolean).every(token => available.has(token))) return false
   const unrequested = (pattern: RegExp) => Array.from(candidate.matchAll(new RegExp(pattern.source, 'g')))
     .some(match => !new RegExp(`\\b${escapeRegex(match[0])}\\b`).test(requested))
-  if (unrequested(/\b(?:liver|heart|gizzard|giblet|kidney|organ|offal|broth|stock|gravy|sauce|soup|candy|cookie|cake|dessert|pudding|creamer|whitener|bar)\b/)) return false
+  if (unrequested(/\b(?:liver|heart|gizzard|giblet|kidney|organ|offal|broth|stock|gravy|sauce|soup|candy|cookie|cake|dessert|pudding|custard|roll|substitute|creamer|whitener|bar)\b/)) return false
   if (/\bskin\b/.test(candidate) && !/\bskin\b/.test(requested) && !/\bmeat\b/.test(candidate)) return false
   if (/\bmilk\b/.test(requested)) {
     if (unrequested(/\b(?:babyfood|cereal|oatmeal|porridge|cheese|yogurt|bread|custard|potato|nougat|chicken|egg|pancake|margarine|butter)\b/)) return false
@@ -4247,9 +4249,11 @@ async function findOrdinaryVoiceFood(ingredient: any, country: string | undefine
       if (compatible) return compatible
     }
     for (const { item } of candidates.slice(0, 6)) {
-      // This exact local USDA record has independently verified recorded
-      // portions. Resolve those locally before a broad provider search.
-      if (!external && !ingredient.requireRecordedPortion && !(item.source === 'usda' && String(item.id) === '171890')) continue
+      // Legacy callers may resolve independently cited local portions too,
+      // without enabling provider detail requests for every ordinary record.
+      const recordedLocal = item.source === 'usda' && verifiedUsdaRecordedPortions.foods.some(record =>
+        String(record.fdcId) === String(item.id) && ordinaryVoiceMatchText(record.name) === ordinaryVoiceMatchText(item.name))
+      if (!external && !ingredient.requireRecordedPortion && !recordedLocal) continue
       if (!['usda', 'fatsecret', 'custom'].includes(item.source) || !item.id) continue
       const key = `${item.source}:${item.id}`
       if (seenDetails.has(key)) continue
@@ -4546,6 +4550,23 @@ function normalizeLibraryFoodItem(row: any): NormalizedFoodItem | null {
   }
 }
 
+async function findRecordedOrdinaryVoiceFood(ingredient: any, scope: ReturnType<typeof createVoiceFoodLookupScope>) {
+  // The registry identifies independently cited source portions, not food
+  // aliases or generic cup weights. Read the actual stored row and require
+  // its original source/name/nutrients before applying those exact portions.
+  const records = verifiedUsdaRecordedPortions.foods.filter(record => voiceOrdinaryIdentityMatches(ingredient.name, { name: record.name }))
+  if (!records.length) return null
+  const rows = await scope.run(() => prisma.foodLibraryItem.findMany({
+    where: { OR: records.map(record => ({ fdcId: record.fdcId, source: record.source })) },
+    take: Math.min(records.length, 30), orderBy: { name: 'asc' },
+  }))
+  const candidates = rows.map(row => {
+    const item = normalizeLibraryFoodItem(row), options = verifiedUsdaRecordedPortionOptions(row)
+    return item && options.length ? { ...item, servingOptions: options } : null
+  }).filter(Boolean)
+  return chooseBestFoodMatch(ingredient.name, candidates, ingredient)
+}
+
 async function findFoodIngredient(query: string, country?: string, ingredient?: any, trustedItems?: any[]) {
   if (ingredient?.requiresSourceServing || isPreparedVoiceFood(query)) {
     const previous = (Array.isArray(trustedItems) ? trustedItems : []).map(item => item?.__voiceSourceFood).find(source => source && voicePreparedIdentityMatches(ingredient || { name: query }, source) && requestedIngredientBasis(ingredient || { name: query, quantity: 1, unit: 'each' }, source))
@@ -4573,6 +4594,10 @@ async function findFoodIngredient(query: string, country?: string, ingredient?: 
   }
   const exactCustomMatch = await findExactCustomPlainFood(lookupQueries, ingredient, scope)
   if (exactCustomMatch) return exactCustomMatch
+  if (ingredient) {
+    const recorded = await findRecordedOrdinaryVoiceFood(ingredient, scope)
+    if (recorded) return recorded
+  }
 
   if (compactFoodMatchText(query).includes('egg')) {
     const wholeEggRows = await scope.run(() => prisma.foodLibraryItem.findMany({
@@ -6590,22 +6615,40 @@ async function structuredFoodSourceChoices(values: any, indices: number[]) {
     const metadata = new Set(['raw','uncooked','cooked','whole','fresh','fried','boiled','poached','scrambled','grilled','roasted','baked','steamed','dried','powdered','small','medium','large','extra','regular','nut','seed','fruit','vegetable','beverage','spice'])
     const candidates = new Map<string, any>()
     for (const token of [...tokens].reverse().filter(token => !metadata.has(token)).slice(0, 3)) {
-      const rows = await scope.run(() => searchLocalFoods(token, { pageSize: 20, mode: 'prefix-contains', sources: ['usda_foundation', 'usda_sr_legacy'] })).catch(() => [])
+      // USDA puts many derivatives and incomplete rows before the base food.
+      // Search its exact comma-separated food head before the broad prefix so
+      // a page of custard/roll/white rows cannot hide whole cooked egg records.
+      const headRows = await scope.run(() => prisma.foodLibraryItem.findMany({
+        where: { source: { in: ['usda_foundation', 'usda_sr_legacy'] }, OR: [
+          { name: { startsWith: `${token},`, mode: 'insensitive' } },
+          { name: { startsWith: `${token}s,`, mode: 'insensitive' } },
+          { name: { startsWith: `Beverages, ${token},`, mode: 'insensitive' } },
+        ], calories: { not: null }, proteinG: { not: null }, carbsG: { not: null }, fatG: { not: null } },
+        take: 30, orderBy: { name: 'asc' },
+      })).catch(() => [])
+      if (scope.isExpired()) break
+      const rows = [...headRows.map(normalizeLibraryFoodItem).filter(Boolean), ...await scope.run(() => searchLocalFoods(token, { pageSize: 20, mode: 'prefix-contains', sources: ['usda_foundation', 'usda_sr_legacy'] })).catch(() => [])]
       if (scope.isExpired()) break
       for (const item of rows) {
-        if (item.source !== 'usda' || !item.id || !item.name || item.name.length > 200 || !hasCoreNutrition(item) || !voiceOrdinaryIdentityMatches(token, item)) continue
+        if (!item || item.source !== 'usda' || !item.id || !item.name || item.name.length > 200 || !hasCoreNutrition(item)) continue
         const candidate = ordinaryVoiceMatchText(item.name)
-        const primary = candidate.split(' ').find(word => !metadata.has(word))
-        if (!primary || !tokens.includes(primary)) continue
-        const methods = ['raw','uncooked','fried','boiled','poached','scrambled','grilled','roasted','baked','steamed','dried','powdered','instant','decaf','decaffeinated']
-        if (methods.some(method => new RegExp(`\\b${method}\\b`).test(requested) && !new RegExp(`\\b${method}\\b`).test(candidate))) continue
+        const heads = String(item.name).split(',').map(part => ordinaryVoiceMatchText(part))
+        const head = /^(?:beverage|food|product)$/.test(heads[0]) ? heads[1] || '' : heads[0]
+        const headTokens = head.split(' ').filter(word => word && !metadata.has(word))
+        if (!headTokens.length || !headTokens.every(word => tokens.includes(word))) continue
         const words = new Set(candidate.split(' '))
+        // Validate all shared identity words together. Testing only "brewed"
+        // would bypass the coffee-specific decaf/instant/espresso exclusions.
+        const identity = tokens.filter(word => words.has(word)).join(' ')
+        if (!voiceOrdinaryIdentityMatches(identity, item)) continue
+        const methods = ['raw','uncooked','fried','boiled','poached','scrambled','grilled','roasted','baked','steamed','dried','powdered','instant','decaf','decaffeinated','whole','nonfat','lowfat']
+        if (methods.some(method => new RegExp(`\\b${method}\\b`).test(requested) && !new RegExp(`\\b${method}\\b`).test(candidate))) continue
         const overlap = tokens.filter(word => words.has(word)).length
         const key = `${item.source}:${item.id}`
-        candidates.set(key, { item, overlap, unmatchedTerms: tokens.filter(word => !words.has(word)) })
+        candidates.set(key, { item, overlap, score: scoreFoodMatch(requested, item), unmatchedTerms: tokens.filter(word => !words.has(word)) })
       }
     }
-    const options = [...candidates.values()].sort((a, b) => b.overlap - a.overlap || String(a.item.name).localeCompare(String(b.item.name))).slice(0, 3)
+    const options = [...candidates.values()].sort((a, b) => b.overlap - a.overlap || b.score - a.score || String(a.item.name).localeCompare(String(b.item.name))).slice(0, 3)
       .map(({ item, unmatchedTerms }) => ({ source: 'usda', id: String(item.id), name: item.name, servingSize: String(item.serving_size || ''), unmatchedTerms }))
     if (options.length) choices.push({ ingredientIndex, requestedName: ingredient.name, quantity: ingredient.quantity, unit: ingredient.unit, options })
   }

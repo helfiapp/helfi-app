@@ -32,7 +32,7 @@ const sugar = food('sugar', 'Sugar', { calories: 400, protein_g: 0, carbs_g: 100
 let local, custom, catalog, options, calls, failure
 const reset = () => { local = []; custom = []; catalog = []; options = {}; calls = []; failure = false }
 const response = (body, ok = true) => ({ ok, json: async () => body })
-const ctx = vm.createContext({ process: { env: Object.freeze({}) }, Date, URL, Buffer, AbortController, setTimeout, clearTimeout, NextRequest: Request,
+const ctx = vm.createContext({ process: { env: Object.freeze({}) }, Date, URL, Buffer, ...require('./voice-recorded-source-fixture.cjs'), AbortController, setTimeout, clearTimeout, NextRequest: Request,
   resolveHelfiTtsVoice: () => 'synthetic', console: { log() {}, warn() {}, error() {} }, ...actual('lib/food/serving-measurements.ts'), ...actual('lib/native-voice-spoken-quantities.ts'),
   fetch() { throw Error('Network forbidden') }, OpenAI: class { constructor() { throw Error('Provider forbidden') } },
   searchLocalFoods: async () => local,

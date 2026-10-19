@@ -1,3 +1,15 @@
+## 19 October 2026 — actual catalog food repair prepared; native61 metadata only
+
+Local candidate now validates complete source identities, rejects unrelated derivatives, searches authoritative food heads before broad prefix pages, and reads existing independently cited portions from the exact stored source/name/nutrients before slow provider detail calls. Exact-custom priority and the same six-second lookup budget remain. No shared serving math, meal/recipe save builder, nutrition values or native UI changed. Eleven offline actual-catalog groups include the original two-large-eggs/one-cup-coffee/30ml-milk request and an explicit100g fried-egg correction before a fresh review; these are synthetic storage tests, not live speech proof. Native metadata alone is61; native types/root and native page locks pass. Full production build passed with1101PASS lines, including117required voice suites. No new release or phone readiness is claimed by this note.
+
+## 19 October 2026 — AWS149 verified; actual breakfast still fails; phone release held
+
+Exact sourcea5b46618/AWS149 all steps and both domains passed, matching new ETag51btasvxg41z15. Worker7d4e1fc47f01d2c8b8c4f75fcf9115c3e8c7bb76d12fa41bdeef0876d3dff6ea applied and independently verified. Full build1089PASS lines and native checks passed. Actual call12 still offered egg custards and could not resolve recorded brewed-coffee cup. Two unique app requests remained needs_clarification, no confirm job and no saved food. Do not claim full speech acceptance or phone readiness. Ordinary source identity, ranking and recorded-portion lookup are being repaired using actual catalog fixtures.
+
+Native60/a5 signed, Apple validated and uploaded (delivery7dbdb97f-536c-4829-87fa-01cb2de423ac), but NOT distributed/installed. Physical phone last55. Immutable artifact preserved privately. Design Manager's47 pending files remain isolated; current private restoration plan targetsa5/build60 and must be refreshed if final source changes. Mac mini Speakers Mute1 was reverified after owner's latest request; never use the old journal sample phrase as test speech or a sign-off.
+
+At02:07:44UTC,12calls bookedUS$1.430907971667 plus priorcall11US$0.011477625held;110testcredits charged plus10reserved,0open,1uncertain. Call12 closed115seconds,10credits,US$0.148551668333,3of3backendreceipts settled. Owner test authority remainsUS$3total with fixed immutable allowance expiry. Customer50% margin is not established by test costs; actual retained purchase proceeds/refund integration and infrastructure invoice reconciliation are still required. Unknown revenue remains refused.
+
 ## 19 October 2026 — journal spoken save verified; food clarification and interrupted costs
 
 Owner's latest instruction: keep the Mac mini speaker muted during voice testing. Sound settings showed Mac mini Speakers selected and Mute1 after root applied it. Synthetic input remains restricted to the verified virtual audio device. Do not use or repeat the former journal sample phrase as test speech or a closing message; it was test content, not a required product sign-off.
