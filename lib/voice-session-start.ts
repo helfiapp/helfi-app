@@ -87,13 +87,20 @@ export async function startMeteredLiveVoiceSession(input: { request: NextRequest
     await allocationGate(userId)
     let operatorFundingId: string | undefined
     if (userId === OPERATOR_ACCOUNT && Date.now() >= OPERATOR_AUTHORIZED_AT && Date.now() < OPERATOR_EXPIRY) {
+      let largestAvailable = BigInt(-1)
       for (const authorizationId of OPERATOR_AUTHORIZATIONS) {
         const funding = await registerVoiceOperatorTestBudget({ kind: 'operator_test_budget', accountId: userId, authorizationId, fundingEvidenceId: OPERATOR_EVIDENCE, fundingConfirmed: true, fundedUsdMicros: BigInt(1000000), expiresAtMs: OPERATOR_EXPIRY })
         // This is only selection. The existing ledger rechecks and reserves
         // the same lot atomically, so concurrent calls cannot overspend it.
-        if (funding.userId === userId && funding.kind === 'operator_test_budget' && !funding.revokedAt && new Date(funding.expiresAt).getTime() === OPERATOR_EXPIRY && BigInt(funding.providerBudgetCostUnits) === BigInt('60000000000') && BigInt(funding.spentCostUnits) >= BigInt(0) && BigInt(funding.heldCostUnits) >= BigInt(0) && BigInt(funding.providerBudgetCostUnits) - BigInt(funding.spentCostUnits) - BigInt(funding.heldCostUnits) >= MINIMUM_OPERATOR_BUDGET) {
-          operatorFundingId = funding.id
-          break
+        if (funding.userId === userId && funding.kind === 'operator_test_budget' && !funding.revokedAt && new Date(funding.expiresAt).getTime() === OPERATOR_EXPIRY && BigInt(funding.providerBudgetCostUnits) === BigInt('60000000000') && BigInt(funding.spentCostUnits) >= BigInt(0) && BigInt(funding.heldCostUnits) >= BigInt(0)) {
+          const available = BigInt(funding.providerBudgetCostUnits) - BigInt(funding.spentCostUnits) - BigInt(funding.heldCostUnits)
+          // Inspect both fixed allowances. A small qualifying remainder must
+          // not shorten the call while a larger funded allowance is unused.
+          // Equal balances retain the stable authorization-list order.
+          if (available >= MINIMUM_OPERATOR_BUDGET && available > largestAvailable) {
+            operatorFundingId = funding.id
+            largestAvailable = available
+          }
         }
       }
       if (!operatorFundingId) throw Object.assign(new Error('operator_budget_exhausted'), { code: 'operator_budget_exhausted' })

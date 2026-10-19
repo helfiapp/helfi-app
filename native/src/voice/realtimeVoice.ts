@@ -18,6 +18,8 @@ type RealtimeCallbacks = {
   onTranscript?: (text: string) => void
   /** Actual human transcript evidence, separate from display caption batches. */
   onHumanTranscript?: (text: string) => void
+  /** A new immutable authenticated server job, never a media/model event. */
+  onOwnedHumanTurn?: (callId: string, text: string) => boolean
   onAssistantText?: (text: string) => void
   onUserSpeech?: () => void
   onActionRequest?: (args: { request?: string; action?: string; needsReview?: boolean; capability?: VoiceCapabilityRequest; assistantCommand?: GeneralAssistantCommand }) => Promise<unknown> | unknown
@@ -1187,6 +1189,7 @@ export async function startHelfiRealtimeVoiceSession(params: {
         isCurrent: () => !stopped && !params.signal?.aborted,
         onJob: async job => {
           if (stopped || params.signal?.aborted) return { ok: false, saved: false, safeToClaimSaved: false }
+          if (callbacks.onOwnedHumanTurn?.(job.callId, job.actualHumanText) === false) return { ok: false, saved: false, safeToClaimSaved: false }
           humanCommandText = job.actualHumanText
           humanCommandTooLarge = false
           return executeToolCall({ type: 'function_call', name: 'request_helfi_action', call_id: job.callId, arguments: JSON.stringify(job.args) })

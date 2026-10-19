@@ -47,4 +47,4 @@ async function main(){
  console.log(`General assistant transport: ${groups} actual-source offline groups passed. No provider, real auth, network, account or spend.`)
 }
 if(require.main===module)main().catch(error=>{console.error(error);process.exitCode=1})
-module.exports={main}
+module.exports={main,send,permitDecision}

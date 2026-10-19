@@ -89,6 +89,16 @@ function setup(options = {}) {
   const run = async (attempt = 'synthetic-attempt-one') => { request.headers.set('x-helfi-voice-attempt-id', attempt); return api.startMeteredLiveVoiceSession({ request, userId, sdp: 'synthetic-offer-sdp', general: { sessionId: 'synthetic-app-session', localDate: '2026-10-18', timeZone: 'Australia/Melbourne' }, frontend: { model: options.model || 'gpt-live-1', store: false, instructions: 'Synthetic voice instructions', delegation: { type: 'responses', responses: { model: 'MUST_BE_OVERRIDDEN' } } } }) }
   return { run, calls, financial, runtime, controller, request, userId, ledger, get clock() { return clock } }
 }
+const OPERATOR_IDS=['owner-voice-repair-2026-10-19-allowance-1','owner-voice-repair-2026-10-19-allowance-2']
+const OPERATOR_START=Date.parse('2026-10-19T00:30:00Z'),OPERATOR_EXPIRY=Date.parse('2026-10-20T00:25:00Z'),OPERATOR_DOLLAR=60000000000n,OPERATOR_MINIMUM=8550000000n
+function operatorSelection(overrides=[{},{}]){
+ const f=setup({operator:true,nowMs:OPERATOR_START}),proofs=[],opens=[]
+ const lots=OPERATOR_IDS.map((sourceId,index)=>({id:'synthetic-funded-'+index,sourceId,userId:f.userId,kind:'operator_test_budget',providerBudgetCostUnits:OPERATOR_DOLLAR,spentCostUnits:0n,heldCostUnits:0n,expiresAt:new Date(OPERATOR_EXPIRY),revokedAt:null,...overrides[index]}))
+ f.ledger.registerVoiceOperatorTestBudget=async proof=>{proofs.push(clone(proof));assert(OPERATOR_IDS.includes(proof.authorizationId));assert.equal(proof.accountId,f.userId);assert.equal(proof.fundedUsdMicros,1000000n);assert.equal(proof.expiresAtMs,OPERATOR_EXPIRY);assert.equal(proof.fundingEvidenceId,'owner-explicit-usd3-total-voice-verification-2026-10-19T0030Z');return clone(lots[OPERATOR_IDS.indexOf(proof.authorizationId)])}
+ const original=f.ledger.openVoiceBillingSession
+ f.ledger.openVoiceBillingSession=async input=>{opens.push(clone(input));assert(input.operatorFundingId,'Operator authorization cannot fall back to customer funds');const lot=lots.find(l=>l.id===input.operatorFundingId),remaining=lot.providerBudgetCostUnits-lot.spentCostUnits-lot.heldCostUnits;assert(remaining>=OPERATOR_MINIMUM);const result=await original(input);result.providerBudgetCostUnits=remaining;return result}
+ return{...f,lots,proofs,opens}
+}
 let groups = 0
 async function check(label, work) { await work(); groups++; console.log('PASS ' + label) }
 async function main() {
@@ -107,7 +117,19 @@ async function main() {
     assert.equal(body.helfiSession.marginBasis, '50_percent_realized_net'); assert.equal(f.calls.finalizations.length, 0)
   })
   await check('operator test expense is labeled separately from customer realized-net margin', async () => {
-    const f = setup({ operator: true, nowMs: Date.parse('2026-10-19T00:30:00Z') }), body = await (await f.run()).json(); assert.equal(f.calls.funding, 1); assert.equal(body.helfiSession.marginBasis, 'operator_test_budget'); assert.equal(body.helfiSession.reservedCredits, 10)
+    const f = setup({ operator: true, nowMs: Date.parse('2026-10-19T00:30:00Z') }), body = await (await f.run()).json(); assert.equal(f.calls.funding, 2); assert.equal(body.helfiSession.marginBasis, 'operator_test_budget'); assert.equal(body.helfiSession.reservedCredits, 10)
+  })
+  await check('operator selects larger verified allowance instead of an earlier qualifying nineteen-cent remainder',async()=>{
+    const f=operatorSelection([{spentCostUnits:48600000000n},{}]),before=clone(f.lots),response=await f.run(),body=await response.json();assert.equal(response.status,200);assert.equal(f.opens[0].operatorFundingId,f.lots[1].id);assert.equal(body.helfiSession.deadlineMs-OPERATOR_START,120000);assert.deepEqual(f.lots,before);assert.deepEqual(f.proofs.map(p=>p.authorizationId),OPERATOR_IDS);assert.equal(f.proofs.reduce((n,p)=>n+p.fundedUsdMicros,0n),2000000n)
+  })
+  await check('operator ranking subtracts spent and concurrent holds while equal balances retain stable fixed order',async()=>{
+    for(const balances of [[{spentCostUnits:10000000000n,heldCostUnits:30000000000n},{spentCostUnits:30000000000n}],[{spentCostUnits:20000000000n,heldCostUnits:10000000000n},{spentCostUnits:10000000000n,heldCostUnits:20000000000n}]]){const f=operatorSelection(balances);assert.equal((await f.run()).status,200);assert.equal(f.opens[0].operatorFundingId,f.lots[balances[0].heldCostUnits===30000000000n?1:0].id);assert.deepEqual(f.proofs.map(p=>p.authorizationId),OPERATOR_IDS)}
+  })
+  await check('operator ignores invalid bigger lots and preserves exact minimum funding and expiry rules',async()=>{
+    for(const invalid of [{expiresAt:new Date(OPERATOR_EXPIRY-1)},{expiresAt:new Date(OPERATOR_EXPIRY+1)},{revokedAt:new Date(OPERATOR_START)},{userId:'another-account'},{providerBudgetCostUnits:OPERATOR_DOLLAR+1n}]){const f=operatorSelection([{spentCostUnits:OPERATOR_DOLLAR-OPERATOR_MINIMUM},invalid]),response=await f.run(),body=await response.json();assert.equal(response.status,200);assert.equal(f.opens[0].operatorFundingId,f.lots[0].id);assert.equal(body.helfiSession.deadlineMs-OPERATOR_START,15000);assert.equal(f.calls.reserves.find(h=>h.key==='voice-duration').maxCostUnits,3750000000n)}
+  })
+  await check('both operator allowances below minimum refuse before provider work with no extra authority',async()=>{
+    const f=operatorSelection([{spentCostUnits:OPERATOR_DOLLAR-OPERATOR_MINIMUM+1n},{heldCostUnits:OPERATOR_DOLLAR-OPERATOR_MINIMUM+1n}]),before=clone(f.lots);assert.equal((await f.run()).status,402);assert.equal(f.opens.length,0);assert.equal(f.calls.posts.length,0);assert.equal(f.calls.watchdogs,0);assert.deepEqual(f.lots,before);assert.deepEqual(f.proofs.map(p=>p.authorizationId),OPERATOR_IDS);assert.equal(f.proofs.reduce((n,p)=>n+p.fundedUsdMicros,0n),2000000n)
   })
   await check('duplicate HTTP attempt never allocates or cleans up the original active call', async () => {
     const f = setup(); assert.equal((await f.run()).status, 200)

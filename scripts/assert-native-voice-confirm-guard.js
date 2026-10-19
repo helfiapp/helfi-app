@@ -1149,6 +1149,8 @@ for (const regression of [
   'voice-transport-recovery-check.cjs',
   'voice-worker-transport-recovery-check.cjs',
   'voice-general-transport-check.cjs',
+  'voice-owned-human-turn-check.cjs',
+  'voice-decision-recovery-identity-check.cjs',
   'voice-structured-route-check.cjs',
   'voice-review-intent-check.cjs',
   'voice-credit-settlement-check.cjs',

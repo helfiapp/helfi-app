@@ -1,3 +1,10 @@
+## Fresh owned voice turns and decision recovery — 19 October 2026
+
+- Live captions do not emit the legacy speech-start callback. A consumed approval from a previous call must not reject a new, independently verified server-owned turn. Reset local turn state only once for a new immutable authenticated job in the current mounted, active, open run and account; media captions, duplicates, stale runs and foreign accounts cannot reset approval. Normal signed decision, exact review fence, exclusive dispatch and verified save receipt remain mandatory.
+- Publication and lost-response recovery must hash the identical immutable job fields, including optional signed assessment and review fence. Recovery never executes or retries a command; unknown outcomes stay unknown. Required actual-source checks are `voice-owned-human-turn-check.cjs` and `voice-decision-recovery-identity-check.cjs`. Offline success does not establish an actual spoken save.
+- Operator startup may inspect only the same two immutable approved19October dollar allowances and select the greatest verified available balance, subtracting both spent and held costs. Keep stable fixed-ID order on ties, exact expiry, original total authority and atomic ledger reservation. A small qualifying first remainder must not shorten a call while a larger existing allowance is available. Never create extra authorizations, replenish or extend them.
+- Keep the owner's computer speaker muted during all voice testing. Do not use the former journal sample as test speech or a closing sign-off.
+
 ## Closed voice and retained interrupted-request costs — 19 October 2026
 
 - Actual call11 proved a closed98second voice connection while one backend response lost its usage receipt. Preserve that old UNCERTAIN session, all reserved credits and the full registered maximum backend cost. Never invent zero usage, refund, or finalize it merely to permit another call.

@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS150 /90228309a435ad014f470ac479e2a377bd0083b2.
+- Date/time: 19October2026, verified02:28:21UTC.
+- What changed: Ordinary-food source identity/head filtering and exact independently cited source-portion retrieval before slow details, preserving custom priority and lookup deadlines. Worker9ed3e13c652d0ff89561d2846462c6a2d57b8861af3491469a4e3fc52b58cfad applied and independently verified; all AWS steps succeeded.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai both200/CloudFront, matching new ETagbav22rmhsm1z15/bodySHA7e432310fc14639c6e128aec738b0d7b35634fd099af6958593d4d47ab11cc01.
+- What to quickly test: Calls13/14 now prepared the correct209.185kcal review after the original egg request and explicit100gfried correction, retaining coffee1cup/milk30ml; neither saved. Call13 reached reserved_deadline before approval completed; call14 ended after89s and its approval/shutdown reason is being checked.14calls bookedUS$1.716130156667 plus oldUS$0.011477625held,130testcredits charged/10reserved. Native61 signed/validated/uploaded, NOT distributed; physical phone last55. Hold release until actual spoken approval/save/reopen passes. Customer50%profit remains unverified. Mac speakers remain muted; no spoken test signoff.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS149 / a5b46618b05d5666368eddaaee36de278f2118aa.
 - Date/time: 19 October 2026, verified02:02:53UTC.
 - What changed: Source-preserving food clarification, bounded ordinary lookups, pause for fresh human responses, bounded receipt-only shutdown drain and strict closed-session collateral checks. Worker7d4e1fc47f01d2c8b8c4f75fcf9115c3e8c7bb76d12fa41bdeef0876d3dff6ea applied and independently verified. BUILD/DEPLOY/VERIFY all succeeded.

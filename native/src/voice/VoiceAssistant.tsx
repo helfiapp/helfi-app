@@ -3158,6 +3158,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
     const realtimeRunId = realtimeVoiceRunRef.current + 1
     realtimeVoiceRunRef.current = realtimeRunId
     const startupAccountToken = session.token
+    const ownedHumanTurnIds = new Set<string>()
     const aiAllowed = await requestAiDataSharingPermission()
     if (
       realtimeVoiceRunRef.current !== realtimeRunId || !openRef.current ||
@@ -3377,6 +3378,19 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
             setTranscript(text)
             addVoiceActivity(`Heard: “${cleanFavoriteText(text, 80)}”`, 'done')
             appendConversationTurns([makeConversationTurn('user', text)])
+          },
+          onOwnedHumanTurn: (callId, text) => {
+            if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current || !openRef.current || !voiceProviderMountedRef.current || voiceAccountTokenRef.current !== startupAccountToken) return false
+            if (typeof callId !== 'string' || typeof text !== 'string' || !/^[A-Za-z0-9_.:-]{1,200}$/.test(callId) || !text.trim() || text.length > 20000 || ownedHumanTurnIds.has(callId) || ownedHumanTurnIds.size >= 200) return false
+            // Server jobs already bind a fresh human turn and its exact review.
+            // Live captions have no speech-start event, so a previous call's
+            // local consent flag must not reject this separately verified job.
+            ownedHumanTurnIds.add(callId)
+            generalAssistantHeardRef.current = text
+            generalAssistantConfirmationConsumedRef.current = false
+            clearReviewSilenceTimer()
+            pendingReviewAnswerRef.current = false
+            return true
           },
           onHumanTranscript: (text) => {
             if (realtimeVoiceRunRef.current !== realtimeRunId || !voiceSessionActiveRef.current || !text) return

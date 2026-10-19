@@ -79,7 +79,10 @@ async function main() {
     assert.equal(response.status, 200); assert.equal(body.helfiSession.marginBasis, 'operator_test_budget'); assert.equal(body.helfiSession.reservedCredits, 10)
     assert.equal(f.shared.opens[0].operatorFundingId, lot(IDS[0]).id)
     assert.deepEqual(f.shared.lots.get(f.shared.old.sourceId), f.shared.old)
-    assert.equal(f.shared.registrations.length, 1)
+    assert.equal(f.shared.registrations.length, 2)
+  })
+  await check('a smaller qualifying first allowance cannot shorten a call while the second dollar is available',async()=>{
+    const shared=store(),first=lot(IDS[0],{spentCostUnits:BUDGET-11400000000n});shared.lots.set(IDS[0],first);const before=copy(first),f=harness({},shared),response=await f.run(),body=await response.json();assert.equal(response.status,200);assert.equal(shared.opens[0].operatorFundingId,lot(IDS[1]).id);assert.equal(body.helfiSession.deadlineMs-START,120000);assert.deepEqual(first,before);assert.deepEqual(shared.registrations.map(p=>p.authorizationId),IDS)
   })
   await check('spent plus held selects the second fixed lot without modifying the first', async () => {
     const shared = store(), first = lot(IDS[0], { spentCostUnits: BUDGET - MINIMUM, heldCostUnits: 1n })
@@ -89,7 +92,7 @@ async function main() {
     assert.deepEqual(shared.registrations.map(proof => proof.authorizationId), IDS)
   })
   await check('the exact minimum covers 15 seconds, fixed service, backend and shutdown reserves', async () => {
-    const shared = store(); shared.lots.set(IDS[0], lot(IDS[0], { spentCostUnits: BUDGET - MINIMUM }))
+    const shared = store(); shared.lots.set(IDS[0], lot(IDS[0], { spentCostUnits: BUDGET - MINIMUM })); shared.lots.set(IDS[1], lot(IDS[1], { heldCostUnits: BUDGET }))
     const f = harness({}, shared), response = await f.run(), body = await response.json(); assert.equal(response.status, 200)
     assert.equal(body.helfiSession.deadlineMs - START, 15000)
     assert.equal(f.calls.reserves.find(row => row.key === 'voice-infrastructure').maxCostUnits, 3000000000n)
@@ -135,7 +138,7 @@ async function main() {
   await check('a concurrent hold won after selection is still enforced before any provider allocation', async () => {
     const f = harness({ beforeOpen(shared, input) { [...shared.lots.values()].find(row => row.id === input.operatorFundingId).heldCostUnits = BUDGET } })
     assert.equal((await f.run()).status, 402); assert.equal(f.calls.posts.length, 0); assert.equal(f.calls.watchdogs, 0)
-    assert(f.shared.opens.every(row => row.operatorFundingId)); assert.equal(f.shared.registrations.length, 1)
+    assert(f.shared.opens.every(row => row.operatorFundingId)); assert.equal(f.shared.registrations.length, 2)
   })
   console.log(`Voice operator renewal: ${groups} actual-startup offline groups passed; no provider, credentials, database or cloud access.`)
 }

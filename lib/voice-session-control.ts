@@ -27,6 +27,14 @@ const hash = (value: string) => createHash('sha256').update(value).digest('hex')
 const clone = <T>(value: T): T => JSON.parse(JSON.stringify(value))
 const canonical = (value: any): any => Array.isArray(value) ? value.map(canonical) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, canonical(value[key])])) : value
 const digest = (value: any) => hash(JSON.stringify(canonical(value)))
+// Publication and response-loss recovery must bind the same immutable job,
+// including independently assessed decision authority and its review fence.
+// Mutable delivery state and the subsequently issued receipt are excluded.
+const immutableVoiceJobIdentity = (value: Row) => ({
+  callId: value.callId, args: clone(value.args), delegationId: value.delegationId, actualHumanText: value.actualHumanText,
+  ...(value.reviewFence !== undefined ? { reviewFence: clone(value.reviewFence) } : {}),
+  ...(value.assessment !== undefined ? { assessment: clone(value.assessment) } : {}),
+})
 const opaque = (value: unknown, maximum = 200): value is string => typeof value === 'string' && value.length <= maximum && /^[A-Za-z0-9_-]+$/.test(value)
 const fields = (value: any, allowed: string[], required: string[] = allowed) => {
   if (!value || typeof value !== 'object' || Array.isArray(value) || Object.keys(value).some(key => !allowed.includes(key)) || required.some(key => !Object.hasOwn(value, key))) fail('invalid_voice_control_fields')
@@ -120,7 +128,7 @@ export function deriveVoiceToolResultFromOwnedState(input: { userId: string; con
   const { userId, configuration: config, job, evidence, session, view } = input, command = job.args.assistantCommand, baseline = job.baseline
   const recovery = lostTransportResult(evidence)
   if (recovery) {
-    const identity = { callId: job.callId, args: job.args, delegationId: job.delegationId, actualHumanText: job.actualHumanText }
+    const identity = immutableVoiceJobIdentity(job)
     if (job.identity !== digest(identity) || session && (session.actorId !== userId || session.id !== config.assistantSessionId) || view && (view.actorId !== userId || view.id !== config.assistantSessionId) || input.turns.some(turn => turn.actorId !== userId || turn.sessionId !== config.assistantSessionId)) fail('voice_tool_result_not_verified', 409)
     // No execution or retry: an unchanged/missing owned session cannot prove
     // whether an HTTP request reached the normal handler. End only this job.
@@ -299,7 +307,7 @@ export function createVoiceSessionControl(deps: VoiceSessionControlDependencies)
           const command = sanitizeGeneralAssistantCommand(body.args.assistantCommand)
           if (body.args.action !== 'assistant_plan' || typeof body.args.needsReview !== 'boolean' || typeof body.args.request !== 'string' || !command) fail('invalid_voice_tool_request')
           const replyFence = body.reviewFence ?? body.assessment?.reviewFence
-          const args = { ...clone(body.args), request: body.actualHumanText, assistantCommand: command }, identity = { callId: body.callId, args, delegationId: body.delegationId, actualHumanText: body.actualHumanText, ...(replyFence !== undefined ? { reviewFence: clone(replyFence) } : {}), ...(body.assessment !== undefined ? { assessment: clone(body.assessment) } : {}) }
+          const args = { ...clone(body.args), request: body.actualHumanText, assistantCommand: command }, identity = immutableVoiceJobIdentity({ ...body, args, ...(replyFence !== undefined ? { reviewFence: replyFence } : {}) })
           const old = jobs.jobs.find(job => job.callId === body.callId)
           if (old) { if (old.identity !== digest(identity)) fail('voice_tool_call_conflict', 409); return { jobId: old.callId } }
           if (jobs.jobs.length >= 20 || new Set([...jobs.jobs.map(job => job.delegationId), body.delegationId]).size > 10 || jobs.jobs.some(job => job.status === 'pending')) fail('voice_tool_request_limit', 409)
