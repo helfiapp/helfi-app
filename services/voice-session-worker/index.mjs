@@ -20,6 +20,13 @@ const id = value => typeof value === 'string' && value.length > 0 && value.lengt
 const units = value => typeof value === 'string' && /^\d{1,30}$/.test(value) ? BigInt(value) : null
 const fail = code => { throw new Error(code) }
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
+const BACKEND_FAILURE_CODES = new Set(['request_timeout', 'backend_request_unconfirmed', 'response_exceeds_limit', 'invalid_response_json', 'duplicate_backend_response', 'unsupported_response_pricing', 'provider_usage_unconfirmed', 'provider_cache_usage_unconfirmed', 'provider_usage_exceeds_reserve', 'backend_settlement_unconfirmed', 'control_request_rejected', 'control_denied', 'session_closing'])
+const boundedFailureMs = value => Number.isFinite(value) ? Math.min(600000, Math.max(0, Math.floor(value))) : 0
+function backendFailureMetadata(error, phase, startedAt, timeoutMs, now, responseReceived, validatedUsage, signal) {
+  const aborted = signal.aborted || error?.name === 'AbortError' || error?.name === 'TimeoutError' || error?.message === 'request_timeout'
+  const code = BACKEND_FAILURE_CODES.has(error?.message) ? error.message : error?.name === 'AbortError' ? 'request_aborted' : error?.name === 'TimeoutError' ? 'request_timeout' : 'backend_failure_unclassified'
+  return { type: 'voice_backend_failure', phase, elapsedMs: boundedFailureMs(now - startedAt), timeoutMs: Math.min(30000, boundedFailureMs(timeoutMs)), responseReceived, validatedUsage, aborted, code }
+}
 
 // This is a rendering of already validated catalog choices, not a summary of
 // a review or permission to substitute a food. Whole source/request names are
@@ -272,7 +279,8 @@ async function readJson(response, maximum = 1000000) {
   try { return JSON.parse(value) } catch { fail('invalid_response_json') }
 }
 async function timedFetch(url, options, timeoutMs, fetcher = fetch) {
-  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), timeoutMs)
+  let timedOut = false
+  const controller = new AbortController(), timeout = setTimeout(() => { timedOut = true; controller.abort() }, timeoutMs)
   const abort = () => controller.abort()
   options.signal?.addEventListener('abort', abort)
   if (options.signal?.aborted) controller.abort()
@@ -280,6 +288,7 @@ async function timedFetch(url, options, timeoutMs, fetcher = fetch) {
     const response = await fetcher(url, { ...options, signal: controller.signal })
     return { ok: response.ok, value: await readJson(response) }
   }
+  catch (error) { if (timedOut) fail('request_timeout'); throw error }
   finally { clearTimeout(timeout); options.signal?.removeEventListener('abort', abort) }
 }
 async function appControl(job, command, payload) {
@@ -318,7 +327,7 @@ async function providerConnect(config, onEvent, onLost) {
 }
 
 export function createVoiceSessionWorker(dependencies = {}) {
-  const io = { now: Date.now, sleep: pause, control: appControl, connect: providerConnect, respond: providerResponse, allowOrigin: origin => origin === 'https://helfi.ai', ...dependencies }
+  const io = { now: Date.now, sleep: pause, control: appControl, connect: providerConnect, respond: providerResponse, reportBackendFailure: metadata => console.info(JSON.stringify(metadata)), allowOrigin: origin => origin === 'https://helfi.ai', ...dependencies }
   const command = (job, leaseToken, name, payload = {}) => io.control(job, name, { ...payload, ...(leaseToken ? { leaseToken } : {}) })
 
   async function watchdog(rawJob) {
@@ -420,19 +429,31 @@ export function createVoiceSessionWorker(dependencies = {}) {
       pendingBackend.add(key)
       if (closing) { backendUnknown = true; return null }
       accountingInFlight = true
+      const requestStartedAt = io.now(), timeoutMs = Math.min(30000,Math.max(1,config.deadlineMs-requestStartedAt-CLOSE_BUFFER_MS))
+      let phase = 'provider_request', responseReceived = false, validatedUsage = false
       try {
-        const response = await io.respond(config,body,controller.signal,Math.min(30000,Math.max(1,config.deadlineMs-io.now()-CLOSE_BUFFER_MS)))
+        const response = await io.respond(config,body,controller.signal,timeoutMs)
+        responseReceived = true; phase = 'provider_validation'
         if (accountingClosed) { backendUnknown=true; return null }
         if (seenResponses.has(response?.id)) fail('duplicate_backend_response')
         if (response.model !== config.backendModel || response.service_tier && !['default','standard'].includes(response.service_tier)) fail('unsupported_response_pricing')
         const cost = backendUsageCost(response,config.rates)
         if (BigInt(cost.actualCostUnits)>maximum || response.usage.input_tokens>maxInputTokens || response.usage.output_tokens>maxOutputTokens) fail('provider_usage_exceeds_reserve')
+        validatedUsage = true; phase = 'settlement'
         seenResponses.add(response.id)
         const settled = await control('settle',{key,...cost,providerResponseId:response.id,receiptDigest:digest({id:response.id,usage:response.usage})})
         if (settled.allowed !== true) fail('backend_settlement_unconfirmed')
         pendingBackend.delete(key)
         return response
-      } catch { backendUnknown = true; requestClose('backend_usage_unconfirmed'); return null }
+      } catch (error) {
+        let metadata
+        try { metadata = backendFailureMetadata(error,phase,requestStartedAt,timeoutMs,io.now(),responseReceived,validatedUsage,controller.signal) } catch {}
+        backendUnknown = true; requestClose('backend_usage_unconfirmed')
+        // Only fixed codes, phases, booleans and bounded timings leave this
+        // boundary. Logging cannot release a hold or delay financial closure.
+        try { if (metadata) Promise.resolve(io.reportBackendFailure(metadata)).catch(() => {}) } catch {}
+        return null
+      }
       finally { accountingInFlight = false }
     }
     const toolResults = async (calls, delegationId, actualHumanText, expectedFence, humanReviewFence) => {
@@ -464,7 +485,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
             resultNotVerified = true
             continue
           }
-          const response = await paidResponse({model:config.backendModel,service_tier:'default',store:false,instructions:DECISION_INSTRUCTIONS,tools:[],max_output_tokens:Math.min(config.maxOutputTokens,1024),text:{format:{type:'json_schema',name:'helfi_review_decision',strict:true,schema:{type:'object',additionalProperties:false,properties:decisionProperties,required:decisionFields}}},input:[{role:'user',content:JSON.stringify({actualHumanText,reviewFence:fence,review:currentReviewState.reviewText})}]},delegationId)
+          const response = await paidResponse({model:config.backendModel,service_tier:'default',store:false,reasoning:{effort:'low'},instructions:DECISION_INSTRUCTIONS,tools:[],max_output_tokens:Math.min(config.maxOutputTokens,1024),text:{format:{type:'json_schema',name:'helfi_review_decision',strict:true,schema:{type:'object',additionalProperties:false,properties:decisionProperties,required:decisionFields}}},input:[{role:'user',content:JSON.stringify({actualHumanText,reviewFence:fence,review:currentReviewState.reviewText})}]},delegationId)
           if (!response || closing) fail('decision_assessment_unconfirmed')
           if (response.status !== 'completed' || !sameFence(fence)) fail('review_changed_before_reply')
           let result
@@ -511,7 +532,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
       const canonicalResults = []
       for (let continuation = 0; continuation < 20 && !closing; continuation++) {
         if (backendCalls >= MAX_BACKEND_CALLS || io.now() >= config.deadlineMs - CLOSE_BUFFER_MS) { requestClose('backend_or_duration_limit'); return }
-        const body = { model: config.backendModel, service_tier: 'default', store: false, instructions: config.instructions,
+        const body = { model: config.backendModel, service_tier: 'default', store: false, reasoning: { effort: 'low' }, instructions: config.instructions,
           // The generic command's operation values intentionally permit
           // different fields. Prevent automatic strict-schema normalization.
           tools: config.tools.map(tool => ({ ...tool, strict: false })), parallel_tool_calls: false, max_output_tokens: config.maxOutputTokens, input }

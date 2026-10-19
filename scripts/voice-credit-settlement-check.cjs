@@ -49,11 +49,26 @@ function voiceHarness(c){
 let groups=0
 async function check(name,fn){await fn();groups++;console.log('PASS '+name)}
 async function run(){
- await check('unchanged native presentation; normal Food loading uses the same guarded credit reader',async()=>{
-  assert.equal(presentationHash(food),'b54f1e086256443b2a8fe29a3ec28385015feb90bd9546a4d40c435e8c04e234');assert.equal(presentationHash(voice),'fca539f03e48bae7365f63ce8c590ee3803bb4b94d5efd70c6f697eaac71a27a')
+ await check('unchanged Food and scoped voice ended-state presentation; normal loading retains its guarded credit reader',async()=>{
+  assert.equal(presentationHash(food),'b54f1e086256443b2a8fe29a3ec28385015feb90bd9546a4d40c435e8c04e234');assert.equal(presentationHash(voice),'1b8418f552b2ba89cf29f52dba489526d0ebd40fba80fa16c6d903b58788ca02')
   assert.match(callback(food,'loadAll'),/const creditPromise = refreshCreditBalance\(\)/);assert(!callback(food,'loadAll').includes('setCreditsRemaining'))
   for(const name of ['stopRealtimeVoiceSession','startVoiceSession'])assert(callback(voice,name).includes('finishVoiceCreditObservers'))
   assert.match(callback(voice,'startVoiceSession'),/onMeteredSession: sessionId => observeVoiceCredits\(sessionId, voiceMemoryUserId, startupAccountToken, realtimeRunId\)/)
+ })
+ await check('actual closed voice display says ended and offers explicit retry only after voice stops',async()=>{
+  let title,retry
+  function walk(n){
+   if(ts.isJsxElement(n)&&n.openingElement.attributes.getText(voice.ast).includes('styles.voiceCallTitle'))title=n.children.find(ts.isJsxExpression)?.expression?.getText(voice.ast)
+   if(ts.isConditionalExpression(n)&&n.whenTrue.getText(voice.ast).includes('accessibilityLabel="Try live voice again"'))retry=n.condition.getText(voice.ast)
+   ts.forEachChild(n,walk)
+  }
+  walk(voice.ast);assert(title&&retry)
+  const box={voicePaidAccessGranted:true,checkingRealtimeVoice:false,realtimeVoiceStatus:'closed',microphoneMuted:false,busy:false,voiceSessionActive:false}
+  assert.equal(vm.runInNewContext(title,box),'Voice ended');assert.equal(vm.runInNewContext(retry,box),true)
+  box.voiceSessionActive=true;assert.equal(vm.runInNewContext(retry,box),false)
+  box.realtimeVoiceStatus='live';assert.equal(vm.runInNewContext(title,box),'Ready — speak now');assert.equal(vm.runInNewContext(retry,box),false)
+  box.voiceSessionActive=false;box.realtimeVoiceStatus='failed';assert.equal(vm.runInNewContext(retry,box),true)
+  box.realtimeVoiceStatus='connecting';assert.equal(vm.runInNewContext(retry,box),false)
  })
  await check('reservation is announced immediately; no session GET until stop; settlement waits for the server',async()=>{
   const c=clock(),changes=[],states=['ready','closing','complete'];let reads=0

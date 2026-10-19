@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS151 /a2899d34b012a5be576690f83ae8d503989e9e90.
+- Date/time: 19October2026, verified03:06:07UTC.
+- What changed: Fresh authenticated native voice turns reset old local approval consumption; signed decision recovery binds the same immutable assessment/fence identity. Operator selection uses the larger of the same two existing fixed allowances, unchanged cap/expiry. BUILD/DEPLOY/VERIFY succeeded. Worker ZIPd964eed4df464300ff11306da5518d85b97b5c42712b3cad7c3341339d27c89a independently verified; existing permissions unchanged, code-only update after generic identical-policy rewrite was denied.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai both200/CloudFront/new ETagl238ngq9vh1z15/bodySHAc3012099b2add31687b74354c34ef19605565fc29aab6cebceb8665b55563fa6.
+- What to quickly test: Full build1121PASS/119required suites, native types/locks pass. Signed62 strictsignature/Health/push and Applevalidation passed, NOT uploaded/distributed/installed. Actual call15 reached first breakfast clarification, but a later backend request timed out without a usage receipt; closed90s, no correct/confirm/job/save. Preserve all unknown cost collateral; actual consecutive spoken save/reopen still required. Physical55. Computer muted; no spoken sample/signoff. Customer50%profit remains unverified.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS150 /90228309a435ad014f470ac479e2a377bd0083b2.
 - Date/time: 19October2026, verified02:28:21UTC.
 - What changed: Ordinary-food source identity/head filtering and exact independently cited source-portion retrieval before slow details, preserving custom priority and lookup deadlines. Worker9ed3e13c652d0ff89561d2846462c6a2d57b8861af3491469a4e3fc52b58cfad applied and independently verified; all AWS steps succeeded.

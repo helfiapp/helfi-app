@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T02:50:02.768Z",
+  "generatedAt": "2026-10-19T03:12:58.520Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -300,7 +300,7 @@
     "native/src/voice/realtimeVoice.ts": "64e11d013bb6313671060fd862924f31e800008ac073ab6afd861e0467278e60",
     "native/src/voice/reportPdfActions.ts": "56d91796e8fcce58fc10b71629ff1a5da3d2f0f046d6fc71da8ba04a527b4ba6",
     "native/src/voice/voiceActionReadRefresh.ts": "4109b5bb3bf669d96731746a728018f2dc284dcc8d19e3c6fe5d822fa85e1ead",
-    "native/src/voice/VoiceAssistant.tsx": "ef5afbaf1a27452302ca89cf861cd8bed24db061f5c191836b9529ae662aa667",
+    "native/src/voice/VoiceAssistant.tsx": "a0c2664d33e7037662ecc634d1d548687056b3b6de74b070e9953e7d5463df9f",
     "native/src/voice/VoiceAssistantIconButton.tsx": "88360d1a7a0eac43943aaf7b6428d53f80d84d8f092dd0c28341acb3c88c762e",
     "native/src/voice/voiceCapabilityManifest.ts": "4dcfd38fe04f9e2ee28a5e36f1a1b04c2cd2ddc38849d803ea9f49a8916ec366",
     "native/src/voice/voiceCreditSettlement.ts": "fb077a855adc0df0919e5c3ed7edf5fef7f3131a4b42ffeeb115440091b4bde6",

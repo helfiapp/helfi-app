@@ -3322,6 +3322,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
               if (status === 'disconnected') {
                 setRealtimeVoiceError((current) => current || 'The voice connection was interrupted. Check your internet or Bluetooth audio, then tap Try again.')
                 addVoiceActivity('Connection interrupted — ready to retry', 'error')
+              } else {
+                addVoiceActivity('Voice ended — check the latest result before reconnecting', 'done')
               }
               return
             }
@@ -3801,6 +3803,8 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                           ? 'Thinking'
                           : realtimeVoiceStatus === 'live'
                           ? microphoneMuted ? 'Muted' : 'Ready — speak now'
+                          : realtimeVoiceStatus === 'closed'
+                          ? 'Voice ended'
                           : realtimeVoiceStatus === 'failed'
                           ? 'Could not connect'
                           : busy
@@ -3830,7 +3834,7 @@ export function VoiceAssistantProvider({ children }: { children: React.ReactNode
                         </View>
                       ) : null}
                     </View>
-                    {!voiceSessionActive && realtimeVoiceStatus === 'failed' ? (
+                    {!voiceSessionActive && (realtimeVoiceStatus === 'failed' || realtimeVoiceStatus === 'closed') ? (
                       <Pressable
                         accessibilityRole="button"
                         accessibilityLabel="Try live voice again"
