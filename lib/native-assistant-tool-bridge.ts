@@ -20,7 +20,8 @@ export type AssistantPlannerTurn = {
 }
 export type AssistantPlannerReply = { command: AssistantCommand } | { question: string } | { done: true }
 export type AssistantPlanner = (turn: AssistantPlannerTurn) => Promise<AssistantPlannerReply>
-export type AssistantDecisionEvidence = { channel: 'typed' | 'realtime'; text: string } | { channel: 'control'; controlId: string }
+export type AssistantDecisionEvidence = { channel: 'typed' | 'realtime'; text: string; /** Server-injected only after separately verified fresh-turn assessment. */ decisionReceipt?: string } | { channel: 'control'; controlId: string }
+export type AssistantReviewFence = { revision: number; stepId: string; reviewId: string }
 /** Host-neutral bridge. A planner chooses/composes registered operations and
  * returns their structured arguments; no request text is reparsed into action
  * families here. The normal voice route supplies its planner; offline tests
@@ -118,12 +119,19 @@ export function createAssistantToolBridge(options: {
     },
     /** Same callback target for typed/realtime structured tool arguments. The
      * host supplies authenticated context and session ID, never the model. */
-    async dispatch(context: AssistantContext, sessionId: string, command: AssistantCommand, evidence: AssistantDecisionEvidence) {
+    async dispatch(context: AssistantContext, sessionId: string, command: AssistantCommand, evidence: AssistantDecisionEvidence, hostState: { expectedReviewFence?: AssistantReviewFence } = {}) {
       const execute = async (assertCurrent: () => Promise<void> = async () => {}) => {
       const current = await options.readSession(context.actorId, sessionId)
       if (current && (current.actorId !== context.actorId || current.id !== sessionId)) throw new Error('Please use your own assistant conversation.')
       await options.authorizeCommand(context, command, evidence, current)
       await assertCurrent()
+      if (hostState.expectedReviewFence !== undefined) {
+        const fence = hostState.expectedReviewFence
+        const latest = await options.readSession(context.actorId, sessionId)
+        const pending = latest?.steps.find(step => !['completed', 'cancelled'].includes(step.status))
+        if (!Number.isSafeInteger(fence.revision) || fence.revision < 0 || typeof fence.stepId !== 'string' || !fence.stepId || typeof fence.reviewId !== 'string' || !fence.reviewId || !latest || latest.actorId !== context.actorId || latest.id !== sessionId || latest.status !== 'active' || latest.revision !== fence.revision || pending?.id !== fence.stepId || pending.status !== 'review' || pending.reviewId !== fence.reviewId) throw new Error('That review changed. Please check the current review before replying again.')
+        await assertCurrent()
+      }
       return options.runtime.handle(context, sessionId, command)
       }
       return options.runTurnExclusive ? options.runTurnExclusive(context.actorId, sessionId, execute) : execute()

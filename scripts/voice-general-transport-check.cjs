@@ -14,17 +14,23 @@ async function send(f,text,command,draft=null){
   fetch:async(url,init)=>{calls.push({url,method:init.method,body:JSON.parse(init.body),bytes:Buffer.byteLength(init.body)});const response=await f.route.POST(new Request(url,init));calls[calls.length-1].response={status:response.status,body:await response.clone().json()};return response}})
  return{...result,calls,alerts}
 }
+// Simulate only the server's separately verified, current pending job.
+function permitDecision(f,view,text,command){
+ const at=require('./voice-symptom-analysis-check.cjs').base.AuditDate.now()
+ const decisionReceipt=f.load('native-assistant-decision').issueAssistantDecisionReceipt({actorId:'owner',sessionId:'app-owned-session',reviewId:command.reviewId,revision:view.revision,text,decision:command.type,turnId:'synthetic-fresh-human-turn-'+view.revision+'-'+command.type,assessmentReceiptId:'synthetic-settled-decision-assessment-'+view.revision+'-'+command.type},{decision:command.type,directHuman:true,completeTurn:true,quoted:false,historical:false,injected:false,ambiguous:false,conditional:false,correcting:false,mixed:false},{secret:'synthetic-control-secret-not-production',nowMs:at})
+ f.db.db.voiceSessionRuntime.findMany=async()=>[{userId:'owner',state:'ready',expiresAt:new Date(at+120000),configuration:{assistantSessionId:'app-owned-session',deadlineMs:at+120000},toolJobs:{jobs:[{status:'pending',actualHumanText:text,args:{assistantCommand:command},decisionReceipt}]}}]
+}
 async function main(){
  await check('structured prepare uses one small normal-host request without favorites/history or another planner',async()=>{
   const f=host.setup(),command={type:'plan',steps:[{id:'note',operation:'journal.health.create',values:{content:'Exact synthetic note.',localDate:'2026-10-17'}}]},r=await send(f,'Prepare my note. Do not save it yet.',command)
   assert.equal(r.result.ok,true);assert.equal(r.result.needsReview,true);assert.equal(r.calls.length,1);assert.equal(new URL(r.calls[0].url).pathname,'/api/native/assistant');assert(r.calls[0].bytes<2000);assert.deepEqual(Object.keys(r.calls[0].body).sort(),['aiConsentGranted','channel','command','localDate','selectedLocalDate','sessionId','text','timeZone'].sort());assert.equal(f.counts().plannerCalls,0);assert.equal(f.counts().providerCalls,0);assert.equal(f.counts().postCalls,0);assert.equal(r.alerts.length,0)
  })
  await check('structured spoken yes bypasses the old phrase shortcut and saves only its current reviewed command',async()=>{
-  const f=host.setup(),prepared=await(await f.app.handleNativeAssistantRequest(f.request(f.body()),f.planner)).json(),command={type:'confirm',reviewId:prepared.draft.assistantPlan.reviewId},r=await send(f,'Yes, save it.',command,prepared.draft)
+  const f=host.setup(),prepared=await(await f.app.handleNativeAssistantRequest(f.request(f.body()),f.planner)).json(),command={type:'confirm',reviewId:prepared.draft.assistantPlan.reviewId};permitDecision(f,prepared.assistant,'Yes, save it.',command);const r=await send(f,'Yes, save it.',command,prepared.draft)
   assert.equal(r.result.ok,true);assert.equal(r.saveOptions.length,0);assert.equal(r.calls.length,1);assert.deepEqual(r.calls[0].body.command,command);assert.equal(f.counts().postCalls,1);assert.equal(f.counts().plannerCalls,1);assert.equal(f.counts().providerCalls,0);assert(r.result.assistantContext);assert.equal(r.result.assistantContext.status,'completed')
  })
  await check('structured spoken no uses only its immutable decline and never resets or saves another plan',async()=>{
-  const f=host.setup(),prepared=await(await f.app.handleNativeAssistantRequest(f.request(f.body()),f.planner)).json(),command={type:'decline',reviewId:prepared.draft.assistantPlan.reviewId},r=await send(f,'No',command,prepared.draft)
+  const f=host.setup(),prepared=await(await f.app.handleNativeAssistantRequest(f.request(f.body()),f.planner)).json(),command={type:'decline',reviewId:prepared.draft.assistantPlan.reviewId};permitDecision(f,prepared.assistant,'No',command);const r=await send(f,'No',command,prepared.draft)
   assert.equal(r.result.ok,true,JSON.stringify({result:r.result,calls:r.calls}));assert.equal(r.calls.length,1);assert.deepEqual(r.calls[0].body.command,command);assert.equal(r.saveOptions.length,0);assert.equal(f.counts().postCalls,0);assert.equal(r.result.assistantContext.steps[0].status,'cancelled')
  })
  await check('typed general planning also excludes irrelevant large snapshots and retains its billed planner endpoint',async()=>{

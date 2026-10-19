@@ -161,11 +161,45 @@ export async function handleNativeAssistantRequest(request: NextRequest, planner
         return NextResponse.json(draftForView(actorId, body.localDate, timeZone, body.sessionId, { question: policy.decision === 'confirm' ? 'There is no current reviewed change to save. Please give the change you want to make.' : 'There is no pending reviewed change to discard. Earlier saved records remain as they are.' }))
       }
     }
-    const result = await host.run(context, body.sessionId, { text: body.text, channel: body.channel, ...(body.command ? { command: body.command as AssistantCommand } : {}), ...(body.controlId ? { controlId: body.controlId } : {}) }, expectedQuestionRevision !== undefined ? { expectedQuestionRevision } : {})
+    // Only a matching pending job in this account's active server-owned voice
+    // runtime may supply semantic authorization or a fallback review fence.
+    // Neither value is accepted from the public request body.
+    const voiceEvidence = body.channel === 'realtime' && body.command && !body.controlId
+      ? await resolvePendingVoiceDecisionEvidence(actorId, body.sessionId, body.text, body.command)
+      : undefined
+    if (body.channel === 'realtime' && ['confirm', 'decline'].includes(body.command?.type) && !body.controlId && !voiceEvidence?.decisionReceipt) throw new Error('Please give a fresh direct decision about the current voice review.')
+    const result = await host.run(context, body.sessionId, { text: body.text, channel: body.channel, ...(body.command ? { command: body.command as AssistantCommand } : {}), ...(body.controlId ? { controlId: body.controlId } : {}), ...(voiceEvidence?.decisionReceipt ? { decisionReceipt: voiceEvidence.decisionReceipt } : {}) }, { ...(expectedQuestionRevision !== undefined ? { expectedQuestionRevision } : {}), ...(voiceEvidence?.reviewFence ? { expectedReviewFence: voiceEvidence.reviewFence } : {}) })
     return NextResponse.json(draftForView(actorId, body.localDate, timeZone, body.sessionId, result))
   } catch (error: any) {
     return NextResponse.json({ error: error?.message || 'The assistant could not verify this request.', code: typeof error?.code === 'string' ? error.code : 'assistant_request_failed' }, { status: 400 })
   }
+}
+
+/** Metadata stays inside the real server. The phone cannot mint, submit or
+ * select a decision receipt. Its ordinary action request must match one exact
+ * pending job, literal human turn and structured command. */
+export async function resolvePendingVoiceDecisionEvidence(actorId: string, sessionId: string, text: string, command: AssistantCommand, options: { nowMs?: number; database?: any } = {}) {
+  const at = options.nowMs ?? Date.now(), database = options.database ?? prisma
+  const rows = await database.voiceSessionRuntime.findMany({ where: { userId: actorId, state: 'ready', expiresAt: { gt: new Date(at) }, configuration: { path: ['assistantSessionId'], equals: sessionId } }, select: { userId: true, state: true, expiresAt: true, configuration: true, toolJobs: true }, take: 21 })
+  if (!Array.isArray(rows) || rows.length > 20) throw new Error('Please check the current voice review again.')
+  const matches: any[] = []
+  for (const row of rows) {
+    if (row.userId !== actorId || row.state !== 'ready' || new Date(row.expiresAt).getTime() <= at || row.configuration?.assistantSessionId !== sessionId || !Number.isSafeInteger(row.configuration?.deadlineMs) || row.configuration.deadlineMs <= at) continue
+    const jobs = row.toolJobs?.jobs
+    if (!Array.isArray(jobs) || jobs.length > 20) throw new Error('Please check the current voice review again.')
+    for (const job of jobs) {
+      if (job.status !== 'pending' || job.actualHumanText !== text || digestVoiceCommand(job.args?.assistantCommand) !== digestVoiceCommand(command) || typeof job.decisionReceipt !== 'string' && job.reviewFence === undefined) continue
+      matches.push({ ...(typeof job.decisionReceipt === 'string' ? { decisionReceipt: job.decisionReceipt } : {}), ...(job.reviewFence !== undefined ? { reviewFence: job.reviewFence } : {}) })
+    }
+  }
+  if (matches.length > 1) throw new Error('Please check the current voice review again.')
+  return matches[0]
+}
+
+function digestVoiceCommand(command: any): string | undefined {
+  if (!command || typeof command !== 'object' || Array.isArray(command)) return undefined
+  const stable = (value: any): any => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).sort().map(key => [key, stable(value[key])])) : value
+  return JSON.stringify(stable(command))
 }
 
 export async function handleNativeAssistantConfirmation(request: NextRequest, draft: any) {

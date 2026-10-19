@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 19 October 2026, 11:45 AEDT (verification)
+- What changed: Owner-approved one-off voice test authority; exactly two new fixed US$1 test lots, historical US$0.918289288333 remains included below the US$3 total ceiling. No customer pricing or native UI change.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai; exact commit 641b5188677af9c7ca1d3735fefdbddeacb62471, AWS147 BUILD/DEPLOY/VERIFY succeeded; both200 CloudFront, matching new ETag12ejqgtm4u31z15/body SHA b108a840c3335f755ef35db9a9bb8c2e62818334094f9588deaf2e7aaf071801.
+- What to quickly test: Actual call9 prepared/corrected reviews but spoken approval failed to dispatch; normal journal empty. Signed59 is held and unuploaded while the general reply-routing/semantic approval repair is verified.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS146 / f82fe4e7bb75d99e3483dbb001ce243231d2dc18.
 - Date/time: 18 October 2026, verified08:24 UTC.
 - What changed: Every spoken app result carries canonical saved/review/uncertain facts, including bounded long-review fallbacks and later human replies. The speaking instructions distinguish unsaved review from saved drafts. Original shutdown causes survive provider acknowledgement. Worker ZIPaac040f13a843dc2a3ef64960b8b077614167e3ece8c30b45f7da043bb2045ee applied and canonical verified. BUILD/DEPLOY/VERIFY all succeeded.

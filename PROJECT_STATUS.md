@@ -1,3 +1,9 @@
+## 19 October 2026 — actual voice acceptance caught missed approval
+
+AWS147/641 is verified on both live domains. Signed native59 passed strict signature/identity, byte-identical native bundle proof and Apple validation; it remains unuploaded and physical iPhone remains55. Actual call9 produced two corrected journal reviews (canonical revisions15→17→19), zero confirm jobs and zero normal journal entries after a visibly heard approval. Two backend groups ended about38seconds before Close; neither timing nor preparation delay explains that missing later recorded action. Do not call this voice acceptance passed.
+
+Root is integrating one server-owned pending-review transcript routing lane, same-span provider deduplication, exact review/revision fences and a separately metered signed semantic decision check. This changes no native UI/design. Design Manager's47 isolated pending files remain preserved under the active approved-aws manifest; root owns deployment/integration. Known test cost is US$1.030323008333 across9closed calls/90testcredits,0open/uncertain/unsettled; total owner authority remainsUS$3. OpenAI balance observedUS$4.93 with auto-reloadoff is separate and shared with other AI features. Customer50% profit is not proven: purchase proceeds/refund integrations and actual overhead reconciliation are still required; unknown customer revenue fails closed before paid allocation.
+
 ## Voice continuation — 19 October 2026
 
 - Owner renewed the physicaliPhone update request and explicitly approved US$3TOTALtestexpenseincluding priorUS$0.918289288333. Freshreadonlyaudit still8closed/80testcredits,0open/uncertain/unsettled. The18October allowance expired; do not modify or extend that record. Narrow startup renewal adds atmosttwo fixedUS$1lots for the same test account, fixedexpiry20October00:25UTC; totalhistoricalplusnew authority<=US$2.918289288333. Root is integrating/testing; no newbudget deployment or paidcall yet.

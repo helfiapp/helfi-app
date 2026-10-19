@@ -2,16 +2,21 @@ import { AssistantContext, AssistantContractError, AssistantRegistry } from './n
 import { formatNativeAssistantView } from './native-assistant-readable'
 import { completionForStep } from './native-assistant-completions'
 import { AssistantCommand, AssistantSession, createAssistantRuntime } from './native-assistant-runtime'
-import { AssistantDecisionEvidence, AssistantPlanner, createAssistantToolBridge } from './native-assistant-tool-bridge'
+import { AssistantDecisionEvidence, AssistantPlanner, AssistantReviewFence, createAssistantToolBridge } from './native-assistant-tool-bridge'
 import { createPrismaAssistantSessionStore } from './native-assistant-session-store'
+import { verifyAssistantDecisionReceipt } from './native-assistant-decision'
 
 export function authorizeAssistantDecision(command: AssistantCommand, evidence: AssistantDecisionEvidence, session: AssistantSession | null) {
+  if (evidence.channel !== 'control' && evidence.decisionReceipt !== undefined && !['confirm', 'decline'].includes(command.type)) throw new Error('A decision receipt needs its exact current reviewed command.')
   const currentReview = session?.steps.find(step => step.status === 'review')?.reviewId
   if (command.type === 'confirm' || command.type === 'decline') {
     const replay = command.type === 'confirm' && evidence.channel === 'control' && session?.steps.some(step => step.status === 'completed' && step.reviewId === command.reviewId)
     if (!replay && (!currentReview || command.reviewId !== currentReview)) throw new Error('Please review the current requested change again.')
     if (evidence.channel === 'control') {
       if (evidence.controlId !== `${command.type}:${command.reviewId}`) throw new Error('Please use the current review control.')
+    } else if (evidence.decisionReceipt !== undefined) {
+      if (!session) throw new Error('Please review the current requested change again.')
+      verifyAssistantDecisionReceipt(evidence.decisionReceipt, { actorId: session.actorId, sessionId: session.id, reviewId: command.reviewId, revision: session.revision, text: evidence.text, decision: command.type })
     } else {
       const answer = evidence.text.trim().toLowerCase().replace(/[.!]+$/g, '')
       const allowed = command.type === 'confirm' ? /^(?:yes|yes please|yes,? save (?:it|that)|confirm|save (?:it|that)|go ahead)$/ : /^(?:no|no thanks|cancel|discard|don't save|do not save)$/
@@ -100,8 +105,10 @@ export function createNativeAssistantHost(options: {
     async snapshot(context: AssistantContext, sessionId: string) { await authenticate(context); return project(context, await options.persistence.readSession(context.actorId, sessionId)) },
     pendingQuestionRevision,
     async hasPendingQuestion(context: AssistantContext, sessionId: string) { return await pendingQuestionRevision(context, sessionId) !== null },
-    async run(context: AssistantContext, sessionId: string, input: { channel: 'typed' | 'realtime'; text: string; command?: AssistantCommand; controlId?: string }, hostState: { expectedQuestionRevision?: number } = {}) {
+    async run(context: AssistantContext, sessionId: string, input: { channel: 'typed' | 'realtime'; text: string; command?: AssistantCommand; controlId?: string; decisionReceipt?: string }, hostState: { expectedQuestionRevision?: number; expectedReviewFence?: AssistantReviewFence } = {}) {
       await authenticate(context)
+      if (input.decisionReceipt !== undefined && (input.controlId || !input.command || !['confirm', 'decline'].includes(input.command.type))) throw new Error('A decision receipt needs its exact current reviewed command.')
+      if (hostState.expectedReviewFence !== undefined && !input.command) throw new Error('A review reply needs its exact reviewed command.')
       let recoveringPriorAction = false
       const recoveredThisTurn = new Map<string,{actionId:string;completion:ReturnType<typeof completionForStep>}>()
       const turnStepIds = new Set<string>()
@@ -116,8 +123,8 @@ export function createNativeAssistantHost(options: {
         if (hostState.expectedQuestionRevision !== undefined) throw new Error('A clarification answer must continue through its current question.')
         const before = await options.persistence.readSession(context.actorId, sessionId)
         const replay = before?.steps.some(step => step.status === 'completed' && (input.command!.type === 'confirm' && step.reviewId === input.command!.reviewId || input.command!.type === 'recover' && step.actionId === input.command!.actionId))
-        const evidence: AssistantDecisionEvidence = input.controlId ? { channel: 'control', controlId: input.controlId } : { channel: input.channel, text: input.text }
-        let session = await bridge.dispatch(context, sessionId, input.command, evidence)
+        const evidence: AssistantDecisionEvidence = input.controlId ? { channel: 'control', controlId: input.controlId } : { channel: input.channel, text: input.text, ...(input.decisionReceipt !== undefined ? { decisionReceipt: input.decisionReceipt } : {}) }
+        let session = await bridge.dispatch(context, sessionId, input.command, evidence, hostState.expectedReviewFence !== undefined ? { expectedReviewFence: hostState.expectedReviewFence } : {})
         if (['confirm', 'recover'].includes(input.command.type) && session.status === 'active' && session.steps.find(step => !['completed', 'cancelled'].includes(step.status))?.status === 'pending') {
           if (replay) return { session: projectRun(session), question: 'The earlier change is confirmed. The next action still needs its details checked. Please correct it or continue from the current pending step.' }
           try {

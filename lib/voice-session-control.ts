@@ -2,6 +2,7 @@ import { createHash, createHmac, randomBytes, timingSafeEqual } from 'node:crypt
 import { sanitizeGeneralAssistantCommand } from '../native/src/voice/generalAssistantActions'
 import { liveVoiceCostUnits, reserveVoiceBackendCostUnits, voiceBackendCostQuote } from './voice-cost-policy'
 import { formatNativeAssistantView } from './native-assistant-readable'
+import { issueAssistantDecisionReceipt } from './native-assistant-decision'
 
 const TOKEN_MS = 12 * 60 * 1000, LEASE_MS = 35000, MAX_JSON_BYTES = 180000
 const MAX_JOB_BYTES = 1024 * 1024, RESULT_BYTES = 160000, RESULT_NODES = 5000
@@ -196,9 +197,18 @@ export function createVoiceSessionControl(deps: VoiceSessionControlDependencies)
           const financial = await billing(), holds = financial.reservations ?? []
           const voice = holds.find((hold: any) => hold.key === config.voiceHoldKey), overhead = holds.find((hold: any) => hold.key === config.infrastructureHoldKey)
           if (!['OPEN', ...(closing ? ['UNCERTAIN'] : [])].includes(financial.state) || !voice || !overhead || voice.maxCostUnits !== units(config.voiceReservedCostUnits) || overhead.maxCostUnits !== OVERHEAD_UNITS || !row.providerSessionId) fail('voice_budget_not_reserved', 402)
+          let initialAssistantState: Row | undefined
+          if (!closing) {
+            const source = await deps.assistantState(row.userId, config)
+            if (source.session && (source.session.actorId !== row.userId || source.session.id !== config.assistantSessionId) || !Array.isArray(source.turns) || source.turns.some(turn => turn.actorId !== row.userId || turn.sessionId !== config.assistantSessionId)) fail('voice_tool_source_not_owned', 409)
+            const baseline = baselineFor(source.session, source.turns)
+            const current = source.session?.steps.find((step: any) => step.id === baseline.pending?.id)
+            const summary = current?.status === 'review' ? current.prepared?.summary : undefined
+            initialAssistantState = { revision: baseline.revision, pending: baseline.pending, ...(typeof summary === 'string' && summary.length <= 24000 ? { reviewText: summary } : {}) }
+          }
           const key = await deps.providerKey()
           if (typeof key !== 'string' || !key || key.length > 1000) fail('voice_provider_not_configured', 503)
-          return { claimed: true, leaseToken, providerKey: key, providerSessionId: row.providerSessionId, backendModel: config.backendModel, instructions: config.instructions, tools: clone(config.tools), ...(config.initialInput ? { initialInput: clone(config.initialInput) } : {}), maxInputBytes: config.maxInputBytes, maxOutputTokens: config.maxOutputTokens, deadlineMs: config.deadlineMs, voiceHoldKey: config.voiceHoldKey, infrastructureHoldKey: config.infrastructureHoldKey, voiceReservedCostUnits: config.voiceReservedCostUnits, infrastructureReservedCostUnits: OVERHEAD_UNITS.toString(), infrastructureAllocationPolicyVersion: OVERHEAD_POLICY, infrastructureAllocationReceiptDigest: digest({ sessionId: row.sessionId, policy: OVERHEAD_POLICY, allocatedOverheadCostUnits: OVERHEAD_UNITS.toString() }), maxAffordableDurationMs: Math.max(0, Number(units(config.voiceReservedCostUnits) / BigInt(50000)) - 60000), watchdogReady: jobs.watchdogReady === true, pricing: clone(config.pricing) }
+          return { claimed: true, leaseToken, providerKey: key, providerSessionId: row.providerSessionId, backendModel: config.backendModel, instructions: config.instructions, tools: clone(config.tools), ...(initialAssistantState ? { initialAssistantState } : {}), ...(config.initialInput ? { initialInput: clone(config.initialInput) } : {}), maxInputBytes: config.maxInputBytes, maxOutputTokens: config.maxOutputTokens, deadlineMs: config.deadlineMs, voiceHoldKey: config.voiceHoldKey, infrastructureHoldKey: config.infrastructureHoldKey, voiceReservedCostUnits: config.voiceReservedCostUnits, infrastructureReservedCostUnits: OVERHEAD_UNITS.toString(), infrastructureAllocationPolicyVersion: OVERHEAD_POLICY, infrastructureAllocationReceiptDigest: digest({ sessionId: row.sessionId, policy: OVERHEAD_POLICY, allocatedOverheadCostUnits: OVERHEAD_UNITS.toString() }), maxAffordableDurationMs: Math.max(0, Number(units(config.voiceReservedCostUnits) / BigInt(50000)) - 60000), watchdogReady: jobs.watchdogReady === true, pricing: clone(config.pricing) }
         }
         if (body.command === 'attach' || body.command === 'watchdog-claim') {
           fieldsFor([])
@@ -281,21 +291,40 @@ export function createVoiceSessionControl(deps: VoiceSessionControlDependencies)
           receipt.settled = clone(binding); bounded(jobs, MAX_JOB_BYTES); await save({ toolJobs: jobs }); return { allowed: true, costBasis: quote.costBasis, invoiceConfirmed: false }
         }
         if (body.command === 'enqueue-tool') {
-          fieldsFor(['callId', 'args', 'delegationId', 'actualHumanText']); active()
+          fieldsFor(['callId', 'args', 'delegationId', 'actualHumanText', 'reviewFence', 'assessment'], ['callId', 'args', 'delegationId', 'actualHumanText']); active()
           if (row.state !== 'ready') fail('voice_session_not_ready', 409)
           if ((await billing()).state !== 'OPEN') fail('voice_session_not_active', 409)
           if (!opaque(body.callId) || !opaque(body.delegationId) || typeof body.actualHumanText !== 'string' || !body.actualHumanText.trim() || body.actualHumanText.length > 20000) fail('invalid_voice_tool_request')
           fields(body.args, ['request', 'action', 'needsReview', 'assistantCommand'])
           const command = sanitizeGeneralAssistantCommand(body.args.assistantCommand)
           if (body.args.action !== 'assistant_plan' || typeof body.args.needsReview !== 'boolean' || typeof body.args.request !== 'string' || !command) fail('invalid_voice_tool_request')
-          const args = { ...clone(body.args), request: body.actualHumanText, assistantCommand: command }, identity = { callId: body.callId, args, delegationId: body.delegationId, actualHumanText: body.actualHumanText }
+          const replyFence = body.reviewFence ?? body.assessment?.reviewFence
+          const args = { ...clone(body.args), request: body.actualHumanText, assistantCommand: command }, identity = { callId: body.callId, args, delegationId: body.delegationId, actualHumanText: body.actualHumanText, ...(replyFence !== undefined ? { reviewFence: clone(replyFence) } : {}), ...(body.assessment !== undefined ? { assessment: clone(body.assessment) } : {}) }
           const old = jobs.jobs.find(job => job.callId === body.callId)
           if (old) { if (old.identity !== digest(identity)) fail('voice_tool_call_conflict', 409); return { jobId: old.callId } }
           if (jobs.jobs.length >= 20 || new Set([...jobs.jobs.map(job => job.delegationId), body.delegationId]).size > 10 || jobs.jobs.some(job => job.status === 'pending')) fail('voice_tool_request_limit', 409)
           const source = await deps.assistantState(row.userId, config)
           lease(); active()
           if (source.session && (source.session.actorId !== row.userId || source.session.id !== config.assistantSessionId) || !Array.isArray(source.turns) || source.turns.some(turn => turn.actorId !== row.userId || turn.sessionId !== config.assistantSessionId)) fail('voice_tool_source_not_owned', 409)
-          const job = { ...identity, identity: digest(identity), status: 'pending', createdAtMs: now(), baseline: baselineFor(source.session, source.turns) }
+          const baseline = baselineFor(source.session, source.turns)
+          const checkFence = (fence: any) => {
+            fields(fence, ['revision', 'stepId', 'reviewId'])
+            integer(fence.revision, Number.MAX_SAFE_INTEGER)
+            if (!opaque(fence.stepId, 80) || !opaque(fence.reviewId, 120) || baseline.revision !== fence.revision || baseline.pending?.status !== 'review' || baseline.pending.id !== fence.stepId || baseline.pending.reviewId !== fence.reviewId) fail('voice_review_changed', 409)
+          }
+          if (body.reviewFence !== undefined) checkFence(body.reviewFence)
+          let decisionReceipt: string | undefined
+          if (body.assessment !== undefined) {
+            const decisionCommand = command && (command.type === 'confirm' || command.type === 'decline') ? command : fail('voice_decision_assessment_invalid', 409)
+            fields(body.assessment, ['providerResponseId', 'result', 'exactHumanTextSha256', 'reviewFence'])
+            checkFence(body.assessment.reviewFence)
+            if (decisionCommand.reviewId !== baseline.pending?.reviewId || body.assessment.exactHumanTextSha256 !== hash(body.actualHumanText) || !opaque(body.assessment.providerResponseId)) fail('voice_decision_assessment_invalid', 409)
+            const receipt = jobs.receipts.find(item => item.settled?.providerResponseId === body.assessment.providerResponseId)
+            const financial = await billing()
+            if (!receipt || !backendReceiptsVerified(financial, jobs.receipts) || jobs.jobs.some(job => job.assessment?.providerResponseId === body.assessment.providerResponseId)) fail('voice_decision_cost_unverified', 409)
+            decisionReceipt = issueAssistantDecisionReceipt({ actorId: row.userId, sessionId: config.assistantSessionId, reviewId: decisionCommand.reviewId, revision: baseline.revision, text: body.actualHumanText, decision: decisionCommand.type, turnId: body.delegationId, assessmentReceiptId: body.assessment.providerResponseId }, body.assessment.result, { secret: deps.secret(), nowMs: now() })
+          }
+          const job = { ...identity, identity: digest(identity), status: 'pending', createdAtMs: now(), baseline, ...(decisionReceipt ? { decisionReceipt } : {}) }
           jobs.jobs.push(job)
           // Reserve the bounded canonical output BEFORE the phone can run an
           // app action. A saved note must not lose its receipt to a storage
@@ -341,10 +370,24 @@ export function createVoiceSessionControl(deps: VoiceSessionControlDependencies)
       })
     },
     async nativeRead(userId: string, sessionId: string): Promise<Row> {
-      return owned(userId, sessionId, async row => {
+      return owned(userId, sessionId, async (row, save) => {
         if (now() >= new Date(row.expiresAt).getTime()) return { sessionId, state: 'expired', jobs: [] }
+        if (['attaching', 'ready'].includes(row.state) && now() >= configuration(row, now()).deadlineMs) return { sessionId, state: 'expired', jobs: [] }
         if (['attaching', 'ready'].includes(row.state) && (await deps.ledger.get(userId, sessionId)).state !== 'OPEN') return { sessionId, state: 'uncertain', jobs: [] }
         const jobs = jobState(row.toolJobs)
+        if (jobs.jobs.some(job => job.status === 'pending' && job.reviewFence && job.publishedAtMs === undefined)) {
+          const config = configuration(row, now()), source = await deps.assistantState(userId, config)
+          if (source.session && (source.session.actorId !== userId || source.session.id !== config.assistantSessionId) || !Array.isArray(source.turns) || source.turns.some(turn => turn.actorId !== userId || turn.sessionId !== config.assistantSessionId)) fail('voice_tool_source_not_owned', 409)
+          const current = baselineFor(source.session, source.turns)
+          let changed = false
+          for (const job of jobs.jobs.filter(job => job.status === 'pending' && job.reviewFence && job.publishedAtMs === undefined)) {
+            const fence = job.reviewFence
+            if (current.revision !== fence.revision || current.pending?.status !== 'review' || current.pending.id !== fence.stepId || current.pending.reviewId !== fence.reviewId) {
+              job.status = 'completed'; job.result = { ok: false, saved: false, safeToClaimSaved: false, needsReview: true, spokenReply: 'The review changed before this reply could run. Check the current review before deciding.', transportRecovery: { status: 'result_not_verified' } }; changed = true
+            } else { job.publishedAtMs = now(); changed = true }
+          }
+          if (changed) await save({ toolJobs: jobs })
+        }
         return { sessionId, state: row.state, jobs: ['attaching', 'ready'].includes(row.state) ? jobs.jobs.filter(job => job.status === 'pending').map(job => ({ callId: job.callId, args: clone(job.args), actualHumanText: job.actualHumanText })) : [] }
       })
     },

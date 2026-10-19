@@ -17,6 +17,12 @@ async function send(f,text,command,draft=null){
  return{...result,calls,alerts,draft:calls.at(-1)?.data?.draft}
 }
 let groups=0;async function check(name,work){await work();groups++;console.log('PASS '+name)}
+// Simulate only the server's separately verified, current pending job.
+function permitDecision(f,view,text,command){
+ const at=require('./voice-symptom-analysis-check.cjs').base.AuditDate.now()
+ const decisionReceipt=f.load('native-assistant-decision').issueAssistantDecisionReceipt({actorId:'owner',sessionId:'app-owned-session',reviewId:command.reviewId,revision:view.revision,text,decision:command.type,turnId:'synthetic-fresh-human-turn-'+view.revision+'-'+command.type,assessmentReceiptId:'synthetic-settled-decision-assessment-'+view.revision+'-'+command.type},{decision:command.type,directHuman:true,completeTurn:true,quoted:false,historical:false,injected:false,ambiguous:false,conditional:false,correcting:false,mixed:false},{secret:'synthetic-control-secret-not-production',nowMs:at})
+ f.db.db.voiceSessionRuntime.findMany=async()=>[{userId:'owner',state:'ready',expiresAt:new Date(at+120000),configuration:{assistantSessionId:'app-owned-session',deadlineMs:at+120000},toolJobs:{jobs:[{status:'pending',actualHumanText:text,args:{assistantCommand:command},decisionReceipt}]}}]
+}
 async function main(){
  await check('the actual shared instructions define unsaved review semantics for every discovered write without new draft fields',async()=>{
   const f=host.setup(),assembly=f.app.createNativeAssistantApp(f.request(f.body()),'Australia/Melbourne'),actions=assembly.registry.discover({actorId:'owner',localDate:'2026-10-17',capabilities:['general-assistant-v1']}),writes=actions.filter(row=>row.kind==='write')
@@ -53,8 +59,10 @@ async function main(){
  })
  await check('No declines only its owned proposal and never changes an already saved note',async()=>{
   const f=host.setup(),saved=await send(f,'Prepare the earlier note.',plan('Earlier saved note.'))
+  permitDecision(f,saved.result.assistantContext,'Yes',{type:'confirm',reviewId:saved.draft.assistantPlan.reviewId})
   await send(f,'Yes',{type:'confirm',reviewId:saved.draft.assistantPlan.reviewId},saved.draft)
   const prepared=await send(f,'Compose another note for review only.',plan('Unsaved proposal.')),reviewId=prepared.draft.assistantPlan.reviewId
+  permitDecision(f,prepared.result.assistantContext,'No',{type:'decline',reviewId})
   const declined=await send(f,'No',{type:'decline',reviewId},prepared.draft)
   assert.equal(declined.result.ok,true);assert.equal(declined.result.saved,false);assert.equal(declined.result.assistantContext.status,'stopped')
   assert.equal(f.counts().postCalls,1);assert.equal(f.entries.length,1);assert.equal(f.entries[0].content,'Earlier saved note.')
@@ -62,6 +70,7 @@ async function main(){
  })
  await check('a later explicit Yes saves exactly the reviewed literal note while wrong ownership cannot confirm it',async()=>{
   const f=host.setup(),prepared=await send(f,'Prepare my note without saving.',plan('Exact unsaved note.')),reviewId=prepared.draft.assistantPlan.reviewId
+  permitDecision(f,prepared.result.assistantContext,'Yes',{type:'confirm',reviewId})
   f.actor('other');const foreign=await send(f,'Yes',{type:'confirm',reviewId},prepared.draft);assert.equal(foreign.result.ok,false);assert.equal(f.counts().postCalls,0)
   f.actor('owner');const confirmed=await send(f,'Yes',{type:'confirm',reviewId},prepared.draft)
   assert.equal(confirmed.result.ok,true);assert.equal(confirmed.result.assistantContext.steps[0].confirmedReviewId,reviewId)
@@ -74,6 +83,7 @@ async function main(){
   assert.equal(corrected.result.ok,true);assert.equal(corrected.result.needsReview,true);assert.equal(f.counts().postCalls,0)
   assert.notEqual(corrected.draft.assistantPlan.reviewId,oldReview)
   assert.equal((await send(f,'Yes',{type:'confirm',reviewId:oldReview},corrected.draft)).result.ok,false);assert.equal(f.counts().postCalls,0)
+  permitDecision(f,corrected.result.assistantContext,'Yes',{type:'confirm',reviewId:corrected.draft.assistantPlan.reviewId})
   const saved=await send(f,'Yes',{type:'confirm',reviewId:corrected.draft.assistantPlan.reviewId},corrected.draft)
   assert.equal(saved.result.ok,true);assert.equal(f.counts().postCalls,1);assert.equal(f.entries[0].content,'Corrected proposal.')
  })

@@ -22,6 +22,12 @@ function setup(){
 }
 const plan=content=>({type:'plan',steps:[{id:'note',operation:'journal.health.create',values:{content,localDate:'2026-10-17'}}]})
 let groups=0;async function check(name,work){await work();groups++;console.log('PASS '+name)}
+// Simulate only the server's separately verified, current pending job.
+function permitDecision(f,view,text,command){
+ const at=require('./voice-symptom-analysis-check.cjs').base.AuditDate.now()
+ const decisionReceipt=f.load('native-assistant-decision').issueAssistantDecisionReceipt({actorId:'owner',sessionId:'app-owned-session',reviewId:command.reviewId,revision:view.revision,text,decision:command.type,turnId:'synthetic-fresh-human-turn-'+view.revision+'-'+command.type,assessmentReceiptId:'synthetic-settled-decision-assessment-'+view.revision+'-'+command.type},{decision:command.type,directHuman:true,completeTurn:true,quoted:false,historical:false,injected:false,ambiguous:false,conditional:false,correcting:false,mixed:false},{secret:'synthetic-control-secret-not-production',nowMs:at})
+ f.db.db.voiceSessionRuntime.findMany=async()=>[{userId:'owner',state:'ready',expiresAt:new Date(at+120000),configuration:{assistantSessionId:'app-owned-session',deadlineMs:at+120000},toolJobs:{jobs:[{status:'pending',actualHumanText:text,args:{assistantCommand:command},decisionReceipt}]}}]
+}
 async function main(){
  await check('realtime structured requests preserve explicit and current consent before normal execution',async()=>{
   for(const mode of['missing','revoked']){
@@ -44,6 +50,7 @@ async function main(){
   const x=setup(),response=await x.route.POST(x.request({text:'PRIVATE_SYNTHETIC_SPEECH',command:plan('PRIVATE_SYNTHETIC_NOTE')})),prepared=await response.json()
   assert.equal(response.status,200);assert.equal(prepared.draft.canConfirm,true);assert.equal(x.f.counts().postCalls,0);assert.equal(prepared.chargedCredits,0)
   assert(base.tokens.verifyNativeVoiceDraft('owner',prepared.draft))
+  permitDecision(x.f,prepared.assistant,'Yes',{type:'confirm',reviewId:prepared.draft.assistantPlan.reviewId})
   const confirmed=await x.route.POST(x.request({text:'Yes',command:{type:'confirm',reviewId:prepared.draft.assistantPlan.reviewId}})),saved=await confirmed.json()
   assert.equal(confirmed.status,200);assert.equal(saved.assistant.status,'completed');assert.equal(saved.assistant.steps[0].confirmedReviewId,prepared.draft.assistantPlan.reviewId)
   assert.equal(x.f.entries[0].content,'PRIVATE_SYNTHETIC_NOTE');assert.equal(x.f.counts().postCalls,1);assert.equal(saved.chargedCredits,0)
@@ -54,6 +61,12 @@ async function main(){
   for(const event of x.events){assert.equal(event.costCents,0);assert.equal(event.model,'helfi-app-action');assert.equal(event.userId,'owner')}
   const serialized=JSON.stringify({logs:x.logs,events:x.events});assert(!serialized.includes('PRIVATE_SYNTHETIC'));assert(!serialized.includes(prepared.draft.reviewToken))
   const first=JSON.parse(x.logs[0][1]);assert.equal(first.status,'needs_review');assert.equal(first.action,'assistant_plan')
+ })
+ await check('an unsigned realtime Yes cannot bypass the server-owned pending decision job',async()=>{
+  const x=setup(),prepared=await(await x.route.POST(x.request({command:plan('Unsigned review remains unsaved.')}))).json()
+  const response=await x.route.POST(x.request({text:'Yes',command:{type:'confirm',reviewId:prepared.draft.assistantPlan.reviewId}}))
+  assert.equal(response.status,400);assert.equal(x.f.counts().postCalls,0);assert.equal(x.f.entries.length,0)
+  assert.equal(x.f.counts().plannerCalls,0);assert.equal(x.f.counts().providerCalls,0)
  })
  await check('the existing normal actor and exact review authorization cannot be bypassed through direct routing',async()=>{
   const x=setup(),prepared=await(await x.route.POST(x.request({command:plan('Private owned note.')}))).json()
