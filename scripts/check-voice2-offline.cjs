@@ -27,6 +27,7 @@ const checks = [
   ['voice2-food-actions-check.cjs'],
   ['voice2-food-normal-prepare-check.cjs'],
   ['voice2-food-normal-save-check.cjs'],
+  ['voice-food-source-storage-check.cjs'],
   ['voice2-food-clarification-check.cjs'],
   ['voice-recorded-counted-serving-check.cjs'],
   ['voice-food-lookup-dedup-check.cjs'],

@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS152 /0a300187e5ce89998caba348ebbe487bfda05989.
+- Date/time: 19October2026, verified03:31:02UTC.
+- What changed: Low reasoning on the existing backend planner and independent decision check, safe timing/phase diagnostics, and native63's accurate ended status/explicit retry. All120required suites/full production build passed; native types and both page locks passed. Worker0294732f12ac81bd3c3e959ca0a67388d4757b73e081097fba920c9fb8a87120 independently verified; no permission changes.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai both200/CloudFront/new matching ETag120hxsjne9h1z15/bodySHA829fbe09c039ff0ca2f268446ffc0111cb0e51d74eba215772abe3850c2c1e40.
+- What to quickly test: Actual call16 accepted separately signed spoken approval and created one normal breakfast row; exact assistant readback verification then failed. Normal Food UI reopens209kcal with100gfriedegg/1cupcoffee/30mlmilk. Do not replay the save or call voice accepted. Signed63 validated/uploaded but NOT distributed/installed; physical55. Readonly16-call totalUS$1.962393691667 booked plusUS$0.021779375held,0open/2uncertain. Customer50%profit remains unverified. Speakers muted and former test phrase excluded.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS151 /a2899d34b012a5be576690f83ae8d503989e9e90.
 - Date/time: 19October2026, verified03:06:07UTC.
 - What changed: Fresh authenticated native voice turns reset old local approval consumption; signed decision recovery binds the same immutable assessment/fence identity. Operator selection uses the larger of the same two existing fixed allowances, unchanged cap/expiry. BUILD/DEPLOY/VERIFY succeeded. Worker ZIPd964eed4df464300ff11306da5518d85b97b5c42712b3cad7c3341339d27c89a independently verified; existing permissions unchanged, code-only update after generic identical-policy rewrite was denied.

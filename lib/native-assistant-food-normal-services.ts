@@ -7,6 +7,23 @@ import { verifyNativeVoiceDraft } from './native-voice-review-token'
 const stable = (value: any): any => Array.isArray(value) ? value.map(stable) : value && typeof value === 'object' ? Object.fromEntries(Object.keys(value).filter(key => value[key] !== undefined).sort().map(key => [key, stable(value[key])])) : value
 const same = (a: any, b: any) => JSON.stringify(stable(a)) === JSON.stringify(stable(b))
 const fields = [['calories','calories_kcal'],['protein_g','protein'],['carbs_g','carbs'],['fat_g','fat'],['fiber_g','fiber'],['sugar_g','sugar']] as const
+const sourceNutrientFields = new Set<string>(fields.flatMap(keys => [...keys]))
+/** JSON storage can round a fractional source nutrient by one floating-point
+ * step. Keep source identity, portions, unknowns and structure exact; this is
+ * only a readback comparison, never permission to change a signed review. */
+function storedSourceMatches(actual: any, expected: any, field?: string): boolean {
+  if (typeof actual === 'number' || typeof expected === 'number') {
+    if (typeof actual !== 'number' || typeof expected !== 'number' || !Number.isFinite(actual) || !Number.isFinite(expected)) return false
+    if (actual === expected) return true
+    if (!sourceNutrientFields.has(field || '') || Number.isInteger(actual) || Number.isInteger(expected)) return false
+    return Math.abs(actual - expected) <= 2 * Number.EPSILON * Math.max(Math.abs(actual), Math.abs(expected))
+  }
+  if (actual === expected) return true
+  if (Array.isArray(actual) || Array.isArray(expected)) return Array.isArray(actual) && Array.isArray(expected) && actual.length === expected.length && actual.every((value, index) => storedSourceMatches(value, expected[index]))
+  if (!actual || !expected || typeof actual !== 'object' || typeof expected !== 'object') return false
+  const actualKeys = Object.keys(actual).filter(key => actual[key] !== undefined).sort(), expectedKeys = Object.keys(expected).filter(key => expected[key] !== undefined).sort()
+  return actualKeys.length === expectedKeys.length && actualKeys.every((key, index) => key === expectedKeys[index] && storedSourceMatches(actual[key], expected[key], key))
+}
 const nutrient = (row: any, keys: readonly string[]) => { const key = keys.find(key => Object.hasOwn(row || {}, key)); return key === undefined ? null : row[key] }
 function nutrientsMatch(actual: any, expected: any, roundedCalories = false) {
   return fields.every((keys, index) => {
@@ -20,9 +37,9 @@ function itemsMatch(actual: any, expected: any, diary: boolean) {
   if (!Array.isArray(actual) || !Array.isArray(expected) || actual.length !== expected.length) return false
   return actual.every((item, index) => {
     const reviewed = expected[index]
-    if (!item || !reviewed || !nutrientsMatch(item, reviewed) || !same(item.__voiceSourceFood, reviewed.__voiceSourceFood)) return false
+    if (!item || !reviewed || !nutrientsMatch(item, reviewed) || !storedSourceMatches(item.__voiceSourceFood, reviewed.__voiceSourceFood)) return false
     for (const key of ['requestedName','requestedAmount','nutritionCoversServing','estimatedPortion']) if (!same(item[key], reviewed[key])) return false
-    if (!diary) return same(item, reviewed)
+    if (!diary) return same({ ...item, __voiceSourceFood: reviewed.__voiceSourceFood }, reviewed)
     return item.servings === (reviewed.servings ?? 1) && String(item.serving_size || '') === String(reviewed.serving_size || reviewed.serving || reviewed.unit || reviewed.requestedAmount || '1 serving')
   })
 }

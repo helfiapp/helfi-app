@@ -1185,6 +1185,7 @@ for (const regression of [
   'voice2-food-clarification-check.cjs',
   'voice-food-source-choice-check.cjs',
   'voice-actual-catalog-source-check.cjs',
+  'voice-food-source-storage-check.cjs',
   'voice-food-lookup-deadline-check.cjs',
   'voice-recorded-counted-serving-check.cjs',
   'voice-food-lookup-dedup-check.cjs',
