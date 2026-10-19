@@ -1133,6 +1133,7 @@ for (const regression of [
   'voice-live-protocol-check.cjs',
   'voice-cost-policy-check.cjs',
   'voice-session-ledger-check.cjs',
+  'voice-operator-budget-renewal-check.cjs',
   'voice-session-control-check.cjs',
   'voice-session-control-routes-check.cjs',
   'voice-session-worker-check.cjs',

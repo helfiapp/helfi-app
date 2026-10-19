@@ -8,7 +8,7 @@ const costSource = fs.readFileSync(path.join(__dirname, '../lib/voice-cost-polic
 const U = 60000n, INFRA = 3000000000n
 const clone = value => structuredClone(value)
 function setup(options = {}) {
-  let clock = Date.parse('2026-10-17T18:00:00Z'), financialSequence = 0, queue = Promise.resolve(), ready = false
+  let clock = options.nowMs ?? Date.parse('2026-10-17T18:00:00Z'), financialSequence = 0, queue = Promise.resolve(), ready = false
   class FixtureDate extends Date { constructor(...args) { super(...(args.length ? args : [clock])) } static now() { return clock } }
   const calls = { events: [], posts: [], closes: [], settlements: [], finalizations: [], reserves: [], funding: 0, claims: 0, dispatches: 0, watchdogs: 0, logs: [], responses: [] }
   const runtime = new Map(), financial = new Map(), controller = new AbortController(), timers = new Set()
@@ -28,7 +28,7 @@ function setup(options = {}) {
   }, $executeRaw: async (_parts, account) => { assert.equal(account, userId); calls.events.push('account-lock'); return 1 },
   async $transaction(work) { const prior = queue; let release; queue = new Promise(resolve => { release = resolve }); await prior; try { return await work(db) } finally { release() } } }
   const ledger = {
-    async registerVoiceOperatorTestBudget(proof) { calls.funding++; assert.equal(proof.fundedUsdMicros, 1000000n); assert.equal(proof.accountId, userId); return { id: 'operator-funded-task' } },
+    async registerVoiceOperatorTestBudget(proof) { calls.funding++; assert.equal(proof.fundedUsdMicros, 1000000n); assert.equal(proof.accountId, userId); return { id: 'operator-funded-task', userId, kind: 'operator_test_budget', expiresAt: new FixtureDate(proof.expiresAtMs), providerBudgetCostUnits: 60000000000n, spentCostUnits: 0n, heldCostUnits: 0n, revokedAt: null } },
     async openVoiceBillingSession(input) {
       calls.claims++; calls.events.push('financial-claim')
       if (options.fundingRefused) throw Object.assign(Error('Synthetic unverified proceeds'), { code: 'voice_source_revenue_unverified' })
@@ -101,7 +101,7 @@ async function main() {
     assert.equal(body.helfiSession.marginBasis, '50_percent_realized_net'); assert.equal(f.calls.finalizations.length, 0)
   })
   await check('operator test expense is labeled separately from customer realized-net margin', async () => {
-    const f = setup({ operator: true }), body = await (await f.run()).json(); assert.equal(f.calls.funding, 1); assert.equal(body.helfiSession.marginBasis, 'operator_test_budget'); assert.equal(body.helfiSession.reservedCredits, 10)
+    const f = setup({ operator: true, nowMs: Date.parse('2026-10-19T00:30:00Z') }), body = await (await f.run()).json(); assert.equal(f.calls.funding, 1); assert.equal(body.helfiSession.marginBasis, 'operator_test_budget'); assert.equal(body.helfiSession.reservedCredits, 10)
   })
   await check('duplicate HTTP attempt never allocates or cleans up the original active call', async () => {
     const f = setup(); assert.equal((await f.run()).status, 200)

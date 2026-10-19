@@ -15,7 +15,17 @@ const VOICE_HOLD = 'voice-duration'
 const INFRA_HOLD = 'voice-infrastructure'
 const INFRA_UNITS = BigInt('3000000000') // Explicit conservative $0.05 service allocation, not an AWS invoice.
 const OPERATOR_ACCOUNT = 'cmcku4yvq000010l6z4ttp0ib'
-const OPERATOR_EXPIRY = Date.parse('2026-10-18T16:10:00Z')
+const OPERATOR_AUTHORIZED_AT = Date.parse('2026-10-19T00:30:00Z')
+const OPERATOR_EXPIRY = Date.parse('2026-10-20T00:25:00Z')
+// The owner approved US$3 TOTAL, including US$0.918289288333 already spent.
+// These two immutable US$1 lots keep historical + new authority below US$3.
+// Do not renew the expired 18 October lot or derive IDs from a call/date.
+const OPERATOR_AUTHORIZATIONS = Object.freeze(['owner-voice-repair-2026-10-19-allowance-1', 'owner-voice-repair-2026-10-19-allowance-2'])
+const OPERATOR_EVIDENCE = 'owner-explicit-usd3-total-voice-verification-2026-10-19T0030Z'
+const BACKEND_RESERVE_UNITS = BigInt('1800000000')
+const SHUTDOWN_RESERVE_MS = 60000
+const MINIMUM_DURATION_MS = 15000
+const MINIMUM_OPERATOR_BUDGET = INFRA_UNITS + BACKEND_RESERVE_UNITS + liveVoiceCostUnits({ model: 'gpt-live-1', allocated: true, durationMs: BigInt(MINIMUM_DURATION_MS + SHUTDOWN_RESERVE_MS) })
 export const VOICE_WORKER_PRICING = Object.freeze({ scale: '60000000000', voiceUnitsPerSecond: '50000000', inputUnitsPerToken: '6000', cachedInputUnitsPerToken: '600', cacheWriteUnitsPerToken: '7500', outputUnitsPerToken: '30000', longInputUnitsPerToken: '12000', longCachedInputUnitsPerToken: '1200', longCacheWriteUnitsPerToken: '15000', longOutputUnitsPerToken: '45000' })
 const hash = (value: unknown) => crypto.createHash('sha256').update(JSON.stringify(value)).digest('hex')
 
@@ -67,9 +77,17 @@ export async function startMeteredLiveVoiceSession(input: { request: NextRequest
     // for the account until the preceding one is verified closed.
     await allocationGate(userId)
     let operatorFundingId: string | undefined
-    if (userId === OPERATOR_ACCOUNT && Date.now() < OPERATOR_EXPIRY) {
-      const funding = await registerVoiceOperatorTestBudget({ kind: 'operator_test_budget', accountId: userId, authorizationId: 'owner-voice-repair-2026-10-18', fundingEvidenceId: 'owner-explicit-paid-voice-verification-2026-10-18', fundingConfirmed: true, fundedUsdMicros: BigInt(1000000), expiresAtMs: OPERATOR_EXPIRY })
-      operatorFundingId = funding.id
+    if (userId === OPERATOR_ACCOUNT && Date.now() >= OPERATOR_AUTHORIZED_AT && Date.now() < OPERATOR_EXPIRY) {
+      for (const authorizationId of OPERATOR_AUTHORIZATIONS) {
+        const funding = await registerVoiceOperatorTestBudget({ kind: 'operator_test_budget', accountId: userId, authorizationId, fundingEvidenceId: OPERATOR_EVIDENCE, fundingConfirmed: true, fundedUsdMicros: BigInt(1000000), expiresAtMs: OPERATOR_EXPIRY })
+        // This is only selection. The existing ledger rechecks and reserves
+        // the same lot atomically, so concurrent calls cannot overspend it.
+        if (funding.userId === userId && funding.kind === 'operator_test_budget' && !funding.revokedAt && new Date(funding.expiresAt).getTime() === OPERATOR_EXPIRY && BigInt(funding.providerBudgetCostUnits) === BigInt('60000000000') && BigInt(funding.spentCostUnits) >= BigInt(0) && BigInt(funding.heldCostUnits) >= BigInt(0) && BigInt(funding.providerBudgetCostUnits) - BigInt(funding.spentCostUnits) - BigInt(funding.heldCostUnits) >= MINIMUM_OPERATOR_BUDGET) {
+          operatorFundingId = funding.id
+          break
+        }
+      }
+      if (!operatorFundingId) throw Object.assign(new Error('operator_budget_exhausted'), { code: 'operator_budget_exhausted' })
     }
     const reserveCredits = operatorFundingId ? 10 : Math.min(100, Math.floor(Number(wallet.totalAvailableCents)))
     const expiresAt = new Date(started + 12 * 60_000)
@@ -82,10 +100,10 @@ export async function startMeteredLiveVoiceSession(input: { request: NextRequest
     // It is never represented as an observed AWS invoice. Reserve it before
     // doing that work, and settle it even when no provider ID is returned.
     await reserveVoiceSessionCost({ userId, sessionId, key: INFRA_HOLD, kind: 'service_overhead_allocation', maxCostUnits: INFRA_UNITS })
-    const affordableMs = Number((BigInt(financial.providerBudgetCostUnits) - INFRA_UNITS - BigInt('1800000000')) / BigInt(50000)) - 60000
+    const affordableMs = Number((BigInt(financial.providerBudgetCostUnits) - INFRA_UNITS - BACKEND_RESERVE_UNITS) / BigInt(50000)) - SHUTDOWN_RESERVE_MS
     const durationMs = Math.min(120000, Math.floor(affordableMs))
-    if (durationMs < 15000) throw Object.assign(new Error('voice_budget_exhausted'), { code: 'voice_budget_exhausted' })
-    const voiceUnits = liveVoiceCostUnits({ model: 'gpt-live-1', allocated: true, durationMs: BigInt(durationMs + 60000) })
+    if (durationMs < MINIMUM_DURATION_MS) throw Object.assign(new Error('voice_budget_exhausted'), { code: 'voice_budget_exhausted' })
+    const voiceUnits = liveVoiceCostUnits({ model: 'gpt-live-1', allocated: true, durationMs: BigInt(durationMs + SHUTDOWN_RESERVE_MS) })
     // A repeated HTTP attempt never creates another provider connection.
     const existingRuntime = await db.voiceSessionRuntime.findUnique({ where: { sessionId } })
     if (existingRuntime) throw new Error('voice_runtime_claim_conflict')

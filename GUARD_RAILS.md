@@ -1,5 +1,7 @@
 ## Voice spoken result truthfulness (18 October 2026)
 
+- On19October the owner explicitly approved US$3 TOTAL for the current voice verification, including US$0.918289288333 already booked. The18October US$1 lot is expired and immutable. Only the two fixed19October US$1 authorizations may add test authority, expiring20October00:25UTC; historical plus new authority stays below US$3. Never replenish, extend or derive new per-call/day authorizations. This separate expense is not customer purchase proceeds or proof of50% profit. Retain the normal atomic spent-plus-held limit and refuse before paid allocation when neither lot covers the minimum call.
+
 - Actual Release59 / AWS145 testing found that Live called an unsubmitted Health Journal review a saved draft. The normal app had not saved it. Backend review instructions alone do not establish what the voice says.
 - Pass canonical saved/safe-to-claim-saved/review/uncertain state to the speaking model with every result. Keep those facts when a long result needs a bounded screen-review fallback; never substitute a truncated literal note for a complete review. Full owned tool results and exact review IDs remain in backend history.
 - Only canonical verified current receipts permit saved language. An unsubmitted review is not a durable draft. Earlier completed steps cannot authorize a later pending review, and a later no-tool model answer cannot silently clear its state. A caption alone is not evidence of a delegated or completed app action.

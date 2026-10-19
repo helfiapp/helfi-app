@@ -1,3 +1,16 @@
+## Voice continuation — 19 October 2026
+
+- Owner renewed the physicaliPhone update request and explicitly approved US$3TOTALtestexpenseincluding priorUS$0.918289288333. Freshreadonlyaudit still8closed/80testcredits,0open/uncertain/unsettled. The18October allowance expired; do not modify or extend that record. Narrow startup renewal adds atmosttwo fixedUS$1lots for the same test account, fixedexpiry20October00:25UTC; totalhistoricalplusnew authority<=US$2.918289288333. Root is integrating/testing; no newbudget deployment or paidcall yet.
+- ExistingChrome normalGoogle sign-in recovered Helfi OpenAI billing. Actualorganization balance US$4.93, auto-reloadOFF, observed19Octoberaround11:33Melbourne. Balance is shared acrossOpenAIfeatures and distinct from the testcap. No purchase, APIkeyread/export or directproviderbillingcall occurred. Private screenshot: /Users/louieveleski/.config/helfi/private-verification/2026-10-19-voice-final/openai-balance.png.
+- PhysicaliPhone mirroring is connected; TestFlight visiblyshows55. Prepared59/f82 signedandApplevalidated remainsunuploaded/undistributed; no updateclaim. Finalspokenreview/Yes/save/reopen is required. ActualRelease59simulator is stillbooted/signedin on HealthJournalHistory. DesignManager notifiedtoavoidoverlap;47pendingfilesremainpreserved.
+
+## Voice checkpoint — 18 October 2026, 08:24 UTC
+
+- LIVE server f82fe4e7 / AWS146 and matching worker ZIPaac040f13a843dc2a3ef64960b8b077614167e3ece8c30b45f7da043bb2045ee are verified. Both domains serve matching new CloudFront content; public Live readiness passes. Canonical spoken-result state repair passes eight new groups, existing worker/boundary/transport/protocol, types, locks and full production build.
+- Fresh signed Release59 IPA08920965df1aa9412e0562b7c8e491703381988ca61b4c05911957d9fdde0edb belongs to f82fe4e7 and passed Apple validation. Its native JavaScript bundle is byte-identical to the previously tested59. No Apple upload, internal distribution or phone installation has happened. Physical iPhone last55. Do not call spoken confirmation/save or phone readiness verified.
+- Eight closed calls remain US$0.918289288333/80operator credits; remaining shared US$1 allowance is US$0.081710711667. Owner answer to proposed US$3 total test cap is pending. Do not extend or replenish the existing immutable budget, run a new paid call, or treat test expenses as customer revenue while awaiting that answer. Actual retained customer purchase proceeds/fees remain unverified; do not claim50% profit.
+- HEADf82fe4e7 must remain frozen through final archive/upload identity checks. These deployment notes are intentionally local after the exact release commit. Correct47-file Design isolation remains active; Design Manager is notified and idle. Preserve the original approved AWS isolation manifest and hard design locks.
+
 ## Voice verification checkpoint — 18 October 2026, 08:06 UTC
 
 - Server c9a57b4 / AWS145 is verified on both live domains. Release59 was signed and passed Apple validation but is held, unuploaded and undistributed; physical iPhone last verified55. Do not claim it is ready on the phone.

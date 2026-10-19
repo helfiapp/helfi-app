@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS146 / f82fe4e7bb75d99e3483dbb001ce243231d2dc18.
+- Date/time: 18 October 2026, verified08:24 UTC.
+- What changed: Every spoken app result carries canonical saved/review/uncertain facts, including bounded long-review fallbacks and later human replies. The speaking instructions distinguish unsaved review from saved drafts. Original shutdown causes survive provider acknowledgement. Worker ZIPaac040f13a843dc2a3ef64960b8b077614167e3ece8c30b45f7da043bb2045ee applied and canonical verified. BUILD/DEPLOY/VERIFY all succeeded.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai both200 through CloudFront, matching new ETagum1miz22r81z15. Public Live readiness passes.
+- What to quickly test: Eight new offline state groups, existing worker/transport/boundary/protocol checks and complete production build pass. Fresh signed59 matches this source and passed Apple validation; its native bundle is byte-identical to the earlier59. It is NOT uploaded/distributed/installed. Actual spoken review→Yes→save/reopen must still pass; paid test allowance increase is awaiting the owner. No new calls since the eight settled tests, US$0.918289288333/80operator credits. Customer50% margin is not verified.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE, AWS Amplify145, exact source c9a57b4ab6ffb3cf53c4c9b86857aa4f3b6bb745.
 - Date/time: 18 October 2026; all BUILD/DEPLOY/VERIFY steps and both CloudFront domains verified before the Release59 call.
 - What changed: Generic preparation of unsaved reviews across registered writes; local native voice-cost settlement observer and credit value refresh included in the same source. Packaged59 remains held and has not been uploaded or installed on the owner's phone.
