@@ -1117,6 +1117,9 @@ function buildIngredientLookupQueries(query: string) {
   }
 
   add(strippedQuery)
+  // Retrieval must use the same identity-preserving spelling/descriptor
+  // normalization as candidate validation. Keep the literal query as well.
+  add(ordinaryVoiceMatchText(strippedQuery, true))
   add(singularFoodText(strippedQuery))
   if (strippedQuery.includes('greek yogurt') || strippedQuery.includes('greek yoghurt')) {
     add('greek yogurt')
@@ -4078,18 +4081,24 @@ function voiceSugarVariant(value: unknown) {
   return found.length > 1 ? 'ambiguous' : found[0] || null
 }
 
-function voiceOrdinaryIdentityMatches(query: string, item: any) {
-  const normalize = (value: unknown) => singularFoodText(String(value || ''))
+function ordinaryVoiceMatchText(value: unknown, requested = false) {
+  let text = singularFoodText(String(value || ''))
     .replace(/\b(?:yoghurt|yoghurts)\b/g, 'yogurt').replace(/\bnashi\b/g, 'asian pear')
     .replace(/\bfull cream\b/g, 'whole').replace(/\b(?:skim|skimmed|fat free)\b/g, 'nonfat')
     .replace(/\b(almond|oat|soy|coconut|rice|cashew|hemp|pea|macadamia)milk\b/g, '$1 milk')
     .replace(/\bof\b/g, ' ').replace(/\s+/g, ' ').trim()
-  let requested = normalize(query)
+  if (requested && /\bcoffee\b/.test(text)) text = text.replace(/\bblack\b/g, ' ').replace(/\s+/g, ' ').trim()
+  return text
+}
+
+function voiceOrdinaryIdentityMatches(query: string, item: any) {
+  const normalize = ordinaryVoiceMatchText
+  let requested = normalize(query, true)
   const candidate = normalize(item?.name)
   if (!requested || !candidate) return false
   const sugar = /\bsugar\b/.test(requested)
   const aliases = Array.isArray(item?.__voiceSourceAliases) ? item.__voiceSourceAliases : Array.isArray(item?.aliases) ? item.aliases : []
-  const sweetenerIdentity = sugar ? `${candidate} ${aliases.map(normalize).join(' ')}` : candidate
+  const sweetenerIdentity = sugar ? `${candidate} ${aliases.map((value: unknown) => normalize(value)).join(' ')}` : candidate
   if (sugar) {
     const requestedVariant = voiceSugarVariant(requested) || 'granulated'
     const actualVariant = voiceSugarVariant(sweetenerIdentity)
@@ -4165,11 +4174,33 @@ function chooseBestFoodMatch(query: string, items: any[], ingredient?: any) {
   return best && best.score > 12 ? best.item : null
 }
 
-async function findExactCustomPlainFood(lookupQueries: string[], ingredient?: any) {
+function createVoiceFoodLookupScope(milliseconds: number) {
+  const controller = new AbortController(), deadline = Date.now() + milliseconds
+  let expired = false, closed = false
+  const failure = () => Object.assign(new Error('The food lookup reached its time limit.'), { code: 'voice_food_lookup_deadline' })
+  const isExpired = () => { if (Date.now() >= deadline) { expired = true; controller.abort() }; return expired }
+  let timer: ReturnType<typeof setTimeout>
+  const timeout = new Promise<never>((_resolve, reject) => { timer = setTimeout(() => { expired = true; controller.abort(); reject(failure()) }, milliseconds) })
+  // A scope may complete from a trusted retained source without starting I/O.
+  void timeout.catch(() => {})
+  return {
+    signal: controller.signal, isExpired,
+    async run<T>(work: () => Promise<T>): Promise<T> {
+      if (closed || isExpired()) throw failure()
+      const result = await Promise.race([Promise.resolve().then(() => { if (closed || isExpired()) throw failure(); return work() }), timeout])
+      if (closed || isExpired()) throw failure()
+      return result
+    },
+    close() { closed = true; clearTimeout(timer!); controller.abort() },
+  }
+}
+
+async function findExactCustomPlainFood(lookupQueries: string[], ingredient?: any, scope?: ReturnType<typeof createVoiceFoodLookupScope>) {
   for (const lookupQuery of lookupQueries) {
+    if (scope?.isExpired()) return null
     const queryName = singularFoodText(lookupQuery)
     if (!queryName) continue
-    const customRows = await searchCustomFoodMacros(lookupQuery, 20, { allowTypo: false }).catch(() => [])
+    const customRows = await (scope ? scope.run(() => searchCustomFoodMacros(lookupQuery, 20, { allowTypo: false })) : searchCustomFoodMacros(lookupQuery, 20, { allowTypo: false })).catch(() => [])
     const exact = customRows
       .map(normalizeFoodItem)
       .filter(Boolean)
@@ -4181,10 +4212,13 @@ async function findExactCustomPlainFood(lookupQueries: string[], ingredient?: an
   return null
 }
 
-async function findOrdinaryVoiceFood(ingredient: any, country: string | undefined, lookupQueries: string[]) {
+async function findOrdinaryVoiceFood(ingredient: any, country: string | undefined, lookupQueries: string[], existingScope?: ReturnType<typeof createVoiceFoodLookupScope>) {
+  const scope = existingScope || createVoiceFoodLookupScope(6000)
+  try {
   const seenDetails = new Set<string>()
   const seenQueries = new Set<string>()
   for (const external of [false, true]) for (const query of lookupQueries) {
+    if (scope.isExpired()) return null
     // Hyphen/case/spacing variants are the same catalog search. Keep genuinely
     // different words and singular/plural queries, and the local-first order.
     const equivalentQuery = String(query).toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()
@@ -4200,8 +4234,8 @@ async function findOrdinaryVoiceFood(ingredient: any, country: string | undefine
     url.searchParams.set('limit', '50')
     if (!external) url.searchParams.set('localOnly', '1')
     if (country) url.searchParams.set('country', country)
-    const response = await searchDiaryFoods(new NextRequest(url))
-    const payload = await response.json().catch(() => ({}))
+    const response = await scope.run(() => searchDiaryFoods(new NextRequest(url, { signal: scope.signal })))
+    const payload = await scope.run(() => response.json()).catch(() => ({}))
     if (!response.ok) continue
     const candidates = (Array.isArray(payload.items) ? payload.items : [])
       .filter((item: any) => voiceOrdinaryIdentityMatches(ingredient.name, item))
@@ -4223,8 +4257,8 @@ async function findOrdinaryVoiceFood(ingredient: any, country: string | undefine
       const servingUrl = new URL('https://helfi.ai/api/food-data/servings')
       servingUrl.searchParams.set('source', item.source)
       servingUrl.searchParams.set('id', String(item.id))
-      const servingResponse = await searchDiaryFoodServings(new NextRequest(servingUrl))
-      const details = await servingResponse.json().catch(() => ({}))
+      const servingResponse = await scope.run(() => searchDiaryFoodServings(new NextRequest(servingUrl, { signal: scope.signal })))
+      const details = await scope.run(() => servingResponse.json()).catch(() => ({}))
       if (!servingResponse.ok || details.source && details.source !== item.source) continue
       const enriched = { ...item, servingOptions: [...(Array.isArray(item.servingOptions) ? item.servingOptions : []), ...(Array.isArray(details.options) ? details.options : [])] }
       const compatible = compatibleOrdinaryVoiceFood(ingredient.name, enriched, ingredient)
@@ -4236,6 +4270,7 @@ async function findOrdinaryVoiceFood(ingredient: any, country: string | undefine
     }
   }
   return null
+  } finally { if (!existingScope) scope.close() }
 }
 
 function itemCore(item: any, grams: number, servingRatio?: number) {
@@ -4517,6 +4552,10 @@ async function findFoodIngredient(query: string, country?: string, ingredient?: 
     if (previous) return previous
   }
   if (ingredient?.requiresSourceServing || isPreparedVoiceFood(query)) return findPreparedVoiceFood(ingredient || { name: query, quantity: 1, unit: 'each', brand: voiceRestaurantBrand(query), requiresSourceServing: true }, country)
+  // Six seconds cover the complete ordinary resolution lane; structured source
+  // alternatives below have a separate two-second total read-only allowance.
+  const scope = createVoiceFoodLookupScope(6000)
+  try {
   if (ingredient) {
     const previous = (Array.isArray(trustedItems) ? trustedItems : []).map(item => item?.__voiceSourceFood)
       .map(source => source && !(/\b(?:sugar|honey)\b/i.test(query) && source.source === 'custom') ? compatibleOrdinaryVoiceFood(query, source, ingredient) : null).find(Boolean)
@@ -4527,44 +4566,48 @@ async function findFoodIngredient(query: string, country?: string, ingredient?: 
     // Imported custom rows may share the generic name Sugar while representing
     // different forms. Prefer the normal authoritative USDA source before them.
     for (const lookupQuery of lookupQueries) {
-      const local = await searchLocalFoods(lookupQuery, { pageSize: 30, mode: 'prefix-contains', sources: ['usda_foundation', 'usda_sr_legacy'] })
+      const local = await scope.run(() => searchLocalFoods(lookupQuery, { pageSize: 30, mode: 'prefix-contains', sources: ['usda_foundation', 'usda_sr_legacy'] }))
       const authoritative = chooseBestFoodMatch(lookupQuery, local, ingredient)
       if (authoritative) return authoritative
     }
   }
-  const exactCustomMatch = await findExactCustomPlainFood(lookupQueries, ingredient)
+  const exactCustomMatch = await findExactCustomPlainFood(lookupQueries, ingredient, scope)
   if (exactCustomMatch) return exactCustomMatch
 
   if (compactFoodMatchText(query).includes('egg')) {
-    const wholeEggRows = await prisma.foodLibraryItem.findMany({
+    const wholeEggRows = await scope.run(() => prisma.foodLibraryItem.findMany({
       where: {
         name: { contains: 'Egg, whole', mode: 'insensitive' },
         source: { in: ['usda_foundation', 'usda_sr_legacy'] },
       },
       take: 12,
       orderBy: { name: 'asc' },
-    })
+    }))
     const wholeEggMatch = chooseBestFoodMatch(query, wholeEggRows.map(normalizeLibraryFoodItem).filter(Boolean), ingredient)
     if (wholeEggMatch) return wholeEggMatch
   }
 
   for (const lookupQuery of lookupQueries) {
-    const local = await searchLocalFoods(lookupQuery, {
+    const local = await scope.run(() => searchLocalFoods(lookupQuery, {
       pageSize: 18,
       mode: 'prefix-contains',
       sources: ['usda_foundation', 'usda_sr_legacy'],
-    })
+    }))
     const localMatch = chooseBestFoodMatch(lookupQuery, local, ingredient)
     if (localMatch) return localMatch
   }
 
   for (const lookupQuery of lookupQueries) {
-    const custom = await searchCustomFoodMacros(lookupQuery, 12, { allowTypo: true }).catch(() => [])
+    const custom = await scope.run(() => searchCustomFoodMacros(lookupQuery, 12, { allowTypo: true })).catch(() => [])
     const customMatch = chooseBestFoodMatch(lookupQuery, custom.map(normalizeFoodItem).filter(Boolean), ingredient)
     if (customMatch) return customMatch
   }
 
-  return ingredient ? findOrdinaryVoiceFood(ingredient, country, lookupQueries) : null
+  return ingredient ? await findOrdinaryVoiceFood(ingredient, country, lookupQueries, scope) : null
+  } catch (error: any) {
+    if (scope.isExpired() || error?.code === 'voice_food_lookup_deadline') return null
+    throw error
+  } finally { scope.close() }
 }
 
 async function buildVoiceMealDraft(parsedFood: any, transcript: string, localDate: string, country?: string, trustedItems?: any[]) {
@@ -6532,6 +6575,45 @@ function needsReviewedAppControl(transcript: string, hint?: RealtimeActionHint |
 
 /** General-assistant structured source preparation. This path never enters
  * language intent parsing, transcription, AI completion, TTS or credit charging. */
+async function structuredFoodSourceChoices(values: any, indices: number[]) {
+  const choices: any[] = []
+  const scope = createVoiceFoodLookupScope(2000)
+  try {
+  for (const ingredientIndex of indices.slice(0, 3)) {
+    if (scope.isExpired()) break
+    const ingredient = values.ingredients[ingredientIndex]
+    const requested = ordinaryVoiceMatchText(ingredient.name, true)
+    // A compound request must be separated into its stated ingredients, not
+    // replaced by a catalog record for just one component.
+    if (/\b(?:with|and|plus)\b/.test(requested) || ingredient.brand || isPreparedVoiceFood(ingredient.name)) continue
+    const tokens = [...new Set(requested.split(' ').filter((token: string) => token.length > 1 && !/^\d+$/.test(token)))] as string[]
+    const metadata = new Set(['raw','uncooked','cooked','whole','fresh','fried','boiled','poached','scrambled','grilled','roasted','baked','steamed','dried','powdered','small','medium','large','extra','regular','nut','seed','fruit','vegetable','beverage','spice'])
+    const candidates = new Map<string, any>()
+    for (const token of [...tokens].reverse().filter(token => !metadata.has(token)).slice(0, 3)) {
+      const rows = await scope.run(() => searchLocalFoods(token, { pageSize: 20, mode: 'prefix-contains', sources: ['usda_foundation', 'usda_sr_legacy'] })).catch(() => [])
+      if (scope.isExpired()) break
+      for (const item of rows) {
+        if (item.source !== 'usda' || !item.id || !item.name || item.name.length > 200 || !hasCoreNutrition(item) || !voiceOrdinaryIdentityMatches(token, item)) continue
+        const candidate = ordinaryVoiceMatchText(item.name)
+        const primary = candidate.split(' ').find(word => !metadata.has(word))
+        if (!primary || !tokens.includes(primary)) continue
+        const methods = ['raw','uncooked','fried','boiled','poached','scrambled','grilled','roasted','baked','steamed','dried','powdered','instant','decaf','decaffeinated']
+        if (methods.some(method => new RegExp(`\\b${method}\\b`).test(requested) && !new RegExp(`\\b${method}\\b`).test(candidate))) continue
+        const words = new Set(candidate.split(' '))
+        const overlap = tokens.filter(word => words.has(word)).length
+        const key = `${item.source}:${item.id}`
+        candidates.set(key, { item, overlap, unmatchedTerms: tokens.filter(word => !words.has(word)) })
+      }
+    }
+    const options = [...candidates.values()].sort((a, b) => b.overlap - a.overlap || String(a.item.name).localeCompare(String(b.item.name))).slice(0, 3)
+      .map(({ item, unmatchedTerms }) => ({ source: 'usda', id: String(item.id), name: item.name, servingSize: String(item.serving_size || ''), unmatchedTerms }))
+    if (options.length) choices.push({ ingredientIndex, requestedName: ingredient.name, quantity: ingredient.quantity, unit: ingredient.unit, options })
+  }
+  return choices
+  } catch { return choices }
+  finally { scope.close() }
+}
+
 async function prepareStructuredAssistantFood(request: NextRequest, actorId: string, operation: unknown, rawValues: unknown): Promise<AssistantFoodPreparation> {
   const values = validateAssistantFoodServiceValues(operation, rawValues)
   const batches: any[] = []
@@ -6541,7 +6623,8 @@ async function prepareStructuredAssistantFood(request: NextRequest, actorId: str
     if (built?.canConfirm === false && ['food_source_unavailable', 'food_serving_unavailable', 'food_amount_ambiguous'].includes(built.reasonCode)) {
       const resolved = built.food?.items || []
       const missing = requested.flatMap((ingredient, index) => resolved.some((item: any) => item.requestedName === ingredient.name && item.requestedAmount === ingredient.display) ? [] : [offset + index])
-      throw assistantFoodNeedsDetails(values, missing, built.reasonCode === 'food_source_unavailable' ? 'source' : 'portion')
+      const sourceMissing = built.reasonCode === 'food_source_unavailable'
+      throw assistantFoodNeedsDetails(values, missing, sourceMissing ? 'source' : 'portion', sourceMissing ? await structuredFoodSourceChoices(values, missing) : undefined)
     }
     if (!built?.canConfirm || built.autoSave === true || !built.food || built.food.items?.length !== requested.length || built.food.meal !== values.meal) throw new Error('Every measured ingredient needs its exact normal food source before review.')
     const estimated = built.food.items.flatMap((item: any, index: number) => item.estimatedPortion === true ? [offset + index] : [])
@@ -6590,7 +6673,7 @@ export async function POST(request: NextRequest) {
         const preparation = await prepareStructuredAssistantFood(request, user.id, structured.structuredFood.operation, structured.structuredFood.values)
         return NextResponse.json({ success: true, preparation, chargedCredits: 0 })
       } catch (error: any) {
-        if (error instanceof AssistantContractError && error.code === 'missing_fields') return NextResponse.json({ error: error.message, code: 'missing_fields', fields: error.fields }, { status: 422 })
+        if (error instanceof AssistantContractError && error.code === 'missing_fields') return NextResponse.json({ error: error.message, code: 'missing_fields', fields: error.fields, ...(Array.isArray((error as any).choices) && (error as any).choices.length ? { choices: (error as any).choices } : {}) }, { status: 422 })
         return NextResponse.json({ error: cleanText(error?.message, 500) || 'The exact measured meal could not be prepared.' }, { status: 400 })
       }
     }

@@ -1,4 +1,11 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — AWS148 /55cec8aebae6f176d568294a4c6f990225f71a1a.
+- Date/time: 19 October 2026, verified01:15:57UTC.
+- What changed: Owned pending-review routing, signed metered semantic decisions, exact review fences and publication-race protection. Worker16e56bb31ebd13c7f601f97b4edd87e22c6657cdd5d9012ae169b805ff0b82f0 applied and verified; all AWS steps succeeded.
+- Where to see it (page/link): https://helfi.ai and https://www.helfi.ai both200/CloudFront, matching new ETag16lspk1ev8i1z15/bodySHA c214562f2a1673085abc5946869f205b6a18db1d5e19363b2fd2f0f730c2fe2d.
+- What to quickly test: Call10 journal correction/separate spoken approval/one save/normal History reopen passed. Call11 food still requested already supplied details; no meal saved. One interrupted backend cost remains fully held. Native59 uploaded/processed but not distributed; physical phone remains55. Further repair/testing is in progress; customer50% profit is not verified.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 19 October 2026, 11:45 AEDT (verification)
 - What changed: Owner-approved one-off voice test authority; exactly two new fixed US$1 test lots, historical US$0.918289288333 remains included below the US$3 total ceiling. No customer pricing or native UI change.

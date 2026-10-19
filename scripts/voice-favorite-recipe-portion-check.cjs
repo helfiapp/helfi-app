@@ -9,7 +9,7 @@ const compile=source=>ts.transpileModule(source,{compilerOptions:{target:ts.Scri
 function pure(relative){const module={exports:{}};vm.runInNewContext(compile(fs.readFileSync(path.join(root,relative),'utf8')),{module,exports:module.exports,URL,crypto,Buffer,process:{env:{NODE_ENV:'test'}},require:name=>{if(name==='crypto')return crypto;throw Error('Imports forbidden')}});return module.exports}
 const readAst=relative=>{const raw=fs.readFileSync(path.join(root,relative),'utf8');return ts.createSourceFile(relative,raw,ts.ScriptTarget.Latest,true)}
 const route=readAst('app/api/native/voice-assistant/route.ts'),confirm=readAst('app/api/native/voice-assistant/confirm/route.ts')
-const box=vm.createContext({...pure('lib/native-voice-spoken-quantities.ts'),...pure('lib/native-voice-recipe-metadata.ts'),URL,Date,crypto,Prisma:{JsonNull:null},console,fetch:()=>{throw Error('Network forbidden')}})
+const box=vm.createContext({...pure('lib/native-voice-spoken-quantities.ts'),...pure('lib/native-voice-recipe-metadata.ts'),URL,Date,crypto,AbortController,setTimeout,clearTimeout,Prisma:{JsonNull:null},console,fetch:()=>{throw Error('Network forbidden')}})
 vm.runInContext(compile(route.statements.filter(n=>ts.isFunctionDeclaration(n)).map(n=>n.getText(route).replace(/^export\s+/,'')).join('\n')),box)
 vm.runInContext(compile(confirm.statements.filter(n=>ts.isFunctionDeclaration(n)&&['saveFavoriteFood','reviewedTimestamp','localDate','mealTargetFromText'].includes(n.name.text)).map(n=>n.getText(confirm)).join('\n')),box)
 const tokens=pure('lib/native-voice-review-token.ts')

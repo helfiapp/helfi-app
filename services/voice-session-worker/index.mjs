@@ -21,6 +21,31 @@ const units = value => typeof value === 'string' && /^\d{1,30}$/.test(value) ? B
 const fail = code => { throw new Error(code) }
 const pause = ms => new Promise(resolve => setTimeout(resolve, ms))
 
+// This is a rendering of already validated catalog choices, not a summary of
+// a review or permission to substitute a food. Whole source/request names are
+// preserved. Unknown shapes always use the ordinary safe UI fallback.
+function foodSourceClarificationSpeech(rows) {
+  const keys = (value, expected) => value && typeof value === 'object' && !Array.isArray(value) && Object.keys(value).length === expected.length && expected.every(key=>Object.hasOwn(value,key))
+  const text = (value, maximum) => typeof value === 'string' && value.length > 0 && value.length <= maximum && value.trim() === value && !/[\x00-\x1f\x7f]/.test(value)
+  if(rows.length!==1)return[]
+  const row=rows[0],state=row.assistantState
+  if(row.ok!==true||row.saved!==false||row.safeToClaimSaved!==false||row.needsReview!==false||row.status!=='needs_clarification'||row.action!=='assistant_plan'||!number(state?.revision)||state.revision<1||!Array.isArray(state.currentStepIds)||state.currentStepIds.length!==1||!opaqueSourceStep(state.currentStepIds[0])||!Array.isArray(state.steps))return[]
+  const selected=state.steps.filter(step=>step?.id===state.currentStepIds[0])
+  if(selected.length!==1)return[]
+  const step=selected[0],clarification=step.clarification
+  if(state.steps.some(other=>other!==step&&!['completed','cancelled'].includes(other?.status)))return[]
+  if(step.status!=='needs_details'||!['food.diary.create','recipe.library.create','food.recipe.log'].includes(step.operation)||step.review||step.recoveryActionId||!keys(clarification,['message','choices'])||typeof clarification.message!=='string'||!Array.isArray(clarification.choices)||clarification.choices.length!==1)return[]
+  const choice=clarification.choices[0]
+  if(!keys(choice,['ingredientIndex','requestedName','quantity','unit','options'])||!number(choice.ingredientIndex)||choice.ingredientIndex>99||!text(choice.requestedName,200)||typeof choice.quantity!=='number'||!Number.isFinite(choice.quantity)||choice.quantity<=0||!text(choice.unit,30)||!Array.isArray(choice.options)||choice.options.length<1||choice.options.length>3)return[]
+  const ids=new Set()
+  for(const option of choice.options){
+    if(!keys(option,['source','id','name','servingSize','unmatchedTerms'])||option.source!=='usda'||!text(option.id,200)||ids.has(option.id)||!text(option.name,200)||!text(option.servingSize,200)||option.name.toLocaleLowerCase()===choice.requestedName.toLocaleLowerCase()||!Array.isArray(option.unmatchedTerms)||option.unmatchedTerms.length<1||option.unmatchedTerms.length>30||option.unmatchedTerms.some(term=>!text(term,100)))return[]
+    ids.add(option.id)
+  }
+  return choice.options.map(option=>`“${option.name}” is a different alternative to “${choice.requestedName}”, not an exact match. Use it instead? Full choices are in Helfi. Nothing is saved.`)
+}
+const opaqueSourceStep = value => typeof value === 'string' && /^[A-Za-z0-9_-]{1,80}$/.test(value)
+
 /** Facts come from canonical app receipts, never from backend prose. Keep these
  * facts intact even when a long literal result must be read in the normal UI. */
 export function buildLiveVoiceResultContext(speech, results = [], prior = {}) {
@@ -59,13 +84,16 @@ export function buildLiveVoiceResultContext(speech, results = [], prior = {}) {
   const envelope = { type: 'helfi_app_result', saved, safeToClaimSaved, needsReview, unverified, status, instruction, speech: typeof speech === 'string' ? speech : '' }
   let content = JSON.stringify(envelope)
   if (bytes(content) > 500) {
+    const compact = !saved && !safeToClaimSaved && !unverified && needsReview === false && needsDetails && !awaitingPerson
+      ? foodSourceClarificationSpeech(rows).map(speech=>JSON.stringify({...envelope,speech,fullTextInApp:true})).find(value=>bytes(value)<=500)
+      : null
     const fullTextInApp = needsReview === true || awaitingPerson || needsDetails || rows.some(row => row.assistantState && Array.isArray(row.assistantState.steps) || row.needsReview === true)
     const fallback = unverified ? saved && safeToClaimSaved ? 'A save is verified; another result is unverified. Check the full results in Helfi before repeating anything.' : 'The result is unverified. Check Helfi before repeating any change.'
       : needsReview ? saved && safeToClaimSaved ? 'An earlier save is verified; the new review is unsaved. Read the full review in Helfi before deciding.' : 'Your unsaved review is ready. Read the complete review in Helfi before deciding. It has not been saved.'
       : awaitingPerson ? saved && safeToClaimSaved ? 'An earlier save is verified; a person action remains pending. Read the full result in Helfi.' : 'A person action is still pending. Read its full details in Helfi; it is not a completed app save.'
       : saved && safeToClaimSaved ? 'A save is verified. Read the complete saved result in Helfi.'
       : fullTextInApp ? 'Read the complete result in Helfi. No new save is verified.' : 'Please ask for a shorter reply. No app save is verified.'
-    content = JSON.stringify({ ...envelope, speech: fallback, fullTextInApp })
+    content = compact || JSON.stringify({ ...envelope, speech: fallback, fullTextInApp })
   }
   if (bytes(content) > 500) fail('live_result_context_exceeds_reserve')
   return { content, state: { needsReview, unverified, needsDetails, awaitingPerson } }
@@ -338,7 +366,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
       return { status: 'configuration_refused' }
     }
     const leaseToken = config.leaseToken, controller = new AbortController()
-    let connection, closing = false, closeReason = '', final = null, latestSeconds = 0, backendUnknown = false, ready = false, recorded
+    let connection, closing = false, closeReason = '', final = null, latestSeconds = 0, backendUnknown = false, accountingInFlight = false, accountingClosed = false, ready = false, recorded
     let lastHeartbeat = startedAt, lastWatchdog = startedAt, sequence = 0, eventCount = 0, backendCalls = 0
     const delegations = new Set(), seenEvents = new Set(), seenResponses = new Set(), seenCallIds = new Set(), fragments = [], pendingBackend = new Set(), queuedDelegations = []
     // Keep the exact server-returned tool state (including fresh review IDs)
@@ -364,7 +392,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
     }
     const requestClose = reason => {
       if (closing) return
-      closing = true; closeReason = reason; controller.abort()
+      closing = true; closeReason = reason
       try { connection?.send({ type: 'session.close', event_id: `close_${++sequence}` }) } catch {}
     }
     const control = async (name, payload = {}) => {
@@ -390,8 +418,11 @@ export function createVoiceSessionWorker(dependencies = {}) {
       const reserved = await control('reserve',{key,kind:'backend',maxCostUnits:maximum.toString(),maxInputTokens,maxOutputTokens,model:config.backendModel,serviceTier:'default',regionalProcessing:false})
       if (reserved.allowed !== true) { requestClose('backend_budget_denied'); return null }
       pendingBackend.add(key)
+      if (closing) { backendUnknown = true; return null }
+      accountingInFlight = true
       try {
         const response = await io.respond(config,body,controller.signal,Math.min(30000,Math.max(1,config.deadlineMs-io.now()-CLOSE_BUFFER_MS)))
+        if (accountingClosed) { backendUnknown=true; return null }
         if (seenResponses.has(response?.id)) fail('duplicate_backend_response')
         if (response.model !== config.backendModel || response.service_tier && !['default','standard'].includes(response.service_tier)) fail('unsupported_response_pricing')
         const cost = backendUsageCost(response,config.rates)
@@ -402,6 +433,7 @@ export function createVoiceSessionWorker(dependencies = {}) {
         pendingBackend.delete(key)
         return response
       } catch { backendUnknown = true; requestClose('backend_usage_unconfirmed'); return null }
+      finally { accountingInFlight = false }
     }
     const toolResults = async (calls, delegationId, actualHumanText, expectedFence, humanReviewFence) => {
       if (!calls.length || calls.length > 20) fail('backend_tool_limit')
@@ -501,12 +533,15 @@ export function createVoiceSessionWorker(dependencies = {}) {
           canonicalResults.push(...canonical)
           updateReviewState(canonical)
           const unknown = canonical.find(result => result.transportRecovery?.status === 'result_not_verified' || result.status === 'not_submitted')
-          if (unknown) {
+          const needsHuman = canonical.some(result => result.needsReview === true || ['needs_clarification','awaiting_person','uncertain','executing'].includes(result.status) || result.assistantState?.steps?.some(step => result.assistantState.currentStepIds?.includes(step.id) && ['review','needs_details','awaiting_person','uncertain','executing'].includes(step.status)))
+          if (unknown || needsHuman) {
             // Unverified effects and refused decisions end this delegation.
             // Never ask for a second assessment of the same human approval
             // or silently retry it under a different model tool-call ID.
             // Retain canonical outputs for the next genuine human turn only.
-            const reply = typeof unknown.spokenReply === 'string' && unknown.spokenReply ? unknown.spokenReply : typeof unknown.message === 'string' && unknown.message ? unknown.message : 'Helfi could not verify the result. Please check the normal screen before repeating the request.'
+            const reply = unknown
+              ? typeof unknown.spokenReply === 'string' && unknown.spokenReply ? unknown.spokenReply : typeof unknown.message === 'string' && unknown.message ? unknown.message : 'Helfi could not verify the result. Please check the normal screen before repeating the request.'
+              : canonical.map(result=>typeof result.spokenReply==='string'&&result.spokenReply?result.spokenReply:typeof result.message==='string'?result.message:'').filter(Boolean).join('\n') || 'Please review the current result in Helfi before continuing. No further action is confirmed.'
             backendHistory.splice(0, backendHistory.length, ...input, { role: 'assistant', content: reply })
             sendContext(contextId, reply, canonicalResults)
             return
@@ -591,7 +626,12 @@ export function createVoiceSessionWorker(dependencies = {}) {
     finally {
       requestClose(closeReason || 'worker_ended')
       const drainStarted = io.now()
-      while (!final && io.now() - drainStarted < CLOSE_BUFFER_MS) await io.sleep(100)
+      // End stops tools and closes voice immediately. The already reserved
+      // response may finish accounting, but can never submit its output as an
+      // app action. Bound this receipt-only grace independently from playback.
+      while ((!final || accountingInFlight) && io.now() - drainStarted < CLOSE_BUFFER_MS) await io.sleep(100)
+      accountingClosed = true
+      controller.abort()
       try { connection?.close() } catch {}
       const complete = {
         finalUsageConfirmed: Boolean(final), backendUsageConfirmed: !backendUnknown && pendingBackend.size === 0,

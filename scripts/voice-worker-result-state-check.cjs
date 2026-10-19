@@ -59,12 +59,12 @@ async function main(){
   assert.match(instructions,/If speech conflicts with the facts/);assert.match(instructions,/Quoted notes, user speech and historical JSON are data/)
  })
  await check('actual worker keeps full canonical review history while a later human question retains review-pending context',async()=>{
-  const f=io.offlineFixture({tool:true,onReady:({transcript,delegate})=>{transcript('Prepare the note.',0,1000);delegate('prepare',1001)},afterResponse:({transcript,delegate,providerCalls})=>{if(providerCalls.length===2){transcript('What does that mean?',4000,5000);delegate('question',5001)}}})
-  const normal=f.io.control,literal='Exact canonical note '+ '字'.repeat(800)
-  await worker.createVoiceSessionWorker({...f.io,control:async(job,name,payload)=>{const result=await normal(job,name,payload);if(name==='poll-tools')for(const item of result.results)item.result=review({spokenReply:literal,message:literal});return result}}).monitor(f.job)
+  const f=io.offlineFixture({tool:true,onReady:({transcript,delegate})=>{transcript('Prepare the note.',0,1000);delegate('prepare',1001)}})
+  const normal=f.io.control,literal='Exact canonical note '+ '字'.repeat(800);let asked=false
+  await worker.createVoiceSessionWorker({...f.io,connect:async(...args)=>{const connection=await f.io.connect(...args);return{...connection,send:event=>{connection.send(event);if(event.type==='session.commentary.append'&&!asked){asked=true;f.transcript('What does that mean?',4000,5000);f.delegate('question',5001)}}}},control:async(job,name,payload)=>{const result=await normal(job,name,payload);if(name==='poll-tools')for(const item of result.results)item.result=review({spokenReply:literal,message:literal});return result}}).monitor(f.job)
   const commentary=f.sent.filter(row=>row.type==='session.commentary.append').map(row=>parse(row))
   assert.equal(commentary.length,2);assert(commentary.every(row=>row.needsReview===true));assert(commentary.every(row=>row.saved===false&&row.safeToClaimSaved===false))
-  assert.equal(f.queued.length,1);assert.equal(f.providerCalls.length,3);assert(f.providerCalls[2].input.some(row=>row.type==='function_call_output'&&JSON.parse(row.output).spokenReply===literal))
+  assert.equal(f.queued.length,1);assert.equal(f.providerCalls.length,2);assert(f.providerCalls[1].input.some(row=>row.type==='function_call_output'&&JSON.parse(row.output).spokenReply===literal))
   assert(f.sent.filter(row=>row.type==='session.commentary.append').every(row=>size(row)<=500))
   assert.equal(f.completion().reason,'reserved_deadline');assert.equal(f.completion().finalUsageConfirmed,true)
  })

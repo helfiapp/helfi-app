@@ -11,15 +11,35 @@ export type AssistantFoodValues = { name: string; meal: string; localDate: strin
 export type AssistantFoodPreparation = { actorId: string; localDate: string; destination: 'diary' | 'library'; normalDraft: any; trustedSources: any[]; cost: AssistantCost }
 /** A missing source or recorded portion is a continuing conversation, never a
  * failed save. Keep the complete requested meal in the runtime until corrected. */
-export function assistantFoodNeedsDetails(values: AssistantFoodValues, indices: number[], reason: 'source' | 'portion'): AssistantContractError {
+export function validateAssistantFoodSourceChoices(raw: unknown, values: AssistantFoodValues): AssistantValue[] {
+  if (raw === undefined) return []
+  if (!Array.isArray(raw) || raw.length > 3) throw new Error('The food source choices could not be verified.')
+  const seen = new Set<number>()
+  for (const row of raw) {
+    const ingredient = values.ingredients[row?.ingredientIndex]
+    if (!row || Object.keys(row).some(key => !['ingredientIndex','requestedName','quantity','unit','options'].includes(key)) || !Number.isInteger(row.ingredientIndex) || seen.has(row.ingredientIndex) || !ingredient || row.requestedName !== ingredient.name || row.quantity !== ingredient.quantity || row.unit !== ingredient.unit || !Array.isArray(row.options) || !row.options.length || row.options.length > 3) throw new Error('The food source choices changed the requested ingredient.')
+    seen.add(row.ingredientIndex)
+    const ids = new Set<string>()
+    for (const option of row.options) {
+      if (!option || Object.keys(option).some(key => !['source','id','name','servingSize','unmatchedTerms'].includes(key)) || option.source !== 'usda' || typeof option.id !== 'string' || !option.id || option.id.length > 200 || ids.has(option.id) || typeof option.name !== 'string' || !option.name.trim() || option.name.length > 200 || typeof option.servingSize !== 'string' || option.servingSize.length > 200 || !Array.isArray(option.unmatchedTerms) || option.unmatchedTerms.length > 30 || option.unmatchedTerms.some((term: unknown) => typeof term !== 'string' || !term || term.length > 100)) throw new Error('The food source alternative could not be verified.')
+      ids.add(option.id)
+    }
+  }
+  return raw as AssistantValue[]
+}
+export function assistantFoodNeedsDetails(values: AssistantFoodValues, indices: number[], reason: 'source' | 'portion', rawChoices?: unknown): AssistantContractError {
   const selected = [...new Set(indices)].filter(index => Number.isInteger(index) && index >= 0 && index < values.ingredients.length)
   if (!selected.length) throw new Error('The food clarification did not identify a requested ingredient.')
   const names = selected.map(index => values.ingredients[index].name).join(', ')
+  const choices = validateAssistantFoodSourceChoices(rawChoices, values)
+  if (choices.some((choice: any) => !selected.includes(choice.ingredientIndex))) throw new Error('The source choices do not match the missing foods.')
+  const alternatives = choices.map((choice: any) => `For ${choice.quantity} ${choice.unit} ${choice.requestedName}, actual catalog records are ${choice.options.map((option: any) => `“${option.name}”${option.unmatchedTerms.length ? ` (does not specify ${option.unmatchedTerms.join(', ')})` : ''}`).join('; ')}.`).join(' ')
   const question = reason === 'portion'
     ? `What size or measured amount did you have for ${names}? I need a portion recorded for that food, such as its weight or a listed serving.`
-    : `I couldn't match ${names} to a food record. Can you describe how it was prepared and the amount of each ingredient?`
+    : alternatives ? `I couldn't match the exact description for ${names}. ${alternatives} Which record should I use, or would you prefer to keep the original description? The amounts are already retained. A choice only prepares a new review; it does not save the meal.`
+    : `I couldn't match ${names} to a food record. Can you describe the food using its catalog name? The stated amounts are already retained.`
   const root = values.recipe ? 'recipe.ingredients' : 'ingredients'
-  return new AssistantContractError('missing_fields', `${question} I've kept the rest of your meal. Nothing has been saved.`, selected.map(index => `${root}.${index}`))
+  return Object.assign(new AssistantContractError('missing_fields', `${question} I've kept the rest of your meal. Nothing has been saved.`, selected.map(index => `${root}.${index}`)), { choices })
 }
 export type AssistantFoodServices = {
   authenticate(context: AssistantContext): Promise<string | null>

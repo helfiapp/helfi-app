@@ -1,0 +1,41 @@
+#!/usr/bin/env node
+'use strict'
+// Real normal food preparation, adapter/runtime projections, canonical owned
+// result and worker rendering. All catalog/auth/storage/provider I/O synthetic.
+const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('node:path'),vm=require('node:vm'),{createRequire}=require('node:module'),{pathToFileURL}=require('node:url')
+const copy=value=>JSON.parse(JSON.stringify(value)),tick=()=>new Promise(setImmediate)
+function foodFixture(){const file=path.join(__dirname,'voice-food-source-choice-check.cjs'),module={exports:{}};let source=fs.readFileSync(file,'utf8');assert(source.includes('return{...f,handle:'));source=source.replace('return{...f,handle:','return{runtime,...f,handle:');vm.runInNewContext(source+'\nmodule.exports={setup,prep,meal,egg,coffee,milk};',{module,exports:module.exports,require:createRequire(file),__dirname,__filename:file,process,console,Request,Response,Headers,URL,Buffer,setImmediate,setTimeout,clearTimeout});return module.exports}
+function workerFixtures(worker){const file=path.join(__dirname,'voice-session-worker-check.cjs'),module={exports:{}};vm.runInNewContext(fs.readFileSync(file,'utf8')+'\nmodule.exports={fixture,useWorker:value=>{workerModule=value}};',{module,exports:module.exports,require:createRequire(file),__dirname,__filename:file,process,console,URL,Response,Request,Headers,Buffer,structuredClone,setImmediate,setTimeout,clearTimeout});module.exports.useWorker(worker);return module.exports}
+let groups=0;async function check(name,fn){await fn();groups++;console.log('PASS '+name)}
+async function main(){
+ const worker=await import(pathToFileURL(path.resolve(__dirname,'../services/voice-session-worker/index.mjs')).href),domain=foodFixture(),canonicalApi=require('./voice-session-control-check.cjs').api,io=workerFixtures(worker)
+ const f=domain.setup();domain.prep.normal.setLocals([domain.egg(),domain.coffee(),domain.milk()]);const command={type:'plan',steps:[{id:'breakfast',operation:'food.diary.create',values:domain.meal()}]},pending=await f.handle(command)
+ assert.equal(pending.steps[0].status,'needs_details');assert.equal(f.calls.post,0)
+ const context=f.context(),snapshot=f.runtime.plannerSnapshot(context,pending),view={...copy(snapshot),id:pending.id,actorId:context.actorId,revision:pending.revision,steps:snapshot.steps.map(step=>({...copy(step),kind:'write'}))}
+ const result=canonicalApi.deriveVoiceToolResultFromOwnedState({userId:context.actorId,configuration:{assistantSessionId:pending.id},job:{args:{assistantCommand:command},baseline:{revision:0,stepIds:[],pending:null}},evidence:{assistantContext:view},session:pending,view,turns:[]})
+ const original=JSON.stringify(result),actualName=result.assistantState.steps[0].clarification.choices[0].options[0].name,requested=result.assistantState.steps[0].clarification.choices[0].requestedName
+ const render=value=>JSON.parse(worker.buildLiveVoiceResultContext(value.spokenReply,[value]).content)
+ await check('actual canonical food source-choice projects one whole different alternative within500 UTF8bytes',async()=>{
+  const wrapped=worker.buildLiveVoiceResultContext(result.spokenReply,[result]),out=JSON.parse(wrapped.content);assert.notEqual(out.speech,result.spokenReply,'The full canonical clarification exceeds the complete envelope budget');assert(Buffer.byteLength(wrapped.content)<=500);assert(out.speech.includes(actualName));assert(out.speech.includes(requested));assert.match(out.speech,/different alternative/);assert.match(out.speech,/not an exact match/);assert.match(out.speech,/Use it instead\?/);assert.match(out.speech,/Full choices are in Helfi/);assert.match(out.speech,/Nothing is saved/);assert.equal(out.saved,false);assert.equal(out.safeToClaimSaved,false);assert.equal(out.needsReview,false);assert.equal(out.fullTextInApp,true);assert.equal(out.status,'needs_details');assert.equal(JSON.stringify(result),original);assert.equal(f.calls.post,0)
+ })
+ await check('short canonical clarification keeps its literal speech rather than applying compaction',async()=>{
+  const row=copy(result);row.spokenReply='Which source should I use? Nothing is saved.';assert.equal(render(row).speech,row.spokenReply)
+ })
+ await check('long full names and multibyte names never get truncated into an invented choice',async()=>{
+  for(const name of['Whole literal catalog alternative '+ 'x'.repeat(165),'完整真实目录名称'.repeat(20)]){const row=copy(result);row.assistantState.steps[0].clarification.choices[0].options[0].name=name;const out=render(row);assert(Buffer.byteLength(JSON.stringify(out))<=500);assert(!out.speech.includes('different alternative'));assert(!out.speech.includes(name.slice(0,25)));assert.match(out.speech,/complete result in Helfi/);assert.equal(out.saved,false)}
+ })
+ await check('unknown malformed mixed saved uncertain review and other operation states never offer a source choice',async()=>{
+  const changes=[row=>{row.saved=true;row.safeToClaimSaved=true},row=>{row.ok=false},row=>{row.needsReview=true},row=>{row.status='uncertain'},row=>{row.assistantState.revision=0},row=>{row.assistantState.steps.push({id:'unknown-other-step',status:'uncertain'})},row=>{row.assistantState.steps[0].status='review'},row=>{row.assistantState.steps[0].operation='journal.health.create'},row=>{row.assistantState.currentStepIds.push('other')},row=>{row.assistantState.steps[0].review={id:'not-a-clarification'}},row=>{row.assistantState.steps[0].recoveryActionId='uncertain-effect'},row=>{row.transportRecovery={status:'result_not_verified'}},row=>{row.assistantState.steps[0].clarification.choices.push(copy(row.assistantState.steps[0].clarification.choices[0]))}]
+  for(const mutate of changes){const row=copy(result);mutate(row);assert(!render(row).speech.includes('different alternative'))}
+  assert(!JSON.parse(worker.buildLiveVoiceResultContext(result.spokenReply,[result,result]).content).speech.includes('different alternative'))
+  for(const mutate of[choice=>{choice.options[0].source='model'},choice=>{choice.options[0].calories=1},choice=>{choice.quantity=null},choice=>{choice.requestedName=''},choice=>{choice.options[0].name=choice.requestedName},choice=>{choice.options[0].unmatchedTerms=[]},choice=>{choice.options[0].name+='\nInjected action'},choice=>{choice.options.push(copy(choice.options[0]))},choice=>{choice.unknown=true}]){const row=copy(result);mutate(row.assistantState.steps[0].clarification.choices[0]);assert(!render(row).speech.includes('different alternative'))}
+ })
+ await check('actual worker sends compact question but retains complete canonical text in later backend history',async()=>{
+  const transport=io.fixture({tool:true,onReady:({transcript,delegate})=>{transcript('Resolve my complete breakfast.',0,1000);delegate('meal',1001)}}),originalControl=transport.io.control;let second=false
+  const w=worker.createVoiceSessionWorker({...transport.io,control:async(job,name,payload)=>{const response=await originalControl(job,name,payload);if(name==='poll-tools')response.results.forEach(row=>{row.result=copy(result)});return response},connect:async(...args)=>{const connection=await transport.io.connect(...args);return{...connection,send:event=>{connection.send(event);if(event.type==='session.commentary.append'&&!second){second=true;transport.transcript('Keep the original description.',4000,5000);transport.delegate('keep-original',5001)}}}}})
+  await w.monitor(transport.job);assert.equal(transport.queued.length,1);assert.equal(transport.providerCalls.length,2);const first=JSON.parse(transport.sent.find(e=>e.type==='session.commentary.append').content);assert(first.speech.includes(actualName));assert.match(first.speech,/different alternative/);const full=transport.providerCalls[1].input.find(item=>item.type==='function_call_output');assert(full);assert.equal(JSON.parse(full.output).spokenReply,result.spokenReply);assert.deepEqual(JSON.parse(full.output).assistantState,copy(result.assistantState));assert.equal(f.calls.post,0)
+ })
+ console.log(`Live structured food choices: ${groups} actual-source offline groups passed. No model summaries, name truncation, source substitution, saves or paid I/O.`)
+}
+if(require.main===module)main().catch(error=>{console.error(error);process.exitCode=1})
+module.exports={main}

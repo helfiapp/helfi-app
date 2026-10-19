@@ -5,6 +5,7 @@
 const assert = require('node:assert/strict'), fs = require('node:fs'), path = require('node:path'), vm = require('node:vm'), ts = require('typescript'), crypto = require('node:crypto')
 const source = fs.readFileSync(path.join(__dirname, '../lib/voice-session-start.ts'), 'utf8')
 const costSource = fs.readFileSync(path.join(__dirname, '../lib/voice-cost-policy.ts'), 'utf8')
+const closedCollateral = require('./voice-closed-collateral-check.cjs')
 const U = 60000n, INFRA = 3000000000n
 const clone = value => structuredClone(value)
 function setup(options = {}) {
@@ -25,6 +26,10 @@ function setup(options = {}) {
     async create({ data }) { calls.events.push('runtime-create'); if (options.runtimeCreateFails) throw Error('Synthetic runtime storage failure'); assert(!runtime.has(data.sessionId)); runtime.set(data.sessionId, clone(data)); return clone(data) },
     async update({ where, data }) { const row = findRuntime(where.sessionId); assert(row); calls.events.push(data.configuration?.allocationIntent?.state === 'posted' ? 'intent-posted' : 'runtime-update'); return apply(row, data) },
     async updateMany({ where, data }) { const row = findRuntime(where.sessionId); if (row) apply(row, data); return { count: row ? 1 : 0 } },
+  }, voiceBillingSession: {
+    async findFirst({ where, include }) { assert.equal(where.userId, userId); assert.equal(include.reservations, true); assert.equal(include.allocations, true); const row = byId(where.id); return row?.userId === userId ? clone(row) : null },
+  }, voiceFundingLot: {
+    async findMany({ where }) { assert.equal(where.userId, userId); return (options.priorFundingLots || []).filter(row => row.userId === userId && where.id.in.includes(row.id)).map(clone) },
   }, $executeRaw: async (_parts, account) => { assert.equal(account, userId); calls.events.push('account-lock'); return 1 },
   async $transaction(work) { const prior = queue; let release; queue = new Promise(resolve => { release = resolve }); await prior; try { return await work(db) } finally { release() } } }
   const ledger = {
@@ -57,6 +62,7 @@ function setup(options = {}) {
     '@/lib/prisma': { prisma: db }, '@/lib/credit-system': { CreditManager: class { async getWalletStatus() { calls.events.push('wallet'); if (options.abortAfterWallet) controller.abort(); return { totalAvailableCents: options.wallet ?? 100 } } } },
     '@/lib/ai-safety': { assertAiUsageAllowed: async () => { calls.events.push('consent'); if (options.consentRefused) throw Error('Synthetic consent refusal') } },
     '@/lib/voice-session-ledger': ledger, '@/lib/voice-cost-policy': cost,
+    '@/lib/voice-closed-collateral': closedCollateral.load('voice-closed-collateral'),
     '@/lib/voice-session-control': { signVoiceSessionControlToken: () => 'synthetic-scoped-worker-control' },
     '@/lib/voice-session-worker-dispatch': {
       async sendVoiceWatchdog() { calls.watchdogs++; calls.events.push('watchdog'); if (options.abortAfterQueue) controller.abort(); if (options.queueFails && calls.watchdogs === 1) throw Error('Synthetic queue failure'); return 'synthetic-queue-receipt' },
@@ -133,6 +139,37 @@ async function main() {
     assert.equal(f.calls.settlements.find(value => value.key === 'voice-infrastructure').actualCostUnits, INFRA)
     const stored = [...f.runtime.values()][0]; assert.equal(stored.state, 'uncertain'); assert.equal(stored.configuration.allocationIntent.state, 'posted')
     assert.equal((await f.run('another-synthetic-attempt')).status, 409); assert.equal(f.calls.posts.length, 1); assert.equal(f.calls.claims, 1)
+  })
+  await check('new allocation accepts proved closed voice with complete retained collateral, without settling or refunding old work', async () => {
+    for (const mode of ['operator_test_budget', 'customer_realized_revenue']) {
+      const prior = closedCollateral.fixture(mode), userId = mode === 'operator_test_budget' ? 'cmcku4yvq000010l6z4ttp0ib' : 'synthetic-customer'
+      prior.actorId = prior.runtime.userId = prior.financial.userId = userId
+      for (const lot of prior.fundingLots) lot.userId = userId
+      const f = setup({ operator: mode === 'operator_test_budget', nowMs: Date.parse('2026-10-19T00:30:00Z'), priorFundingLots: prior.fundingLots })
+      f.runtime.set(prior.runtime.sessionId, clone(prior.runtime)); f.financial.set('previous-billing-run', clone(prior.financial))
+      const before = clone(f.financial.get('previous-billing-run')), runtimeBefore = clone(f.runtime.get(prior.runtime.sessionId))
+      assert.equal((await f.run()).status, 200); assert.equal(f.calls.posts.length, 1)
+      assert.deepEqual(f.financial.get('previous-billing-run'), before); assert.deepEqual(f.runtime.get(prior.runtime.sessionId), runtimeBefore)
+      assert(f.calls.settlements.every(row => row.sessionId !== prior.financial.id)); assert(f.calls.finalizations.every(row => row.sessionId !== prior.financial.id))
+    }
+  })
+  await check('startup still refuses unknown voice, lost collateral, revoked funding and pending executable work before any new claim', async () => {
+    for (const mutate of [p => { p.runtime.toolJobs.completion.finalUsageConfirmed = false }, p => { p.financial.reservations[1].state = 'PENDING' }, p => { p.financial.heldCostUnits = 0n }, p => { p.fundingLots[0].revokedAt = new Date() }, p => { p.runtime.toolJobs.jobs[0].status = 'pending' }, p => { p.runtime.providerSessionId = null }]) {
+      const prior = closedCollateral.fixture(), userId = 'synthetic-customer'
+      prior.actorId = prior.runtime.userId = prior.financial.userId = userId
+      for (const lot of prior.fundingLots) lot.userId = userId
+      mutate(prior)
+      const f = setup({ priorFundingLots: prior.fundingLots })
+      f.runtime.set(prior.runtime.sessionId, clone(prior.runtime)); f.financial.set('previous-billing-run', clone(prior.financial))
+      assert.equal((await f.run()).status, 409); assert.equal(f.calls.posts.length, 0); assert.equal(f.calls.claims, 0); assert.equal(f.calls.settlements.length, 0)
+    }
+  })
+  await check('an existing provider ID never permits overlapping allocating attaching ready or closing calls', async () => {
+    for (const state of ['allocating', 'attaching', 'ready', 'closing']) {
+      const f = setup()
+      f.runtime.set('previous-runtime', { sessionId: 'previous-runtime', userId: f.userId, providerSessionId: 'known-but-not-proved-closed', state })
+      assert.equal((await f.run()).status, 409); assert.equal(f.calls.posts.length, 0); assert.equal(f.calls.claims, 0); assert.equal(f.calls.settlements.length, 0)
+    }
   })
   await check('known rejected allocation closes the exact provider and settles reported duration plus service', async () => {
     const f = setup({ providerRejected: true }); assert.equal((await f.run()).status, 503)

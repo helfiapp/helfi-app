@@ -24,7 +24,7 @@ const ast = ts.createSourceFile('route.ts',raw,ts.ScriptTarget.Latest,true)
 const source = ast.statements.filter(n=>ts.isFunctionDeclaration(n)||(ts.isVariableStatement(n)&&n.declarationList.declarations.some(d=>d.name.getText(ast)==='INGREDIENT_LOOKUP_FILLER_WORDS'))).map(n=>n.getText(ast).replace(/^export\s+/,'')).join('\n')
 const assertNoNetwork = () => { throw Error('Network/provider access forbidden') }
 let missing = false, saved = null
-const ctx = vm.createContext({ ...measurement('lib/native-voice-spoken-quantities.ts'), ...measurement('lib/food/serving-measurements.ts'), ...measurement('lib/native-voice-recipe-metadata.ts'), URL, console,
+const ctx = vm.createContext({ ...measurement('lib/native-voice-spoken-quantities.ts'), ...measurement('lib/food/serving-measurements.ts'), ...measurement('lib/native-voice-recipe-metadata.ts'), URL, console, AbortController, setTimeout, clearTimeout,
   verifiedVoiceMenuAliases: [],
   searchLocalFoods: async q => missing ? [] : [{ id:'source:'+q,name:q,source:'usda_foundation',serving_size:/milk/i.test(q)?'100 ml':'100 g',calories:100,protein_g:10,carbs_g:5,fat_g:2,fiber_g:null,sugar_g:0 }],
   searchCustomFoodMacros: async()=>[], prisma:{foodLibraryItem:{findMany:async()=>[]}}, fetch:assertNoNetwork,

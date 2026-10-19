@@ -74,7 +74,7 @@ function actualControlFixture(options={}){
       if(command==='enqueue-tool')await options.onTool?.({f,payload,result})
       return result
     },
-    connect:async(config,onEvent)=>{assert.equal(config.providerKey,'fixture-provider-key-not-real');receive=onEvent;return{send:event=>{sent.push(event);if(event.type==='session.close'&&!options.missingFinal)receive({type:'session.closed',session:{id:providerSessionId},usage:{seconds:30},reason:'close_requested'})},close:()=>{}}},
+    connect:async(config,onEvent)=>{assert.equal(config.providerKey,'fixture-provider-key-not-real');receive=onEvent;return{send:event=>{sent.push(event);if(event.type==='session.close'&&!options.missingFinal)receive({type:'session.closed',session:{id:providerSessionId},usage:{seconds:30},reason:'close_requested'});if(event.type==='session.commentary.append')options.onCommentary?.({receive,event})},close:()=>{}}},
     respond:async(_config,body)=>{
       backend.push(structuredClone(body));if(options.providerFailure)throw Error('Synthetic lost provider response')
       const classifier=body.instructions.startsWith('Independently assess a fresh human reply'),plannerCount=backend.filter(row=>!row.instructions.startsWith('Independently assess a fresh human reply')).length
@@ -216,9 +216,11 @@ async function main(){
     const app=require('./voice2-app-host-check.cjs').setup(),literal='Keep this exact offline journal note.',plan={type:'plan',steps:[{id:'note',operation:'journal.health.create',values:{content:literal,localDate:'2026-10-17'}}]}
     const confirmation=fallback?'Yes save this note':'Yes'
     let reviewId,latestView,toolCount=0
-    const output=count=>count===1?[{type:'function_call',call_id:'prepare_note',name:'request_helfi_action',arguments:JSON.stringify({action:'assistant_plan',needsReview:true,request:literal,assistantCommand:plan})},...(multiple?[{type:'function_call',call_id:'refine_note',name:'request_helfi_action',arguments:JSON.stringify({action:'assistant_plan',needsReview:true,request:literal,assistantCommand:{type:'correct',stepId:'note',values:{content:literal}}})}]:[])]:count===3?[{type:'function_call',call_id:'confirm_note',name:'request_helfi_action',arguments:JSON.stringify({action:'assistant_plan',needsReview:true,request:'Yes',assistantCommand:{type:'confirm',reviewId}})}]:[{type:'message',role:'assistant',content:[{type:'output_text',text:'This invented model wording must not replace the exact verified normal app result.'}]}]
+    const output=count=>count===1?[{type:'function_call',call_id:'prepare_note',name:'request_helfi_action',arguments:JSON.stringify({action:'assistant_plan',needsReview:true,request:literal,assistantCommand:plan})},...(multiple?[{type:'function_call',call_id:'refine_note',name:'request_helfi_action',arguments:JSON.stringify({action:'assistant_plan',needsReview:true,request:literal,assistantCommand:{type:'correct',stepId:'note',values:{content:literal}}})}]:[])]:count===2?[{type:'function_call',call_id:'confirm_note',name:'request_helfi_action',arguments:JSON.stringify({action:'assistant_plan',needsReview:true,request:'Yes',assistantCommand:{type:'confirm',reviewId}})}]:[{type:'message',role:'assistant',content:[{type:'output_text',text:'This invented model wording must not replace the exact verified normal app result.'}]}]
+    let confirmationSent=false
     const a=actualControlFixture({delegate:true,initialHumanText:literal,output,
-      afterResponse:({receive,body,count})=>{if(count===2){assert.equal(app.counts().postCalls,0);receive({type:'session.input_transcript.delta',event_id:'confirm-human',delta:confirmation,start_ms:2000,end_ms:2400});if(!fallback)receive({type:'session.delegation.created',event_id:'confirm-delegation',offset_ms:2401,delegation:{id:'confirm-delegation',target:'client'}})}if(count===3)assert(JSON.stringify(body.input).includes(reviewId),'Exact fresh review ID must come from prior server-canonical tool result')},
+      onCommentary:({receive})=>{if(confirmationSent)return;confirmationSent=true;assert.equal(app.counts().postCalls,0);receive({type:'session.input_transcript.delta',event_id:'confirm-human',delta:confirmation,start_ms:2000,end_ms:2400});if(!fallback)receive({type:'session.delegation.created',event_id:'confirm-delegation',offset_ms:2401,delegation:{id:'confirm-delegation',target:'client'}})},
+      afterResponse:({body,count})=>{if(count===2)assert(JSON.stringify(body.input).includes(reviewId),'Exact fresh review ID must come from prior server-canonical tool result')},
       onTool:async({f,payload})=>{
         toolCount++;assert.equal(payload.actualHumanText,toolCount<=(multiple?2:1)?literal:confirmation)
         if(fallback&&toolCount===2)assert(payload.reviewFence,'Missing delegation confirmation must carry the exact owned review fence')
@@ -232,11 +234,11 @@ async function main(){
         await f.control.nativeResult({},'owner',{sessionId:'billing-session',callId:payload.callId,result:{saved:true,message:'Untrusted client wording',assistantContext:latestView}})
       },
     })
-    await a.worker.monitor(a.job);assert.equal(toolCount,multiple?3:2,JSON.stringify(a.callbacks.map(row=>({command:row.command,error:row.error}))));assert.equal(a.backend.length,5);assert.equal(a.backend.filter(row=>row.instructions.startsWith('Independently assess')).length,1);assert.equal(app.counts().postCalls,1);assert.equal(app.entries.length,1);assert.equal(app.entries[0].content,literal)
-    assert.equal(a.backend[1].input.filter(row=>row.type==='function_call_output').length,multiple?2:1,'All native outputs reach one continuation')
+    await a.worker.monitor(a.job);assert.equal(toolCount,multiple?3:2,JSON.stringify(a.callbacks.map(row=>({command:row.command,error:row.error}))));assert.equal(a.backend.length,4);assert.equal(a.backend.filter(row=>row.instructions.startsWith('Independently assess')).length,1);assert.equal(app.counts().postCalls,1);assert.equal(app.entries.length,1);assert.equal(app.entries[0].content,literal)
+    assert.equal(a.backend[1].input.filter(row=>row.type==='function_call_output').length,multiple?2:1,'All native outputs reach the next genuine human turn without an unused continuation')
     const spoken=a.sent.filter(row=>row.type==='session.commentary.append');assert.equal(spoken.length,2);assert(JSON.parse(spoken[1].content).speech.includes(literal));assert(!JSON.parse(spoken[1].content).speech.includes('invented model wording'));assert.equal(JSON.parse(spoken[1].content).safeToClaimSaved,true)
     if(fallback)assert.equal(spoken[1].delegation_id,null)
-    assert.equal(a.f.bill.state,'CLOSED');assert.equal(a.f.bill.reservations.filter(row=>row.kind==='backend').length,5);assert(a.f.bill.reservations.every(row=>row.state==='SETTLED'))
+    assert.equal(a.f.bill.state,'CLOSED');assert.equal(a.f.bill.reservations.filter(row=>row.kind==='backend').length,4);assert(a.f.bill.reservations.every(row=>row.state==='SETTLED'))
    }
   })
   console.log(`Voice session worker: ${groups} actual-source offline groups passed. No provider, AWS, microphone, key or credits.`)

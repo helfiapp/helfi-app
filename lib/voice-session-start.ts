@@ -9,6 +9,7 @@ import { liveVoiceCostUnits } from '@/lib/voice-cost-policy'
 import { signVoiceSessionControlToken } from '@/lib/voice-session-control'
 import { dispatchVoiceSessionWorker, sendVoiceWatchdog } from '@/lib/voice-session-worker-dispatch'
 import { nativeAssistantCommandInstructions, nativeAssistantCommandTool, type AssistantGeneralSessionConfig } from '@/lib/native-assistant-command-tool'
+import { canStartAfterClosedVoice } from '@/lib/voice-closed-collateral'
 
 const db = prisma as any
 const VOICE_HOLD = 'voice-duration'
@@ -32,9 +33,17 @@ const hash = (value: unknown) => crypto.createHash('sha256').update(JSON.stringi
 async function allocationGate(userId: string, create?: (tx: any) => Promise<void>) {
   return db.$transaction(async (tx: any) => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${userId}))`
-    const outstanding = await tx.voiceSessionRuntime.findMany({ where: { userId, state: { in: ['allocating', 'uncertain'] } }, select: { sessionId: true, state: true, providerSessionId: true } })
-    if (outstanding.some((row: any) => row.state === 'uncertain' || !row.providerSessionId)) {
-      throw Object.assign(new Error('voice_previous_allocation_unresolved'), { code: 'voice_previous_allocation_unresolved' })
+    const outstanding = await tx.voiceSessionRuntime.findMany({ where: { userId, state: { in: ['allocating', 'attaching', 'ready', 'closing', 'uncertain'] } }, take: 21 })
+    if (outstanding.length > 20) throw Object.assign(new Error('voice_previous_allocation_unresolved'), { code: 'voice_previous_allocation_unresolved' })
+    for (const runtime of outstanding) {
+      if (!runtime.providerSessionId || runtime.state !== 'uncertain') throw Object.assign(new Error('voice_previous_allocation_unresolved'), { code: 'voice_previous_allocation_unresolved' })
+      const financial = await tx.voiceBillingSession.findFirst({ where: { id: runtime.sessionId, userId }, include: { reservations: true, allocations: true } })
+      const fundingIds = financial ? [...new Set([financial.operatorFundingId, ...financial.allocations.map((allocation: any) => allocation.fundingLotId)].filter(Boolean))] : []
+      const fundingLots = fundingIds.length ? await tx.voiceFundingLot.findMany({ where: { userId, id: { in: fundingIds } } }) : []
+      // A provider that is proved closed cannot keep consuming voice time.
+      // Unknown backend work stays fully collateralized in the old ledger;
+      // neither that session nor its held costs is silently finalized here.
+      if (!canStartAfterClosedVoice({ actorId: userId, runtime, financial, fundingLots })) throw Object.assign(new Error('voice_previous_allocation_unresolved'), { code: 'voice_previous_allocation_unresolved' })
     }
     if (create) await create(tx)
   }, { maxWait: 10000, timeout: 20000 })

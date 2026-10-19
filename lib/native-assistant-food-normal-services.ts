@@ -1,6 +1,6 @@
 import { NextRequest } from 'next/server'
 import { AssistantContractError, AssistantContext, AssistantReceipt } from './native-assistant-registry'
-import { AssistantFoodServices, AssistantFoodValues } from './native-assistant-food-actions'
+import { AssistantFoodServices, AssistantFoodValues, validateAssistantFoodSourceChoices } from './native-assistant-food-actions'
 import { invokeNativeVoiceRecordRoute } from './native-voice-record-actions'
 import { verifyNativeVoiceDraft } from './native-voice-review-token'
 
@@ -56,7 +56,9 @@ export function createNativeAssistantFoodNormalServices(options: {
       const root = values.recipe ? 'recipe.ingredients' : 'ingredients'
       const allowedFields = new Set(values.ingredients.map((_item, index) => `${root}.${index}`))
       if (response.status === 422 && data?.code === 'missing_fields' && typeof data.error === 'string' && data.error.length > 0 && data.error.length <= 10000 && Array.isArray(data.fields) && data.fields.length > 0 && data.fields.length <= values.ingredients.length && data.fields.every((field: unknown) => typeof field === 'string' && allowedFields.has(field))) {
-        throw new AssistantContractError('missing_fields', data.error, [...new Set<string>(data.fields)])
+        const choices = validateAssistantFoodSourceChoices(data.choices, values)
+        if (choices.some((choice: any) => !data.fields.includes(`${root}.${choice.ingredientIndex}`))) throw new Error('The source alternatives do not match the missing foods.')
+        throw Object.assign(new AssistantContractError('missing_fields', data.error, [...new Set<string>(data.fields)]), { choices })
       }
       if (!response.ok || data?.success !== true || data.chargedCredits !== 0 || !data.preparation || !verifyNativeVoiceDraft(context.actorId, data.preparation.normalDraft)) throw new Error(data?.error || 'The normal food builder could not prepare this exact source review.')
       return data.preparation
