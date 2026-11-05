@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-10-19T11:33:59.265Z",
+  "generatedAt": "2026-11-05T13:58:07.531Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -167,7 +167,7 @@
     "components/marketing/MockupCarousel.tsx": "5b472072853bbd4c69960b4ea3246ec11a049d2b5ad9b579bb9f46a52e626169",
     "components/marketing/MockupGallery.tsx": "d530113d07ddbfcc9c2a507c191434a6e98c12a17e1783ff91febfdecf043138",
     "components/marketing/PublicFooter.tsx": "07359c5b50a3581aa8298043427eb22b125f4d0be6090bd00852f9c86ced7405",
-    "components/marketing/PublicHeader.tsx": "3a1d80c05b4bee19fedef1588bcb81dea2e146ff86dacfb99dcc298211aa7cf8",
+    "components/marketing/PublicHeader.tsx": "4b465a64089f7ef013799fd968346d512425794cf72a147a33bf813da24533b4",
     "components/MaterialSymbol.tsx": "0ffd0bce7cd91aa6969475b87b601bcfbaa1561ae6fa899b3f8074e4daf51d26",
     "components/MessageModal.tsx": "60a8e73949efc0b509b2beb4191a71cc6a042a232dd35905f63fe465ccfd2321",
     "components/MobileBottomNav.tsx": "708fb838329fe40e43f3bb58240495b0b2cdc6dcba0964bd1e5fc285512914f2",

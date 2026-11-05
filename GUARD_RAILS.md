@@ -1178,6 +1178,8 @@ Critical note:
 - Logos: `public/mobile-assets/LOGOS/helfi-01-01.*` (standard), `helfi-01-06.*` (white-on-dark).  
 - Favicon/PWA base: `public/mobile-assets/FAVICONS/FAVICON-01.svg` (use this SVG for all generated icons).
 
+The public homepage header uses the approved standard SVG directly. The former 9712 × 5180 PNG exceeds the live image service's 9000-pixel limit and produces a blank logo. Verify the logo actually loads in the browser after homepage changes.
+
 **Protected outputs (must stay consistent):**
 - `public/icons/app-192.png`, `public/icons/app-512.png`, `public/icons/app-1024.png`
 - `public/icons/admin-192.png`, `public/icons/admin-512.png`

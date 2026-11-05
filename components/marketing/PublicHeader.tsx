@@ -261,7 +261,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
             aria-label="Go to homepage"
           >
             <Image
-              src="/mobile-assets/LOGOS/helfi-01-01.png"
+              src={pathname === '/' ? '/mobile-assets/LOGOS/helfi-01-01.svg' : '/mobile-assets/LOGOS/helfi-01-01.png'}
               alt="Helfi Logo"
               width={160}
               height={160}
