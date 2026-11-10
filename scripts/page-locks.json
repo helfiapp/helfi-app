@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-05T13:58:07.531Z",
+  "generatedAt": "2026-11-10T03:13:11.819Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -116,7 +116,7 @@
     "app/notifications/quiet-hours/page.tsx": "e43f350422fb26336e8e7608b57f2f8624b2ae277085ae175a94572382204ebe",
     "app/notifications/reminders/page.tsx": "6d0bf6d08e3dd1b93f33b95ea92ac486453170912f1e422b3a712b887999b623",
     "app/onboarding/page.tsx": "33dcf05c16a8c4bb1d694ca15c4aecc9906f3cbe9a47f343731e94aff1942dea",
-    "app/page.tsx": "d6f38699b1454c3b5c9a0e4b53a2976a0d5e13bdac94c65b3bc1e7e3fff83d4d",
+    "app/page.tsx": "827c57d74669828341765ffd4d988bf1eb1e211357fdbe54be69596401466336",
     "app/practitioner/page.tsx": "91820f362b93547fc91145e67f1baff32122bceb019d1a1e353b6c18a624de9e",
     "app/practitioners/[slug]/layout.tsx": "387410273273ad940f5087f68bb1a43c77d83e808886bab627d34a73b44d11f9",
     "app/practitioners/[slug]/page.tsx": "48c4e5a41959ba00fcd714e66c98ec2411c4ed57c7121e9283f0d9a52300542b",

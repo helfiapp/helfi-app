@@ -1,79 +1,81 @@
 'use client'
 
-import React, { useState, useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import Image from 'next/image'
 import Link from 'next/link'
 import { useSession } from 'next-auth/react'
 import PublicHeader from '@/components/marketing/PublicHeader'
 import { absoluteUrl } from '@/lib/site-url'
-// Back to Top Button Component
-function BackToTopButton() {
-  const [isVisible, setIsVisible] = useState(false)
+import styles from './homepage.module.css'
 
-  useEffect(() => {
-    const toggleVisibility = () => {
-      if (window.pageYOffset > 300) {
-        setIsVisible(true)
-      } else {
-        setIsVisible(false)
-      }
-    }
+const signupHref = '/auth/signin?mode=signup'
+const reportImage = '/MOBILE MOCKUPS/HEALTH TRACKING/MOBILE MOCKUPS/7 DAY HEALTH REPORT-portrait.png'
 
-    window.addEventListener('scroll', toggleVisibility)
-    return () => window.removeEventListener('scroll', toggleVisibility)
-  }, [])
+const features = [
+  { name: 'Food diary', href: '/features/nutrition-food', description: 'Log meals by photo, barcode or ingredient search.' },
+  { name: 'Daily check-ins', href: '/features/daily-check-ins', description: 'Record your energy, sleep and how you feel.' },
+  { name: 'Weekly reports', href: '/features/ai-insights', description: 'Look back at seven days of entries in one report.' },
+  { name: 'Health tracking & wearables', href: '/features/health-tracking', description: 'See your daily activity alongside your own notes.' },
+  { name: 'Mood tracking', href: '/features/mood-tracking', description: 'Keep a mood journal and see how it changes over time.' },
+  { name: 'Health notes', href: '/features/symptom-tracking', description: 'Write down what you noticed and when it happened.' },
+  { name: 'Supplements & medications', href: '/features/supplement-safety', description: 'Keep a list and look up possible interactions.' },
+  { name: 'Lab reports', href: '/features/lab-reports', description: 'Keep your results together for future reference.' },
+  { name: 'Health image notes', href: '/features/health-image-notes', description: 'Save a photo with a date and a note.' },
+  { name: 'Talk to Helfi', href: '/features/talk-to-helfi', description: 'Ask a question about the health information you logged.' },
+]
 
-  const scrollToTop = () => {
-    window.scrollTo({
-      top: 0,
-      behavior: 'smooth'
-    })
-  }
+const plans = [
+  { price: 10, credits: '700', id: 'plan_10_monthly' },
+  { price: 20, credits: '1,400', id: 'plan_20_monthly' },
+  { price: 30, credits: '2,100', id: 'plan_30_monthly' },
+  { price: 50, credits: '3,500', id: 'plan_50_monthly' },
+]
 
-  return (
-    <button
-      onClick={scrollToTop}
-      className={`fixed bottom-5 right-5 z-50 hidden md:inline-flex bg-helfi-green text-white p-3 rounded-full shadow-lg hover:bg-helfi-green/90 transition-all duration-300 transform ${
-        isVisible ? 'translate-y-0 opacity-100' : 'translate-y-16 opacity-0'
-      }`}
-      aria-label="Back to top"
-    >
-      <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 10l7-7m0 0l7 7m-7-7v18" />
-      </svg>
-    </button>
-  )
-}
+const topUps = [
+  { price: 5, credits: '250', id: 'credits_250' },
+  { price: 10, credits: '500', id: 'credits_500' },
+  { price: 20, credits: '1,000', id: 'credits_1000' },
+]
+
+const questions = [
+  { question: 'What goes into a weekly report?', answer: 'Your weekly report looks at the last seven days of entries, including meals, supplements, sleep, check-ins and health notes. What you see depends on what you log.' },
+  { question: 'Can I edit a meal logged from a photo?', answer: 'Yes. A photo gives you an estimate. You can check the ingredients and change portions before saving.' },
+  { question: 'Which devices can I connect?', answer: 'Helfi supports Fitbit and Garmin Connect. See Health Tracking for more about connected devices.' },
+  { question: 'What can I ask Talk to Helfi?', answer: 'Ask about information you have recorded, such as how you rated your energy this week. You can review entries before they are saved.' },
+  { question: 'How does Helfi handle my data?', answer: 'Read what we collect, how we use it, and how you can access or delete your information in our', link: '/privacy' },
+  { question: 'Can I use Helfi for medical advice?', answer: 'Helfi helps you organise your own information. Always speak to a qualified healthcare provider about symptoms, treatment or possible medication and supplement interactions.' },
+]
+
+const news = [
+  { name: 'A simpler way to log meals', href: '/news/complete-food-tracking-workflow', category: 'Food diary' },
+  { name: 'What goes into a weekly health report', href: '/news/weekly-health-insights-you-can-use', category: 'Weekly reports' },
+  { name: 'Helfi on iPhone and Android', href: '/news/mobile-apps-coming-soon', category: 'Product update' },
+]
 
 export default function SplashPage() {
   const { data: session, status } = useSession()
-  const [showDemoModal, setShowDemoModal] = useState(false)
-  const [videoLoaded, setVideoLoaded] = useState(false)
   const [checkoutError, setCheckoutError] = useState('')
-  const [isDisclaimerOpen, setIsDisclaimerOpen] = useState(false)
+  const [videoPlaying, setVideoPlaying] = useState(false)
   const videoRef = useRef<HTMLVideoElement>(null)
+  const startHref = status === 'authenticated' ? '/dashboard' : signupHref
+  const startLabel = status === 'authenticated' ? 'Go to Dashboard' : 'Create an account'
+
   useEffect(() => {
+    if (videoRef.current) setVideoPlaying(!videoRef.current.paused)
+  }, [])
+
+  const toggleHeroVideo = () => {
     const video = videoRef.current
     if (!video) return
 
-    const attemptPlay = () => {
-      const playPromise = video.play()
-      if (playPromise && typeof playPromise.then === 'function') {
-        playPromise.then(() => setVideoLoaded(true)).catch(() => {})
-      }
+    if (video.paused) {
+      void video.play().catch(() => setVideoPlaying(false))
+    } else {
+      video.pause()
     }
+  }
 
-    attemptPlay()
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') {
-        attemptPlay()
-      }
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    return () => document.removeEventListener('visibilitychange', handleVisibility)
-  }, [])
-
-  // Handle subscription plan selection
-  const handlePlanSelection = async (planId: string) => {
+  const handleCheckout = async (planId: string) => {
     setCheckoutError('')
     // If user is authenticated, go directly to checkout
     if (status === 'authenticated' && session) {
@@ -102,41 +104,6 @@ export default function SplashPage() {
     window.location.href = `/auth/signin?plan=${encodeURIComponent(planId)}`
   }
 
-  // Handle credit purchase
-  const handleCreditPurchase = async (planId: string) => {
-    setCheckoutError('')
-    // If user is authenticated, go directly to checkout
-    if (status === 'authenticated' && session) {
-      try {
-        const res = await fetch('/api/billing/create-checkout-session', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ plan: planId }),
-        })
-        if (res.ok) {
-          const { url } = await res.json()
-          if (url) {
-            window.location.href = url
-            return
-          }
-        }
-        setCheckoutError('We could not open the payment page. Please try again.')
-        return
-      } catch (error) {
-        console.error('Checkout error:', error)
-        setCheckoutError('We could not open the payment page. Please try again.')
-        return
-      }
-    }
-    // If not authenticated, redirect to signin with plan parameter
-    window.location.href = `/auth/signin?plan=${encodeURIComponent(planId)}`
-  }
-
-  const handleDemoModalClose = () => {
-    setShowDemoModal(false)
-  }
-
-  const signupHref = '/auth/signin?mode=signup'
   const homepageSchema = {
     '@context': 'https://schema.org',
     '@graph': [
@@ -147,7 +114,7 @@ export default function SplashPage() {
         url: absoluteUrl('/'),
         logo: absoluteUrl('/icons/app-512.png'),
         description:
-          'Helfi is an AI food tracker and calorie tracker app for food calorie tracking, weekly reports, and practical AI health insights.',
+          'Helfi is a health tracking app with a food diary, daily check-ins, and weekly health reports.',
       },
       {
         '@type': 'WebSite',
@@ -158,7 +125,7 @@ export default function SplashPage() {
           '@id': absoluteUrl('/#organization'),
         },
         description:
-          'AI food calorie tracker app for food logging, weekly AI health report reviews, hydration, and daily habit tracking.',
+          'Log meals and water, keep health notes, and look back on your week with Helfi.',
         potentialAction: {
           '@type': 'SearchAction',
           target: `${absoluteUrl('/practitioners')}?query={search_term_string}`,
@@ -188,1360 +155,246 @@ export default function SplashPage() {
     ],
   }
   return (
-    <div className="min-h-screen bg-gradient-to-br from-helfi-green/5 via-white to-blue-50">
-      {/* Medical Disclaimer Banner */}
-      <div className="bg-helfi-green text-white">
-        <div className="max-w-6xl mx-auto px-4">
-          <button
-            type="button"
-            onClick={() => setIsDisclaimerOpen((prev) => !prev)}
-            className="w-full flex items-center justify-center gap-2 py-3 text-sm font-semibold tracking-wide"
-            aria-expanded={isDisclaimerOpen}
-            aria-controls="medical-disclaimer-content"
-          >
-            <span>Medical Disclaimer</span>
-            <svg
-              className={`w-4 h-4 transition-transform duration-300 ${isDisclaimerOpen ? 'rotate-180' : ''}`}
-              viewBox="0 0 20 20"
-              fill="currentColor"
-              aria-hidden="true"
-            >
-              <path d="M10 14l-6-7h12l-6 7z" />
-            </svg>
-          </button>
-          <div
-            id="medical-disclaimer-content"
-            className={`overflow-hidden transition-all duration-300 ease-in-out ${
-              isDisclaimerOpen ? 'max-h-64 opacity-100 pb-4' : 'max-h-0 opacity-0'
-            }`}
-          >
-            <p className="text-sm text-white/95 text-center">
-              Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment. Always consult
-              with a qualified healthcare provider before making health-related decisions.{' '}
-              <Link href="/terms" className="underline text-white hover:text-white/90">
-                View full disclaimer
-              </Link>
-            </p>
-          </div>
-        </div>
-      </div>
+    <div className={styles.home}>
+      <a className={styles.skipLink} href="#main-content">Skip to content</a>
+      <header className={styles.header}>
+        <details className={styles.disclaimer}>
+          <summary>Medical disclaimer</summary>
+          <p>
+            Helfi is not a medical device and does not provide medical advice, diagnosis, or treatment.
+            Always consult with a qualified healthcare provider before making health-related decisions.{' '}
+            <Link href="/terms">View full disclaimer</Link>
+          </p>
+        </details>
+        <PublicHeader />
+      </header>
 
-      {/* Navigation */}
-      <PublicHeader />
-
-      {/* Hero Section */}
-      <section className="relative w-full min-h-[72vh] md:min-h-[78vh] flex flex-col justify-center overflow-visible bg-gray-900" style={{ overflow: 'visible' }}>
-        {/* Full-Width Background Video */}
-        <div className="absolute inset-0 z-0">
+      <main id="main-content">
+        <section className={styles.hero}>
           <video
             ref={videoRef}
+            className={styles.heroVideo}
             autoPlay
             loop
             muted
             playsInline
             preload="auto"
-            poster="/screenshots/hero/hero-poster.jpg"
-            className="absolute inset-0 w-full h-full object-cover z-0"
-            onCanPlay={() => setVideoLoaded(true)}
-            onCanPlayThrough={() => setVideoLoaded(true)}
-            onLoadedData={() => setVideoLoaded(true)}
-            onError={(e) => {
-              console.error('Video error:', e)
-              setVideoLoaded(false)
-            }}
-            style={{ width: '100%', height: '100%', objectFit: 'cover' }}
+            aria-hidden="true"
+            onPlay={() => setVideoPlaying(true)}
+            onPause={() => setVideoPlaying(false)}
+            onError={() => setVideoPlaying(false)}
           >
             <source src="/screenshots/hero/hero-background.mp4" type="video/mp4" />
-            Your browser does not support the video tag.
           </video>
-          {/* Dark overlay on video */}
-          <div className="absolute inset-0 bg-black/60 z-[1]" />
-          {/* Dark background fallback - only shown when video doesn't load */}
-          {!videoLoaded && (
-            <div className="absolute inset-0 bg-gray-900 z-0" />
-          )}
-        </div>
-
-        {/* Content Container */}
-        <div className="relative z-10 w-full max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 md:py-14">
-          {/* Text Content */}
-          <div className="text-center">
-            <h1 className="text-5xl sm:text-6xl md:text-7xl lg:text-8xl font-bold text-white mb-6 leading-tight">
-              Your AI <span className="text-helfi-green">Health Tracking App</span>
-            </h1>
-            <p className="text-xl md:text-2xl text-white/90 mb-10 leading-relaxed max-w-4xl mx-auto">
-              Track meals, supplements, daily notes, and health metrics in one place. Get weekly AI
-              health insights, monitor trends, and turn your data into practical next steps. Review food
-              photos, lab reports, and personal health notes with clear summaries you can actually use. Find trusted
-              healthcare providers in our practitioner directory.
-            </p>
-            <div className="flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/practitioners"
-                className="btn-primary text-lg px-8 py-4 bg-helfi-green hover:bg-green-600 text-white text-center"
-              >
-                Find a practitioner
-              </Link>
-              <button 
-                onClick={() => setShowDemoModal(true)}
-                className="btn-secondary text-lg px-8 py-4 bg-white/10 backdrop-blur-sm border-2 border-white/30 text-white hover:bg-white/20"
-              >
-                Watch Demo
-              </button>
-            </div>
-          </div>
-        </div>
-
-      </section>
-
-      {/* Practitioner Directory Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="bg-emerald-50/60 border border-emerald-100 rounded-3xl p-8 md:p-12 text-center">
-            <h2 className="text-3xl md:text-4xl font-bold text-gray-900">Practitioner Directory</h2>
-            <p className="text-gray-600 mt-3 text-lg">
-              Find trusted health professionals near you, or list your practice to reach new patients.
-            </p>
-            <div className="mt-6 flex flex-col sm:flex-row gap-4 justify-center">
-              <Link
-                href="/practitioners"
-                className="px-8 py-4 rounded-full bg-helfi-green text-white font-semibold text-lg hover:bg-helfi-green/90 transition-colors"
-              >
-                Find a practitioner
-              </Link>
-              <Link
-                href="/list-your-practice"
-                className="px-8 py-4 rounded-full border-2 border-emerald-200 text-emerald-800 font-semibold text-lg hover:border-emerald-300 hover:text-emerald-900 transition-colors"
-              >
-                List your practice
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Features Section */}
-      <section id="features" className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-helfi-black mb-4">
-              Explore the Helfi platform
-            </h2>
-            <p className="text-xl text-gray-600">
-              Each module has its own feature page with detailed walkthroughs.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            <Link
-              href="/features/health-tracking"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Health Tracking and Wearables</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Sync Fitbit and Garmin data alongside daily check-ins and trends.
+          <div className={styles.container}>
+            <div className={styles.heroCopy}>
+              <p className={styles.label}>Health tracking &amp; food diary</p>
+              <h1>Keep your health records in one place</h1>
+              <p className={styles.lead}>
+                Log meals, water, sleep and how you feel. Helfi brings your entries together in a weekly report you can look back on.
               </p>
-            </Link>
-
-            <Link
-              href="/features/ai-insights"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">AI Insights and Weekly Reports</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Weekly reports built from your last 7 days of data.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-              data-chat-anchor="food-photo-analysis"
-            >
-              <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Food Photo Notes and Nutrition</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Photo-assisted meal logging with flexible edits and trends.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/supplement-safety"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Supplements and Medication Safety</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Track your stack and review possible interactions.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/lab-reports"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Lab Report Review</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Upload labs and follow biomarkers over time.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/health-image-notes"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-slate-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Health Image Notes</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Store health-related images with simple notes for tracking and doctor conversations.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/symptom-tracking"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-indigo-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-indigo-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Health Notes</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Log how you feel with context and spot patterns over time.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/mood-tracking"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-emerald-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21a9 9 0 110-18 9 9 0 010 18z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.5 10.5h.01M15.5 10.5h.01" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 15c1 1 2.2 1.5 3 1.5s2-.5 3-1.5" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Mood Tracking</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Quick mood check-ins with journaling and trends.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/daily-check-ins"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M5 19h14M7 11v8m10-8v8" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Daily Check-ins and Health Tips</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Simple daily ratings that power weekly insights.
-              </p>
-            </Link>
-
-            <Link
-              href="/features/talk-to-helfi"
-              className="group bg-white rounded-xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300 hover:-translate-y-1"
-            >
-              <div className="w-16 h-16 bg-sky-100 rounded-full flex items-center justify-center mx-auto mb-6">
-                <svg className="w-8 h-8 text-sky-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                </svg>
-              </div>
-              <h3 className="text-2xl font-bold text-helfi-black mb-4">Talk to Helfi</h3>
-              <p className="text-gray-600 leading-relaxed">
-                Chat with your health data and get clear answers.
-              </p>
-            </Link>
-          </div>
-
-          <div className="mt-10 flex justify-center">
-            <Link
-              href="/features"
-              className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-            >
-              See all feature pages
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Food Tracking Capabilities Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-br from-emerald-50/70 via-white to-cyan-50/50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-12">
-            <span className="inline-flex items-center px-4 py-2 rounded-full bg-emerald-100 text-emerald-700 text-sm font-semibold mb-5">
-              One of our strongest modules
-            </span>
-            <h2 className="text-4xl md:text-5xl font-bold text-helfi-black mb-4">
-              Fully Featured Food Tracking
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Helfi works as a food calorie tracking app, calorie tracker app, AI calorie tracker app, and AI food tracker app. You can log meals in multiple ways, edit fast, and reuse meals.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-            <Link
-              href="/features/nutrition-food#photo-camera-logging"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-emerald-400 to-cyan-400" />
-              <div className="w-11 h-11 rounded-xl bg-emerald-100 text-emerald-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7h18M7 3h10l2 4H5l2-4zm-2 6h14v11H5V9zm4 3h6m-6 4h4" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Photo Library / Camera logging</h3>
-              <p className="text-sm text-gray-600">Capture food photos and turn them into editable meal entries.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#barcode-scanner"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-cyan-400 to-blue-400" />
-              <div className="w-11 h-11 rounded-xl bg-cyan-100 text-cyan-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7h16M4 12h16M4 17h16M7 7v10m10-10v10" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Barcode scanner</h3>
-              <p className="text-sm text-gray-600">Scan packaged foods and add them in seconds.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#build-a-meal"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-green-400 to-emerald-400" />
-              <div className="w-11 h-11 rounded-xl bg-green-100 text-green-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.3-4.3m1.3-5.2a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Add ingredient search</h3>
-              <p className="text-sm text-gray-600">Search food databases and add single ingredients with nutrition data.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#build-a-meal"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-lime-400 to-emerald-400" />
-              <div className="w-11 h-11 rounded-xl bg-lime-100 text-lime-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4m3-5h10a2 2 0 012 2v10a2 2 0 01-2 2H7a2 2 0 01-2-2V9a2 2 0 012-2z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Build a meal</h3>
-              <p className="text-sm text-gray-600">Combine multiple ingredients into one saved meal entry.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#import-recipe"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-amber-400 to-orange-400" />
-              <div className="w-11 h-11 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 14L21 3m0 0h-7m7 0v7M3 10v11h11" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Import recipe</h3>
-              <p className="text-sm text-gray-600">Import by URL or by recipe photos, then review and edit before saving.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#ai-recommended-meals"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-violet-400 to-fuchsia-400" />
-              <div className="w-11 h-11 rounded-xl bg-violet-100 text-violet-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.5 9.5a2.5 2.5 0 015 0c0 1.5-1.2 2.2-2.1 2.8-.8.5-1.4.9-1.4 1.7m0 3h.01M12 3l2.5 4.5 5 .7-3.6 3.5.8 4.9L12 14l-4.7 2.6.8-4.9L4.5 8.2l5-.7L12 3z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">AI recommended meals</h3>
-              <p className="text-sm text-gray-600">Generate meal suggestions for each meal time and save them directly to your diary.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#favorites-reusable-meals"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-pink-400 to-rose-400" />
-              <div className="w-11 h-11 rounded-xl bg-pink-100 text-pink-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 21s-7-4.7-7-10a4 4 0 017-2.6A4 4 0 0119 11c0 5.3-7 10-7 10z" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Favorites and reusable meals</h3>
-              <p className="text-sm text-gray-600">Save meals to favorites and quickly add them again.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#copy-duplicate-combine-tools"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-indigo-400 to-blue-500" />
-              <div className="w-11 h-11 rounded-xl bg-indigo-100 text-indigo-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h11M8 12h11M8 17h11M4 7h.01M4 12h.01M4 17h.01" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Copy, duplicate, and combine tools</h3>
-              <p className="text-sm text-gray-600">Duplicate meals, copy entries to today, copy multiple items, and combine existing foods.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#meal-categories-nutrition-totals"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-teal-400 to-emerald-500" />
-              <div className="w-11 h-11 rounded-xl bg-teal-100 text-teal-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 19h16M7 16V8m5 8V5m5 11v-6" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Meal categories + nutrition totals</h3>
-              <p className="text-sm text-gray-600">Track breakfast, lunch, dinner, and snacks with clear macro totals.</p>
-            </Link>
-
-            <Link
-              href="/features/nutrition-food#water-drinks-logging"
-              className="group relative overflow-hidden bg-white/90 backdrop-blur-sm rounded-2xl border border-emerald-100 p-5 shadow-sm hover:shadow-lg hover:-translate-y-1 transition-all duration-300 block"
-            >
-              <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-sky-400 to-cyan-500" />
-              <div className="w-11 h-11 rounded-xl bg-sky-100 text-sky-700 flex items-center justify-center mb-3">
-                <svg className="w-6 h-6" viewBox="0 0 24 24" fill="none" stroke="currentColor">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 18a4 4 0 010-8 5 5 0 019.7-1.3A3.5 3.5 0 1118 18H7zm5-6v4m0 0l-2-2m2 2l2-2" />
-                </svg>
-              </div>
-              <h3 className="text-lg font-semibold text-gray-900 mb-1">Water and drinks logging</h3>
-              <p className="text-sm text-gray-600">Log water, tea, coffee, and bottle sizes with daily hydration tracking.</p>
-            </Link>
-          </div>
-
-          <div className="mt-9 text-center">
-            <Link
-              href="/features/nutrition-food"
-              className="inline-flex items-center px-7 py-3 rounded-full bg-helfi-green text-white font-semibold shadow-lg shadow-emerald-200/50 hover:bg-helfi-green/90 transition-colors"
-            >
-              See Food Diary Feature Page
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Mobile Apps Coming Soon Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 bg-white">
-        <div className="max-w-5xl mx-auto">
-          <div className="rounded-3xl border border-gray-200 bg-gradient-to-r from-slate-900 to-slate-800 p-8 md:p-10 text-white">
-            <div className="text-center">
-              <p className="text-sm uppercase tracking-[0.2em] text-emerald-200 font-semibold">Coming Soon</p>
-              <h2 className="text-3xl md:text-4xl font-bold mt-3">
-                Native iOS and Android apps are in progress
-              </h2>
-              <p className="text-white/80 mt-3 text-lg max-w-2xl mx-auto">
-                We are currently building the mobile apps so you can use Helfi on the App Store and Google Play.
-              </p>
-            </div>
-
-            <div className="mt-8 grid grid-cols-1 sm:grid-cols-2 gap-4 max-w-2xl mx-auto">
-              <div className="rounded-2xl border border-white/20 bg-black/25 px-5 py-4 flex items-center gap-3">
-                <svg viewBox="0 0 24 24" className="w-7 h-7 text-white" fill="currentColor" aria-hidden="true">
-                  <path d="M16.8 12.5c0-2.2 1.8-3.2 1.9-3.3-1-1.5-2.6-1.7-3.2-1.8-1.4-.1-2.7.8-3.4.8-.8 0-1.9-.8-3.1-.8-1.6 0-3 .9-3.8 2.4-1.6 2.9-.4 7 1.2 9.2.8 1.1 1.6 2.3 2.8 2.3 1.1 0 1.5-.7 2.8-.7 1.3 0 1.7.7 2.8.7 1.2 0 2-1.1 2.7-2.2.8-1.3 1.2-2.5 1.2-2.6-.1 0-1.9-.7-1.9-4z" />
-                  <path d="M14.7 6c.6-.8 1.1-2 1-3.1-1 .1-2.2.7-2.9 1.6-.6.7-1.2 1.9-1 3 .9.1 2.2-.5 2.9-1.5z" />
-                </svg>
-                <div>
-                  <div className="text-xs text-white/70">Download on the</div>
-                  <div className="text-base font-semibold">App Store (Soon)</div>
-                </div>
-              </div>
-
-              <div className="rounded-2xl border border-white/20 bg-black/25 px-5 py-4 flex items-center gap-3">
-                <svg viewBox="0 0 24 24" className="w-7 h-7" aria-hidden="true">
-                  <polygon fill="#34A853" points="3,2 13,12 3,22" />
-                  <polygon fill="#FBBC04" points="13,12 18,9 21,11 16,14" />
-                  <polygon fill="#4285F4" points="3,2 13,12 16,10 10,6" />
-                  <polygon fill="#EA4335" points="3,22 13,12 16,14 10,18" />
-                </svg>
-                <div>
-                  <div className="text-xs text-white/70">Get it on</div>
-                  <div className="text-base font-semibold">Google Play (Soon)</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="mt-8 flex justify-center">
-              <Link
-                href={signupHref}
-                className="inline-flex items-center px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-              >
-                Create account for launch updates
-              </Link>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Latest News Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 bg-gradient-to-br from-emerald-50/40 via-white to-sky-50/40">
-        <div className="max-w-6xl mx-auto">
-          <div className="flex flex-col md:flex-row md:items-end md:justify-between gap-4 mb-8">
-            <div>
-              <p className="text-xs uppercase tracking-[0.2em] text-emerald-700 font-semibold mb-3">News</p>
-              <h2 className="text-3xl md:text-4xl font-bold text-helfi-black">
-                Latest health tracking guides and product updates
-              </h2>
-              <p className="text-gray-600 mt-3 max-w-2xl">
-                Read practical articles about food tracking, weekly health insights, and what we are building next.
-              </p>
-            </div>
-            <Link
-              href="/news"
-              className="inline-flex items-center px-5 py-3 rounded-full border border-emerald-200 text-emerald-700 font-semibold hover:bg-emerald-50 transition-colors"
-            >
-              View all news
-            </Link>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-5">
-            <Link
-              href="/news/mobile-apps-coming-soon"
-              className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">Product update</p>
-              <h3 className="text-xl font-semibold text-gray-900 mt-3">Helfi iOS and Android apps are coming soon</h3>
-              <p className="text-sm text-gray-600 mt-3">
-                Learn what is coming in the mobile apps, including Apple Health, Google health data, and sleep coaching.
-              </p>
-            </Link>
-
-            <Link
-              href="/news/complete-food-tracking-workflow"
-              className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">Food tracking</p>
-              <h3 className="text-xl font-semibold text-gray-900 mt-3">A better food tracking workflow for everyday life</h3>
-              <p className="text-sm text-gray-600 mt-3">
-                See how photo logging, barcode scan, ingredient search, and reusable tools work together.
-              </p>
-            </Link>
-
-            <Link
-              href="/news/weekly-health-insights-you-can-use"
-              className="rounded-2xl border border-emerald-100 bg-white p-6 shadow-sm hover:shadow-md transition-shadow"
-            >
-              <p className="text-xs uppercase tracking-[0.14em] text-emerald-700 font-semibold">AI insights</p>
-              <h3 className="text-xl font-semibold text-gray-900 mt-3">Weekly health insights you can actually use</h3>
-              <p className="text-sm text-gray-600 mt-3">
-                Understand how Helfi turns daily logs into clear weekly actions that feel realistic.
-              </p>
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Why Health Tracking Matters Section */}
-      <section id="why-helfi" className="px-6 py-20 bg-gradient-to-br from-green-50 to-blue-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-helfi-black mb-6">
-              Why Personal Health Intelligence Matters
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              In today's fast-paced world, maintaining optimal health requires more than just good intentions. 
-              Helfi helps you keep daily health tracking organized so patterns are easier to review over time.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-16 items-start mt-16">
-            <div className="space-y-8">
-              <div className="flex items-start space-x-4">
-                <div className="bg-red-100 rounded-full p-3 mt-1 flex-shrink-0">
-                  <svg className="w-6 h-6 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-helfi-black mb-3">Hidden Health Patterns</h3>
-                  <p className="text-gray-600">
-                    Many health issues develop silently over time. Without consistent tracking, patterns that could 
-                    indicate emerging problems often go unnoticed until they become serious.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="bg-yellow-100 rounded-full p-3 mt-1 flex-shrink-0">
-                  <svg className="w-6 h-6 text-yellow-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-helfi-black mb-3">Supplement Confusion</h3>
-                  <p className="text-gray-600">
-                    With thousands of supplements available, knowing what works, what's safe, and what interacts 
-                    with your medications is overwhelming without expert guidance.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="bg-orange-100 rounded-full p-3 mt-1 flex-shrink-0">
-                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-helfi-black mb-3">Safety &amp; Interaction Alerts</h3>
-                  <p className="text-gray-600">
-                    Stay safe with automatic detection of dangerous drug interactions, supplement conflicts, and personalized warnings.
-                  </p>
-                </div>
-              </div>
-            </div>
-
-            <div className="space-y-8">
-              <div className="flex items-start space-x-4">
-                <div className="bg-helfi-green/20 rounded-full p-3 mt-1 flex-shrink-0">
-                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-helfi-black mb-3">Personalized Insights</h3>
-                  <p className="text-gray-600">
-                    Our AI learns your unique patterns and provides recommendations tailored specifically to your 
-                    body, lifestyle, and health goals.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="bg-blue-100 rounded-full p-3 mt-1 flex-shrink-0">
-                  <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-helfi-black mb-3">Proactive Prevention</h3>
-                  <p className="text-gray-600">
-                    Identify potential health issues before they become problems, allowing you to take preventive 
-                    action and maintain optimal wellness.
-                  </p>
-                </div>
-              </div>
-
-              <div className="flex items-start space-x-4">
-                <div className="bg-purple-100 rounded-full p-3 mt-1 flex-shrink-0">
-                  <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z" />
-                  </svg>
-                </div>
-                <div>
-                  <h3 className="text-xl font-bold text-helfi-black mb-3">Optimization Guidance</h3>
-                  <p className="text-gray-600">
-                    Get science-backed recommendations for supplements, timing, dosages, and lifestyle changes 
-                    to maximize your health outcomes.
-                  </p>
-                </div>
+              <div className={styles.actions}>
+                <Link href={startHref} className={styles.primary}>{startLabel}</Link>
+                <a href="#why-helfi" className={styles.textLink}>See how it works <span aria-hidden="true">↓</span></a>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+          <button type="button" className={styles.videoToggle} onClick={toggleHeroVideo}>
+            {videoPlaying ? 'Pause background video' : 'Play background video'}
+          </button>
+        </section>
 
-      {/* Health Intelligence Benefits Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-white">
-        <div className="max-w-7xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-helfi-black mb-6">
-              Transform Your Health with AI Intelligence
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto">
-              Discover how artificial intelligence can revolutionize your approach to wellness, nutrition, and longevity.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 lg:gap-8">
-            <div className="text-center p-6 bg-gradient-to-br from-green-50 to-blue-50 rounded-2xl">
-              <div className="w-16 h-16 bg-helfi-green/10 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-helfi-black mb-3">Smart Supplement Optimization</h3>
-              <p className="text-gray-600 text-sm">
-                Optimize your supplement timing, dosages, and combinations based on your unique metabolism and health goals.
-              </p>
-            </div>
-
-            <div className="text-center p-6 bg-gradient-to-br from-blue-50 to-purple-50 rounded-2xl">
-              <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-helfi-black mb-3">Weekly Health Insights</h3>
-              <p className="text-gray-600 text-sm">
-                Review weekly patterns across energy, mood, sleep quality, and nutrition to understand what is working.
-              </p>
-            </div>
-
-            <div className="text-center p-6 bg-gradient-to-br from-purple-50 to-pink-50 rounded-2xl">
-              <div className="w-16 h-16 bg-purple-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-helfi-black mb-3">Pattern-Based Health Analytics</h3>
-              <p className="text-gray-600 text-sm">
-                Spot trends earlier with pattern summaries built from your weekly data.
-              </p>
-            </div>
-
-            <div className="text-center p-6 bg-gradient-to-br from-orange-50 to-red-50 rounded-2xl">
-              <div className="w-16 h-16 bg-orange-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                <svg className="w-8 h-8 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4.5c-.77-.833-1.996-.833-2.764 0L3.052 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                </svg>
-              </div>
-              <h3 className="text-xl font-bold text-helfi-black mb-3">Safety & Interaction Alerts</h3>
-              <p className="text-gray-600 text-sm">
-                Surface potential drug and supplement interactions and keep a clear record of what you are taking.
-              </p>
+        <section id="why-helfi" className={styles.section} aria-labelledby="routine-heading">
+          <div className={styles.container}>
+            <p className={styles.label}>How it works</p>
+            <h2 id="routine-heading">A clearer picture of your week</h2>
+            <div className={styles.steps}>
+              <article>
+                <p className={styles.stepNumber}>01</p>
+                <h3>Log what you eat</h3>
+                <p>Start with a photo, scan a barcode or search for ingredients. Check the portions before you save.</p>
+                <Link className={styles.textLink} href="/features/nutrition-food">Explore the food diary <span aria-hidden="true">↗</span></Link>
+              </article>
+              <article>
+                <p className={styles.stepNumber}>02</p>
+                <h3>Check in with yourself</h3>
+                <p>Note your sleep, mood or energy in a daily check-in. Add a few words about what was different that day.</p>
+                <Link className={styles.textLink} href="/features/daily-check-ins">Explore check-ins <span aria-hidden="true">↗</span></Link>
+              </article>
+              <article>
+                <p className={styles.stepNumber}>03</p>
+                <h3>Look back on your week</h3>
+                <p>See seven days of entries together and revisit the details you want to remember or discuss at an appointment.</p>
+                <Link className={styles.textLink} href="/features/ai-insights">Explore weekly reports <span aria-hidden="true">↗</span></Link>
+              </article>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Talk to Helfi Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-r from-purple-50 to-blue-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-12 items-center">
-            <div>
-              <h2 className="text-4xl font-bold text-helfi-black mb-6">Talk to Helfi</h2>
-              <p className="text-xl text-gray-600 mb-8">
-                Ask questions about your health data by text or voice. Helfi uses your profile and logs to answer clearly.
-              </p>
-              
-              <div className="space-y-6">
-                  <div className="bg-white p-6 rounded-xl shadow-sm border border-purple-100">
-                    <div className="flex items-start space-x-4">
-                      <div className="bg-purple-100 rounded-full p-2 mt-1">
-                        <svg className="w-6 h-6 text-purple-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Natural questions</h4>
-                      <p className="text-gray-600 text-sm">"How did my week look for energy and sleep?"</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-blue-100">
-                  <div className="flex items-start space-x-4">
-                    <div className="bg-blue-100 rounded-full p-2 mt-1">
-                      <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Past conversations stay with you</h4>
-                      <p className="text-gray-600 text-sm">"Can you remind me what we discussed last month?"</p>
-                    </div>
-                  </div>
-                </div>
-                
-                <div className="bg-white p-6 rounded-xl shadow-sm border border-green-100">
-                  <div className="flex items-start space-x-4">
-                    <div className="bg-helfi-green/20 rounded-full p-2 mt-1">
-                      <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
-                      </svg>
-                    </div>
-                    <div>
-                      <h4 className="font-semibold text-gray-900 mb-2">Clear, short answers</h4>
-                      <p className="text-gray-600 text-sm">"Here is what stands out from your recent logs."</p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex justify-center">
-              <div className="w-full max-w-lg h-96 bg-gradient-to-br from-purple-100 to-blue-100 rounded-2xl shadow-2xl overflow-hidden">
-                <img 
-                  src="https://res.cloudinary.com/dh7qpr43n/image/upload/v1749922074/WOMAN_TALKING_INTO_HER_PHONE_zi9fh8.jpg"
-                  alt="Person using Talk to Helfi"
-                  className="w-full h-full object-cover object-center"
-                  style={{objectPosition: 'center 20%'}}
+        <section id="features" className={styles.featureSection} aria-labelledby="features-heading">
+          <div className={styles.container}>
+            <div className={styles.featureGrid}>
+              <figure className={styles.reportVisual}>
+                <Image
+                  className={styles.phone}
+                  src={reportImage}
+                  alt="Helfi Insights screen with a seven-day report and the next report date"
+                  width={1419}
+                  height={2796}
+                  sizes="(max-width: 700px) 180px, 230px"
                 />
+                <figcaption>Example from Helfi Insights</figcaption>
+              </figure>
+              <div>
+                <p className={styles.label}>Explore Helfi</p>
+                <h2 id="features-heading">More ways to keep track</h2>
+                <ul className={styles.featureList}>
+                  {features.map(({ name, href, description }) => (
+                    <li key={href}>
+                      <Link href={href}>
+                        <strong>{name}</strong>
+                        <span>{description}</span>
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+                <Link className={styles.textLink} href="/features">View all features <span aria-hidden="true">↗</span></Link>
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Pricing Section */}
-      <section id="pricing" className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gray-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-helfi-black mb-4">
-              Simple, Transparent Pricing
-            </h2>
-            <p className="text-xl text-gray-600">
-              Choose the plan that fits your health journey
-            </p>
-          </div>
-          {checkoutError && (
-            <div className="mb-8 rounded-lg border border-red-200 bg-red-50 p-4 text-sm text-red-700">
-              {checkoutError}
-            </div>
-          )}
-
-          {/* Plans Section */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Plans</h2>
-            <div className="grid grid-cols-1 lg:grid-cols-4 gap-8">
-              {/* $10 plan */}
-              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 700 credits</p>
-                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
-                <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
-                </ul>
-                <button onClick={() => handlePlanSelection('plan_10_monthly')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
-                  Choose $10 Plan
-                </button>
+        <section className={styles.directory} aria-labelledby="directory-heading">
+          <div className={styles.container}>
+            <div className={styles.directoryGrid}>
+              <div>
+                <p className={styles.label}>Practitioner directory</p>
+                <h2 id="directory-heading">Find a practitioner</h2>
+                <p>Search by location, specialty or telehealth. Have a practice? Add it to the directory.</p>
               </div>
-
-              {/* $20 plan */}
-              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 1,400 credits</p>
-                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
-                <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
-                </ul>
-                <button onClick={() => handlePlanSelection('plan_20_monthly')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
-                  Choose $20 Plan
-                </button>
-              </div>
-
-              {/* $30 plan */}
-              <div className="border-2 border-helfi-green rounded-2xl p-8 relative shadow-sm hover:shadow-lg transition-shadow bg-white">
-                <div className="absolute -top-3 left-1/2 transform -translate-x-1/2">
-                  <span className="bg-helfi-green text-white px-3 py-1 rounded-full text-sm font-medium">Most Popular</span>
-                </div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$30 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 2,100 credits</p>
-                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
-                <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
-                </ul>
-                <button onClick={() => handlePlanSelection('plan_30_monthly')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
-                  Choose $30 Plan
-                </button>
-              </div>
-
-              {/* $50 plan */}
-              <div className="border border-gray-200 rounded-2xl p-8 shadow-sm hover:shadow-md transition-shadow bg-white">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$50 / month</h3>
-                <p className="text-3xl font-bold text-gray-900 mb-1">Monthly wallet: 3,500 credits</p>
-                <p className="text-xs text-gray-500 mb-4">Credits refresh monthly. No rollover.</p>
-                <ul className="space-y-2 mb-6 text-sm text-gray-600">
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> All features unlocked</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Percentage‑based usage meter</li>
-                  <li className="flex items-center"><span className="w-4 h-4 text-green-500 mr-2">✓</span> Top‑ups valid 12 months</li>
-                </ul>
-                <button onClick={() => handlePlanSelection('plan_50_monthly')} className="w-full bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-gray-800 transition-colors" type="button">
-                  Choose $50 Plan
-                </button>
+              <div className={styles.actions}>
+                <Link className={styles.lightButton} href="/practitioners">Search the directory</Link>
+                <Link className={styles.textLink} href="/list-your-practice">List your practice <span aria-hidden="true">↗</span></Link>
               </div>
             </div>
           </div>
+        </section>
 
-          {/* Buy Extra Credits Section */}
-          <div className="bg-white rounded-lg shadow-sm p-6 mb-8">
-            <h2 className="text-2xl font-bold text-gray-900 mb-6 text-center">Buy Extra Credits</h2>
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Try with $5 (250 credits)</h3>
-                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
-                <button onClick={() => handleCreditPurchase('credits_250')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
-                  Buy $5 Credits
-                </button>
+        <section id="pricing" className={styles.section} aria-labelledby="pricing-heading">
+          <div className={styles.container}>
+            <p className={styles.label}>Pricing</p>
+            <h2 id="pricing-heading">Choose a monthly plan</h2>
+            <p className={styles.sectionIntro}>Every plan includes access to all features. Credits refresh monthly and unused monthly credits do not roll over.</p>
+            {checkoutError && <p className={styles.checkoutError} role="alert">{checkoutError}</p>}
+            <div className={styles.plans}>
+              {plans.map(({ price, credits, id }) => (
+                <article key={id} className={styles.plan}>
+                  <h3>${price}<span> / month</span></h3>
+                  <p>{credits} credits per month</p>
+                  <button type="button" className={styles.outlineButton} onClick={() => handleCheckout(id)}>Choose ${price} plan</button>
+                </article>
+              ))}
+            </div>
+            <div className={styles.topUps}>
+              <div>
+                <h3>Buy extra credits</h3>
+                <p>One-time top-ups. Credits are valid for 12 months.</p>
               </div>
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$10 (500 credits)</h3>
-                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
-                <button onClick={() => handleCreditPurchase('credits_500')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
-                  Buy $10 Credits
-                </button>
-              </div>
-              <div className="border border-gray-200 rounded-lg p-6">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">$20 (1,000 credits)</h3>
-                <p className="text-sm text-gray-600 mb-6">One‑time top‑up. Credits valid for 12 months.</p>
-                <button onClick={() => handleCreditPurchase('credits_1000')} className="w-full bg-helfi-green text-white px-4 py-2 rounded-lg hover:bg-helfi-green/90 transition-colors" type="button">
-                  Buy $20 Credits
-                </button>
+              <div className={styles.topUpActions}>
+                {topUps.map(({ price, credits, id }) => (
+                  <button type="button" key={id} className={styles.outlineButton} onClick={() => handleCheckout(id)}>
+                    {credits} credits · ${price}
+                  </button>
+                ))}
               </div>
             </div>
           </div>
-        </div>
-      </section>
+        </section>
 
-      {/* Affiliate Program Section */}
-      <section id="affiliate" className="px-6 py-20 bg-gradient-to-br from-emerald-50 to-white">
-        <div className="max-w-6xl mx-auto grid grid-cols-1 lg:grid-cols-2 gap-12 items-start">
-          <div>
-            <p className="text-xs uppercase tracking-[0.2em] text-gray-500 mb-4">
-              Affiliate program
-            </p>
-            <h2 className="text-4xl font-bold text-helfi-black mb-6">
-              Earn by sharing Helfi
-            </h2>
-            <p className="text-lg text-gray-600 mb-6 leading-relaxed">
-              Partner with Helfi and get paid for every qualified referral. The program is built
-              for coaches, clinics, wellness creators, and anyone guiding clients toward better
-              health habits. You get a unique tracking link, an affiliate dashboard, and clear
-              monthly reporting so you can see performance at a glance.
-            </p>
-            <p className="text-base text-gray-600 mb-8 leading-relaxed">
-              We pay 50% of net revenue on first-month subscriptions and every top-up purchase.
-              Attribution is last-click with a 30-day window. Commissions become payable after
-              30 days, with a $50 minimum, and are paid out monthly via Stripe Connect. Refunds or
-              disputes within the 30-day window are voided to keep payouts accurate.
-            </p>
-            <div className="grid gap-4 mb-8">
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">How it works</h3>
-                <ol className="space-y-2 text-sm text-gray-600">
-                  <li>1. Apply and get approved with your preferred channel.</li>
-                  <li>2. Share your unique Helfi link in content, newsletters, or client portals.</li>
-                  <li>3. Track clicks, conversions, and payouts in your affiliate dashboard.</li>
-                </ol>
+        <section id="faq" className={styles.faq} aria-labelledby="faq-heading">
+          <div className={styles.container}>
+            <div className={styles.faqGrid}>
+              <div>
+                <p className={styles.label}>Help</p>
+                <h2 id="faq-heading">Common questions</h2>
+                <Link className={styles.textLink} href="/faq">Read the full FAQ <span aria-hidden="true">↗</span></Link>
               </div>
-              <div className="bg-white rounded-2xl p-5 shadow-sm border border-emerald-100">
-                <h3 className="text-lg font-semibold text-gray-900 mb-2">Why partners choose us</h3>
-                <ul className="space-y-2 text-sm text-gray-600">
-                  <li>High-value health analytics and reports your audience can trust.</li>
-                  <li>Privacy-first attribution with anonymized reporting.</li>
-                  <li>Clear terms, predictable payouts, and long-term product updates.</li>
-                </ul>
+              <div className={styles.questions}>
+                {questions.map(({ question, answer, link }) => (
+                  <details key={question}>
+                    <summary>{question}</summary>
+                    <p>{answer}{link && <> <Link href={link}>Privacy Policy</Link>.</>}</p>
+                  </details>
+                ))}
               </div>
             </div>
-            <div className="flex flex-wrap gap-3">
-              <Link
-                href="/affiliate/apply"
-                className="px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-              >
-                Apply to the program
+          </div>
+        </section>
+
+        <section className={styles.section} aria-labelledby="news-heading">
+          <div className={styles.container}>
+            <p className={styles.label}>Guides &amp; updates</p>
+            <div className={styles.sectionHeading}>
+              <h2 id="news-heading">From Helfi</h2>
+              <Link className={styles.textLink} href="/news">All news <span aria-hidden="true">↗</span></Link>
+            </div>
+            <div className={styles.news}>
+              {news.map(({ name, href, category }) => (
+                <Link key={href} href={href}>
+                  <span>{category}</span>
+                  <strong>{name}</strong>
+                  <span aria-hidden="true">↗</span>
+                </Link>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className={styles.footer}>
+        <div className={styles.container}>
+          <div className={styles.footerTop}>
+            <div>
+              <Link href="/" aria-label="Helfi home">
+                <Image src="/mobile-assets/LOGOS/helfi-01-06.svg" alt="Helfi" width={126} height={67} />
               </Link>
-              <Link
-                href="/affiliate/terms"
-                className="px-6 py-3 rounded-full border border-gray-200 text-gray-700 font-semibold hover:border-helfi-green/60 hover:text-helfi-green transition-colors"
-              >
-                View affiliate terms
-              </Link>
+              <p>A food diary and health tracker for everyday life.</p>
             </div>
+            <Link className={styles.lightButton} href={startHref}>{startLabel}</Link>
           </div>
-          <div className="grid gap-4">
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">50% net revenue</h3>
-              <p className="text-gray-600">
-                Earn 50% of net revenue on the first subscription payment and every top-up.
-              </p>
-            </div>
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">30-day attribution</h3>
-              <p className="text-gray-600">
-                Last-click attribution stays active for 30 days after each referral click.
-              </p>
-            </div>
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Net-30 payouts</h3>
-              <p className="text-gray-600">
-                Commissions become payable after 30 days, with a $50 minimum payout threshold.
-              </p>
-            </div>
-            <div className="bg-white rounded-2xl p-6 shadow-sm border border-emerald-100">
-              <h3 className="text-xl font-semibold text-gray-900 mb-2">Monthly transfers</h3>
-              <p className="text-gray-600">
-                Payouts are sent monthly through Stripe Connect once commissions clear.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* FAQ Section */}
-      <section id="faq" className="px-6 py-20 bg-white">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-helfi-black mb-6">
-              Frequently Asked Questions
-            </h2>
-            <p className="text-xl text-gray-600">
-              Everything you need to know about Helfi's health tracking tools
-            </p>
-          </div>
-
-          <div className="space-y-8">
-            <div className="bg-gray-50 rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-helfi-black mb-4">
-                How does Helfi review my health tracking data?
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                Helfi looks at the data you log across nutrition, supplements, sleep, check-ins, and health notes. Each week we
-                build a report from your last 7 days and surface patterns that are easier to miss in day-to-day tracking. The
-                more consistent your logging, the clearer the weekly trends become.
-              </p>
-            </div>
-
-            <div className="bg-gray-50 rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-helfi-black mb-4">
-                Is my health data secure and private?
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                We encrypt stored data and use strict access controls. We never sell your personal information to third
-                parties, and you can export or delete your data at any time. See our Privacy Policy for details on how data
-                is handled.
-              </p>
-            </div>
-
-            <div className="bg-gray-50 rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-helfi-black mb-4">
-                Can Helfi detect dangerous supplement and medication interactions?
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                Helfi surfaces potential interactions based on known sources and your logged stack. It is designed to help you
-                ask better questions, not replace medical advice. Always confirm interactions with a qualified healthcare
-                provider.
-              </p>
-            </div>
-
-            <div className="bg-gray-50 rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-helfi-black mb-4">
-                How accurate is the food photo recognition?
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                Food photo notes provide estimates that you can review and edit. For best results, take clear photos and
-                adjust ingredients or portions before saving. The goal is speed and consistency, with you in control of final
-                entries.
-              </p>
-            </div>
-
-            <div className="bg-gray-50 rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-helfi-black mb-4">
-                What devices can I connect to Helfi?
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                Fitbit and Garmin Connect are supported today. You can also share interest in other devices, and we will notify
-                you as new integrations roll out.
-              </p>
-            </div>
-
-            <div className="bg-gray-50 rounded-2xl p-8">
-              <h3 className="text-xl font-bold text-helfi-black mb-4">
-                How does the voice AI feature work?
-              </h3>
-              <p className="text-gray-600 leading-relaxed">
-                The voice assistant lets you speak naturally to log entries or ask questions about your week. You can review
-                what gets saved, and it is designed to help you capture context quickly without typing.
-              </p>
-            </div>
-          </div>
-
-          <div className="mt-8 text-center">
-            <Link
-              href="/faq"
-              className="inline-flex items-center px-6 py-3 rounded-full bg-helfi-green text-white font-semibold hover:bg-helfi-green/90 transition-colors"
-            >
-              See full FAQ and Help Center
-            </Link>
-          </div>
-        </div>
-      </section>
-
-      {/* Benefits for Health Optimization Section */}
-      <section className="px-4 sm:px-6 lg:px-10 xl:px-16 py-16 lg:py-20 bg-gradient-to-br from-helfi-green/5 to-blue-50">
-        <div className="max-w-6xl mx-auto">
-          <div className="text-center mb-16">
-            <h2 className="text-4xl font-bold text-helfi-black mb-6">
-              Why Health Optimization Matters More Than Ever
-            </h2>
-            <p className="text-xl text-gray-600 max-w-3xl mx-auto leading-relaxed">
-              In 2024, chronic diseases affect 6 in 10 adults in the US. Many of these conditions are preventable 
-              through proper nutrition, supplement optimization, and lifestyle tracking.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8">
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-4xl mb-4">📈</div>
-              <h3 className="text-xl font-bold text-helfi-black mb-4">Prevent Chronic Disease</h3>
-              <p className="text-gray-600">
-                Studies show that proper nutrition tracking and supplement optimization can reduce the risk of heart disease, 
-                diabetes, and other chronic conditions by up to 40%. Early intervention through data-driven insights is key.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-4xl mb-4">💊</div>
-              <h3 className="text-xl font-bold text-helfi-black mb-4">Optimize Supplement Efficacy</h3>
-              <p className="text-gray-600">
-                Most people take supplements incorrectly, reducing their effectiveness by 50-70%. Proper timing, dosages, 
-                and interaction awareness can dramatically improve health outcomes and save money on ineffective supplementation.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-4xl mb-4">🧠</div>
-              <h3 className="text-xl font-bold text-helfi-black mb-4">Enhance Mental Performance</h3>
-              <p className="text-gray-600">
-                Tracking correlations between nutrition, supplements, and cognitive performance helps identify what boosts 
-                your mental clarity, focus, and mood. Personalized insights lead to sustained cognitive enhancement.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-4xl mb-4">⚡</div>
-              <h3 className="text-xl font-bold text-helfi-black mb-4">Increase Energy Levels</h3>
-              <p className="text-gray-600">
-                By reviewing patterns in your sleep, nutrition, and supplement intake, Helfi helps highlight what factors
-                contribute to energy crashes and sustained vitality, helping you maintain consistent energy throughout the day.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-4xl mb-4">🏃</div>
-              <h3 className="text-xl font-bold text-helfi-black mb-4">Improve Athletic Performance</h3>
-              <p className="text-gray-600">
-                Athletes who track nutrition and supplementation with AI guidance show 20-30% improvements in recovery time 
-                and performance metrics compared to those using generic approaches.
-              </p>
-            </div>
-
-            <div className="bg-white p-8 rounded-2xl shadow-sm border border-gray-100">
-              <div className="text-4xl mb-4">💰</div>
-              <h3 className="text-xl font-bold text-helfi-black mb-4">Save Money on Healthcare</h3>
-              <p className="text-gray-600">
-                Preventive health optimization through proper tracking and AI insights can reduce healthcare costs by 
-                thousands of dollars annually by preventing costly chronic diseases and optimizing supplement spending.
-              </p>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      {/* Footer */}
-      <footer className="bg-helfi-black text-white px-4 py-12">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid grid-cols-1 md:grid-cols-5 gap-8">
-            <div className="md:col-span-2">
-              <div className="text-2xl font-bold mb-4">
-                <span className="text-helfi-green">Helfi</span>
-              </div>
-              <p className="text-gray-400 mb-4">
-                Your personal health intelligence platform. Track, analyze, and optimize your wellbeing with AI-powered insights.
-              </p>
-            </div>
-            
+          <div className={styles.footerLinks}>
             <div>
-              <h4 className="font-semibold mb-4">Platform</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li>
-                  <button 
-                    onClick={() => document.getElementById('features')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="hover:text-white text-left"
-                  >
-                    Features
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => document.getElementById('pricing')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="hover:text-white text-left"
-                  >
-                    Pricing
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => document.getElementById('why-helfi')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="hover:text-white text-left"
-                  >
-                    Why Helfi
-                  </button>
-                </li>
-                <li>
-                  <button 
-                    onClick={() => document.getElementById('faq')?.scrollIntoView({ behavior: 'smooth' })}
-                    className="hover:text-white text-left"
-                  >
-                    FAQ
-                  </button>
-                </li>
-              </ul>
+              <h3>Explore</h3>
+              <Link href="/features">Features</Link>
+              <a href="#pricing">Pricing</a>
+              <Link href="/practitioners">Practitioner directory</Link>
+              <Link href="/news">News</Link>
             </div>
-
-            <div>
-              <h4 className="font-semibold mb-4">Affiliates</h4>
-              <p className="text-gray-400 mb-3 text-sm">
-                Earn by sharing Helfi.
-              </p>
-              <ul className="space-y-2 text-gray-400 text-sm">
-                <li>
-                  <Link href="/affiliate/apply" className="hover:text-white">
-                    Apply to the affiliate program
-                  </Link>
-                </li>
-                <li>
-                  <Link href="/affiliate/terms" className="hover:text-white">
-                    Affiliate Terms
-                  </Link>
-                </li>
-              </ul>
+            <div id="affiliate">
+              <h3>For partners</h3>
+              <Link href="/list-your-practice">List your practice</Link>
+              <Link href="/affiliate/apply">Affiliate program</Link>
+              <Link href="/affiliate/terms">Affiliate terms</Link>
             </div>
-            
             <div>
-              <h4 className="font-semibold mb-4">Legal</h4>
-              <ul className="space-y-2 text-gray-400">
-                <li><Link href="/privacy" className="hover:text-white">Privacy Policy</Link></li>
-                <li><Link href="/terms" className="hover:text-white">Terms of Service</Link></li>
-                <li><Link href="/support" className="hover:text-white">Contact</Link></li>
-              </ul>
+              <h3>Help &amp; legal</h3>
+              <Link href="/faq">FAQ</Link>
+              <Link href="/support">Contact</Link>
+              <Link href="/privacy">Privacy policy</Link>
+              <Link href="/terms">Terms of service</Link>
             </div>
           </div>
-          
-          <div className="border-t border-gray-800 mt-8 pt-8 text-center text-gray-400">
-            <p>&copy; 2024 Helfi. All rights reserved.</p>
+          <div className={styles.footerBottom}>
+            <span>© Helfi. All rights reserved.</span>
+            <a href="#main-content">Back to top ↑</a>
           </div>
         </div>
       </footer>
 
-      {/* Back to Top Button */}
-      <BackToTopButton />
-
-      {/* Demo Modal */}
-      {showDemoModal && (
-        <div 
-          className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4"
-          onClick={handleDemoModalClose}
-        >
-          <div 
-            className="bg-white rounded-2xl max-w-md w-full p-8 shadow-xl"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="flex justify-between items-start mb-6">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-gradient-to-br from-helfi-green/20 to-blue-100 rounded-full flex items-center justify-center">
-                  <svg className="w-6 h-6 text-helfi-green" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M14.752 11.168l-3.197-2.132A1 1 0 0010 9.87v4.263a1 1 0 001.555.832l3.197-2.132a1 1 0 000-1.664z" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                  </svg>
-                </div>
-                <h3 className="text-2xl font-bold text-gray-900">Demo Video</h3>
-              </div>
-              <button
-                onClick={handleDemoModalClose}
-                className="text-gray-400 hover:text-gray-600 transition-colors"
-                aria-label="Close"
-              >
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <div className="mb-6">
-              <p className="text-gray-600 text-lg leading-relaxed mb-4">
-                We're finalizing an updated demo video to show you all the amazing features of Helfi.
-              </p>
-              <p className="text-gray-600 leading-relaxed">
-                Stay tuned for a simple walkthrough of how Helfi helps you organize food, water, mood, notes, and weekly reports.
-              </p>
-            </div>
-            <div className="flex gap-3">
-              <button
-                onClick={handleDemoModalClose}
-                className="flex-1 bg-gray-100 text-gray-700 px-6 py-3 rounded-lg hover:bg-gray-200 transition-colors font-medium"
-              >
-                Got it
-              </button>
-              {status === 'authenticated' ? (
-                <Link
-                  href="/dashboard"
-                  onClick={() => setShowDemoModal(false)}
-                  className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium text-center"
-                >
-                  Go to Dashboard
-                </Link>
-              ) : (
-                <Link
-                  href={signupHref}
-                  onClick={() => setShowDemoModal(false)}
-                  className="flex-1 bg-helfi-green text-white px-6 py-3 rounded-lg hover:bg-helfi-green/90 transition-colors font-medium text-center"
-                >
-                  Create account
-                </Link>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       <script
         type="application/ld+json"
-        dangerouslySetInnerHTML={{
-          __html: JSON.stringify(homepageSchema),
-        }}
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(homepageSchema) }}
       />
-
     </div>
   )
-} 
+}

@@ -10,7 +10,7 @@ const SUPPORT_AGENTS: SupportAgent[] = [
   { name: 'Amelia', role: SUPPORT_AGENT_ROLE, avatar: '/support/amelia-brooks.jpg' },
   { name: 'Luca', role: SUPPORT_AGENT_ROLE, avatar: '/support/luca-bennett.jpg' },
   { name: 'Priya', role: SUPPORT_AGENT_ROLE, avatar: '/support/priya-shah.jpg' },
-  { name: 'Mateo', role: SUPPORT_AGENT_ROLE, avatar: '/support/mateo-reed.jpg' },
+  { name: 'Mateo', role: SUPPORT_AGENT_ROLE, avatar: '/icons/helfi-ios-nontransparent-v20260722g-192.png' },
   { name: 'Chloe', role: SUPPORT_AGENT_ROLE, avatar: '/support/chloe-nguyen.jpg' },
 ]
 
