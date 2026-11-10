@@ -25,6 +25,7 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
   const { data: session, status } = useSession()
   const pathname = usePathname()
   const router = useRouter()
+  const isHomepage = pathname === '/'
   const isPractitionerDirectory = pathname === '/practitioners' || pathname?.startsWith('/practitioners/')
   const loginHref = isPractitionerDirectory
     ? '/auth/signin?context=practitioner&next=/practitioner'
@@ -257,11 +258,11 @@ export default function PublicHeader({ mobileVariant = 'default' }: PublicHeader
                 window.location.href = '/'
               }
             }}
-            className={`w-28 h-28 md:w-40 md:h-40 cursor-pointer hover:opacity-80 transition-opacity ${showMobileBack ? 'hidden md:block' : ''}`}
+            className={`w-28 md:w-40 ${isHomepage ? 'h-16 md:h-[88px]' : 'h-28 md:h-40'} cursor-pointer hover:opacity-80 transition-opacity ${showMobileBack ? 'hidden md:block' : ''}`}
             aria-label="Go to homepage"
           >
             <Image
-              src={pathname === '/' ? '/mobile-assets/LOGOS/helfi-01-01.svg' : '/mobile-assets/LOGOS/helfi-01-01.png'}
+              src={isHomepage ? '/mobile-assets/LOGOS/helfi-01-01.svg' : '/mobile-assets/LOGOS/helfi-01-01.png'}
               alt="Helfi Logo"
               width={160}
               height={160}
