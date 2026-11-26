@@ -1,4 +1,18 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — DNS email authentication only; website source remains33e639ce/AWS158.
+- Date/time: 27 November2026, 4:18am Australia/Melbourne.
+- What changed: Restored the missing SPF TXT record for the existing Zoho Australia support sender. Both previous verification TXT values and TTL remain; MX, DMARC reject policy, SES and website records are unchanged. Route53 changeC0284249F0VZMPYSAZ80 isINSYNC.
+- Where to see it (page/link): Publichelfi.ai TXT; authoritativeDNS,1.1.1.1and8.8.8.8 return the same ZohoAU SPF. Both live domains200CloudFront retain matchingAWS158 ETag/hash.
+- What to quickly test: Send one controlled support reply after propagation and verify recipient Inbox plus message authentication. The first real-agent reply reached SonicWeb spam before this fix; no Inbox improvement is claimed yet. Automatic replies remain disabled pending that check.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — native purchase runtime settings only, AWS158, existing source33e639ce160f9f75c0ccb0034581aeb97161d536.
+- Date/time: 27 November 2026, approximately 3:35am Australia/Melbourne.
+- What changed: Restored 18 existing native billing settings to the production runtime. No local app candidates were included.
+- Where to see it (page/link): https://helfi.ai/billing and native Billing. Both live domains200/CloudFront with matching deployment identity; authenticated catalog changed from14empty productIDs/bothnotready to14configured/bothready.
+- What to quickly test: iPhone monthly/top-up store prices now load (existing iOS63 verified all7). Actual purchase completion is not established. Android catalog is ready; emulator localized prices still need separate checking.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — AWS152 /0a300187e5ce89998caba348ebbe487bfda05989.
 - Date/time: 19October2026, verified03:31:02UTC.
 - What changed: Low reasoning on the existing backend planner and independent decision check, safe timing/phase diagnostics, and native63's accurate ended status/explicit retry. All120required suites/full production build passed; native types and both page locks passed. Worker0294732f12ac81bd3c3e959ca0a67388d4757b73e081097fba920c9fb8a87120 independently verified; no permission changes.
