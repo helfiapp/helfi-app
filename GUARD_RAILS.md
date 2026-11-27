@@ -1,3 +1,7 @@
+## Public help must match current app behavior — 27 November 2026
+
+PublicHeader uses the approved existing SVG at original sizes on all public routes; do not restore oversized9712×5180PNG that exceeds live image limits. FAQ directs current prices/credit allowances to Billing and retains monthlyrefresh/no-rollover,12-monthtopups,provider cancellation and explicitAIsharing/PrivacyPolicy retention wording. Do not restore nonexistent unlimited daily retries,nonexpiringtopups,never-shared/never-lostguarantees or unsupportedoffline promises. Journal device help must stay platform-neutral. Preserve all layouts,colours,food captions and functional account/credit/consent controls.
+
 ## Health-summary PDF text and packaging — 27 November2026
 
 Keep original supported text, paragraph breaks and visual word wrapping in health-summary PDFs. Use the checked, licensed bundled fonts; never delete unsupported characters from names or notes. Unsupported text returns a truthful error with support guidance, not an export option the app does not offer. Saved data must remain unchanged. `check:pdf-export` executes the real export and Settings error/success paths with synthetic data and validates original text extraction, margins and font hashes; it is required by prebuild. Both font files must appear in the route's runtime file trace. A local build or trace alone is not proof of the deployed PDF route.
