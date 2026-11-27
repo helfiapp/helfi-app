@@ -1,3 +1,9 @@
+## Food saved portions and rounding — candidate, 27 November 2026
+
+Normal live UI verification caught an unchanged web update dropping a native half portion: one controlled entry changed111→221kcal. The same source (41kcal/100g,0.24gfat/100g,540gwholemeal) exposed web rounding-before-scaling: half fat0.7 instead of0.6 and double calories442 instead of443. Native source-first totals were correct.
+
+The narrow web repair preserves saved portion metadata through numeric ingredient edits and both save containers; grams/ounces must stay consistent with the retained share and whole weight. For item-backed entries, apply the saved positive scale BEFORE the single rounding step. Keep stored/legacy fallbacks scaled once, allow portions above100%, preserve unknown nutrients and nonnegative validation. This supersedes the literal helper-call prescription in3.13 only; its saved-scale and no-clamping requirements remain. Review cards must clearly distinguish full-meal amounts from the saved eaten share. Rename, source identity, credit and account logic stay outside this change. A current-source permanent regression is required before release.
+
 ## Counted-serving totals and unknown targets — 27 November 2026
 
 - Native diary loading, ingredient editing, physical amount conversion and save/reopen must use the same whole-serving factor once. Preserve piecesPerServing, original source IDs/labels, custom full-set gram/ml denominator and nutritionCoversServing. A complete multi-piece serving must never be counted twice. Legacy explicit multiplier fields keep their existing native precedence pending a verified conflicting record; do not rewrite saved history.
