@@ -80,7 +80,7 @@ const userDataSource=fs.readFileSync(path.join(root,'app/api/user-data/route.ts'
 const userDataAst=ts.createSourceFile('user-data.ts',userDataSource,ts.ScriptTarget.Latest,true)
 let goalsBlock,exerciseBlock,profileBlock,metabolicGenderBlock
 function findBlocks(node){
-  if(ts.isBlock(node)&&node.statements.some(item=>ts.isVariableStatement(item)&&item.declarationList.declarations.some(value=>value.name.getText(userDataAst)==='profileUpdateData')))profileBlock=node.getText(userDataAst)
+  if(ts.isTryStatement(node)&&node.tryBlock.getText(userDataAst).includes('const incomingProfileInfo')&&node.tryBlock.getText(userDataAst).includes('tx.healthGoal.create'))profileBlock=node.tryBlock.getText(userDataAst)
   if(ts.isIfStatement(node)&&node.expression.getText(userDataAst)==='data.gender'&&node.thenStatement.getText(userDataAst).includes('updateData.gender'))metabolicGenderBlock=node.getText(userDataAst)
   if(ts.isTryStatement(node)&&node.tryBlock.getText(userDataAst).includes('const hasGoalsPayload')&&!node.tryBlock.getText(userDataAst).includes('POST /api/user-data DEBUG'))goalsBlock=node.getText(userDataAst)
   if(ts.isIfStatement(node)&&node.expression.getText(userDataAst)==='Array.isArray(data.exerciseTypes)')exerciseBlock=node.getText(userDataAst)
@@ -89,18 +89,20 @@ function findBlocks(node){
 findBlocks(userDataAst)
 assert(goalsBlock&&exerciseBlock&&profileBlock&&metabolicGenderBlock,'Actual changed manual-handler blocks must be present')
 async function actualProfileBlock(profileInfoPayload,metabolic='MALE',data={}){
-  const writes=[],context=vm.createContext({profileInfoPayload,data,user:{id:'synthetic-owner'},prisma:{user:{update:async query=>{writes.push(copy(query.data));return query.data}},healthGoal:{deleteMany:async()=>{},create:async()=>({})}},console:{log(){},error(){}},updateData:{}})
-  // Exact normal profile basic-field statements, ending before unrelated special-row storage.
-  const blockAst=ts.createSourceFile('profile-block.ts',profileBlock,ts.ScriptTarget.Latest,true)
-  const block=blockAst.statements[0]
-  const boundary=block.statements.findIndex(node=>node.getText(blockAst).includes('prisma.healthGoal.deleteMany'))
-  const start=block.statements.findIndex(node=>ts.isVariableStatement(node)&&node.declarationList.declarations.some(value=>value.name.getText(blockAst)==='profileUpdateData'))
-  assert(start>=0&&boundary>start)
-  const source=block.statements.slice(start,boundary).map(node=>node.getText(blockAst)).join('\n')
-  await vm.runInContext(ts.transpileModule(`(async()=>{${metabolicGenderBlock};${source}})()`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,context)
+  const writes=[]
+  let stored={firstName:'Old',lastName:'Name',bio:'Keep',dateOfBirth:'1990-01-01'}
+  const owned=query=>{assert.equal(query.where.userId,'synthetic-owner');assert.equal(query.where.name,'__PROFILE_INFO_DATA__')}
+  const tx={
+    $queryRaw:async(parts,...values)=>{assert.match(parts.join('?'),/SELECT id FROM "User".*FOR UPDATE/);assert.equal(values[0],'synthetic-owner');return[]},
+    user:{update:async query=>{assert.equal(query.where.id,'synthetic-owner');writes.push(copy(query.data));return query.data}},
+    healthGoal:{findFirst:async query=>{owned(query);return{category:JSON.stringify(stored)}},deleteMany:async query=>{owned(query)},create:async({data:row})=>{assert.equal(row.userId,'synthetic-owner');assert.equal(row.name,'__PROFILE_INFO_DATA__');stored=JSON.parse(row.category);return row}},
+  }
+  const context=vm.createContext({data:{...data,profileInfo:profileInfoPayload},normalizedBirthdate:typeof data.birthdate==='string'?data.birthdate.trim():'',user:{id:'synthetic-owner'},prisma:{$transaction:async operation=>operation(tx)},console:{log(){},error(){}},updateData:{}})
+  // Execute the complete current transaction rather than an obsolete variable name.
+  await vm.runInContext(ts.transpileModule(`(async()=>{${metabolicGenderBlock};${profileBlock}})()`,{compilerOptions:{target:ts.ScriptTarget.ES2020}}).outputText,context)
   for(const write of writes)if('gender'in write)metabolic=write.gender
   if('gender'in context.updateData)metabolic=context.updateData.gender
-  return {metabolic,writes,display:profileInfoPayload.gender}
+  return {metabolic,writes,display:stored.gender}
 }
 async function actualListBlocks(data,stamp,initialNames=['Sleep','Energy']){
   const fixture={goals:[...initialNames.map(name=>({id:`own-${name.toLowerCase()}`,userId:'synthetic-owner',name})),{id:'hidden',userId:'synthetic-owner',name:'__FOOD_FAVORITES__'},{id:'foreign',userId:'other',name:'Sleep'}],selected:{id:'selected',category:JSON.stringify(initialNames)},commands:[],issues:[...initialNames]}

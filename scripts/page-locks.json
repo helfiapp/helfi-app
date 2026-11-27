@@ -1,8 +1,8 @@
 {
-  "generatedAt": "2026-11-27T06:37:14.110Z",
+  "generatedAt": "2026-11-27T07:34:01.030Z",
   "scope": "all",
   "files": {
-    "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
+    "app/account/page.tsx": "97894ec5e7473487f657c48223583389e032ce5e73b480150fc1f5f7ce08e6ad",
     "app/admin-panel/page.tsx": "5929e24306e622179f35723b07cc3b3ddaddfba7f6b601c2540d3b8fefaedca6",
     "app/admin-panel/qr-login/page.tsx": "f6bbb3786474136d0a419421d7f05e149f434f4b69ec40097c574918aa13f236",
     "app/admin-panel/tickets/[id]/page.tsx": "023f92352ba48f0b80a0ed4ca407eb110b1c5d9975fd95669071a68ce37c9bd2",
@@ -238,7 +238,7 @@
     "native/src/navigation/MainTabs.tsx": "8f31f311f776bdcdaeb620288aee4b7b1319e8b721936aec559eff2a16e32839",
     "native/src/navigation/NativeBottomNav.tsx": "6939c54d1d7f206c98fe57be46df98e7fe9c0edd1f12f03266a142f88ece17a8",
     "native/src/navigation/RootNavigator.tsx": "3e133cdb0f9721dc140baa6aafd370fc74c046cb72bfc049fcb890ecd1fd11d0",
-    "native/src/screens/AccountSettingsScreen.tsx": "78f1b46ff4e18c1498e3c171e688ddfbd4ed6803cdc5dfe355d79e1d3bfa1478",
+    "native/src/screens/AccountSettingsScreen.tsx": "b3e66aaaa33d0a521c1acc7b6ab993cd6dfa5cfa63fbfcfa0d05c49c3b25909b",
     "native/src/screens/AddIngredientScreen.tsx": "5da16968c543fd87ac2fed7eae26983352214d05f00ea9c4e244db5b5028d08e",
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
     "native/src/screens/BillingScreen.tsx": "4af68df2092f9669fb9b4d4f0b8ddc02564d84d4a9c2a67b08c1cd40889692b4",
@@ -281,7 +281,7 @@
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
     "native/src/screens/TrackCaloriesScreen.tsx": "f5d8d452f590dce50811b7592f0493ecfa7241349d1073f41f31a9d4c8aeaad5",
     "native/src/screens/WaterIntakeScreen.tsx": "027fedc4368d04533a3714995fbfbb1d0cfec635ebad670c9eb63594e0da801a",
-    "native/src/state/AppModeContext.tsx": "ee7d08f06814f4aa7e2da4cd08bbefe83de4cdc448915c311f1bfd8ee825864f",
+    "native/src/state/AppModeContext.tsx": "3f58348d79e2e1da643ea3521b028cd653942b2d19e3bd8774b333107641301c",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",
     "native/src/ui/HelfiButton.tsx": "351c6e506085f49f81a9e6bfc1d3d004f5c1d642538c258071585d8fc22e6f64",
     "native/src/ui/HelfiTextField.tsx": "4e7c45b42f6e5858a689c6a2cca88d903b184800a32b788a7f2d46f4e6172dc3",
