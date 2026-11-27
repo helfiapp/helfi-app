@@ -1,3 +1,7 @@
+## Food measurement fields — release candidate, 27 November 2026
+
+A normal web weight edit must persist one consistent amount across weightAmount/weightUnit, amount/amountUnit and __amount/__unit. A recorded540g meal edited to600g must reopen as600g in both native ingredient input and whole-meal portion block, with the original100g nutrient basis,6servings and246full/123half calories intact. Synchronize at the existing shared web item-storage boundary for both add and update; retain source IDs, labels, source nutrient fields, saved portion and valid recorded conversions. Never guess historical household country/physical mass or bulk-rewrite records. Native read/persistence compatibility and invalid inputs require actual-source regression coverage. Owner-locked Done/Enter commit and blur-discard behavior remain unchanged; no rename, auth, credit or design changes are part of this fix.
+
 ## Food saved portions and rounding — candidate, 27 November 2026
 
 Normal live UI verification caught an unchanged web update dropping a native half portion: one controlled entry changed111→221kcal. The same source (41kcal/100g,0.24gfat/100g,540gwholemeal) exposed web rounding-before-scaling: half fat0.7 instead of0.6 and double calories442 instead of443. Native source-first totals were correct.
