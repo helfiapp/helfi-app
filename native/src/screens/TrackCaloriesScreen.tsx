@@ -33,7 +33,7 @@ import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { sortPlainFoodResults } from '../lib/plainFoodSearch'
 import { parseRecipeAmount, chooseRecipeFood, measuredRecipeFood, recipePortionRatio } from '../lib/recipeNutrition'
 import { materializeMealPortion, savedMealPortion } from '../lib/mealPortions'
-import { roundTo, nullableNumber, sanitizeEntryTotals, hasNonZeroEntryTotals, extractTotalsFromDescriptionText, recalculateTotalsFromItems, normalizeFoodApiEntry } from '../lib/foodDiaryEntries'
+import { roundTo, nullableNumber, nutritionServingMultiplier, sanitizeEntryTotals, hasNonZeroEntryTotals, extractTotalsFromDescriptionText, recalculateTotalsFromItems, normalizeFoodApiEntry } from '../lib/foodDiaryEntries'
 import { mealPortionScale, portionMealItems, type MealPortionUnit } from '../lib/mealPortionEditor'
 import { isFoodIdentityCompatible, suggestMealName } from '../lib/foodIdentity'
 import { optionalNutrient, readOptionalNutrient, scaleOptionalNutrient, sumOptionalNutrients, roundOptionalNutrient } from '../lib/nutrientValues'
@@ -365,16 +365,10 @@ const MEALS = [
   { key: 'uncategorized', label: 'Other' },
 ] as const
 
-const DEFAULT_TARGETS = {
-  calories: 2200,
-  protein: 130,
-  carbs: 250,
-  fat: 75,
-  fiber: 30,
-  sugar: 35,
+type DailyTargets = Record<'calories' | 'protein' | 'carbs' | 'fat' | 'fiber' | 'sugar', number | null>
+const DEFAULT_TARGETS: DailyTargets = {
+  calories: null, protein: null, carbs: null, fat: null, fiber: null, sugar: null,
 }
-
-type DailyTargets = typeof DEFAULT_TARGETS
 
 const DEFAULT_FOOD_ICON_URI = `${API_BASE_URL}/mobile-assets/MOBILE%20ICONS/FOOD%20ICON.png`
 const SWIPE_MENU_WIDTH = 96
@@ -842,12 +836,26 @@ function favoriteAmountUnitOptions(item: FavoriteAdjustItem): FavoriteAmountUnit
 }
 
 function favoriteAmountUnitLabel(unit: FavoriteAmountUnit, item: FavoriteAdjustItem) {
-  if (unit === 'serving') return item.servingLabel || 'serving'
+  if (unit === 'serving') {
+    const factor = nutritionServingMultiplier(item.raw)
+    return factor > 1 ? `${formatFavoriteAmount(factor)} × ${item.servingLabel || 'serving'}` : item.servingLabel || 'serving'
+  }
   return unit
 }
 
 function favoriteAmountStateFromRaw(raw: any, servingLabel: string, servings: number) {
-  const base = parseServingBaseForFavorite(servingLabel, String(raw?.name || ''))
+  const name = String(raw?.name || '')
+  const parsed = parseServingBaseForFavorite(servingLabel, name)
+  const grams = nullableNumber(raw?.customGramsPerServing)
+  const ml = nullableNumber(raw?.customMlPerServing)
+  const volume = parsed?.unit === 'ml' || parsed?.unit === 'fl oz'
+  const custom = volume ? ml : grams
+  const base: FavoriteBase | null = parsed
+    ? { ...parsed, amount: custom != null && custom > 0
+        ? convertFoodAmount(custom, volume ? 'ml' : 'g', parsed.unit)
+        : parsed.amount * nutritionServingMultiplier(raw) }
+    : grams != null && grams > 0 ? { amount: grams, unit: 'g', density: liquidDensity(name) }
+    : ml != null && ml > 0 ? { amount: ml, unit: 'ml', density: liquidDensity(name) } : null
   // Newer saved physical fields win over an older amount alias. Keep each
   // amount paired with its unit so stale grams cannot override saved ounces.
   const savedMeasurement = [
@@ -981,6 +989,9 @@ function applyServingOptionToFavoriteAdjustItem(
     raw: {
       ...raw,
       serving_size: servingLabel,
+      nutritionCoversServing: true,
+      macroMultiplier: 1,
+      multiplier: 1,
       selectedServingId: String(option.id),
       selectedServingFoodName: option.foodName || null,
       servingOptions: options,
@@ -1060,12 +1071,6 @@ function clamp(n: number, min: number, max: number) {
   return Math.min(max, Math.max(min, n))
 }
 
-function toOptionalPositive(value: any) {
-  const n = Number(value)
-  if (!Number.isFinite(n) || n <= 0) return null
-  return n
-}
-
 function normalizeMacroSplit(raw: any) {
   if (!raw || typeof raw !== 'object') return null
 
@@ -1136,12 +1141,12 @@ function buildDailyTargetsFromUserData(raw: any): DailyTargets {
     diabetesType: source.diabetesType,
   })
 
-  const calories = Math.round(toOptionalPositive(calculated.calories) || DEFAULT_TARGETS.calories)
-  const protein = Math.max(0, Math.round(toOptionalPositive(calculated.protein) || DEFAULT_TARGETS.protein))
-  const carbs = Math.max(0, Math.round(toOptionalPositive(calculated.carbs) || DEFAULT_TARGETS.carbs))
-  const fat = Math.max(0, Math.round(toOptionalPositive(calculated.fat) || DEFAULT_TARGETS.fat))
-  const fiber = Math.max(0, Math.round(toOptionalPositive(calculated.fiber) || DEFAULT_TARGETS.fiber))
-  const sugar = Math.max(0, Math.round(toOptionalPositive(calculated.sugarMax) || DEFAULT_TARGETS.sugar))
+  const calories = roundOptionalNutrient(calculated.calories, 0)
+  const protein = roundOptionalNutrient(calculated.protein, 0)
+  const carbs = roundOptionalNutrient(calculated.carbs, 0)
+  const fat = roundOptionalNutrient(calculated.fat, 0)
+  const fiber = roundOptionalNutrient(calculated.fiber, 0)
+  const sugar = roundOptionalNutrient(calculated.sugarMax, 0)
 
   return {
     calories,
@@ -1195,7 +1200,8 @@ function formatWaterMl(value: number) {
   return `${Math.round(ml)} ml`
 }
 
-function formatCalories(value: number, unit: 'kcal' | 'kj') {
+function formatCalories(value: number | null, unit: 'kcal' | 'kj') {
+  if (value == null) return '—'
   if (unit === 'kj') {
     return `${Math.round(value * 4.184)} kJ`
   }
@@ -1574,12 +1580,13 @@ function calculateFavoriteAdjustTotals(items: FavoriteAdjustItem[]) {
   return items.reduce(
     (acc, item) => {
       const servings = Number.isFinite(Number(item?.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1
-      acc.calories += Math.max(0, Number(item?.calories) || 0) * servings
-      acc.protein += Math.max(0, Number(item?.protein) || 0) * servings
-      acc.carbs += Math.max(0, Number(item?.carbs) || 0) * servings
-      acc.fat += Math.max(0, Number(item?.fat) || 0) * servings
-      acc.fiber = sumOptionalNutrients(acc.fiber, scaleOptionalNutrient(item?.fiber, servings))
-      acc.sugar = sumOptionalNutrients(acc.sugar, scaleOptionalNutrient(item?.sugar, servings))
+      const factor = servings * nutritionServingMultiplier(item.raw)
+      acc.calories += Math.max(0, Number(item?.calories) || 0) * factor
+      acc.protein += Math.max(0, Number(item?.protein) || 0) * factor
+      acc.carbs += Math.max(0, Number(item?.carbs) || 0) * factor
+      acc.fat += Math.max(0, Number(item?.fat) || 0) * factor
+      acc.fiber = sumOptionalNutrients(acc.fiber, scaleOptionalNutrient(item?.fiber, factor))
+      acc.sugar = sumOptionalNutrients(acc.sugar, scaleOptionalNutrient(item?.sugar, factor))
       return acc
     },
     { calories: 0, protein: 0, carbs: 0, fat: 0, fiber: 0 as number | null, sugar: 0 as number | null },
@@ -2015,15 +2022,15 @@ export function TrackCaloriesScreen() {
 
   const macroTargetsWithExercise = useMemo(() => {
     const base = {
-      protein: Math.max(0, dailyTargets.protein),
-      carbs: Math.max(0, dailyTargets.carbs),
-      fat: Math.max(0, dailyTargets.fat),
-      fiber: Math.max(0, dailyTargets.fiber),
-      sugar: Math.max(0, dailyTargets.sugar),
+      protein: optionalNutrient(dailyTargets.protein),
+      carbs: optionalNutrient(dailyTargets.carbs),
+      fat: optionalNutrient(dailyTargets.fat),
+      fiber: optionalNutrient(dailyTargets.fiber),
+      sugar: optionalNutrient(dailyTargets.sugar),
     }
 
     const extraCalories = Math.max(0, Number(exerciseCalories) || 0)
-    if (extraCalories <= 0) return base
+    if (extraCalories <= 0 || base.protein == null || base.carbs == null || base.fat == null) return base
 
     const proteinCals = base.protein * 4
     const carbCals = base.carbs * 4
@@ -2068,11 +2075,11 @@ export function TrackCaloriesScreen() {
   }, [totals.calories, totals.carbs, totals.fat, totals.protein])
 
   const dailyAllowanceKcal = useMemo(() => {
-    return Math.max(0, Math.round(dailyTargets.calories + Math.max(0, exerciseCalories)))
+    return dailyTargets.calories == null ? null : Math.max(0, Math.round(dailyTargets.calories + Math.max(0, exerciseCalories)))
   }, [dailyTargets.calories, exerciseCalories])
 
   const remainingKcal = useMemo(() => {
-    return Math.max(0, Math.round(dailyAllowanceKcal - usedKcal))
+    return dailyAllowanceKcal == null ? null : Math.max(0, Math.round(dailyAllowanceKcal - usedKcal))
   }, [dailyAllowanceKcal, usedKcal])
 
   const macroRows = useMemo(
@@ -3107,13 +3114,14 @@ export function TrackCaloriesScreen() {
     if (!first || typeof first !== 'object') return items
     const name = String(nextName || '').trim()
     const servings = Number.isFinite(Number(first.servings)) && Number(first.servings) > 0 ? Number(first.servings) : 1
-    const perServing = (value: any, decimals = 3) => Math.max(0, roundTo((Number(value) || 0) / servings, decimals))
+    const factor = servings * nutritionServingMultiplier(first)
+    const perServing = (value: any, decimals = 3) => Math.max(0, roundTo((Number(value) || 0) / factor, decimals))
     const caloriesPerServing = perServing(nextTotals.calories)
     const proteinPerServing = perServing(Number(nextTotals.protein) || Number(nextTotals.protein_g) || 0, 3)
     const carbsPerServing = perServing(Number(nextTotals.carbs) || Number(nextTotals.carbs_g) || 0, 3)
     const fatPerServing = perServing(Number(nextTotals.fat) || Number(nextTotals.fat_g) || 0, 3)
-    const fiberPerServing = roundOptionalNutrient(scaleOptionalNutrient(readOptionalNutrient(nextTotals, ['fiber', 'fiber_g']), 1 / servings), 3)
-    const sugarPerServing = roundOptionalNutrient(scaleOptionalNutrient(readOptionalNutrient(nextTotals, ['sugar', 'sugar_g']), 1 / servings), 3)
+    const fiberPerServing = roundOptionalNutrient(scaleOptionalNutrient(readOptionalNutrient(nextTotals, ['fiber', 'fiber_g']), 1 / factor), 3)
+    const sugarPerServing = roundOptionalNutrient(scaleOptionalNutrient(readOptionalNutrient(nextTotals, ['sugar', 'sugar_g']), 1 / factor), 3)
 
     return [
       {
@@ -4372,7 +4380,7 @@ export function TrackCaloriesScreen() {
         if (item.id !== id) return item
         const servings = Number.isFinite(Number(item.servings)) && Number(item.servings) > 0 ? Number(item.servings) : 1
         const total = key === 'fiber' || key === 'sugar' ? optionalNutrient(totalValue) : Math.max(0, Number(totalValue) || 0)
-        return { ...item, [key]: scaleOptionalNutrient(total, 1 / servings) }
+        return { ...item, [key]: scaleOptionalNutrient(total, 1 / (servings * nutritionServingMultiplier(item.raw))) }
       }),
     )
   }
@@ -5351,7 +5359,7 @@ export function TrackCaloriesScreen() {
     ].map((row) => ({
       ...row,
       display: row.unit === 'kcal' ? row.value == null ? '—' : String(Math.round(row.value)) : `${formatNutrientGrams(row.value)}g`,
-      percent: row.target > 0 ? clamp((Number(row.value) / Number(row.target)) * 100, 0, 100) : 0,
+      percent: row.target != null && row.target > 0 ? clamp((Number(row.value) / Number(row.target)) * 100, 0, 100) : 0,
     }))
   }
 
@@ -5961,10 +5969,7 @@ export function TrackCaloriesScreen() {
         color: '#F97316',
         bg: '#FFF7ED',
         border: '#FED7AA',
-        value:
-          energyUnit === 'kj'
-            ? `${Math.round((totals.calories + entryTotals.calories) * 4.184)} kJ / ${Math.round(dailyAllowanceKcal * 4.184)} kJ`
-            : `${Math.round(totals.calories + entryTotals.calories)} kcal / ${dailyAllowanceKcal} kcal`,
+        value: `${formatCalories(totals.calories + entryTotals.calories, energyUnit)} / ${formatCalories(dailyAllowanceKcal, energyUnit)}`,
       },
       {
         key: 'protein',
@@ -6310,7 +6315,7 @@ export function TrackCaloriesScreen() {
                 </View>
 
                 <Text style={{ marginTop: 10, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>
-                  Daily allowance: <Text style={{ fontWeight: '600', color: theme.colors.muted }}>{Math.round(energyUnit === 'kj' ? dailyTargets.calories * 4.184 : dailyTargets.calories)} {energyUnit}</Text>
+                  Daily allowance: <Text style={{ fontWeight: '600', color: theme.colors.muted }}>{dailyTargets.calories == null ? '—' : Math.round(energyUnit === 'kj' ? dailyTargets.calories * 4.184 : dailyTargets.calories)} {energyUnit}</Text>
                 </Text>
                 {exerciseCalories > 0 ? <Text style={{ marginTop: 4, textAlign: 'center', color: '#6B7280', fontSize: 13 }}>Exercise added: +{formatCalories(exerciseCalories, energyUnit)}</Text> : null}
               </>
@@ -6322,11 +6327,11 @@ export function TrackCaloriesScreen() {
                   const safeTarget = Math.max(0, Number(row.target) || 0)
                   const safeConsumed = Math.max(0, Number(row.consumed) || 0)
                   const rawPct = safeTarget > 0 ? safeConsumed / safeTarget : 0
-                  const over = rawPct > 1
-                  const unknown = row.consumed == null
-                  const percentLabel = unknown ? '—' : safeTarget > 0 ? (rawPct > 0 && rawPct < 0.01 ? '<1%' : `${Math.round(rawPct * 100)}%`) : '0%'
+                  const unknown = row.consumed == null || row.target == null
+                  const over = !unknown && (safeTarget > 0 ? rawPct > 1 : safeConsumed > 0)
+                  const percentLabel = unknown || safeTarget === 0 ? '—' : (rawPct > 0 && rawPct < 0.01 ? '<1%' : `${Math.round(rawPct * 100)}%`)
                   const remaining = Math.max(0, safeTarget - safeConsumed)
-                  const usedWidth = clamp(rawPct * 100, 0, 100)
+                  const usedWidth = over && safeTarget === 0 ? 100 : clamp(rawPct * 100, 0, 100)
                   const fatTotal = Math.max(0, fatSplit.good + fatSplit.bad + fatSplit.unclear)
                   const fatGoodPct = fatTotal > 0 ? (fatSplit.good / fatTotal) * 100 : 0
                   const fatBadPct = fatTotal > 0 ? (fatSplit.bad / fatTotal) * 100 : 0
@@ -6338,7 +6343,7 @@ export function TrackCaloriesScreen() {
                         <Text style={{ color: theme.colors.text, fontSize: 25/2, fontWeight: '500', flex: 1 }}>
                           {row.label}{' '}
                           <Text style={{ color: '#4B5563', fontWeight: '400' }}>
-                            {formatMacroAmount(row.consumed)} / {formatMacroAmount(safeTarget)} {row.unit}
+                            {formatMacroAmount(row.consumed)} / {formatMacroAmount(row.target)} {row.unit}
                             {row.key === 'sugar' ? ' cap' : ''}
                           </Text>{' '}
                           <Text style={{ color: over ? '#EF4444' : row.color, fontWeight: '500' }}>
@@ -8093,10 +8098,12 @@ export function TrackCaloriesScreen() {
                 <View style={{ marginTop: 12, gap: 10 }}>
                   {favoriteEditItems.map((editItem) => {
                     const expanded = favoriteEditExpandedItemId === editItem.id
+                    const itemTotals = calculateFavoriteAdjustTotals([editItem])
                     const servingOptions = normalizeFavoriteServingOptions(editItem.servingOptions || editItem.raw?.servingOptions)
                     const servingPickerOpen = favoriteEditServingPickerItemId === editItem.id
                     const amountUnitOptions = favoriteAmountUnitOptions(editItem)
                     const amountUnitLabel = favoriteAmountUnitLabel(editItem.amountUnit, editItem)
+                    const amountSeparator = editItem.amountUnit === 'serving' && /^\s*(?:\d|\.\d|[¼½¾⅐⅑⅒⅓⅔⅕⅖⅗⅘⅙⅚⅛⅜⅝⅞])/.test(amountUnitLabel) ? ' × ' : ' '
                     return (
                       <View key={editItem.id} style={{ borderWidth: 1, borderColor: '#E5E7EB', borderRadius: 16, overflow: 'hidden', backgroundColor: theme.colors.card }}>
                         <Pressable
@@ -8109,7 +8116,7 @@ export function TrackCaloriesScreen() {
                           <View style={{ flex: 1 }}>
                             <Text style={{ color: theme.colors.text, fontWeight: '500', fontSize: 16, lineHeight: 22 }}>{editItem.name}</Text>
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 12 }}>
-                              Serving: {editItem.servingLabel} • Full-meal amount: {editItem.amountInput || formatFavoriteAmount(favoriteAmountFromServings(editItem.servings, editItem.amountUnit, favoriteBaseForItem(editItem)))} {amountUnitLabel}
+                              Serving: {editItem.servingLabel} • Full-meal amount: {editItem.amountInput || formatFavoriteAmount(favoriteAmountFromServings(editItem.servings, editItem.amountUnit, favoriteBaseForItem(editItem)))}{amountSeparator}{amountUnitLabel}
                             </Text>
                             {editItem.raw?.selectedServingFoodName ? <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 11 }}>Matched food: {editItem.raw.selectedServingFoodName}</Text> : null}
                             <Text style={{ color: '#6B7280', marginTop: 4, fontSize: 11 }}>Source: {editItem.raw?.matchSourceLabel || editItem.raw?.sourceLabel || ingredientSourceLabel(editItem.raw || {})}</Text>
@@ -8272,8 +8279,7 @@ export function TrackCaloriesScreen() {
                                   ['fiber', 'Fibre', 'g'],
                                   ['sugar', 'Sugar', 'g'],
                                 ] as const).map(([key, label, unit]) => {
-                                  const servings = Number.isFinite(Number(editItem.servings)) && Number(editItem.servings) > 0 ? Number(editItem.servings) : 1
-                                  const total = scaleOptionalNutrient(editItem[key], servings)
+                                  const total = itemTotals[key]
                                   return (
                                     <View key={key} style={{ width: '48%' }}>
                                       <Text style={{ color: '#6B7280', fontSize: 11, fontWeight: '500', marginBottom: 5 }}>{label} ({unit})</Text>
@@ -8291,14 +8297,7 @@ export function TrackCaloriesScreen() {
                               </View>
                             </View>
 
-                            <NutrientCards cornerRadius={16} energyUnit={energyUnit} values={{
-                              calories: editItem.calories * editItem.servings,
-                              protein: editItem.protein * editItem.servings,
-                              carbs: editItem.carbs * editItem.servings,
-                              fat: editItem.fat * editItem.servings,
-                              fiber: scaleOptionalNutrient(editItem.fiber, editItem.servings),
-                              sugar: scaleOptionalNutrient(editItem.sugar, editItem.servings),
-                            }} />
+                            <NutrientCards cornerRadius={16} energyUnit={energyUnit} values={itemTotals} />
 
                             <Pressable
                               onPress={() => removeFavoriteEditIngredient(editItem.id)}
@@ -8594,14 +8593,7 @@ export function TrackCaloriesScreen() {
                   </View>
 
                   <View style={{ marginTop: 12 }}>
-                    <NutrientCards cornerRadius={16} energyUnit={energyUnit} values={{
-                      calories: adjustItem.calories * adjustItem.servings,
-                      protein: adjustItem.protein * adjustItem.servings,
-                      carbs: adjustItem.carbs * adjustItem.servings,
-                      fat: adjustItem.fat * adjustItem.servings,
-                      fiber: scaleOptionalNutrient(adjustItem.fiber, adjustItem.servings),
-                      sugar: scaleOptionalNutrient(adjustItem.sugar, adjustItem.servings),
-                    }} />
+                    <NutrientCards cornerRadius={16} energyUnit={energyUnit} values={calculateFavoriteAdjustTotals([adjustItem])} />
                   </View>
                 </View>
               ))}
@@ -9578,7 +9570,7 @@ function CircleMetric({
   unit,
   size = 'normal',
 }: {
-  value: number
+  value: number | null
   label: string
   color: string
   unit: 'kcal' | 'kj' | 'g'
@@ -9589,7 +9581,7 @@ function CircleMetric({
   const ringBorder = compact ? 6 : 7
   const valueFontSize = compact ? 16 : 18
   const labelFontSize = compact ? 13 : 14
-  const display = unit === 'kj' ? Math.round(value * 4.184) : unit === 'kcal' ? Math.round(value) : formatNutrientGrams(value)
+  const display = value == null ? '—' : unit === 'kj' ? Math.round(value * 4.184) : unit === 'kcal' ? Math.round(value) : formatNutrientGrams(value)
 
   return (
     <View style={{ alignItems: 'center' }}>
