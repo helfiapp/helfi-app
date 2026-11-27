@@ -5,7 +5,7 @@ import { prisma } from '@/lib/prisma'
 import { ensureMoodTables } from '@/app/api/mood/_db'
 import { extractScopedBlobPath, mapToSignedBlobUrl } from '@/lib/blob-access'
 import { getUserIdFromNativeAuth } from '@/lib/native-auth'
-import { del, isObjectStorageConfigured } from '@/lib/object-storage'
+import { del, head, isObjectStorageConfigured } from '@/lib/object-storage'
 
 export const dynamic = 'force-dynamic'
 
@@ -107,15 +107,16 @@ function mediaBlobPaths(value: unknown): string[] {
   return Array.from(set)
 }
 
-async function deleteMoodMedia(paths: string[]) {
-  if (!isObjectStorageConfigured()) return
+async function deleteMoodMedia(paths: string[], beforeDelete: () => Promise<unknown>, abortSignal: AbortSignal) {
   if (paths.length === 0) return
+  if (!isObjectStorageConfigured()) throw new Error('Journal media storage is not configured')
   const batches = chunk(Array.from(new Set(paths)), 100)
   for (const batch of batches) {
     if (!batch.length) continue
-    await del(batch).catch((error) => {
-      console.warn('mood journal media delete skipped', error)
-    })
+    abortSignal.throwIfAborted()
+    await beforeDelete()
+    abortSignal.throwIfAborted()
+    await del(batch, { abortSignal })
   }
 }
 
@@ -167,49 +168,76 @@ export async function PUT(req: NextRequest, { params }: { params: { id: string }
 
   try {
     await ensureMoodTables()
-    const existingRows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT images, audio
-       FROM MoodJournalEntries
-       WHERE userId = $1 AND id = $2`,
-      user.id,
-      params.id,
-    )
-    const existing = existingRows[0] || null
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return await prisma.$transaction(async (tx) => {
+      const storageAbort = new AbortController()
+      const storageDeadline = setTimeout(() => storageAbort.abort(), 10000)
+      try {
+        storageAbort.signal.throwIfAborted()
+        const existingRows: any[] = await tx.$queryRawUnsafe(
+          `SELECT images, audio
+           FROM MoodJournalEntries
+           WHERE userId = $1 AND id = $2 FOR UPDATE`,
+          user.id,
+          params.id,
+        )
+        const existing = existingRows[0] || null
+        if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const beforePaths = new Set([
-      ...mediaBlobPaths(existing.images),
-      ...mediaBlobPaths(existing.audio),
-    ])
-    const nextPaths = new Set([...mediaBlobPaths(images), ...mediaBlobPaths(audio)])
-    const removedPaths = Array.from(beforePaths).filter((path) => !nextPaths.has(path))
+        const beforePaths = new Set([
+          ...mediaBlobPaths(existing.images),
+          ...mediaBlobPaths(existing.audio),
+        ])
+        const nextPaths = new Set([...mediaBlobPaths(images), ...mediaBlobPaths(audio)])
+        const removedPaths = Array.from(beforePaths).filter((path) => !nextPaths.has(path))
 
-    const updated = await prisma.$executeRawUnsafe(
-      `UPDATE MoodJournalEntries
-       SET localDate = $1,
-           title = $2,
-           content = $3,
-           images = $4::jsonb,
-           tags = $5::jsonb,
-           audio = $6::jsonb,
-           prompt = $7,
-           template = $8,
-           updatedAt = NOW()
-       WHERE userId = $9 AND id = $10`,
-      localDate,
-      title,
-      content,
-      JSON.stringify(images),
-      JSON.stringify(tags),
-      JSON.stringify(audio),
-      prompt,
-      template,
-      user.id,
-      params.id,
-    )
-    if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-    await deleteMoodMedia(removedPaths)
-    return NextResponse.json({ success: true })
+        storageAbort.signal.throwIfAborted()
+        const introducedPaths = Array.from(nextPaths).filter((path) => !beforePaths.has(path))
+        if (introducedPaths.length) {
+          if (introducedPaths.some((path) => !path.startsWith(`mood-journal/${user.id}/`))) {
+            throw new Error('Journal attachment is unavailable')
+          }
+          if (!isObjectStorageConfigured()) throw new Error('Journal media storage is not configured')
+          for (const batch of chunk(introducedPaths, 4)) {
+            storageAbort.signal.throwIfAborted()
+            await Promise.all(batch.map(async (path) => {
+              if (!(await head(path, { abortSignal: storageAbort.signal }))) throw new Error('Journal attachment is unavailable')
+            }))
+          }
+        }
+
+        await deleteMoodMedia(removedPaths, () => tx.$queryRawUnsafe('SELECT 1'), storageAbort.signal)
+
+        storageAbort.signal.throwIfAborted()
+        const updated = await tx.$executeRawUnsafe(
+          `UPDATE MoodJournalEntries
+           SET localDate = $1,
+               title = $2,
+               content = $3,
+               images = $4::jsonb,
+               tags = $5::jsonb,
+               audio = $6::jsonb,
+               prompt = $7,
+               template = $8,
+               updatedAt = NOW()
+           WHERE userId = $9 AND id = $10`,
+          localDate,
+          title,
+          content,
+          JSON.stringify(images),
+          JSON.stringify(tags),
+          JSON.stringify(audio),
+          prompt,
+          template,
+          user.id,
+          params.id,
+        )
+        if (!updated) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+        return NextResponse.json({ success: true })
+      } finally {
+        clearTimeout(storageDeadline)
+        storageAbort.abort()
+      }
+    }, { maxWait: 5000, timeout: 20000 })
   } catch (e) {
     console.error('mood journal update error', e)
     return NextResponse.json({ error: 'Failed to update entry' }, { status: 500 })
@@ -222,28 +250,40 @@ export async function DELETE(req: NextRequest, { params }: { params: { id: strin
 
   try {
     await ensureMoodTables()
-    const existingRows: any[] = await prisma.$queryRawUnsafe(
-      `SELECT images, audio
-       FROM MoodJournalEntries
-       WHERE userId = $1 AND id = $2`,
-      user.id,
-      params.id,
-    )
-    const existing = existingRows[0] || null
-    if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+    return await prisma.$transaction(async (tx) => {
+      const storageAbort = new AbortController()
+      const storageDeadline = setTimeout(() => storageAbort.abort(), 10000)
+      try {
+        storageAbort.signal.throwIfAborted()
+        const existingRows: any[] = await tx.$queryRawUnsafe(
+          `SELECT images, audio
+           FROM MoodJournalEntries
+           WHERE userId = $1 AND id = $2 FOR UPDATE`,
+          user.id,
+          params.id,
+        )
+        const existing = existingRows[0] || null
+        if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-    const mediaToDelete = [
-      ...mediaBlobPaths(existing.images),
-      ...mediaBlobPaths(existing.audio),
-    ]
+        const mediaToDelete = [
+          ...mediaBlobPaths(existing.images),
+          ...mediaBlobPaths(existing.audio),
+        ]
 
-    await prisma.$executeRawUnsafe(
-      `DELETE FROM MoodJournalEntries WHERE userId = $1 AND id = $2`,
-      user.id,
-      params.id,
-    )
-    await deleteMoodMedia(mediaToDelete)
-    return NextResponse.json({ success: true })
+        await deleteMoodMedia(mediaToDelete, () => tx.$queryRawUnsafe('SELECT 1'), storageAbort.signal)
+
+        storageAbort.signal.throwIfAborted()
+        await tx.$executeRawUnsafe(
+          `DELETE FROM MoodJournalEntries WHERE userId = $1 AND id = $2`,
+          user.id,
+          params.id,
+        )
+        return NextResponse.json({ success: true })
+      } finally {
+        clearTimeout(storageDeadline)
+        storageAbort.abort()
+      }
+    }, { maxWait: 5000, timeout: 20000 })
   } catch (e) {
     console.error('mood journal delete error', e)
     return NextResponse.json({ error: 'Failed to delete entry' }, { status: 500 })
