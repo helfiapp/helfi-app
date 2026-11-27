@@ -3,7 +3,8 @@ import crypto from 'crypto'
 import { prisma } from '@/lib/prisma'
 import { buildSupportFeedbackPrompt, processSupportTicketAutoReply, sendSupportFeedbackEmail, sendSupportTranscriptEmail } from '@/lib/support-automation'
 import { getSupportAgentForTimestamp } from '@/lib/support-agents'
-import { rehydrateSupportTicket } from '@/lib/support-attachments'
+import { SUPPORT_CHAT_ENDED_MARKER, isSupportChatClosed } from '@/lib/support-state'
+import { rehydratePublicSupportTicket as rehydrateSupportTicket } from '@/lib/support-attachments'
 
 function guestTokenPrefix(token: string) {
   return `guest:${token}`
@@ -47,7 +48,7 @@ export async function POST(request: NextRequest) {
     const email = normalizeEmail(String(body?.email || ''))
     const message = String(body?.message || '').trim()
 
-    if (!email || !message) {
+    if (!/^[^\s@<>]+@[^\s@<>]+\.[^\s@<>]+$/.test(email) || email.length > 254 || !message || message.length > 20000) {
       return NextResponse.json({ error: 'Name, email, and message are required' }, { status: 400 })
     }
 
@@ -100,27 +101,31 @@ export async function POST(request: NextRequest) {
         id: ticketId,
         externalMessageId: guestTokenPrefix(token),
       },
+      include: { responses: true },
     })
     if (!ticket) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
 
-    await prisma.ticketResponse.create({
-      data: {
-        ticketId,
-        message,
-        isAdminResponse: false,
-        userEmail: ticket.userEmail,
-      },
+    const accepted = await prisma.$transaction(async (tx) => {
+      const current = await tx.supportTicket.update({
+        where: { id: ticket.id },
+        data: { updatedAt: new Date() },
+        include: { responses: true },
+      })
+      if (isSupportChatClosed(current)) return false
+      await tx.ticketResponse.create({
+        data: { ticketId, message, isAdminResponse: false, userEmail: ticket.userEmail },
+      })
+      await tx.supportTicket.update({
+        where: { id: ticketId },
+        data: { status: 'AWAITING_RESPONSE', updatedAt: new Date() },
+      })
+      return true
     })
-
-    await prisma.supportTicket.update({
-      where: { id: ticketId },
-      data: {
-        status: 'AWAITING_RESPONSE',
-        updatedAt: new Date(),
-      },
-    })
+    if (!accepted) {
+      return NextResponse.json({ error: 'This support chat has ended. Please create a new ticket to send another message.' }, { status: 409 })
+    }
 
     try {
       await processSupportTicketAutoReply({
@@ -158,32 +163,32 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Ticket not found' }, { status: 404 })
     }
 
-    const agent = getSupportAgentForTimestamp(new Date(ticket.createdAt || Date.now()))
-    const feedbackPrompt = buildSupportFeedbackPrompt(ticket.userName, agent)
-    const hasFeedbackPrompt = ticket.responses?.some((response) => response.isAdminResponse && response.message?.includes('rate your support experience'))
-    if (!hasFeedbackPrompt) {
-      await prisma.ticketResponse.create({
-        data: {
-          ticketId: ticket.id,
-          message: feedbackPrompt,
-          isAdminResponse: true,
-          adminId: null,
-        },
+    const endedNow = await prisma.$transaction(async (tx) => {
+      // Updating the ticket serializes repeated endings without resolving its fault.
+      const current = await tx.supportTicket.update({
+        where: { id: ticket.id },
+        data: { updatedAt: new Date() },
+        include: { responses: { orderBy: { createdAt: 'asc' } } },
       })
-    }
-
-    await prisma.supportTicket.update({
-      where: { id: ticket.id },
-      data: {
-        status: 'RESOLVED',
-        updatedAt: new Date(),
-      },
+      if (isSupportChatClosed(current)) return false
+      const agent = getSupportAgentForTimestamp(new Date(current.createdAt || Date.now()))
+      const hasFeedbackPrompt = current.responses.some((response) => response.isAdminResponse && response.message?.includes('rate your support experience'))
+      if (!hasFeedbackPrompt) {
+        await tx.ticketResponse.create({
+          data: { ticketId: ticket.id, message: buildSupportFeedbackPrompt(current.userName, agent), isAdminResponse: true, adminId: null },
+        })
+      }
+      await tx.ticketResponse.create({
+        data: { ticketId: ticket.id, message: SUPPORT_CHAT_ENDED_MARKER, isAdminResponse: true, adminId: null },
+      })
+      return true
     })
 
-    try {
+    if (endedNow) try {
       await sendSupportTranscriptEmail(ticket.id)
-    } catch (emailError) {
-      console.error('📧 [SUPPORT TRANSCRIPT] Failed to send inquiry transcript:', emailError)
+    } catch {
+      await prisma.ticketResponse.create({ data: { ticketId: ticket.id, message: '[SYSTEM] Transcript delivery needs review. Check sent history before retrying.', isAdminResponse: true } })
+      console.error('[SUPPORT TRANSCRIPT] Delivery needs review', { ticketId: ticket.id })
     }
 
     const updatedTicket = await prisma.supportTicket.findUnique({
@@ -233,7 +238,6 @@ export async function POST(request: NextRequest) {
     await prisma.supportTicket.update({
       where: { id: ticketId },
       data: {
-        status: 'CLOSED',
         updatedAt: new Date(),
       },
     })
