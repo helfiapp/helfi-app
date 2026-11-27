@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { nutritionServingMultiplier } from '../native/src/lib/foodDiaryEntries'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
@@ -15,7 +16,7 @@ function source(path: string) {
 const screen = source('native/src/screens/TrackCaloriesScreen.tsx')
 const cardsSource = source('native/src/components/NutrientCards.tsx')
 let width = 369
-const context = vm.createContext({ ...nutrients, Text: 'Text', View: 'View', useState: () => [width, () => {}], React: { createElement: (type: any, props: any, ...children: any[]) => ({ type, props, children }) } })
+const context = vm.createContext({ nutritionServingMultiplier, ...nutrients, Text: 'Text', View: 'View', useState: () => [width, () => {}], React: { createElement: (type: any, props: any, ...children: any[]) => ({ type, props, children }) } })
 function evaluate(text: string) {
   return vm.runInContext(ts.transpile(text, { target: ts.ScriptTarget.ES2020, jsx: ts.JsxEmit.React }), context)
 }
@@ -77,3 +78,32 @@ for (const [value, expected] of [[10.7 * 1.5, '16.1'], [4.9 * 1.5, '7.4'], [10.6
 const energy = context.NutrientCards({ values: context.favoriteEditTotals, energyUnit: 'kj' }).children[0]
 assert.equal(energy[0].props.accessibilityLabel, 'Kilojoules: 798 kJ')
 console.log('PASS actual native meal sum/summary/six-color cards: precise source preserved, decimal ties and boundaries, missing/zero, kcal/kJ, phone/tablet layout; no network or writes')
+
+// Render the existing full-meal caption; this must never change saved amounts or source labels.
+bind('favoriteAmountUnitLabel')
+let amountSeparator: ts.Expression | undefined
+let amountCaption: ts.JsxElement | undefined
+function findAmountCaption(node: ts.Node) {
+  if (ts.isVariableDeclaration(node) && node.name.getText(screen) === 'amountSeparator') amountSeparator = node.initializer
+  if (ts.isJsxElement(node) && node.openingElement.tagName.getText(screen) === 'Text' && node.getText(screen).includes('Full-meal amount:')) amountCaption = node
+  ts.forEachChild(node, findAmountCaption)
+}
+findAmountCaption(screen)
+assert.ok(amountSeparator); assert.ok(amountCaption)
+for (const [amount, unit, label, expected] of [
+  ['1', 'serving', '1 cup', '1 × 1 cup'], ['0.5', 'serving', '1 cup', '0.5 × 1 cup'],
+  ['2', 'serving', '2 slices', '2 × 2 slices'], ['1', 'serving', '½ cup', '1 × ½ cup'],
+  ['0.5', 'serving', '1/2 cup', '0.5 × 1/2 cup'], ['1', 'serving', '.5 cup', '1 × .5 cup'],
+  ['1', 'serving', 'cup', '1 cup'], ['1', 'serving', '', '1 serving'],
+  ['100', 'g', '1 cup', '100 g'], ['30', 'ml', '1 cup', '30 ml'],
+  ['1', 'oz', '1 cup', '1 oz'], ['2', 'fl oz', '1 cup', '2 fl oz'],
+] as const) {
+  context.editItem = { amountInput: amount, amountUnit: unit, servingLabel: label, servings: 0.5 }
+  const before = JSON.stringify(context.editItem)
+  context.amountUnitLabel = context.favoriteAmountUnitLabel(unit, context.editItem)
+  context.amountSeparator = evaluate(`(${amountSeparator.getText(screen)})`)
+  const caption = evaluate(`(${amountCaption.getText(screen)})`).children.join('')
+  assert.ok(caption.endsWith(`Full-meal amount: ${expected}`), caption)
+  assert.equal(JSON.stringify(context.editItem), before)
+}
+console.log('PASS actual food amount captions preserve all source labels and amounts')

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { nutritionServingMultiplier } from '../native/src/lib/foodDiaryEntries'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
@@ -34,7 +35,7 @@ const plain = (value: any) => JSON.parse(JSON.stringify(value))
 const native = sourceFile('native/src/screens/TrackCaloriesScreen.tsx')
 const diaryEntries = sourceFile('native/src/lib/foodDiaryEntries.ts')
 const movedDiaryHelpers = new Set(['roundTo', 'nullableNumber', 'sanitizeEntryTotals', 'hasNonZeroEntryTotals', 'extractTotalsFromDescriptionText', 'recalculateTotalsFromItems', 'normalizeFoodApiEntry'])
-const ctx = vm.createContext({ ...nativeValues, materializeMealPortion, savedMealPortion, mealPortionScale, portionMealItems, parseFoodServing, liquidDensity, convertFoodAmount, console })
+const ctx = vm.createContext({ nutritionServingMultiplier, ...nativeValues, materializeMealPortion, savedMealPortion, mealPortionScale, portionMealItems, parseFoodServing, liquidDensity, convertFoodAmount, console })
 bind(ctx, native, ['roundTo', 'round1', 'nullableNumber', 'numberOrZero', 'normalizeFavoriteLabel', 'normalizeFavoriteAmountUnit', 'parseServingBaseForFavorite', 'favoriteAmountStateFromRaw', 'favoriteBaseForItem', 'convertFavoriteBaseAmount', 'favoriteAmountFromServings', 'formatFavoriteAmount', 'isOpenMeasurementServing', 'hasServingOptionMacroData', 'normalizeFavoriteServingOptions', 'findSelectedServingId', 'sanitizeEntryTotals', 'hasNonZeroEntryTotals', 'extractTotalsFromDescriptionText', 'recalculateTotalsFromItems', 'normalizeFoodApiEntry', 'buildFavoriteAdjustItems', 'buildFavoriteAdjustItemFromSearchFood', 'calculateFavoriteAdjustTotals', 'buildFallbackFavoriteServingOptions', 'formatMacroAmount', 'formatNutrientGrams', 'formatFavoriteNutrientValue'])
 
 const sauce = { id: '1106110', source: 'usda', name: 'TERIYAKI SAUCE', barcode: '072036761163', serving_size: '100 g', calories: 88, protein_g: 5.88, carbs_g: 11.76, fat_g: 0, fiber_g: null, sugar_g: 11.76, servings: 1 }

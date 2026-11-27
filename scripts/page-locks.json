@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-26T16:34:56.955Z",
+  "generatedAt": "2026-11-27T04:56:02.337Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "e7c64e8438eff2b2f21e734098368122936834ae8c8dab39431f96efc3185f41",
@@ -216,7 +216,7 @@
     "native/src/lib/aiConsent.ts": "1ad4b7d9d18c80838f838298215e1eaf2abc02e64b3f3fae60a343f525ce91f3",
     "native/src/lib/dailyTargets.ts": "8ada3e9e7f09218f025bb4041ebfeeadb2c249c512ea3edcfff85bc800da7776",
     "native/src/lib/foodAnalysisRequest.ts": "a372c4d29d9485f768014184545014d2c7597c7db006c23afba01a41673c9c10",
-    "native/src/lib/foodDiaryEntries.ts": "c4902331aa8785931afd9f171197895322727f51b02dd0e2fbada99686f8b580",
+    "native/src/lib/foodDiaryEntries.ts": "6a6e7810f8fd77912ee70dd3b03d7ad70e9d531aeda5576d0c9b32cc7b75dff0",
     "native/src/lib/foodIdentity.ts": "800acbf010d596088a9f3d0051301b4205cda9396700f2fbdf3c30aa2252fc2a",
     "native/src/lib/foodPhoto.ts": "cd3263caa424dd69c88c494977bfdc3a205f3ac3a647d6612423900e61213b2b",
     "native/src/lib/foodPreparation.ts": "b0db28b4b9a93184b335708f801c12993a79400f5f586f959b759008e9750e42",
@@ -279,7 +279,7 @@
     "native/src/screens/SupportScreen.tsx": "6136d267e35d6ef33a0261f047090d778ee68f7639da6c14599944cd879d5e9c",
     "native/src/screens/SymptomNotesScreen.tsx": "a2621b96f114dc76843ec5d9345b37dcee5b8be303bc4c2ba5ef07adebc80d78",
     "native/src/screens/TermsScreen.tsx": "61fc455f27c102b590ccacd1483fcf084beb2b56f5573ca0584e421b73b0e9f1",
-    "native/src/screens/TrackCaloriesScreen.tsx": "010ddc8c390812cb28f72f3d466cb7a7b197ba712953f0cb0348019ad783c8f5",
+    "native/src/screens/TrackCaloriesScreen.tsx": "f5d8d452f590dce50811b7592f0493ecfa7241349d1073f41f31a9d4c8aeaad5",
     "native/src/screens/WaterIntakeScreen.tsx": "027fedc4368d04533a3714995fbfbb1d0cfec635ebad670c9eb63594e0da801a",
     "native/src/state/AppModeContext.tsx": "ee7d08f06814f4aa7e2da4cd08bbefe83de4cdc448915c311f1bfd8ee825864f",
     "native/src/ui/EntryActionsMenu.tsx": "b6d936d3dd6e87c63eb26de86a1987879c0dd361c2e81401fa92e481b50d5bad",

@@ -49,8 +49,8 @@ function voiceHarness(c){
 let groups=0
 async function check(name,fn){await fn();groups++;console.log('PASS '+name)}
 async function run(){
- await check('unchanged Food and scoped voice ended-state presentation; normal loading retains its guarded credit reader',async()=>{
-  assert.equal(presentationHash(food),'b54f1e086256443b2a8fe29a3ec28385015feb90bd9546a4d40c435e8c04e234');assert.equal(presentationHash(voice),'1b8418f552b2ba89cf29f52dba489526d0ebd40fba80fa16c6d903b58788ca02')
+ await check('approved Food accuracy display and unchanged scoped voice presentation; normal loading retains its guarded credit reader',async()=>{
+  assert.equal(presentationHash(food),'9049167626ba4bbf41bba81c1be1dc9d90100ba7758d2f15d861292ca46382aa');assert.equal(presentationHash(voice),'1b8418f552b2ba89cf29f52dba489526d0ebd40fba80fa16c6d903b58788ca02')
   assert.match(callback(food,'loadAll'),/const creditPromise = refreshCreditBalance\(\)/);assert(!callback(food,'loadAll').includes('setCreditsRemaining'))
   for(const name of ['stopRealtimeVoiceSession','startVoiceSession'])assert(callback(voice,name).includes('finishVoiceCreditObservers'))
   assert.match(callback(voice,'startVoiceSession'),/onMeteredSession: sessionId => observeVoiceCredits\(sessionId, voiceMemoryUserId, startupAccountToken, realtimeRunId\)/)

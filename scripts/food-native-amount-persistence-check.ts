@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { nutritionServingMultiplier } from '../native/src/lib/foodDiaryEntries'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
@@ -23,7 +24,7 @@ function actual(name: string) {
   visit(actualSource); assert.ok(text, name)
   return ts.transpile(text, { target: ts.ScriptTarget.ES2020 })
 }
-const ctx = vm.createContext({ ...nutrients, parseFoodServing, liquidDensity, convertFoodAmount, savedMealPortion })
+const ctx = vm.createContext({ nutritionServingMultiplier, ...nutrients, parseFoodServing, liquidDensity, convertFoodAmount, savedMealPortion })
 for (const name of ['roundTo', 'round1', 'nullableNumber', 'numberOrZero', 'normalizeFavoriteLabel', 'normalizeFavoriteAmountUnit', 'parseServingBaseForFavorite', 'favoriteAmountStateFromRaw', 'favoriteBaseForItem', 'convertFavoriteBaseAmount', 'favoriteAmountFromServings', 'favoriteAmountInBase', 'favoriteServingsFromAmount', 'formatFavoriteAmount', 'isOpenMeasurementServing', 'hasServingOptionMacroData', 'normalizeFavoriteServingOptions', 'findSelectedServingId', 'favoriteAdjustPersistenceFields', 'updateFavoriteAdjustItemAmount', 'calculateFavoriteAdjustTotals', 'cloneFavoriteItems', 'buildFavoriteAdjustItems']) ctx[name] = vm.runInContext(actual(name), ctx)
 const raw = { id: 'recorded-chicken', name: 'Chicken meat with skin, cooked, roasted', serving_size: '100 g', amount: 100, amountUnit: 'g', __amount: 100, __unit: 'g', weightAmount: 100, weightUnit: 'g', servings: 1, calories: 239, protein_g: 27.3, carbs_g: 0, fat_g: 13.6, fiber_g: null, sugar_g: 0, source: 'usda', __sourceId: 'original-chicken' }
 function build(rawItem: any) {
