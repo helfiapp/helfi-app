@@ -1,3 +1,9 @@
+Stable account scope:2cdaa508e19d06874f4b0814e460478838d1b04c/AWS165,27November2026. Bounded real load/save and cross-device restoration passed; no sign-in rule change.
+
+## Native store completion follows verified purchase — 27 November 2026
+
+Use the existing transaction-ID Apple verification when a receipt is empty; reject only when neither is available. Finish/consume only after successful server verification. Already acknowledged Android subscriptions need no second acknowledgement, but credit packs still consume. Restore must finish each verified pending purchase and report partial/errors honestly, retaining retry and once-only server crediting. Billing refreshes once after each started attempt even if final store completion fails; stale account results must not act or refresh. No receipt bypass, guessed credits, pricing, funding or sign-in changes. Gates: native-purchase-completion, native-billing-attempt-refresh and native-store-prices. Actual sandbox receipts remain separate from synthetic checks.
+
 ## Account display refresh must not remount in a loop — 27 November 2026
 
 Account on-open display read uses one ordinary no-store GET to the existing session endpoint. Do not use global NextAuth update for this mount read: its loading state changes the existing layout hierarchy, remounting Account and recursively refreshing. Preserve owner/dirty/unmount/snapshot guards and bounded failure behavior. Save may use its existing once-only display update; do not change provider/loading/authentication rules for this repair. Actual-source regression lives in scripts/account-name-save-check.cjs.
