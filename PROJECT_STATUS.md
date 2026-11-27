@@ -1,3 +1,9 @@
+## Help accuracy follow-up — scoped local candidate, 27 November 2026
+
+Uses the already-approved SVG logo on public pages, retaining original dimensions/layout; the oversized alternate PNG failed live FAQ and embedded native FAQ. Final approved FAQ wording matches monthly wallets,12-monthtopups,provider cancellation, feature allowances and actual privacy/audit-retention policy, with a Billing link. Removes unsupported guarantees and offline/roadmap promises. Native Journal audio help says device rather than iPhone/iPad on Android.
+
+Exact3source files plus existing display check,3snapshots and required notes only. No TrackCalories,design,colours,prices,credit enforcement,consent,sign-in or dependency change. Actual current-source rendering on4publicroutes, FAQschema/Billinglink, existing food/Journal display checks, root/native types0,306/107locks and full production build exit0/1242PASS verified. Exact deployment and live logo/FAQ smoke test remain required; no paid/provider or store completion claim. PDF PR12/AWS167 is the separate preceding release.
+
 ## PDF export repair — exact latest candidate, 27 November 2026
 
 Latest approved export handler, Settings caller, licensed font assets and focused check are integrated with all existing account/IAP/food/support gates intact. The standard export previously failed for non-Latin names and the date-range arrow. Existing layout/data are retained; supported accented Latin, Greek, Cyrillic and Chinese/Japanese/Korean text renders with licensed bundled fonts, safe wrapping and clear unsupported-text guidance without changing saved data. Settings preserves the actual error message. No native, authentication, provider, schema or voice-funding change.
