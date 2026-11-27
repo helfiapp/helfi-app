@@ -1,6 +1,7 @@
 'use client'
 
 import React, { useState, useEffect, useCallback, useRef } from 'react'
+import { isSupportChatClosed } from '@/lib/support-state'
 import { useSession } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
@@ -169,7 +170,7 @@ export default function SupportPage() {
         const isClearedClosed =
           clearedTicketId &&
           result.ticket?.id === clearedTicketId &&
-          ['RESOLVED', 'CLOSED'].includes(result.ticket?.status)
+          isSupportChatClosed(result.ticket)
         setActiveTicket(isClearedClosed ? null : (result.ticket || null))
         setFeedbackSubmitted(Boolean(result.ticket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]'))))
       }
@@ -580,7 +581,7 @@ export default function SupportPage() {
   }
 
   const shouldShowRegisteredEmail = formData.inquiryType === 'account' && !session
-  const isChatClosed = activeTicket && ['RESOLVED', 'CLOSED'].includes(activeTicket.status)
+  const isChatClosed = isSupportChatClosed(activeTicket)
   const hasFeedback = feedbackSubmitted || Boolean(activeTicket?.responses?.some((res: any) => String(res.message || '').startsWith('[FEEDBACK]')))
   const showChatPanel = Boolean(session && showChatView && (activeTicket || showChatComposer))
   const showSupportEntry = Boolean(session && !showChatPanel)
