@@ -14,10 +14,11 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
   const [password, setPassword] = useState('');
   const [consentData, setConsentData] = useState<ConsentData | null>(null);
   const [isPasswordProtected, setIsPasswordProtected] = useState(false);
-  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'completed' | 'error'>('idle');
+  const [uploadStatus, setUploadStatus] = useState<'idle' | 'uploading' | 'processing' | 'cleaning' | 'completed' | 'error' | 'cleanup-error' | 'uncertain' | 'checking' | 'pending'>('idle');
   const [error, setError] = useState<string | null>(null);
   const [reportId, setReportId] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const cleanupRetryRef = useRef(false);
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
     const selectedFiles = Array.from(e.target.files || []);
@@ -59,6 +60,98 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
 
   const handleConsent = (consent: ConsentData) => {
     setConsentData(consent);
+  };
+
+  const processUploadedReport = async (id: string, cleanupOnly = false) => {
+    setUploadStatus(cleanupOnly ? 'cleaning' : 'processing');
+    setError(null);
+    let response: Response;
+    let data: any;
+    try {
+      response = await fetch(`/api/reports/${id}/process`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ password: !cleanupOnly && isPasswordProtected ? password : undefined }),
+      });
+      data = await response.json();
+    } catch {
+      setError(cleanupOnly ? 'Original-file cleanup could not be confirmed. Please try again.' : 'The processing result could not be confirmed. Check this report before trying again.');
+      setUploadStatus(cleanupOnly ? 'cleanup-error' : 'uncertain');
+      return;
+    }
+    if (!response.ok) {
+      if (response.status === 503 && data?.reportId === id && data.status === 'COMPLETED' && data.originalDeleted === false) {
+        setPassword('');
+        setError('Your report results are saved, but deletion of the original file could not be confirmed. Retry cleanup; the report will not be processed again.');
+        setUploadStatus('cleanup-error');
+      } else if (response.status === 409 && !cleanupOnly) {
+        setError('Processing may already be underway. Check this report before trying again.');
+        setUploadStatus('uncertain');
+      } else {
+        setError(data?.error || 'Failed to process PDF');
+        setUploadStatus(cleanupOnly ? 'cleanup-error' : 'error');
+      }
+      return;
+    }
+    if (data?.success !== true || data.reportId !== id || data.status !== 'COMPLETED') {
+      setError('The processing result could not be confirmed. Check this report before trying again.');
+      setUploadStatus(cleanupOnly ? 'cleanup-error' : 'uncertain');
+      return;
+    }
+    setUploadStatus('completed');
+    setPassword('');
+    if (onUploadComplete) onUploadComplete(id);
+  };
+
+  const retryOriginalCleanup = async () => {
+    if (!reportId || cleanupRetryRef.current) return;
+    cleanupRetryRef.current = true;
+    try {
+      await processUploadedReport(reportId, true);
+    } finally {
+      cleanupRetryRef.current = false;
+    }
+  };
+
+  const checkProcessingStatus = async () => {
+    if (!reportId || cleanupRetryRef.current) return;
+    cleanupRetryRef.current = true;
+    setUploadStatus('checking');
+    setError(null);
+    try {
+      const response = await fetch('/api/reports/list', { cache: 'no-store' });
+      const data = await response.json();
+      if (!response.ok || !Array.isArray(data?.reports)) throw new Error('Status unavailable');
+      const report = data.reports.find((item: any) => item?.id === reportId);
+      if (report?.status === 'COMPLETED') {
+        setPassword('');
+        await processUploadedReport(reportId, true);
+      } else if (report?.status === 'PENDING') {
+        setError('This uploaded report has not started processing. You can retry processing the same report without uploading it again.');
+        setUploadStatus('pending');
+      } else if (report?.status === 'FAILED' || report?.status === 'DECRYPTION_FAILED') {
+        setError(report.processingError || 'Report processing failed. You can try uploading again.');
+        setUploadStatus('error');
+      } else {
+        setError(report?.status === 'PROCESSING' ? 'This report is still processing. Check again shortly; do not upload it again.' : 'This report status could not be confirmed. Please check again.');
+        setUploadStatus('uncertain');
+      }
+    } catch {
+      setError('This report status could not be confirmed. Please check again.');
+      setUploadStatus('uncertain');
+    } finally {
+      cleanupRetryRef.current = false;
+    }
+  };
+
+  const retryPendingProcessing = async () => {
+    if (!reportId || cleanupRetryRef.current) return;
+    cleanupRetryRef.current = true;
+    try {
+      await processUploadedReport(reportId);
+    } finally {
+      cleanupRetryRef.current = false;
+    }
   };
 
   const handleUpload = async () => {
@@ -204,32 +297,8 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
         throw new Error(errorData.error || 'Failed to upload file');
       }
 
-      // Step 3: Process PDF
-      setUploadStatus('processing');
-      
-      const processResponse = await fetch(`/api/reports/${newReportId}/process`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          password: isPasswordProtected ? password : undefined,
-        }),
-      });
-
-      if (!processResponse.ok) {
-        const errorData = await processResponse.json();
-        throw new Error(errorData.error || 'Failed to process PDF');
-      }
-
-      const processData = await processResponse.json();
-      
-      setUploadStatus('completed');
-      setPassword(''); // Clear password from memory
-      
-      if (onUploadComplete) {
-        onUploadComplete(newReportId);
-      }
+      // Step 3: Keep this report available if its processing response is uncertain.
+      await processUploadedReport(newReportId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Upload failed');
       setUploadStatus('error');
@@ -358,13 +427,27 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
         </div>
       )}
 
-      {uploadStatus === 'processing' && (
+      {(uploadStatus === 'processing' || uploadStatus === 'cleaning') && (
         <div className="text-center py-8">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-green-600 mx-auto mb-4"></div>
-          <p className="text-gray-700">Processing PDF...</p>
+          <p className="text-gray-700">{uploadStatus === 'cleaning' ? 'Retrying original-file cleanup...' : 'Processing PDF...'}</p>
           <p className="text-sm text-gray-500 mt-2">
-            Decrypting, extracting lab values, and encrypting data...
+            {uploadStatus === 'cleaning' ? 'Your saved results will not be processed again.' : 'Decrypting, extracting lab values, and encrypting data...'}
           </p>
+        </div>
+      )}
+
+      {(uploadStatus === 'uncertain' || uploadStatus === 'checking' || uploadStatus === 'pending') && (
+        <div role="status" className="bg-green-50 border border-green-200 rounded-lg p-6">
+          <h2 className="text-xl font-bold text-green-900 mb-2">Report processing status</h2>
+          <p className="text-green-800 mb-4">{uploadStatus === 'checking' ? 'Checking the same uploaded report...' : error}</p>
+          <button
+            onClick={uploadStatus === 'pending' ? retryPendingProcessing : checkProcessingStatus}
+            disabled={uploadStatus === 'checking'}
+            className="px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg"
+          >
+            {uploadStatus === 'pending' ? 'Retry processing this report' : 'Check report status'}
+          </button>
         </div>
       )}
 
@@ -395,20 +478,20 @@ export default function LabReportUpload({ onUploadComplete, compact }: LabReport
         </div>
       )}
 
-      {uploadStatus === 'error' && (
-        <div className="bg-red-50 border border-red-200 rounded-lg p-6">
+      {(uploadStatus === 'error' || uploadStatus === 'cleanup-error') && (
+        <div role="alert" className="bg-red-50 border border-red-200 rounded-lg p-6">
           <h2 className="text-xl font-bold text-red-900 mb-2">
-            Processing Failed
+            {uploadStatus === 'cleanup-error' ? 'Report processed; cleanup pending' : 'Processing Failed'}
           </h2>
           <p className="text-red-800 mb-4">{error}</p>
           <button
-            onClick={() => {
+            onClick={uploadStatus === 'cleanup-error' ? retryOriginalCleanup : () => {
               setUploadStatus('idle');
               setError(null);
             }}
             className="px-4 py-2 bg-red-600 hover:bg-red-700 text-white rounded-lg"
           >
-            Try Again
+            {uploadStatus === 'cleanup-error' ? 'Retry original-file cleanup' : 'Try Again'}
           </button>
         </div>
       )}
