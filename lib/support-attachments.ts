@@ -1,4 +1,5 @@
 import { buildSignedBlobUrl, extractScopedBlobPath } from '@/lib/blob-access'
+import { SUPPORT_CHAT_ENDED_MARKER } from '@/lib/support-state'
 
 const ATTACHMENTS_MARKER = '[[ATTACHMENTS]]'
 
@@ -75,4 +76,18 @@ export function rehydrateSupportTicket<T extends { message?: string; responses?:
     message: hydratedMessage,
     responses: hydratedResponses,
   }
+}
+
+export function rehydratePublicSupportTicket<T extends {
+  message?: string
+  responses?: Array<{ message?: string; isAdminResponse?: boolean }>
+}>(ticket: T, expiresInSeconds = 60 * 60): T {
+  if (!ticket) return ticket
+  return rehydrateSupportTicket({
+    ...ticket,
+    responses: Array.isArray(ticket.responses)
+      ? ticket.responses.filter(response => response.isAdminResponse !== true ||
+          !response.message?.startsWith('[SYSTEM]') || response.message === SUPPORT_CHAT_ENDED_MARKER)
+      : ticket.responses,
+  }, expiresInSeconds)
 }

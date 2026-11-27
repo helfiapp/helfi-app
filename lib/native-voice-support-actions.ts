@@ -1,4 +1,5 @@
 import crypto from 'crypto'
+import { SUPPORT_CHAT_ENDED_MARKER, isSupportChatClosed } from '@/lib/support-state'
 import { NextRequest } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/lib/auth'
@@ -94,12 +95,12 @@ export async function prepareVoiceSupportAction(request:NextRequest,userId:strin
   const selected: { ticket?: any; choices?: any[] }=action==='support.create'?{}:await select(request,values,io)
   if('choices' in selected)return {canConfirm:false,summary:'Choose a support ticket',confirmationMessage:selected.choices?.length?'More than one support ticket matches. Please choose its exact subject.':'I could not find that support ticket.',supportAction:{action,values,choices:selected.choices}}
   const ticket='ticket' in selected?selected.ticket:undefined
-  if(ticket&&['RESOLVED','CLOSED'].includes(ticket.status)&&['support.end_chat','support.reply'].includes(action))return {canConfirm:false,summary:'Support chat is closed',confirmationMessage:action==='support.reply'?'This support chat is closed. Please create a new support ticket to send a new message.':'That support chat is already closed. No transcript has been requested again.'}
+  if(ticket&&isSupportChatClosed(ticket)&&['support.end_chat','support.reply'].includes(action))return {canConfirm:false,summary:'Support chat is closed',confirmationMessage:action==='support.reply'?'This support chat is closed. Please create a new support ticket to send a new message.':'That support chat is already closed. No transcript has been requested again.'}
   const payload:Record<string,any>={...values};delete payload.query;delete payload.ticketId
   payload.action=action.replace('support.','')==='reply'?'add_response':action==='support.feedback'?'submit_feedback':action==='support.delete'?'delete_ticket':action.replace('support.','')
   if(ticket)payload.ticketId=ticket.id
   const target=ticket?`“${ticket.subject}”`:'a new support ticket'
-  const summary=action==='support.create'?`Send a new support ticket${values.subject?`: ${values.subject}`:''}`:action==='support.reply'?`Send a reply to ${target}`:action==='support.end_chat'?`Close ${target} and request its transcript email`:action==='support.feedback'?`Send ${values.rating}/5 feedback for ${target} and close this ticket`:`Permanently delete ${target}`
+  const summary=action==='support.create'?`Send a new support ticket${values.subject?`: ${values.subject}`:''}`:action==='support.reply'?`Send a reply to ${target}`:action==='support.end_chat'?`End the chat for ${target} and request its transcript email`:action==='support.feedback'?`Send ${values.rating}/5 feedback for ${target}`:`Permanently delete ${target}`
   const detail=values.message||values.comment||''
   const draft:any={action:'support_action',transcript,localDate,summary,confirmationMessage:`${summary}${detail?` with this exact text: “${detail}”`:''}. Would you like me to confirm this action?`,canConfirm:true,autoSave:false,reviewIssuedAt:Date.now(),supportAction:{action,userId,payload,...(ticket?{ticketId:ticket.id,beforeHash:version(userId,ticket)}:{})}}
   draft.reviewToken=signNativeVoiceDraft(userId,draft);return draft
@@ -120,9 +121,9 @@ export async function executeVoiceSupportAction(request:NextRequest,userId:strin
   else if(after.ticket?.id===id){
     if(prepared.action==='support.create')confirmed=after.ticket.message===prepared.payload.message&&(prepared.payload.subject===undefined||after.ticket.subject===prepared.payload.subject)
     if(prepared.action==='support.reply')confirmed=after.ticket.responses?.some((reply:any)=>reply.isAdminResponse===false&&reply.message===prepared.payload.message)===true
-    if(prepared.action==='support.end_chat')confirmed=after.ticket.status==='RESOLVED'
-    if(prepared.action==='support.feedback'){const message=`[FEEDBACK] Rating: ${prepared.payload.rating}/5\nComment: ${prepared.payload.comment||'(none)'}`;confirmed=after.ticket.status==='CLOSED'&&after.ticket.responses?.some((reply:any)=>reply.isAdminResponse===false&&reply.message===message)===true}
+    if(prepared.action==='support.end_chat')confirmed=after.ticket.responses?.some((reply:any)=>reply.isAdminResponse===true&&reply.message===SUPPORT_CHAT_ENDED_MARKER)===true
+    if(prepared.action==='support.feedback'){const message=`[FEEDBACK] Rating: ${prepared.payload.rating}/5\nComment: ${prepared.payload.comment||'(none)'}`;confirmed=after.ticket.responses?.some((reply:any)=>reply.isAdminResponse===false&&reply.message===message)===true}
   }
   if(!confirmed)throw new Error('Support has not confirmed this action. Please check it before retrying.')
-  return {kind:'support_action',action:prepared.action,id,status:'completed',actionId:receipt.actionId,message:prepared.action==='support.delete'?'The selected support ticket was deleted.':prepared.action==='support.end_chat'?'The selected support chat was closed. Email delivery is not verified.':'The reviewed support action was saved. Email delivery is not verified.'}
+  return {kind:'support_action',action:prepared.action,id,status:'completed',actionId:receipt.actionId,message:prepared.action==='support.delete'?'The selected support ticket was deleted.':prepared.action==='support.end_chat'?'The selected support chat ended. Email delivery is not verified.':'The reviewed support action was saved. Email delivery is not verified.'}
 }
