@@ -1,3 +1,15 @@
+## Initial report response uncertainty must retain the upload —27November2026
+
+After the first process response is lost or unreadable, retain its report ID and use the existing no-store owned-report list to confirm status. COMPLETED only confirms/retries existing cleanup; PROCESSING remains checkable; PENDING permits explicit same-report processing, never another presign/upload. Confirmed failure stays explicit, never automatically reprocessed. Conditional status claims allow only one extraction winner after existing validation; a stale wrong-password result cannot overwrite PROCESSING/COMPLETED. Keep claim failures outside processing-failure mutation. No new leases, schemas, auth helper changes or hidden automatic retry. Existing report gate includes14actual-source groups and fails against the old caller.
+
+## Completed report cleanup retries —27November2026
+
+LabReportUpload must distinguish saved results with pending original deletion from extraction failure. Retry the same owned report process endpoint only, never a new presign/upload/extraction. Repeated cleanup errors, permission/network/JSON errors remain retryable; a response lost after successful cleanup must confirm idempotent COMPLETED success without repeating storage/audit/extraction. Keep original consent/password validation and parent completion callback only after confirmed success. Existing report-original-deletion gate now covers the actual component plus actual process handler. Refresh only the upload component snapshot; preserve all other designs.
+
+## Report original cleanup must be truthful and retryable —27November2026
+
+S3DeleteObjects HTTP200 can contain per-object Errors; del() must reject them like transport failures. Do not erase report references or mark/audit originalDeletedAt after failed storage deletion. Successful extraction remains completed; cleanup-only retry must not repeat paid extraction. Preserve ownership,password/consent,retained-original behavior and synthetic fault checks. Never delete real user files to prove a failure path; synthetic storage checks do not establish a live deletion result.
+
 ## Public help must match current app behavior — 27 November 2026
 
 PublicHeader uses the approved existing SVG at original sizes on all public routes; do not restore oversized9712×5180PNG that exceeds live image limits. FAQ directs current prices/credit allowances to Billing and retains monthlyrefresh/no-rollover,12-monthtopups,provider cancellation and explicitAIsharing/PrivacyPolicy retention wording. Do not restore nonexistent unlimited daily retries,nonexpiringtopups,never-shared/never-lostguarantees or unsupportedoffline promises. Journal device help must stay platform-neutral. Preserve all layouts,colours,food captions and functional account/credit/consent controls.

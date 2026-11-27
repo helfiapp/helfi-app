@@ -1,3 +1,17 @@
+## Report response recovery candidate —27November2026
+
+Independent review caught initial process-response loss still allowing reupload. Final three-path follow-up retains the original report, checks owned status, explicitly resumes PENDING and guards the server processing claim; completed/in-flight requests cannot duplicate extraction. Root reran14actual-source synthetic groups successfully, including all8previous groups and first-response transport/JSON loss, missing/denied status and concurrent password/claim cases.306/107locks pass; final full build follows. Previous1249PASS v2 build remains historical and unpublished. No real upload/deletion/AI/payment test.
+
+## Report cleanup caller candidate —27November2026
+
+The isolated Report task now includes the actual upload caller. Baseline actual-source proof created two uploads/extractions after cleanup-only failure; candidate keeps one report/upload/extraction across retries, including response loss after server cleanup. All8actual-source synthetic groups and306/107locks pass; full production build follows. No real user files deleted or paid extraction performed. Public help commit15092356/AWS168 independently verified on both domains and normal FAQ; Journal source awaits final native binary. Advanced sign-in candidates remain preserved outside this isolation.
+
+## Report original-file cleanup — scoped local candidate,27 November2026
+
+Storage per-object failures now reject even when S3 returns HTTP200. Report deletion retains its database/file reference when storage refuses removal. Extraction results commit as completed before original cleanup; cleanup failure returns truthful503/originalDeletedfalse without losing results, and retry removes only the original without paying for extraction again. Explicit deletion never marks/audits success after a storage failure. Original account/ownership/password/consent checks remain intact.
+
+Exact3report routes,object-storage del(),focused check,one package gate and required notes only. Existing deletion helper already rejects transport failures; per-object errors now use the same rejection contract for its existing await/catch callers. No dependency/schema/authentication or actual storage deletion. All7actual-source synthetic groups,root types0,306/107unchangedlocks and full production build exit0/1249PASS verified. Exact deployment remains required; no actual customer object deletion was performed. Help PR13/AWS168 is a separate preceding release.
+
 ## Help accuracy follow-up — scoped local candidate, 27 November 2026
 
 Uses the already-approved SVG logo on public pages, retaining original dimensions/layout; the oversized alternate PNG failed live FAQ and embedded native FAQ. Final approved FAQ wording matches monthly wallets,12-monthtopups,provider cancellation, feature allowances and actual privacy/audit-retention policy, with a Billing link. Removes unsupported guarantees and offline/roadmap promises. Native Journal audio help says device rather than iPhone/iPad on Android.
