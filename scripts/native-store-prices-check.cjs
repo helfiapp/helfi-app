@@ -42,6 +42,7 @@ async function priceFixture(platform, currencyPrice, missing = false) {
 function renderBilling(platform, source, prices = {}) {
   const calls = [], alerts = []
   let state = 0
+  const identity = { token: 'fixture', user: { id: 'fixture-owner' } }
   const subscription = { id: 'fixture', tier: 'plan_20_monthly', credits: 1400, monthlyPriceCents: 2000, source }
   const hooks = { ...React, useCallback: f => f, useEffect: () => {}, useMemo: f => f(), useRef: value => ({ current: value }), useState: value => {
     const index = state++
@@ -59,7 +60,8 @@ function renderBilling(platform, source, prices = {}) {
       readNativeStorePrices: async () => ({}),
     },
     '../lib/nativeAuthHeaders': { buildNativeAuthHeaders: () => ({}) },
-    '../state/AppModeContext': { useAppMode: () => ({ mode: 'signedIn', session: { token: 'fixture' } }) },
+    '../state/AppModeContext': { useAppMode: () => ({ mode: 'signedIn', session: identity }) },
+    '../lib/nativeAuthSession': { getCurrentNativeAuthSession: () => identity },
     '../ui/Screen': { Screen: 'Screen' }, '../ui/theme': { theme: { colors: {}, radius: {}, spacing: {}, fontSize: {} } },
   }, { fetch: async (url, opts = {}) => {
     calls.push({ type: 'fetch', url, method: opts.method || 'GET', body: opts.body })

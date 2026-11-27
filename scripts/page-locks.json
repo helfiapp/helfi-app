@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-27T08:16:18.924Z",
+  "generatedAt": "2026-11-27T08:26:30.831Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "46a7aa67b4c42a5252052e8069e58c32fe30317fe052bd0d8e01b8c5be4d838a",
@@ -221,7 +221,7 @@
     "native/src/lib/foodPhoto.ts": "cd3263caa424dd69c88c494977bfdc3a205f3ac3a647d6612423900e61213b2b",
     "native/src/lib/foodPreparation.ts": "b0db28b4b9a93184b335708f801c12993a79400f5f586f959b759008e9750e42",
     "native/src/lib/foodUnits.ts": "9555664f0e30088600e2a773fe91e028da4b2d2ac5b8077738ade8bb6d0e168d",
-    "native/src/lib/inAppPurchase.ts": "b6ec30395a256428c2033d1797873c71c1724ccca33a7bcbbb2072da422b657c",
+    "native/src/lib/inAppPurchase.ts": "67da6e4efd51eaefa8644043c33f3077692761150406c644bfaa47982e971fc6",
     "native/src/lib/mealPortionEditor.ts": "d0d24d41dd1c0b38003a9a63b4a9756a2e491ccad99c6473cd1bc50b3de339df",
     "native/src/lib/mealPortions.ts": "16d3a1e5cfe6ca652dc66b7e08ddd84f6e591ab95b6cb1dd5cc9b1232d60ee3a",
     "native/src/lib/nativeAuthHeaders.ts": "8b6a8a2b33b95d497a4d7bab4fe9003ea91db6a6a3c78bcd80ce63bb6f1dbdf9",
@@ -241,7 +241,7 @@
     "native/src/screens/AccountSettingsScreen.tsx": "b3e66aaaa33d0a521c1acc7b6ab993cd6dfa5cfa63fbfcfa0d05c49c3b25909b",
     "native/src/screens/AddIngredientScreen.tsx": "5da16968c543fd87ac2fed7eae26983352214d05f00ea9c4e244db5b5028d08e",
     "native/src/screens/AnimatedSplashScreen.tsx": "ce3b4a85216b7321b4f309ae4e0812b7e6bd691edb92f11b61e8a8fd35aafee5",
-    "native/src/screens/BillingScreen.tsx": "4af68df2092f9669fb9b4d4f0b8ddc02564d84d4a9c2a67b08c1cd40889692b4",
+    "native/src/screens/BillingScreen.tsx": "3d70f99e394370298c5ba89d9c1b1c72515514e8a1183fed0d6829bef4fdf873",
     "native/src/screens/DailyCheckInScreen.tsx": "98e7d5ff8187ec506898f3e7366e49a04b0ba2ba5cf903cf90ee00b1943ea717",
     "native/src/screens/DashboardScreen.tsx": "c4ceba674f286ed4479066899f5ad29df7f343761f5f995b09b10d6f5cfafa00",
     "native/src/screens/DevicesScreen.tsx": "6ef949877dea0ab66a7e94f8f513f7df546142f1a2e9afc0363942e913161299",
