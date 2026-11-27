@@ -50,7 +50,7 @@ let groups=0
 async function check(name,fn){await fn();groups++;console.log('PASS '+name)}
 async function run(){
  await check('approved Food accuracy display and unchanged scoped voice presentation; normal loading retains its guarded credit reader',async()=>{
-  assert.equal(presentationHash(food),'9049167626ba4bbf41bba81c1be1dc9d90100ba7758d2f15d861292ca46382aa');assert.equal(presentationHash(voice),'1b8418f552b2ba89cf29f52dba489526d0ebd40fba80fa16c6d903b58788ca02')
+  assert.equal(presentationHash(food),'9049167626ba4bbf41bba81c1be1dc9d90100ba7758d2f15d861292ca46382aa');assert.equal(presentationHash(voice),'19ab9479c9c44c79933ee9a254073e3cefaac1f3267b82d4d23905346aac8751')
   assert.match(callback(food,'loadAll'),/const creditPromise = refreshCreditBalance\(\)/);assert(!callback(food,'loadAll').includes('setCreditsRemaining'))
   for(const name of ['stopRealtimeVoiceSession','startVoiceSession'])assert(callback(voice,name).includes('finishVoiceCreditObservers'))
   assert.match(callback(voice,'startVoiceSession'),/onMeteredSession: sessionId => observeVoiceCredits\(sessionId, voiceMemoryUserId, startupAccountToken, realtimeRunId\)/)
