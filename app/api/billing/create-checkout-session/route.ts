@@ -22,8 +22,8 @@ export async function POST(request: NextRequest) {
     const origin = url.origin
 
     const body = await request.json().catch(() => ({} as any))
-    const requestedPlan: string | undefined = body?.plan
-    const quantity: number = Number(body?.quantity || 1)
+    const requestedPlan = typeof body?.plan === 'string' ? body.plan : undefined
+    const quantity = Number(body?.quantity ?? 1)
 
     const PLAN_TO_PRICE: Record<string, string | undefined> = {
       // Monthly subscription plans
@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
       credits_100: process.env.STRIPE_PRICE_CREDITS_100,
     }
 
-    const priceId = requestedPlan ? PLAN_TO_PRICE[requestedPlan] : undefined
+    const priceId = requestedPlan && Object.hasOwn(PLAN_TO_PRICE, requestedPlan) ? PLAN_TO_PRICE[requestedPlan] : undefined
     const isCredits = (requestedPlan ?? '').startsWith('credits_')
 
     if (!isCredits && !priceId) {
@@ -59,6 +59,12 @@ export async function POST(request: NextRequest) {
       credits_500: { unitAmount: 1000, title: 'Helfi Credit Top-up (500 credits)' },
       credits_1000: { unitAmount: 2000, title: 'Helfi Credit Top-up (1,000 credits)' },
       credits_100: { unitAmount: 200, title: 'Helfi Credit Top-up (100 credits)' },
+    }
+    const creditPack = isCredits && Object.hasOwn(CREDIT_PLAN_FALLBACK, requestedPlan || '')
+      ? Number(requestedPlan!.slice('credits_'.length)) : 0
+    if (!Number.isSafeInteger(quantity) || quantity < 1 ||
+      (isCredits && (!creditPack || !Number.isSafeInteger(creditPack * quantity) || creditPack * quantity > 2147483647))) {
+      return NextResponse.json({ error: 'Invalid purchase quantity or credit package' }, { status: 400 })
     }
 
     // Get user email from session if available
@@ -80,6 +86,10 @@ export async function POST(request: NextRequest) {
       }
     }
     const baseMetadata: Record<string, string> = {}
+    if (isCredits) {
+      baseMetadata.helfi_credit_plan = requestedPlan!
+      baseMetadata.helfi_credit_quantity = String(quantity)
+    }
     if (hasFreshAffiliateAttribution) {
       baseMetadata.helfi_aff_code = affiliateCookie!.code
       baseMetadata.helfi_aff_click = affiliateCookie!.clickId
