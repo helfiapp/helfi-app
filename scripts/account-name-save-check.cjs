@@ -85,27 +85,38 @@ function screenFixture(platform) {
     setFetch: value => { handler = value }, setConfirmedName: value => { confirmedName = value }, switchAccount: () => { activeIdentity = {}; globals.ownerRef.current = 'other-owner' } }
 }
 
-function webLoadFixture() {
+function webLoadFixture(httpStatus = 200, invalidJson = false) {
   const source = fs.readFileSync('app/account/page.tsx', 'utf8')
   const start = source.indexOf('  useEffect(() => {\n    const ownerId =')
   assert.ok(start >= 0)
   const end = source.indexOf('\n\n  useEffect(', start + 1)
   const gate = deferred()
-  let data, cleanup
+  let data, cleanup, globalRefreshes = 0
+  const requests = []
   const globals = {
     session: { user: owner }, ownerRef: { current: owner.id }, dirtyRef: { current: false },
     accountRef: { current: null }, accountSnapshotRef: { current: '' }, hasInitializedRef: { current: false },
-    refreshSessionRef: { current: () => gate.promise }, setHasUnsavedChanges() {}, setSaveStatus() {},
+    refreshSessionRef: { current: () => { globalRefreshes++; return gate.promise } },
+    refreshSession: () => { globalRefreshes++; return gate.promise },
+    fetch: async (url, options) => {
+      requests.push({ url, options })
+      assert.equal(url, '/api/auth/session'); assert.equal(options.cache, 'no-store'); assert.equal(options.method, undefined)
+      const result = response(await gate.promise, httpStatus)
+      if (invalidJson) result.json = async () => { throw Error('Synthetic invalid JSON') }
+      return result
+    }, setHasUnsavedChanges() {}, setSaveStatus() {},
     setAccountData: next => { data = next }, useEffect: callback => { cleanup = callback() },
   }
   compile(source.slice(start, end), {}, globals)
-  return { gate, globals, data: () => data, unmount: () => cleanup() }
+  return { gate, globals, requests, globalRefreshes: () => globalRefreshes, data: () => data, unmount: () => cleanup() }
 }
 
 async function main() {
   {
     const fresh = { user: { ...owner, name: 'Changed On Another Device' } }
     const f = webLoadFixture()
+    assert.equal(f.requests.length, 1, 'one ordinary read per mounted effect')
+    assert.equal(f.globalRefreshes(), 0, 'opening Account must not mutate global session loading')
     assert.equal(f.data().fullName, owner.name)
     f.gate.resolve(fresh); await tick()
     assert.equal(f.data().fullName, fresh.user.name)
@@ -118,8 +129,18 @@ async function main() {
       g.gate.resolve(change === 'foreign-result' ? { user: { ...fresh.user, id: 'other-owner' } } : fresh)
       await tick()
       assert.equal(g.data().fullName, owner.name, change)
+      assert.equal(g.requests.length, 1); assert.equal(g.globalRefreshes(), 0)
     }
-    console.log('PASS actual web load refreshes cached names and ignores late, foreign or dirty-form replies')
+    for (const [status, invalidJson] of [[500, false], [200, true]]) {
+      const failed = webLoadFixture(status, invalidJson)
+      failed.gate.resolve(fresh); await tick(); await tick()
+      assert.equal(failed.data().fullName, owner.name, 'failed refresh retains current form')
+      assert.equal(failed.requests.length, 1, 'failed read must not retry in a loop')
+      assert.equal(failed.globalRefreshes(), 0)
+    }
+    await tick()
+    assert.equal(f.requests.length, 1); assert.equal(f.globalRefreshes(), 0)
+    console.log('PASS actual web load uses one no-store read without global session mutation; preserves late/foreign/dirty/snapshot/unmount and failed-read guards')
   }
   {
     const f = profileFixture()

@@ -1,3 +1,9 @@
+## Account refresh-loop follow-up — 27 November 2026
+
+Actual PR9/a2cb4443/AWS164 is deployed on both live domains. Normal web name save appeared in new unsigned iOS64; native save showed Saved and web Account read the same name. Original name was restored through native Saved and verified on web Profile; both remain signed in727credits. A fresh actual test exposed repeated web session reads: global update on Account mount enters the existing layout loading branch and remounts Account. Web was moved to Food to stop the loop.
+
+Actual-source9groups,root types0,306/107page locks and full production build exit0/1230PASS verified. Exact deployment and bounded normal web save/reopen remain required. This exact follow-up changes only the Account mount read to one ordinary no-store session GET, retaining owner, dirty-form, snapshot and unmount checks. Server, native, layout/provider and held sign-in candidates are unchanged. The actual-source regression requires one GET and zero global session mutations, including HTTP/JSON failure with no retry. Save retains its existing one global display refresh; local Saved may reset during that single remount, so verify bounded requests and persistent name rather than claiming a persistent banner. No new native build, paid feature or store submission.
+
 ## Account-name persistence — VERIFIED LOCAL CANDIDATE, 27 November 2026
 
 Exact ordinary six-source repair saves names through existing Profile API and confirms current-account server readback before Saved. Atomic per-user Profile merge preserves unrelated metadata on concurrent writes or failures. Both clients retain newer drafts and queued reversions; native display cache refresh preserves token, active identity, expiry and remember choice. Email remains read-only. The only lib/auth change is one display-name field; all other authentication expressions/held candidates are excluded.
