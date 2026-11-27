@@ -27,8 +27,6 @@ export default function AccountPage() {
   const ownerRef = useRef(session?.user?.id)
   ownerRef.current = session?.user?.id
   const saveQueue = useRef(Promise.resolve())
-  const refreshSessionRef = useRef(refreshSession)
-  refreshSessionRef.current = refreshSession
 
   // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -73,7 +71,8 @@ export default function AccountPage() {
     setHasUnsavedChanges(false)
     setSaveStatus('idle')
     setAccountData(seeded)
-    if (ownerId) void refreshSessionRef.current().then((fresh) => {
+    if (ownerId) void fetch('/api/auth/session', { cache: 'no-store' })
+      .then(response => response.ok ? response.json() : null).then((fresh) => {
       if (cancelled || ownerRef.current !== ownerId || fresh?.user?.id !== ownerId || dirtyRef.current || accountSnapshotRef.current !== initialSnapshot) return
       const confirmed = { fullName: fresh.user.name || '', email: fresh.user.email || '' }
       accountRef.current = confirmed
