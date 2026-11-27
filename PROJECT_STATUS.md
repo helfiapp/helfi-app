@@ -1,3 +1,7 @@
+## Stripe credit delivery candidate —27November2026
+
+Root isolated only confirm/create-checkout/webhook, shared grant helper, focused test and package/three notes from actualReportmergec0c56537. Accepted final candidate plus one delayed-success event case passes13actual-source synthetic groups; no duplicate credits across confirm/webhook/retry/refund orderings. Promo discounts preserve purchased package quantity. Protected notifications/account lookup remain unchanged except already-approved verified creditAmount field. No real payment/refund/email/DB/funding action. ReportAWS169 remains the only deployment in progress; next publish waits for its verification. Stripe saved account identity question pending; no unrelated saved account was signed in. Advanced sign-in candidates remain privately preserved and excluded.
+
 ## Report response recovery candidate —27November2026
 
 Independent review caught initial process-response loss still allowing reupload. Final three-path follow-up retains the original report, checks owned status, explicitly resumes PENDING and guards the server processing claim; completed/in-flight requests cannot duplicate extraction. Root reran14actual-source synthetic groups successfully, including all8previous groups and first-response transport/JSON loss, missing/denied status and concurrent password/claim cases.306/107locks pass; final full build follows. Previous1249PASS v2 build remains historical and unpublished. No real upload/deletion/AI/payment test.

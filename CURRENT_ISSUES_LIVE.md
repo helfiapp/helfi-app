@@ -1,3 +1,6 @@
+STRIPE DELIVERY CANDIDATE —27November2026:
+Paid-credit fulfillment now has one shared per-checkout path for redirects and payment notices, including delayed success; provider/refund failures remain retryable and promotions retain the purchased pack.13synthetic actual-handler groups pass. No live payment/refund/grant or deployment is claimed; ReportAWS169 verifies first.
+
 REPORT RESPONSE RECOVERY CANDIDATE —27November2026:
 First-response transport/JSON failure retains the same upload for an owned status check. Completed/in-flight processing does not start a second analysis; PENDING has an explicit same-report retry guarded by one server claim.14synthetic actual-source groups pass; final build and exact deployment remain to be verified. No real user-file deletion or paid extraction.
 
