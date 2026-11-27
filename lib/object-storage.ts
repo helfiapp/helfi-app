@@ -169,10 +169,11 @@ export async function del(pathnameOrUrls: string | string[]) {
 
   for (let index = 0; index < keys.length; index += 1000) {
     const batch = keys.slice(index, index + 1000)
-    await s3Client().send(new DeleteObjectsCommand({
+    const result = await s3Client().send(new DeleteObjectsCommand({
       Bucket: awsBucket(),
       Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
     }))
+    if (result.Errors?.length) throw new Error('Object storage could not delete every requested file.')
   }
 }
 

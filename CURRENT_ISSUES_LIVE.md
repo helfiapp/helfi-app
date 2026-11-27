@@ -1,3 +1,15 @@
+REPORT RESPONSE RECOVERY CANDIDATE —27November2026:
+First-response transport/JSON failure retains the same upload for an owned status check. Completed/in-flight processing does not start a second analysis; PENDING has an explicit same-report retry guarded by one server claim.14synthetic actual-source groups pass; final build and exact deployment remain to be verified. No real user-file deletion or paid extraction.
+
+REPORT CANDIDATE —27November2026:
+Completed extraction survives failed original-file cleanup; normal upload UI retries only cleanup on the same report, and already-completed retries confirm success without another extraction. Eight synthetic actual-source groups pass; deployment not yet claimed. No real user files were deleted to test this.
+
+## Report original-file cleanup — scoped local candidate,27 November2026
+
+Storage per-object failures now reject even when S3 returns HTTP200. Report deletion retains its database/file reference when storage refuses removal. Extraction results commit as completed before original cleanup; cleanup failure returns truthful503/originalDeletedfalse without losing results, and retry removes only the original without paying for extraction again. Explicit deletion never marks/audits success after a storage failure. Original account/ownership/password/consent checks remain intact.
+
+Exact3report routes,object-storage del(),focused check,one package gate and required notes only. Existing deletion helper already rejects transport failures; per-object errors now use the same rejection contract for its existing await/catch callers. No dependency/schema/authentication or actual storage deletion. All7actual-source synthetic groups,root types0,306/107unchangedlocks and full production build exit0/1249PASS verified. Exact deployment remains required; no actual customer object deletion was performed. Help PR13/AWS168 is a separate preceding release.
+
 ## Help accuracy follow-up — scoped local candidate, 27 November 2026
 
 Uses the already-approved SVG logo on public pages, retaining original dimensions/layout; the oversized alternate PNG failed live FAQ and embedded native FAQ. Final approved FAQ wording matches monthly wallets,12-monthtopups,provider cancellation, feature allowances and actual privacy/audit-retention policy, with a Billing link. Removes unsupported guarantees and offline/roadmap promises. Native Journal audio help says device rather than iPhone/iPad on Android.

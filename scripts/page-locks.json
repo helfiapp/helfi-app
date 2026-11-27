@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-11-27T08:58:05.306Z",
+  "generatedAt": "2026-11-27T09:55:00.198Z",
   "scope": "all",
   "files": {
     "app/account/page.tsx": "46a7aa67b4c42a5252052e8069e58c32fe30317fe052bd0d8e01b8c5be4d838a",
@@ -195,7 +195,7 @@
     "components/providers/AuthProvider.tsx": "1d5d04877fc2ed8648ca22000ca55eac315443eb6a3b32758c15dd8219679be6",
     "components/providers/UserDataProvider.tsx": "30c6fa6b0016cab7c9b667248c26a7792cf34e440544c127812a1211f5e14457",
     "components/reports/ConsentGate.tsx": "e24784c6295270453f70f2eedade5e696976a0965613e60f40c1844b36132313",
-    "components/reports/LabReportUpload.tsx": "e7661163dabd0a2804f937f3c837d0e80ba2933fbc992b1abe3880d099ec0632",
+    "components/reports/LabReportUpload.tsx": "7f5e0b188cde9b2677d9d42ddf92b3b956c14c8be85b3d65976cf7268a2e1fa2",
     "components/SolidMacroRing.tsx": "c3c6e3f07fafd237fa4dcd498b024ac48e48c2ebd23a64c924aab253590fedaa",
     "components/support/SupportChatWidget.tsx": "93ae56520c216198628c9ba4a62c692134be00faee9480a6ef86490b88b8687b",
     "components/UsageMeter.tsx": "c031540fcb357f17144674e6a8fddb2f15af88887d56b0c743cec2ad6f1eb9a0",
