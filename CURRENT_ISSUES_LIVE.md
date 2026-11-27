@@ -1,5 +1,16 @@
 DEPLOYED:
 - LIVE or STAGING: LIVE — https://helfi.ai and https://www.helfi.ai
+- Date/time: 27 November 2026, 22:09 Melbourne
+- What changed: Medical-image/Mood cleanup preserves references on storage failure, protects captured bulk selections and concurrent journal attachments, and bounds storage waits. PR16/0b55aca1; AWS171 allsteps succeeded.
+- Where to see it (page/link): https://helfi.ai/medical-images/history and https://helfi.ai/mood/journal
+- What to quickly test: Both pages load existing account/history normally; Food727credits/123used/2161remaining/2284allowance unchanged.18health/14Report actual-source synthetic groups and full1288PASS build passed. No real files deleted; failure/concurrency proofs use synthetic storage/database fixtures.
+
+## Preparing next phone release65/47 —27November2026
+
+The accepted ordinary app fixes are being packaged with the narrowly tested voice startup timeout repair. New iPhone/Android counters65/47 match fresh store maxima64/46. Signed artifacts, actual runtime and submissions remain separate steps; no real paid voice/photo or purchase result is claimed. Health cleanup AWS171 is still being verified.
+
+DEPLOYED:
+- LIVE or STAGING: LIVE — https://helfi.ai and https://www.helfi.ai
 - Date/time: 27 November2026,21:38Melbourne
 - What changed: Paid Stripe credit packs now share once-only delivery across browser confirmation and payment events, including delayed success; refunded/disputed purchases are checked and transient failures remain retryable. PR15/1beb7c0e; AWS170 BUILD/DEPLOY/VERIFY succeeded.
 - Where to see it (page/link): https://helfi.ai/billing

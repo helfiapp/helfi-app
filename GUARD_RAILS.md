@@ -1,3 +1,15 @@
+## Preserve native voice presentation pin meaning —27November2026
+
+The existing voice-credit-settlement fixture hashes JSX plus top-level constants. Accepted17second startup changes that hash despite byte-identical JSX. Keep its new expected19ab9479c9c44c79933ee9a254073e3cefaac1f3267b82d4d23905346aac8751 only with the exact reviewed17second source; allFood/credit/confirmation assertions remain intact. Private ASTproof compares every JSX element and constant and allows only the actual deadline replacement. This is a pin refresh, not a design or financial change.
+
+## Last stable health-file cleanup release —27November2026
+
+PR16/0b55aca11ec662b03a37e949529c354781cac22f, AWS171 allsteps and bothdomains verified; normal imagehistory/MoodJournal load without data changes. Keep selected-ID bulk cleanup, owned same-entry locking, introduced-path metadata checks, pre-write cancellation and real provider AbortSignal forwarding. Keep truthful failure/retry behavior and all18health/14Report/connectedcaller assertions. No actual file deletion test or distributed-transaction guarantee is implied.
+
+## Native release65/47 startup deadline —27November2026
+
+Native server startup allows17seconds for the existing15second server deadline plus bounded handling; media connection remains4seconds. Preserve explicit review/confirmation, stop/late/account isolation, money/consent gates and the approved UI. Both existing literal guard assertions and actual-client fixture must agree with the real constant; do not weaken other checks. New build counters65iOS/47Android exceed freshly observed store64/46. Source tests do not establish actual microphone speed, eligible voice funding, sandbox transactions or store submission. Reuse existing signing credentials with canonical guards, preserving the original keychain search list after bounded signing access.
+
 ## Keep actual Mood caller fixtures current —27November2026
 
 The existing voice-record-actions fixture executes the ordinary Mood route. Its VM must supply standard AbortController/timers and its synthetic database must support the route callback transaction; preserve every review-first, single-write, skipped-write and readback assertion. Dedicated health fixtures separately prove row-lock concurrency, rollback/failure and provider cancellation. Do not bypass existing voice or Report checks when cleanup changes their required runtime.

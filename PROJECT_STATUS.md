@@ -1,3 +1,15 @@
+## Native65/47 source checks verified —27November2026
+
+Full productionbuild exit0/1289PASS; complete nativevoiceguard/commandbehavior, native types0, Health/installedbridge/TestFlight checks and306/107locks pass. Android platform regenerated in existing mainfolder withversion47/1.0.0, exactlyoneprivate-signing marker and no debug release signing; no tracked file outside approvedscope changed. Additional expected presentationhash fixture refreshed onlyafter ASTproof: allVoice JSX and top constants identical except accepted12→17deadline; all other assertions retained. Exact12-file task only; old pending voice/accounting/sign-in candidates excluded. Signed65IPA/47AAB, actual runtime and store receipts remain required. Health0b55/AWS171 now independentlyverified onbothdomains/normalpages.
+
+## Health-file cleanup deployed —27November2026
+
+PR16 merged0b55aca11ec662b03a37e949529c354781cac22f; treefb0cd1972fab3ace20d9b379614adf22489d23c0 equals tested02efa9fd. AWS171 BUILD/DEPLOY/VERIFY allSUCCEED; both domains200CloudFront/newmatchingdeploymentidentity. Normal image-notes/history and MoodJournal load;3existing savedimage records remain visible, no delete/upload/save touched. ReturnedFood727/123/2161/2284.18health/14Report/currentMoodcaller/0types/306+107locks/full1288PASS. Failure/concurrency/provider cancellation checks synthetic only, no remote atomicity claim. New native65/47 source checks/full1289PASS are local and not yet signed/uploaded/submitted.
+
+## Next native release source65/47 —27November2026
+
+Accepted baseline-only voice startup17seconds prevents a valid13second server response from being cut off; media4seconds stays unchanged. Actual timer fixture covers true timeout, cleanup and late/replaced runs. Exact7proposal paths plus1Voice snapshot and3notes; every other config/project/guard condition is preserved. iOS counters65/Android47 exceed freshApple64/Play46. No old pending voice/accounting/sign-in candidate is included. Root actual native/Health/TestFlight/type/full-build checks follow, then exact signed binaries and runtime/store receipts. HealthPR16/AWS171 is a separate preceding release still building; no new store submission or actual paid voice/photo claim.
+
 ## Health-file cleanup reviewed release candidate —27November2026
 
 Exact3health routes, shared storage optional cancellation, new health check, existing connected Mood voice fixture setup, package gate and3notes only.18actual-source health groups,14Report groups, unchanged voice record assertions, root types0,306/107locks and full production build exit0/1288PASS verified. One old actual-Mood VM fixture needed standard abort/timer globals and callback transaction support; assertions/skip-write behavior are unchanged and independently reviewed. No real storage/database/file deletion or provider/financial call. Exact deployment and normal read-only pages remain required. All held sign-in candidates are excluded.
