@@ -637,10 +637,15 @@ export default function Settings() {
                   onClick={async () => {
                     const previewWindow = window.open('about:blank', '_blank')
                     if (previewWindow) previewWindow.opener = null
+                    let errorMessage = 'Could not start export.'
                     try {
                       setExporting(true)
                       const res = await fetch('/api/export/pdf')
-                      if (!res.ok) throw new Error('Export failed')
+                      if (!res.ok) {
+                        const failure = await res.json().catch(() => null)
+                        if (typeof failure?.error === 'string' && failure.error.trim()) errorMessage = failure.error
+                        throw new Error('Export failed')
+                      }
                       const blob = await res.blob()
                       const url = URL.createObjectURL(blob)
                       if (previewWindow) {
@@ -652,7 +657,7 @@ export default function Settings() {
                       }
                     } catch (e) {
                       previewWindow?.close()
-                      alert('Could not start export.')
+                      alert(errorMessage)
                     } finally {
                       setExporting(false)
                     }

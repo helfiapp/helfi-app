@@ -131,7 +131,7 @@
     "app/public-home/page.tsx": "f6739c6d6dcf13d07da70d81cd19f686d7a8ba388dbbf379d5da20de68059639",
     "app/pwa-entry/page.tsx": "96e2d551f404dd50c612c4ab4d47e10463ec14fb7f8be5e362da5da5ca1fb334",
     "app/settings/food-diary/page.tsx": "e4c391f7a1f0c0b8c69a752661cb0ffd41f6c86ea81b7f0cc8ba4c8c15863f89",
-    "app/settings/page.tsx": "a42cccb7f2cbe3217d84ab436155ac07d60e0703ad568bad5127e76af6c02421",
+    "app/settings/page.tsx": "1840ec86d3ab984a2631893b1009449c1ef620454fc2619fd9dfb3faa248abba",
     "app/support/layout.tsx": "ed50de55af3f4ea1243d793aaeee076e7c9bd383f6c7dd634272f77691215220",
     "app/support/page.tsx": "3cfd357ae28529df8a0e4576cc066e372abdf6c26933c33a43450ee26617ef54",
     "app/symptoms/history/page.tsx": "058865b2cfb79421d6216aa65ed0cb19909287ac67cf969af5ed7ae286e94c0c",

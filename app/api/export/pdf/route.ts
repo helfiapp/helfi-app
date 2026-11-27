@@ -4,7 +4,10 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth/next'
 import { authOptions } from '@/lib/auth'
 import { prisma } from '@/lib/prisma'
-import { PDFDocument, StandardFonts, rgb } from 'pdf-lib'
+import { PDFDocument, PDFFont, StandardFonts, rgb } from 'pdf-lib'
+import fontkit from '@pdf-lib/fontkit'
+import { readFile } from 'node:fs/promises'
+import path from 'node:path'
 import { computeHydrationGoal } from '@/lib/hydration-goal'
 
 export async function GET(request: NextRequest) {
@@ -48,11 +51,40 @@ export async function GET(request: NextRequest) {
       : 'All time'
 
     const doc = await PDFDocument.create()
+    doc.registerFontkit(fontkit)
     let page = doc.addPage([595.28, 841.89]) // A4 in points
     const font = await doc.embedFont(StandardFonts.Helvetica)
     const fontBold = await doc.embedFont(StandardFonts.HelveticaBold)
+    const unicodeFont = await doc.embedFont(await readFile(path.join(process.cwd(), 'assets/pdf-fonts/NotoSans-Regular.ttf')), { subset: true })
+    const symbolFont = await doc.embedFont(StandardFonts.Symbol)
+    const cjkBytes = await readFile(path.join(process.cwd(), 'assets/pdf-fonts/DroidSansFallback.ttf'))
+    const cjkCharacters = new Set(fontkit.create(cjkBytes).characterSet)
+    const regularCharacters = new Set([...font.getCharacterSet(), ...unicodeFont.getCharacterSet(), ...symbolFont.getCharacterSet()])
+    const needsCjk = Array.from(JSON.stringify(user)).some(character => !regularCharacters.has(character.codePointAt(0)!) && cjkCharacters.has(character.codePointAt(0)!))
+    // shortcut: this font needs full embedding; subset only after glyph-render checks pass.
+    const cjkFont = needsCjk ? await doc.embedFont(cjkBytes) : null
+    const regularFonts = [font, unicodeFont, ...(cjkFont ? [cjkFont] : []), symbolFont]
+    const boldFonts = [fontBold, ...regularFonts.slice(1)]
+    const characterSets = new Map([fontBold, ...regularFonts].map(font => [font, new Set(font.getCharacterSet())]))
+    const segmenter = new Intl.Segmenter(undefined, { granularity: 'grapheme' })
     const margin = 40
     let cursorY = page.getHeight() - margin
+
+    const textRuns = (text: string, bold: boolean) => {
+      const runs: Array<{ text: string; font: PDFFont }> = []
+      for (const { segment } of segmenter.segment(text)) {
+        const selected = (bold ? boldFonts : regularFonts).find(candidate =>
+          Array.from(segment).every(character => characterSets.get(candidate)!.has(character.codePointAt(0)!)),
+        )
+        if (!selected) throw new Error('unsupported_pdf_text')
+        const last = runs[runs.length - 1]
+        if (last?.font === selected) last.text += segment
+        else runs.push({ text: segment, font: selected })
+      }
+      return runs
+    }
+    const textWidth = (text: string, size: number, bold: boolean) =>
+      textRuns(text, bold).reduce((width, run) => width + run.font.widthOfTextAtSize(run.text, size), 0)
 
     const newPage = () => {
       page = doc.addPage([595.28, 841.89])
@@ -60,10 +92,14 @@ export async function GET(request: NextRequest) {
     }
 
     const drawText = (text: string, size = 12, bold = false, color = rgb(0.07, 0.09, 0.15)) => {
-      const lines = wrapText(text, bold ? fontBold : font, size, page.getWidth() - margin * 2)
+      const lines = wrapText(text, size, bold, page.getWidth() - margin * 2)
       lines.forEach((line) => {
         if (cursorY < margin + 20) { newPage() }
-        page.drawText(line, { x: margin, y: cursorY, size, font: bold ? fontBold : font, color })
+        let x = margin
+        for (const run of textRuns(line, bold)) {
+          page.drawText(run.text, { x, y: cursorY, size, font: run.font, color })
+          x += run.font.widthOfTextAtSize(run.text, size)
+        }
         cursorY -= size + 4
       })
     }
@@ -71,16 +107,28 @@ export async function GET(request: NextRequest) {
     const h1 = (t: string) => { drawText(t, 18, true, rgb(0.02, 0.59, 0.41)); cursorY -= 4 }
     const h2 = (t: string) => { cursorY -= 6; drawText(t, 14, true, rgb(0.04, 0.37, 0.28)); cursorY -= 2 }
 
-    const wrapText = (text: string, f: any, size: number, maxWidth: number): string[] => {
-      const words = String(text || '').split(/\s+/)
+    const wrapText = (text: string, size: number, bold: boolean, maxWidth: number): string[] => {
       const lines: string[] = []
-      let line = ''
-      words.forEach(w => {
-        const test = line ? line + ' ' + w : w
-        const width = f.widthOfTextAtSize(test, size)
-        if (width > maxWidth && line) { lines.push(line); line = w } else { line = test }
-      })
-      if (line) lines.push(line)
+      for (const rawParagraph of String(text || '').split(/\r\n|[\r\n\u2028\u2029]/)) {
+        const paragraph = rawParagraph.replace(/\s/g, ' ')
+        let line = ''
+        for (const word of paragraph.split(/(\s+)/)) {
+          if (!word) continue
+          if (line && textWidth(line + word, size, bold) > maxWidth && textWidth(word, size, bold) <= maxWidth) {
+            lines.push(line.trimEnd())
+            line = ''
+          }
+          if (!line && !word.trim()) continue
+          for (const { segment } of segmenter.segment(word)) {
+            if (line && textWidth(line + segment, size, bold) > maxWidth) {
+              lines.push(line)
+              line = ''
+            }
+            line += segment
+          }
+        }
+        lines.push(line.trimEnd())
+      }
       return lines
     }
 
@@ -235,6 +283,9 @@ export async function GET(request: NextRequest) {
       }
     })
   } catch (e: any) {
+    if (e?.message === 'unsupported_pdf_text') {
+      return NextResponse.json({ error: 'Some characters cannot be shown in this PDF yet. Your saved data has not changed. Please contact support for help.' }, { status: 422 })
+    }
     console.error('PDF export failed:', e)
     return NextResponse.json({ error: 'Export failed' }, { status: 500 })
   }
