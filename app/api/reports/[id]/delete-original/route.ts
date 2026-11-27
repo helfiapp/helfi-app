@@ -54,13 +54,7 @@ export async function POST(
       );
     }
 
-    // Delete from Vercel Blob
-    try {
-      await del(report.s3Key); // s3Key field stores the blob path
-    } catch (deleteError) {
-      console.error('Failed to delete blob:', deleteError);
-      // Continue - blob might already be deleted
-    }
+    await del(report.s3Key);
 
     // Update report
     await prisma.report.update({
