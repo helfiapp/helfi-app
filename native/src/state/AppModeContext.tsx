@@ -1,5 +1,6 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
+import { setCurrentNativeAuthSession } from '../lib/nativeAuthSession'
 
 export type AppMode = 'signedOut' | 'signedIn'
 
@@ -64,13 +65,16 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   const [hydrated, setHydrated] = useState(false)
   const [mode, setMode] = useState<AppMode>('signedOut')
   const [session, setSession] = useState<NativeAuthSession | null>(null)
+  const authRevision = useRef(0)
 
   useEffect(() => {
     let cancelled = false
+    const revision = authRevision.current
 
     const hydrate = async () => {
       try {
         const raw = await AsyncStorage.getItem(AUTH_SESSION_KEY)
+        if (cancelled || revision !== authRevision.current) return
         if (!raw) return
 
         const stored = JSON.parse(raw) as StoredAuthSession
@@ -85,11 +89,13 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
           return
         }
 
-        if (!cancelled) {
+        if (!cancelled && revision === authRevision.current) {
+          setCurrentNativeAuthSession(stored)
           setMode('signedIn')
           setSession({ token: stored.token, expiresAt: stored.expiresAt, user: stored.user })
         }
       } catch {
+        if (cancelled || revision !== authRevision.current) return
         // If storage is corrupted, just fall back to signed out.
         try {
           await AsyncStorage.removeItem(AUTH_SESSION_KEY)
@@ -104,12 +110,17 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
 
     return () => {
       cancelled = true
+      setCurrentNativeAuthSession(null)
     }
   }, [])
 
   const signIn = async ({ rememberMe, session }: { rememberMe: boolean; session: NativeAuthSession }) => {
+    const revision = ++authRevision.current
+    setCurrentNativeAuthSession(null)
     await clearStoredAccountData()
+    if (revision !== authRevision.current) return
 
+    setCurrentNativeAuthSession(session)
     setMode('signedIn')
     setSession(session)
 
@@ -137,6 +148,8 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   }
 
   const signOut = async () => {
+    authRevision.current++
+    setCurrentNativeAuthSession(null)
     setMode('signedOut')
     setSession(null)
     try {

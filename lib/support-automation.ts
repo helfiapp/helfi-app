@@ -7,6 +7,8 @@ import { runChatCompletionWithLogging } from '@/lib/ai-usage-logger'
 import { getEmailFooter } from '@/lib/email-footer'
 import { buildSupportCodeContext } from '@/lib/support-code-search'
 import { getSupportAgentForTimestamp } from '@/lib/support-agents'
+import { hasAiSharingConsent } from '@/lib/ai-consent'
+import { isSupportChatClosed } from '@/lib/support-state'
 import supportKnowledgeBase from '@/data/support-kb.json'
 
 const SUPPORT_AI_MODEL = 'gpt-5.6-sol'
@@ -56,6 +58,12 @@ function getOpenAIClient(): OpenAI | null {
 function getResendClient(): Resend | null {
   if (!isEmailConfigured()) return null
   return new Resend(process.env.RESEND_API_KEY)
+}
+
+async function sendSupportEmail(client: Resend, options: Parameters<Resend['emails']['send']>[0]) {
+  const result = await client.emails.send(options)
+  if (result.error || !result.data?.id) throw new Error('Support email delivery was not accepted.')
+  return result.data.id
 }
 
 function escapeHtml(input: string): string {
@@ -134,7 +142,7 @@ function buildSupportSystemPrompt(agentName: string, agentRole: string): string 
     '- Start with a brief greeting only if this is your first reply in the conversation; otherwise, skip the greeting and continue naturally.',
     '- Focus on app troubleshooting, not medical advice.',
     '- Do not claim hardware or device integrations that are not currently supported.',
-    '- If asked about Apple devices or Apple Watch, explain they are not supported in the web app and are planned for the future native apps.',
+    '- Device support depends on the platform. Use verified device instructions; do not describe the native apps as future products.',
     '- Do not show code snippets or internal file paths in the customer reply.',
     '- Use the Support Knowledge Base for verified links and steps. Always provide the most direct link when relevant.',
     '- If the user mentions the affiliate program or referrals, always explain: sign up first, apply, approval required, then portal access.',
@@ -145,7 +153,7 @@ function buildSupportSystemPrompt(agentName: string, agentRole: string): string 
     '- For troubleshooting, ask for at most two missing details. Prefer which page/chat and whether it happens on mobile or desktop.',
     '- Only ask for OS/browser versions or screenshots if the issue cannot be investigated without them.',
     '- If the user is frustrated or says they already answered, do not repeat questions. Move forward with investigation and explain what you will check.',
-    '- Never say you cannot check the latest app build. Say you are checking it now and will confirm with the team.',
+    '- Do not claim to inspect a live app, change an account, fix a fault, or contact a repair agent. Escalate faults for investigation and describe only work actually recorded.',
     '- If a bug is likely, tell the user we are investigating and provide clear internal notes for the team.',
     '- If the user already provided steps or a link they clicked, do not ask for the same info again. Move to the next helpful step.',
     '- Use the product facts below when answering questions about trials, pricing, credits, or features.',
@@ -193,12 +201,11 @@ function supportProductFacts(): string {
     '- Free chats on signup: 2 symptom note chats, 2 health image note chats, 2 insights chats, 2 voice chats.',
     '- Free re-analyses on signup: 2 food re-analyses, 2 interaction re-analyses.',
     '- Non-AI features remain free for all users.',
-    '- Premium plan: $20/month includes 30 daily AI food analyses, 30 reanalysis credits per day, 30 health image note uses per day, advanced insights, priority support, and export capabilities.',
-    '- Credit packs: $5 for 100 credits or $10 for 150 credits. Credits do not expire and can be used for any analysis.',
-    '- Helfi is a web app that works in the browser on mobile and desktop; no download is required.',
+    '- Plans and credit packs are shown at https://helfi.ai/billing. Direct users there for current prices, credits and purchase terms; store prices can differ by country. Do not invent a daily allowance or quote old packs.',
+    '- Helfi has a browser-based web app and native iPhone/Android apps. The web app needs no download.',
     '- Device integrations: Fitbit is available now. Garmin Connect is in evaluation and may be temporarily unavailable until production approval is granted.',
     '- Sleep tracking is available only through connected devices (Fitbit; Garmin evaluation). There is no built-in sleep monitoring without a device connection.',
-    '- Apple Watch, Apple Health, Samsung Health, Oura Ring, and Google Fit are not supported yet. These are planned for future iOS/Android apps.',
+    '- Apple Health is available in the native iPhone app on supported devices, with the user\'s permission. Do not promise a device connection without verified platform-specific instructions.',
   ].join('\n')
 }
 
@@ -245,7 +252,7 @@ function supportKnowledgeBaseFacts(): string {
 }
 
 function isGreetingOrThanks(message: string): boolean {
-  return /(^(hi|hello|hey|thanks|thank you|ok|okay|cool|great)\b)/i.test(message.trim())
+  return /^(hi|hello|hey|sup|thanks|thank you|ok|okay|cool|great)[\s!?.]*$/i.test(message.trim())
 }
 
 function matchesSupportKnowledgeBase(message: string): boolean {
@@ -353,6 +360,10 @@ function buildDeterministicSupportReply(options: {
   const featuresTopic = findSupportTopic('features')
   const sleepTopic = findSupportTopic('sleep_tracking')
 
+  if (/\b(no help|not helpful|didn.t help|doesn.t help|still (?:broken|not working)|already (?:said|told|answered))\b/i.test(text)) {
+    return addAgentSignOff('I’m sorry my previous reply did not help. Your request still needs investigation. Please tell us what you were trying to do and what went wrong, if you have not already shared that.', options.agent)
+  }
+
   if (isGreetingOrThanks(text)) {
     const reply = [
       `Hi! I’m ${options.agent?.name || 'Helfi Support'}.`,
@@ -394,7 +405,7 @@ function buildDeterministicSupportReply(options: {
 
     const lines = [
       'Thanks for reporting this. I can see how frustrating that is.',
-      'I am checking the latest app build and the chat module now so we can fix this.',
+      'Your report has been saved for investigation. We have not confirmed a fix yet.',
       'If the input is jumping or disappearing, a quick refresh usually brings it back while we investigate.',
     ]
 
@@ -500,7 +511,7 @@ function buildDeterministicSupportReply(options: {
     return addAgentSignOff(reply, options.agent)
   }
 
-  const supportMatch = /support|help|contact/i.test(text)
+  const supportMatch = /^(?:(?:where|how) (?:can|do) (?:i|we) (?:get |find )?(?:support|help|contact support)|(?:support|help|contact)(?: page| email| address| details)?)[\s?!.]*$/i.test(text.trim())
   if (supportMatch) {
     const supportUrl = supportTopic?.links?.support || 'https://helfi.ai/support'
     const helpUrl = supportTopic?.links?.help || 'https://helfi.ai/help'
@@ -717,7 +728,7 @@ async function ensureVerificationCode(ticketId: string, userEmail: string): Prom
     </div>
   `
 
-  await resend.emails.send({
+  await sendSupportEmail(resend, {
     from: 'Helfi Support <support@helfi.ai>',
     to: userEmail,
     subject: 'Your Helfi support verification code',
@@ -805,7 +816,7 @@ async function sendSupportResponseEmail(options: {
   sendSupportCopy?: boolean
 }) {
   const resend = getResendClient()
-  if (!resend) return
+  if (!resend) throw new Error('Support email service is not configured.')
 
   const subject = options.ticket.subject || 'Support request'
   const userEmail = options.ticket.userEmail
@@ -814,16 +825,16 @@ async function sendSupportResponseEmail(options: {
   const sendSupportCopy = options.sendSupportCopy ?? false
 
   if (sendUserEmail) {
-    await resend.emails.send({
+    await sendSupportEmail(resend, {
       from: 'Helfi Support <support@helfi.ai>',
       to: userEmail,
-      subject: `Re: ${subject}`,
+      subject: `Re: [Helfi:${options.ticket.id}] ${subject}`,
       html: buildSupportResponseHtml({ subject, message: options.message }),
     })
   }
 
   if (sendSupportCopy && copyEmail && userEmail.toLowerCase() !== copyEmail.toLowerCase()) {
-    await resend.emails.send({
+    await sendSupportEmail(resend, {
       from: 'Helfi Support <support@helfi.ai>',
       to: copyEmail,
       subject: `Copy: Re: ${subject}`,
@@ -845,7 +856,7 @@ async function sendEscalationNotice(options: {
   reason?: string
 }) {
   const resend = getResendClient()
-  if (!resend) return
+  if (!resend) throw new Error('Support email service is not configured.')
 
   const subject = `Escalation needed: ${options.ticket.subject || 'Support request'}`
   const html = `
@@ -864,7 +875,7 @@ async function sendEscalationNotice(options: {
     </div>
   `
 
-  await resend.emails.send({
+  await sendSupportEmail(resend, {
     from: 'Helfi Alerts <support@helfi.ai>',
     to: SUPPORT_COPY_EMAIL,
     subject,
@@ -972,7 +983,7 @@ function buildTranscriptHtml(options: {
 
 export async function sendSupportTranscriptEmail(ticketId: string) {
   const resend = getResendClient()
-  if (!resend) return
+  if (!resend) throw new Error('Support email service is not configured.')
 
   const ticket = await prisma.supportTicket.findUnique({
     where: { id: ticketId },
@@ -983,7 +994,7 @@ export async function sendSupportTranscriptEmail(ticketId: string) {
   if (alreadySent) return
 
   const transcript = ''
-  await resend.emails.send({
+  await sendSupportEmail(resend, {
     from: 'Helfi Support <support@helfi.ai>',
     to: SUPPORT_COPY_EMAIL,
     subject: `Support transcript: ${ticket.subject || 'Support request'}`,
@@ -998,7 +1009,7 @@ export async function sendSupportTranscriptEmail(ticketId: string) {
   })
 
   if (ticket.userEmail && ticket.userEmail !== SUPPORT_COPY_EMAIL) {
-    await resend.emails.send({
+    await sendSupportEmail(resend, {
       from: 'Helfi Support <support@helfi.ai>',
       to: ticket.userEmail,
       subject: 'Your Helfi support chat transcript',
@@ -1031,7 +1042,7 @@ export function buildSupportFeedbackPrompt(
   const agentName = agent?.name || 'Helfi Support'
   const agentRole = agent?.role || 'Helfi Support'
   return [
-    `Thanks ${name} — I’m glad we could help.`,
+    `Thanks ${name}. This chat has ended. Any issue still needing investigation remains open with support.`,
     'If you have a moment, could you rate your support experience and leave a quick comment? It helps us improve.',
     `\n${agentName} from ${agentRole}`,
   ].join('\n')
@@ -1043,7 +1054,7 @@ export async function sendSupportFeedbackEmail(options: {
   comment?: string
 }) {
   const resend = getResendClient()
-  if (!resend) return
+  if (!resend) throw new Error('Support email service is not configured.')
 
   const ticket = await prisma.supportTicket.findUnique({
     where: { id: options.ticketId },
@@ -1067,7 +1078,7 @@ export async function sendSupportFeedbackEmail(options: {
     </div>
   `
 
-  await resend.emails.send({
+  await sendSupportEmail(resend, {
     from: 'Helfi Support <support@helfi.ai>',
     to: SUPPORT_COPY_EMAIL,
     subject: `Support feedback: ${ticket.subject || 'Support request'}`,
@@ -1102,11 +1113,11 @@ function fallbackSupportReply(options?: {
   }
 
   return {
-    customerReply: 'Thanks for reaching out. I am unable to access the support assistant right now. I have flagged your request for a human review and will follow up as soon as possible.',
+    customerReply: addAgentSignOff('I’m sorry, the automatic reply could not be completed. Your message is saved for our support team to investigate. Please tell us what you were trying to do and what went wrong, if you have not already shared that.', options?.agent),
     shouldEscalate: true,
     escalationReason: 'AI unavailable',
     needsIdentityCheck: false,
-    needsMoreInfo: true,
+    needsMoreInfo: false,
     requestedInfo: [],
     internalNotes: 'OpenAI client unavailable or response parse failed.',
     suggestedCategory: '',
@@ -1157,8 +1168,12 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     return response.isAdminResponse && !message.startsWith('[SYSTEM]') && !message.startsWith('[FEEDBACK]')
   })
   const chatBug = latestMessage ? analyzeChatBugMessage(latestMessage) : null
-  const openai = getOpenAIClient()
   let aiResult: SupportAiResult
+  const supportUserId = ticket.userId || ticket.user?.id || null
+  const needsFollowUp = /\b(no help|not helpful|didn.t help|doesn.t help|still (?:broken|not working)|already (?:said|told|answered))\b/i.test(latestMessage)
+  const pendingFollowUp = (ticket.responses || []).some((response: any) =>
+    response.isAdminResponse && String(response.message || '').startsWith('[SYSTEM] Follow-up required')
+  ) || ticket.status === 'IN_PROGRESS'
 
   const directReply = latestMessage
     ? buildDeterministicSupportReply({ message: latestMessage, userLoggedIn, agent })
@@ -1167,8 +1182,8 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   if (directReply) {
     aiResult = {
       customerReply: directReply,
-      shouldEscalate: false,
-      escalationReason: '',
+      shouldEscalate: needsFollowUp || pendingFollowUp,
+      escalationReason: needsFollowUp ? 'Previous reply did not resolve the request.' : pendingFollowUp ? 'Existing investigation still needs follow-up.' : '',
       needsIdentityCheck: false,
       needsMoreInfo: false,
       requestedInfo: [],
@@ -1179,9 +1194,20 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
   } else {
     const codeContext = buildSupportCodeContext([ticket.subject, latestMessage].filter(Boolean).join(' '))
     const kbMatch = latestMessage ? matchesSupportKnowledgeBase(latestMessage) : false
+    const hasConsent = supportUserId ? await hasAiSharingConsent(supportUserId).catch(() => false) : false
+    const openai = hasConsent ? getOpenAIClient() : null
     const canUseAi = Boolean(openai && (codeContext || kbMatch))
 
-    if (!canUseAi) {
+    if (!hasConsent) {
+      aiResult = {
+        customerReply: addAgentSignOff('Your message is saved for our support team. You can continue here without using AI. For automatic AI replies, sign in to your Helfi account and allow AI help in Settings. Please tell us what you need help with, if you have not already shared that.', agent),
+        shouldEscalate: true,
+        escalationReason: 'Manual support requested: AI permission is not available for this ticket.',
+        needsIdentityCheck: false,
+        needsMoreInfo: false,
+        internalNotes: 'AI was not called. No saved permission for this ticket account; do not identify or link an account by the supplied email address.',
+      }
+    } else if (!canUseAi) {
       const escalationReply = [
         'I have escalated this to a human so we can confirm it properly.',
         'You will get an email update as soon as we have the answer.',
@@ -1237,7 +1263,7 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
           }
         )
       } catch (error) {
-        console.error('🤖 [SUPPORT AI] Model failed:', error)
+        console.error('[SUPPORT AI] Reply failed', { ticketId: ticket.id, code: String((error as any)?.code || 'support_ai_failed').slice(0, 80) })
         completion = null
       }
 
@@ -1249,6 +1275,8 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
       }
     }
   }
+
+  if (pendingFollowUp) aiResult.shouldEscalate = true
 
   if (chatBug?.isChatBug) {
     const bugNotes = buildChatBugInternalNotes(chatBug)
@@ -1293,69 +1321,52 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     aiResult = fallbackSupportReply()
   }
 
-  if (aiResult.suggestedCategory && aiResult.suggestedCategory !== ticket.category) {
-    const allowedCategories: TicketCategory[] = ['GENERAL', 'TECHNICAL', 'BILLING', 'ACCOUNT', 'FEATURE_REQUEST', 'BUG_REPORT', 'EMAIL']
-    if (allowedCategories.includes(aiResult.suggestedCategory as TicketCategory)) {
-      await prisma.supportTicket.update({
-        where: { id: ticket.id },
-        data: { category: aiResult.suggestedCategory as TicketCategory },
-      })
-    }
-  }
-
-  if (aiResult.suggestedPriority && aiResult.suggestedPriority !== ticket.priority) {
-    const allowedPriorities: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
-    if (allowedPriorities.includes(aiResult.suggestedPriority as TicketPriority)) {
-      await prisma.supportTicket.update({
-        where: { id: ticket.id },
-        data: { priority: aiResult.suggestedPriority as TicketPriority },
-      })
-    }
-  }
-
-  await prisma.ticketResponse.create({
-    data: {
-      ticketId: ticket.id,
-      message: aiResult.customerReply,
-      isAdminResponse: true,
-      adminId: null,
-    },
-  })
-
-  const internalNotes = aiResult.internalNotes?.trim()
-  if (internalNotes) {
-    const trimmedNotes = internalNotes.length > 1800 ? `${internalNotes.slice(0, 1800)}...` : internalNotes
-    await prisma.ticketResponse.create({
-      data: {
-        ticketId: ticket.id,
-        message: `${SYSTEM_INTERNAL_NOTES_MARKER} ${trimmedNotes}`,
-        isAdminResponse: true,
-        adminId: null,
-      },
+  const savedReply = await prisma.$transaction(async (tx) => {
+    const current = await tx.supportTicket.update({
+      where: { id: ticket.id }, data: { updatedAt: new Date() },
+      include: { responses: { orderBy: { createdAt: 'asc' } } },
     })
-  }
-
-  await prisma.supportTicket.update({
-    where: { id: ticket.id },
-    data: {
-      status: aiResult.shouldEscalate ? 'IN_PROGRESS' : 'RESPONDED',
-      updatedAt: new Date(),
-    },
+    const closed = isSupportChatClosed(current)
+    if (current.responses.some(response => response.isAdminResponse && response.message.startsWith('[SYSTEM] Follow-up required'))) aiResult.shouldEscalate = true
+    const data: any = {}
+    const categories: TicketCategory[] = ['GENERAL', 'TECHNICAL', 'BILLING', 'ACCOUNT', 'FEATURE_REQUEST', 'BUG_REPORT', 'EMAIL']
+    const priorities: TicketPriority[] = ['LOW', 'MEDIUM', 'HIGH', 'URGENT']
+    if (categories.includes(aiResult.suggestedCategory as TicketCategory)) data.category = aiResult.suggestedCategory
+    if (priorities.includes(aiResult.suggestedPriority as TicketPriority)) data.priority = aiResult.suggestedPriority
+    if (!closed) {
+      await tx.ticketResponse.create({ data: { ticketId: ticket.id, message: aiResult.customerReply, isAdminResponse: true, adminId: null } })
+      data.status = aiResult.shouldEscalate ? 'IN_PROGRESS' : 'RESPONDED'
+    }
+    if (aiResult.internalNotes?.trim()) {
+      await tx.ticketResponse.create({ data: { ticketId: ticket.id, message: `${SYSTEM_INTERNAL_NOTES_MARKER} ${aiResult.internalNotes.trim().slice(0, 1800)}`, isAdminResponse: true, adminId: null } })
+    }
+    if (aiResult.shouldEscalate && !current.responses.some(response => response.isAdminResponse && response.message.startsWith('[SYSTEM] Follow-up required'))) {
+      await tx.ticketResponse.create({ data: { ticketId: ticket.id, message: '[SYSTEM] Follow-up required', isAdminResponse: true, adminId: null } })
+    }
+    await tx.supportTicket.update({ where: { id: ticket.id }, data })
+    return !closed
   })
 
   const isEmailChannel =
     input.source === 'email_reply' ||
     input.source === 'email_ticket' ||
     input.source === 'web_ticket'
-  if (isEmailChannel) {
-    await sendSupportResponseEmail({
-      ticket,
-      message: aiResult.customerReply,
-      internalNotes: aiResult.internalNotes || '',
-      latestUserMessage: rawLatestMessage,
-      sendUserEmail: true,
-      sendSupportCopy: false,
-    })
+  if (isEmailChannel && savedReply) {
+    try {
+      await sendSupportResponseEmail({
+        ticket,
+        message: aiResult.customerReply,
+        internalNotes: aiResult.internalNotes || '',
+        latestUserMessage: rawLatestMessage,
+        sendUserEmail: true,
+        sendSupportCopy: false,
+      })
+    } catch {
+      await prisma.supportTicket.update({ where: { id: ticket.id }, data: { status: 'IN_PROGRESS' } })
+      await prisma.ticketResponse.create({ data: { ticketId: ticket.id, message: '[SYSTEM] Follow-up required: email delivery was not confirmed. Check sent history before retrying.', isAdminResponse: true } })
+      await sendEscalationNotice({ ticket, reason: 'Customer email delivery was not confirmed. Check sent history before retrying.' }).catch(() => {})
+      throw new Error('Support email delivery was not confirmed; the saved ticket needs follow-up.')
+    }
   }
 
   if (aiResult.shouldEscalate) {
@@ -1366,11 +1377,11 @@ export async function processSupportTicketAutoReply(input: SupportAutomationInpu
     })
   }
 
-  console.log('✅ [SUPPORT AI] Auto-reply sent', {
+  console.log('[SUPPORT AI] Reply processed', {
+    savedReply,
     ticketId: ticket.id,
     source: input.source || 'unknown',
     identityVerified,
     verificationPending,
-    latestMessage: rawLatestMessage.slice(0, 120),
   })
 }

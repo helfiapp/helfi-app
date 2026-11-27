@@ -2,36 +2,31 @@ import { Alert } from 'react-native'
 import AsyncStorage from '@react-native-async-storage/async-storage'
 import { API_BASE_URL } from '../config'
 import { buildNativeAuthHeaders } from './nativeAuthHeaders'
+import { getCurrentNativeAuthSession } from './nativeAuthSession'
 
 const AI_DATA_SHARING_PERMISSION_KEY = 'helfi_ai_data_sharing_permission_v1'
 const AI_CONSENT_VERSION = '2026-10-04'
 export const AI_SHARING_DISCLOSURE = 'To use AI features, Helfi may send what you choose to share, such as typed text, voice audio, photos, notes, food logs, health profile details, or lab report text, to OpenAI, LLC. OpenAI processes it so Helfi can create your AI response. You can say no and still use non-AI tracking like food, water, mood, and device logs. You can withdraw this permission in Settings at any time. Withdrawal stops future AI processing, including weekly AI reports.'
 
-async function currentToken() {
-  const raw = await AsyncStorage.getItem('helfi_auth_session_v1')
-  if (!raw) return null
-  return String(JSON.parse(raw)?.token || '') || null
-}
-
 async function consentRequest(token: string, granted?: boolean) {
   const controller = new AbortController()
   const timeout = setTimeout(() => controller.abort(), 10000)
   try {
-    return await fetch(`${API_BASE_URL}/api/ai-consent`, {
+    const response = await fetch(`${API_BASE_URL}/api/ai-consent`, {
       headers: buildNativeAuthHeaders(token, { json: granted !== undefined, includeCookie: true }),
       signal: controller.signal,
       ...(granted === undefined ? {} : { method: 'POST', body: JSON.stringify({ granted, version: AI_CONSENT_VERSION }) }),
     })
+    return { ok: response.ok, data: await response.json() }
   } finally { clearTimeout(timeout) }
 }
 
 export async function hasAiDataSharingPermission() {
   try {
-    const token = await currentToken()
-    if (!token) return false
-    const response = await consentRequest(token)
-    const data = await response.json()
-    return response.ok && data.granted === true && data.version === AI_CONSENT_VERSION
+    const session = getCurrentNativeAuthSession()
+    if (!session) return false
+    const { ok, data } = await consentRequest(session.token)
+    return getCurrentNativeAuthSession() === session && ok && data.granted === true && data.version === AI_CONSENT_VERSION
   } catch {
     return false
   }
@@ -39,14 +34,13 @@ export async function hasAiDataSharingPermission() {
 
 async function setAiDataSharingPermission(granted: boolean, expectedToken?: string) {
   try {
-    const token = await currentToken()
-    if (!token || (expectedToken && expectedToken !== token)) return false
-    const response = await consentRequest(token, granted)
-    if (!response.ok) return false
-    const data = await response.json()
-    if (data.granted !== granted || data.version !== AI_CONSENT_VERSION || await currentToken() !== token) return false
+    const session = getCurrentNativeAuthSession()
+    if (!session || (expectedToken && expectedToken !== session.token)) return false
+    const { ok, data } = await consentRequest(session.token, granted)
+    if (!ok) return false
+    if (data.granted !== granted || data.version !== AI_CONSENT_VERSION || getCurrentNativeAuthSession() !== session) return false
     await AsyncStorage.removeItem(AI_DATA_SHARING_PERMISSION_KEY).catch(() => {})
-    return true
+    return getCurrentNativeAuthSession() === session
   } catch {
     return false
   }
@@ -60,13 +54,14 @@ export async function revokeAiDataSharingPermission() {
   return setAiDataSharingPermission(false)
 }
 
-let permissionRequest: Promise<boolean> | null = null
+let permissionRequest: { session: NonNullable<ReturnType<typeof getCurrentNativeAuthSession>>; promise: Promise<boolean> } | null = null
 export async function requestAiDataSharingPermission() {
-  if (permissionRequest) return permissionRequest
-  permissionRequest = (async () => {
-    if (await hasAiDataSharingPermission()) return true
-    const token = await currentToken().catch(() => null)
-    if (!token) return false
+  const session = getCurrentNativeAuthSession()
+  if (!session) return false
+  if (permissionRequest?.session === session) return permissionRequest.promise
+  const promise = (async () => {
+    if (await hasAiDataSharingPermission()) return getCurrentNativeAuthSession() === session
+    if (getCurrentNativeAuthSession() !== session) return false
     return new Promise<boolean>((resolve) => {
     Alert.alert(
       'Allow AI help?',
@@ -76,9 +71,10 @@ export async function requestAiDataSharingPermission() {
         {
           text: 'I agree',
           onPress: () => {
-            grantAiDataSharingPermission(token).then(allowed => {
+            if (getCurrentNativeAuthSession() !== session) { resolve(false); return }
+            grantAiDataSharingPermission(session.token).then(allowed => {
               if (!allowed) Alert.alert('Permission was not saved', 'Your data was not sent to AI. Please try again.')
-              resolve(allowed)
+              resolve(allowed && getCurrentNativeAuthSession() === session)
             }).catch(() => resolve(false))
           },
         },
@@ -86,5 +82,6 @@ export async function requestAiDataSharingPermission() {
     )
     })
   })()
-  try { return await permissionRequest } finally { permissionRequest = null }
+  permissionRequest = { session, promise }
+  try { return await promise } finally { if (permissionRequest?.promise === promise) permissionRequest = null }
 }

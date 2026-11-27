@@ -19,8 +19,11 @@ export function AiConsentProvider({ children }: { children: React.ReactNode }) {
       const url = new URL(typeof input === 'string' ? input : input instanceof URL ? input.href : input.url, window.location.href)
       const method = init?.method || (input instanceof Request ? input.method : 'GET')
       let body: unknown = init?.body
-      if (url.pathname === '/api/reports/weekly/preferences' && body === undefined && input instanceof Request) body = await input.clone().text()
-      if (url.origin === window.location.origin && isAiProcessingRequest(url.pathname, method, body)) {
+      if (['/api/reports/weekly/preferences', '/api/support/tickets'].includes(url.pathname) && body === undefined && input instanceof Request) body = await input.clone().text()
+      const optionalSupportAi = url.origin === window.location.origin && !!session?.user?.id && url.pathname === '/api/support/tickets' && method.toUpperCase() === 'POST' && (() => {
+        try { return ['create', 'add_response'].includes(JSON.parse(String(body || '{}')).action) } catch { return false }
+      })()
+      if (optionalSupportAi || (url.origin === window.location.origin && isAiProcessingRequest(url.pathname, method, body))) {
         const saved = await hasSavedAiConsent()
         if (!active) return new Response(JSON.stringify({ error: 'Your account changed. Please try again.', code: 'ai_consent_required' }), { status: 403 })
         if (!saved) {
@@ -32,7 +35,8 @@ export function AiConsentProvider({ children }: { children: React.ReactNode }) {
             setOpen(true)
           }
           const allowed = await pending.current.promise
-          if (!allowed) return new Response(JSON.stringify({ error: 'AI permission was not granted. Your data was not sent to AI.', code: 'ai_consent_required' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
+          if (!active) return new Response(JSON.stringify({ error: 'Your account changed. Please try again.', code: 'ai_consent_required' }), { status: 403 })
+          if (!allowed && !optionalSupportAi) return new Response(JSON.stringify({ error: 'AI permission was not granted. Your data was not sent to AI.', code: 'ai_consent_required' }), { status: 403, headers: { 'Content-Type': 'application/json' } })
         }
       }
       return originalFetch.call(window, input, init)

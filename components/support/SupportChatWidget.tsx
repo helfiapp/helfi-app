@@ -1,6 +1,7 @@
 'use client'
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { isSupportChatClosed } from '@/lib/support-state'
 import Image from 'next/image'
 import { usePathname } from 'next/navigation'
 import { useSession } from 'next-auth/react'
@@ -68,7 +69,7 @@ export default function SupportChatWidget() {
   const [feedbackSubmitted, setFeedbackSubmitted] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement | null>(null)
 
-  const isChatClosed = ticket && ['RESOLVED', 'CLOSED'].includes(ticket.status)
+  const isChatClosed = isSupportChatClosed(ticket)
   const shouldHideWidget = pathname === '/support' || pathname.startsWith('/admin-panel') || pathname.startsWith('/main-admin')
   const agent = useMemo(() => {
     if (ticket?.createdAt) {
