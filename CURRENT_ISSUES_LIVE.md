@@ -1,3 +1,9 @@
+## Food measurement synchronization — VERIFIED LOCAL CANDIDATE, 27 November 2026
+
+Fixes the observed cross-device600g/540g conflict at the existing web item-storage boundary for add and update. All three recorded amount/unit pairs now match valid committed input; source identity, original100g nutrient basis, saved half and Done/Enter-only input intent are preserved. Historical household measurements without a country remain unchanged; no native reader, rename, sign-in, credits or design code changes.
+
+Actual-source saved-measurement suite and9portion groups pass; root compiler reports0errors, exact306/107page locks pass, and full production build exits0 with1220PASS lines. Compiler initially found two nullable test reads; those assertions now allow the optional result while still requiring123calories. The isolated six-file candidate excludes all held sign-in and unrelated audit work. Exact deployment and normal web→native no-op save/reopen remain required. Previous9a9/AWS160 is the current live baseline; HEL344 remains in progress until the corrected ingredient input is verified live.
+
 ## Food cross-device follow-up — LOCAL CANDIDATE, 27 November 2026
 
 Fresh food-only unsigned Release iPhone16e build64 compiled and stayed signed in727. Normal USDA ingredient search and one saved six-medium-carrot entry (540g) verified221kcal/full,111/half and443/double; unchanged native save/reopen retained540g. A saved half reopened correctly and the web read matched111kcal/2173remaining. Then one unchanged WEB Update Entry reproduced loss of the saved half (221kcal); the same test entry was restored to half once from iPhone. All observations used the controlled test account, no rename/deletion/AI/provider/purchase. Exact filtered actual response confirmed source41kcal/0.24gfatper100g,servings5.4,weight540g and absent portion metadata after the web update.

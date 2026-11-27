@@ -5,7 +5,8 @@ import ts from 'typescript'
 import * as measurements from '../lib/food/measurement-units'
 import * as recorded from '../lib/food/serving-measurements'
 import * as nutrients from '../lib/food/nutrient-values'
-import { convertFoodAmount, liquidDensity } from '../native/src/lib/foodUnits'
+import { convertFoodAmount, liquidDensity, parseFoodServing } from '../native/src/lib/foodUnits'
+import * as nativeDiary from '../native/src/lib/foodDiaryEntries'
 
 // Execute the real page's measurement/update functions without React, server
 // dependencies, credentials, a database or network calls.
@@ -379,6 +380,113 @@ for (const [name, label, pieces] of [['Fried eggs', '3 eggs (150 g)', 3], ['Crac
 }
 console.log('PASS: captured636kcal breakfast preserves all six nutrients,150g stays a measured weight, per-serving photo totals scale once through real half/full edits and saved reopening, null/zero and legacy egg/cracker counts remain intact.')
 console.log('PASS: actual saved-food page options, recorded basis, density, source quantity, unknown nutrients, precise updates and invalid/unsupported measurements; no credentials or network.')
+
+// The native read and no-op persistence primitives must agree with both real
+// web save mappings after a committed amount, serving count or unit change.
+const nativeSource = ts.createSourceFile('TrackCaloriesScreen.tsx', fs.readFileSync('native/src/screens/TrackCaloriesScreen.tsx', 'utf8'), ts.ScriptTarget.Latest, true, ts.ScriptKind.TSX)
+const nativeCtx = vm.createContext({ ...nativeDiary, convertFoodAmount, parseFoodServing, liquidDensity })
+for (const name of ['parseServingBaseForFavorite', 'normalizeFavoriteAmountUnit', 'formatFavoriteAmount', 'isOpenMeasurementServing', 'convertFavoriteBaseAmount', 'favoriteAmountInBase', 'favoriteAmountFromServings', 'favoriteServingsFromAmount', 'favoriteBaseForItem', 'favoriteAmountStateFromRaw', 'favoriteAdjustPersistenceFields']) {
+  let code = ''
+  const visit = (node: ts.Node) => {
+    if (ts.isFunctionDeclaration(node) && node.name?.text === name) code = node.getText(nativeSource)
+    ts.forEachChild(node, visit)
+  }
+  visit(nativeSource); assert.ok(code, `actual native ${name} exists`)
+  vm.runInContext(ts.transpile(code, { target: ts.ScriptTarget.ES2020 }), nativeCtx)
+}
+const aliasCarrot = {
+  id: 'synthetic-native-carrot', source: 'usda', name: 'Carrots, raw', serving_size: '100 g',
+  customGramsPerServing: 100, calories: 41, calories_kcal: 41, protein_g: 0.93, carbs_g: 9.58, fat_g: 0.24, fiber_g: 2.8, sugar_g: 4.74,
+  servings: 5.4, weightAmount: 540, weightUnit: 'g', portionMode: 'weight', amount: 540, amountUnit: 'g', __amount: 540, __unit: 'g',
+}
+const aliasesAgree = (item: any) => {
+  assert.equal(item.amount, item.weightAmount, 'plain amount alias must match committed weight')
+  assert.equal(item.__amount, item.weightAmount, 'native-priority amount alias must match committed weight')
+  assert.equal(item.amountUnit, item.weightUnit)
+  assert.equal(item.__unit, item.weightUnit)
+}
+const mappedAliasItems = (item: any) => {
+  ctx.analyzedItems = [item]; ctx.editingEntry = { items: [] }
+  const updated = vm.runInContext(ts.transpile(`(${updateMapping})`, { target: ts.ScriptTarget.ES2020 }), ctx)
+  ctx.finalItems = [item]
+  vm.runInContext(ts.transpile(addMapping, { target: ts.ScriptTarget.ES2020 }), ctx)
+  ctx.editingEntry = null
+  return [updated[0], ctx.finalItems[0]]
+}
+const nativeNoopMeasurementSave = (raw: any) => {
+  const state = nativeCtx.favoriteAmountStateFromRaw(raw, raw.serving_size, raw.servings)
+  const adjustment = { ...state, name: raw.name, servingLabel: raw.serving_size, servings: raw.servings }
+  return { state, saved: { ...raw, ...nativeCtx.favoriteAdjustPersistenceFields(adjustment) } }
+}
+const halfAliasTotals = (raw: any) => nativeDiary.normalizeFoodApiEntry({
+  id: 'synthetic-half-carrot', items: [raw],
+  nutrition: { __portionScale: 0.5, __portionAmount: 0.5, __portionUnit: 'serving', __portionControlEnabled: true, __portionTotalWeightG: 600, __portionRecipeServings: 1 },
+}).nutrients
+ctx.editingEntry = null; ctx.analyzedItems = [{ ...aliasCarrot }]
+ctx.updateItemField(0, 'weightAmount', '600')
+const committedCarrot = ctx.analyzedItems[0]
+assert.equal(committedCarrot.__amount, 540, 'fixture reaches the actual stale-alias condition before the storage boundary')
+for (const stored of mappedAliasItems(committedCarrot)) {
+  aliasesAgree(stored); close(stored.weightAmount, 600); close(stored.servings, 6)
+  const { state, saved } = nativeNoopMeasurementSave(JSON.parse(JSON.stringify(stored)))
+  assert.equal(state.amountInput, '600'); assert.equal(state.amountUnit, 'g')
+  close(nativeCtx.favoriteServingsFromAmount(Number(state.amountInput), state.amountUnit, { amount: state.baseAmount, unit: state.baseUnit }), 6)
+  aliasesAgree(saved); close(saved.weightAmount, 600); close(saved.servings, 6)
+  assert.equal(nativeDiary.recalculateTotalsFromItems([saved])?.calories, 246)
+  assert.equal(halfAliasTotals(saved)?.calories, 123)
+  for (const field of ['id', 'source', 'name', 'serving_size', 'customGramsPerServing', 'calories', 'calories_kcal', 'protein_g', 'carbs_g', 'fat_g', 'fiber_g', 'sugar_g']) {
+    assert.equal(saved[field], (aliasCarrot as any)[field], `measurement storage preserves ${field}`)
+  }
+}
+assert.equal(aliasCarrot.__amount, 540, 'fixture source remains unchanged')
+console.log('PASS: actual web600g add/update mappings replace stale540g aliases; native actual read/no-op measurement persistence retains600g/6servings/246full/123half.')
+
+for (const edit of ['servings', 'ounces', 'unit-roundtrip'] as const) {
+  ctx.analyzedItems = [{ ...aliasCarrot }]
+  if (edit === 'servings') ctx.updateItemField(0, 'servings', 6)
+  if (edit === 'ounces') {
+    ctx.updateItemField(0, 'weightUnit', 'oz'); ctx.updateItemField(0, 'weightAmount', '20')
+  }
+  if (edit === 'unit-roundtrip') {
+    ctx.updateItemField(0, 'weightAmount', '600'); ctx.updateItemField(0, 'weightUnit', 'oz')
+    for (const stored of mappedAliasItems(ctx.analyzedItems[0])) {
+      aliasesAgree(stored); assert.equal(stored.weightUnit, 'oz'); close(stored.weightAmount * 28.349523125, 600)
+      assert.equal(stored.serving_size, '100 g'); assert.equal(stored.customGramsPerServing, 100)
+    }
+    ctx.analyzedItems = [{ ...committedCarrot }]
+    ctx.updateItemField(0, 'weightUnit', 'oz'); ctx.updateItemField(0, 'weightUnit', 'g')
+  }
+  const changed = ctx.analyzedItems[0]
+  for (const stored of mappedAliasItems(changed)) {
+    aliasesAgree(stored)
+    const { state, saved } = nativeNoopMeasurementSave(JSON.parse(JSON.stringify(stored)))
+    aliasesAgree(saved); assert.equal(state.amountUnit, stored.weightUnit)
+    close(saved.servings, stored.servings)
+    if (edit === 'ounces') { close(saved.weightAmount, 20); assert.equal(nativeDiary.recalculateTotalsFromItems([saved])?.calories, 232) }
+    else { close(saved.servings, 6); assert.equal(nativeDiary.recalculateTotalsFromItems([saved])?.calories, 246); assert.equal(halfAliasTotals(saved)?.calories, 123) }
+  }
+}
+for (const item of [savedQuarter, savedProvider]) {
+  aliasesAgree(item)
+  const { saved } = nativeNoopMeasurementSave(item)
+  aliasesAgree(saved)
+}
+assert.equal(ctx.measurementItemForStorage(historicalSpoon), historicalSpoon, 'untouched historical household measurements keep their interpretation')
+const countOnlyAlias = { ...unweighed, portionMode: 'weight', weightUnit: 'serving', weightAmount: 3, servings: 3, __amount: 2, __unit: 'serving', amount: 2, amountUnit: 'serving' }
+const countStored = ctx.measurementItemForStorage(countOnlyAlias)
+aliasesAgree(countStored); close(countStored.weightAmount, 3)
+assert.equal(ctx.getBaseGramsPerServing(countStored), null)
+const countState = nativeCtx.favoriteAmountStateFromRaw(countStored, countStored.serving_size, countStored.servings)
+assert.equal(countState.amountInput, '3'); assert.equal(countState.amountUnit, 'serving'); assert.equal(countState.baseAmount, null)
+for (const invalid of [null, '', 0, -1, NaN, true]) {
+  const item = { ...aliasCarrot, weightAmount: invalid }
+  assert.ok(!Number.isFinite(ctx.effectiveServings(item)))
+  assert.equal(ctx.measurementItemForStorage(item), item, 'invalid committed input is not repaired into a valid alias')
+}
+const unknownWeight = { ...countOnlyAlias, weightAmount: 600, weightUnit: 'g' }
+assert.ok(!Number.isFinite(ctx.effectiveServings(unknownWeight)), 'no recorded mass cannot acquire a serving denominator')
+console.log('PASS: actual g/oz/serving/unit edits and household conversion keep all paired aliases aligned; count-only and invalid inputs do not invent mass or bypass existing save gates.')
+
 
 async function checkSaveGates() {
   bind('updateFoodEntry'); bind('addFoodEntry')
