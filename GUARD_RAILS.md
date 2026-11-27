@@ -1,3 +1,7 @@
+## Deterministic synthetic timeout checks — 27 November 2026
+
+Synthetic worker tests must not race a real zero-delay timer against a virtual clock that advances on every setImmediate. The existing provider-deadline fixture schedules its synthetic30000ms abort as a microtask, after the synchronous fake fetch installs its abort listener. Preserve the full timeout telemetry, unknown-usage reserve, no-retry and close-reason assertions. Other timers and the actual worker remain unchanged; this is not permission to lengthen production deadlines, release unknown collateral or claim live voice speed.
+
 ## Food measurement fields — release candidate, 27 November 2026
 
 A normal web weight edit must persist one consistent amount across weightAmount/weightUnit, amount/amountUnit and __amount/__unit. A recorded540g meal edited to600g must reopen as600g in both native ingredient input and whole-meal portion block, with the original100g nutrient basis,6servings and246full/123half calories intact. Synchronize at the existing shared web item-storage boundary for both add and update; retain source IDs, labels, source nutrient fields, saved portion and valid recorded conversions. Never guess historical household country/physical mass or bulk-rewrite records. Native read/persistence compatibility and invalid inputs require actual-source regression coverage. Owner-locked Done/Enter commit and blur-discard behavior remain unchanged; no rename, auth, credit or design changes are part of this fix.

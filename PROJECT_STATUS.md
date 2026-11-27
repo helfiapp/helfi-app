@@ -1,3 +1,9 @@
+## Synthetic release-check correction — VERIFIED LOCAL CANDIDATE, 27 November 2026
+
+One test line schedules the mocked30000ms abort as a microtask instead of a real zero-delay timer. Private independent separate-process proof deliberately delays zero timers: old fixture closesreserved_deadline, exact candidate passes all8unchanged groups with correctrequest_timeout30000/backend_usage_unconfirmed and unknown collateral retained. Real worker code, production deadlines, pricing, funding and all assertions remain unchanged.
+
+Actual current-source8groups,306/107page locks and full production build exit0 with1220PASS lines verified. This exact4-file release excludes all other audit and held sign-in work. Food31a/AWS162 already verified both domains and normal web→iOS→web600g/half123 roundtrip; independent Android46 confirms600g ingredient/wholemeal,50% and all6matching values. Both simulators returned signed-in Dashboard727. This test-only release still requires its own exact deployment; no physical voice/photo/store readiness claim.
+
 ## Food measurement synchronization — VERIFIED LOCAL CANDIDATE, 27 November 2026
 
 Fixes the observed cross-device600g/540g conflict at the existing web item-storage boundary for add and update. All three recorded amount/unit pairs now match valid committed input; source identity, original100g nutrient basis, saved half and Done/Enter-only input intent are preserved. Historical household measurements without a country remain unchanged; no native reader, rename, sign-in, credits or design code changes.
