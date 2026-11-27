@@ -10,10 +10,10 @@ import PageHeader from '@/components/PageHeader'
 import { useSaveOnLeave } from '@/lib/use-save-on-leave'
 
 export default function AccountPage() {
-  const { data: session } = useSession()
-  const { userData, profileImage, updateUserData } = useUserData()
+  const { data: session, update: refreshSession } = useSession()
+  const { refreshData } = useUserData()
   const [loading, setLoading] = useState(true)
-  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle')
+  const [saveStatus, setSaveStatus] = useState<'idle' | 'saving' | 'saved' | 'error'>('idle')
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const [accountData, setAccountData] = useState({
     fullName: '',
@@ -24,6 +24,11 @@ export default function AccountPage() {
   const dirtyRef = useRef(false)
   const hasInitializedRef = useRef(false)
   const router = useRouter()
+  const ownerRef = useRef(session?.user?.id)
+  ownerRef.current = session?.user?.id
+  const saveQueue = useRef(Promise.resolve())
+  const refreshSessionRef = useRef(refreshSession)
+  refreshSessionRef.current = refreshSession
 
   // Modal states
   const [showPasswordModal, setShowPasswordModal] = useState(false)
@@ -56,41 +61,27 @@ export default function AccountPage() {
     }
   }, [session])
 
-  // Load saved data on mount
   useEffect(() => {
-    const savedAccountData = localStorage.getItem('accountSettings')
-    
-    if (savedAccountData) {
-      try {
-        const parsed = JSON.parse(savedAccountData)
-        setAccountData(prev => {
-          const next = { ...prev, ...parsed }
-          if (!hasInitializedRef.current) {
-            hasInitializedRef.current = true
-            accountSnapshotRef.current = JSON.stringify(next)
-            dirtyRef.current = false
-            setHasUnsavedChanges(false)
-          }
-          return next
-        })
-      } catch (error) {
-        console.error('Error loading account data:', error)
-      }
-    } else {
-      // Initialize with session data
-      const seeded = {
-        fullName: session?.user?.name || '',
-        email: session?.user?.email || ''
-      }
-      setAccountData(seeded)
-      if (!hasInitializedRef.current) {
-        hasInitializedRef.current = true
-        accountSnapshotRef.current = JSON.stringify(seeded)
-        dirtyRef.current = false
-        setHasUnsavedChanges(false)
-      }
-    }
-  }, [session])
+    const ownerId = session?.user?.id
+    let cancelled = false
+    const seeded = { fullName: session?.user?.name || '', email: session?.user?.email || '' }
+    const initialSnapshot = JSON.stringify(seeded)
+    accountRef.current = seeded
+    accountSnapshotRef.current = initialSnapshot
+    hasInitializedRef.current = true
+    dirtyRef.current = false
+    setHasUnsavedChanges(false)
+    setSaveStatus('idle')
+    setAccountData(seeded)
+    if (ownerId) void refreshSessionRef.current().then((fresh) => {
+      if (cancelled || ownerRef.current !== ownerId || fresh?.user?.id !== ownerId || dirtyRef.current || accountSnapshotRef.current !== initialSnapshot) return
+      const confirmed = { fullName: fresh.user.name || '', email: fresh.user.email || '' }
+      accountRef.current = confirmed
+      accountSnapshotRef.current = JSON.stringify(confirmed)
+      setAccountData(confirmed)
+    }).catch(() => {})
+    return () => { cancelled = true }
+  }, [session?.user?.id])
 
   useEffect(() => {
     accountRef.current = accountData
@@ -103,25 +94,58 @@ export default function AccountPage() {
 
   const saveAccount = useCallback((options?: { silent?: boolean; payload?: typeof accountData }) => {
     const payload = options?.payload ?? accountRef.current
-    if (!options?.silent) setSaveStatus('saving')
-    try {
-      localStorage.setItem('accountSettings', JSON.stringify(payload))
-      accountSnapshotRef.current = JSON.stringify(payload)
-      dirtyRef.current = false
-      setHasUnsavedChanges(false)
-      if (!options?.silent) {
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus('idle'), 2000)
+    const ownerId = session?.user?.id
+    const fullName = payload.fullName.trim().replace(/\s+/g, ' ')
+    const pending = saveQueue.current.then(async () => {
+      if (!ownerId || ownerRef.current !== ownerId) return
+      if (JSON.stringify({ ...payload, fullName }) === accountSnapshotRef.current) {
+        if (accountRef.current.fullName === payload.fullName) {
+          const next = { ...payload, fullName }
+          accountRef.current = next
+          setAccountData(next)
+          dirtyRef.current = false
+          setHasUnsavedChanges(false)
+          setSaveStatus('idle')
+        }
+        return
       }
-    } catch (error) {
-      console.error('Error saving account settings:', error)
-      if (!options?.silent) setSaveStatus('idle')
-    }
-  }, [])
+      if (!fullName) { setSaveStatus('error'); return }
+      setSaveStatus('saving')
+      try {
+        const [firstName, ...remaining] = fullName.split(' ')
+        const response = await fetch('/api/user-data', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' }, keepalive: true,
+          body: JSON.stringify({ accountNameOwnerId: ownerId, profileInfo: { firstName, lastName: remaining.join(' ') } }),
+        })
+        if (!response.ok) throw new Error('Name could not be saved')
+        if (ownerRef.current !== ownerId) return
+        const refreshed = await refreshSession()
+        if (ownerRef.current !== ownerId || refreshed?.user?.id !== ownerId) return
+        if (refreshed.user.name !== fullName) throw new Error('Name could not be confirmed')
+        accountSnapshotRef.current = JSON.stringify({ ...payload, fullName })
+        if (accountRef.current.fullName === payload.fullName) {
+          const next = { ...payload, fullName }
+          accountRef.current = next
+          setAccountData(next)
+          dirtyRef.current = false
+          setHasUnsavedChanges(false)
+          setSaveStatus('saved')
+        } else {
+          dirtyRef.current = JSON.stringify(accountRef.current) !== accountSnapshotRef.current
+          setHasUnsavedChanges(dirtyRef.current)
+          setSaveStatus('idle')
+        }
+        await refreshData()
+      } catch {
+        if (ownerRef.current === ownerId) setSaveStatus('error')
+      }
+    })
+    saveQueue.current = pending.catch(() => {})
+    return pending
+  }, [session?.user?.id, refreshSession, refreshData])
 
   useSaveOnLeave(() => {
-    if (!dirtyRef.current) return
-    saveAccount({ silent: true, payload: accountRef.current })
+    void saveAccount({ silent: true, payload: accountRef.current })
   })
 
   const resetPasswordModal = () => {
@@ -201,9 +225,10 @@ export default function AccountPage() {
                   <span className="text-sm font-medium">Saved</span>
                 </div>
               )}
+              {saveStatus === 'error' && <span role="alert" className="text-sm text-red-600">Name could not be saved. Enter a name and try again.</span>}
               {saveStatus === 'idle' && hasUnsavedChanges && (
-                <div className="flex items-center text-amber-600">
-                  <span className="text-sm font-medium">Will save on exit</span>
+                <div className="flex items-center text-helfi-green">
+                  <span className="text-sm font-medium">Changes save when you leave the field</span>
                 </div>
               )}
             </div>
@@ -230,7 +255,14 @@ export default function AccountPage() {
                 <input
                   type="text"
                   value={accountData.fullName}
-                  onChange={(e) => setAccountData({ ...accountData, fullName: e.target.value })}
+                  onChange={(e) => {
+                    const next = { ...accountRef.current, fullName: e.target.value }
+                    accountRef.current = next
+                    dirtyRef.current = JSON.stringify(next) !== accountSnapshotRef.current
+                    setAccountData(next)
+                    setSaveStatus('idle')
+                  }}
+                  onBlur={() => { void saveAccount() }}
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:ring-helfi-green focus:border-helfi-green"
                   placeholder="Enter your full name"
                 />
@@ -244,7 +276,7 @@ export default function AccountPage() {
                   className="w-full px-3 py-2 border border-gray-300 rounded-lg bg-gray-50"
                   disabled
                 />
-                <p className="text-xs text-gray-500 mt-1">Email cannot be changed</p>
+                <p className="text-xs text-gray-500 mt-1">Changing email requires verification and is not available here.</p>
               </div>
             </div>
 
