@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { isSupportChatClosed } from '../lib/supportState'
 import {
   ActivityIndicator,
   Alert,
@@ -16,6 +17,8 @@ import * as ImagePicker from 'expo-image-picker'
 import { API_BASE_URL } from '../config'
 import { createVoiceActionReadGuard } from '../voice/voiceActionReadRefresh'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { getCurrentNativeAuthSession } from '../lib/nativeAuthSession'
+import { requestAiDataSharingPermission } from '../lib/aiConsent'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
@@ -249,6 +252,15 @@ export function SupportScreen() {
   const requestJson = useCallback(
     async (url: string, init?: RequestInit) => {
       if (!authHeaders) throw new Error('Please log in again.')
+      if (init?.method?.toUpperCase() === 'POST' && new URL(url).pathname === '/api/support/tickets') {
+        const action = typeof init.body === 'string' ? JSON.parse(init.body).action : undefined
+        if (action === 'create' || action === 'add_response') {
+          const current = getCurrentNativeAuthSession()
+          if (!current || current.token !== session?.token || current.user.id !== session?.user?.id) throw new Error('Your account changed. Please try again.')
+          await requestAiDataSharingPermission()
+          if (getCurrentNativeAuthSession() !== current) throw new Error('Your account changed. Please try again.')
+        }
+      }
       const headers = {
         ...authHeaders,
         ...(init?.headers || {}),
@@ -260,7 +272,7 @@ export function SupportScreen() {
       }
       return data
     },
-    [authHeaders],
+    [authHeaders, session?.token, session?.user?.id],
   )
 
   const loadActiveTicket = useCallback(async (preserveSelection = false) => {
@@ -377,7 +389,7 @@ export function SupportScreen() {
     return items
   }, [activeTicket])
 
-  const isChatClosed = !!activeTicket && ['RESOLVED', 'CLOSED'].includes(String(activeTicket.status || ''))
+  const isChatClosed = isSupportChatClosed(activeTicket)
 
   const hasFeedback = useMemo(() => {
     if (!activeTicket) return false
