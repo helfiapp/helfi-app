@@ -6,18 +6,20 @@ const assert=require('node:assert/strict'),fs=require('node:fs'),path=require('n
 const root=path.resolve(__dirname,'..'),copy=value=>JSON.parse(JSON.stringify(value)),user='synthetic-user'
 function load(relative,deps){const module={exports:{}};vm.runInNewContext(ts.transpileModule(fs.readFileSync(path.join(root,relative),'utf8'),{compilerOptions:{module:ts.ModuleKind.CommonJS,target:ts.ScriptTarget.ES2020,esModuleInterop:true}}).outputText,{module,exports:module.exports,URL,Headers,Date,Buffer,process:{env:{NODE_ENV:'test',AUTH_SECRET:'synthetic-support-review-secret'}},require:name=>{if(Object.hasOwn(deps,name))return deps[name];throw Error('Forbidden dependency '+name)}},{filename:relative});return module.exports}
 let tickets,sessionId,sequence,sends,posts
-const matches=(row,where)=>Object.entries(where).every(([key,value])=>key==='OR'?value.some(branch=>matches(row,branch)):key==='status'&&value?.notIn?!value.notIn.includes(row.status):row[key]===value)
+const matches=(row,where)=>Object.entries(where).every(([key,value])=>key==='OR'?value.some(branch=>matches(row,branch)):key==='status'&&value?.notIn?!value.notIn.includes(row.status):key==='responses'&&value?.none?!(row.responses||[]).some(reply=>matches(reply,value.none)):row[key]===value)
 const decorate=row=>row?copy({...row,responses:row.responses||[]}):null
 const prisma={user:{findUnique:async({where})=>({id:where.id||sessionId,email:`${sessionId}@example.invalid`,name:'Synthetic user'})},supportTicket:{
  findFirst:async({where})=>decorate(tickets.find(row=>matches(row,where))),findUnique:async({where})=>decorate(tickets.find(row=>row.id===where.id)),findMany:async({where})=>tickets.filter(row=>matches(row,where)).map(row=>({id:row.id,subject:row.subject,status:row.status,createdAt:row.createdAt,updatedAt:row.updatedAt})),
  create:async({data})=>{const row={id:`new-${++sequence}`,createdAt:'2026-10-17T00:00:00Z',updatedAt:'2026-10-17T00:00:00Z',responses:[],...data};tickets.push(row);return decorate(row)},
  update:async({where,data})=>{const row=tickets.find(row=>row.id===where.id);Object.assign(row,data);return decorate(row)},delete:async({where})=>{tickets=tickets.filter(row=>row.id!==where.id);return{id:where.id}}},
  ticketResponse:{create:async({data})=>{const response={id:`response-${++sequence}`,createdAt:`2026-10-17T00:00:${sequence}Z`,...data};tickets.find(row=>row.id===data.ticketId).responses.push(response);return copy(response)}}}
+prisma.$transaction=async run=>run(prisma)
+const supportState=load('native/src/lib/supportState.ts',{})
 const server={NextResponse:{json:(data,options)=>({ok:(options?.status||200)<400,status:options?.status||200,json:async()=>data})}}
-const routes=load('app/api/support/tickets/route.ts',{'next/server':server,'next-auth':{getServerSession:async()=>sessionId?{user:{id:sessionId,email:`${sessionId}@example.invalid`,name:'Synthetic user'}}:null},'@/lib/auth':{authOptions:{}},'@/lib/native-auth':{getUserIdFromNativeAuth:async()=>null},'@/lib/prisma':{prisma},'@prisma/client':{},'@/lib/support-automation':{buildSupportFeedbackPrompt:()=> 'Please rate your support experience',processSupportTicketAutoReply:async()=>{sends.push('normal-support-auto-reply')},sendSupportFeedbackEmail:async()=>{sends.push('normal-feedback-email')},sendSupportTranscriptEmail:async()=>{sends.push('normal-transcript-email')}},'@/lib/support-agents':{getSupportAgentForTimestamp:()=>({})},'@/lib/support-attachments':{rehydrateSupportTicket:ticket=>ticket}})
+const routes=load('app/api/support/tickets/route.ts',{'next/server':server,'next-auth':{getServerSession:async()=>sessionId?{user:{id:sessionId,email:`${sessionId}@example.invalid`,name:'Synthetic user'}}:null},'@/lib/auth':{authOptions:{}},'@/lib/native-auth':{getUserIdFromNativeAuth:async()=>null},'@/lib/prisma':{prisma},'@prisma/client':{},'@/lib/support-automation':{buildSupportFeedbackPrompt:()=> 'Please rate your support experience',processSupportTicketAutoReply:async()=>{sends.push('normal-support-auto-reply')},sendSupportFeedbackEmail:async()=>{sends.push('normal-feedback-email')},sendSupportTranscriptEmail:async()=>{sends.push('normal-transcript-email')}},'@/lib/support-state':supportState,'@/lib/support-agents':{getSupportAgentForTimestamp:()=>({})},'@/lib/support-attachments':{rehydratePublicSupportTicket:ticket=>ticket}})
 const review=load('lib/native-voice-review-token.ts',{crypto})
 class Request{constructor(url,options={}){this.url=String(url);this.headers=options.headers;this.body=options.body}async json(){return JSON.parse(this.body||'{}')}}
-const helper=load('lib/native-voice-support-actions.ts',{crypto,'next/server':{NextRequest:Request},'next-auth':{getServerSession:async()=>sessionId?{user:{id:sessionId,email:sessionId+'@example.invalid'}}:null},'@/lib/auth':{authOptions:{}},'@/lib/native-auth':{getUserIdFromNativeAuth:async()=>sessionId},'@/lib/native-voice-review-token':review,'@/app/api/support/tickets/route':{GET:routes.GET,POST:async request=>{posts++;return routes.POST(request)}}})
+const helper=load('lib/native-voice-support-actions.ts',{'@/lib/support-state':supportState,crypto,'next/server':{NextRequest:Request},'next-auth':{getServerSession:async()=>sessionId?{user:{id:sessionId,email:sessionId+'@example.invalid'}}:null},'@/lib/auth':{authOptions:{}},'@/lib/native-auth':{getUserIdFromNativeAuth:async()=>sessionId},'@/lib/native-voice-review-token':review,'@/app/api/support/tickets/route':{GET:routes.GET,POST:async request=>{posts++;return routes.POST(request)}}})
 const request=new Request('https://helfi.invalid/api/native/voice-assistant',{headers:new Headers({authorization:'Bearer synthetic-original-auth'})})
 const input=(action,values={})=>({action,values}),prepare=(action,values,transcript)=>helper.prepareVoiceSupportAction(request,user,input(action,values),transcript,'2026-10-17')
 const execute=draft=>helper.executeVoiceSupportAction(request,user,draft,{receiptClaimed:true,actionId:'synthetic-support-receipt'})
@@ -43,12 +45,12 @@ await check('reply selects an owned ticket and verifies exact persisted user res
 await check('end chat includes normal transcript side effect and never claims email delivered',async()=>{
  const draft=await prepare('support.end_chat',{ticketId:'owned'},'Close this support ticket')
  assert.match(draft.summary,/transcript email/);const result=await execute(draft)
- assert.equal(tickets[0].status,'RESOLVED');assert(sends.includes('normal-transcript-email'));assert.match(result.message,/Email delivery is not verified/)
+ assert.equal(tickets[0].status,'OPEN');assert(supportState.isSupportChatClosed(tickets[0]));assert(sends.includes('normal-transcript-email'));assert.match(result.message,/Email delivery is not verified/)
  const again=await prepare('support.end_chat',{ticketId:'owned'},'Close this support ticket');assert.equal(again.canConfirm,false);assert.equal(posts,1)
 })
 await check('feedback exact rating/comment and selected ticket delete match normal manual actions',async()=>{
  const draft=await prepare('support.feedback',{ticketId:'owned',rating:4,comment:'Thanks for helping.'},'Send support feedback four stars: Thanks for helping.')
- await execute(draft);assert.equal(tickets[0].status,'CLOSED');assert(sends.includes('normal-feedback-email'))
+ await execute(draft);assert.equal(tickets[0].status,'OPEN');assert(sends.includes('normal-feedback-email'))
  const deletion=await prepare('support.delete',{ticketId:'owned'},'Delete this support ticket');assert.match(deletion.summary,/Permanently delete/);await execute(deletion)
  assert.equal(tickets.length,1);assert.equal(tickets[0].id,'foreign')
 })

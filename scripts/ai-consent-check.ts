@@ -77,10 +77,12 @@ async function main() {
   let postOk = true
   let alert: any = null
   let sends = 0
+  let nativeIdentity = { token, expiresAt: Date.now() + 60000, user: { id: token } }
   const native = load('native/src/lib/aiConsent.ts', {
     AbortController, setTimeout, clearTimeout,
     API_BASE_URL: 'https://helfi.ai', buildNativeAuthHeaders: (value: string) => ({ 'x-native-token': value }),
     AsyncStorage: { getItem: async (key: string) => key === 'helfi_auth_session_v1' ? JSON.stringify({ token }) : 'granted', removeItem: async () => {} },
+    getCurrentNativeAuthSession: () => { if (nativeIdentity.token !== token) nativeIdentity = { ...nativeIdentity, token, user: { id: token } }; return nativeIdentity },
     Alert: { alert: (...args: any[]) => { alert = args } },
     fetch: async (_url: string, options: any = {}) => {
       if (options.method === 'POST') { sends++; if (postOk) grant = JSON.parse(options.body).granted }
