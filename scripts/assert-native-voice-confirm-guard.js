@@ -206,7 +206,7 @@ if (
 
 const realtimeRoute = fs.readFileSync(path.join(root, 'app/api/native/voice-assistant/realtime/route.ts'), 'utf8')
 if (
-  !/const REALTIME_VOICE_SERVER_TIMEOUT_MS = 12000/.test(native) ||
+  !/const REALTIME_VOICE_SERVER_TIMEOUT_MS = 17000/.test(native) ||
   !/const REALTIME_VOICE_MEDIA_TIMEOUT_MS = 4000/.test(native) ||
   !/armRealtimeConnectTimeout\(REALTIME_VOICE_MEDIA_TIMEOUT_MS\)/.test(native) ||
   !/preferredRegion = 'syd1'/.test(realtimeRoute) ||

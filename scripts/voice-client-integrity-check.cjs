@@ -21,7 +21,7 @@ function visit(node) {
   if (ts.isFunctionDeclaration(node) && node.name) functions.set(node.name.text, node.getText(file))
   if (ts.isVariableDeclaration(node) && ts.isIdentifier(node.name)) {
     if (['primaryFooterLabel', 'discardFooterLabel'].includes(node.name.text)) footerExpressions.set(node.name.text, node.initializer.getText(file))
-    if (['NOT_SAVED_MESSAGE', 'CONFIRM_DRAFT_TEXTS', 'REJECT_DRAFT_TEXTS', 'VOICE_CONVERSATION_MEMORY_KEY', 'VOICE_CONVERSATION_MEMORY_TTL_MS', 'MAX_VOICE_CONVERSATION_TURNS', 'VOICE_ASSISTANT_OPENING_EVENT', 'SPOKEN_REPLY_VOICE_NAME'].includes(node.name.text)) constants.push(`const ${node.getText(file)}`)
+    if (['NOT_SAVED_MESSAGE', 'CONFIRM_DRAFT_TEXTS', 'REJECT_DRAFT_TEXTS', 'VOICE_CONVERSATION_MEMORY_KEY', 'VOICE_CONVERSATION_MEMORY_TTL_MS', 'MAX_VOICE_CONVERSATION_TURNS', 'VOICE_ASSISTANT_OPENING_EVENT', 'SPOKEN_REPLY_VOICE_NAME', 'REALTIME_VOICE_SERVER_TIMEOUT_MS', 'REALTIME_VOICE_MEDIA_TIMEOUT_MS'].includes(node.name.text)) constants.push(`const ${node.getText(file)}`)
     if (node.initializer && ts.isCallExpression(node.initializer) && node.initializer.expression.getText(file) === 'useCallback') callbacks.set(node.name.text, node.initializer.arguments[0].getText(file))
   }
   if (ts.isPropertyAssignment(node) && ts.isArrowFunction(node.initializer)) properties.set(node.name.getText(file), node.initializer.getText(file))
@@ -74,7 +74,6 @@ function baseBox() {
     realtimeVoicePromptRef: { current: null }, realtimeVoiceFlushRef: { current: null }, voiceGreetingConversationRef: { current: '' }, realtimeBillingSessionIdRef: { current: 'synthetic-conversation' },
     openAppTargetRef: { current: noop },
     pendingReviewAnswerRef: { current: true }, voiceSaveRequestsRef: { current: 0 },
-    REALTIME_VOICE_SERVER_TIMEOUT_MS: 12000, REALTIME_VOICE_MEDIA_TIMEOUT_MS: 4000,
     Alert: { alert: noop },
     makeConversationTurn: (role, text) => ({ role, text }), todayLocalDate: () => '2026-10-17',
   }
@@ -1196,6 +1195,75 @@ async function verifyLocalPreferences() {
   console.log('PASS: device settings require exact server authorization, account-bound current review, explicit confirmation and storage proof; stop, stale values, malformed replies, duplicate confirmations and readback failures remain honest.')
 }
 
+async function verifyConnectionDeadlineBoundaries() {
+  const flush = () => new Promise(resolve => setImmediate(resolve))
+  function fixture() {
+    const box = baseBox(), timers = new Map()
+    let now = 0, nextId = 0, release
+    const gate = new Promise(resolve => { release = resolve })
+    const state = { status: '', error: '', stopped: 0 }
+    Object.assign(box, {
+      liveVoiceEnabled: true, voiceRecordingSupported: true, checkingRealtimeVoice: false,
+      realtimeVoiceAvailable: true, realtimeVoiceError: '', hasNativeRealtimeVoiceSupport: () => true,
+      requestAiDataSharingPermission: async () => true,
+      setTimeout: (fn, delay) => { const id = ++nextId; timers.set(id, { fn, due: now + delay }); return id },
+      clearTimeout: id => timers.delete(id),
+      clearRealtimeConnectTimeout: () => { timers.delete(box.realtimeVoiceConnectTimeoutRef.current); box.realtimeVoiceConnectTimeoutRef.current = null },
+      setRealtimeVoiceStatus: value => { state.status = value }, setRealtimeVoiceError: value => { state.error = value },
+      startHelfiRealtimeVoiceSession: async params => {
+        params.callbacks.onConnectStage('local-offer-ready')
+        await gate
+        params.callbacks.onConnectStage('server-answer-received')
+        params.callbacks.onStatus('live')
+        return { stop: async () => { state.stopped++ }, setMicrophoneMuted: noop, promptAssistant: noop, flushTranscript: noop }
+      },
+    })
+    evaluate(box, `globalThis.run = ${callback('startVoiceSession')}`)
+    return {
+      box, state, timers, release,
+      advance: async elapsed => {
+        const end = now + elapsed
+        while (true) {
+          const next = [...timers.entries()].filter(([, timer]) => timer.due <= end).sort((a, b) => a[1].due - b[1].due)[0]
+          if (!next) break
+          timers.delete(next[0]); now = next[1].due; next[1].fn(); await flush()
+        }
+        now = end; await flush()
+      },
+    }
+  }
+  const timely = fixture(), timelyRun = timely.box.run()
+  await flush(); await timely.advance(13000)
+  assert.equal(timely.state.status, 'connecting', 'A valid13s server response must not be cut off by the client')
+  assert.equal(timely.box.realtimeVoiceAbortRef.current.signal.aborted, false)
+  timely.release(); await timelyRun
+  assert.equal(timely.state.status, 'live')
+  await timely.advance(20000)
+  assert.equal(timely.state.status, 'live', 'A completed connection clears its startup timer')
+
+  const overdue = fixture(), overdueRun = overdue.box.run()
+  await flush(); const overdueSignal = overdue.box.realtimeVoiceAbortRef.current.signal
+  await overdue.advance(17001)
+  assert.equal(overdueSignal.aborted, true)
+  assert.equal(overdue.state.status, 'failed')
+  overdue.release(); await overdueRun
+  assert.equal(overdue.state.status, 'failed', 'A late response cannot revive a timed-out run')
+  assert.equal(overdue.state.stopped, 1)
+
+  const replaced = fixture(), replacedRun = replaced.box.run()
+  await flush(); const oldTimer = [...replaced.timers.values()][0]
+  const replacedSignal = replaced.box.realtimeVoiceAbortRef.current.signal
+  replaced.box.realtimeVoiceRunRef.current++
+  replaced.box.voiceSessionActiveRef.current = false
+  replaced.state.status = 'replacement-run'
+  oldTimer.fn()
+  assert.equal(replacedSignal.aborted, false, 'An old queued timeout must ignore a replacement run')
+  replaced.release(); await replacedRun
+  assert.equal(replaced.state.status, 'replacement-run')
+  assert.equal(replaced.state.stopped, 1)
+  console.log('PASS actual native connection deadline:13s permitted response, genuine timeout, completed-timer cleanup and late/replacement run isolation; synthetic clock only')
+}
+
 async function main() {
   const box = evaluate(baseBox(), '')
   const noticeState = baseBox(), activity = [], errors = []
@@ -1326,6 +1394,7 @@ async function main() {
   assert.equal(box.supportsNativeVoiceInput('ios', false), true, 'iPhone voice survives landscape width')
   assert.equal(box.supportsNativeVoiceInput('android', false), true)
   assert.equal(await startupScenario(noop), 1)
+  await verifyConnectionDeadlineBoundaries()
   const stageTimers = []
   assert.equal(await startupScenario((state) => {
     state.setTimeout = (_callback, delay) => { stageTimers.push(delay); return stageTimers.length }
@@ -1333,7 +1402,7 @@ async function main() {
     callbacks.onConnectStage('local-offer-ready')
     callbacks.onConnectStage('server-answer-received')
   }), 1)
-  assert.deepEqual(stageTimers, [12000, 12000, 4000], 'Local media gathering, server response and verified media connection need separate startup budgets')
+  assert.deepEqual(stageTimers, [17000, 17000, 4000], 'Local media gathering, server response and verified media connection need separate startup budgets')
   assert.equal(await startupScenario((state) => { state.openRef.current = false; state.realtimeVoiceRunRef.current++ }), 0, 'Done prevents late startup')
   assert.equal(await startupScenario((state) => { state.AppState.currentState = 'background' }), 0)
   assert.equal(await startupScenario((state) => { state.voiceAccountTokenRef.current = 'another-synthetic-account' }), 0)
