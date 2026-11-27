@@ -506,7 +506,7 @@ export function HealthJournalScreen() {
                 <Text style={styles.audioTitle}>Audio settings</Text>
                 <Text style={styles.audioPill}>Device default</Text>
               </View>
-              <Text style={styles.smallMuted}>Microphone and playback use your iPhone or iPad audio settings.</Text>
+              <Text style={styles.smallMuted}>Microphone and playback use your device's audio settings.</Text>
             </View>
 
             <TextInput
