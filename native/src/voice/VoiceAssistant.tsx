@@ -222,7 +222,8 @@ const SPOKEN_REPLY_VOICE_NAME = 'Marin'
 // Do not gate it behind a build command: missing build flags previously restored the retired recorder UI.
 const LIVE_VOICE_ENABLED = true
 const LIVE_VOICE_DISABLED_MESSAGE = 'Live voice is paused while it is being rebuilt. Text and camera still work.'
-const REALTIME_VOICE_SERVER_TIMEOUT_MS = 12000
+// Allow the server15s startup deadline plus bounded network handling.
+const REALTIME_VOICE_SERVER_TIMEOUT_MS = 17000
 const REALTIME_VOICE_MEDIA_TIMEOUT_MS = 4000
 const NOT_SAVED_MESSAGE = 'No problem. I have not saved anything.'
 const VOICE_TURN_SILENCE_MS = 750
