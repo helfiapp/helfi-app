@@ -41,6 +41,11 @@ export async function DELETE(
       )
     }
 
+    // Keep the report's file reference available if storage deletion fails.
+    if (!report.originalDeletedAt && report.s3Key) {
+      await del(report.s3Key)
+    }
+
     await prisma.$transaction(async (tx) => {
       await tx.auditEvent.updateMany({
         where: { reportId: report.id },
@@ -65,14 +70,6 @@ export async function DELETE(
         })
       }
     })
-
-    if (!report.originalDeletedAt && report.s3Key) {
-      try {
-        await del(report.s3Key)
-      } catch (error) {
-        console.error('Failed to delete lab report blob after report removal:', error)
-      }
-    }
 
     return NextResponse.json({
       success: true,
