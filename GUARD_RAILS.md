@@ -1,3 +1,22 @@
+## Food saved portions and rounding — candidate, 27 November 2026
+
+Normal live UI verification caught an unchanged web update dropping a native half portion: one controlled entry changed111→221kcal. The same source (41kcal/100g,0.24gfat/100g,540gwholemeal) exposed web rounding-before-scaling: half fat0.7 instead of0.6 and double calories442 instead of443. Native source-first totals were correct.
+
+The narrow web repair preserves saved portion metadata through numeric ingredient edits and both save containers; grams/ounces must stay consistent with the retained share and whole weight. For item-backed entries, apply the saved positive scale BEFORE the single rounding step. Keep stored/legacy fallbacks scaled once, allow portions above100%, preserve unknown nutrients and nonnegative validation. This supersedes the literal helper-call prescription in3.13 only; its saved-scale and no-clamping requirements remain. Review cards must clearly distinguish full-meal amounts from the saved eaten share. Rename, source identity, credit and account logic stay outside this change. A current-source permanent regression is required before release.
+
+## Counted-serving totals and unknown targets — 27 November 2026
+
+- Native diary loading, ingredient editing, physical amount conversion and save/reopen must use the same whole-serving factor once. Preserve piecesPerServing, original source IDs/labels, custom full-set gram/ml denominator and nutritionCoversServing. A complete multi-piece serving must never be counted twice. Legacy explicit multiplier fields keep their existing native precedence pending a verified conflicting record; do not rewrite saved history.
+- Known-zero daily targets and energy stay zero; missing targets remain unknown with a dash. Do not replace absent profile targets with guessed calories/macros, and do not invent a percentage for zero/unknown caps. Exercise cannot make an unknown base target known.
+- Keep check:food-calorie-parity in prebuild, existing amount/recipe/missing-nutrient/display checks and all normal source/portion gates. Source fixtures do not prove photo accuracy or actual save/reopen on a rebuilt app. Existing name/label and rename handling remain byte-preserved.
+
+## Verified support investigation and privacy baseline — 27 November 2026
+
+- Stable release e09b74145f5d47b97c63d15e4401ed4d552da9d7 / AWS159, both domains and normal UI verified. A negative follow-up keeps IN_PROGRESS; chat ending and feedback preserve investigation. Never infer successful repair from closure or a rating.
+- Public ticket hydration must omit internal staff notes, email receipts and private identifiers before attachment signing. Preserve the public chat-ended marker. Keep the actual-source lifecycle/privacy/webhook/consent checks and manual support when AI permission is declined.
+- Email arrivals use the Apple Mail rule and supported exact-chat queue notification. The retired five-minute inbox checker stays paused. Daily24-hour shift handover is separate from email arrival and must not scan the inbox on a timer.
+
+
 ## Customer support API privacy — 27 November2026
 
 Customer ticket responses must use `rehydratePublicSupportTicket`, which removes staff `[SYSTEM]` notes, email receipts, identity checks and follow-up markers before attachment signing. Retain the exact authenticated chat-ended marker needed by conversation controls. Staff ticket views keep their existing internal notes. Customer/admin messages, feedback and normal attachment handling must be preserved; UI-only filtering is insufficient. The actual helper and guest/signed-in GET, create, reply, ending and feedback regression check is required by `check:support`.

@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict'
+import { nutritionServingMultiplier } from '../native/src/lib/foodDiaryEntries'
 import fs from 'node:fs'
 import vm from 'node:vm'
 import ts from 'typescript'
@@ -46,7 +47,7 @@ assert.equal(recipeValues.chooseRecipeFood([{ ...foods[2], name: 'Milk, human' }
 assert.equal(recipeValues.chooseRecipeFood([{ ...foods[2], calories: null }], milkRequest), null)
 assert.equal(recipeValues.measuredRecipeFood({ ...foods[0] }, milkRequest), null, 'Unknown density blocks cross-dimension conversion')
 
-const ctx = vm.createContext({ ...recipeValues, ...nutrientValues, parseFoodServing, liquidDensity, convertFoodAmount, AbortController, setTimeout, clearTimeout })
+const ctx = vm.createContext({ nutritionServingMultiplier, ...recipeValues, ...nutrientValues, parseFoodServing, liquidDensity, convertFoodAmount, AbortController, setTimeout, clearTimeout })
 for (const name of ['roundTo', 'round1', 'numberOrZero', 'nullableNumber', 'normalizeFavoriteLabel', 'normalizeFavoriteAmountUnit', 'parseServingBaseForFavorite', 'favoriteAmountStateFromRaw', 'favoriteBaseForItem', 'convertFavoriteBaseAmount', 'favoriteAmountFromServings', 'formatFavoriteAmount', 'isOpenMeasurementServing', 'hasServingOptionMacroData', 'normalizeFavoriteServingOptions', 'findSelectedServingId', 'buildFavoriteAdjustItemFromSearchFood', 'calculateFavoriteAdjustTotals', 'favoriteAdjustPersistenceFields']) ctx[name] = vm.runInContext(actual(name), ctx)
 ctx.session = { token: 'synthetic' }; ctx.API_BASE_URL = 'https://synthetic.invalid'; ctx.buildNativeAuthHeaders = () => ({})
 ctx.fetch = async (url: string) => { assert.ok(url.includes('localOnly=1')); return { ok: true, json: async () => ({ items: foods }) } }

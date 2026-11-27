@@ -63,7 +63,7 @@ function checkVisibleFoodReview() {
     theme: { colors: { text: '#111', muted: '#666' } },
     favoriteEditName: 'My chosen dinner', setFavoriteEditName: value => { context.favoriteEditName = value },
     editItem: { id: 'review-food', name: 'Cooked chicken', servingLabel: '100 g', amountInput: '100', raw: {} },
-    expanded: false, amountUnitLabel: 'g', ingredientSourceLabel: () => 'USDA',
+    expanded: false, amountUnitLabel: 'g', amountSeparator: ' ', ingredientSourceLabel: () => 'USDA',
     setFavoriteEditExpandedItemId: value => { context.openedFood = value },
   }
   vm.createContext(context)

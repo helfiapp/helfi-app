@@ -203,7 +203,7 @@ async function main() {
       const text = node.expression.getText(trackAst)
       if (text.startsWith("entry.source === 'APPLE_HEALTH'") && text.includes("'Apple Health activity'")) healthRowTitle = text
       if (text.includes('Daily total •')) healthRowDetail = text
-      if (text.startsWith("Math.round(energyUnit === 'kj' ? dailyTargets.calories")) baseAllowanceExpression = text
+      if (text.startsWith("Math.round(energyUnit === 'kj' ? dailyTargets.calories") || text.startsWith("dailyTargets.calories == null ? '—' : Math.round(")) baseAllowanceExpression = text
       if (ts.isConditionalExpression(node.expression) && text.includes('onAppleHealthImportSelectedDate')) buttonCondition = node.expression.condition.getText(trackAst)
     }
     ts.forEachChild(node, collectEvent)
@@ -265,6 +265,12 @@ async function main() {
   assert.deepEqual(JSON.parse(JSON.stringify(budgetContext.exports.budget())), { usedKcal: 1400, dailyAllowanceKcal: 2380, remainingKcal: 980 })
   assert.equal(budgetContext.exports.budget().remainingKcal, 980, 'repeated daily total does not add calories again')
   budgetContext.exerciseCalories = 0; assert.equal(budgetContext.exports.budget().remainingKcal, 800)
+  displayContext.dailyTargets.calories = 0; assert.equal(displayContext.exports.base(), 0, 'a known-zero base target remains zero')
+  displayContext.dailyTargets.calories = null; assert.equal(displayContext.exports.base(), '—', 'an unknown base target displays a dash')
+  budgetContext.exerciseCalories = 180; budgetContext.dailyTargets.calories = 0
+  assert.deepEqual(JSON.parse(JSON.stringify(budgetContext.exports.budget())), { usedKcal: 1400, dailyAllowanceKcal: 180, remainingKcal: 0 })
+  budgetContext.dailyTargets.calories = null
+  assert.deepEqual(JSON.parse(JSON.stringify(budgetContext.exports.budget())), { usedKcal: 1400, dailyAllowanceKcal: null, remainingKcal: null }, 'exercise does not invent a missing daily target')
   console.log('PASS: actual dated Health reader/provider/Food handlers preserve account/day consent, serialized refresh, per-day cooldown, exact selected-date requests, daily labels/base target, late-response safety and no invented calories.')
 }
 main().catch(error => { console.error(error); process.exitCode = 1 })

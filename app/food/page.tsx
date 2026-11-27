@@ -6231,6 +6231,30 @@ export default function FoodDiary() {
     return parsed
   }
 
+  const preserveSavedEntryPortion = (totals: any, entry: any, items?: any[]) => {
+    if (totals != null && typeof totals !== 'object') return totals
+    if (getEntryPortionScale({ nutrition: totals }) != null || getEntryPortionScale(entry) == null || (totals == null && !items?.length)) return totals
+    const source = entry.nutrition?.__portionScale != null ? entry.nutrition : entry.total
+    const next = { ...totals }
+    for (const key of ['__portionScale', '__portionAmount', '__portionUnit', '__portionControlEnabled', '__portionTotalWeightG', '__portionRecipeServings']) {
+      if (Object.prototype.hasOwnProperty.call(source, key)) next[key] = source[key]
+    }
+    if (items?.length && totals != null) {
+      const grams = items.map(item => convertItemMeasurement(effectiveServings(item), 'serving', 'g', item, null, piecesMultiplierForServing(item)))
+      const wholeGrams = grams.every(value => value != null) ? grams.reduce<number>((sum, value) => sum + (value || 0), 0) : null
+      next.__portionTotalWeightG = wholeGrams
+      if (next.__portionUnit === 'g' || next.__portionUnit === 'oz') {
+        const scale = getEntryPortionScale(entry)!
+        if (wholeGrams != null) next.__portionAmount = wholeGrams * scale / (next.__portionUnit === 'oz' ? 28.349523125 : 1)
+        else {
+          next.__portionUnit = 'serving'
+          next.__portionAmount = scale * (Number(next.__portionRecipeServings) || 1)
+        }
+      }
+    }
+    return next
+  }
+
   const applyPortionScaleToTotals = (totals: any, scale: number) => {
     if (!totals || typeof totals !== 'object') return totals
     const round = (value: any, decimals: number) => {
@@ -6555,9 +6579,9 @@ export default function FoodDiary() {
       }
       if (Array.isArray(entry?.items) && entry.items.length > 0) {
         const normalized = normalizeSuspiciousKjItems(entry.items)
-        const recalculated = recalculateNutritionFromItems(normalized.items || [])
+        const recalculated = recalculateNutritionFromItems(normalized.items || [], portionScale ?? 1)
         if (recalculated) {
-          return portionScale ? applyPortionScaleToTotals(recalculated, portionScale) : recalculated
+          return recalculated
         }
       }
       const storedTotals =
@@ -6714,12 +6738,12 @@ export default function FoodDiary() {
     applyRecalculatedNutrition(next)
     if (editingEntry) {
       try {
-        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(next), editingEntry, next)
         const updatedEntry = {
           ...editingEntry,
           items: next,
           nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
+          total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
         }
         setEditingEntry(updatedEntry)
         setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
@@ -6914,12 +6938,12 @@ export default function FoodDiary() {
     applyRecalculatedNutrition(next)
     if (editingEntry) {
       try {
-        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(next), editingEntry, next)
         const updatedEntry = {
           ...editingEntry,
           items: next,
           nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
+          total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
         }
         setEditingEntry(updatedEntry)
         setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
@@ -7089,12 +7113,12 @@ export default function FoodDiary() {
     applyRecalculatedNutrition(itemsCopy)
     if (editingEntry) {
       try {
-        const updatedNutrition = recalculateNutritionFromItems(itemsCopy)
+        const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(itemsCopy), editingEntry, itemsCopy)
         const updatedEntry = {
           ...editingEntry,
           items: itemsCopy,
           nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
+          total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
         }
         setEditingEntry(updatedEntry)
         setTodaysFoods((prev) => prev.map((food) => (food.id === editingEntry.id ? updatedEntry : food)))
@@ -7139,12 +7163,12 @@ export default function FoodDiary() {
     applyRecalculatedNutrition(next)
     if (editingEntry) {
       try {
-        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(next), editingEntry, next)
         const updatedEntry = {
           ...editingEntry,
           items: next,
           nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
+          total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
         }
         setEditingEntry(updatedEntry)
         setTodaysFoods((prev) => prev.map((food) => (food.id === editingEntry.id ? updatedEntry : food)))
@@ -7164,12 +7188,12 @@ export default function FoodDiary() {
     applyRecalculatedNutrition(next)
     if (editingEntry) {
       try {
-        const updatedNutrition = recalculateNutritionFromItems(next)
+        const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(next), editingEntry, next)
         const updatedEntry = {
           ...editingEntry,
           items: next,
           nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
+          total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
         }
         setEditingEntry(updatedEntry)
         setTodaysFoods((prev) => prev.map((food) => (food.id === editingEntry.id ? updatedEntry : food)))
@@ -7248,12 +7272,12 @@ export default function FoodDiary() {
     applyRecalculatedNutrition(itemsCopy)
     if (editingEntry) {
       try {
-        const updatedNutrition = recalculateNutritionFromItems(itemsCopy)
+        const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(itemsCopy), editingEntry, itemsCopy)
         const updatedEntry = {
           ...editingEntry,
           items: itemsCopy,
           nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
+          total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
         }
         setEditingEntry(updatedEntry)
         setTodaysFoods(prev => prev.map(food => (food.id === editingEntry.id ? updatedEntry : food)))
@@ -8547,12 +8571,12 @@ const applyStructuredItems = (
     // Live-update Today's Totals while editing an existing entry (no persistence)
     if (editingEntry) {
       try {
-        const updatedNutrition = recalculateNutritionFromItems(itemsCopy)
+        const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(itemsCopy), editingEntry, itemsCopy)
         const updatedEntry = {
           ...editingEntry,
           items: itemsCopy,
           nutrition: updatedNutrition,
-          total: convertTotalsForStorage(updatedNutrition),
+          total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
         }
         setEditingEntry(updatedEntry)
         setTodaysFoods(prev =>
@@ -9494,12 +9518,12 @@ const applyStructuredItems = (
           applyRecalculatedNutrition(updated)
           if (editingEntry) {
             try {
-              const updatedNutrition = recalculateNutritionFromItems(updated)
+              const updatedNutrition = preserveSavedEntryPortion(recalculateNutritionFromItems(updated), editingEntry, updated)
               const refreshed = {
                 ...editingEntry,
                 items: updated,
                 nutrition: updatedNutrition,
-                total: convertTotalsForStorage(updatedNutrition),
+                total: preserveSavedEntryPortion(convertTotalsForStorage(updatedNutrition), { nutrition: updatedNutrition }),
               }
               setEditingEntry(refreshed)
               setTodaysFoods((prev: any[]) =>
@@ -11359,7 +11383,7 @@ const applyStructuredItems = (
   }
 
   // Recalculate nutrition totals from items array (multiplying by servings)
-  const recalculateNutritionFromItems = (items: any[]): NutritionTotals | null => {
+  const recalculateNutritionFromItems = (items: any[], portionScale = 1): NutritionTotals | null => {
     if (!items || items.length === 0) return null
     if (items.some(item => !Number.isFinite(effectiveServings(item)))) return null
 
@@ -11373,7 +11397,7 @@ const applyStructuredItems = (
     }
 
     items.forEach((item: any) => {
-      const servings = effectiveServings(item)
+      const servings = effectiveServings(item) * portionScale
       const multiplier = macroMultiplierForItem(item)
       const protein = Number(item?.protein_g) || 0
       const carbs = Number(item?.carbs_g) || 0
@@ -11389,9 +11413,9 @@ const applyStructuredItems = (
         calories = macroEnergy > 0 ? macroEnergy : 0
       }
       totals.calories += calories * servings * multiplier
-      totals.protein += protein * servings * multiplier
-      totals.carbs += carbs * servings * multiplier
-      totals.fat += fat * servings * multiplier
+      totals.protein += safeProtein * servings * multiplier
+      totals.carbs += safeCarbs * servings * multiplier
+      totals.fat += safeFat * servings * multiplier
       totals.fiber = sumOptionalNutrients(totals.fiber, scaleOptionalNutrient(fiber, servings * multiplier))
       totals.sugar = sumOptionalNutrients(totals.sugar, scaleOptionalNutrient(sugar, servings * multiplier))
     })
@@ -12748,7 +12772,7 @@ Please add nutritional information manually if needed.`);
     }
 
     const mergedNutrition = (() => {
-      const base = stripSweetenerMetaFromTotals((analyzedNutrition || editingEntry.nutrition) as any)
+      const base = stripSweetenerMetaFromTotals(preserveSavedEntryPortion((analyzedNutrition || editingEntry.nutrition) as any, editingEntry))
       if (!base || typeof base !== 'object') return base
       let next: any = removeSweetenerFromTotals(base, baseSweetenerMeta)
       next = applyDrinkMetaToTotals(next, drinkMeta)
@@ -12766,7 +12790,7 @@ Please add nutritional information manually if needed.`);
       return next
     })()
     const mergedTotal = (() => {
-      const base = stripSweetenerMetaFromTotals(analyzedTotal || (editingEntry.total || null))
+      const base = stripSweetenerMetaFromTotals(preserveSavedEntryPortion(analyzedTotal || (editingEntry.total || null), editingEntry))
       let next: any = removeSweetenerFromTotals(base, baseSweetenerMeta)
       next = applyDrinkMetaToTotals(next, drinkMeta)
       next = applySweetenerMetaToTotals(next, resolvedSweetenerMeta)
@@ -23397,6 +23421,12 @@ Please add nutritional information manually if needed.`);
                       Photo estimates can vary. Check each food and its weight before saving; use a label or weighed amount when available.
                     </p>
                   )}
+                  {editingEntry && (analyzedNutrition || analyzedItems.length > 0) && (() => {
+                        const savedScale = getEntryPortionScale(editingEntry)
+                        if (savedScale == null || savedScale === 1) return null
+                        const eatenKcal = foodNumberOrNull(getEntryTotals(editingEntry)?.calories)
+                        return <p data-testid="food-saved-portion-note" className="mb-2 px-4 text-sm text-gray-600 sm:px-6">The nutrition below is for the whole meal. Your saved portion ({Number((savedScale * 100).toPrecision(6))}%{eatenKcal != null ? ', ' + Math.round(eatenKcal * (energyUnit === 'kJ' ? KCAL_TO_KJ : 1)) + ' ' + (energyUnit === 'kJ' ? 'kJ' : 'kcal') : ''}) will be kept when you update this entry.</p>
+                      })()}
                   {(analyzedNutrition || analyzedItems.length > 0) && (
                     <section aria-label="Nutrient results" data-testid="food-result-nutrient-cards" className="mb-6 mt-3 px-4 sm:px-6">
                       <NutrientCards values={analyzedNutrition || {}} energyUnit={energyUnit} />
@@ -26929,10 +26959,10 @@ Please add nutritional information manually if needed.`);
 
                 const totals = source.reduce((acc: { calories: number; protein: number; carbs: number; fat: number; fiber: number | null; sugar: number | null }, item: any) => {
                   const derivedItems = deriveItemsForEntry(item)
-                  const recalculated = derivedItems ? recalculateNutritionFromItems(derivedItems) : null
                   const portionScale = getEntryPortionScale(item)
-                  const scaledRecalculated =
-                    recalculated && portionScale ? applyPortionScaleToTotals(recalculated, portionScale) : recalculated
+                  const scaledRecalculated = derivedItems
+                    ? recalculateNutritionFromItems(derivedItems, portionScale ?? 1)
+                    : null
                   const splitFromItems = derivedItems ? splitFatFromItems(derivedItems, portionScale) : null
                   if (scaledRecalculated) {
                     acc.calories += scaledRecalculated.calories || 0

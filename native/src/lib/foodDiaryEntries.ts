@@ -130,6 +130,43 @@ export function extractTotalsFromDescriptionText(value: any): EntryTotals | null
   }
 }
 
+// One factor for the saved web count convention; never fold it into stored servings.
+export function nutritionServingMultiplier(item: any): number {
+  if (item?.nutritionCoversServing === true) return 1
+  const explicit = Number(item?.macroMultiplier ?? item?.multiplier)
+  if (Number.isFinite(explicit) && explicit > 0) return explicit
+  const pieces = Number(item?.piecesPerServing)
+  if (!Number.isFinite(pieces) || pieces <= 1) return 1
+  const discreteUnit = (value: string) => {
+    const unit = value.toLowerCase().trim()
+    const measured = ['g','gram','grams','kg','kilogram','ml','milliliter','millilitre','l','liter','litre','cup','cups','tbsp','tablespoon','tsp','teaspoon','oz','ounce','lb','pound']
+    if (measured.some(word => unit === word || unit.endsWith(' ' + word))) return false
+    if (unit.includes('slice') && /avocado|cucumber|tomato|zucchini|courgette/.test(unit)) return false
+    return ['egg','slice','cookie','piece','patty','pattie','wing','nugget','meatball','stick','bar','biscuit','pancake','scoop','cracker','chip','bacon','rasher','strip','sausage','link','hashbrown','hash brown','zucchini','courgette','carrot','cucumber','banana','apple','tomato'].some(word => unit.includes(word))
+  }
+  const quantity = (value: string) => {
+    const mixed = value.match(/(\d+)\s+(\d+)\/(\d+)/)
+    if (mixed && Number(mixed[3])) return Number(mixed[1]) + Number(mixed[2]) / Number(mixed[3])
+    const fraction = value.match(/(\d+)\/(\d+)/)
+    if (fraction && Number(fraction[2])) return Number(fraction[1]) / Number(fraction[2])
+    return Number(value.match(/(\d+(?:\.\d+)?)/)?.[1])
+  }
+  const label = String(item?.serving_size || '')
+  const token = label.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
+  let count = quantity(label)
+  let unit = token ? label.replace(token[0], '').trim().replace(/^of\s+/i, '').trim() : label.trim()
+  const following = token ? label.slice((token.index ?? 0) + token[0].length).trim() : ''
+  unit = following.match(/^(g|grams?|kg|kilograms?|ml|milliliters?|millilitres?|l|liters?|litres?|oz|ounces?|lb|pounds?|cups?|tbsp|tablespoons?|tsp|teaspoons?)\b/i)?.[0] || unit
+  for (const segment of label.match(/\(([^)]*)\)/g) || []) {
+    if (/\b(?:estimated equivalent|equivalent of)\b/i.test(segment)) continue
+    const inner = segment.slice(1, -1).trim()
+    const innerToken = inner.match(/(\d+\s+\d+\/\d+|\d+\/\d+|\d+(?:\.\d+)?)/)
+    const innerUnit = innerToken ? inner.replace(innerToken[0], '').trim().replace(/^of\s+/i, '').trim() : inner
+    if (quantity(inner) > 0 && discreteUnit(innerUnit)) { count = quantity(inner); unit = innerUnit; break }
+  }
+  return Number.isFinite(count) && count > 1 && discreteUnit(unit) ? 1 : pieces
+}
+
 export function recalculateTotalsFromItems(items: any[] | null | undefined): EntryTotals | null {
   if (!Array.isArray(items) || items.length === 0) return null
 
@@ -146,8 +183,7 @@ export function recalculateTotalsFromItems(items: any[] | null | undefined): Ent
   for (const item of items) {
     const servingsRaw = Number(item?.servings)
     const servings = Number.isFinite(servingsRaw) && servingsRaw > 0 ? servingsRaw : 1
-    const multRaw = Number(item?.macroMultiplier ?? item?.multiplier)
-    const multiplier = Number.isFinite(multRaw) && multRaw > 0 ? multRaw : 1
+    const multiplier = nutritionServingMultiplier(item)
     const factor = servings * multiplier
 
     const protein = Math.max(0, Number(item?.protein_g ?? item?.protein) || 0)
