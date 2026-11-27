@@ -1,4 +1,18 @@
 DEPLOYED:
+- LIVE or STAGING: LIVE — https://helfi.ai and https://www.helfi.ai
+- Date/time: 27 November 2026, 3:47 PM Melbourne
+- What changed: Support e09b74145f5d47b97c63d15e4401ed4d552da9d7 / AWS159, all steps SUCCEED. Unhelpful replies now apologize and retain investigation; ending/rating a chat does not resolve its issue. Customer APIs hide internal notes. Actual email arrivals wake EMAIL REPLIES; no timed inbox scan.
+- Where to see it (page/link): https://helfi.ai/support
+- What to quickly test: A new greeting, negative follow-up, End, feedback and refresh. Controlled normal-UI ticket cmwyhzdkc000114h0q4qj3hzx passed every stage; status stayed IN_PROGRESS after the negative follow-up, End, feedback and reload. Credits727 unchanged, no provider call. Both domains200/CloudFront/new matching ETag d9dtk4u6b11yri. Mail worker independently processed own-system copies once, preserved read states and sent no extra reply.
+- Limits: Phone source requires a new native build; no new store submission or paid support-model test. Original customer contact remains invalid doe; apology email unsent, no guessed recipient. Other ordinary audit candidates are not in this release; held sign-in work remains untouched.
+
+## Food serving accuracy repair — LOCAL ONLY, 27 November 2026
+
+Food-only candidate against live support e09. Corrects counted-food native totals and full-set physical measurements through edit/save/reopen, retains whole-serving metadata, preserves zero versus unknown targets, and keeps declared-zero web builder energy at zero. Earlier caption separator is included once. Source labels, rename handling, portion scale, credit logic, Dashboard and Insights are unchanged. No customer data migration or actual phone/photo test occurred in this preparation. Legacy explicit multiplier precedence is preserved; universal parity for unverified conflicting legacy fields is not claimed.
+
+Verified locally: actual-source parity8groups, existing food/portion/measurement/recipe/display suites, root and native types,306root/107native locks, and full production build exit0 with1210PASS lines and265static pages. Three existing test dependencies were updated for the approved food display; voice behavior and its separate presentation pin are unchanged. Held sign-in and all other pending work are privately preserved outside this build. Apple/Google submission and new native binaries remain separate.
+
+DEPLOYED:
 - LIVE or STAGING: LIVE — DNS email authentication only; website source remains33e639ce/AWS158.
 - Date/time: 27 November2026, 4:18am Australia/Melbourne.
 - What changed: Restored the missing SPF TXT record for the existing Zoho Australia support sender. Both previous verification TXT values and TTL remain; MX, DMARC reject policy, SES and website records are unchanged. Route53 changeC0284249F0VZMPYSAZ80 isINSYNC.
