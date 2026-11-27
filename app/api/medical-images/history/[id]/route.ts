@@ -42,12 +42,9 @@ export async function DELETE(
     }
 
     const blobTarget = analysis.imageFile?.cloudinaryId || analysis.imageFile?.secureUrl || null
-    if (blobTarget && isObjectStorageConfigured()) {
-      try {
-        await del(blobTarget)
-      } catch (deleteError) {
-        console.warn('Failed to delete health image note file:', deleteError)
-      }
+    if (blobTarget) {
+      if (!isObjectStorageConfigured()) throw new Error('Image storage is not configured')
+      await del(blobTarget)
     }
 
     await prisma.$transaction([
@@ -63,7 +60,6 @@ export async function DELETE(
     return NextResponse.json(
       {
         error: 'Failed to delete history item',
-        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )
