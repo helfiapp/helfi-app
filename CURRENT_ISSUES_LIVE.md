@@ -1,3 +1,11 @@
+## Account-name persistence — VERIFIED LOCAL CANDIDATE, 27 November 2026
+
+Exact ordinary six-source repair saves names through existing Profile API and confirms current-account server readback before Saved. Atomic per-user Profile merge preserves unrelated metadata on concurrent writes or failures. Both clients retain newer drafts and queued reversions; native display cache refresh preserves token, active identity, expiry and remember choice. Email remains read-only. The only lib/auth change is one display-name field; all other authentication expressions/held candidates are excluded.
+
+Nine actual-source account groups, all56existing preference groups, root/native types0, exact3account snapshots with306/107page checks and full production build exit0/1229PASS verified. The first build caught an obsolete Profile-variable extractor; only that existing preference test harness now executes the actual transaction, with every existing assertion retained. Unsigned iPhone16e Release64 compiled149.1seconds, source hashes frozen, not installed before matching server release. No new store build/upload/submission, actual photo or paid voice call.
+
+This exact13-file account task includes6production source files,2existing/new checks,package gate,snapshot and3required notes. All held callback/helper/fallback/account-delete code stays preserved outside the build. The earlier same-task native Account draft and untracked test are privately preserved while the final accepted versions are promoted. Exact deployment and normal name save/reopen/cross-device restoration remain required. Background Insights regeneration is unset/disabled in both current hosting scopes, so normal profile-name checks must not start paid regeneration.
+
 ## Synthetic release-check correction — VERIFIED LOCAL CANDIDATE, 27 November 2026
 
 One test line schedules the mocked30000ms abort as a microtask instead of a real zero-delay timer. Private independent separate-process proof deliberately delays zero timers: old fixture closesreserved_deadline, exact candidate passes all8unchanged groups with correctrequest_timeout30000/backend_usage_unconfirmed and unknown collateral retained. Real worker code, production deadlines, pricing, funding and all assertions remain unchanged.

@@ -1,3 +1,7 @@
+## Account names must persist across devices — 27 November 2026
+
+Account Settings saves a normalized nonempty name through the existing Profile API, confirms the same account and fresh server name before showing Saved, and preserves unsaved newer edits while queued writes/load replies complete. The profile metadata merge and User.name update share one per-user row lock/transaction so failure cannot leave a half-save or erase unrelated profile fields. Email stays read-only until an actual verified change-email flow exists. Native display refresh may update only name/image; token, active identity, expiry and remember choice stay unchanged. Preserve baseline token decoding and the held sign-in candidates; ordinary lib/auth changes exactly one display-name field. Run check:account-name-save and normal web/native save/reopen/restore before claiming persistence.
+
 ## Deterministic synthetic timeout checks — 27 November 2026
 
 Synthetic worker tests must not race a real zero-delay timer against a virtual clock that advances on every setImmediate. The existing provider-deadline fixture schedules its synthetic30000ms abort as a microtask, after the synchronous fake fetch installs its abort listener. Preserve the full timeout telemetry, unknown-usage reserve, no-retry and close-reason assertions. Other timers and the actual worker remain unchanged; this is not permission to lengthen production deadlines, release unknown collateral or claim live voice speed.
