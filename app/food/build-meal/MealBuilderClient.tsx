@@ -1790,8 +1790,8 @@ const computeItemTotals = (item: BuilderItem) => {
   const carbs = macroOrZero(item.carbs_g)
   const fat = macroOrZero(item.fat_g)
   const fiber = optionalNutrient(item.fiber_g)
-  let calories = macroOrZero(item.calories)
-  if (!Number.isFinite(calories) || calories <= 0) {
+  let calories = optionalNutrient(item.calories)
+  if (calories == null) {
     const macroEnergy = protein * 4 + carbs * 4 + fat * 9
     calories = Number.isFinite(macroEnergy) && macroEnergy > 0 ? macroEnergy : 0
   }
