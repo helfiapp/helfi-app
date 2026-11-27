@@ -1,3 +1,16 @@
+DEPLOYED:
+- LIVE or STAGING: LIVE
+- Date/time: 27 November 2026, 7:35PM Melbourne
+- What changed: Account names persist across website and native app; account opening uses a bounded read instead of repeated global refreshes. PR9/a2cb4443/AWS164 and follow-up PR10/2cdaa508/AWS165 all steps succeeded; both domains verified through CloudFront.
+- Where to see it (page/link): https://helfi.ai/account
+- What to quickly test: Save a name, leave/reopen and check native Account; restore original name. Actual web→native and native→web checks passed; original name restored,727credits/123foodused/2161remaining preserved. Normal account load had2session responses over29seconds; one save had1POST,1readbackGET and3session responses over15seconds. Persistent web Saved banner is not claimed across its one display refresh.
+
+## Native purchase completion — scoped local candidate, 27 November 2026
+
+Uses the existing server transaction-ID verification when Apple supplies no legacy receipt. Verified purchases and restored consumables now finish/consume through the existing store primitive; already acknowledged Android subscriptions avoid a second acknowledgement. Verification failure never finishes a purchase. Completion/partial restore failure remains retryable and truthful; Billing refreshes authoritative balance once after any started attempt, while ignoring stale account results. No server, price, credit calculation, schema, funding, token or sign-in change.
+
+Actual-source9purchase groups,2Billing groups and existing localized-price/routing/connection fixtures pass without network or financial calls. Exact2native source paths and3checks,2prebuild gates,2snapshots and required notes only. Journal wording and earlier food captions remain outside this task. Full production build exit0/1241PASS,root/native types0,306/107locks and unsigned iPhone16e Release64 compile148.767seconds verified. Installed build retains login727 and actual StoreKit shows all7prices; no purchase/restore was clicked. Exact source deployment and actual sandbox transaction acceptance remain required; synthetic grants are not voice funding. Current account-loop follow-up PR10/AWS165 is a separate release being verified first.
+
 ## Account refresh-loop follow-up — 27 November 2026
 
 Actual PR9/a2cb4443/AWS164 is deployed on both live domains. Normal web name save appeared in new unsigned iOS64; native save showed Saved and web Account read the same name. Original name was restored through native Saved and verified on web Profile; both remain signed in727credits. A fresh actual test exposed repeated web session reads: global update on Account mount enters the existing layout loading branch and remounts Account. Web was moved to Food to stop the loop.

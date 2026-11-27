@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native'
 import { API_BASE_URL } from '../config'
 import { openNativeSubscriptionManagement, readNativeStorePrices, restoreNativePurchases, runNativePurchase, type NativeBillingCatalogProduct, type NativePurchaseCode, type NativeStorePrices } from '../lib/inAppPurchase'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
+import { getCurrentNativeAuthSession } from '../lib/nativeAuthSession'
 import { useAppMode } from '../state/AppModeContext'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
@@ -437,25 +438,29 @@ export function BillingScreen() {
   }
 
   const startCheckout = async (plan: NativePurchaseCode) => {
+    const identity = getCurrentNativeAuthSession()
+    let attempted = false
     try {
-      if (mode !== 'signedIn' || !session?.token) {
+      if (mode !== 'signedIn' || !session?.token || !identity || identity.token !== session.token || identity.user.id !== session.user.id) {
         Alert.alert('Not signed in', 'Please log in again and try.')
         return
       }
       setIsCreatingCheckout(plan)
       await storePriceLookup.current
+      if (getCurrentNativeAuthSession() !== identity) return
       const kind = plan.startsWith('credits_') ? 'topup' : 'subscription'
+      attempted = true
       const result = await runNativePurchase({
         code: plan,
         kind,
         token: session.token,
       })
-      Alert.alert('Purchase complete', result.message)
-      await loadBillingData()
+      if (getCurrentNativeAuthSession() === identity) Alert.alert('Purchase complete', result.message)
     } catch (error: any) {
       const storeName = Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Google Play' : 'store'
-      Alert.alert(`${storeName} purchase error`, error?.message || 'Please try again.')
+      if (getCurrentNativeAuthSession() === identity) Alert.alert(`${storeName} purchase error`, error?.message || 'Please try again.')
     } finally {
+      if (attempted && getCurrentNativeAuthSession() === identity) await loadBillingData().catch(() => {})
       setIsCreatingCheckout(null)
     }
   }
@@ -605,24 +610,29 @@ export function BillingScreen() {
   }
 
   const handleRestorePurchases = async () => {
+    const identity = getCurrentNativeAuthSession()
+    let attempted = false
     try {
-      if (mode !== 'signedIn' || !session?.token) {
+      if (mode !== 'signedIn' || !session?.token || !identity || identity.token !== session.token || identity.user.id !== session.user.id) {
         Alert.alert('Not signed in', 'Please log in again and try.')
         return
       }
       setIsRestoringPurchases(true)
       await storePriceLookup.current
+      if (getCurrentNativeAuthSession() !== identity) return
       const products = nativeProducts.length > 0 ? nativeProducts : await fetchNativeCatalog()
+      if (getCurrentNativeAuthSession() !== identity) return
+      attempted = true
       const result = await restoreNativePurchases({
         token: session.token,
         products,
       })
-      Alert.alert('Restore purchases', result.message)
-      await loadBillingData()
+      if (getCurrentNativeAuthSession() === identity) Alert.alert('Restore purchases', result.message)
     } catch (error: any) {
       const storeName = Platform.OS === 'ios' ? 'App Store' : Platform.OS === 'android' ? 'Google Play' : 'store'
-      Alert.alert(`${storeName} restore error`, error?.message || 'Please try again.')
+      if (getCurrentNativeAuthSession() === identity) Alert.alert(`${storeName} restore error`, error?.message || 'Please try again.')
     } finally {
+      if (attempted && getCurrentNativeAuthSession() === identity) await loadBillingData().catch(() => {})
       setIsRestoringPurchases(false)
     }
   }

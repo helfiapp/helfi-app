@@ -222,6 +222,15 @@ function withNativeStoreConnection<T>(operation: () => Promise<T>): Promise<T> {
   return pending
 }
 
+async function finishVerifiedPurchase(purchase: any, kind: NativePurchaseKind) {
+  if (Platform.OS === 'android' && kind === 'subscription' && purchase?.isAcknowledgedAndroid === true) return
+  try {
+    await IAP.finishTransaction({ purchase, isConsumable: kind === 'topup' } as any)
+  } catch {
+    throw new Error('Your purchase was verified, but the store could not finish it. Use Restore purchases to retry; do not buy it again.')
+  }
+}
+
 export type NativeStorePrices = Partial<Record<NativePurchaseCode, string>>
 
 export async function readNativeStorePrices(products: NativeBillingCatalogProduct[]): Promise<NativeStorePrices> {
@@ -366,14 +375,15 @@ export async function runNativePurchase(opts: {
       if (!receiptData) {
         receiptData = await IAP.requestReceiptRefreshIOS().catch(() => '')
       }
-      if (!receiptData) {
-        throw new Error('Could not read Apple receipt from this purchase.')
+      const transactionId = String(purchase?.transactionId || '').trim() || String(purchase?.id || '').trim()
+      if (!receiptData && !transactionId) {
+        throw new Error('Could not read Apple receipt or transaction ID from this purchase.')
       }
       verifyBody = {
         platform,
         code: opts.code,
         receiptData,
-        transactionId: String(purchase?.transactionId || purchase?.id || ''),
+        transactionId,
         affiliateAttribution,
       }
     } else {
@@ -400,10 +410,7 @@ export async function runNativePurchase(opts: {
       throw new Error(verifyData?.message || verifyData?.error || 'Purchase verification failed.')
     }
 
-    await IAP.finishTransaction({
-      purchase,
-      isConsumable: opts.kind === 'topup',
-    } as any).catch(() => {})
+    await finishVerifiedPurchase(purchase, opts.kind)
 
     return {
       message: String(verifyData?.message || 'Purchase completed.'),
@@ -423,7 +430,7 @@ export async function restoreNativePurchases(opts: {
   const headers = buildAuthHeaders(opts.token)
 
   return withNativeStoreConnection(async () => {
-    const purchases = (await IAP.getAvailablePurchases().catch(() => [])) as any[]
+    const purchases = (await IAP.getAvailablePurchases()) as any[]
     if (!Array.isArray(purchases) || purchases.length === 0) {
       return { message: 'No previous purchases were found on this device/account.' }
     }
@@ -447,6 +454,7 @@ export async function restoreNativePurchases(opts: {
     }
 
     let restoredCount = 0
+    let restoreFailure = ''
     const attempted = new Set<string>()
 
     for (const purchase of purchases) {
@@ -454,41 +462,52 @@ export async function restoreNativePurchases(opts: {
       const product = productByStoreId.get(storeId)
       if (!product) continue
 
-      const attemptKey = `${product.code}:${String(purchase?.transactionId || purchase?.purchaseToken || '')}`
+      const transactionId = String(purchase?.transactionId || '').trim() || String(purchase?.id || '').trim()
+      const purchaseToken = String(purchase?.purchaseToken || '').trim()
+      const attemptKey = `${product.code}:${platform === 'ios' ? transactionId : purchaseToken}`
       if (attempted.has(attemptKey)) continue
       attempted.add(attemptKey)
 
-      let body: any = {
-        platform,
-        code: product.code,
-        transactionId: String(purchase?.transactionId || purchase?.id || ''),
-      }
-      if (platform === 'ios') {
-        if (!receiptData) continue
-        body = {
-          ...body,
-          receiptData,
+      try {
+        let body: any = {
+          platform,
+          code: product.code,
+          transactionId,
         }
-      } else {
-        const purchaseToken = String(purchase?.purchaseToken || '')
-        if (!purchaseToken) continue
-        body = {
-          ...body,
-          purchaseToken,
+        if (platform === 'ios') {
+          if (!receiptData && !transactionId) throw new Error('Could not read Apple receipt or transaction ID. Please try Restore purchases again.')
+          body = {
+            ...body,
+            receiptData,
+          }
+        } else {
+          if (!purchaseToken) throw new Error('Google purchase token was missing. Please try Restore purchases again.')
+          body = {
+            ...body,
+            purchaseToken,
+          }
         }
-      }
 
-      const verifyRes = await fetch(`${API_BASE_URL}/api/native-billing/verify-purchase`, {
-        method: 'POST',
-        headers,
-        body: JSON.stringify(body),
-      })
-      const verifyData: any = await parseJsonSafe(verifyRes)
-      if (verifyRes.ok && verifyData?.ok) {
+        const verifyRes = await fetch(`${API_BASE_URL}/api/native-billing/verify-purchase`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify(body),
+        })
+        const verifyData: any = await parseJsonSafe(verifyRes)
+        if (!verifyRes.ok || !verifyData?.ok) {
+          throw new Error(verifyData?.message || verifyData?.error || 'Purchase verification failed. Please try Restore purchases again.')
+        }
+        await finishVerifiedPurchase(purchase, product.kind)
         restoredCount += 1
+      } catch (error: any) {
+        restoreFailure ||= error?.message || 'Purchase restore could not finish. Please try Restore purchases again.'
       }
     }
 
+    if (restoreFailure) {
+      const completed = restoredCount > 0 ? `${restoredCount} ${restoredCount === 1 ? 'purchase restored' : 'purchases restored'}. ` : ''
+      throw new Error(`${completed}Some purchases could not be restored. ${restoreFailure}`)
+    }
     if (restoredCount === 0) {
       return { message: 'No matching Helfi purchases were restored.' }
     }
