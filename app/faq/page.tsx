@@ -14,7 +14,7 @@ export default function FAQPage() {
       questions: [
         {
           q: "How do I get started with Helfi?",
-          a: "Simply sign up for an account and complete our comprehensive onboarding process. We'll guide you through setting up your health profile, including your physical metrics, health goals, medications, and supplements. This helps our AI provide personalized recommendations from day one."
+          a: "Create an account and complete Health Setup with your health goals and the details you choose to share. You can use ordinary tracking without AI. AI features require your separate data-sharing permission."
         },
         {
           q: "What information do I need to provide during onboarding?",
@@ -22,7 +22,7 @@ export default function FAQPage() {
         },
         {
           q: "How long does it take to see results?",
-          a: "You'll start seeing personalized insights immediately after completing your profile. More detailed patterns and recommendations develop as you track your food and health metrics over 1-2 weeks."
+          a: "You can start tracking straight away. Reports depend on what you log and your report settings. Weekly reports follow the seven-day schedule shown in Insights."
         }
       ]
     },
@@ -43,28 +43,28 @@ export default function FAQPage() {
         },
         {
           q: "What if the AI gets something wrong?",
-          a: "You can always edit or correct the food notes. Premium users get extra food-photo credits for another estimate when needed."
+          a: "Review and correct food notes before saving them. Another AI estimate may use credits; check the cost shown in the app."
         }
       ]
     },
     {
-      category: "Premium Features & Billing",
+      category: "Plans & Billing",
       questions: [
         {
-          q: "What's included in the Premium plan?",
-          a: "Premium includes 30 daily AI food-photo notes, 30 retry credits per day, 30 health image notes requests per day, advanced insights, priority support, and export capabilities. It's $20/month."
+          q: "How do Helfi subscriptions work?",
+          a: "Choose a monthly credit plan in Billing, which shows the current price, currency, and credit allowance. Subscription credits refresh monthly and do not roll over."
         },
         {
-          q: "What happens if I exceed my daily limits?",
-          a: "You can purchase additional credits: $5 for 100 credits or $10 for 150 credits. Credits don't expire and can be used for supported AI note features."
+          q: "What happens if I run out of credits?",
+          a: "You can buy the credit packs shown in Billing. Top-up credits are valid for 12 months. Check the credit cost shown for an AI action before using it."
         },
         {
           q: "Can I cancel my subscription anytime?",
-          a: "Yes, you can cancel anytime from your billing settings. You'll continue to have Premium access until the end of your billing period."
+          a: "Manage or cancel your subscription through the provider where you bought it: Apple App Store, Google Play, or Helfi web Billing. Cancellation stops future renewals; your current subscription continues until its expiry."
         },
         {
-          q: "Is there a free trial?",
-          a: "No, we no longer offer free trials. However, you can try each AI feature once for free. After that, you'll need a subscription or credits to continue using AI features. Non-AI features remain free for all users."
+          q: "Can I try AI features for free?",
+          a: "Some AI features include a limited free allowance. The allowance varies by feature and is shown in the app. After it is used, AI actions require available credits. Ordinary non-AI tracking remains available without an AI subscription."
         }
       ]
     },
@@ -73,15 +73,15 @@ export default function FAQPage() {
       questions: [
         {
           q: "How is my health data protected?",
-          a: "We use enterprise-grade encryption, secure cloud storage, and strict access controls. Your data is never sold or shared with third parties. We comply with healthcare privacy standards."
+          a: "Helfi uses account controls and encryption to protect data. Service providers help store and process it. With your separate AI permission, selected data is sent to OpenAI for AI features. See the Privacy Policy for details."
         },
         {
           q: "Can I delete my data?",
-          a: "Yes, you can delete your account and all associated data at any time from your account settings. We provide data export options before deletion."
+          a: "You can delete your account in Account Settings. The Privacy Policy explains deletion and required audit-log retention. Use the available export option first, or contact support@helfi.ai for help with a data copy."
         },
         {
           q: "Where is my data stored?",
-          a: "Your data is stored securely in the cloud with automatic backups and redundancy to ensure it's never lost while maintaining the highest security standards."
+          a: "Helfi stores data with the service providers described in the Privacy Policy. That policy explains how data is used, retained, and deleted."
         }
       ]
     },
@@ -90,19 +90,19 @@ export default function FAQPage() {
       questions: [
         {
           q: "What devices does Helfi work on?",
-          a: "Helfi works on any device with a web browser - smartphones, tablets, laptops, and desktops. We're optimized for mobile use with responsive design."
+          a: "You can use Helfi in a supported web browser on phones, tablets, and computers. Native phone apps are also supported. Features and app availability depend on your device and the current release."
         },
         {
           q: "Do I need to download an app?",
-          a: "No, Helfi is a web application that works in your browser. You can add it to your home screen for an app-like experience."
+          a: "You can use Helfi in your browser without downloading an app. You can also add the website to your home screen. Native apps provide phone-specific features where available."
         },
         {
           q: "What if I'm having technical issues?",
-          a: "Contact our support team through the support form, and we'll help resolve any issues quickly. Premium users get priority support."
+          a: "Contact our support team through the support form. Include your device, the page you were using, and what went wrong so the team can investigate."
         },
         {
           q: "Can I use Helfi offline?",
-          a: "Some features work offline, but AI analysis and syncing require an internet connection. We're working on enhanced offline capabilities."
+          a: "AI processing and account syncing need an internet connection. If a request fails while you are offline, reconnect and check the app before trying again."
         }
       ]
     }
@@ -141,7 +141,7 @@ export default function FAQPage() {
           <div className="text-center mb-8">
             <h2 className="text-2xl font-bold text-gray-900 mb-2">How can we help you today?</h2>
             <p className="text-gray-600">
-              Browse the most common Helfi questions below. Need account help? <Link href="/support" className="text-helfi-green hover:text-helfi-green/80 font-medium">Contact our support team</Link>
+              Browse the most common Helfi questions below. <Link href="/billing" className="text-helfi-green hover:text-helfi-green/80 font-medium">View current plans and credits</Link>. Need account help? <Link href="/support" className="text-helfi-green hover:text-helfi-green/80 font-medium">Contact our support team</Link>
             </p>
           </div>
 
