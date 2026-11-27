@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import Stripe from 'stripe'
 import { prisma } from '@/lib/prisma'
+import { purchasedCredits, grantStripeCreditPurchase } from '@/lib/stripe-credit-purchase'
 import { Resend, isEmailConfigured } from '@/lib/email-client'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { getEmailFooter } from '@/lib/email-footer'
@@ -38,15 +39,11 @@ function isStripeSubscriptionActive(subscription: Stripe.Subscription): boolean 
 }
 
 async function findCheckoutSessionForPaymentIntent(paymentIntentId: string): Promise<Stripe.Checkout.Session | null> {
-  try {
-    const sessions = await stripe.checkout.sessions.list({
-      payment_intent: paymentIntentId,
-      limit: 1,
-    })
-    return sessions.data[0] ?? null
-  } catch {
-    return null
-  }
+  const sessions = await stripe.checkout.sessions.list({
+    payment_intent: paymentIntentId,
+    limit: 1,
+  })
+  return sessions.data[0] ?? null
 }
 
 function addDays(date: Date, days: number): Date {
@@ -601,8 +598,25 @@ export async function POST(request: NextRequest) {
 
         break
       }
+      case 'checkout.session.async_payment_succeeded':
       case 'checkout.session.completed': {
         const session = event.data.object as Stripe.Checkout.Session
+
+        if (session.mode === 'payment') {
+          const checkout = await stripe.checkout.sessions.retrieve(session.id, { expand: ['line_items', 'payment_intent'] })
+          if (checkout.mode === 'payment' && purchasedCredits(checkout)) {
+            if (checkout.status !== 'complete' || checkout.payment_status !== 'paid') throw new Error('Credit payment not confirmed')
+            const metadata = checkout.metadata || {}
+            const userId = String(metadata.helfi_user_id || '').trim()
+            const email = String(metadata.helfi_user_email || checkout.customer_details?.email || checkout.customer_email || '').toLowerCase().trim()
+            const user = userId
+              ? await prisma.user.findUnique({ where: { id: userId }, select: { id: true } })
+              : email ? await prisma.user.findUnique({ where: { email }, select: { id: true } }) : null
+            if (!user) throw new Error('Credit purchase account not found')
+            const granted = await grantStripeCreditPurchase(stripe, checkout, user.id)
+            if (granted === 'payment_unavailable') throw new Error('Credit payment could not be verified')
+          }
+        }
         
         // Only handle credit purchases (one-time payments), not subscriptions
         if (session.mode === 'payment' && session.payment_status === 'paid') {
@@ -838,7 +852,10 @@ export async function POST(request: NextRequest) {
       }
       case 'charge.refunded':
       case 'charge.dispute.created': {
-        const charge = event.data.object as Stripe.Charge
+        const dispute = event.type === 'charge.dispute.created' ? event.data.object as Stripe.Dispute : null
+        const charge = dispute
+          ? typeof dispute.charge === 'string' ? await stripe.charges.retrieve(dispute.charge) : dispute.charge
+          : event.data.object as Stripe.Charge
         const conversion = await prisma.affiliateConversion.findFirst({
           where: { stripeChargeId: charge.id },
           select: { id: true, commission: { select: { id: true, status: true, payableAt: true } } },
@@ -899,16 +916,17 @@ export async function POST(request: NextRequest) {
           const session = await findCheckoutSessionForPaymentIntent(paymentIntentId)
           if (session?.id) {
             const source = `stripe:${session.id}`
-            const topUps = await prisma.creditTopUp.findMany({ where: { source } })
-            if (topUps.length) {
+            await prisma.$transaction(async tx => {
+              await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${source}))`
+              const topUps = await tx.creditTopUp.findMany({ where: { source } })
               for (const topUp of topUps) {
                 const nextUsed = Math.max(topUp.usedCents, topUp.amountCents)
-                await prisma.creditTopUp.update({
+                await tx.creditTopUp.update({
                   where: { id: topUp.id },
                   data: { usedCents: nextUsed },
                 })
               }
-            }
+            })
           }
         }
         break
