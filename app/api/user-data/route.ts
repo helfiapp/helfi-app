@@ -1548,11 +1548,6 @@ export async function POST(request: NextRequest) {
 
     const normalizedBirthdate =
       typeof data.birthdate === 'string' ? data.birthdate.trim() : ''
-    const effectiveBirthdate =
-      normalizedBirthdate ||
-      (existingProfileInfoData && typeof existingProfileInfoData.dateOfBirth === 'string'
-        ? existingProfileInfoData.dateOfBirth
-        : '')
     const birthdateChanged = Boolean(
       normalizedBirthdate &&
         normalizedBirthdate !== (existingProfileInfoData?.dateOfBirth || '')
@@ -2689,90 +2684,47 @@ export async function POST(request: NextRequest) {
       console.error('Error storing food library data:', error)
     }
 
-    // 8. Handle profileInfo data from profile page - store as special health goal
+    // 8. Merge profile fields under the user's row lock so concurrent saves preserve other fields.
     try {
-      const incomingProfileInfo =
-        data.profileInfo && typeof data.profileInfo === 'object'
-          ? data.profileInfo
-          : null
-
-      let shouldUpdateProfileInfo = false
-      let profileInfoPayload: Record<string, any> | null = null
-
-      if (incomingProfileInfo) {
-        shouldUpdateProfileInfo = true
-        profileInfoPayload = {
-          ...(existingProfileInfoData || {}),
-          ...incomingProfileInfo,
+      const incomingProfileInfo = data.profileInfo && typeof data.profileInfo === 'object' && !Array.isArray(data.profileInfo)
+        ? data.profileInfo : null
+      if (data.accountNameOwnerId !== undefined) {
+        if (data.accountNameOwnerId !== user.id) {
+          return NextResponse.json({ error: 'Your account changed. Please reload before saving.' }, { status: 409 })
+        }
+        if (!incomingProfileInfo || typeof incomingProfileInfo.firstName !== 'string' ||
+            typeof incomingProfileInfo.lastName !== 'string' || !incomingProfileInfo.firstName.trim()) {
+          return NextResponse.json({ error: 'Please enter your name.' }, { status: 400 })
         }
       }
-
-      if (normalizedBirthdate) {
-        if (!profileInfoPayload) {
-          profileInfoPayload = { ...(existingProfileInfoData || {}) }
-        }
-        if (profileInfoPayload.dateOfBirth !== normalizedBirthdate) {
-          profileInfoPayload.dateOfBirth = normalizedBirthdate
-          shouldUpdateProfileInfo = true
-        }
-      }
-
-      if (effectiveBirthdate && profileInfoPayload && !profileInfoPayload.dateOfBirth) {
-        profileInfoPayload.dateOfBirth = effectiveBirthdate
-        shouldUpdateProfileInfo = true
-      }
-
-      if (shouldUpdateProfileInfo && profileInfoPayload) {
-        console.log('POST /api/user-data - Handling profileInfo data:', profileInfoPayload)
-        if (effectiveBirthdate) {
-          profileInfoPayload.dateOfBirth = effectiveBirthdate
-        } else if (!profileInfoPayload.dateOfBirth && existingProfileInfoData?.dateOfBirth) {
-          profileInfoPayload.dateOfBirth = existingProfileInfoData.dateOfBirth
-        }
-        
-        // Update basic User fields if available in profileInfo
-        const profileUpdateData: any = {}
-        const firstName = profileInfoPayload.firstName || ''
-        const lastName = profileInfoPayload.lastName || ''
-        
-        // Handle name concatenation
-        if (firstName || lastName) {
-          profileUpdateData.name = `${firstName} ${lastName}`.trim()
-        }
-        
-        // Profile gender is a display preference. The separate metabolic gender
-        // changes only through the explicit top-level Health Setup field.
-        
-        // Update User model with basic profile data
-        if (Object.keys(profileUpdateData).length > 0) {
-          await prisma.user.update({
-            where: { id: user.id },
-            data: profileUpdateData
+      if (incomingProfileInfo || normalizedBirthdate) {
+        await prisma.$transaction(async (tx) => {
+          await tx.$queryRaw`SELECT id FROM "User" WHERE id = ${user.id} FOR UPDATE`
+          const latest = await tx.healthGoal.findFirst({
+            where: { userId: user.id, name: '__PROFILE_INFO_DATA__' },
+            orderBy: { updatedAt: 'desc' },
           })
-          console.log('Updated user profile basic data:', profileUpdateData)
-        }
-        
-        // Store full profileInfo as special health goal for additional fields like bio, dateOfBirth
-        await prisma.healthGoal.deleteMany({
-          where: {
-            userId: user.id,
-            name: '__PROFILE_INFO_DATA__'
+          const previous = latest?.category ? JSON.parse(latest.category) : {}
+          const profileInfoPayload = { ...previous, ...(incomingProfileInfo || {}) }
+          if (normalizedBirthdate) profileInfoPayload.dateOfBirth = normalizedBirthdate
+          else if (!profileInfoPayload.dateOfBirth && previous.dateOfBirth) profileInfoPayload.dateOfBirth = previous.dateOfBirth
+          if (incomingProfileInfo && ('firstName' in incomingProfileInfo || 'lastName' in incomingProfileInfo)) {
+            if (typeof profileInfoPayload.firstName !== 'string' ||
+                (profileInfoPayload.lastName !== undefined && typeof profileInfoPayload.lastName !== 'string')) {
+              throw new Error('Invalid profile name')
+            }
+            const name = `${profileInfoPayload.firstName} ${profileInfoPayload.lastName || ''}`.trim()
+            await tx.user.update({ where: { id: user.id }, data: { name } })
           }
+          await tx.healthGoal.deleteMany({ where: { userId: user.id, name: '__PROFILE_INFO_DATA__' } })
+          await tx.healthGoal.create({ data: {
+            userId: user.id, name: '__PROFILE_INFO_DATA__', category: JSON.stringify(profileInfoPayload), currentRating: 0,
+          } })
         })
-        
-        await prisma.healthGoal.create({
-          data: {
-            userId: user.id,
-            name: '__PROFILE_INFO_DATA__',
-            category: JSON.stringify(profileInfoPayload),
-            currentRating: 0,
-          }
-        })
-        console.log('Stored profile info data successfully')
       }
     } catch (error) {
       console.error('Error storing profile info data:', error)
-      // Continue with other updates
+      return NextResponse.json({ error: 'Your profile could not be saved. Please try again.' }, { status: 500 })
     }
 
     console.log('✅ POST /api/user-data - All updates completed successfully')
