@@ -99,7 +99,7 @@ async function main(){
   await check('actual provider adapter deadline emits only fixed timeout metadata and retains its unknown reserve without retry',async()=>{
     const f=fixture({defaultProvider:true}),previousFetch=globalThis.fetch,previousTimer=globalThis.setTimeout
     let calls=0
-    globalThis.setTimeout=(callback,ms,...args)=>ms===30000?previousTimer(callback,0,...args):previousTimer(callback,ms,...args)
+    globalThis.setTimeout=(callback,ms,...args)=>ms===30000?queueMicrotask(()=>callback(...args)):previousTimer(callback,ms,...args)
     globalThis.fetch=async(_url,request)=>{calls++;return new Promise((resolve,reject)=>request.signal.addEventListener('abort',()=>{f.advance(30000);reject(Object.assign(Error(privateText),{name:'AbortError'}))},{once:true}))}
     try{await f.worker.monitor(f.job)}finally{globalThis.fetch=previousFetch;globalThis.setTimeout=previousTimer}
     assert.equal(calls,1);assertFailure(f,'provider_request','request_timeout',false,false,true);assert(f.logs[0].elapsedMs>=30000);assert.equal(f.callbacks.filter(row=>row.command==='settle').length,0);assert.equal(f.completion().backendResponseIds.length,0)
