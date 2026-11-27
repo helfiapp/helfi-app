@@ -1,3 +1,9 @@
+## PDF export repair — exact latest candidate, 27 November 2026
+
+Latest approved export handler, Settings caller, licensed font assets and focused check are integrated with all existing account/IAP/food/support gates intact. The standard export previously failed for non-Latin names and the date-range arrow. Existing layout/data are retained; supported accented Latin, Greek, Cyrillic and Chinese/Japanese/Korean text renders with licensed bundled fonts, safe wrapping and clear unsupported-text guidance without changing saved data. Settings preserves the actual error message. No native, authentication, provider, schema or voice-funding change.
+
+Actual-source PDF/font/Settings fixtures, fresh Poppler visual pages, root types0,306/107page locks and full production build exit0/1242PASS verified. Both exact font hashes appear in the actual PDF route NFT; packaged server font inclusion is checked. Normal deployed export remains required. This is the root latest11-file packaging candidate, not the older proposal. Native purchase PR11/AWS166 is a separate exact release being verified first.
+
 DEPLOYED:
 - LIVE or STAGING: LIVE
 - Date/time: 27 November 2026, 7:35PM Melbourne

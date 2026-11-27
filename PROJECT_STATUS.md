@@ -1,3 +1,9 @@
+## PDF export repair — exact latest candidate, 27 November 2026
+
+Latest approved export handler, Settings caller, licensed font assets and focused check are integrated with all existing account/IAP/food/support gates intact. The standard export previously failed for non-Latin names and the date-range arrow. Existing layout/data are retained; supported accented Latin, Greek, Cyrillic and Chinese/Japanese/Korean text renders with licensed bundled fonts, safe wrapping and clear unsupported-text guidance without changing saved data. Settings preserves the actual error message. No native, authentication, provider, schema or voice-funding change.
+
+Actual-source PDF/font/Settings fixtures, fresh Poppler visual pages, root types0,306/107page locks and full production build exit0/1242PASS verified. Both exact font hashes appear in the actual PDF route NFT; packaged server font inclusion is checked. Normal deployed export remains required. This is the root latest11-file packaging candidate, not the older proposal. Native purchase PR11/AWS166 is a separate exact release being verified first.
+
 ## Account persistence and refresh correction deployed — 27 November 2026
 
 PR9/a2cb4443/AWS164 and PR10/2cdaa508/AWS165 allstepsSUCCEED; both domains200CloudFront with new matching identity. Actual bounded web opening2session200responses/29seconds and one save1POST200+1GET200+3session200responses/15seconds verify the loop is gone. Web name reached native; native name reached web in prior roundtrip; original name restored and reopened on both. Both signed in727; Food123/2161/2284 unchanged. Native account/purchase simulator64 remains unsigned; no new store upload or paid/provider feature. Existing one save refresh can reset the local webSaved banner, no persistence claim for that feedback. All40held sign-in working files remain preserved outside releases.

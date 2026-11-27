@@ -1,3 +1,7 @@
+## Health-summary PDF text and packaging — 27 November2026
+
+Keep original supported text, paragraph breaks and visual word wrapping in health-summary PDFs. Use the checked, licensed bundled fonts; never delete unsupported characters from names or notes. Unsupported text returns a truthful error with support guidance, not an export option the app does not offer. Saved data must remain unchanged. `check:pdf-export` executes the real export and Settings error/success paths with synthetic data and validates original text extraction, margins and font hashes; it is required by prebuild. Both font files must appear in the route's runtime file trace. A local build or trace alone is not proof of the deployed PDF route.
+
 Stable account scope:2cdaa508e19d06874f4b0814e460478838d1b04c/AWS165,27November2026. Bounded real load/save and cross-device restoration passed; no sign-in rule change.
 
 ## Native store completion follows verified purchase — 27 November 2026
