@@ -17,6 +17,8 @@ import { randomUUID } from 'crypto'
 
 type StorageProviderName = 'aws-s3' | 'vercel-blob' | 'none'
 
+type ObjectStorageRequestOptions = { abortSignal?: AbortSignal }
+
 type PutOptions = {
   access: 'public'
   contentType?: string
@@ -128,23 +130,47 @@ export async function put(pathname: string, body: any, options: PutOptions) {
   }
 }
 
-export async function head(pathnameOrUrl: string) {
+// SDK retry waits can outlive cancellation; HTTP still receives the same real signal.
+function abortableStorageRequest<T>(signal: AbortSignal | undefined, request: () => Promise<T>): Promise<T> {
+  if (!signal) return request()
+  signal.throwIfAborted()
+  return new Promise<T>((resolve, reject) => {
+    const cleanup = () => signal.removeEventListener('abort', onAbort)
+    const onAbort = () => { cleanup(); reject(signal.reason) }
+    signal.addEventListener('abort', onAbort, { once: true })
+    try {
+      request().then(
+        (value) => { cleanup(); resolve(value) },
+        (error) => { cleanup(); reject(error) },
+      )
+    } catch (error) {
+      cleanup()
+      reject(error)
+    }
+  })
+}
+
+export async function head(pathnameOrUrl: string, options: ObjectStorageRequestOptions = {}) {
+  options.abortSignal?.throwIfAborted()
   const provider = getObjectStorageProviderName()
-  if (provider === 'vercel-blob') return vercelHead(pathnameOrUrl)
+  if (provider === 'vercel-blob') return abortableStorageRequest(options.abortSignal, () => vercelHead(pathnameOrUrl, options))
   if (provider !== 'aws-s3') throw new Error('Object storage is not configured.')
 
   const pathname = normalizeS3Path(pathnameOrUrl)
-  const result = await s3Client().send(new HeadObjectCommand({
+  const client = options.abortSignal ? new S3Client({ region: awsRegion(), maxAttempts: 1 }) : s3Client()
+  const result = await abortableStorageRequest(options.abortSignal, () => client.send(new HeadObjectCommand({
     Bucket: awsBucket(),
     Key: pathname,
-  }))
+  }), { abortSignal: options.abortSignal }))
+  options.abortSignal?.throwIfAborted()
   const url = isPublicPath(pathname)
     ? publicS3Url(pathname)
-    : await getSignedUrl(
-        s3Client(),
+    : await abortableStorageRequest(options.abortSignal, () => getSignedUrl(
+        client,
         new GetObjectCommand({ Bucket: awsBucket(), Key: pathname }),
         { expiresIn: 300 },
-      )
+      ))
+  options.abortSignal?.throwIfAborted()
 
   return {
     url,
@@ -158,21 +184,25 @@ export async function head(pathnameOrUrl: string) {
   }
 }
 
-export async function del(pathnameOrUrls: string | string[]) {
+export async function del(pathnameOrUrls: string | string[], options: ObjectStorageRequestOptions = {}) {
+  options.abortSignal?.throwIfAborted()
   const provider = getObjectStorageProviderName()
-  if (provider === 'vercel-blob') return vercelDel(pathnameOrUrls)
+  if (provider === 'vercel-blob') return abortableStorageRequest(options.abortSignal, () => vercelDel(pathnameOrUrls, options))
   if (provider !== 'aws-s3') throw new Error('Object storage is not configured.')
 
   const values = Array.isArray(pathnameOrUrls) ? pathnameOrUrls : [pathnameOrUrls]
   const keys = Array.from(new Set(values.map(normalizeS3Path).filter(Boolean)))
   if (keys.length === 0) return
+  const client = options.abortSignal ? new S3Client({ region: awsRegion(), maxAttempts: 1 }) : s3Client()
 
   for (let index = 0; index < keys.length; index += 1000) {
+    options.abortSignal?.throwIfAborted()
     const batch = keys.slice(index, index + 1000)
-    const result = await s3Client().send(new DeleteObjectsCommand({
+    const result = await abortableStorageRequest(options.abortSignal, () => client.send(new DeleteObjectsCommand({
       Bucket: awsBucket(),
       Delete: { Objects: batch.map((Key) => ({ Key })), Quiet: true },
-    }))
+    }), { abortSignal: options.abortSignal }))
+    options.abortSignal?.throwIfAborted()
     if (result.Errors?.length) throw new Error('Object storage could not delete every requested file.')
   }
 }

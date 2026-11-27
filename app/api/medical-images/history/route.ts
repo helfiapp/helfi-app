@@ -226,12 +226,9 @@ export async function DELETE(request: NextRequest) {
       .map((item) => item.imageFile?.cloudinaryId || item.imageFile?.secureUrl)
       .filter((value): value is string => typeof value === 'string' && value.length > 0)
 
-    if (isObjectStorageConfigured() && blobTargets.length > 0) {
-      try {
-        await del(blobTargets)
-      } catch (deleteError) {
-        console.warn('Failed to delete health image note files:', deleteError)
-      }
+    if (blobTargets.length > 0) {
+      if (!isObjectStorageConfigured()) throw new Error('Image storage is not configured')
+      await del(blobTargets)
     }
 
     const fileIds = analyses
@@ -239,7 +236,7 @@ export async function DELETE(request: NextRequest) {
       .filter((value): value is string => typeof value === 'string' && value.length > 0)
 
     const deletedCount = await prisma.$transaction([
-      prisma.medicalImageAnalysis.deleteMany({ where: { userId: user.id } }),
+      prisma.medicalImageAnalysis.deleteMany({ where: { userId: user.id, id: { in: analyses.map((item) => item.id) } } }),
       fileIds.length > 0
         ? prisma.file.deleteMany({ where: { id: { in: fileIds } } })
         : prisma.file.deleteMany({ where: { id: { in: [] } } }),
@@ -255,7 +252,6 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json(
       {
         error: 'Failed to delete health image notes history',
-        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )

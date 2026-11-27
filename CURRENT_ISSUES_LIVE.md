@@ -1,3 +1,18 @@
+DEPLOYED:
+- LIVE or STAGING: LIVE — https://helfi.ai and https://www.helfi.ai
+- Date/time: 27 November2026,21:38Melbourne
+- What changed: Paid Stripe credit packs now share once-only delivery across browser confirmation and payment events, including delayed success; refunded/disputed purchases are checked and transient failures remain retryable. PR15/1beb7c0e; AWS170 BUILD/DEPLOY/VERIFY succeeded.
+- Where to see it (page/link): https://helfi.ai/billing
+- What to quickly test: Billing plans/topups load; existing test account727credits and Food123/2161/2284 remain unchanged.13actual-source synthetic groups and full1269PASS build passed. No actual payment/refund or live Stripe event-subscription verification claim; saved-login account identity remains pending.
+
+## Health cleanup final candidate —27November2026
+
+Preparing the separately scoped medical-image/Mood cleanup repair with concurrent attachment protection and abort-aware storage. No real file deletion, provider/database test or sign-in change. Exact deployment and normal read-only page checks remain required. Payment170 is already verified on both domains.
+
+## Health-file cleanup candidate —27November2026
+
+Preparing one separate ordinary audit repair: Medical-image and Mood removal must not discard references or claim success when storage refuses cleanup. Concurrent bulk deletion preserves newly arriving uploads. Failure/retry coverage uses synthetic storage/database fixtures only; no real files removed. Deployment/live verification still required.
+
 STRIPE DELIVERY CANDIDATE —27November2026:
 Paid-credit fulfillment now has one shared per-checkout path for redirects and payment notices, including delayed success; provider/refund failures remain retryable and promotions retain the purchased pack.13synthetic actual-handler groups pass. No live payment/refund/grant or deployment is claimed; ReportAWS169 verifies first.
 

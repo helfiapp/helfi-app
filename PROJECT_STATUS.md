@@ -1,3 +1,19 @@
+## Health-file cleanup reviewed release candidate —27November2026
+
+Exact3health routes, shared storage optional cancellation, new health check, existing connected Mood voice fixture setup, package gate and3notes only.18actual-source health groups,14Report groups, unchanged voice record assertions, root types0,306/107locks and full production build exit0/1288PASS verified. One old actual-Mood VM fixture needed standard abort/timer globals and callback transaction support; assertions/skip-write behavior are unchanged and independently reviewed. No real storage/database/file deletion or provider/financial call. Exact deployment and normal read-only pages remain required. All held sign-in candidates are excluded.
+
+## Health cleanup concurrency candidate —27November2026
+
+Independent review extended the exact ordinary cleanup task to prevent stale concurrent Mood editors restoring deleted attachments or deletion forgetting an arriving media reference. Same-row lock, existing metadata lookup for introduced owned paths, bounded real provider cancellation and pre-write checks preserve legacy clients without a schema/UI change. All18health and14Report actual-source fixtures pass privately; primary actual-main checks and fresh full build follow. Prior1279PASS v2 build is historical, not the final candidate. PaymentPR15/AWS170 is verified live independently.
+
+## Payment delivery source deployed —27November2026
+
+PR15 merged1beb7c0ef91e825e2e5b3a97025268e1c762c9fd; published tree2cae0d5c7ef67651f0226bb0006dfd3e3479dc65 equals tested61e509b2. AWS170 allstepsSUCCEED, both domains200CloudFront/newmatchingETagdbji1f87v61yri, bodySHAb7fd89dfc5d2dbc1c329f9742bd7d35c3d5be4f300cb313d150c9804b80bb2bd. NormalBilling loads4monthlyplans/3topups; Food727credits/123used/2161remaining/2284allowance. No real payment/refund or live event-subscription claim; owner savedStripeaccountchoice remains pending. HEL343InProgress/Readyremoved. Healthcleanupv2 historical1279PASS build is not a release: independent review found Mood same-entry concurrency; private v3 in progress, main isolation retained.
+
+## Health-file cleanup — scoped candidate,27November2026
+
+Three existing Medical-image/Mood routes now await storage cleanup before changing references and preserve retryable failures. Bulk image deletion is limited to its captured selection, preserving concurrent uploads. Exact three routes, one focused check, package gate and required notes; no UI, dependency, schema or sign-in change. Nine actual-source synthetic groups pass; root types, locks and production build follow. No real file deletion or provider call. Payment PR15/AWS170 is the separate preceding release still being verified.
+
 ## Stripe credit delivery candidate —27November2026
 
 Root isolated only confirm/create-checkout/webhook, shared grant helper, focused test and package/three notes from actualReportmergec0c56537. Accepted final candidate plus one delayed-success event case passes13actual-source synthetic groups; no duplicate credits across confirm/webhook/retry/refund orderings. Promo discounts preserve purchased package quantity. Protected notifications/account lookup remain unchanged except already-approved verified creditAmount field. No real payment/refund/email/DB/funding action. ReportAWS169 remains the only deployment in progress; next publish waits for its verification. Stripe saved account identity question pending; no unrelated saved account was signed in. Advanced sign-in candidates remain privately preserved and excluded.

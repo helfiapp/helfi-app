@@ -27,7 +27,7 @@ function loadRoute(relative, fixtures) {
   const source = fs.readFileSync(path.join(root, relative), 'utf8')
   const ast = ts.createSourceFile(relative, source, ts.ScriptTarget.Latest, true)
   const stripped = ast.statements.filter((item) => !ts.isImportDeclaration(item)).map((item) => printer.printNode(ts.EmitHint.Unspecified, item, ast)).join('\n').replace(/^export\s+/gm, '')
-  const context = vm.createContext({ URL, Date, resizeNativeVoiceDrinkLabel: ctx.resizeNativeVoiceDrinkLabel, console: { log() {}, warn() {}, error() {} }, ...fixtures })
+  const context = vm.createContext({ URL, Date, AbortController, setTimeout, clearTimeout, resizeNativeVoiceDrinkLabel: ctx.resizeNativeVoiceDrinkLabel, console: { log() {}, warn() {}, error() {} }, ...fixtures })
   vm.runInContext(ts.transpileModule(stripped, { compilerOptions: { target: ts.ScriptTarget.ES2020, module: ts.ModuleKind.CommonJS } }).outputText, context)
   return context
 }
@@ -198,6 +198,7 @@ async function run() {
           return 1
         },
       }
+      db.$transaction = async (run) => run(db)
       const shared = { prisma: db, ensureMoodTables: async () => {}, authOptions: {}, getServerSession: async () => ({ user: { email: 'synthetic@example.invalid' } }), getUserIdFromNativeAuth: async () => user, NextResponse: { json: (body, options) => new Response(JSON.stringify(body), { status: options?.status || 200 }) }, extractScopedBlobPath: () => null, mapToSignedBlobUrl: () => null, isObjectStorageConfigured: () => false }
       const normalGet = loadRoute('app/api/mood/journal/entries/route.ts', shared), normalMutation = loadRoute('app/api/mood/journal/entries/[id]/route.ts', shared)
       const io = async (_original, call) => {
