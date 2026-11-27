@@ -11293,14 +11293,23 @@ const applyStructuredItems = (
   }
 
   const measurementItemForStorage = (item: any) => {
-    if (typeof item?.__measurementCountry !== 'string') return item
+    const hasCountry = typeof item?.__measurementCountry === 'string'
     const stored = { ...item }
     delete stored.__measurementCountry
     const unit = normalizeWeightUnit(item?.weightUnit)
-    if (!['tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup'].includes(unit)) return stored
-    const physical = itemMeasurementPhysicalAmount(item, Number(item.weightAmount), unit, getItemMeasurementCountry(item))
-    if (!physical) return item
-    return { ...stored, weightUnit: physical.unit, weightAmount: physical.amount, __unit: physical.unit, __amount: physical.amount }
+    if (['tsp', 'tbsp', 'quarter-cup', 'half-cup', 'three-quarter-cup', 'cup'].includes(unit)) {
+      if (!hasCountry) return item
+      const physical = itemMeasurementPhysicalAmount(item, Number(item.weightAmount), unit, getItemMeasurementCountry(item))
+      if (!physical) return item
+      stored.weightUnit = physical.unit
+      stored.weightAmount = physical.amount
+    } else if (item?.portionMode !== 'weight' || !['g', 'ml', 'oz', 'fl oz', 'serving'].includes(item?.weightUnit)) {
+      return hasCountry ? stored : item
+    }
+    const amount = optionalNutrient(stored.weightAmount)
+    if (amount == null || amount <= 0) return hasCountry ? stored : item
+    // Mobile reads the older aliases first; persist the committed measurement together.
+    return { ...stored, weightAmount: amount, amount, amountUnit: stored.weightUnit, __amount: amount, __unit: stored.weightUnit }
   }
 
   // Estimate grams per serving when no explicit weight/volume is available.
