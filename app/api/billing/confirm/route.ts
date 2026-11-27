@@ -5,6 +5,7 @@ import { prisma } from '@/lib/prisma'
 import Stripe from 'stripe'
 import { notifyOwner } from '@/lib/owner-notifications'
 import { reportCriticalError } from '@/lib/error-reporter'
+import { purchasedCredits, grantStripeCreditPurchase } from '@/lib/stripe-credit-purchase'
 
 // Force dynamic so this route isn't considered for static optimization at build time
 export const dynamic = 'force-dynamic'
@@ -61,42 +62,16 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'user_not_found' }, { status: 404 })
     }
 
-    // Only process one time
-    const existing = await prisma.creditTopUp.findFirst({
-      where: { source: `stripe:${checkout.id}` },
-    })
-    if (existing) {
-      return NextResponse.json({ ok: true, alreadyProcessed: true })
-    }
-
     // For credit purchases we used Checkout in 'payment' mode.
     const paymentCents = typeof checkout.amount_total === 'number' ? checkout.amount_total : 0
-    if (paymentCents <= 0 || checkout.mode !== 'payment') {
+    const walletCredits = purchasedCredits(checkout)
+    if (paymentCents <= 0 || checkout.mode !== 'payment' || checkout.status !== 'complete' || !walletCredits) {
       return NextResponse.json({ error: 'not_a_credit_purchase' }, { status: 400 })
     }
 
-    const purchasedAt = new Date()
-    const expiresAt = new Date(purchasedAt)
-    expiresAt.setUTCMonth(expiresAt.getUTCMonth() + 12)
-
-    // Map paid amount to wallet credits (not 1:1 dollars). New schedule (75% profit target):
-    // $5 -> 250 credits, $10 -> 500 credits, $20 -> 1,000 credits. Fallback: use payment amount.
-    let creditAmount = 0
-    if (paymentCents >= 2000) creditAmount = 1000
-    else if (paymentCents >= 1000) creditAmount = 500
-    else if (paymentCents >= 500) creditAmount = 250
-    const walletCredits = creditAmount > 0 ? creditAmount : paymentCents
-
-    await prisma.creditTopUp.create({
-      data: {
-        userId: user.id,
-        amountCents: walletCredits,
-        usedCents: 0,
-        purchasedAt,
-        expiresAt,
-        source: `stripe:${checkout.id}`,
-      },
-    })
+    const created = await grantStripeCreditPurchase(stripe, checkout, user.id)
+    if (typeof created === 'string') return NextResponse.json({ error: 'payment_refunded_or_unavailable' }, { status: 400 })
+    if (!created) return NextResponse.json({ ok: true, alreadyProcessed: true })
 
     // Notify owner of credit purchase (don't await to avoid blocking response)
     notifyOwner({
@@ -105,7 +80,7 @@ export async function GET(request: NextRequest) {
       userName: user.name || undefined,
       amount: paymentCents,
       currency: (checkout.currency || 'usd').toUpperCase(),
-      creditAmount: creditAmount || undefined,
+      creditAmount: walletCredits,
     }).catch(error => {
       console.error('❌ Owner notification failed (non-blocking):', error)
     })
