@@ -9,17 +9,17 @@ import {
   TextInput,
   View,
 } from 'react-native'
-import AsyncStorage from '@react-native-async-storage/async-storage'
 import { useFocusEffect } from '@react-navigation/native'
 
 import { API_BASE_URL } from '../config'
+import { getCurrentNativeAuthSession } from '../lib/nativeAuthSession'
 import { buildNativeAuthHeaders } from '../lib/nativeAuthHeaders'
 import { useAppMode } from '../state/AppModeContext'
 import { HelfiButton } from '../ui/HelfiButton'
 import { Screen } from '../ui/Screen'
 import { theme } from '../ui/theme'
 
-type SaveState = 'idle' | 'saving' | 'saved'
+type SaveState = 'idle' | 'saving' | 'saved' | 'error'
 
 type AccountForm = {
   fullName: string
@@ -31,8 +31,6 @@ type PasswordForm = {
   newPassword: string
   confirmPassword: string
 }
-
-const ACCOUNT_STORAGE_KEY = 'helfi_native_account_settings_v1'
 
 const emptyAccount: AccountForm = {
   fullName: '',
@@ -93,7 +91,7 @@ function PasswordField({
 }
 
 export function AccountSettingsScreen() {
-  const { mode, session, signOut } = useAppMode()
+  const { mode, session, signOut, refreshProfile } = useAppMode()
 
   const [loading, setLoading] = useState(true)
   const [saveStatus, setSaveStatus] = useState<SaveState>('idle')
@@ -115,6 +113,12 @@ export function AccountSettingsScreen() {
   const accountSnapshotRef = useRef('')
   const dirtyRef = useRef(false)
   const hasInitializedRef = useRef(false)
+  const saveQueue = useRef(Promise.resolve())
+  const formIdentityRef = useRef(getCurrentNativeAuthSession())
+  const sessionRef = useRef(session)
+  sessionRef.current = session
+  const refreshProfileRef = useRef(refreshProfile)
+  refreshProfileRef.current = refreshProfile
 
   useEffect(() => {
     accountRef.current = accountData
@@ -125,67 +129,109 @@ export function AccountSettingsScreen() {
     setHasUnsavedChanges(dirty)
   }, [accountData])
 
-  const saveAccount = useCallback(async (options?: { silent?: boolean; payload?: AccountForm }) => {
+  const saveAccount = useCallback((options?: { silent?: boolean; payload?: AccountForm }) => {
     const payload = options?.payload ?? accountRef.current
-    if (!options?.silent) setSaveStatus('saving')
-    try {
-      await AsyncStorage.setItem(ACCOUNT_STORAGE_KEY, JSON.stringify(payload))
-      accountSnapshotRef.current = JSON.stringify(payload)
-      dirtyRef.current = false
-      setHasUnsavedChanges(false)
-      if (!options?.silent) {
-        setSaveStatus('saved')
-        setTimeout(() => setSaveStatus('idle'), 2000)
+    const identity = getCurrentNativeAuthSession()
+    const current = sessionRef.current
+    const fullName = payload.fullName.trim().replace(/\s+/g, ' ')
+    const pending = saveQueue.current.then(async () => {
+      if (!identity || !current || formIdentityRef.current !== identity || getCurrentNativeAuthSession() !== identity) return
+      if (JSON.stringify({ ...payload, fullName }) === accountSnapshotRef.current) {
+        if (accountRef.current.fullName === payload.fullName) {
+          const next = { ...payload, fullName }
+          accountRef.current = next
+          setAccountData(next)
+          dirtyRef.current = false
+          setHasUnsavedChanges(false)
+          setSaveStatus('idle')
+        }
+        return
       }
-    } catch {
-      if (!options?.silent) setSaveStatus('idle')
-    }
+      if (!fullName) { setSaveStatus('error'); return }
+      setSaveStatus('saving')
+      try {
+        const headers = buildNativeAuthHeaders(current.token, { json: true, includeCookie: true })
+        const [firstName, ...remaining] = fullName.split(' ')
+        const response = await fetch(`${API_BASE_URL}/api/user-data`, {
+          method: 'POST', headers,
+          body: JSON.stringify({ accountNameOwnerId: current.user.id, profileInfo: { firstName, lastName: remaining.join(' ') } }),
+        })
+        if (!response.ok) throw new Error('Name could not be saved')
+        if (getCurrentNativeAuthSession() !== identity) return
+        const readback = await fetch(`${API_BASE_URL}/api/native-auth/me`, { headers })
+        const result = await readback.json()
+        if (getCurrentNativeAuthSession() !== identity) return
+        if (!readback.ok || result?.user?.id !== current.user.id || result.user.email !== current.user.email || result.user.name !== fullName) {
+          throw new Error('Name could not be confirmed')
+        }
+        if (!await refreshProfileRef.current(identity, result.user)) return
+        accountSnapshotRef.current = JSON.stringify({ ...payload, fullName })
+        if (accountRef.current.fullName === payload.fullName) {
+          const next = { ...payload, fullName }
+          accountRef.current = next
+          setAccountData(next)
+          dirtyRef.current = false
+          setHasUnsavedChanges(false)
+          setSaveStatus('saved')
+        } else {
+          dirtyRef.current = JSON.stringify(accountRef.current) !== accountSnapshotRef.current
+          setHasUnsavedChanges(dirtyRef.current)
+          setSaveStatus('idle')
+        }
+      } catch {
+        if (getCurrentNativeAuthSession() === identity) setSaveStatus('error')
+      }
+    })
+    saveQueue.current = pending.catch(() => {})
+    return pending
   }, [])
 
   const loadAccount = useCallback(async () => {
-    try {
-      setLoading(true)
-      const seeded = {
-        fullName: String(session?.user?.name || '').trim(),
-        email: String(session?.user?.email || '').trim(),
-      }
-
-      const raw = await AsyncStorage.getItem(ACCOUNT_STORAGE_KEY)
-      if (raw) {
-        try {
-          const parsed = JSON.parse(raw) as Partial<AccountForm>
-          const next: AccountForm = {
-            fullName: String(parsed?.fullName || seeded.fullName || '').trim(),
-            email: String(parsed?.email || seeded.email || '').trim(),
-          }
-          setAccountData(next)
-          hasInitializedRef.current = true
-          accountSnapshotRef.current = JSON.stringify(next)
-          dirtyRef.current = false
-          setHasUnsavedChanges(false)
-          return
-        } catch {
-          // fall through and use seeded values
-        }
-      }
-
-      setAccountData(seeded)
-      hasInitializedRef.current = true
-      accountSnapshotRef.current = JSON.stringify(seeded)
+    const identity = getCurrentNativeAuthSession()
+    const current = sessionRef.current
+    setLoading(true)
+    if (identity && current && formIdentityRef.current !== identity) {
       dirtyRef.current = false
-      setHasUnsavedChanges(false)
-    } finally {
-      setLoading(false)
+      hasInitializedRef.current = false
     }
-  }, [session?.user?.name, session?.user?.email])
+    formIdentityRef.current = identity
+    if (current && !dirtyRef.current) {
+      const seeded = { fullName: current.user.name || '', email: current.user.email }
+      accountRef.current = seeded
+      accountSnapshotRef.current = JSON.stringify(seeded)
+      hasInitializedRef.current = true
+      setAccountData(seeded)
+      setHasUnsavedChanges(false)
+    }
+    const initialSnapshot = accountSnapshotRef.current
+    try {
+      if (!identity || !current) return
+      const response = await fetch(`${API_BASE_URL}/api/native-auth/me`, {
+        headers: buildNativeAuthHeaders(current.token, { includeCookie: true }),
+      })
+      const result = await response.json()
+      if (getCurrentNativeAuthSession() !== identity || !response.ok || result?.user?.id !== current.user.id || result.user.email !== current.user.email) return
+      const next = { fullName: String(result.user.name || ''), email: current.user.email }
+      if (!dirtyRef.current && accountSnapshotRef.current === initialSnapshot) {
+        accountRef.current = next
+        accountSnapshotRef.current = JSON.stringify(next)
+        hasInitializedRef.current = true
+        setAccountData(next)
+        setHasUnsavedChanges(false)
+        void refreshProfileRef.current(identity, result.user)
+      }
+    } catch {
+      if (getCurrentNativeAuthSession() === identity) setSaveStatus('error')
+    } finally {
+      if (getCurrentNativeAuthSession() === identity) setLoading(false)
+    }
+  }, [session?.user?.id, session?.token])
 
   useFocusEffect(
     React.useCallback(() => {
       void loadAccount()
       return () => {
-        if (dirtyRef.current) {
-          void saveAccount({ silent: true, payload: accountRef.current })
-        }
+        void saveAccount({ silent: true, payload: accountRef.current })
       }
     }, [loadAccount, saveAccount]),
   )
@@ -308,8 +354,9 @@ export function AccountSettingsScreen() {
             <Text style={{ fontSize: 24, fontWeight: '700', color: theme.colors.text }}>Account Settings</Text>
             <View>
               {saveStatus === 'saving' ? <Text style={{ color: '#2563EB', fontWeight: '700' }}>Saving...</Text> : null}
+              {saveStatus === 'error' ? <Text accessibilityRole="alert" style={{ color: '#DC2626' }}>Name could not be saved. Enter a name and try again.</Text> : null}
               {saveStatus === 'saved' ? <Text style={{ color: '#16A34A', fontWeight: '700' }}>Saved</Text> : null}
-              {saveStatus === 'idle' && hasUnsavedChanges ? <Text style={{ color: '#B45309', fontWeight: '700' }}>Will save on exit</Text> : null}
+              {saveStatus === 'idle' && hasUnsavedChanges ? <Text style={{ color: theme.colors.primary, fontWeight: '700' }}>Changes save when you leave the field</Text> : null}
             </View>
           </View>
 
@@ -324,7 +371,14 @@ export function AccountSettingsScreen() {
             <Text style={{ fontSize: 13, fontWeight: '700', color: theme.colors.muted, marginTop: 10, marginBottom: 8 }}>Full Name</Text>
             <TextInput
               value={accountData.fullName}
-              onChangeText={(fullName) => setAccountData((prev) => ({ ...prev, fullName }))}
+              onChangeText={(fullName) => {
+                const next = { ...accountRef.current, fullName }
+                accountRef.current = next
+                dirtyRef.current = JSON.stringify(next) !== accountSnapshotRef.current
+                setAccountData(next)
+                setSaveStatus('idle')
+              }}
+              onBlur={() => { void saveAccount() }}
               placeholder="Enter your full name"
               placeholderTextColor="#8AA39D"
               style={{
@@ -354,7 +408,7 @@ export function AccountSettingsScreen() {
                 fontSize: 16,
               }}
             />
-            <Text style={{ marginTop: 6, color: theme.colors.muted, fontSize: 12 }}>Email cannot be changed</Text>
+            <Text style={{ marginTop: 6, color: theme.colors.muted, fontSize: 12 }}>Changing email requires verification and is not available here.</Text>
           </View>
 
           <View style={{ marginTop: 18 }}>

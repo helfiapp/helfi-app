@@ -1,5 +1,6 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { prisma } from '@/lib/prisma'
 import { getToken } from 'next-auth/jwt'
+import { NextRequest, NextResponse } from 'next/server'
 
 const SECRET = process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET
 
@@ -14,14 +15,22 @@ export async function GET(req: NextRequest) {
       return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
     }
 
+    const user = await prisma.user.findUnique({
+      where: { id: String(token.id || token.sub) },
+      select: { id: true, email: true, name: true, image: true },
+    })
+    if (!user || user.email !== token.email) {
+      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
+    }
+
     const res = NextResponse.json(
       {
         ok: true,
         user: {
-          id: token.id || token.sub || null,
-          email: String(token.email),
-          name: token.name ? String(token.name) : null,
-          image: token.image ? String(token.image) : null,
+          id: user.id,
+          email: user.email,
+          name: user.name,
+          image: user.image,
         },
       },
       { status: 200 }

@@ -565,7 +565,7 @@ export const authOptions: NextAuthOptions = {
           session.user = {
             id: token.id as string,
             email: token.email as string,
-            name: token.name as string,
+            name: dbUser.name ?? (token.name as string),
             image: (dbUser.image as string) || (token.image as string) || null,
             needsVerification: !dbUser.emailVerified,
             isPractitioner: !!dbUser.practitionerAccount,

@@ -1,6 +1,6 @@
 import React, { createContext, useContext, useEffect, useMemo, useRef, useState } from 'react'
 import AsyncStorage from '@react-native-async-storage/async-storage'
-import { setCurrentNativeAuthSession } from '../lib/nativeAuthSession'
+import { getCurrentNativeAuthSession, setCurrentNativeAuthSession } from '../lib/nativeAuthSession'
 
 export type AppMode = 'signedOut' | 'signedIn'
 
@@ -25,6 +25,7 @@ type AppModeContextValue = {
   session: NativeAuthSession | null
   signIn: (opts: { rememberMe: boolean; session: NativeAuthSession }) => Promise<void>
   signOut: () => Promise<void>
+  refreshProfile: (identity: NonNullable<ReturnType<typeof getCurrentNativeAuthSession>>, user: NativeAuthUser) => Promise<boolean>
 }
 
 const AppModeContext = createContext<AppModeContextValue | null>(null)
@@ -66,6 +67,13 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   const [mode, setMode] = useState<AppMode>('signedOut')
   const [session, setSession] = useState<NativeAuthSession | null>(null)
   const authRevision = useRef(0)
+  const displaySession = useRef<NativeAuthSession | null>(null)
+  const storageQueue = useRef(Promise.resolve())
+  const queueStorage = (operation: () => Promise<void>) => {
+    const pending = storageQueue.current.then(operation, operation)
+    storageQueue.current = pending.catch(() => {})
+    return pending
+  }
 
   useEffect(() => {
     let cancelled = false
@@ -84,12 +92,16 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
         if (!stored.user?.id || !stored.user?.email) return
 
         if (Date.now() > stored.expiresAt) {
-          await AsyncStorage.removeItem(AUTH_SESSION_KEY)
-          await clearStoredAccountData()
+          await queueStorage(async () => {
+            if (cancelled || revision !== authRevision.current) return
+            await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+            await clearStoredAccountData()
+          })
           return
         }
 
         if (!cancelled && revision === authRevision.current) {
+          displaySession.current = stored
           setCurrentNativeAuthSession(stored)
           setMode('signedIn')
           setSession({ token: stored.token, expiresAt: stored.expiresAt, user: stored.user })
@@ -98,8 +110,11 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
         if (cancelled || revision !== authRevision.current) return
         // If storage is corrupted, just fall back to signed out.
         try {
-          await AsyncStorage.removeItem(AUTH_SESSION_KEY)
-          await clearStoredAccountData()
+          await queueStorage(async () => {
+            if (cancelled || revision !== authRevision.current) return
+            await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+            await clearStoredAccountData()
+          })
         } catch {}
       }
     }
@@ -120,6 +135,7 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
     await clearStoredAccountData()
     if (revision !== authRevision.current) return
 
+    displaySession.current = session
     setCurrentNativeAuthSession(session)
     setMode('signedIn')
     setSession(session)
@@ -127,7 +143,7 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
     if (!rememberMe) {
       // User explicitly doesn't want persistence.
       try {
-        await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+        await queueStorage(async () => { if (revision === authRevision.current) await AsyncStorage.removeItem(AUTH_SESSION_KEY) })
       } catch {}
       return
     }
@@ -141,7 +157,9 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
       user: session.user,
     }
     try {
-      await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(stored))
+      await queueStorage(async () => {
+        if (revision === authRevision.current) await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify(stored))
+      })
     } catch {
       // If write fails, user is still signed in for this run.
     }
@@ -150,15 +168,40 @@ export function AppModeProvider({ children }: { children: React.ReactNode }) {
   const signOut = async () => {
     authRevision.current++
     setCurrentNativeAuthSession(null)
+    displaySession.current = null
     setMode('signedOut')
     setSession(null)
     try {
-      await AsyncStorage.removeItem(AUTH_SESSION_KEY)
-      await clearStoredAccountData()
+      await queueStorage(async () => {
+        await AsyncStorage.removeItem(AUTH_SESSION_KEY)
+        await clearStoredAccountData()
+      })
     } catch {}
   }
 
-  const value = useMemo(() => ({ hydrated, mode, session, signIn, signOut }), [hydrated, mode, session])
+  const refreshProfile: AppModeContextValue['refreshProfile'] = async (identity, user) => {
+    if (getCurrentNativeAuthSession() !== identity || user.id !== identity.user.id || user.email !== displaySession.current?.user.email) return false
+    // Display updates keep the existing authentication identity and remember-me deadline.
+    const current = displaySession.current!
+    displaySession.current = { ...current, user: { ...current.user, name: user.name, image: user.image } }
+    setSession(displaySession.current)
+    try {
+      await queueStorage(async () => {
+        const raw = await AsyncStorage.getItem(AUTH_SESSION_KEY)
+        if (!raw || getCurrentNativeAuthSession() !== identity) return
+        const stored = JSON.parse(raw) as StoredAuthSession
+        if (stored.token !== identity.token || stored.user.id !== user.id || stored.user.email !== user.email) return
+        await AsyncStorage.setItem(AUTH_SESSION_KEY, JSON.stringify({
+          ...stored, user: { ...stored.user, name: user.name, image: user.image },
+        }))
+      })
+    } catch {
+      // The current-run display remains valid when the optional remembered cache fails.
+    }
+    return getCurrentNativeAuthSession() === identity
+  }
+
+  const value = useMemo(() => ({ hydrated, mode, session, signIn, signOut, refreshProfile }), [hydrated, mode, session])
   return <AppModeContext.Provider value={value}>{children}</AppModeContext.Provider>
 }
 
