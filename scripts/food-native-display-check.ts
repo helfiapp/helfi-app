@@ -107,3 +107,7 @@ for (const [amount, unit, label, expected] of [
   assert.equal(JSON.stringify(context.editItem), before)
 }
 console.log('PASS actual food amount captions preserve all source labels and amounts')
+
+const journal = fs.readFileSync('native/src/screens/HealthJournalScreen.tsx', 'utf8')
+assert.ok(journal.includes("Microphone and playback use your device's audio settings."))
+assert.ok(!journal.includes('Microphone and playback use your iPhone or iPad audio settings.'))
