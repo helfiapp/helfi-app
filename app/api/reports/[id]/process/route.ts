@@ -51,12 +51,40 @@ export async function POST(
       return NextResponse.json({ error: 'Unauthorized' }, { status: 403 });
     }
 
-    // Check if already processed
+    const respondAfterCleanup = async (labValueCount: number) => {
+      if (!report.retainOriginal && !report.originalDeletedAt) {
+        try {
+          await del(report.s3Key);
+          await prisma.report.update({
+            where: { id: reportId },
+            data: { originalDeletedAt: new Date() },
+          });
+          await createAuditEvent({
+            reportId,
+            userId: user.id,
+            eventType: AuditEventType.ORIGINAL_DELETED,
+            eventDescription: 'Original PDF deleted per user consent',
+          });
+        } catch {
+          console.error('Original PDF cleanup did not complete.');
+          return NextResponse.json({
+            error: 'Report processed, but the original PDF could not be deleted. Please try again.',
+            reportId,
+            status: 'COMPLETED',
+            originalDeleted: false,
+          }, { status: 503 });
+        }
+      }
+      return NextResponse.json({ success: true, reportId, labValueCount, status: 'COMPLETED' });
+    };
+
+    // A completed extraction can confirm or retry cleanup without extracting values twice.
     if (report.status === 'COMPLETED') {
-      return NextResponse.json(
-        { error: 'Report already processed' },
-        { status: 400 }
-      );
+      return respondAfterCleanup(await prisma.labResult.count({ where: { reportId } }));
+    }
+
+    if (report.status === 'PROCESSING') {
+      return NextResponse.json({ error: 'Report is already processing' }, { status: 409 });
     }
 
     // Only password-protected PDFs require the decryption/password consent pair.
@@ -89,13 +117,17 @@ export async function POST(
         const isValid = await verifyPasswordHash(password, hashHex, saltHex);
         
         if (!isValid) {
-          await prisma.report.update({
-            where: { id: reportId },
+          const failedPassword = await prisma.report.updateMany({
+            where: { id: reportId, status: { in: ['PENDING', 'FAILED', 'DECRYPTION_FAILED'] } },
             data: {
               status: 'DECRYPTION_FAILED',
               processingError: 'Password verification failed',
             },
           });
+
+          if (failedPassword.count === 0) {
+            return NextResponse.json({ error: 'Report processing state changed. Check its status.' }, { status: 409 });
+          }
 
           await createAuditEvent({
             reportId,
@@ -112,14 +144,18 @@ export async function POST(
       }
     }
 
-    // Update status to PROCESSING
-    await prisma.report.update({
-      where: { id: reportId },
+    // Only one request may start extraction for this uploaded report.
+    const claimed = await prisma.report.updateMany({
+      where: { id: reportId, status: { in: ['PENDING', 'FAILED', 'DECRYPTION_FAILED'] } },
       data: {
         status: 'PROCESSING',
         processingStartedAt: new Date(),
       },
     });
+
+    if (claimed.count === 0) {
+      return NextResponse.json({ error: 'Report processing state changed. Check its status.' }, { status: 409 });
+    }
 
     await createAuditEvent({
       reportId,
@@ -224,30 +260,6 @@ export async function POST(
         },
       });
 
-      // Delete original PDF if user didn't consent to retention
-      if (!report.retainOriginal) {
-        try {
-          await del(report.s3Key);
-        } catch (deleteError) {
-          console.error('Failed to delete blob:', deleteError);
-          // Continue even if deletion fails - we'll log it
-        }
-
-        await prisma.report.update({
-          where: { id: reportId },
-          data: {
-            originalDeletedAt: new Date(),
-          },
-        });
-
-        await createAuditEvent({
-          reportId,
-          userId: user.id,
-          eventType: AuditEventType.ORIGINAL_DELETED,
-          eventDescription: 'Original PDF deleted per user consent',
-        });
-      }
-
       // Update report status to COMPLETED
       await prisma.report.update({
         where: { id: reportId },
@@ -267,12 +279,7 @@ export async function POST(
         },
       });
 
-      return NextResponse.json({
-        success: true,
-        reportId: report.id,
-        labValueCount: labResults.length,
-        status: 'COMPLETED',
-      });
+      return respondAfterCleanup(labResults.length);
     } catch (error) {
       // Update status to FAILED
       await prisma.report.update({
